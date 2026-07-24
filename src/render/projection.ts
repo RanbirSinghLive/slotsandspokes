@@ -42,6 +42,14 @@ const EASTERN_CANADA_BOUNDS: Polygon = {
 export const projection: GeoProjection = geoMercator();
 
 /**
+ * The projection's `scale` right after the most recent fit — the "100% zoom"
+ * baseline. Pan/zoom code uses this to clamp how far in or out the player is
+ * allowed to go, as a multiple of the zoom level that exactly frames eastern
+ * Canada, rather than as some arbitrary fixed number.
+ */
+export let baselineScale = 1;
+
+/**
  * Refit the projection so EASTERN_CANADA_BOUNDS exactly fills a
  * `width` x `height` canvas, with a little breathing room.
  *
@@ -55,7 +63,10 @@ export const projection: GeoProjection = geoMercator();
  *
  * We call this once on startup and again every time the canvas resizes,
  * because "fill the canvas" depends on the canvas's current width and height.
+ * Resizing therefore also resets any pan/zoom the player had applied — that's
+ * a deliberate simplification for now, not an oversight.
  */
 export function fitProjection(width: number, height: number): void {
   projection.fitSize([width, height], EASTERN_CANADA_BOUNDS);
+  baselineScale = projection.scale();
 }

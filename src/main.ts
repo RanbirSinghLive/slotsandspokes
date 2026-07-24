@@ -1,6 +1,7 @@
 import './style.css';
-import { fitProjection } from './render/projection';
+import { projection, fitProjection, baselineScale } from './render/projection';
 import { drawBasemap } from './render/basemap';
+import { drawAirports } from './render/airports';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#map')!;
 const ctx = canvas.getContext('2d')!;
@@ -48,7 +49,78 @@ function render(): void {
 
   ctx.clearRect(0, 0, cssWidth, cssHeight);
   drawBasemap(ctx);
+  drawAirports(ctx);
 }
 
 window.addEventListener('resize', resize);
 resize();
+
+// --- Pan (click and drag) ---
+//
+// `projection.translate()` is the [x, y] pixel position that the
+// projection's reference point (roughly, the map's own "origin") lands on.
+// Dragging the mouse by (dx, dy) pixels should slide the whole map by that
+// same (dx, dy), so panning is just: remember where the translate was when
+// the drag started, then add the mouse's total movement to it on every
+// subsequent move.
+let isDragging = false;
+let dragStartX = 0;
+let dragStartY = 0;
+let translateAtDragStart: [number, number] = [0, 0];
+
+canvas.addEventListener('mousedown', (event) => {
+  isDragging = true;
+  dragStartX = event.clientX;
+  dragStartY = event.clientY;
+  translateAtDragStart = projection.translate();
+});
+
+window.addEventListener('mousemove', (event) => {
+  if (!isDragging) return;
+  const dx = event.clientX - dragStartX;
+  const dy = event.clientY - dragStartY;
+  projection.translate([translateAtDragStart[0] + dx, translateAtDragStart[1] + dy]);
+  render();
+});
+
+window.addEventListener('mouseup', () => {
+  isDragging = false;
+});
+
+// --- Zoom (scroll wheel) ---
+//
+// Changing `projection.scale()` alone would zoom toward the map's reference
+// point, not toward the mouse — try it and the whole map slides sideways as
+// you scroll, which feels wrong. To zoom toward the cursor instead: find the
+// [longitude, latitude] currently under the mouse *before* changing the
+// scale, apply the new scale, then see where that same geographic point
+// lands *after* the change, and nudge `translate` by the difference. That
+// nudge cancels out the drift, so the point under the cursor never moves.
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 20;
+
+canvas.addEventListener(
+  'wheel',
+  (event) => {
+    event.preventDefault();
+
+    const mouseX = event.clientX;
+    const mouseY = event.clientY;
+    const geoUnderMouse = projection.invert?.([mouseX, mouseY]);
+    if (!geoUnderMouse) return;
+
+    const zoomFactor = Math.pow(1.002, -event.deltaY);
+    const currentScale = projection.scale();
+    const targetScale = currentScale * zoomFactor;
+    const clampedScale = Math.min(Math.max(targetScale, baselineScale * MIN_ZOOM), baselineScale * MAX_ZOOM);
+
+    projection.scale(clampedScale);
+
+    const [driftedX, driftedY] = projection(geoUnderMouse)!;
+    const [tx, ty] = projection.translate();
+    projection.translate([tx + (mouseX - driftedX), ty + (mouseY - driftedY)]);
+
+    render();
+  },
+  { passive: false },
+);
