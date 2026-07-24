@@ -3,12 +3,23 @@ import { projection, fitProjection, baselineScale } from './render/projection';
 import { drawBasemap } from './render/basemap';
 import { drawRoutes } from './render/routes';
 import { drawAirports } from './render/airports';
+import { drawAircraft } from './render/aircraft';
 import { scheduleLegs, validateSchedule } from './sim/schedule';
+import { createInitialState, type SimState } from './sim/state';
+import { step } from './sim/step';
 
 validateSchedule(scheduleLegs);
 
+// M4 brings only one aircraft to life to prove out the clock and the
+// depart/arrive mechanism on something small. M5 turns the rest on by
+// listing more tails here — see the comment on createInitialState.
+const ACTIVE_TAILS = ['C-GVIA'];
+const state: SimState = createInitialState(ACTIVE_TAILS);
+
 const canvas = document.querySelector<HTMLCanvasElement>('#map')!;
 const ctx = canvas.getContext('2d')!;
+const clockEl = document.querySelector<HTMLDivElement>('#clock')!;
+const speedButtons = document.querySelectorAll<HTMLButtonElement>('#speed-controls button');
 
 /**
  * Size the canvas's actual pixel buffer, then fit the projection to it, then
@@ -47,6 +58,12 @@ function resize(): void {
   render();
 }
 
+// The exact (fractional) simulated minute currently on screen. Updated once
+// per animation frame by tick() below; render() re-reads it every time it's
+// called, including from pan/zoom/resize, which don't otherwise know what
+// time it is.
+let latestFractionalMinute = state.simMinute;
+
 function render(): void {
   const cssWidth = window.innerWidth;
   const cssHeight = window.innerHeight;
@@ -54,11 +71,80 @@ function render(): void {
   ctx.clearRect(0, 0, cssWidth, cssHeight);
   drawBasemap(ctx);
   drawRoutes(ctx);
+  drawAircraft(ctx, state, latestFractionalMinute);
   drawAirports(ctx);
+  updateClock(state);
+}
+
+const MINUTES_PER_DAY = 1440;
+
+function pad(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
+function updateClock(state: SimState): void {
+  const dayNumber = Math.floor(state.simMinute / MINUTES_PER_DAY) + 1;
+  const minuteOfDay = state.simMinute % MINUTES_PER_DAY;
+  const hours = Math.floor(minuteOfDay / 60);
+  const minutes = minuteOfDay % 60;
+  clockEl.textContent = `Day ${dayNumber} · ${pad(hours)}:${pad(minutes)} UTC`;
 }
 
 window.addEventListener('resize', resize);
 resize();
+
+// --- Simulation loop ---
+//
+// The accumulator pattern from CLAUDE.md: real time (`deltaMs`, milliseconds
+// since the last animation frame) piles up in `accumulator`, and every time
+// it reaches MS_PER_SIM_MINUTE we spend 125ms of it on one call to step(),
+// which advances the simulated world by exactly one minute. This decouples
+// "how often the browser paints a frame" from "how fast simulated time
+// passes" — at 20x speed, `accumulator` fills up 20 times faster, so step()
+// gets called roughly 20 times as often per second of real time.
+//
+// `speedMultiplier` is how many simulated minutes should pass per real
+// millisecond, scaled by MS_PER_SIM_MINUTE; 0 means paused. Because
+// `accumulator` only ever grows by `deltaMs * speedMultiplier`, setting
+// speedMultiplier to 0 makes it stop growing entirely — step() never runs
+// again, and neither does latestFractionalMinute change, so a paused
+// aircraft doesn't just stop advancing, it stays at the exact fractional
+// position it was at the instant of pausing.
+const MS_PER_SIM_MINUTE = 125;
+let accumulator = 0;
+let speedMultiplier = 1;
+let lastFrameTimeMs: number | null = null;
+
+function tick(nowMs: number): void {
+  if (lastFrameTimeMs === null) {
+    // First frame: nothing to measure a delta against yet.
+    lastFrameTimeMs = nowMs;
+    requestAnimationFrame(tick);
+    return;
+  }
+
+  const deltaMs = nowMs - lastFrameTimeMs;
+  lastFrameTimeMs = nowMs;
+
+  accumulator += deltaMs * speedMultiplier;
+  while (accumulator >= MS_PER_SIM_MINUTE) {
+    step(state);
+    accumulator -= MS_PER_SIM_MINUTE;
+  }
+
+  latestFractionalMinute = state.simMinute + accumulator / MS_PER_SIM_MINUTE;
+  render();
+  requestAnimationFrame(tick);
+}
+
+requestAnimationFrame(tick);
+
+speedButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    speedMultiplier = Number(button.dataset.speed);
+    speedButtons.forEach((b) => b.classList.toggle('active', b === button));
+  });
+});
 
 // --- Pan (click and drag) ---
 //
