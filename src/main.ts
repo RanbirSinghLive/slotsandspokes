@@ -1,7 +1,11 @@
 import './style.css';
 import { projection, fitProjection, baselineScale } from './render/projection';
 import { drawBasemap } from './render/basemap';
+import { drawRoutes } from './render/routes';
 import { drawAirports } from './render/airports';
+import { scheduleLegs, validateSchedule } from './sim/schedule';
+
+validateSchedule(scheduleLegs);
 
 const canvas = document.querySelector<HTMLCanvasElement>('#map')!;
 const ctx = canvas.getContext('2d')!;
@@ -49,6 +53,7 @@ function render(): void {
 
   ctx.clearRect(0, 0, cssWidth, cssHeight);
   drawBasemap(ctx);
+  drawRoutes(ctx);
   drawAirports(ctx);
 }
 

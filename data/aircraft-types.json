@@ -1,0 +1,10 @@
+[
+  {
+    "code": "DH4",
+    "name": "Dash 8-400",
+    "seats": 78,
+    "cruiseKts": 360,
+    "costPerBlockHour": 3400,
+    "costPerDeparture": 900
+  }
+]
