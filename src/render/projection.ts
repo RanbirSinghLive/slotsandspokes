@@ -65,8 +65,23 @@ export let baselineScale = 1;
  * because "fill the canvas" depends on the canvas's current width and height.
  * Resizing therefore also resets any pan/zoom the player had applied — that's
  * a deliberate simplification for now, not an oversight.
+ *
+ * This also sets `clipExtent` to exactly the canvas's pixel bounds. Some
+ * shapes (the night-shading circle in render/terminator.ts is the case that
+ * prompted this — it's nearly half the globe) have most of their edge sit
+ * thousands of pixels outside the visible area once projected. Canvas
+ * renders that correctly regardless, but there's no reason to hand it
+ * coordinates that extreme when d3-geo can clip the geometry down to the
+ * visible rectangle first — cheaper to rasterize and one less variable if
+ * something odd ever does turn up. It's defined in screen pixels, not
+ * geography, so it only needs updating on resize — panning and zooming
+ * don't change the canvas's own pixel bounds.
  */
 export function fitProjection(width: number, height: number): void {
   projection.fitSize([width, height], EASTERN_CANADA_BOUNDS);
   baselineScale = projection.scale();
+  projection.clipExtent([
+    [0, 0],
+    [width, height],
+  ]);
 }

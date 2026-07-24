@@ -1,6 +1,7 @@
 import './style.css';
 import { projection, fitProjection, baselineScale } from './render/projection';
 import { drawBasemap } from './render/basemap';
+import { drawTerminator } from './render/terminator';
 import { drawRoutes } from './render/routes';
 import { drawAirports } from './render/airports';
 import { drawAircraft } from './render/aircraft';
@@ -10,10 +11,10 @@ import { step } from './sim/step';
 
 validateSchedule(scheduleLegs);
 
-// M4 brings only one aircraft to life to prove out the clock and the
+// M4 brought only one aircraft to life, to prove out the clock and the
 // depart/arrive mechanism on something small. M5 turns the rest on by
-// listing more tails here — see the comment on createInitialState.
-const ACTIVE_TAILS = ['C-GVIA'];
+// listing all three tails here — see the comment on createInitialState.
+const ACTIVE_TAILS = ['C-GVIA', 'C-FATL', 'C-GMAR'];
 const state: SimState = createInitialState(ACTIVE_TAILS);
 
 const canvas = document.querySelector<HTMLCanvasElement>('#map')!;
@@ -70,6 +71,7 @@ function render(): void {
 
   ctx.clearRect(0, 0, cssWidth, cssHeight);
   drawBasemap(ctx);
+  drawTerminator(ctx, latestFractionalMinute);
   drawRoutes(ctx);
   drawAircraft(ctx, state, latestFractionalMinute);
   drawAirports(ctx);
