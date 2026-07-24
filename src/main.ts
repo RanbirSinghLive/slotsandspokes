@@ -8,6 +8,7 @@ import { drawAircraft } from './render/aircraft';
 import { scheduleLegs, validateSchedule } from './sim/schedule';
 import { createInitialState, type SimState } from './sim/state';
 import { step } from './sim/step';
+import { updatePanel, PANEL_WIDTH_PX } from './ui/panels';
 
 validateSchedule(scheduleLegs);
 
@@ -43,7 +44,7 @@ const speedButtons = document.querySelectorAll<HTMLButtonElement>('#speed-contro
  * but it lands on a high-enough-resolution buffer to look sharp.
  */
 function resize(): void {
-  const cssWidth = window.innerWidth;
+  const cssWidth = window.innerWidth - PANEL_WIDTH_PX;
   const cssHeight = window.innerHeight;
   const dpr = window.devicePixelRatio || 1;
 
@@ -66,7 +67,7 @@ function resize(): void {
 let latestFractionalMinute = state.simMinute;
 
 function render(): void {
-  const cssWidth = window.innerWidth;
+  const cssWidth = window.innerWidth - PANEL_WIDTH_PX;
   const cssHeight = window.innerHeight;
 
   ctx.clearRect(0, 0, cssWidth, cssHeight);
@@ -76,6 +77,7 @@ function render(): void {
   drawAircraft(ctx, state, latestFractionalMinute);
   drawAirports(ctx);
   updateClock(state);
+  updatePanel(state);
 }
 
 const MINUTES_PER_DAY = 1440;

@@ -26,6 +26,9 @@ export type SimState = {
   aircraft: Aircraft[];
   activeFlights: ActiveFlight[];
   completedToday: string[];
+  todayRevenue: number;
+  todayCost: number;
+  todayMargin: number;
 };
 
 // Only one aircraft type exists so far, so every aircraft record uses it.
@@ -70,5 +73,8 @@ export function createInitialState(tails: string[]): SimState {
     aircraft,
     activeFlights: [],
     completedToday: [],
+    todayRevenue: 0,
+    todayCost: 0,
+    todayMargin: 0,
   };
 }

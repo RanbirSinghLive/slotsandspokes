@@ -10,9 +10,12 @@ body {
   overflow: hidden;
 }
 
+/* Must match PANEL_WIDTH_PX in ui/panels.ts, which main.ts uses to size the
+   canvas so the map and the sidebar share the viewport instead of the panel
+   floating on top of it. */
 #map {
   display: block;
-  width: 100vw;
+  width: calc(100vw - 280px);
   height: 100vh;
 }
 
@@ -56,4 +59,60 @@ body {
   background: #3a4258;
   border-color: #6b7694;
   color: #fff;
+}
+
+#panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 280px;
+  height: 100vh;
+  box-sizing: border-box;
+  padding: 16px;
+  background: #0a0c12;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 13px;
+  color: #cdd3e0;
+  overflow-y: auto;
+}
+
+#panel h2 {
+  margin: 20px 0 8px;
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7694;
+}
+
+.econ-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+}
+
+.econ-label {
+  color: #9aa3b8;
+}
+
+.econ-value {
+  color: #fff;
+}
+
+#fleet-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#fleet-table th,
+#fleet-table td {
+  text-align: left;
+  padding: 4px 6px 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#fleet-table th {
+  color: #6b7694;
+  font-weight: 400;
 }

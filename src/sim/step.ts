@@ -1,20 +1,29 @@
+import aircraftTypesData from '../../data/aircraft-types.json';
 import { scheduleLegs } from './schedule';
+import { flightResult, type EconomyAircraftType } from './economy';
 import type { SimState, ActiveFlight } from './state';
 
 const MINUTES_PER_DAY = 1440;
+
+const aircraftTypesByCode = new Map<string, EconomyAircraftType>(
+  (aircraftTypesData as Array<EconomyAircraftType & { code: string }>).map((type) => [type.code, type]),
+);
 
 /**
  * Advance the world by exactly one simulated minute. Mutates `state` in
  * place and returns nothing, per CLAUDE.md's rule for this function — no
  * randomness, no clock reads, nothing but `state` in and `state` mutated.
  *
- * Two things happen each minute, in this order:
+ * Three things happen each minute, in this order:
  *   1. Depart: any scheduled leg whose departure time is right now, flown
  *      by an aircraft that's on the ground at the correct airport, takes
  *      off — it becomes an ActiveFlight and its aircraft flips to airborne.
  *   2. Arrive: any ActiveFlight whose arrival minute has been reached
- *      lands — its aircraft flips back to ground at the destination, and
- *      the flight is removed from the active list.
+ *      lands — its aircraft flips back to ground at the destination, the
+ *      flight's economics (sim/economy.ts) are applied to cash and today's
+ *      running totals, and the flight is removed from the active list.
+ *   3. Day rollover: once simMinute crosses into a new day, today's tallies
+ *      (completedToday, todayRevenue, todayCost, todayMargin) reset to zero.
  *
  * `scheduleLegs` is "the daily repeating schedule" (CLAUDE.md), so matching
  * against `state.simMinute % MINUTES_PER_DAY` makes every leg fire again at
@@ -54,6 +63,16 @@ export function step(state: SimState): void {
       aircraft.status = 'ground';
       aircraft.atAirport = flight.dest;
       aircraft.activeLegId = null;
+
+      const type = aircraftTypesByCode.get(aircraft.typeCode);
+      if (type) {
+        const blockMinutes = flight.arriveMinute - flight.departMinute;
+        const result = flightResult({ blockMinutes }, type);
+        state.cash += result.margin;
+        state.todayRevenue += result.revenue;
+        state.todayCost += result.cost;
+        state.todayMargin += result.margin;
+      }
     }
 
     state.completedToday.push(flight.legId);
@@ -61,4 +80,11 @@ export function step(state: SimState): void {
   }
 
   state.simMinute += 1;
+
+  if (state.simMinute % MINUTES_PER_DAY === 0) {
+    state.completedToday = [];
+    state.todayRevenue = 0;
+    state.todayCost = 0;
+    state.todayMargin = 0;
+  }
 }
