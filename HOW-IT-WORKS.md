@@ -146,16 +146,37 @@ absorb the maximum single-leg delay (45 minutes) in practice.
 
 ## Economy (`src/sim/economy.ts`)
 
-Deliberately crude, per WEEK-ONE.md — the same for every leg regardless of
-route or day:
+Deliberately crude, per WEEK-ONE.md — same fare, same load factor,
+regardless of route or day — but since week two, capped by whether the
+route's market can actually support that many passengers:
 
 ```
 LOAD_FACTOR = 0.75      AVG_FARE = 185
-pax     = round(seats * LOAD_FACTOR)
+demandPerFlight = dailyDemand(origin, dest) / legsServingMarket
+pax     = min(round(seats * LOAD_FACTOR), round(demandPerFlight))
 revenue = pax * AVG_FARE
 cost    = (blockMinutes / 60) * costPerBlockHour + costPerDeparture
 margin  = revenue - cost
 ```
+
+`legsServingMarket` (`sim/schedule.ts`) counts every currently-scheduled
+leg between this pair, either direction — the route's total daily demand
+(`sim/demand.ts`) is split evenly across all of them, so a second daily
+frequency on an already-thin market doesn't conjure new passengers, it
+just gives the same ones a second flight to spread across. `pax` is
+whichever is smaller: the old flat load-factor figure (still the ceiling
+on a market with demand to spare), or this flight's actual slice of the
+market. Verified via the headless runner: the Ottawa-Montréal-Toronto
+corridor still fills to the old 59-pax ceiling (plenty of demand there),
+while every Atlantic Canada leg the fleet flies today is demand-starved —
+YQM-YYG dropping to 3 pax, YYG-YFC to a single passenger, on a 78-seat
+aircraft. Total daily revenue fell from a flat $128,760 to $52,725,
+several days now finish with a negative margin — the first time this
+schedule's real problem (too much airplane for these particular Atlantic
+markets) has been visible in the numbers rather than just implied by the
+demand map. This still isn't a real choice model — no fare sensitivity, no
+competitor share, demand is just split evenly — see WEEK-TWO.md's "Layers"
+for what's still ahead of this.
 
 Applied on **arrival**, not departure — a flight in the air hasn't earned or
 spent anything yet. `margin` is added to `state.cash`; `revenue`/`cost`/
@@ -191,11 +212,13 @@ This is a pure function of static data (population never changes at
 runtime, distance is fixed per airport pair), so nothing caches a
 matrix — it's cheap enough to call directly whenever a number is
 needed. It's visible in the map's Demand view (see "Rendering," below)
-but still *not* wired into `economy.ts`: today's flat `LOAD_FACTOR`/
-`AVG_FARE` model runs every flight regardless of what this function
-would say. Making that gap matter — a route whose demand can't fill a
-78-seat DH4 actually flying half-empty — is the job of the choice
-model and pricing loop, both still ahead (see WEEK-TWO.md's "Layers").
+and, as of this same milestone, caps `economy.ts`'s pax count too (see
+"Economy," above) — a route whose demand can't fill a 78-seat DH4 now
+genuinely flies half-empty instead of always reporting the same flat
+load factor. What's still missing is a real choice model: today every
+flight on a market just gets an even split of that market's demand,
+with no fare sensitivity and no competitor share, since neither exists
+yet (see WEEK-TWO.md's "Layers").
 
 ## Headless runner (`src/headless/run.ts`)
 

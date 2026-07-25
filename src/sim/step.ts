@@ -1,6 +1,6 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { flightResult, type EconomyAircraftType } from './economy';
-import { MIN_TURN_MINUTES } from './schedule';
+import { MIN_TURN_MINUTES, legsServingMarket } from './schedule';
 import { nextRandom } from './rng';
 import type { SimState, ActiveFlight } from './state';
 
@@ -143,7 +143,8 @@ export function step(state: SimState): void {
       const type = aircraftTypesByCode.get(aircraft.typeCode);
       if (type) {
         const blockMinutes = flight.arriveMinute - flight.departMinute;
-        const result = flightResult({ blockMinutes }, type);
+        const marketFrequency = legsServingMarket(flight.origin, flight.dest, state.schedule);
+        const result = flightResult({ origin: flight.origin, dest: flight.dest, blockMinutes }, type, marketFrequency);
         state.cash += result.margin;
         state.todayRevenue += result.revenue;
         state.todayCost += result.cost;

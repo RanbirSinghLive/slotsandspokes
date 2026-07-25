@@ -108,6 +108,23 @@ export function nextLegId(tail: string, legs: ScheduleLeg[]): string {
 }
 
 /**
+ * How many of `legs` serve the `origin`-`dest` market, counting both
+ * directions as the same market (a leg YHZ→YQM and a leg YQM→YHZ both count)
+ * — the same bidirectional definition `render/routes.ts` and
+ * `ui/routeBuilder.ts`'s `isExistingMarket()` use for what counts as "the
+ * same route." Used by `sim/economy.ts` (via `step.ts`) to split a market's
+ * total daily demand evenly across however many flights currently serve it:
+ * a market with one frequency each way gives each of those two flights half
+ * the market to itself; add a third flight to that market and each of the
+ * three now splits it three ways instead.
+ */
+export function legsServingMarket(origin: string, dest: string, legs: ScheduleLeg[]): number {
+  return legs.filter(
+    (leg) => (leg.origin === origin && leg.dest === dest) || (leg.origin === dest && leg.dest === origin),
+  ).length;
+}
+
+/**
  * Sanity-check that every aircraft's day is one unbroken chain: the
  * destination of one leg must be the origin of that same tail's next leg,
  * with at least MIN_TURN_MINUTES on the ground in between. A schedule that

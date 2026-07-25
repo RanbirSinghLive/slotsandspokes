@@ -154,9 +154,21 @@ canvas-vs-`#rotation-board` swap mechanism M11 built. Demand mode draws
 all 45 city-pair arcs weighted by `dailyDemand()`, with an amber halo
 on pairs that already have scheduled service, plus airport circles
 sized by population — see HOW-IT-WORKS.md's "Rendering" section for the
-full draw order. This is still just visualization: the number isn't
-wired into `economy.ts` or anything that affects the books — that's the
-choice model (layer 4) and pricing loop's job, both still ahead.
+full draw order.
+
+**Now also caps `economy.ts`'s pax count**, not just visualization: a
+market's total daily demand is split evenly across however many
+scheduled legs serve it (`sim/schedule.ts`'s `legsServingMarket()`), and
+`pax` is the smaller of the old flat load-factor figure or this
+flight's actual slice of that split. Verified via the headless runner —
+the Ottawa-Montréal-Toronto corridor still fills to the old 59-pax
+ceiling, but every Atlantic leg the fleet flies today is now
+demand-starved (YYG-YFC down to a single passenger on a 78-seat
+aircraft); total daily revenue fell from a flat $128,760 to $52,725,
+and some days now finish with a negative margin. This is deliberately
+still not a real choice model — no fare sensitivity, no competitor
+share, just an even split of a fixed market — that's layer 4 and the
+pricing loop's job, both still ahead.
 
 ### 2. Yield mix / travel purpose (business, leisure, VFR)
 
@@ -398,7 +410,9 @@ it last of everything above.
    Phases 2–4 (create/reschedule-by-drag, bulk tool) are back-burnered
    behind this same dependency order, not next by default.
 3. **Population data + O-D demand layer** — done. StatsCan 2021 census
-   figures added to `airports.json`; gravity model in `sim/demand.ts`.
+   figures added to `airports.json`; gravity model in `sim/demand.ts`,
+   visible via the new Demand map mode, and now capping `economy.ts`'s
+   pax count so a thin market genuinely flies half-empty.
 4. Choice/market-share model — the connective piece
 5. Yield mix / travel purpose segmentation
 6. Static competitor data, authored and wired into the choice model
