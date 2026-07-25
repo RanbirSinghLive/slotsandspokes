@@ -129,6 +129,27 @@ body {
   box-sizing: border-box;
 }
 
+.filter-row th {
+  padding: 0 6px 6px 0;
+  font-weight: 400;
+}
+
+.filter-row input[type='text'] {
+  font-family: inherit;
+  font-size: inherit;
+  color: #cdd3e0;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  padding: 2px 4px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.filter-row input[type='text']::placeholder {
+  color: #6b7694;
+}
+
 /* M10: cursor feedback while a route is armed (see ui/routeBuilder.ts) */
 #map.armed {
   cursor: crosshair;

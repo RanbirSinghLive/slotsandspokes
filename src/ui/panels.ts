@@ -11,6 +11,9 @@ const costEl = document.querySelector<HTMLSpanElement>('#panel-cost')!;
 const marginEl = document.querySelector<HTMLSpanElement>('#panel-margin')!;
 const fleetBody = document.querySelector<HTMLTableSectionElement>('#fleet-table tbody')!;
 const scheduleBody = document.querySelector<HTMLTableSectionElement>('#schedule-table tbody')!;
+const scheduleFilterTail = document.querySelector<HTMLInputElement>('#schedule-filter-tail')!;
+const scheduleFilterRoute = document.querySelector<HTMLInputElement>('#schedule-filter-route')!;
+const scheduleFilterDepart = document.querySelector<HTMLInputElement>('#schedule-filter-depart')!;
 
 function formatMoney(amount: number): string {
   const sign = amount < 0 ? '-' : '';
@@ -103,6 +106,7 @@ function buildScheduleRow(leg: ScheduleLeg, state: SimState): HTMLTableRowElemen
   departInput.addEventListener('change', () => {
     leg.departMinute = timeStringToMinuteOfDay(departInput.value);
     validateSchedule(state.schedule);
+    applyScheduleFilters(); // the edited time may no longer match an active Depart filter
   });
   departCell.appendChild(departInput);
 
@@ -145,4 +149,45 @@ export function setupScheduleEditor(state: SimState): void {
  */
 export function addScheduleRow(leg: ScheduleLeg, state: SimState): void {
   scheduleBody.appendChild(buildScheduleRow(leg, state));
+}
+
+/**
+ * Show or hide each schedule row against the three filter inputs above the
+ * table — case-insensitive substring match, ANDed across fields (a row
+ * must match every non-empty filter to stay visible). Depart is matched
+ * against the row's current <input type="time"> value rather than text
+ * content, since that cell holds a live input, not a plain text node.
+ */
+function applyScheduleFilters(): void {
+  const tailQuery = scheduleFilterTail.value.trim().toLowerCase();
+  const routeQuery = scheduleFilterRoute.value.trim().toLowerCase();
+  const departQuery = scheduleFilterDepart.value.trim().toLowerCase();
+
+  for (const row of Array.from(scheduleBody.children)) {
+    const tailText = row.children[0].textContent?.toLowerCase() ?? '';
+    const routeText = row.children[1].textContent?.toLowerCase() ?? '';
+    const departValue = row.querySelector<HTMLInputElement>('input[type="time"]')?.value.toLowerCase() ?? '';
+
+    const matches =
+      tailText.includes(tailQuery) && routeText.includes(routeQuery) && departValue.includes(departQuery);
+    (row as HTMLElement).style.display = matches ? '' : 'none';
+  }
+}
+
+for (const filterInput of [scheduleFilterTail, scheduleFilterRoute, scheduleFilterDepart]) {
+  filterInput.addEventListener('input', applyScheduleFilters);
+}
+
+/**
+ * Called by the M10 route builder right after adding a new leg: clears the
+ * tail/depart filters — so a filter left over from before can't hide the
+ * row the player just created — and sets the route filter to that leg's
+ * exact "ORIGIN → DEST" text, so the table immediately narrows to just
+ * that route.
+ */
+export function filterScheduleToRoute(origin: string, dest: string): void {
+  scheduleFilterTail.value = '';
+  scheduleFilterDepart.value = '';
+  scheduleFilterRoute.value = `${origin} → ${dest}`;
+  applyScheduleFilters();
 }

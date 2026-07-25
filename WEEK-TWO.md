@@ -223,6 +223,15 @@ pending a decision:
   is probably also a slip) — needs a threshold decision, not just
   logic.
 
+**Second post-M10 addition — filterable schedule table:** the schedule
+table now has a type-in filter per column (Tail/Route/Depart, case-
+insensitive substring, ANDed together), and adding a new frequency
+auto-narrows the table to just that route (clearing any stale Tail/
+Depart filter that would otherwise hide it) instead of the new row
+landing wherever it lands among a dozen-plus others. Verified in-
+browser: each filter in isolation, filters clearing correctly, and the
+auto-narrow correctly overriding a deliberately-left-stale Tail filter.
+
 **Priority call:** build this first, ahead of the demand/choice-model
 layers, deliberately reversing the sequencing note below. The reasoning:
 nailing the core interaction — does *creating a route* feel good? — is

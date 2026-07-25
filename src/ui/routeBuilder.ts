@@ -3,7 +3,7 @@ import type { LineString } from 'geojson';
 import { projection } from '../render/projection';
 import { airports, type Airport } from '../render/airports';
 import { computeBlockMinutes, nextLegId, validateSchedule, type ScheduleLeg } from '../sim/schedule';
-import { addScheduleRow } from './panels';
+import { addScheduleRow, filterScheduleToRoute } from './panels';
 import type { SimState } from '../sim/state';
 
 const HIT_RADIUS_PX = 14;
@@ -300,6 +300,9 @@ export function setupRouteBuilder(state: SimState): void {
     state.schedule.push(leg);
     addScheduleRow(leg, state);
     validateSchedule(state.schedule);
+    // Narrow the schedule table to the route just added — otherwise a new
+    // row lands wherever it lands among the other 12+ entries, easy to miss.
+    filterScheduleToRoute(origin.iata, dest.iata);
 
     reset();
   });

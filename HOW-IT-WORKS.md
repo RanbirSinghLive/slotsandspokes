@@ -251,6 +251,20 @@ Editing is departure time only for now — reassigning a leg's origin,
 destination, or tail (which would also mean recomputing `blockMinutes` and
 touching `render/routes.ts`'s route list) is out of scope for this pass.
 
+**Column filters:** a second header row holds one text input per column
+(Tail/Route/Depart). `applyScheduleFilters()` re-checks all three on every
+keystroke in any of them — case-insensitive substring match, ANDed across
+fields — and just toggles each row's `display`, not a rebuild, so it can't
+interfere with the "build once" rule above. Depart matches against the
+row's live `<input type="time">` value rather than text content, since
+that cell holds an input, not a text node; editing a row's time re-applies
+the filters too, in case the new value no longer matches. `main.ts`'s M10
+route builder calls the exported `filterScheduleToRoute(origin, dest)`
+right after adding a leg, clearing the Tail/Depart filters (so a stale one
+can't hide the row just created) and setting the Route filter to that
+leg's exact text — the table narrows to just the route you touched instead
+of the new row landing wherever it lands among a dozen others.
+
 ## Route builder (`src/ui/routeBuilder.ts`) — M10
 
 Creating a *new* route is a map gesture, not a form: click an airport to
