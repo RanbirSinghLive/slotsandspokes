@@ -9,6 +9,13 @@ import { validateSchedule } from './sim/schedule';
 import { createInitialState, type SimState } from './sim/state';
 import { step } from './sim/step';
 import { updatePanel, setupScheduleEditor, PANEL_WIDTH_PX } from './ui/panels';
+import {
+  setupRouteBuilder,
+  handleRouteBuilderMouseDown,
+  handleRouteBuilderMouseMove,
+  handleRouteBuilderKeyDown,
+  drawRoutePreview,
+} from './ui/routeBuilder';
 
 // M4 brought only one aircraft to life, to prove out the clock and the
 // depart/arrive mechanism on something small. M5 turns the rest on by
@@ -22,6 +29,7 @@ const state: SimState = createInitialState(ACTIVE_TAILS);
 // would be caught here at startup.
 validateSchedule(state.schedule);
 setupScheduleEditor(state);
+setupRouteBuilder(state);
 
 const canvas = document.querySelector<HTMLCanvasElement>('#map')!;
 const ctx = canvas.getContext('2d')!;
@@ -81,6 +89,7 @@ function render(): void {
   drawRoutes(ctx);
   drawAircraft(ctx, state, latestFractionalMinute);
   drawAirports(ctx);
+  drawRoutePreview(ctx);
   updateClock(state);
   updatePanel(state);
 }
@@ -169,10 +178,23 @@ let dragStartY = 0;
 let translateAtDragStart: [number, number] = [0, 0];
 
 canvas.addEventListener('mousedown', (event) => {
+  // M10's route-creation gesture (ui/routeBuilder.ts) gets first refusal
+  // on any click on the canvas: arming, confirming, or cancelling a route
+  // all take priority over starting a pan. Only once it says "not mine"
+  // does an ordinary click-and-drag start panning, exactly as before.
+  if (handleRouteBuilderMouseDown(event)) {
+    render();
+    return;
+  }
+
   isDragging = true;
   dragStartX = event.clientX;
   dragStartY = event.clientY;
   translateAtDragStart = projection.translate();
+});
+
+canvas.addEventListener('mousemove', (event) => {
+  if (handleRouteBuilderMouseMove(event)) render();
 });
 
 window.addEventListener('mousemove', (event) => {
@@ -186,6 +208,8 @@ window.addEventListener('mousemove', (event) => {
 window.addEventListener('mouseup', () => {
   isDragging = false;
 });
+
+window.addEventListener('keydown', handleRouteBuilderKeyDown);
 
 // --- Zoom (scroll wheel) ---
 //

@@ -44,7 +44,14 @@ const airportsByIata = new Map<string, AirportLocation>(
 // once a second type is introduced.
 const aircraftType = (aircraftTypesData as AircraftType[])[0];
 
-function computeBlockMinutes(originIata: string, destIata: string): number {
+/**
+ * Block time for a leg between two airports, from great-circle distance and
+ * the (only, for now) aircraft type's cruise speed — see CLAUDE.md's note
+ * on this formula. Exported so the M10 route builder can compute a real
+ * block time for a leg the player is creating, not just at schedule-load
+ * time for the fixed template.
+ */
+export function computeBlockMinutes(originIata: string, destIata: string): number {
   const origin = airportsByIata.get(originIata);
   const dest = airportsByIata.get(destIata);
   if (!origin || !dest) {
@@ -82,6 +89,22 @@ export const scheduleLegs: ScheduleLeg[] = (scheduleData as Array<Omit<ScheduleL
  */
 export function loadSchedule(): ScheduleLeg[] {
   return scheduleLegs.map((leg) => ({ ...leg }));
+}
+
+/**
+ * A fresh legId for a new leg on `tail` — "<tail>-<n>", one past the
+ * highest existing number for that tail, matching the naming already used
+ * in data/schedule.json (e.g. "C-GVIA-1".."C-GVIA-4"). Used by the M10
+ * route builder when a player adds a leg; never called by anything that
+ * needs to be deterministic (it's a one-off UI action, not part of step()).
+ */
+export function nextLegId(tail: string, legs: ScheduleLeg[]): string {
+  const existingNumbers = legs
+    .filter((leg) => leg.tail === tail)
+    .map((leg) => Number(leg.legId.split('-').pop()))
+    .filter((n) => !Number.isNaN(n));
+  const nextNumber = (existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0) + 1;
+  return `${tail}-${nextNumber}`;
 }
 
 /**

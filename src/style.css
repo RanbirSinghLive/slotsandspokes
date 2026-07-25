@@ -128,3 +128,73 @@ body {
   width: 100%;
   box-sizing: border-box;
 }
+
+/* M10: cursor feedback while a route is armed (see ui/routeBuilder.ts) */
+#map.armed {
+  cursor: crosshair;
+}
+
+#new-route-section {
+  padding: 10px;
+  margin: 4px 0 20px;
+  background: rgba(255, 209, 102, 0.08);
+  border: 1px solid rgba(255, 209, 102, 0.3);
+  border-radius: 6px;
+}
+
+#new-route-label {
+  font-size: 14px;
+  color: #fff;
+  margin-bottom: 2px;
+}
+
+#new-route-block {
+  color: #9aa3b8;
+  margin-bottom: 10px;
+}
+
+.new-route-field {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: #9aa3b8;
+}
+
+.new-route-field select,
+.new-route-field input[type='time'] {
+  font-family: inherit;
+  font-size: inherit;
+  color: #cdd3e0;
+  background: #0a0c12;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 3px 6px;
+}
+
+.new-route-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.new-route-actions button {
+  font-family: inherit;
+  font-size: inherit;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+#new-route-confirm {
+  background: #3a4258;
+  border: 1px solid #6b7694;
+  color: #fff;
+}
+
+#new-route-cancel {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #cdd3e0;
+}

@@ -9,8 +9,10 @@ other way around.
 
 Status: M1–M6 complete (scaffold through economy/panel). Phase 2 — M7
 (headless runner), M8 (schedule editor), and M9 (turn times/delays) all
-done. That's every milestone WEEK-ONE.md's "Then, in order" names; what's
-left is WEEK-ONE.md's "Deliberately deferred" list, not started.
+done — that's every milestone WEEK-ONE.md's "Then, in order" names. Phase 3
+(see WEEK-TWO.md) is underway: M10 (route creation map gesture) done; the
+demand/choice-model/competition/pricing layers it'll eventually plug into
+are still brainstorm-stage, not built.
 
 ---
 
@@ -248,6 +250,39 @@ and turned around.
 Editing is departure time only for now — reassigning a leg's origin,
 destination, or tail (which would also mean recomputing `blockMinutes` and
 touching `render/routes.ts`'s route list) is out of scope for this pass.
+
+## Route builder (`src/ui/routeBuilder.ts`) — M10
+
+Creating a *new* route is a map gesture, not a form: click an airport to
+arm it, move the mouse (no need to hold the button — release and the arm
+state persists) to draw a live preview arc toward the cursor, and click a
+second airport to confirm. The preview is built the same way as a real
+route — a 2-point `LineString` run through the same `d3.geoPath` machinery
+`render/routes.ts` uses — so it curves exactly like the route would once
+created, snapping onto the nearest airport's exact coordinates once the
+cursor is within `HIT_RADIUS_PX`. Escape, re-clicking the armed origin, or
+clicking anywhere that isn't a valid airport all cancel back to idle.
+
+This is a small state machine (`idle` / `armed` / `confirming`) living
+entirely in this module — not in `SimState`, since it's transient UI
+interaction, not simulated-world state. `main.ts`'s existing canvas
+`mousedown` handler gives this module first refusal on every click
+(`handleRouteBuilderMouseDown`); only if it says "not mine" does the
+existing M2 pan gesture start, so the two don't fight over the same event.
+
+Confirming opens a real DOM form (per CLAUDE.md's panel rule) for tail and
+departure time. "Add Route" does nothing clever: it appends a new
+`ScheduleLeg` to `state.schedule` (the same array `step()` reads from) and
+re-runs `validateSchedule()` — exactly the mechanism M8's time-editing
+already uses. There's no new rotation-fitting solver; a leg added
+somewhere the chosen tail isn't actually going to be gets caught by the
+same console error a bad manual edit would produce, and nothing prevents
+adding it anyway, for consistency with M8.
+
+Editing/removing an *existing* route stays table-driven (M8) rather than
+gaining a second, harder gesture — hit-testing a click against an
+arbitrary curve is a meaningfully bigger problem than hit-testing a point,
+and the table already does the job.
 
 ## Randomness (`src/sim/rng.ts`)
 

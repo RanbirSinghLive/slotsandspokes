@@ -1,0 +1,304 @@
+# airgame — Week two (brainstorm, converging)
+
+This is a working document, not a committed plan like WEEK-ONE.md was.
+The five biggest open questions are now answered (see Decisions,
+below) — this isn't a finished plan yet, but it's converged enough
+that the shape of the actual milestones is starting to be visible.
+Update this freely as we keep talking.
+
+Everything here is scoped for phase 3 discussion — it deliberately
+revisits some things WEEK-ONE.md's CLAUDE.md-linked "deliberately
+deferred" list put off limits (competitor AI, in particular). That's
+fine — the user is explicitly opting back into that territory now —
+but each place it happens is called out below rather than done quietly.
+
+---
+
+## The goal, restated
+
+Right now the economy is flat: every seat, every route, every day sells
+at the same fixed load factor and fare (`sim/economy.ts`). Week two is
+about replacing that with an actual market — passengers who exist in
+some volume between specific city pairs, who choose between airlines
+(yours and AI-run competitors) based on price/schedule/product, split
+into segments (business/leisure/VFR) that weight those factors
+differently. On top of that market, the player gets real levers: build
+routes, set frequency, price them, and live with operational disruption
+(delays already exist via M9; diversions and airspace closures are the
+next step up).
+
+## Decisions
+
+1. **Direct flights only.** Connections/connecting itineraries stay
+   deferred, per CLAUDE.md. Demand still *exists* for every O-D pair
+   (the gravity model doesn't care whether anyone serves it), but only
+   pairs with actual direct service — yours or a static competitor's —
+   can capture any of it. Unserved pairs are visible "addressable
+   market" the player can see and decide to go serve, not modeled
+   traffic that goes anywhere.
+2. **Non-reactive (static) competitor AI.** Competitor schedules and
+   fares are fixed data, authored once, never adapting to the player's
+   moves. This has a real consequence, see "What this simplifies,"
+   below.
+3. **Recommended fare, overridable.** The game computes a default fare
+   per route (see "Pricing," a new loop below); the player can override
+   it. Not a free-text price — a lever with a sensible default.
+4. **Fleet stays at 3 aircraft.** No aircraft market, no financing,
+   both still deferred. The route/frequency editor works only by
+   reassigning the existing 3 tails' rotations, not by growing the
+   fleet.
+5. **Population data from StatsCan.** A real, sourced number per
+   airport's catchment population, added to `airports.json` — not a
+   hand-picked proxy. (Research task when we get to implementation:
+   look up each city's metro-area population from StatsCan census
+   data, the same "public sources only" standard `airports.json`
+   already holds to.)
+
+### What this simplifies
+
+Non-reactive AI (decision 2) quietly shrinks "Competition" from a
+systems-engineering problem into a data-authoring one. There's no
+competitor decision-making logic to design at all — a static schedule
+is just a second, smaller `schedule.json`-shaped file for other
+airlines' routes/frequencies/fares. The only real engineering is
+feeding that data into the *same* choice model the player's own routes
+already need (see layer 4, below). That also means competitor data can
+exist early, as soon as there's a choice model to test against, rather
+than waiting for its own build phase.
+
+### One thing this raises that still needs an answer
+
+**How is "recommended fare" computed?** It needs to be more than a
+flat number (today's `AVG_FARE = 185` for everyone) to be worth having
+as a default at all. The natural inputs, given what's already
+planned: distance (a per-nm rate plus a fixed component, the same
+shape `blockMinutes`-based cost already has) and the route's yield mix
+(a route skewing business can plausibly support a higher default than
+one that's mostly leisure/VFR). Whatever the formula, overriding it
+plugs cleanly into the choice model without any special-casing: a
+higher fare directly lowers that route's utility score
+(`w_price · -price`), so pricing above the recommendation trades away
+market share for margin per passenger — exactly the tradeoff a fare
+lever should create. Worth deciding the actual formula before building
+it, not after.
+
+**Related, smaller question:** should the player be able to *see*
+competitor fares/schedules on a route before pricing their own? Static
+competitors can't react either way, but pricing blind against a fixed
+opponent you can't see is a strange player experience. Leaning toward
+yes — visible, just not reactive.
+
+## Two different kinds of thing, worth keeping separate
+
+**Market/model layers** — state that describes the world beyond what
+exists today. These mostly live in new `sim/` modules and new
+`SimState` fields; nothing here needs a UI to matter, only to be
+tunable data, the same way `economy.ts`'s constants are.
+
+**Player-facing loops** — the actual interactions: creating a route,
+setting a frequency, pricing it, reacting to an event. These are new
+UI plus new `step()` logic, and only become *meaningful* decisions once
+the layers below give them something to push against.
+
+---
+
+## Layers
+
+### 1. O-D demand
+
+How many people want to travel between each pair of the 10 airports,
+per day. A gravity model, `demand(A,B) ∝ pop(A) · pop(B) /
+distance(A,B)^k`, using each airport's catchment population (decision
+5, above — sourced from StatsCan) and the great-circle distance already
+computed in `sim/geo.ts`. `k` and the scaling constant are tunable,
+crude parameters in the same spirit as `LOAD_FACTOR`/`AVG_FARE`.
+Direct-service-only per decision 1: this demand number is the ceiling
+for a route that exists, and just a visible "market size" figure for
+one that doesn't.
+
+### 2. Yield mix / travel purpose (business, leisure, VFR)
+
+Splits the O-D demand pool into segments with different fare
+sensitivity and different tastes for schedule/frequency. Simplest v1:
+a fixed percentage split applied to every O-D pair (say 20/50/30);
+refine to vary by route later if it matters. Each segment gets its own
+weights in the choice model (below) — that's what actually makes the
+segmentation do anything, rather than just being a label — and
+plausibly its own contribution to a route's recommended fare (see
+"Pricing," below).
+
+### 3. Competition (static AI airlines)
+
+Other carriers exist alongside yours on some subset of the same O-D
+market, with fixed schedules and fares (decision 2) authored as data,
+not decision-making logic. Their whole job is to be a competing option
+in the choice model below — nothing more.
+
+### 4. The connective piece: a choice / market-share model
+
+None of layers 1–3 actually *do* anything without this. Given a
+passenger segment and a route, something has to decide: book you, book
+a (static) competitor, or don't travel. The standard, well-worn
+technique: a multinomial logit model — each airline's offering on that
+route gets scored by a utility function (`w_price · -price +
+w_schedule · schedule-fit + w_product · quality`, weights varying by
+segment), and market share falls out as a softmax over the scores.
+Real airlines use almost exactly this (the industry term is QSI,
+Quality of Service Index, for the schedule-fit piece specifically).
+
+This is "crude but principled" in the same way `economy.ts` already
+is — not a simulation of individual passengers, just an aggregate
+formula — but it's the piece that makes demand, yield mix, pricing, and
+competition into one system instead of four unconnected ones.
+
+**Side note on frequency specifically:** real airline schedule
+competition has a well-documented effect where frequency share
+translates into *more than proportional* market share (the "S-curve").
+Worth knowing about even if v1 skips the nuance and treats frequency
+share as directly proportional.
+
+---
+
+## Loops
+
+### Pricing (new — falls out of decision 3)
+
+Each route gets a computed recommended fare (formula still open, see
+above) and the player can override it. Directly feeds the choice
+model's price term, so raising fare trades market share for margin and
+lowering it does the reverse — the core yield-management tension, for
+free, once the choice model exists.
+
+### Route creation + editing: the map interaction — M10, done
+
+**Scope for this milestone:** the gesture itself, plus a minimal
+confirmation form that actually appends a working leg to
+`state.schedule` — reusing `validateSchedule()` exactly as M8 does for
+correctness feedback, not a new rotation-fitting solver. No frequency
+UI yet (that's a repeat of "add another leg," better done once this
+lands and feels right). No fare/demand meaning yet — see the priority
+call below.
+
+**Done when:** dragging from one airport to another and confirming
+produces a new row in the schedule table with a real block time, and —
+if the chosen tail and departure time are compatible with that tail's
+existing rotation — an aircraft actually flies the new route on the
+map. If they're not compatible, the same console validation M8 already
+has catches it, the same way an edit that breaks a rotation always has.
+
+**Verified:** headlessly — `nextLegId`/`computeBlockMinutes` produce
+correct values, a leg added where the tail's rotation genuinely allows
+it gets flown by `step()` exactly as scheduled, and a leg added
+somewhere the tail isn't actually located gets caught by
+`validateSchedule()` with the same error shape M8 already produces. In
+the browser — the full gesture end to end (arm → live preview,
+pixel-verified tracing from the exact origin toward the cursor → snap
+→ confirm → form → Add → new schedule row), all three cancel paths
+(Escape, re-click origin, click empty water), and confirmed panning
+still works unaffected for clicks away from any airport.
+
+**Priority call:** build this first, ahead of the demand/choice-model
+layers, deliberately reversing the sequencing note below. The reasoning:
+nailing the core interaction — does *creating a route* feel good? — is
+worth getting right before investing in the economic depth underneath
+it. This doesn't actually undo the dependency trap, it just separates
+two different things that were bundled together: the *gesture* (how a
+route gets drawn) can be built and iterated on now, against today's
+flat economy as a placeholder; its *economic meaning* (was this a good
+decision) arrives later, once layers 1–4 exist, without needing to
+redesign the interaction itself.
+
+**The gesture — drag-then-follow hybrid:**
+1. Click an airport to arm it (cursor enters a distinct "drawing"
+   state — e.g. crosshair). This is *not* a held-button drag; release
+   the mouse and the arm state persists.
+2. While armed, a live preview arc follows the mouse continuously:
+   invert the cursor's screen position to a [lon, lat] via
+   `projection.invert()`, build a 2-point `LineString` from the armed
+   origin to that point, and render it through the *same*
+   `d3.geoPath` machinery `render/routes.ts` already uses for real
+   routes — so the preview curves exactly like a confirmed route
+   would, not an approximation.
+3. When the cursor comes within a hit-radius of another airport,
+   snap the preview's endpoint to that airport's exact coordinates and
+   highlight it as the candidate destination.
+4. Click the highlighted airport to confirm — this opens a real DOM
+   form (per CLAUDE.md's panel rule) for the actual configuration:
+   which of the 3 tails flies it, departure time, frequency. That
+   configuration step is the constraint-satisfaction problem flagged
+   below, not solved by the gesture itself.
+5. Escape, or clicking anywhere that isn't a valid destination,
+   cancels and clears the preview.
+
+**Scope call: creation only, not in-place editing.** Hit-testing a
+click against an arbitrary curve (to let the player click an *existing*
+route arc to edit it) is a meaningfully harder problem than hit-testing
+a click against a point, and there's already a working answer:
+editing/removing legs stays table-driven, extending M8's existing
+schedule table (which already lists every leg) rather than adding a
+second, harder interaction for the same job. The drag gesture is
+specifically for the "what if I connected these two cities" moment —
+discovery, not maintenance.
+
+**Technical note:** this needs to be disambiguated from the existing
+pan gesture, which currently starts on any `mousedown` on the canvas.
+The fix is a priority check: `mousedown` within an airport's hit-radius
+arms/confirms a route instead of starting a pan; everywhere else, pan
+behaves exactly as it does today.
+
+**Reassigning a tail's full rotation** (fitting a new leg into a tail's
+daily chain without breaking its turn times or its return to base) is
+still the harder part of "assign a plane to a route," and it's still
+gated on the same layers as before — see the reordered list below.
+
+**Original dependency-trap note, still true for the *decision-quality*
+half of this loop:** against today's flat economy, adding frequency is
+free linear revenue with no downside — there's no scarcity to push
+against, so *whether creating a route pays off* isn't a real question
+yet. That's fine for iterating on the gesture; it matters again once
+the layers below exist.
+
+### Random events (diversion, airspace closure)
+
+Not just "a bigger M9 delay." M9's delay mechanic assumes the flight
+still completes, late. A diversion or closure needs:
+- **Cancellation handling** — passengers not carried (lost revenue, or
+  rebooked onto a later flight/competitor — ties back into the choice
+  model above)
+- **Aircraft recovery** — a diverted aircraft is out of position for
+  its next scheduled leg, possibly for the rest of the day
+- **Scope beyond one flight** — an airspace closure plausibly affects
+  every flight touching one airport for some time window, not a single
+  ActiveFlight the way a delay roll does
+
+Plugs into the seeded PRNG infrastructure that already exists
+(`sim/rng.ts`, `state.rngSeed`), so the mechanical foundation is there.
+Sequencing-wise, this reads as an enrichment on top of a working
+demand/competition loop, not a prerequisite for it — recommend doing
+it last of everything above.
+
+---
+
+## Deferred, not urgent
+
+- **Recommended-fare formula** — no need to lock this in now; revisit
+  once the pricing loop is actually being built.
+
+## Draft dependency order (not committed)
+
+1. **Route creation + editing map interaction** (drag-then-follow, see
+   above) — built now, against today's flat economy as a placeholder.
+   The gesture and the confirmation form; not yet meaningful as a
+   decision.
+2. Population data (StatsCan research) + O-D demand layer (gravity model)
+3. Choice/market-share model — the connective piece
+4. Yield mix / travel purpose segmentation
+5. Static competitor data, authored and wired into the choice model
+   (small, now that AI is non-reactive — see "What this simplifies")
+6. Pricing (recommended fare + override) — formula TBD, see above
+7. Random events / operational disruption (diversion, closure)
+
+Step 1 is the one deliberate exception to "layers before loops": the
+*gesture* doesn't need the economy to be rich to be worth building and
+feeling right, even though *whether a given route is a good idea*
+still waits on steps 2–5.

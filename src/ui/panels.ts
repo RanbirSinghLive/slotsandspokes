@@ -1,4 +1,4 @@
-import { validateSchedule } from '../sim/schedule';
+import { validateSchedule, type ScheduleLeg } from '../sim/schedule';
 import type { SimState } from '../sim/state';
 
 // Must match the width baked into #map / #panel in style.css — see the
@@ -83,6 +83,34 @@ function timeStringToMinuteOfDay(time: string): number {
 }
 
 /**
+ * Build one schedule-table row for `leg` and append it. Shared by
+ * setupScheduleEditor() (the initial build) and addScheduleRow() (M10 — a
+ * newly created route, appended without touching any other row).
+ */
+function buildScheduleRow(leg: ScheduleLeg, state: SimState): HTMLTableRowElement {
+  const row = document.createElement('tr');
+
+  const tailCell = document.createElement('td');
+  tailCell.textContent = leg.tail;
+
+  const routeCell = document.createElement('td');
+  routeCell.textContent = `${leg.origin} → ${leg.dest}`;
+
+  const departCell = document.createElement('td');
+  const departInput = document.createElement('input');
+  departInput.type = 'time';
+  departInput.value = minuteOfDayToTimeString(leg.departMinute);
+  departInput.addEventListener('change', () => {
+    leg.departMinute = timeStringToMinuteOfDay(departInput.value);
+    validateSchedule(state.schedule);
+  });
+  departCell.appendChild(departInput);
+
+  row.append(tailCell, routeCell, departCell);
+  return row;
+}
+
+/**
  * Build the schedule table and wire up its editing — called once at
  * startup, not from the per-frame render() loop like updatePanel() above.
  *
@@ -91,8 +119,9 @@ function timeStringToMinuteOfDay(time: string): number {
  * text) would tear out and recreate the <input> elements roughly 60 times
  * a second, which steals focus and resets the browser's native time-picker
  * UI out from under anyone actually trying to type into one. Nothing in
- * `state.schedule` changes except through this table's own inputs, so
- * there's nothing else for a repeated render to pick up anyway.
+ * `state.schedule` changes except through this table's own inputs (or
+ * addScheduleRow(), below), so there's nothing else for a repeated render
+ * to pick up anyway.
  *
  * Editing a departure time mutates the leg object in `state.schedule`
  * directly, which is the array `step()` itself reads from — the very next
@@ -104,25 +133,16 @@ function timeStringToMinuteOfDay(time: string): number {
  */
 export function setupScheduleEditor(state: SimState): void {
   for (const leg of state.schedule) {
-    const row = document.createElement('tr');
-
-    const tailCell = document.createElement('td');
-    tailCell.textContent = leg.tail;
-
-    const routeCell = document.createElement('td');
-    routeCell.textContent = `${leg.origin} → ${leg.dest}`;
-
-    const departCell = document.createElement('td');
-    const departInput = document.createElement('input');
-    departInput.type = 'time';
-    departInput.value = minuteOfDayToTimeString(leg.departMinute);
-    departInput.addEventListener('change', () => {
-      leg.departMinute = timeStringToMinuteOfDay(departInput.value);
-      validateSchedule(state.schedule);
-    });
-    departCell.appendChild(departInput);
-
-    row.append(tailCell, routeCell, departCell);
-    scheduleBody.appendChild(row);
+    scheduleBody.appendChild(buildScheduleRow(leg, state));
   }
+}
+
+/**
+ * Append one new row for a leg just created by the M10 route builder,
+ * without rebuilding the table — same reasoning as setupScheduleEditor()
+ * above: a full rebuild would tear out any input another row's edit is
+ * mid-focus on.
+ */
+export function addScheduleRow(leg: ScheduleLeg, state: SimState): void {
+  scheduleBody.appendChild(buildScheduleRow(leg, state));
 }

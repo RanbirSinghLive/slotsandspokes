@@ -25,6 +25,21 @@
         <div class="econ-row"><span class="econ-label">Cost</span><span id="panel-cost" class="econ-value"></span></div>
         <div class="econ-row"><span class="econ-label">Margin</span><span id="panel-margin" class="econ-value"></span></div>
       </section>
+      <section id="new-route-section" hidden>
+        <h2>New Route</h2>
+        <div id="new-route-label"></div>
+        <div id="new-route-block"></div>
+        <label class="new-route-field">Tail
+          <select id="new-route-tail"></select>
+        </label>
+        <label class="new-route-field">Depart
+          <input type="time" id="new-route-depart" value="12:00" />
+        </label>
+        <div class="new-route-actions">
+          <button type="button" id="new-route-confirm">Add Route</button>
+          <button type="button" id="new-route-cancel">Cancel</button>
+        </div>
+      </section>
       <section id="fleet-section">
         <h2>Fleet</h2>
         <table id="fleet-table" class="panel-table">
