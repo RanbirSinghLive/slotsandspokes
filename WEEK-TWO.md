@@ -181,12 +181,27 @@ and giving segments their own fare (both real refinements, not needed
 for this to already behave sensibly) — the latter waits on the pricing
 loop existing at all.
 
-### 3. Competition (static AI airlines)
+### 3. Competition (static AI airlines) — v1 done
 
 Other carriers exist alongside yours on some subset of the same O-D
 market, with fixed schedules and fares (decision 2) authored as data,
 not decision-making logic. Their whole job is to be a competing option
 in the choice model below — nothing more.
+
+**Built as `data/competitors.json`** — a flat list of `{airline, origin,
+dest, dailyFrequency, fare}`, deliberately small (four entries, not one
+per market): three on the busy Ottawa-Montréal-Toronto triangle
+(including YYZ-YOW, a market the player's own fleet doesn't fly at all
+yet — a plausible incumbent on a market big enough to be worth entering
+later) and one on the smaller Québec-Halifax route, since realistically
+no carrier competes for a 1-pax/day market like YYG-YFC. Fictional
+airline names ("Capital Wings," "Trillium Air," "Bluenose Regional") —
+CLAUDE.md's public-sources-only rule rules out using real carriers'
+names for invented competitive behavior. `sim/choiceModel.ts` looks
+competitors up per market (same bidirectional definition every other
+"market" concept in this codebase uses) and folds them straight into the
+softmax below — no separate "competition" logic exists outside that
+lookup.
 
 ### 4. The connective piece: a choice / market-share model — v1 done
 
@@ -199,20 +214,23 @@ varying by segment), and market share falls out as a softmax over the
 scores. Real airlines use almost exactly this (the industry term is
 QSI, Quality of Service Index, for the schedule-fit piece specifically).
 
-**Built as `bookingShare(fare, legsServingMarket)` in the new
-`sim/choiceModel.ts`**, wired into `economy.ts` (see HOW-IT-WORKS.md's
-"Economy"). Since competitor offerings (layer 3) don't exist yet, this
-v1 only ever scores your own flight against a "stay home" option fixed
-at utility 0 — with just one real alternative plus that baseline, the
-softmax collapses to a plain logistic sigmoid, which is what's actually
-implemented per segment, then blended across the three yield-mix
-segments (layer 2, above) by their share of demand.
+**Built as `bookingShare(fare, legsServingMarket, origin, dest)` in the
+new `sim/choiceModel.ts`**, wired into `economy.ts` (see
+HOW-IT-WORKS.md's "Economy"). It's a real softmax now: your flight,
+every competitor serving the same market (layer 3, above), and a "stay
+home" option fixed at utility 0 all get scored, and your share is your
+score over the sum of everyone's. A market with zero competitors
+collapses this to the plain logistic sigmoid of your own utility —
+algebraically identical to the pre-competitor v1, confirmed by every
+market without a competitor producing unchanged numbers.
 `w_product · quality` is dropped entirely for now (no product-quality
-axis exists yet either); `schedule-fit` is `legsServingMarket` alone
-(log-scaled for diminishing returns), since with no competitor to share
-frequency against, your own frequency count is the whole story. Weights
-and intercepts are hand-picked, crude constants per segment, same
-spirit as `LOAD_FACTOR`/`AVG_FARE` — calibrated so, blended together at
+axis exists yet either); `schedule-fit` is each offering's own
+`dailyFrequency`, log-scaled for diminishing returns — your flight and
+every competitor each get their own utility from their own fare and
+frequency, and the softmax is what turns those independent scores into
+shares. Weights and intercepts are hand-picked, crude constants per
+segment, same spirit as `LOAD_FACTOR`/`AVG_FARE` — calibrated so, blended
+together at
 today's $185 fare, the result stays close to what a single undifferentiated
 segment would have produced, so this pass adds *sensitivity that differs
 by segment* without secretly re-swinging the economy again. It already
@@ -224,21 +242,30 @@ loop, still ahead, to pull once it exists.
 This is "crude but principled" in the same way `economy.ts` already
 is — not a simulation of individual passengers, just an aggregate
 formula — but it's the piece that makes demand, yield mix, pricing, and
-competition into one system instead of four unconnected ones. Verified
-via the headless runner and matched exactly against a live browser run:
-daily revenue dropped modestly further (from $52,725 to $51,615), and
-frequency's effect is already real and player-actionable today — adding
-a second daily frequency to a market via the M10 route builder
-measurably raises that market's booking share, right now, with no
-further layers needed to see it.
+competition into one system instead of four unconnected ones, and with
+layer 3's competitor data now live, all three non-pricing layers are
+actually connected through it at once. Verified via the headless runner
+and matched exactly against a live browser run, cash/revenue/cost/margin
+all identical at the same simulated day: daily revenue fell in three
+steps as each layer landed — $128,760 (no layers) → $52,725 (demand cap
+only) → $51,615 (choice model, single segment) → $51,430 (yield mix) →
+$49,950 (competitors) — and **the fleet's current schedule now runs a
+net loss over any 5-day stretch** ($-4,623 cash after 5 days). Frequency
+and price are both already real, player-actionable levers today, with no
+further layers needed: adding a second daily frequency to a market via
+the M10 route builder measurably raises its booking share, and a market
+that gains a competitor (like Québec-Halifax just did) visibly loses
+passengers to it.
 
 **Side note on frequency specifically:** real airline schedule
 competition has a well-documented effect where frequency share
 translates into *more than proportional* market share (the "S-curve").
 v1 skips that nuance and treats frequency as a log-scaled, diminishing-
-returns bump instead of a true S-curve — worth revisiting once
-competitors exist and "frequency share" (yours over the whole market's)
-is actually a meaningful ratio rather than just your own count.
+returns bump instead of a true S-curve, even now that competitors exist
+on four markets — each offering (yours and every competitor's) scores
+its own utility from its own raw frequency independently, rather than
+from a *share* of the market's total frequency. Worth revisiting once
+there's a reason to think the difference actually matters in play.
 
 ---
 
@@ -451,8 +478,11 @@ it last of everything above.
    the same `sim/choiceModel.ts`: a fixed 20/50/30 business/leisure/VFR
    split, each with its own price/schedule weights, blended into the
    one number `economy.ts` sees.
-6. Static competitor data, authored and wired into the choice model
-   (small, now that AI is non-reactive — see "What this simplifies")
+6. **Static competitor data** — v1 done. `data/competitors.json` (4
+   fixed entries, fictional airlines), folded into `bookingShare()`'s
+   softmax as real alternatives instead of just "stay home." The
+   schedule the fleet flies today is now a net loss over 5 days —
+   see the "Layers" write-up for the full revenue trail.
 7. Pricing (recommended fare + override) — formula TBD, see above
 8. Random events / operational disruption (diversion, closure)
 

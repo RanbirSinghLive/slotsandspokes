@@ -1,0 +1,6 @@
+[
+  { "airline": "Capital Wings", "origin": "YOW", "dest": "YUL", "dailyFrequency": 1, "fare": 175 },
+  { "airline": "Trillium Air", "origin": "YUL", "dest": "YYZ", "dailyFrequency": 2, "fare": 210 },
+  { "airline": "Trillium Air", "origin": "YYZ", "dest": "YOW", "dailyFrequency": 3, "fare": 195 },
+  { "airline": "Bluenose Regional", "origin": "YQB", "dest": "YHZ", "dailyFrequency": 1, "fare": 170 }
+]

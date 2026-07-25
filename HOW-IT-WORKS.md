@@ -167,14 +167,17 @@ frequency on an already-thin market doesn't conjure new passengers, it
 just gives the same ones a second flight to spread across.
 
 `bookingShare()` (`sim/choiceModel.ts`, week two's "connective piece") is
-new: of that per-flight slice, only some fraction actually books, given
-this fare and how convenient the market's frequency makes it — the rest
-choose not to travel at all. It's a multinomial logit collapsed to a
-plain logistic sigmoid, since with no competitor offerings yet (still
-ahead — see WEEK-TWO.md's "Layers") there's only one real alternative to
-"stay home." `pax` is whichever is smaller: the old flat load-factor
-figure (still the ceiling on a market with demand to spare), or this
-flight's actual booked count.
+new: of that per-flight slice, only some fraction actually books — the
+rest choose a competitor, or not to travel at all. It's a real
+multinomial logit: your flight, every static competitor serving the same
+market (`data/competitors.json`), and a fixed "stay home" option all get
+scored, and softmax turns those scores into shares. A market with zero
+competitors collapses this to the plain logistic sigmoid of your own
+utility — algebraically identical to what this looked like before
+competitor data existed, so adding competitors changed nothing for a
+market that doesn't have one. `pax` is whichever is smaller: the old
+flat load-factor figure (still the ceiling on a market with demand to
+spare), or this flight's actual booked count.
 
 `bookingShare()` itself blends three travel-purpose segments (business/
 leisure/VFR, week two's "yield mix" layer), each with its own price and
@@ -203,6 +206,28 @@ exactly the lever the pricing loop (still ahead) will get to pull once it
 exists. Frequency's effect (from the previous milestone) is unchanged:
 adding a daily frequency to a market still measurably raises its booking
 share today, no pricing lever required to see it.
+
+**Static competitors** (`data/competitors.json`, week two's "Competition"
+layer) exist on four markets so far — three on the busy Ottawa-Montréal-
+Toronto triangle (one of which, YYZ-YOW, the player's fleet doesn't even
+fly yet) and one on the smaller Québec-Halifax route — fixed schedules
+and fares, authored once, never reacting to anything the player does
+(fictional airline names, not real carriers, per CLAUDE.md's public-
+sources-only rule). Verified via the headless runner: the two big,
+seat-capped Ontario/Quebec legs are unaffected (booking share drops to
+roughly half against Trillium Air, but there was so much spare demand
+there that 59 seats still fill regardless) — but Québec-Halifax, which
+was merely demand-starved before, now also loses real share to Bluenose
+Regional and drops from 8 pax to 4. Total daily revenue fell to $49,950,
+and **the fleet's current schedule now runs a net loss over any 5-day
+stretch** ($-4,623 cash after 5 days, versus a small profit the
+milestone before) — confirmed to match exactly between the headless
+runner and a live browser run, cash/revenue/cost/margin all identical at
+the same simulated day. This is the first point where week two's layers
+have made the schedule the WEEK-ONE.md milestones authored — sensible
+under a flat economy with no competition — genuinely not a viable
+business anymore, which is the whole reason to eventually let the player
+change fares and frequencies in response.
 
 Applied on **arrival**, not departure — a flight in the air hasn't earned or
 spent anything yet. `margin` is added to `state.cash`; `revenue`/`cost`/

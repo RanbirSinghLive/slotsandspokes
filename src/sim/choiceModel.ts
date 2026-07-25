@@ -1,14 +1,41 @@
+import competitorsData from '../../data/competitors.json';
+
 // The "connective piece" from WEEK-TWO.md's Layers — the standard technique
 // for this is a multinomial logit: score every option a traveler could pick
 // (your flight, a competitor's, or not travelling at all) with a utility
 // function, then market share falls out as a softmax over those scores.
-// Competitor offerings (WEEK-TWO.md layer 3) don't exist yet, so this v1
-// only ever scores *your* flight against a fixed "stay home" option pinned
-// at utility 0 — the standard reference point in this kind of model. With
-// just one real alternative plus that baseline, the softmax collapses to
-// the plain logistic sigmoid, which is what `segmentBookingShare` below
-// actually computes; it'll need to become a real softmax over multiple
-// offerings once competitors exist.
+// `bookingShare` below is exactly that softmax, with "stay home" fixed at
+// utility 0 (the standard reference point in this kind of model) and one
+// term per competitor actually serving the market. A market with zero
+// competitors collapses to the plain logistic sigmoid of your own
+// utility — which is also exactly what this looked like before competitor
+// data existed, so adding competitors changes nothing for a market that
+// doesn't have one.
+
+type CompetitorOffering = {
+  airline: string;
+  origin: string;
+  dest: string;
+  dailyFrequency: number;
+  fare: number;
+};
+
+/**
+ * Static, non-reactive competitor service (WEEK-TWO.md layer 3) — fixed
+ * schedules and fares, authored once, never adapting to anything the
+ * player does. Deliberately small: real competition only on the handful
+ * of markets big enough that a second carrier would plausibly bother,
+ * per WEEK-TWO.md's "Competition" note. Fictional airline names — not
+ * real carriers, per CLAUDE.md's public-sources-only rule for anything
+ * that could be mistaken for real-world data.
+ */
+const competitors = competitorsData as CompetitorOffering[];
+
+function competitorsServingMarket(origin: string, dest: string): CompetitorOffering[] {
+  return competitors.filter(
+    (c) => (c.origin === origin && c.dest === dest) || (c.origin === dest && c.dest === origin),
+  );
+}
 
 /**
  * A travel-purpose segment (WEEK-TWO.md layer 2, "yield mix") — the same
@@ -52,26 +79,56 @@ const SEGMENTS: Segment[] = [
  * from 1 to 2 daily frequencies matters more than going from 5 to 6. The
  * real "S-curve" effect (frequency share converting into *more than
  * proportional* passenger share) is a documented refinement on top of this
- * that v1 deliberately skips — see WEEK-TWO.md's note on it.
+ * that v1 deliberately skips — see WEEK-TWO.md's note on it. Each offering
+ * (yours, and every competitor's) gets its own utility from its own fare
+ * and frequency — the softmax in `segmentBookingShare` is what turns those
+ * independent scores into shares, so nothing here needs to know about the
+ * other offerings to compute its own utility.
  */
-function segmentBookingShare(segment: Segment, fare: number, legsServingMarket: number): number {
-  const scheduleFit = Math.log2(1 + legsServingMarket);
-  const utility = segment.intercept - segment.weightPrice * fare + segment.weightSchedule * scheduleFit;
-  return 1 / (1 + Math.exp(-utility));
+function utility(segment: Segment, fare: number, dailyFrequency: number): number {
+  const scheduleFit = Math.log2(1 + dailyFrequency);
+  return segment.intercept - segment.weightPrice * fare + segment.weightSchedule * scheduleFit;
 }
 
 /**
- * What fraction of a market's demand actually books a flight, versus not
- * travelling at all, given this flight's fare and how many daily
- * frequencies serve the market — blended across all three segments,
- * weighted by each one's share of the demand pool. `economy.ts` calls this
- * with one flat fare for everyone (no fare-by-segment lever exists yet),
- * so the segments differ only in how they individually react to that same
- * fare and frequency, not in what they pay.
+ * One segment's softmax over every offering in this market: your flight,
+ * every competitor serving the same market, and a fixed "stay home"
+ * option at utility 0. Your share is your term over the sum of all of
+ * them — standard multinomial logit. With `competitors` empty this is
+ * algebraically identical to the plain logistic sigmoid of your own
+ * utility, which is what this whole model was before competitor data
+ * existed.
  */
-export function bookingShare(fare: number, legsServingMarket: number): number {
+function segmentBookingShare(
+  segment: Segment,
+  fare: number,
+  legsServingMarket: number,
+  competitors: CompetitorOffering[],
+): number {
+  const yourScore = Math.exp(utility(segment, fare, legsServingMarket));
+  const stayHomeScore = Math.exp(0);
+  const competitorScore = competitors.reduce(
+    (total, c) => total + Math.exp(utility(segment, c.fare, c.dailyFrequency)),
+    0,
+  );
+  return yourScore / (yourScore + stayHomeScore + competitorScore);
+}
+
+/**
+ * What fraction of a market's demand books *your* flight — versus a
+ * competitor's, or not travelling at all — given this flight's fare, how
+ * many daily frequencies serve the market, and which market this is (to
+ * look up who else is serving it). Blended across all three segments,
+ * weighted by each one's share of the demand pool. `economy.ts` calls
+ * this with one flat fare for everyone (no fare-by-segment lever exists
+ * yet), so the segments differ only in how they individually react to
+ * that same fare and frequency, not in what they pay.
+ */
+export function bookingShare(fare: number, legsServingMarket: number, originIata: string, destIata: string): number {
+  const marketCompetitors = competitorsServingMarket(originIata, destIata);
   return SEGMENTS.reduce(
-    (total, segment) => total + segment.shareOfDemand * segmentBookingShare(segment, fare, legsServingMarket),
+    (total, segment) =>
+      total + segment.shareOfDemand * segmentBookingShare(segment, fare, legsServingMarket, marketCompetitors),
     0,
   );
 }

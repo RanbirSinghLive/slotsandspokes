@@ -43,13 +43,13 @@ const AVG_FARE = 185;
  * frequency, choose not to travel at all rather than fly you. `pax` is
  * whichever is smaller: the old flat load-factor figure (still the
  * ceiling on a market with plenty of demand to go around), or this
- * flight's actual booked count. Still not a *complete* choice model —
- * no yield-mix segments, no competitor offerings to lose share to, both
- * still ahead — see WEEK-TWO.md's "Layers."
+ * flight's actual booked count. `bookingShare()` also folds in yield-mix
+ * segments and any static competitor serving the same market (week two's
+ * layers 2 and 3) — see WEEK-TWO.md's "Layers" for what's still ahead.
  */
 export function flightResult(leg: EconomyLeg, type: EconomyAircraftType, legsServingMarket: number): FlightResult {
   const demandPerFlight = dailyDemand(leg.origin, leg.dest) / legsServingMarket;
-  const bookedDemand = demandPerFlight * bookingShare(AVG_FARE, legsServingMarket);
+  const bookedDemand = demandPerFlight * bookingShare(AVG_FARE, legsServingMarket, leg.origin, leg.dest);
   const pax = Math.min(Math.round(type.seats * LOAD_FACTOR), Math.round(bookedDemand));
   const revenue = pax * AVG_FARE;
   const cost = (leg.blockMinutes / 60) * type.costPerBlockHour + type.costPerDeparture;
