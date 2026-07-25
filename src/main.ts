@@ -15,7 +15,9 @@ import {
   handleRouteBuilderMouseMove,
   handleRouteBuilderKeyDown,
   drawRoutePreview,
+  cancelPendingRoute,
 } from './ui/routeBuilder';
+import { setupRotationBoard, updateRotationBoard } from './ui/rotationBoard';
 
 // M4 brought only one aircraft to life, to prove out the clock and the
 // depart/arrive mechanism on something small. M5 turns the rest on by
@@ -30,11 +32,14 @@ const state: SimState = createInitialState(ACTIVE_TAILS);
 validateSchedule(state.schedule);
 setupScheduleEditor(state);
 setupRouteBuilder(state);
+setupRotationBoard();
 
 const canvas = document.querySelector<HTMLCanvasElement>('#map')!;
 const ctx = canvas.getContext('2d')!;
 const clockEl = document.querySelector<HTMLDivElement>('#clock')!;
 const speedButtons = document.querySelectorAll<HTMLButtonElement>('#speed-controls button');
+const viewToggleButtons = document.querySelectorAll<HTMLButtonElement>('#view-toggle button');
+const rotationBoardEl = document.querySelector<HTMLDivElement>('#rotation-board')!;
 
 /**
  * Size the canvas's actual pixel buffer, then fit the projection to it, then
@@ -79,7 +84,19 @@ function resize(): void {
 // time it is.
 let latestFractionalMinute = state.simMinute;
 
+// M11: which of the two main views (the map canvas, or the read-only
+// rotation board) is currently showing. The clock and sidebar panel stay
+// relevant either way, so they're not gated by this — only the actual
+// canvas drawing is, since there's no point paying for it while hidden.
+type View = 'map' | 'rotation';
+let currentView: View = 'map';
+
 function render(): void {
+  updateClock(state);
+  updatePanel(state);
+
+  if (currentView !== 'map') return;
+
   const cssWidth = window.innerWidth - PANEL_WIDTH_PX;
   const cssHeight = window.innerHeight;
 
@@ -90,8 +107,6 @@ function render(): void {
   drawAircraft(ctx, state, latestFractionalMinute);
   drawAirports(ctx);
   drawRoutePreview(ctx);
-  updateClock(state);
-  updatePanel(state);
 }
 
 const MINUTES_PER_DAY = 1440;
@@ -161,6 +176,32 @@ speedButtons.forEach((button) => {
   button.addEventListener('click', () => {
     speedMultiplier = Number(button.dataset.speed);
     speedButtons.forEach((b) => b.classList.toggle('active', b === button));
+  });
+});
+
+// --- View toggle (M11: map vs. rotation board) ---
+//
+// #map and #rotation-board are siblings sized identically in style.css;
+// only one is ever un-[hidden] at a time, so switching views is just
+// flipping that attribute on both. Switching away from the map cancels
+// any in-progress route-creation gesture (ui/routeBuilder.ts) — an armed
+// or pending route stops making sense once the canvas it was drawn on is
+// no longer visible. Switching *to* the board rebuilds it, in case the
+// schedule changed while it was hidden (nothing else refreshes it, since
+// it's a plain read of state with no interactive elements yet to justify
+// keeping it live-updated every frame — see ui/rotationBoard.ts).
+viewToggleButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    const view = button.dataset.view as View;
+    if (view === currentView) return;
+
+    currentView = view;
+    canvas.hidden = view !== 'map';
+    rotationBoardEl.hidden = view !== 'rotation';
+    viewToggleButtons.forEach((b) => b.classList.toggle('active', b === button));
+
+    if (view !== 'map') cancelPendingRoute();
+    if (view === 'rotation') updateRotationBoard(state);
   });
 });
 

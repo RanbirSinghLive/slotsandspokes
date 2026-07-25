@@ -12,11 +12,23 @@ body {
 
 /* Must match PANEL_WIDTH_PX in ui/panels.ts, which main.ts uses to size the
    canvas so the map and the sidebar share the viewport instead of the panel
-   floating on top of it. */
-#map {
+   floating on top of it. #rotation-board is a sibling that takes the exact
+   same slot — whichever of the two isn't [hidden] occupies it, no absolute
+   positioning needed. */
+#map,
+#rotation-board {
   display: block;
   width: calc(100vw - 280px);
   height: 100vh;
+  box-sizing: border-box;
+}
+
+/* Without this, the ID selector above (specificity 1-0-0) would beat the
+   browser's own default `[hidden] { display: none }` rule (0-1-0) and the
+   [hidden] attribute toggle in main.ts would silently do nothing. */
+#map[hidden],
+#rotation-board[hidden] {
+  display: none;
 }
 
 #hud {
@@ -35,12 +47,14 @@ body {
   color: #cdd3e0;
 }
 
-#speed-controls {
+#speed-controls,
+#view-toggle {
   display: flex;
   gap: 4px;
 }
 
-#speed-controls button {
+#speed-controls button,
+#view-toggle button {
   font-family: inherit;
   font-size: inherit;
   color: #cdd3e0;
@@ -51,14 +65,21 @@ body {
   cursor: pointer;
 }
 
-#speed-controls button:hover {
+#speed-controls button:hover,
+#view-toggle button:hover {
   border-color: rgba(255, 255, 255, 0.5);
 }
 
-#speed-controls button.active {
+#speed-controls button.active,
+#view-toggle button.active {
   background: #3a4258;
   border-color: #6b7694;
   color: #fff;
+}
+
+#view-toggle {
+  padding-left: 12px;
+  border-left: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 #panel {
@@ -231,4 +252,79 @@ body {
   border-color: rgba(255, 255, 255, 0.15);
   color: #6b7694;
   cursor: not-allowed;
+}
+
+/* M11: the rotation board — a Gantt-style read-only view of the schedule,
+   one row per tail. See ui/rotationBoard.ts. */
+#rotation-board {
+  padding: 68px 24px 24px;
+  overflow-y: auto;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 13px;
+  color: #cdd3e0;
+}
+
+.rotation-axis {
+  display: flex;
+  margin-bottom: 16px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.rotation-axis-spacer {
+  width: 72px;
+  flex-shrink: 0;
+}
+
+.rotation-axis-track {
+  position: relative;
+  flex: 1;
+  height: 14px;
+}
+
+.rotation-tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  color: #6b7694;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.rotation-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.rotation-row-label {
+  width: 72px;
+  flex-shrink: 0;
+  color: #9aa3b8;
+}
+
+.rotation-row-track {
+  position: relative;
+  flex: 1;
+  height: 34px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+}
+
+.rotation-bar {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  min-width: 2px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  padding: 0 5px;
+  background: #3a4258;
+  border: 1px solid #6b7694;
+  border-radius: 3px;
+  color: #fff;
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }

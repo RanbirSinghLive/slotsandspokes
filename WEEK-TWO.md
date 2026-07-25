@@ -362,3 +362,123 @@ Step 1 is the one deliberate exception to "layers before loops": the
 *gesture* doesn't need the economy to be rich to be worth building and
 feeling right, even though *whether a given route is a good idea*
 still waits on steps 2–5.
+
+---
+
+## The rotation board — M11
+
+Raised after M10: the flat schedule table doesn't scale. Even at 3
+aircraft/12 legs it's already a wall of rows you have to mentally
+reconstruct into "what is this tail doing all day" — and the actual ask
+was for more aircraft, some of them different types, added in bulk, with
+a way to actually *see* where a tail has free time to put a new leg. A
+text table was never going to answer "where's the white space."
+
+### The shape of it
+
+The standard tool for exactly this problem, used in real airline
+scheduling software under names like a rotation diagram or string
+diagram: a Gantt chart. One row per tail, one shared time-of-day axis,
+each scheduled leg drawn as a bar from `departMinute` to
+`departMinute + blockMinutes`, labeled with the route. Everything that
+isn't a bar *is* the white space — no separate "free time" indicator
+needed, the gaps just are the answer, which is what makes this solve
+the legibility complaint directly rather than layering more filters on
+top of the same wall of text.
+
+This scales the way the flat table doesn't: more aircraft is just more
+rows (scrollable past some count); a second aircraft type (still on
+CLAUDE.md's deferred list — flagging that this plan would touch it,
+not deciding it) falls out for free, since a bar's width is already
+`blockMinutes`, which is already computed from that type's cruise speed
+(`sim/schedule.ts`'s `computeBlockMinutes`) — a faster type's bars are
+just narrower for the same route, no special-casing needed in the view
+itself.
+
+### Where it lives
+
+280px of sidebar isn't enough room for a legible 24-hour timeline. Two
+real options:
+- **A toggle that swaps the map for the board.** A "Map / Rotation"
+  switch (matching the existing HUD's button styling) gives the board
+  the full canvas area. The existing filterable schedule table could
+  move here too, alongside the board, since there's finally room for
+  both the visual and the precise-detail view side by side.
+- **A modal/overlay on top of everything.** Simpler to bolt on, but
+  modals read as quick in-and-out interactions, and building out a
+  fleet's schedule is more of an extended-session task — leaning
+  toward the toggle instead, but this is a real open question, not a
+  settled one.
+
+### Phasing (build in this order, each one a real stopping point)
+
+1. **Visualize only.** Read-only board: bars for every existing leg,
+   nothing clickable yet. This alone answers "not legible" — worth
+   shipping and sitting with before adding any interaction, the same
+   "nail the core thing first" lesson M10 was built on.
+2. **Create from a gap.** Click-drag inside empty space on a tail's row
+   to place a new leg there — reusing the *exact* confirmation-form
+   machinery already built for the map gesture (tail is already
+   implied by which row you clicked, so that field disappears; time
+   comes from where you dragged; the same `computeBlockMinutes`/
+   `isExistingMarket`/`findExactTimeCollision` checks apply unchanged).
+   The market (origin/destination) still needs picking somehow — likely
+   a lightweight selector rather than the map, since you're not looking
+   at the map in this view.
+3. **Reschedule by dragging.** Drag an existing bar left/right to change
+   its `departMinute`, live-checking the same collision/overlap rules
+   instead of only through the table's tiny time input.
+4. **Bulk generation (speculative, only if 2–3 don't already cover the
+   felt need).** A small "add N frequencies, every X minutes, starting
+   at Y" tool for a market, rather than repeating the single-add
+   gesture by hand. Whether this is actually needed once dragging into
+   gaps is fluid, or whether "adding a bunch of flights at once" was
+   really asking for phase 2's workflow all along, is worth finding out
+   before building a separate bulk tool.
+
+### Decisions
+
+Answered in one pass ("1st pass visual ony, toggle, step 2"):
+
+1. **Phase scope: phase 1 only.** Visualize-only, ship it, sit with it
+   before touching interaction.
+2. **Toggle**, not a modal — a "Map / Rotation" button pair in the HUD,
+   matching the existing speed-control styling.
+3. **"Adding a bunch of flights at once" means phase 2**, not a separate
+   bulk-generation tool. Phase 4 is shelved unless phase 2 turns out not
+   to cover the felt need after all.
+4. Multiple aircraft types: still not being introduced. The board is
+   built ready for it (bar width already comes from `blockMinutes`,
+   which already accounts for cruise speed), but a second type is not
+   in scope here — this stays on CLAUDE.md's deferred list.
+
+### Phase 1 — done
+
+Built as a new `ui/rotationBoard.ts` module, a sibling of `#map` in
+`index.html` sized identically and swapped via the `hidden` attribute
+(same pattern the schedule editor already used for live inputs vs.
+plain reads — the board has no interactive elements yet, so unlike the
+schedule table it can safely be wholesale-rebuilt on every call rather
+than patched).
+
+One row per tail from `state.aircraft`, one bar per leg from
+`state.schedule` positioned by percentage (`left` from
+`departMinute / 1440`, `width` from `blockMinutes / 1440`) against a
+shared 00:00–24:00 axis ticked every 3 hours. Switching to the Map view
+cancels any in-progress route-creation gesture (`cancelPendingRoute()`
+in `ui/routeBuilder.ts`), since an armed/pending route stops making
+sense once the canvas it was drawn on is hidden.
+
+Verified in-browser: toggle swaps Map ⇄ Rotation cleanly in both
+directions, axis ticks land at the right positions, each tail's bars
+match the schedule table's times, and the map re-renders correctly
+(routes/aircraft/basemap) after switching back. One false alarm during
+verification — a `Schedule error: C-GVIA lands at YOW on C-GVIA-4 but
+C-GVIA-5 departs from YSJ` console line turned out to be stale buffered
+history from an earlier manual test, not a real regression; confirmed
+by forcing a hard reload and checking that the *most recent* startup
+log read `Schedule OK: 12 legs across 3 aircraft, no broken rotations.`
+and that `data/schedule.json` on disk has no such leg.
+
+Not built yet, by design: phases 2–4 above, all still gated on being
+explicitly asked for.

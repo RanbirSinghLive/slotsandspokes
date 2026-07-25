@@ -330,6 +330,38 @@ is still meaningful to leave in place while iterating. That collision
 check is same-direction only (opposite-direction departures at the same
 clock time is an ordinary synchronized schedule bank, not a conflict).
 
+## Rotation board (`src/ui/rotationBoard.ts`) — M11
+
+A second view of the same `state`, for when the schedule table stops being
+legible — a Gantt-style diagram, one row per tail, bars from
+`departMinute` to `departMinute + blockMinutes` against a shared 24-hour
+axis. Everything that isn't a bar *is* the answer to "where's the white
+space" — no separate free-time indicator is drawn, since the gaps between
+bars already show it.
+
+`#map` and `#rotation-board` are CSS siblings sized identically; a
+"Map / Rotation" toggle in the HUD swaps which one is visible via the
+`hidden` attribute rather than absolute positioning. `main.ts`'s `render()`
+still updates the clock and sidebar panel every frame regardless of which
+view is showing, but skips all canvas drawing while the board is up
+(`if (currentView !== 'map') return;`) — there's no point paying for it
+while hidden.
+
+The board is read-only for now (phase 1 of a longer plan — see
+WEEK-TWO.md's "rotation board" section for phases 2–4, none of which are
+built). Unlike the schedule table or the route-builder form, it has no
+live `<input>` elements to lose focus on, so `updateRotationBoard()`
+simply clears and rebuilds every row from `state` on each call, rather
+than patching in place the way M8/M10 have to. It's called once when the
+Rotation view is selected (in case the schedule changed while it was
+hidden) and not on every tick, since nothing else currently mutates the
+schedule while the board itself is open.
+
+Switching away from the Map view calls `cancelPendingRoute()` (M10's route
+builder, exported for this purpose) — an armed or half-confirmed route
+gesture doesn't mean anything once the canvas it was being drawn on is no
+longer on screen.
+
 ## Randomness (`src/sim/rng.ts`)
 
 A seeded PRNG (mulberry32); `state.rngSeed` carries its entire internal

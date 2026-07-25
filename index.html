@@ -8,6 +8,13 @@
   </head>
   <body>
     <canvas id="map"></canvas>
+    <div id="rotation-board" hidden>
+      <div class="rotation-axis">
+        <div class="rotation-axis-spacer"></div>
+        <div id="rotation-axis-track" class="rotation-axis-track"></div>
+      </div>
+      <div id="rotation-rows"></div>
+    </div>
     <div id="hud">
       <div id="clock">Day 1 · 00:00 UTC</div>
       <div id="speed-controls">
@@ -15,6 +22,10 @@
         <button type="button" data-speed="1" class="active">1×</button>
         <button type="button" data-speed="4">4×</button>
         <button type="button" data-speed="20">20×</button>
+      </div>
+      <div id="view-toggle">
+        <button type="button" data-view="map" class="active">Map</button>
+        <button type="button" data-view="rotation">Rotation</button>
       </div>
     </div>
     <aside id="panel">

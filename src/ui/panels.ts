@@ -75,8 +75,9 @@ function pad(n: number): string {
 }
 
 // <input type="time"> speaks in "HH:MM" strings; the sim speaks in minutes
-// since midnight. These two just convert between them.
-function minuteOfDayToTimeString(minuteOfDay: number): string {
+// since midnight. These two just convert between them. Exported since
+// ui/rotationBoard.ts needs the same formatting for its bar tooltips.
+export function minuteOfDayToTimeString(minuteOfDay: number): string {
   return `${pad(Math.floor(minuteOfDay / 60))}:${pad(minuteOfDay % 60)}`;
 }
 

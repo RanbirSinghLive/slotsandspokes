@@ -94,6 +94,16 @@ function reset(): void {
 }
 
 /**
+ * Cancel any in-progress arm/confirm gesture from outside this module —
+ * main.ts calls this when switching away from the Map view (M11), since
+ * an armed or pending route makes no sense once the canvas it was drawn
+ * on is hidden.
+ */
+export function cancelPendingRoute(): void {
+  reset();
+}
+
+/**
  * Handle a canvas mousedown *before* main.ts's own pan-drag logic does.
  * Returns true when the route builder consumed the click (armed a new
  * route, confirmed one, or cancelled a pending one) — main.ts should skip
