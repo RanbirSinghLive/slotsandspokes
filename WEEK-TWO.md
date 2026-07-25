@@ -160,15 +160,9 @@ full draw order.
 market's total daily demand is split evenly across however many
 scheduled legs serve it (`sim/schedule.ts`'s `legsServingMarket()`), and
 `pax` is the smaller of the old flat load-factor figure or this
-flight's actual slice of that split. Verified via the headless runner —
-the Ottawa-Montréal-Toronto corridor still fills to the old 59-pax
-ceiling, but every Atlantic leg the fleet flies today is now
-demand-starved (YYG-YFC down to a single passenger on a 78-seat
-aircraft); total daily revenue fell from a flat $128,760 to $52,725,
-and some days now finish with a negative margin. This is deliberately
-still not a real choice model — no fare sensitivity, no competitor
-share, just an even split of a fixed market — that's layer 4 and the
-pricing loop's job, both still ahead.
+flight's actual slice of that split — further refined by layer 4's
+`bookingShare()`, below, so not everyone in that slice necessarily
+travels.
 
 ### 2. Yield mix / travel purpose (business, leisure, VFR)
 
@@ -188,28 +182,51 @@ market, with fixed schedules and fares (decision 2) authored as data,
 not decision-making logic. Their whole job is to be a competing option
 in the choice model below — nothing more.
 
-### 4. The connective piece: a choice / market-share model
+### 4. The connective piece: a choice / market-share model — v1 done
 
-None of layers 1–3 actually *do* anything without this. Given a
-passenger segment and a route, something has to decide: book you, book
-a (static) competitor, or don't travel. The standard, well-worn
-technique: a multinomial logit model — each airline's offering on that
-route gets scored by a utility function (`w_price · -price +
-w_schedule · schedule-fit + w_product · quality`, weights varying by
-segment), and market share falls out as a softmax over the scores.
-Real airlines use almost exactly this (the industry term is QSI,
-Quality of Service Index, for the schedule-fit piece specifically).
+Given a passenger segment and a route, something has to decide: book
+you, book a (static) competitor, or don't travel. The standard,
+well-worn technique: a multinomial logit model — each airline's
+offering on that route gets scored by a utility function (`w_price ·
+-price + w_schedule · schedule-fit + w_product · quality`, weights
+varying by segment), and market share falls out as a softmax over the
+scores. Real airlines use almost exactly this (the industry term is
+QSI, Quality of Service Index, for the schedule-fit piece specifically).
+
+**Built as `bookingShare(fare, legsServingMarket)` in the new
+`sim/choiceModel.ts`**, wired into `economy.ts` (see HOW-IT-WORKS.md's
+"Economy"). Since yield-mix segments (layer 2) and competitor offerings
+(layer 3) don't exist yet, this v1 only ever scores your own flight
+against a "stay home" option fixed at utility 0 — with just one real
+alternative plus that baseline, the softmax collapses to a plain
+logistic sigmoid, which is what's actually implemented.
+`w_product · quality` is dropped entirely for now (no product-quality
+axis exists yet either); `schedule-fit` is `legsServingMarket` alone
+(log-scaled for diminishing returns), since with no competitor to share
+frequency against, your own frequency count is the whole story. Weights
+and the intercept are hand-picked, crude constants, same spirit as
+`LOAD_FACTOR`/`AVG_FARE` — calibrated so today's $185 fare and 1-2 daily
+frequencies land in the high-0.8s/low-0.9s, leaving headroom to respond
+once a real fare lever (the pricing loop, below) exists.
 
 This is "crude but principled" in the same way `economy.ts` already
 is — not a simulation of individual passengers, just an aggregate
 formula — but it's the piece that makes demand, yield mix, pricing, and
-competition into one system instead of four unconnected ones.
+competition into one system instead of four unconnected ones. Verified
+via the headless runner and matched exactly against a live browser run:
+daily revenue dropped modestly further (from $52,725 to $51,615), and
+frequency's effect is already real and player-actionable today — adding
+a second daily frequency to a market via the M10 route builder
+measurably raises that market's booking share, right now, with no
+further layers needed to see it.
 
 **Side note on frequency specifically:** real airline schedule
 competition has a well-documented effect where frequency share
 translates into *more than proportional* market share (the "S-curve").
-Worth knowing about even if v1 skips the nuance and treats frequency
-share as directly proportional.
+v1 skips that nuance and treats frequency as a log-scaled, diminishing-
+returns bump instead of a true S-curve — worth revisiting once
+competitors exist and "frequency share" (yours over the whole market's)
+is actually a meaningful ratio rather than just your own count.
 
 ---
 
@@ -413,7 +430,11 @@ it last of everything above.
    figures added to `airports.json`; gravity model in `sim/demand.ts`,
    visible via the new Demand map mode, and now capping `economy.ts`'s
    pax count so a thin market genuinely flies half-empty.
-4. Choice/market-share model — the connective piece
+4. **Choice/market-share model** — v1 done. `sim/choiceModel.ts`'s
+   `bookingShare()`, a logistic sigmoid (softmax collapses to this with
+   only one real alternative to "stay home"), wired into `economy.ts`.
+   No yield-mix segments or competitor offerings yet, so it only ever
+   scores your own flight — see the "Layers" write-up for what's next.
 5. Yield mix / travel purpose segmentation
 6. Static competitor data, authored and wired into the choice model
    (small, now that AI is non-reactive — see "What this simplifies")

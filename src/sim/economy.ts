@@ -1,4 +1,5 @@
 import { dailyDemand } from './demand';
+import { bookingShare } from './choiceModel';
 
 export type EconomyLeg = {
   origin: string;
@@ -34,18 +35,22 @@ const AVG_FARE = 185;
  * `legsServingMarket` is how many scheduled legs (either direction, see
  * `sim/schedule.ts`'s `legsServingMarket()`) currently split this leg's
  * market between them — the route's total daily demand (week two's
- * `sim/demand.ts`) is divided evenly across all of them, so adding a
- * second frequency to an already-thin market doesn't create new
- * passengers, it just splits the same ones two ways. `pax` is whichever is
- * smaller: the old flat load-factor figure (still the ceiling on a market
- * with plenty of demand to go around), or this flight's actual slice of
- * the market. This is still not a real choice model — no fare sensitivity,
- * no competitor share, demand is just split evenly — see WEEK-TWO.md's
- * "Layers" for what's still ahead of this.
+ * `sim/demand.ts`) is divided evenly across all of them, so a second
+ * frequency on an already-thin market doesn't create new passengers, it
+ * just splits the same ones two ways. Of that per-flight slice, only
+ * `bookingShare()` (`sim/choiceModel.ts`, week two's "connective piece")
+ * actually books — some people, given this fare and this market's
+ * frequency, choose not to travel at all rather than fly you. `pax` is
+ * whichever is smaller: the old flat load-factor figure (still the
+ * ceiling on a market with plenty of demand to go around), or this
+ * flight's actual booked count. Still not a *complete* choice model —
+ * no yield-mix segments, no competitor offerings to lose share to, both
+ * still ahead — see WEEK-TWO.md's "Layers."
  */
 export function flightResult(leg: EconomyLeg, type: EconomyAircraftType, legsServingMarket: number): FlightResult {
   const demandPerFlight = dailyDemand(leg.origin, leg.dest) / legsServingMarket;
-  const pax = Math.min(Math.round(type.seats * LOAD_FACTOR), Math.round(demandPerFlight));
+  const bookedDemand = demandPerFlight * bookingShare(AVG_FARE, legsServingMarket);
+  const pax = Math.min(Math.round(type.seats * LOAD_FACTOR), Math.round(bookedDemand));
   const revenue = pax * AVG_FARE;
   const cost = (leg.blockMinutes / 60) * type.costPerBlockHour + type.costPerDeparture;
   return { pax, revenue, cost, margin: revenue - cost };

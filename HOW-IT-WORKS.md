@@ -153,7 +153,8 @@ route's market can actually support that many passengers:
 ```
 LOAD_FACTOR = 0.75      AVG_FARE = 185
 demandPerFlight = dailyDemand(origin, dest) / legsServingMarket
-pax     = min(round(seats * LOAD_FACTOR), round(demandPerFlight))
+bookedDemand    = demandPerFlight * bookingShare(AVG_FARE, legsServingMarket)
+pax     = min(round(seats * LOAD_FACTOR), round(bookedDemand))
 revenue = pax * AVG_FARE
 cost    = (blockMinutes / 60) * costPerBlockHour + costPerDeparture
 margin  = revenue - cost
@@ -163,20 +164,33 @@ margin  = revenue - cost
 leg between this pair, either direction — the route's total daily demand
 (`sim/demand.ts`) is split evenly across all of them, so a second daily
 frequency on an already-thin market doesn't conjure new passengers, it
-just gives the same ones a second flight to spread across. `pax` is
-whichever is smaller: the old flat load-factor figure (still the ceiling
-on a market with demand to spare), or this flight's actual slice of the
-market. Verified via the headless runner: the Ottawa-Montréal-Toronto
-corridor still fills to the old 59-pax ceiling (plenty of demand there),
-while every Atlantic Canada leg the fleet flies today is demand-starved —
-YQM-YYG dropping to 3 pax, YYG-YFC to a single passenger, on a 78-seat
-aircraft. Total daily revenue fell from a flat $128,760 to $52,725,
-several days now finish with a negative margin — the first time this
-schedule's real problem (too much airplane for these particular Atlantic
-markets) has been visible in the numbers rather than just implied by the
-demand map. This still isn't a real choice model — no fare sensitivity, no
-competitor share, demand is just split evenly — see WEEK-TWO.md's "Layers"
-for what's still ahead of this.
+just gives the same ones a second flight to spread across.
+
+`bookingShare()` (`sim/choiceModel.ts`, week two's "connective piece") is
+new: of that per-flight slice, only some fraction actually books, given
+this fare and how convenient the market's frequency makes it — the rest
+choose not to travel at all. It's a multinomial logit collapsed to a
+plain logistic sigmoid, since with no competitor offerings yet (still
+ahead — see WEEK-TWO.md's "Layers") there's only one real alternative to
+"stay home." `pax` is whichever is smaller: the old flat load-factor
+figure (still the ceiling on a market with demand to spare), or this
+flight's actual booked count.
+
+Verified via the headless runner: the Ottawa-Montréal-Toronto corridor
+still fills to the old 59-pax ceiling (plenty of demand there, and
+`bookingShare` near 0.92 barely trims it), while every Atlantic Canada
+leg the fleet flies today is demand-starved *and* now further trimmed by
+booking share — YQM-YYG down to 3 pax, YYG-YFC to a single passenger, on
+a 78-seat aircraft. Total daily revenue is $51,615 (down from $52,725
+right after the demand cap alone, $128,760 before either existed), and
+some days still finish with a negative margin. Confirmed to match
+exactly between the headless runner and a live browser run at the same
+simulated day boundary. Still not a *complete* choice model — no
+yield-mix segments, no competitor share to lose — but frequency now has
+a real, already-actionable effect: adding a second daily frequency to a
+market (the M10 route builder) measurably raises that market's booking
+share, the "S-curve" dynamic WEEK-TWO.md flags as a documented real-world
+effect, even in this simplified v1.
 
 Applied on **arrival**, not departure — a flight in the air hasn't earned or
 spent anything yet. `margin` is added to `state.cash`; `revenue`/`cost`/
