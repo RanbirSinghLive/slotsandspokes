@@ -9,6 +9,16 @@ export type Aircraft = {
   status: AircraftStatus;
   atAirport: string | null;
   activeLegId: string | null;
+  /**
+   * The simMinute this aircraft last became grounded — 0 at the start of the
+   * world, updated every time it lands. step() (M9) won't let it depart on
+   * its next leg until MIN_TURN_MINUTES after this, even if that leg's
+   * scheduled departure time has already passed: a late arrival still needs
+   * a real turnaround, not an instant one, which is what lets one delay
+   * push the next leg's departure back rather than only "catching up"
+   * instantly.
+   */
+  groundSinceMinute: number;
 };
 
 export type ActiveFlight = {
@@ -18,6 +28,14 @@ export type ActiveFlight = {
   dest: string;
   departMinute: number;
   arriveMinute: number;
+  /**
+   * What arriveMinute would have been with zero delay and an on-time
+   * departure — i.e., the honest "should have landed by" time. Comparing
+   * this to the real arriveMinute (both computed in step.ts at the moment
+   * this flight departs) is how the fleet panel explains *why* a flight is
+   * running late, without the UI layer needing to redo any day-boundary math.
+   */
+  scheduledArriveMinute: number;
 };
 
 export type SimState = {
@@ -92,6 +110,7 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
       status: 'ground',
       atAirport: firstLeg.origin,
       activeLegId: null,
+      groundSinceMinute: 0,
     };
   });
 

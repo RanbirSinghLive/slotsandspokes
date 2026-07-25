@@ -7,10 +7,10 @@ short update whenever a milestone changes how something works; if it drifts
 out of sync with the code, the code is right and this needs fixing, not the
 other way around.
 
-Status: M1–M6 complete (scaffold through economy/panel). Phase 2 M7
-(headless runner) and M8 (schedule editor) done — see their sections below.
-M9 (turn times/delays) not started, though the seeded PRNG it will need
-already exists (see "Randomness" below).
+Status: M1–M6 complete (scaffold through economy/panel). Phase 2 — M7
+(headless runner), M8 (schedule editor), and M9 (turn times/delays) all
+done. That's every milestone WEEK-ONE.md's "Then, in order" names; what's
+left is WEEK-ONE.md's "Deliberately deferred" list, not started.
 
 ---
 
@@ -59,13 +59,21 @@ in-browser sim behave identically).
 ```
 simMinute        — current time, see above
 cash             — running total, persists across days
-aircraft[]       — { tail, typeCode, status: 'ground'|'airborne', atAirport, activeLegId }
-activeFlights[]  — { legId, tail, origin, dest, departMinute, arriveMinute }
+aircraft[]       — { tail, typeCode, status: 'ground'|'airborne', atAirport,
+                      activeLegId, groundSinceMinute }
+activeFlights[]  — { legId, tail, origin, dest, departMinute, arriveMinute,
+                      scheduledArriveMinute }
 schedule[]       — this game's own editable copy of the daily schedule (see M8, below)
 completedToday[] — legIds finished since the last day rollover
 todayRevenue/Cost/Margin — reset to 0 at day rollover; cash is not reset
-rngSeed          — seeded RNG state (see Randomness) — not consumed yet
+rngSeed          — seeded RNG state (see Randomness) — used by M9's delay rolls
 ```
+
+`groundSinceMinute` (added M9) is when an aircraft last landed, used to
+enforce a minimum turnaround. `scheduledArriveMinute` (added M9) is what an
+`ActiveFlight`'s arrival would have been with a fully on-time departure and
+zero delay — comparing it to the real `arriveMinute` is how lateness gets
+explained without redoing day-boundary math outside step.ts.
 
 `createInitialState(tails, rngSeed?)` builds this at `simMinute = 0`. Only
 the tails you pass become `Aircraft` records — a schedule leg for any other
@@ -87,17 +95,50 @@ order:
    specifically so that right up until this call, those fields still hold
    the just-finished day's real totals — readable from outside step()
    (the M7 headless runner, for instance) between calls.
-2. **Depart** — any leg in `state.schedule` whose `departMinute` matches
-   `simMinute % 1440`, flown by an aircraft that's on the ground at the
-   right airport, takes off: the aircraft flips to `airborne` and an
-   `ActiveFlight` is created with `blockMinutes` (computed once at schedule
-   load time from great-circle distance ÷ cruise speed, in
-   `sim/schedule.ts`) added to the absolute departure minute. Reading from
-   `state.schedule` rather than a fixed constant is what lets the M8
-   schedule editor's edits actually change what the sim does.
+2. **Depart** — any leg in `state.schedule` whose `departMinute` has arrived
+   ("at or after," not only the exact minute — see below), not already
+   flown or in the air today, flown by an aircraft that's on the ground at
+   the right airport *and* past its minimum turnaround
+   (`groundSinceMinute + MIN_TURN_MINUTES`), takes off: the aircraft flips
+   to `airborne` and an `ActiveFlight` is created with `blockMinutes`
+   (computed once at schedule load time from great-circle distance ÷ cruise
+   speed) plus a randomly rolled delay (M9, see below) added to the
+   departure minute. Reading from `state.schedule` rather than a fixed
+   constant is what lets the M8 schedule editor's edits actually change
+   what the sim does.
 3. **Arrive** — any `ActiveFlight` whose `arriveMinute` has been reached
-   lands: the aircraft flips back to `ground` at the destination, and
+   lands: the aircraft flips back to `ground` at the destination and
+   records `groundSinceMinute` (for the *next* leg's turnaround check), and
    `sim/economy.ts`'s `flightResult()` is applied (see Economy below).
+
+**Why "at or after" instead of an exact match (M9):** once delays exist, an
+aircraft can still be mid-flight or mid-turnaround at the exact minute its
+next leg was scheduled to leave. Matching only the exact minute would just
+silently skip that leg for the rest of the day the moment it missed its
+slot. "Has the time passed, and haven't we flown this leg yet today"
+instead means a late aircraft departs the moment it's actually ready — the
+whole mechanism that lets one delay push a later one back rather than the
+schedule quietly giving up on that leg.
+
+**Delay rolling** (`step.ts`'s `rollDelayMinutes()`): a fixed, non-tunable
+distribution — 65% of flights are exactly on time; the rest get a delay of
+1–45 minutes, skewed toward the short end (rolled as `severity²` so small
+delays are far more common than the maximum). Two draws from `sim/rng.ts`'s
+`nextRandom()` per roll (one for "delayed at all," one for "how much" when
+it is), threading `state.rngSeed` forward each time — same reasoning as
+always: a delay has to be reproducible from `state` alone.
+
+One concrete traced example (seed 3, single aircraft): a leg rolled a
+27-minute arrival delay, landing at minute 6401 against a scheduled 6374.
+Its next leg was due to depart at 6420, but `6401 + 30 (MIN_TURN_MINUTES) =
+6431` came out later than that — so it departed at 6431, 11 minutes late,
+gated by the turnaround rule rather than the original schedule. That's the
+cascade mechanic, confirmed by hand arithmetic against the actual output.
+
+A full-year run (3 aircraft, several seeds) never produced a "stranded"
+aircraft — a tail sitting at the wrong airport for its next scheduled
+leg — because the schedule's turn buffers (46–59 minutes) comfortably
+absorb the maximum single-leg delay (45 minutes) in practice.
 
 ## Economy (`src/sim/economy.ts`)
 
@@ -116,6 +157,13 @@ Applied on **arrival**, not departure — a flight in the air hasn't earned or
 spent anything yet. `margin` is added to `state.cash`; `revenue`/`cost`/
 `margin` are each added to the day's running totals.
 
+`blockMinutes` here is `arriveMinute - departMinute` on the actual
+`ActiveFlight` — since M9, that includes any rolled delay, so a delayed
+flight genuinely costs more (more block hours burned) with no separate
+code path needed. `revenue` is unaffected (pax count doesn't depend on
+delay), so this is also why the economy no longer produces the same
+margin every day — see Headless runner, below.
+
 ## Headless runner (`src/headless/run.ts`)
 
 `npm run headless` (optionally `-- 30` for a shorter run than the 365-day
@@ -127,10 +175,12 @@ margin, and legs flown, reading `state.todayRevenue` etc. right after the
 day's last minute is processed but before the next day's first minute would
 reset them (see the note on reset timing under "The tick" above).
 
-Running the full year today shows margin is *exactly* $84,423 on every one
-of the 365 days — expected, since nothing in the sim varies day to day yet
-(no delays, no seasonality), but worth having actually confirmed rather
-than assumed, which is the entire point of this milestone per WEEK-ONE.md.
+Before M9, margin was *exactly* $84,423 on every one of 365 days — expected
+at the time (nothing varied day to day yet), but a real limitation: there
+was no way for a bad day to happen at all. Since M9's delays feed into cost
+(see Economy, above), margin now genuinely varies day to day — a 30-day run
+ranged roughly $77,000–$84,000 depending on how much delay-driven cost each
+day happened to roll.
 
 ## Rendering (`src/render/`, plus `main.ts`'s loop)
 
@@ -152,6 +202,9 @@ order each frame, back to front:
    it stays smooth at any speed and freezes exactly when paused. Heading
    comes from `sim/geo.ts`'s `bearing()`, converted to a canvas rotation
    (valid specifically because Mercator always draws north-up/east-right).
+   Since M9, a flight running late (`arriveMinute > scheduledArriveMinute`)
+   is tinted red instead of the usual yellow — the point being to make a
+   cascading delay watchable on the map itself, not just readable as text.
 5. `airports.ts` — a dot + IATA label per airport.
 
 `projection.ts` owns the single shared `d3.geoMercator()` instance, fitted to
@@ -168,9 +221,10 @@ per the pattern in CLAUDE.md's "Time" section.
 A real HTML sidebar, 280px wide (canvas width = `window.innerWidth - 280`,
 kept in sync via `PANEL_WIDTH_PX`). Shows cash, today's revenue/cost/margin,
 a fleet table (tail, type, status, and either the current airport or
-`origin → dest (N min)` while airborne), and the schedule table below. The
-econ/fleet parts are rebuilt from `state` every render — a pure read, same
-rule as the canvas layers.
+`origin → dest (N min)` while airborne — with `, N min late` appended when
+`arriveMinute > scheduledArriveMinute`, M9), and the schedule table below.
+The econ/fleet parts are rebuilt from `state` every render — a pure read,
+same rule as the canvas layers.
 
 ## Schedule editor (M8)
 
@@ -197,17 +251,18 @@ touching `render/routes.ts`'s route list) is out of scope for this pass.
 
 ## Randomness (`src/sim/rng.ts`)
 
-A seeded PRNG (mulberry32) exists and `state.rngSeed` carries its entire
-internal state, but nothing calls it yet. This is groundwork for M9 (turn
-times and delay propagation) — the seed lives in `state`, not a module-level
-variable, specifically so a delay roll stays reproducible: same state in,
-same state out, and a saved/reloaded or headlessly-rerun game produces the
-identical sequence of "random" delays.
+A seeded PRNG (mulberry32); `state.rngSeed` carries its entire internal
+state. Used by M9's delay rolls in `step.ts` (see "The tick," above). The
+seed lives in `state`, not a module-level variable, specifically so a delay
+roll stays reproducible: same state in, same state out, and a saved/
+reloaded or headlessly-rerun game produces the identical sequence of
+"random" delays. Verified: identical seed → identical 60-day outcome;
+different seed → diverges.
 
 ## What isn't built yet
 
-See WEEK-ONE.md's "Then, in order" (turn times/delay propagation — headless
-runner and schedule editor are now done, above) and "Deliberately deferred"
-(aircraft market, financing, maintenance, crew, competitor AI, multiple
-aircraft types, save/load, and more) — not duplicated here since it would
-just go stale twice.
+See WEEK-ONE.md's "Deliberately deferred" list (aircraft market, financing,
+maintenance, crew, competitor AI, multiple aircraft types, save/load, and
+more) — not duplicated here since it would just go stale. Everything in
+"Then, in order" (headless runner, schedule editor, turn times/delays) is
+now done.

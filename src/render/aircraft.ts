@@ -9,6 +9,10 @@ const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]
 const AIRCRAFT_LENGTH = 7;
 const AIRCRAFT_WIDTH = 5;
 const AIRCRAFT_FILL = '#ffd166';
+// A flight running late (M9) is tinted red instead of the usual yellow —
+// this is what makes a cascading delay actually watchable on the map
+// itself, not just readable in the fleet panel's text.
+const AIRCRAFT_FILL_LATE = '#ff5c5c';
 
 // How far ahead (as a fraction of the whole flight) to sample when working
 // out which way the aircraft is pointed. Small enough to be a good local
@@ -52,11 +56,12 @@ export function drawAircraft(ctx: CanvasRenderingContext2D, state: SimState, now
     // but Mercator — see render/projection.ts.
     const canvasRotation = ((compassBearing - 90) * Math.PI) / 180;
 
-    drawTriangle(ctx, point[0], point[1], canvasRotation);
+    const isLate = flight.arriveMinute > flight.scheduledArriveMinute;
+    drawTriangle(ctx, point[0], point[1], canvasRotation, isLate ? AIRCRAFT_FILL_LATE : AIRCRAFT_FILL);
   }
 }
 
-function drawTriangle(ctx: CanvasRenderingContext2D, x: number, y: number, rotation: number): void {
+function drawTriangle(ctx: CanvasRenderingContext2D, x: number, y: number, rotation: number, fillStyle: string): void {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(rotation);
@@ -66,7 +71,7 @@ function drawTriangle(ctx: CanvasRenderingContext2D, x: number, y: number, rotat
   ctx.lineTo(-AIRCRAFT_LENGTH * 0.5, AIRCRAFT_WIDTH * 0.5);
   ctx.lineTo(-AIRCRAFT_LENGTH * 0.5, -AIRCRAFT_WIDTH * 0.5);
   ctx.closePath();
-  ctx.fillStyle = AIRCRAFT_FILL;
+  ctx.fillStyle = fillStyle;
   ctx.fill();
 
   ctx.restore();

@@ -23,7 +23,16 @@ export type ScheduleLeg = {
 };
 
 const TAXI_ALLOWANCE_MINUTES = 20;
-const MIN_TURN_MINUTES = 30;
+
+/**
+ * The minimum ground time between one leg and the next for the same tail.
+ * Used two ways: validateSchedule() below checks the *authored* schedule
+ * against it (a leg written with less gap than this is a design mistake),
+ * and step.ts (M9) enforces it at runtime against the *actual* landing
+ * time — an aircraft that lands late still needs at least this long before
+ * its next departure, which is what lets one delay push a later one.
+ */
+export const MIN_TURN_MINUTES = 30;
 
 const airportsByIata = new Map<string, AirportLocation>(
   (airportsData as AirportLocation[]).map((airport) => [airport.iata, airport]),

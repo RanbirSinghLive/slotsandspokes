@@ -46,9 +46,20 @@ export function updatePanel(state: SimState): void {
       whereCell.textContent = aircraft.atAirport ?? '—';
     } else {
       const flight = state.activeFlights.find((f) => f.tail === aircraft.tail);
-      whereCell.textContent = flight
-        ? `${flight.origin} → ${flight.dest} (${flight.arriveMinute - state.simMinute} min)`
-        : '—';
+      if (flight) {
+        const minutesRemaining = flight.arriveMinute - state.simMinute;
+        // How far behind an entirely on-time day this flight's arrival is —
+        // see ActiveFlight.scheduledArriveMinute in sim/state.ts. This is
+        // what lets the panel explain *why* a flight is running late (M9),
+        // not just that it is.
+        const lateness = flight.arriveMinute - flight.scheduledArriveMinute;
+        whereCell.textContent =
+          lateness > 0
+            ? `${flight.origin} → ${flight.dest} (${minutesRemaining} min, ${lateness} min late)`
+            : `${flight.origin} → ${flight.dest} (${minutesRemaining} min)`;
+      } else {
+        whereCell.textContent = '—';
+      }
     }
 
     row.append(tailCell, typeCell, statusCell, whereCell);
