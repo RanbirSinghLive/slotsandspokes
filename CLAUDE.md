@@ -19,8 +19,10 @@ The map is not decoration. The player must be able to learn things by looking
 at it that a table would not tell them — chiefly how a delay on one sector
 cascades through the rest of that aircraft's day.
 
-Not a goal: realism for its own sake, global scale, aircraft trading,
-financing, passenger simulation at the individual level.
+Not a goal this milestone: realism for its own sake, aircraft trading,
+financing, passenger simulation at the individual level. Global scale
+isn't being built now, but data added for the demand layer (see
+WEEK-TWO.md) shouldn't be designed in a way that forecloses it later.
 
 ---
 
@@ -68,7 +70,8 @@ index.html
 CLAUDE.md
 WEEK-ONE.md
 data/
-  airports.json          10 airports, coords from OurAirports
+  airports.json          10 airports, coords from OurAirports, population
+                         (catchment CMA/CA) from StatsCan 2021 census
   aircraft-types.json    performance and cost parameters
   schedule.json          the daily repeating schedule
   world-110m.json        Natural Earth basemap, TopoJSON

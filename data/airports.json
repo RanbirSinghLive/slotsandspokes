@@ -1,12 +1,12 @@
 [
-  { "iata": "YUL", "name": "Montréal–Trudeau",   "lat": 45.4678, "lon": -73.7423, "utcOffsetMinutes": -300 },
-  { "iata": "YYZ", "name": "Toronto Pearson",    "lat": 43.6759, "lon": -79.6294, "utcOffsetMinutes": -300 },
-  { "iata": "YOW", "name": "Ottawa Macdonald",   "lat": 45.3225, "lon": -75.6692, "utcOffsetMinutes": -300 },
-  { "iata": "YQB", "name": "Québec City Lesage", "lat": 46.7911, "lon": -71.3933, "utcOffsetMinutes": -300 },
-  { "iata": "YHZ", "name": "Halifax Stanfield",  "lat": 44.8808, "lon": -63.5086, "utcOffsetMinutes": -240 },
-  { "iata": "YSJ", "name": "Saint John",         "lat": 45.3161, "lon": -65.8903, "utcOffsetMinutes": -240 },
-  { "iata": "YFC", "name": "Fredericton",        "lat": 45.8687, "lon": -66.5299, "utcOffsetMinutes": -240 },
-  { "iata": "YQM", "name": "Greater Moncton",    "lat": 46.1132, "lon": -64.6772, "utcOffsetMinutes": -240 },
-  { "iata": "YYG", "name": "Charlottetown",      "lat": 46.2889, "lon": -63.1252, "utcOffsetMinutes": -240 },
-  { "iata": "YYT", "name": "St. John's",         "lat": 47.6186, "lon": -52.7519, "utcOffsetMinutes": -210 }
+  { "iata": "YUL", "name": "Montréal–Trudeau",   "lat": 45.4678, "lon": -73.7423, "utcOffsetMinutes": -300, "population": 4291732 },
+  { "iata": "YYZ", "name": "Toronto Pearson",    "lat": 43.6759, "lon": -79.6294, "utcOffsetMinutes": -300, "population": 6202225 },
+  { "iata": "YOW", "name": "Ottawa Macdonald",   "lat": 45.3225, "lon": -75.6692, "utcOffsetMinutes": -300, "population": 1488307 },
+  { "iata": "YQB", "name": "Québec City Lesage", "lat": 46.7911, "lon": -71.3933, "utcOffsetMinutes": -300, "population": 839311 },
+  { "iata": "YHZ", "name": "Halifax Stanfield",  "lat": 44.8808, "lon": -63.5086, "utcOffsetMinutes": -240, "population": 465703 },
+  { "iata": "YSJ", "name": "Saint John",         "lat": 45.3161, "lon": -65.8903, "utcOffsetMinutes": -240, "population": 130613 },
+  { "iata": "YFC", "name": "Fredericton",        "lat": 45.8687, "lon": -66.5299, "utcOffsetMinutes": -240, "population": 108610 },
+  { "iata": "YQM", "name": "Greater Moncton",    "lat": 46.1132, "lon": -64.6772, "utcOffsetMinutes": -240, "population": 157717 },
+  { "iata": "YYG", "name": "Charlottetown",      "lat": 46.2889, "lon": -63.1252, "utcOffsetMinutes": -240, "population": 78858 },
+  { "iata": "YYT", "name": "St. John's",         "lat": 47.6186, "lon": -52.7519, "utcOffsetMinutes": -210, "population": 212579 }
 ]

@@ -36,8 +36,10 @@ seasonally.
 ## Data files (`data/`)
 
 - **`airports.json`** — 10 airports across eastern Canada. Each has `iata`,
-  `name`, `lat`/`lon`, and `utcOffsetMinutes` (winter/standard time, fixed,
-  not DST-aware). Coordinates verified against OurAirports.
+  `name`, `lat`/`lon`, `utcOffsetMinutes` (winter/standard time, fixed,
+  not DST-aware), and `population` (catchment CMA/CA population, StatsCan
+  2021 census — see `sim/demand.ts`, below). Coordinates verified against
+  OurAirports.
 - **`aircraft-types.json`** — one type right now: the Dash 8-400 (`DH4`),
   78 seats, 360kt cruise, `costPerBlockHour` and `costPerDeparture` for the
   economy model below. Multiple types are explicitly deferred.
@@ -165,6 +167,35 @@ flight genuinely costs more (more block hours burned) with no separate
 code path needed. `revenue` is unaffected (pax count doesn't depend on
 delay), so this is also why the economy no longer produces the same
 margin every day — see Headless runner, below.
+
+## O-D demand (`src/sim/demand.ts`) — week two, layer 1
+
+`dailyDemand(originIata, destIata)` estimates how many people want to
+travel between two airports on an average day — a gravity model, the
+standard tool for exactly this problem:
+
+```
+demand(A, B) = round(pop(A) * pop(B) / distance(A, B)^k * C)
+```
+
+`pop` is each airport's `population` field (its catchment CMA/CA
+population); `distance` is the same great-circle distance
+`sim/geo.ts` already computes for route arcs and block time. `k = 1`
+and the scaling constant `C = 1.6e-8` are hand-picked, crude parameters
+in the same spirit as `economy.ts`'s `LOAD_FACTOR`/`AVG_FARE` — not
+calibrated against any real O-D survey, just tuned so the biggest pair
+(Montréal-Toronto) lands in the low thousands and the smallest
+(Saint John-Fredericton) lands in the tens.
+
+This is a pure function of static data (population never changes at
+runtime, distance is fixed per airport pair), so nothing caches a
+matrix — it's cheap enough to call directly whenever a number is
+needed. It is *not* wired into `economy.ts` or anything the player
+sees yet: today's flat `LOAD_FACTOR`/`AVG_FARE` model still runs every
+flight regardless of what this function would say. Making that gap
+matter — a route whose demand can't fill a 78-seat DH4 actually flying
+half-empty — is the job of the choice model and pricing loop, both
+still ahead (see WEEK-TWO.md's "Layers").
 
 ## Headless runner (`src/headless/run.ts`)
 

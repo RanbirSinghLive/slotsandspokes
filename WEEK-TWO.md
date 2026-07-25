@@ -54,6 +54,23 @@ next step up).
    data, the same "public sources only" standard `airports.json`
    already holds to.)
 
+   **Scaling strategy, so a future non-Canada expansion doesn't force a
+   rewrite:** the seam is the data, not the code. `population` is just
+   a plain field on each airport record — today all 10 are Canadian and
+   sourced from StatsCan, but the field itself has no opinion about
+   where the number came from. Adding a US airport later means adding
+   one `airports.json` entry with a Census-sourced population (noting
+   the source the same way this file does); it does not mean adding a
+   country field, a source registry, or a per-country code path. The
+   gravity formula in "1. O-D demand" below only ever multiplies two
+   populations and divides by a distance — it's already country-
+   agnostic by construction, so there's nothing to genericize later.
+   Deliberately not building any actual multi-source plumbing now
+   (no registry, no per-country strategy pattern) — that would be
+   designing for a country we haven't picked, using data-sourcing
+   problems we don't have yet. The first real non-Canada airport is
+   the point to learn what, if anything, actually needs to change.
+
 ### What this simplifies
 
 Non-reactive AI (decision 2) quietly shrinks "Competition" from a
@@ -104,17 +121,33 @@ the layers below give them something to push against.
 
 ## Layers
 
-### 1. O-D demand
+### 1. O-D demand — done
 
 How many people want to travel between each pair of the 10 airports,
-per day. A gravity model, `demand(A,B) ∝ pop(A) · pop(B) /
-distance(A,B)^k`, using each airport's catchment population (decision
-5, above — sourced from StatsCan) and the great-circle distance already
-computed in `sim/geo.ts`. `k` and the scaling constant are tunable,
-crude parameters in the same spirit as `LOAD_FACTOR`/`AVG_FARE`.
+per day. A gravity model, `demand(A,B) = round(pop(A) · pop(B) /
+distance(A,B)^k · C)`, using each airport's catchment population
+(decision 5, above — sourced from StatsCan, now live in
+`airports.json`) and the great-circle distance already computed in
+`sim/geo.ts`. Built as `dailyDemand(originIata, destIata)` in the new
+`sim/demand.ts` — a pure function of static data, so it's cheap to call
+directly rather than caching a matrix anywhere.
+
+`k = 1` and `C = 1.6e-8` are tunable, crude parameters in the same
+spirit as `LOAD_FACTOR`/`AVG_FARE` — picked by hand so the biggest
+pair (Montréal-Toronto) lands in the low thousands and the smallest
+(Saint John-Fredericton) lands in the tens, not calibrated against any
+real O-D survey. Verified headlessly across all 45 pairs: the two
+big-market pairs (YUL-YYZ at 1556, YUL-YOW at 1251) dominate, and the
+small Atlantic routes the fleet actually flies today (YQB-YHZ, YHZ-YSJ,
+YQM-YYG) sit at single/low-double digits — already a visible mismatch
+against a 78-seat DH4 at 75% load factor, which is exactly the tension
+the next layers (yield mix, choice model, pricing) exist to resolve.
+
 Direct-service-only per decision 1: this demand number is the ceiling
 for a route that exists, and just a visible "market size" figure for
-one that doesn't.
+one that doesn't. Not yet wired into `economy.ts` or anything the
+player sees in the UI — that's the choice model (layer 4) and pricing
+loop's job, both still ahead.
 
 ### 2. Yield mix / travel purpose (business, leisure, VFR)
 
@@ -355,7 +388,8 @@ it last of everything above.
    for the rest of this list feeling good to use, not a nice-to-have.
    Phases 2–4 (create/reschedule-by-drag, bulk tool) are back-burnered
    behind this same dependency order, not next by default.
-3. Population data (StatsCan research) + O-D demand layer (gravity model)
+3. **Population data + O-D demand layer** — done. StatsCan 2021 census
+   figures added to `airports.json`; gravity model in `sim/demand.ts`.
 4. Choice/market-share model — the connective piece
 5. Yield mix / travel purpose segmentation
 6. Static competitor data, authored and wired into the choice model
