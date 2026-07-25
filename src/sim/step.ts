@@ -125,6 +125,9 @@ export function step(state: SimState): void {
       // zero delay — the honest "should have landed by" time, for the
       // panel to compare against.
       scheduledArriveMinute: dayStart + leg.departMinute + leg.blockMinutes,
+      // Locked in at departure — see ActiveFlight's note on why this isn't
+      // re-read from state.schedule at arrival.
+      fare: leg.fare,
     };
     state.activeFlights.push(activeFlight);
   }
@@ -144,7 +147,11 @@ export function step(state: SimState): void {
       if (type) {
         const blockMinutes = flight.arriveMinute - flight.departMinute;
         const marketFrequency = legsServingMarket(flight.origin, flight.dest, state.schedule);
-        const result = flightResult({ origin: flight.origin, dest: flight.dest, blockMinutes }, type, marketFrequency);
+        const result = flightResult(
+          { origin: flight.origin, dest: flight.dest, blockMinutes, fare: flight.fare },
+          type,
+          marketFrequency,
+        );
         state.cash += result.margin;
         state.todayRevenue += result.revenue;
         state.todayCost += result.cost;

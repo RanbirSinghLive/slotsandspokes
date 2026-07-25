@@ -146,16 +146,17 @@ absorb the maximum single-leg delay (45 minutes) in practice.
 
 ## Economy (`src/sim/economy.ts`)
 
-Deliberately crude, per WEEK-ONE.md — same fare, same load factor,
-regardless of route or day — but since week two, capped by whether the
-route's market can actually support that many passengers:
+Deliberately crude, per WEEK-ONE.md — same load factor, regardless of
+route or day — but since week two, capped by whether the route's market
+can actually support that many passengers, and priced per-leg rather
+than at one flat rate for everyone:
 
 ```
-LOAD_FACTOR = 0.75      AVG_FARE = 185
+LOAD_FACTOR = 0.75
 demandPerFlight = dailyDemand(origin, dest) / legsServingMarket
-bookedDemand    = demandPerFlight * bookingShare(AVG_FARE, legsServingMarket)
+bookedDemand    = demandPerFlight * bookingShare(leg.fare, legsServingMarket, origin, dest)
 pax     = min(round(seats * LOAD_FACTOR), round(bookedDemand))
-revenue = pax * AVG_FARE
+revenue = pax * leg.fare
 cost    = (blockMinutes / 60) * costPerBlockHour + costPerDeparture
 margin  = revenue - cost
 ```
@@ -202,8 +203,8 @@ moment. Segmenting demand this way also made the *aggregate* price
 sensitivity much sharper than the single-segment version — bookingShare
 at a hypothetical $300 fare drops to ~0.57 now versus ~0.73 before, since
 half of all demand (leisure) is genuinely price-sensitive — which is
-exactly the lever the pricing loop (still ahead) will get to pull once it
-exists. Frequency's effect (from the previous milestone) is unchanged:
+exactly the lever the pricing loop (below) now lets the player actually
+pull. Frequency's effect (from the previous milestone) is unchanged:
 adding a daily frequency to a market still measurably raises its booking
 share today, no pricing lever required to see it.
 
@@ -226,8 +227,54 @@ runner and a live browser run, cash/revenue/cost/margin all identical at
 the same simulated day. This is the first point where week two's layers
 have made the schedule the WEEK-ONE.md milestones authored — sensible
 under a flat economy with no competition — genuinely not a viable
-business anymore, which is the whole reason to eventually let the player
-change fares and frequencies in response.
+business anymore — which is exactly the problem the pricing loop below
+finally lets the player respond to.
+
+**Pricing** (`sim/schedule.ts`'s `recommendedFare()`, week two's "Pricing"
+loop) replaced that flat $185 for everyone with a distance-based default,
+the same shape `costPerDeparture`/`costPerBlockHour` already has — a
+fixed component plus a per-nm rate:
+
+```
+BASE_FARE = 125    PER_NM_RATE = 0.3
+recommendedFare = round(BASE_FARE + PER_NM_RATE * distanceNm)
+```
+
+Every `ScheduleLeg` gets a `fare` field, computed from this at load time
+(the existing template) or leg-creation time (a new route via the M10
+builder) — same pattern `blockMinutes` already uses. It's only ever a
+*default*: decision 3 in WEEK-TWO.md is explicit that fare has to be a
+player-overridable lever, not a fixed number, so the schedule table
+(`ui/panels.ts`) gained a Fare column — a range slider bounded to 50%-
+150% of that leg's own recommended fare, in $5 steps, with a live $
+readout underneath (not a free-text field, which the decision explicitly
+rules out). Dragging it mutates `leg.fare` directly, the same live-
+`state.schedule`-mutation pattern the Depart column already uses; the
+new fare takes effect on that leg's very next departure (`ActiveFlight`
+locks in the fare it departed with, so a change mid-flight doesn't
+retroactively alter one already in the air).
+
+`leg.fare` now feeds both halves of the yield-management tension at
+once: it's `bookingShare()`'s price term (a higher fare loses bookings
+to competitors or "stay home") *and* the multiplier on `revenue`
+directly. Verified via the headless runner and a live browser test:
+raising a fare has a completely different effect depending on whether
+the market is seat-capped or demand-capped. Ottawa-Montréal (recommended
+$150, seat-capped at 59 pax regardless of fare) gained roughly $4,425 of
+pure margin over two days from manually dragging its fare to $225 — the
+market has so much spare demand that losing booking share cost it
+nothing, since 59 seats still filled either way. A demand-capped market
+wouldn't behave the same way — raising its fare would genuinely lose it
+passengers it can't make up elsewhere, since there's no seat-cap slack to
+absorb the drop. Distance-based defaults also gently recalibrated every
+route's fare relative to the old flat $185 (short Atlantic hops now
+default cheaper, the longest leg — Québec-Halifax, already the one with
+a competitor — now defaults *more* expensive), landing total daily
+revenue at $47,962 (down slightly from $49,950) with the schedule's net
+loss over 5 days deepening slightly to $-14,563 — the pricing lever
+existing doesn't fix profitability by itself; a player actually has to
+use it, e.g. by noticing (as above) that raising fares on the two big
+seat-capped corridors is free money at today's demand levels.
 
 Applied on **arrival**, not departure — a flight in the air hasn't earned or
 spent anything yet. `margin` is added to `state.cash`; `revenue`/`cost`/
@@ -377,9 +424,14 @@ schedule, logging to the console exactly like the M3 startup check does if
 the edit leaves an aircraft departing before it could plausibly have landed
 and turned around.
 
-Editing is departure time only for now — reassigning a leg's origin,
-destination, or tail (which would also mean recomputing `blockMinutes` and
-touching `render/routes.ts`'s route list) is out of scope for this pass.
+Editing is departure time and fare (week two's Pricing loop, see
+"Economy" above) — reassigning a leg's origin, destination, or tail
+(which would also mean recomputing `blockMinutes` and touching
+`render/routes.ts`'s route list) is out of scope for this pass. The
+Fare column is a range slider rather than a second `<input type="time">`-
+style text field, deliberately: WEEK-TWO.md's decision 3 rules out a
+free-text price, so the control itself has to make an arbitrary value
+impossible to enter, not just discourage one.
 
 **Column filters:** a second header row holds one text input per column
 (Tail/Route/Depart). `applyScheduleFilters()` re-checks all three on every

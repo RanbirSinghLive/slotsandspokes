@@ -2,9 +2,9 @@
 
 This is a working document, not a committed plan like WEEK-ONE.md was.
 The five biggest open questions are now answered (see Decisions,
-below) — this isn't a finished plan yet, but it's converged enough
-that the shape of the actual milestones is starting to be visible.
-Update this freely as we keep talking.
+below), and — as of the "Pricing" milestone — every item in the "Draft
+dependency order" is done except the last one (random events). Update
+this freely as we keep talking.
 
 Everything here is scoped for phase 3 discussion — it deliberately
 revisits some things WEEK-ONE.md's CLAUDE.md-linked "deliberately
@@ -83,27 +83,21 @@ already need (see layer 4, below). That also means competitor data can
 exist early, as soon as there's a choice model to test against, rather
 than waiting for its own build phase.
 
-### One thing this raises that still needs an answer
+### One thing this raised — now answered, see "Pricing" below
 
-**How is "recommended fare" computed?** It needs to be more than a
-flat number (today's `AVG_FARE = 185` for everyone) to be worth having
-as a default at all. The natural inputs, given what's already
-planned: distance (a per-nm rate plus a fixed component, the same
-shape `blockMinutes`-based cost already has) and the route's yield mix
-(a route skewing business can plausibly support a higher default than
-one that's mostly leisure/VFR). Whatever the formula, overriding it
-plugs cleanly into the choice model without any special-casing: a
-higher fare directly lowers that route's utility score
-(`w_price · -price`), so pricing above the recommendation trades away
-market share for margin per passenger — exactly the tradeoff a fare
-lever should create. Worth deciding the actual formula before building
-it, not after.
+**How is "recommended fare" computed?** Answered: distance alone —
+`round(125 + 0.3 * distanceNm)`. Yield-mix skew was considered but
+dropped, since every market currently shares an identical fixed
+20/50/30 split, so it would've added a constant, not real
+differentiation. Full writeup, including the verified before/after
+effect of actually using the resulting lever, is under "Pricing" in the
+Loops section, below.
 
-**Related, smaller question:** should the player be able to *see*
-competitor fares/schedules on a route before pricing their own? Static
-competitors can't react either way, but pricing blind against a fixed
-opponent you can't see is a strange player experience. Leaning toward
-yes — visible, just not reactive.
+**Related, smaller question, still open:** should the player be able to
+*see* competitor fares/schedules on a route before pricing their own?
+`data/competitors.json` exists and feeds the choice model now, but
+nothing surfaces it in the UI yet — still leaning toward yes (visible,
+just not reactive), just not built.
 
 ## Two different kinds of thing, worth keeping separate
 
@@ -271,13 +265,51 @@ there's a reason to think the difference actually matters in play.
 
 ## Loops
 
-### Pricing (new — falls out of decision 3)
+### Pricing (falls out of decision 3) — done
 
-Each route gets a computed recommended fare (formula still open, see
-above) and the player can override it. Directly feeds the choice
-model's price term, so raising fare trades market share for margin and
-lowering it does the reverse — the core yield-management tension, for
-free, once the choice model exists.
+Each route gets a computed recommended fare, and the player can
+override it. Directly feeds the choice model's price term, so raising
+fare trades market share for margin and lowering it does the
+reverse — the core yield-management tension, for free, now that the
+choice model exists.
+
+**The formula question this section originally left open** ("How is
+'recommended fare' computed?"): distance alone, in the end — `round(125
++ 0.3 * distanceNm)`, the same fixed-plus-per-unit shape
+`costPerDeparture`/`costPerBlockHour` already has. The other candidate
+input, yield-mix skew, was dropped: every market currently shares the
+identical fixed 20/50/30 business/leisure/VFR split
+(`sim/choiceModel.ts`), so a skew term would multiply every route by the
+same constant and add nothing real — worth revisiting once yield mix
+actually varies by route. **The related smaller question** ("should the
+player see competitor fares/schedules") is still open — not addressed
+by this pass; `data/competitors.json` exists and feeds the choice model,
+but nothing in the UI surfaces it yet.
+
+**The override lever:** a range slider in the schedule table
+(`ui/panels.ts`), bounded to 50%-150% of that leg's own recommended
+fare in $5 steps, with a live $ readout — not a free-text field, per
+decision 3. Dragging it mutates `leg.fare` directly (same pattern the
+Depart column already uses), and the new fare takes effect on that
+leg's very next departure.
+
+Verified via the headless runner and a live browser test: the effect of
+raising a fare depends entirely on whether the market is seat-capped or
+demand-capped. Ottawa-Montréal (recommended $150, but pegged at the
+78-seat aircraft's 59-pax load-factor ceiling regardless of fare, since
+demand there is abundant) gained roughly $4,425 of pure margin over two
+days from manually dragging its fare to $225 — losing booking share
+cost it nothing, because 59 seats filled either way. That's free money
+sitting in the current schedule, right now, for a player who notices it.
+A demand-capped market (most of the Atlantic routes) wouldn't behave the
+same way — it would genuinely lose passengers it can't make up
+elsewhere. Distance-based defaults also recalibrated every route
+relative to the old flat $185 — short Atlantic hops now default
+cheaper, Québec-Halifax (the longest leg, already the one with a
+competitor) now defaults more expensive — landing total daily revenue
+at $47,962 (down slightly from $49,950) and the schedule's net loss over
+5 days at $-14,563. The lever existing doesn't fix profitability by
+itself; using it well is now a real decision, not a foregone one.
 
 ### Route creation + editing: the map interaction — M10, done
 
@@ -483,7 +515,11 @@ it last of everything above.
    softmax as real alternatives instead of just "stay home." The
    schedule the fleet flies today is now a net loss over 5 days —
    see the "Layers" write-up for the full revenue trail.
-7. Pricing (recommended fare + override) — formula TBD, see above
+7. **Pricing** — done. Distance-based `recommendedFare()` in
+   `sim/schedule.ts`, overridable via a bounded range slider (not
+   free-text) in the schedule table. Feeds `bookingShare()`'s price
+   term and revenue directly — the full yield-management tension now
+   exists and is player-actionable, see the "Pricing" write-up below.
 8. Random events / operational disruption (diversion, closure)
 
 Steps 1–2 are the deliberate exceptions to "layers before loops": the

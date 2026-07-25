@@ -20,6 +20,7 @@ export type ScheduleLeg = {
   dest: string;
   departMinute: number;
   blockMinutes: number;
+  fare: number;
 };
 
 const TAXI_ALLOWANCE_MINUTES = 20;
@@ -61,6 +62,35 @@ export function computeBlockMinutes(originIata: string, destIata: string): numbe
   return Math.round(TAXI_ALLOWANCE_MINUTES + (distanceNm / aircraftType.cruiseKts) * 60);
 }
 
+// Week two's "Pricing" loop — deliberately crude, same spirit as
+// economy.ts's LOAD_FACTOR/AVG_FARE: a fixed component (covers boarding/
+// handling regardless of distance) plus a per-nm rate, the same shape
+// costPerDeparture/costPerBlockHour already has. Distance is the only
+// input for now — a yield-mix-based skew (a route's business/leisure/VFR
+// split affecting its recommended fare) was considered, but every market
+// currently shares the identical fixed 20/50/30 split (sim/choiceModel.ts),
+// so a skew term would multiply every route by the same constant and add
+// nothing real; worth revisiting once yield mix actually varies by route.
+const BASE_FARE = 125;
+const PER_NM_RATE = 0.3;
+
+/**
+ * The game's suggested fare for a leg between two airports, from
+ * great-circle distance alone. This is only ever a *default* — decision 3
+ * in WEEK-TWO.md is explicit that fare is a player-overridable lever, not
+ * a fixed number, so every `ScheduleLeg.fare` below starts here but can be
+ * changed afterward (the M8/M10-style schedule editor, see ui/panels.ts).
+ */
+export function recommendedFare(originIata: string, destIata: string): number {
+  const origin = airportsByIata.get(originIata);
+  const dest = airportsByIata.get(destIata);
+  if (!origin || !dest) {
+    throw new Error(`Schedule references an unknown airport: ${originIata} -> ${destIata}`);
+  }
+  const distanceNm = greatCircleDistanceNm(origin, dest);
+  return Math.round(BASE_FARE + PER_NM_RATE * distanceNm);
+}
+
 /**
  * The daily schedule as authored in data/schedule.json, with each leg's
  * block time computed up front from great-circle distance — see
@@ -73,12 +103,13 @@ export function computeBlockMinutes(originIata: string, destIata: string): numbe
  * its own independent, mutable copy via loadSchedule() below; nothing
  * mutates this array directly.
  */
-export const scheduleLegs: ScheduleLeg[] = (scheduleData as Array<Omit<ScheduleLeg, 'blockMinutes'>>).map(
-  (leg) => ({
-    ...leg,
-    blockMinutes: computeBlockMinutes(leg.origin, leg.dest),
-  }),
-);
+export const scheduleLegs: ScheduleLeg[] = (
+  scheduleData as Array<Omit<ScheduleLeg, 'blockMinutes' | 'fare'>>
+).map((leg) => ({
+  ...leg,
+  blockMinutes: computeBlockMinutes(leg.origin, leg.dest),
+  fare: recommendedFare(leg.origin, leg.dest),
+}));
 
 /**
  * A fresh, independent copy of the daily schedule — a new array of new leg

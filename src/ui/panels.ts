@@ -1,4 +1,4 @@
-import { validateSchedule, type ScheduleLeg } from '../sim/schedule';
+import { recommendedFare, validateSchedule, type ScheduleLeg } from '../sim/schedule';
 import type { SimState } from '../sim/state';
 
 // Must match the width baked into #map / #panel in style.css — see the
@@ -86,6 +86,18 @@ function timeStringToMinuteOfDay(time: string): number {
   return hours * 60 + minutes;
 }
 
+// Week two's "Pricing" loop: a fare lever, not a free-text price (decision
+// 3 in WEEK-TWO.md) — a range slider bounded around that leg's own
+// recommendedFare(), in $5 steps, rather than an open number field a
+// player could type anything into.
+const FARE_STEP = 5;
+const FARE_MIN_FACTOR = 0.5;
+const FARE_MAX_FACTOR = 1.5;
+
+function roundToStep(value: number): number {
+  return Math.round(value / FARE_STEP) * FARE_STEP;
+}
+
 /**
  * Build one schedule-table row for `leg` and append it. Shared by
  * setupScheduleEditor() (the initial build) and addScheduleRow() (M10 — a
@@ -111,7 +123,34 @@ function buildScheduleRow(leg: ScheduleLeg, state: SimState): HTMLTableRowElemen
   });
   departCell.appendChild(departInput);
 
-  row.append(tailCell, routeCell, departCell);
+  const fareCell = document.createElement('td');
+  const fareControl = document.createElement('div');
+  fareControl.className = 'fare-control';
+
+  const recommended = recommendedFare(leg.origin, leg.dest);
+  const fareSlider = document.createElement('input');
+  fareSlider.type = 'range';
+  fareSlider.min = String(roundToStep(recommended * FARE_MIN_FACTOR));
+  fareSlider.max = String(roundToStep(recommended * FARE_MAX_FACTOR));
+  fareSlider.step = String(FARE_STEP);
+  fareSlider.value = String(leg.fare);
+
+  const fareValue = document.createElement('span');
+  fareValue.className = 'fare-value';
+  fareValue.textContent = `$${leg.fare}`;
+
+  // No validateSchedule() call here — fare doesn't affect rotation
+  // feasibility, only economy.ts's revenue/booking-share math, which
+  // reads leg.fare fresh on the very next flight to arrive on this leg.
+  fareSlider.addEventListener('input', () => {
+    leg.fare = Number(fareSlider.value);
+    fareValue.textContent = `$${leg.fare}`;
+  });
+
+  fareControl.append(fareSlider, fareValue);
+  fareCell.appendChild(fareControl);
+
+  row.append(tailCell, routeCell, departCell, fareCell);
   return row;
 }
 

@@ -36,6 +36,15 @@ export type ActiveFlight = {
    * running late, without the UI layer needing to redo any day-boundary math.
    */
   scheduledArriveMinute: number;
+  /**
+   * The fare this flight is charging, copied from its ScheduleLeg at the
+   * moment it departs (see step.ts) — not re-read from state.schedule at
+   * arrival, so a fare the player changes mid-flight doesn't retroactively
+   * change what an already-departed flight charges. Week two's "Pricing"
+   * loop (sim/schedule.ts's recommendedFare(), overridable in the schedule
+   * editor).
+   */
+  fare: number;
 };
 
 export type SimState = {

@@ -126,6 +126,38 @@ body {
   border-collapse: collapse;
 }
 
+/* #schedule-table specifically needs table-layout: fixed — with the
+   automatic layout the browser's default, a <input type="range">'s
+   intrinsic width (much wider than a table column has room for) pushed the
+   whole table past the panel's fixed width once the Fare column was added,
+   silently overflowing the fare slider off the right edge of the sidebar.
+   Fixed layout instead sizes every column from these percentages, and the
+   slider (flex: 1, min-width: 0 — see .fare-control below) fills whatever
+   width its own <td> actually has. */
+#schedule-table {
+  table-layout: fixed;
+}
+
+#schedule-table th:nth-child(1),
+#schedule-table td:nth-child(1) {
+  width: 15%;
+}
+
+#schedule-table th:nth-child(2),
+#schedule-table td:nth-child(2) {
+  width: 19%;
+}
+
+#schedule-table th:nth-child(3),
+#schedule-table td:nth-child(3) {
+  width: 24%;
+}
+
+#schedule-table th:nth-child(4),
+#schedule-table td:nth-child(4) {
+  width: 42%;
+}
+
 .panel-table th,
 .panel-table td {
   text-align: left;
@@ -148,6 +180,29 @@ body {
   padding: 2px 4px;
   width: 100%;
   box-sizing: border-box;
+}
+
+/* Week two's Pricing loop: the fare lever in the schedule table. A range
+   slider (not a free-text field, per WEEK-TWO.md decision 3), with a small
+   live $ readout underneath — stacked vertically, not side by side, since
+   the schedule panel's fixed 280px width leaves too little room
+   horizontally for both a usable slider *and* a readout wide enough for
+   "$230" without one starving the other. */
+.fare-control {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.fare-control input[type='range'] {
+  width: 100%;
+  accent-color: #6b7694;
+}
+
+.fare-value {
+  font-size: 11px;
+  color: #9aa3b8;
+  text-align: center;
 }
 
 .filter-row th {

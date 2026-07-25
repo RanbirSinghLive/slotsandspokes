@@ -2,7 +2,7 @@ import { geoPath } from 'd3-geo';
 import type { LineString } from 'geojson';
 import { projection } from '../render/projection';
 import { airports, type Airport } from '../render/airports';
-import { computeBlockMinutes, nextLegId, validateSchedule, type ScheduleLeg } from '../sim/schedule';
+import { computeBlockMinutes, nextLegId, recommendedFare, validateSchedule, type ScheduleLeg } from '../sim/schedule';
 import { addScheduleRow, filterScheduleToRoute } from './panels';
 import type { SimState } from '../sim/state';
 
@@ -327,6 +327,7 @@ export function setupRouteBuilder(state: SimState): void {
       dest: dest.iata,
       departMinute,
       blockMinutes: computeBlockMinutes(origin.iata, dest.iata),
+      fare: recommendedFare(origin.iata, dest.iata),
     };
     state.schedule.push(leg);
     addScheduleRow(leg, state);
