@@ -29,6 +29,16 @@ export type SimState = {
   todayRevenue: number;
   todayCost: number;
   todayMargin: number;
+  /**
+   * The entire state of sim/rng.ts's seeded random number generator. Not
+   * used yet — nothing under sim/ calls nextRandom() until the M9 delay
+   * mechanic exists — but it lives here, in `state`, from the start rather
+   * than as a module-level variable, so that whenever step() does start
+   * asking "how late is this flight," the answer stays deterministic and
+   * reproducible: same state in, same state out, same as every other field
+   * here.
+   */
+  rngSeed: number;
 };
 
 // Only one aircraft type exists so far, so every aircraft record uses it.
@@ -54,8 +64,15 @@ function earliestLegFor(tail: string, legs: ScheduleLeg[]): ScheduleLeg {
  * silently skipped. That's how M4 runs "one aircraft" out of the full
  * three-aircraft schedule without step() needing any special-case logic —
  * M5 turns the rest on by passing more tails here.
+ *
+ * `rngSeed` defaults to a fixed constant rather than something like
+ * `Date.now()` — a default that changes every run would make two calls to
+ * createInitialState produce different worlds for no reason you asked for,
+ * which is exactly what determinism is supposed to rule out. Pass a
+ * different seed explicitly (the M7 headless runner will want to, to
+ * compare different random delay patterns run over run).
  */
-export function createInitialState(tails: string[]): SimState {
+export function createInitialState(tails: string[], rngSeed: number = 1): SimState {
   const aircraft: Aircraft[] = tails.map((tail) => {
     const firstLeg = earliestLegFor(tail, scheduleLegs);
     return {
@@ -76,5 +93,6 @@ export function createInitialState(tails: string[]): SimState {
     todayRevenue: 0,
     todayCost: 0,
     todayMargin: 0,
+    rngSeed,
   };
 }
