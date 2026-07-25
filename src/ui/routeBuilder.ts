@@ -230,6 +230,16 @@ function showForm(origin: Airport, dest: Airport, schedule: ScheduleLeg[]): void
   // earlier route.
   formDepartInput.value = DEFAULT_DEPART_TIME;
   checkTimeCollision(origin, dest, schedule);
+
+  // Filter the schedule table to this market *now*, while the form is
+  // still open — not only after "Add Route" is clicked. Filtering only on
+  // confirm meant the table narrowed the instant the form closed, which
+  // in practice looked like nothing happened: by the time the filter took
+  // effect, attention had already moved on with the popup. Filtering here
+  // instead shows the market's existing frequencies (times already taken,
+  // by which tails) while the player is still choosing theirs — which is
+  // also just more useful context to have during the decision itself.
+  filterScheduleToRoute(origin.iata, dest.iata);
 }
 
 function hideForm(): void {
@@ -311,9 +321,9 @@ export function setupRouteBuilder(state: SimState): void {
     state.schedule.push(leg);
     addScheduleRow(leg, state);
     validateSchedule(state.schedule);
-    // Narrow the schedule table to the route just added — otherwise a new
-    // row lands wherever it lands among the other 12+ entries, easy to miss.
-    filterScheduleToRoute(origin.iata, dest.iata);
+    // The Route filter is already set to this exact market — see
+    // showForm() — so the new row satisfies it automatically and just
+    // joins whatever else is already narrowed into view.
 
     reset();
   });

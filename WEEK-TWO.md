@@ -244,6 +244,19 @@ depart input to a fixed default every time it opens. Reproduced the
 exact failure (leave a route's time at 13:00, then arm YSJ-YQB without
 touching the field) and confirmed the fix.
 
+**Second round of playtesting feedback:** even after the fix above, the
+auto-filter still felt broken — because it was applied on *confirm*
+(clicking "Add Route"), the instant the popup closed. By the time the
+table narrowed, attention had already moved on with the closing popup,
+so it looked like nothing happened. Moved `filterScheduleToRoute()` to
+fire when the popup *opens* (`showForm()`) instead of when it resolves
+— now the table narrows to the pending market's existing frequencies
+while the player is still choosing a tail and time, which is also just
+better context for that decision. Verified in-browser: the filter is
+visibly active while the form is still open (before Add is clicked),
+and the newly added leg joins the already-filtered view automatically
+once confirmed.
+
 **Priority call:** build this first, ahead of the demand/choice-model
 layers, deliberately reversing the sequencing note below. The reasoning:
 nailing the core interaction — does *creating a route* feel good? — is

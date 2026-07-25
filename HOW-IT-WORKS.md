@@ -258,12 +258,21 @@ fields — and just toggles each row's `display`, not a rebuild, so it can't
 interfere with the "build once" rule above. Depart matches against the
 row's live `<input type="time">` value rather than text content, since
 that cell holds an input, not a text node; editing a row's time re-applies
-the filters too, in case the new value no longer matches. `main.ts`'s M10
-route builder calls the exported `filterScheduleToRoute(origin, dest)`
-right after adding a leg, clearing the Tail/Depart filters (so a stale one
-can't hide the row just created) and setting the Route filter to that
-leg's exact text — the table narrows to just the route you touched instead
-of the new row landing wherever it lands among a dozen others.
+the filters too, in case the new value no longer matches.
+
+The exported `filterScheduleToRoute(origin, dest)` is called from
+`showForm()` — the moment the confirmation popup opens, not the moment
+"Add Route" is clicked. It clears the Tail/Depart filters (so a stale one
+can't hide anything) and sets the Route filter to the pending route's
+exact text, so the table narrows to that market's existing frequencies
+*while the player is still choosing a tail and time* — useful context for
+the decision itself, not just tidying up afterward. Filtering only on
+confirm was tried first and didn't feel like it worked: by the time the
+filter took effect, the popup had already closed and attention had moved
+on, so the narrowing was easy to miss entirely. Since the Route filter is
+already set to the right market by the time "Add Route" runs, the newly
+added leg satisfies it automatically — no separate re-filter step needed
+after adding.
 
 The confirmation form also resets its own depart-time input to a fixed
 default (`DEFAULT_DEPART_TIME`, `showForm()`) every time it opens, rather
