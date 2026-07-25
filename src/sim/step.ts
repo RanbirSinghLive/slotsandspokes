@@ -15,15 +15,23 @@ const aircraftTypesByCode = new Map<string, EconomyAircraftType>(
  * randomness, no clock reads, nothing but `state` in and `state` mutated.
  *
  * Three things happen each minute, in this order:
- *   1. Depart: any scheduled leg whose departure time is right now, flown
+ *   1. Day rollover: if this is minute 0 of a new day, today's tallies
+ *      (completedToday, todayRevenue, todayCost, todayMargin) reset to zero
+ *      before anything else happens.
+ *   2. Depart: any scheduled leg whose departure time is right now, flown
  *      by an aircraft that's on the ground at the correct airport, takes
  *      off — it becomes an ActiveFlight and its aircraft flips to airborne.
- *   2. Arrive: any ActiveFlight whose arrival minute has been reached
+ *   3. Arrive: any ActiveFlight whose arrival minute has been reached
  *      lands — its aircraft flips back to ground at the destination, the
  *      flight's economics (sim/economy.ts) are applied to cash and today's
  *      running totals, and the flight is removed from the active list.
- *   3. Day rollover: once simMinute crosses into a new day, today's tallies
- *      (completedToday, todayRevenue, todayCost, todayMargin) reset to zero.
+ *
+ * The reset happens at the *start* of the new day rather than the end of
+ * the old one deliberately: it means that right up until the moment the
+ * next day's first minute is processed, `state.todayRevenue` etc. still
+ * hold the just-finished day's real totals — which is what lets something
+ * outside step() (the M7 headless runner, for instance) read "yesterday's
+ * numbers" cleanly between calls, instead of catching them already zeroed.
  *
  * `scheduleLegs` is "the daily repeating schedule" (CLAUDE.md), so matching
  * against `state.simMinute % MINUTES_PER_DAY` makes every leg fire again at
@@ -31,6 +39,13 @@ const aircraftTypesByCode = new Map<string, EconomyAircraftType>(
  */
 export function step(state: SimState): void {
   const minuteOfDay = state.simMinute % MINUTES_PER_DAY;
+
+  if (minuteOfDay === 0) {
+    state.completedToday = [];
+    state.todayRevenue = 0;
+    state.todayCost = 0;
+    state.todayMargin = 0;
+  }
 
   for (const leg of scheduleLegs) {
     if (leg.departMinute !== minuteOfDay) continue;
@@ -80,11 +95,4 @@ export function step(state: SimState): void {
   }
 
   state.simMinute += 1;
-
-  if (state.simMinute % MINUTES_PER_DAY === 0) {
-    state.completedToday = [];
-    state.todayRevenue = 0;
-    state.todayCost = 0;
-    state.todayMargin = 0;
-  }
 }

@@ -7,9 +7,10 @@ short update whenever a milestone changes how something works; if it drifts
 out of sync with the code, the code is right and this needs fixing, not the
 other way around.
 
-Status: M1–M6 complete (scaffold through economy/panel). Phase 2 (headless
-runner, schedule editor, turn times/delays) not started except for the
-seeded PRNG groundwork described under "Randomness" below.
+Status: M1–M6 complete (scaffold through economy/panel). Phase 2 M7
+(headless runner) done — see "Headless runner" below. M8 (schedule editor)
+and M9 (turn times/delays) not started, though the seeded PRNG that M9 will
+need already exists (see "Randomness" below).
 
 ---
 
@@ -75,18 +76,22 @@ place, deterministically (same state in → same state out, always — no
 `Math.random()`, no reading the clock). Each call does three things in
 order:
 
-1. **Depart** — any scheduled leg whose `departMinute` matches
+1. **Day rollover** — if this is minute 0 of a new day,
+   `completedToday`/`todayRevenue`/`todayCost`/`todayMargin` reset to zero
+   *before* anything else this call does. `cash` does not reset. The reset
+   happens at the start of the new day rather than the end of the old one
+   specifically so that right up until this call, those fields still hold
+   the just-finished day's real totals — readable from outside step()
+   (the M7 headless runner, for instance) between calls.
+2. **Depart** — any scheduled leg whose `departMinute` matches
    `simMinute % 1440`, flown by an aircraft that's on the ground at the
    right airport, takes off: the aircraft flips to `airborne` and an
    `ActiveFlight` is created with `blockMinutes` (computed once at schedule
    load time from great-circle distance ÷ cruise speed, in
    `sim/schedule.ts`) added to the absolute departure minute.
-2. **Arrive** — any `ActiveFlight` whose `arriveMinute` has been reached
+3. **Arrive** — any `ActiveFlight` whose `arriveMinute` has been reached
    lands: the aircraft flips back to `ground` at the destination, and
    `sim/economy.ts`'s `flightResult()` is applied (see Economy below).
-3. **Day rollover** — once `simMinute` crosses into a new day,
-   `completedToday`/`todayRevenue`/`todayCost`/`todayMargin` reset to zero.
-   `cash` does not reset.
 
 ## Economy (`src/sim/economy.ts`)
 
@@ -104,6 +109,22 @@ margin  = revenue - cost
 Applied on **arrival**, not departure — a flight in the air hasn't earned or
 spent anything yet. `margin` is added to `state.cash`; `revenue`/`cost`/
 `margin` are each added to the day's running totals.
+
+## Headless runner (`src/headless/run.ts`)
+
+`npm run headless` (optionally `-- 30` for a shorter run than the 365-day
+default) imports `createInitialState`/`step` directly and calls `step()` in
+a plain loop — no canvas, no `requestAnimationFrame`, no waiting for real
+time to pass. It writes one CSV row per day (`headless-output.csv`, git-
+ignored — it's a report, not source) with that day's cash, revenue, cost,
+margin, and legs flown, reading `state.todayRevenue` etc. right after the
+day's last minute is processed but before the next day's first minute would
+reset them (see the note on reset timing under "The tick" above).
+
+Running the full year today shows margin is *exactly* $84,423 on every one
+of the 365 days — expected, since nothing in the sim varies day to day yet
+(no delays, no seasonality), but worth having actually confirmed rather
+than assumed, which is the entire point of this milestone per WEEK-ONE.md.
 
 ## Rendering (`src/render/`, plus `main.ts`'s loop)
 
@@ -155,7 +176,8 @@ identical sequence of "random" delays.
 
 ## What isn't built yet
 
-See WEEK-ONE.md's "Then, in order" (headless runner, schedule editor, turn
-times/delay propagation) and "Deliberately deferred" (aircraft market,
-financing, maintenance, crew, competitor AI, multiple aircraft types, save/
-load, and more) — not duplicated here since it would just go stale twice.
+See WEEK-ONE.md's "Then, in order" (schedule editor, turn times/delay
+propagation — headless runner is now done, above) and "Deliberately
+deferred" (aircraft market, financing, maintenance, crew, competitor AI,
+multiple aircraft types, save/load, and more) — not duplicated here since
+it would just go stale twice.
