@@ -176,21 +176,33 @@ ahead — see WEEK-TWO.md's "Layers") there's only one real alternative to
 figure (still the ceiling on a market with demand to spare), or this
 flight's actual booked count.
 
+`bookingShare()` itself blends three travel-purpose segments (business/
+leisure/VFR, week two's "yield mix" layer), each with its own price and
+schedule-frequency sensitivity — a fixed 20/50/30 split of every market's
+demand pool, not varied by route yet. Business travel barely reacts to
+fare but responds strongly to frequency; leisure is the opposite; VFR
+sits in between. `economy.ts` still only sees the single blended number
+`bookingShare()` returns — it applies one flat fare to everyone, since no
+fare-by-segment lever exists yet, so the segments differ only in how they
+each react to that same fare and frequency, not in what they pay.
+
 Verified via the headless runner: the Ottawa-Montréal-Toronto corridor
-still fills to the old 59-pax ceiling (plenty of demand there, and
-`bookingShare` near 0.92 barely trims it), while every Atlantic Canada
-leg the fleet flies today is demand-starved *and* now further trimmed by
-booking share — YQM-YYG down to 3 pax, YYG-YFC to a single passenger, on
-a 78-seat aircraft. Total daily revenue is $51,615 (down from $52,725
-right after the demand cap alone, $128,760 before either existed), and
-some days still finish with a negative margin. Confirmed to match
-exactly between the headless runner and a live browser run at the same
-simulated day boundary. Still not a *complete* choice model — no
-yield-mix segments, no competitor share to lose — but frequency now has
-a real, already-actionable effect: adding a second daily frequency to a
-market (the M10 route builder) measurably raises that market's booking
-share, the "S-curve" dynamic WEEK-TWO.md flags as a documented real-world
-effect, even in this simplified v1.
+still fills to the old 59-pax ceiling regardless (plenty of demand there
+to absorb any of this), while every Atlantic Canada leg the fleet flies
+today is demand-starved *and* trimmed further by booking share — YQM-YYG
+down to 3 pax, YYG-YFC to a single passenger, on a 78-seat aircraft.
+Total daily revenue is $51,430 (down slightly from $51,615's single-
+segment v1, $128,760 before any of week two's layers existed), and some
+days still finish with a negative margin. Confirmed to match exactly
+between the headless runner and a live browser run at the same simulated
+moment. Segmenting demand this way also made the *aggregate* price
+sensitivity much sharper than the single-segment version — bookingShare
+at a hypothetical $300 fare drops to ~0.57 now versus ~0.73 before, since
+half of all demand (leisure) is genuinely price-sensitive — which is
+exactly the lever the pricing loop (still ahead) will get to pull once it
+exists. Frequency's effect (from the previous milestone) is unchanged:
+adding a daily frequency to a market still measurably raises its booking
+share today, no pricing lever required to see it.
 
 Applied on **arrival**, not departure — a flight in the air hasn't earned or
 spent anything yet. `margin` is added to `state.cash`; `revenue`/`cost`/

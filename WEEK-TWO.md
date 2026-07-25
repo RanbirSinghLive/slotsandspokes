@@ -164,16 +164,22 @@ flight's actual slice of that split — further refined by layer 4's
 `bookingShare()`, below, so not everyone in that slice necessarily
 travels.
 
-### 2. Yield mix / travel purpose (business, leisure, VFR)
+### 2. Yield mix / travel purpose (business, leisure, VFR) — v1 done
 
 Splits the O-D demand pool into segments with different fare
-sensitivity and different tastes for schedule/frequency. Simplest v1:
-a fixed percentage split applied to every O-D pair (say 20/50/30);
-refine to vary by route later if it matters. Each segment gets its own
-weights in the choice model (below) — that's what actually makes the
-segmentation do anything, rather than just being a label — and
-plausibly its own contribution to a route's recommended fare (see
-"Pricing," below).
+sensitivity and different tastes for schedule/frequency. Built directly
+inside `sim/choiceModel.ts` (layer 4, below) rather than a separate
+module — segments only matter through the weights they contribute to
+the choice model, so there was nothing for a standalone module to own.
+v1 is exactly the "simplest v1" this section originally called for: a
+fixed 20/50/30 (business/leisure/VFR) split applied to every O-D pair
+alike, not varied by route. Each segment gets its own price/schedule
+weights — business barely reacts to fare but strongly wants frequency;
+leisure is the opposite; VFR sits in between — blended into the single
+number `economy.ts` consumes. Not yet done: varying the split by route,
+and giving segments their own fare (both real refinements, not needed
+for this to already behave sensibly) — the latter waits on the pricing
+loop existing at all.
 
 ### 3. Competition (static AI airlines)
 
@@ -195,19 +201,25 @@ QSI, Quality of Service Index, for the schedule-fit piece specifically).
 
 **Built as `bookingShare(fare, legsServingMarket)` in the new
 `sim/choiceModel.ts`**, wired into `economy.ts` (see HOW-IT-WORKS.md's
-"Economy"). Since yield-mix segments (layer 2) and competitor offerings
-(layer 3) don't exist yet, this v1 only ever scores your own flight
-against a "stay home" option fixed at utility 0 — with just one real
-alternative plus that baseline, the softmax collapses to a plain
-logistic sigmoid, which is what's actually implemented.
+"Economy"). Since competitor offerings (layer 3) don't exist yet, this
+v1 only ever scores your own flight against a "stay home" option fixed
+at utility 0 — with just one real alternative plus that baseline, the
+softmax collapses to a plain logistic sigmoid, which is what's actually
+implemented per segment, then blended across the three yield-mix
+segments (layer 2, above) by their share of demand.
 `w_product · quality` is dropped entirely for now (no product-quality
 axis exists yet either); `schedule-fit` is `legsServingMarket` alone
 (log-scaled for diminishing returns), since with no competitor to share
 frequency against, your own frequency count is the whole story. Weights
-and the intercept are hand-picked, crude constants, same spirit as
-`LOAD_FACTOR`/`AVG_FARE` — calibrated so today's $185 fare and 1-2 daily
-frequencies land in the high-0.8s/low-0.9s, leaving headroom to respond
-once a real fare lever (the pricing loop, below) exists.
+and intercepts are hand-picked, crude constants per segment, same
+spirit as `LOAD_FACTOR`/`AVG_FARE` — calibrated so, blended together at
+today's $185 fare, the result stays close to what a single undifferentiated
+segment would have produced, so this pass adds *sensitivity that differs
+by segment* without secretly re-swinging the economy again. It already
+shows up as intended: a hypothetical $300 fare now drops blended booking
+share to ~0.57 versus ~0.73 in the pre-segment v1, since leisure (50% of
+demand) is genuinely price-sensitive — real leverage for the pricing
+loop, still ahead, to pull once it exists.
 
 This is "crude but principled" in the same way `economy.ts` already
 is — not a simulation of individual passengers, just an aggregate
@@ -433,9 +445,12 @@ it last of everything above.
 4. **Choice/market-share model** — v1 done. `sim/choiceModel.ts`'s
    `bookingShare()`, a logistic sigmoid (softmax collapses to this with
    only one real alternative to "stay home"), wired into `economy.ts`.
-   No yield-mix segments or competitor offerings yet, so it only ever
-   scores your own flight — see the "Layers" write-up for what's next.
-5. Yield mix / travel purpose segmentation
+   No competitor offerings yet, so it only ever scores your own flight
+   — see the "Layers" write-up for what's next.
+5. **Yield mix / travel purpose segmentation** — v1 done, built into
+   the same `sim/choiceModel.ts`: a fixed 20/50/30 business/leisure/VFR
+   split, each with its own price/schedule weights, blended into the
+   one number `economy.ts` sees.
 6. Static competitor data, authored and wired into the choice model
    (small, now that AI is non-reactive — see "What this simplifies")
 7. Pricing (recommended fare + override) — formula TBD, see above
