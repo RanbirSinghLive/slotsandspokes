@@ -26,7 +26,7 @@
         <div class="econ-row"><span class="econ-label">Margin</span><span id="panel-margin" class="econ-value"></span></div>
       </section>
       <section id="new-route-section" hidden>
-        <h2>New Route</h2>
+        <h2 id="new-route-heading">New Route</h2>
         <div id="new-route-label"></div>
         <div id="new-route-block"></div>
         <label class="new-route-field">Tail
@@ -35,6 +35,7 @@
         <label class="new-route-field">Depart
           <input type="time" id="new-route-depart" value="12:00" />
         </label>
+        <div id="new-route-error"></div>
         <div class="new-route-actions">
           <button type="button" id="new-route-confirm">Add Route</button>
           <button type="button" id="new-route-cancel">Cancel</button>

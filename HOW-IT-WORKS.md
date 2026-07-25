@@ -284,6 +284,21 @@ gaining a second, harder gesture — hit-testing a click against an
 arbitrary curve is a meaningfully bigger problem than hit-testing a point,
 and the table already does the job.
 
+**Market vs. frequency, and the one thing that's hard-blocked:** the form's
+heading reads "New Frequency" instead of "New Route" when the chosen
+origin/destination already has service — checked bidirectionally
+(`isExistingMarket()`), the same definition `render/routes.ts` uses to
+decide what counts as the same route for drawing. Separately, adding a leg
+at the exact same origin, destination, *and* departure minute as one that
+already exists is hard-blocked in the form itself (an inline error,
+disabled Add button, live as the depart time changes) rather than allowed-
+through-then-flagged the way M8/M9's rotation checks are — two departures
+at the identical minute on the identical route has no legitimate
+interpretation in this model, unlike a temporarily awkward rotation, which
+is still meaningful to leave in place while iterating. That collision
+check is same-direction only (opposite-direction departures at the same
+clock time is an ordinary synchronized schedule bank, not a conflict).
+
 ## Randomness (`src/sim/rng.ts`)
 
 A seeded PRNG (mulberry32); `state.rngSeed` carries its entire internal

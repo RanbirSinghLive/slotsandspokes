@@ -198,3 +198,16 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.2);
   color: #cdd3e0;
 }
+
+#new-route-error {
+  color: #ff8080;
+  margin: -2px 0 8px;
+  min-height: 1.2em;
+}
+
+#new-route-confirm:disabled {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #6b7694;
+  cursor: not-allowed;
+}

@@ -197,6 +197,32 @@ pixel-verified tracing from the exact origin toward the cursor → snap
 (Escape, re-click origin, click empty water), and confirmed panning
 still works unaffected for clicks away from any airport.
 
+**Post-M10 refinement, from playtesting:** the form always said "New
+Route" even when the origin/destination already had service, and
+nothing stopped adding a leg at the exact same origin/destination/time
+as one that already existed. Fixed: the heading now reads "New
+Frequency" for an existing market (checked bidirectionally, same
+definition as `render/routes.ts`'s route-drawing dedup), and an exact
+origin+destination+minute match is hard-blocked in the form itself
+(live, disabled Add button) rather than allowed-through-and-flagged —
+unlike M8/M9's rotation checks, there's no legitimate reading of two
+departures at the identical minute on the identical route, so it
+doesn't get the same benefit-of-the-doubt a temporarily-awkward
+rotation does.
+
+Two more rules were proposed alongside this and are still open,
+pending a decision:
+- Checking same-tail double-booking as a genuine time-*overlap*
+  against that tail's other legs (not just an exact match), surfaced
+  live in the form in plain English, rather than only caught after
+  submission by `validateSchedule()`'s less direct chain-mismatch
+  error.
+- A minimum spacing between frequencies on the same market (blocking
+  only the *exact* same minute still allows two departures a few
+  minutes apart, which adds no real coverage in the current model and
+  is probably also a slip) — needs a threshold decision, not just
+  logic.
+
 **Priority call:** build this first, ahead of the demand/choice-model
 layers, deliberately reversing the sequencing note below. The reasoning:
 nailing the core interaction — does *creating a route* feel good? — is

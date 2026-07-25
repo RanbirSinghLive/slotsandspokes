@@ -47,6 +47,40 @@ function findNearestAirport(screenX: number, screenY: number): Airport | null {
   return nearest;
 }
 
+/**
+ * Whether origin/dest is a market that already has service — checked
+ * bidirectionally, the same definition render/routes.ts uses to decide
+ * what counts as "the same route" for drawing purposes (a market is a
+ * market regardless of which direction a given leg happens to fly).
+ * Drives the form's heading: "New Frequency" for an existing market,
+ * "New Route" for a genuinely new one.
+ */
+function isExistingMarket(originIata: string, destIata: string, schedule: ScheduleLeg[]): boolean {
+  return schedule.some(
+    (leg) => (leg.origin === originIata && leg.dest === destIata) || (leg.origin === destIata && leg.dest === originIata),
+  );
+}
+
+/**
+ * A leg already departing this exact origin, for this exact destination,
+ * at this exact minute — checked same-direction only, unlike
+ * isExistingMarket above. Same-direction matters here: two flights leaving
+ * in *opposite* directions at the same clock time is an ordinary
+ * synchronized schedule bank, not a conflict. Two leaving the same
+ * direction at the identical minute has no legitimate interpretation in
+ * this model, so it's hard-blocked rather than just flagged.
+ */
+function findExactTimeCollision(
+  originIata: string,
+  destIata: string,
+  departMinute: number,
+  schedule: ScheduleLeg[],
+): ScheduleLeg | undefined {
+  return schedule.find(
+    (leg) => leg.origin === originIata && leg.dest === destIata && leg.departMinute === departMinute,
+  );
+}
+
 function setArmedCursor(armed: boolean): void {
   document.querySelector<HTMLCanvasElement>('#map')!.classList.toggle('armed', armed);
 }
@@ -66,7 +100,7 @@ function reset(): void {
  * starting a pan in that case. Returns false to mean "not mine, go ahead
  * and pan as usual."
  */
-export function handleRouteBuilderMouseDown(event: MouseEvent): boolean {
+export function handleRouteBuilderMouseDown(event: MouseEvent, state: SimState): boolean {
   const clicked = findNearestAirport(event.clientX, event.clientY);
 
   if (builderState.mode === 'idle') {
@@ -82,7 +116,7 @@ export function handleRouteBuilderMouseDown(event: MouseEvent): boolean {
       return true;
     }
     if (clicked) {
-      showForm(builderState.origin, clicked);
+      showForm(builderState.origin, clicked, state.schedule);
       builderState = { mode: 'confirming', origin: builderState.origin, dest: clicked };
       return true;
     }
@@ -170,21 +204,44 @@ export function drawRoutePreview(ctx: CanvasRenderingContext2D): void {
 // --- The confirmation form (real DOM, per CLAUDE.md's panel rule) ---
 
 const formSection = document.querySelector<HTMLElement>('#new-route-section')!;
+const formHeading = document.querySelector<HTMLElement>('#new-route-heading')!;
 const formLabel = document.querySelector<HTMLElement>('#new-route-label')!;
 const formBlock = document.querySelector<HTMLElement>('#new-route-block')!;
+const formError = document.querySelector<HTMLElement>('#new-route-error')!;
 const formTailSelect = document.querySelector<HTMLSelectElement>('#new-route-tail')!;
 const formDepartInput = document.querySelector<HTMLInputElement>('#new-route-depart')!;
 const formConfirmButton = document.querySelector<HTMLButtonElement>('#new-route-confirm')!;
 const formCancelButton = document.querySelector<HTMLButtonElement>('#new-route-cancel')!;
 
-function showForm(origin: Airport, dest: Airport): void {
+function showForm(origin: Airport, dest: Airport, schedule: ScheduleLeg[]): void {
+  formHeading.textContent = isExistingMarket(origin.iata, dest.iata, schedule) ? 'New Frequency' : 'New Route';
   formLabel.textContent = `${origin.iata} → ${dest.iata}`;
   formBlock.textContent = `Block time: ${computeBlockMinutes(origin.iata, dest.iata)} min`;
   formSection.hidden = false;
+  checkTimeCollision(origin, dest, schedule);
 }
 
 function hideForm(): void {
   formSection.hidden = true;
+}
+
+/**
+ * Live-check the depart time against findExactTimeCollision() (see above)
+ * and hard-block submission when it collides — unlike the M8/M9 rotation
+ * checks, which allow a bad edit through and just log it, this one has no
+ * legitimate interpretation, so it's caught here in the form rather than
+ * after the fact.
+ */
+function checkTimeCollision(origin: Airport, dest: Airport, schedule: ScheduleLeg[]): void {
+  const departMinute = timeStringToMinuteOfDay(formDepartInput.value);
+  const collision = findExactTimeCollision(origin.iata, dest.iata, departMinute, schedule);
+  if (collision) {
+    formError.textContent = `${collision.tail} already departs ${origin.iata} for ${dest.iata} at this exact time (${collision.legId}). Pick a different time.`;
+    formConfirmButton.disabled = true;
+  } else {
+    formError.textContent = '';
+    formConfirmButton.disabled = false;
+  }
 }
 
 function timeStringToMinuteOfDay(time: string): number {
@@ -214,17 +271,30 @@ export function setupRouteBuilder(state: SimState): void {
     formTailSelect.appendChild(option);
   }
 
+  // Re-check for an exact-time collision every time the player changes the
+  // depart time, so the block (see checkTimeCollision) reacts live instead
+  // of only at submission.
+  formDepartInput.addEventListener('input', () => {
+    if (builderState.mode !== 'confirming') return;
+    checkTimeCollision(builderState.origin, builderState.dest, state.schedule);
+  });
+
   formConfirmButton.addEventListener('click', () => {
     if (builderState.mode !== 'confirming') return;
     const { origin, dest } = builderState;
     const tail = formTailSelect.value;
+    const departMinute = timeStringToMinuteOfDay(formDepartInput.value);
+
+    // Defensive re-check: the button should already be disabled in this
+    // case, but never add a duplicate timeslot regardless.
+    if (findExactTimeCollision(origin.iata, dest.iata, departMinute, state.schedule)) return;
 
     const leg: ScheduleLeg = {
       legId: nextLegId(tail, state.schedule),
       tail,
       origin: origin.iata,
       dest: dest.iata,
-      departMinute: timeStringToMinuteOfDay(formDepartInput.value),
+      departMinute,
       blockMinutes: computeBlockMinutes(origin.iata, dest.iata),
     };
     state.schedule.push(leg);

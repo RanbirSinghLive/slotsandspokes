@@ -182,7 +182,7 @@ canvas.addEventListener('mousedown', (event) => {
   // on any click on the canvas: arming, confirming, or cancelling a route
   // all take priority over starting a pan. Only once it says "not mine"
   // does an ordinary click-and-drag start panning, exactly as before.
-  if (handleRouteBuilderMouseDown(event)) {
+  if (handleRouteBuilderMouseDown(event, state)) {
     render();
     return;
   }
