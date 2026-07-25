@@ -213,11 +213,22 @@ const formDepartInput = document.querySelector<HTMLInputElement>('#new-route-dep
 const formConfirmButton = document.querySelector<HTMLButtonElement>('#new-route-confirm')!;
 const formCancelButton = document.querySelector<HTMLButtonElement>('#new-route-cancel')!;
 
+const DEFAULT_DEPART_TIME = '12:00';
+
 function showForm(origin: Airport, dest: Airport, schedule: ScheduleLeg[]): void {
   formHeading.textContent = isExistingMarket(origin.iata, dest.iata, schedule) ? 'New Frequency' : 'New Route';
   formLabel.textContent = `${origin.iata} → ${dest.iata}`;
   formBlock.textContent = `Block time: ${computeBlockMinutes(origin.iata, dest.iata)} min`;
   formSection.hidden = false;
+
+  // Reset to a fixed default every time the form opens, rather than
+  // leaving whatever time a *previous* route's form was left at. Without
+  // this, a leftover time from an unrelated earlier route can silently
+  // collide with an existing leg on this new market and block the Add
+  // button with no obvious reason why — exactly what happened creating a
+  // second YSJ-YQB frequency after leaving the input at 13:00 from an
+  // earlier route.
+  formDepartInput.value = DEFAULT_DEPART_TIME;
   checkTimeCollision(origin, dest, schedule);
 }
 

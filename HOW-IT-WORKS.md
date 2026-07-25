@@ -265,6 +265,14 @@ can't hide the row just created) and setting the Route filter to that
 leg's exact text — the table narrows to just the route you touched instead
 of the new row landing wherever it lands among a dozen others.
 
+The confirmation form also resets its own depart-time input to a fixed
+default (`DEFAULT_DEPART_TIME`, `showForm()`) every time it opens, rather
+than leaving whatever time a *previous* route's form was left at — without
+this, a leftover time from an unrelated earlier route could silently
+collide with an existing leg on a new market and block Add with no
+obvious reason why (this happened for real: creating a second YSJ-YQB
+frequency after leaving the input at 13:00 from an unrelated route).
+
 ## Route builder (`src/ui/routeBuilder.ts`) — M10
 
 Creating a *new* route is a map gesture, not a form: click an airport to

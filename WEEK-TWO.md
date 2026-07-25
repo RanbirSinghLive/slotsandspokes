@@ -232,6 +232,18 @@ landing wherever it lands among a dozen-plus others. Verified in-
 browser: each filter in isolation, filters clearing correctly, and the
 auto-narrow correctly overriding a deliberately-left-stale Tail filter.
 
+**Bug found via playtesting and fixed:** the auto-narrow appeared to
+silently fail when adding a second YSJ-YQB frequency. Root cause
+wasn't the filter at all — the confirmation form's depart-time input
+never reset between separate uses, so a time left over from an earlier,
+unrelated route carried into the next one. When that stale time
+happened to exactly match YSJ-YQB's existing leg (13:00), the M10
+exact-time block silently prevented the Add entirely, so nothing was
+ever added for the filter to narrow to. Fixed: the form now resets its
+depart input to a fixed default every time it opens. Reproduced the
+exact failure (leave a route's time at 13:00, then arm YSJ-YQB without
+touching the field) and confirmed the fix.
+
 **Priority call:** build this first, ahead of the demand/choice-model
 layers, deliberately reversing the sequencing note below. The reasoning:
 nailing the core interaction — does *creating a route* feel good? — is
