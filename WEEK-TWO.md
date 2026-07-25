@@ -346,22 +346,27 @@ it last of everything above.
 
 ## Draft dependency order (not committed)
 
-1. **Route creation + editing map interaction** (drag-then-follow, see
-   above) — built now, against today's flat economy as a placeholder.
-   The gesture and the confirmation form; not yet meaningful as a
-   decision.
-2. Population data (StatsCan research) + O-D demand layer (gravity model)
-3. Choice/market-share model — the connective piece
-4. Yield mix / travel purpose segmentation
-5. Static competitor data, authored and wired into the choice model
+1. **Route creation + editing map interaction** (drag-then-follow) —
+   done, M10. The gesture and the confirmation form, against today's
+   flat economy as a placeholder; not yet meaningful as a decision.
+2. **Rotation board, phase 1 (visualize-only)** — done, M11. Raised
+   organically after M10, not originally in this list: scaling the
+   schedule-editing UI to more aircraft turned out to be a prerequisite
+   for the rest of this list feeling good to use, not a nice-to-have.
+   Phases 2–4 (create/reschedule-by-drag, bulk tool) are back-burnered
+   behind this same dependency order, not next by default.
+3. Population data (StatsCan research) + O-D demand layer (gravity model)
+4. Choice/market-share model — the connective piece
+5. Yield mix / travel purpose segmentation
+6. Static competitor data, authored and wired into the choice model
    (small, now that AI is non-reactive — see "What this simplifies")
-6. Pricing (recommended fare + override) — formula TBD, see above
-7. Random events / operational disruption (diversion, closure)
+7. Pricing (recommended fare + override) — formula TBD, see above
+8. Random events / operational disruption (diversion, closure)
 
-Step 1 is the one deliberate exception to "layers before loops": the
-*gesture* doesn't need the economy to be rich to be worth building and
-feeling right, even though *whether a given route is a good idea*
-still waits on steps 2–5.
+Steps 1–2 are the deliberate exceptions to "layers before loops": the
+map gesture and the board that makes it scale don't need the economy
+to be rich to be worth building and feeling right, even though *whether
+a given route is a good idea* still waits on steps 3–6.
 
 ---
 
