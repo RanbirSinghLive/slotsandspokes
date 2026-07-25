@@ -190,12 +190,12 @@ calibrated against any real O-D survey, just tuned so the biggest pair
 This is a pure function of static data (population never changes at
 runtime, distance is fixed per airport pair), so nothing caches a
 matrix — it's cheap enough to call directly whenever a number is
-needed. It is *not* wired into `economy.ts` or anything the player
-sees yet: today's flat `LOAD_FACTOR`/`AVG_FARE` model still runs every
-flight regardless of what this function would say. Making that gap
-matter — a route whose demand can't fill a 78-seat DH4 actually flying
-half-empty — is the job of the choice model and pricing loop, both
-still ahead (see WEEK-TWO.md's "Layers").
+needed. It's visible in the map's Demand view (see "Rendering," below)
+but still *not* wired into `economy.ts`: today's flat `LOAD_FACTOR`/
+`AVG_FARE` model runs every flight regardless of what this function
+would say. Making that gap matter — a route whose demand can't fill a
+78-seat DH4 actually flying half-empty — is the job of the choice
+model and pricing loop, both still ahead (see WEEK-TWO.md's "Layers").
 
 ## Headless runner (`src/headless/run.ts`)
 
@@ -218,8 +218,12 @@ day happened to roll.
 ## Rendering (`src/render/`, plus `main.ts`'s loop)
 
 Canvas draws the map; everything else (clock, speed buttons, sidebar) is
-real DOM, per CLAUDE.md's rule against hand-rolled canvas widgets. Draw
-order each frame, back to front:
+real DOM, per CLAUDE.md's rule against hand-rolled canvas widgets. The
+Ops/Demand/Rotation toggle in the HUD (`main.ts`'s `currentView`) picks
+what `render()` draws each frame; `basemap.ts` is the one layer shared by
+both canvas modes, drawn first and every time.
+
+**Ops mode** (the default) — draw order back to front:
 
 1. `basemap.ts` — land/coastlines from Natural Earth 110m TopoJSON.
 2. `terminator.ts` — the night hemisphere: a 90°-radius `d3.geoCircle`
@@ -239,6 +243,27 @@ order each frame, back to front:
    is tinted red instead of the usual yellow — the point being to make a
    cascading delay watchable on the map itself, not just readable as text.
 5. `airports.ts` — a dot + IATA label per airport.
+
+**Demand mode** — `demand.ts`'s `drawDemandLayer()`, on top of the same
+basemap: one geodesic arc for every one of the 10 airports' 45 distinct
+pairs, width and opacity scaled to that pair's `sim/demand.ts` figure
+relative to the single busiest pair, so the big markets read as the
+thickest, brightest lines. A pair that already has scheduled service
+(same bidirectional "served" definition `routes.ts` uses) gets an amber
+halo drawn behind its arc, so it's visible at a glance which big markets
+are already flown versus still white space. Airport circles are sized by
+`sqrt(population)` (area, not radius, tracking population — otherwise
+Toronto would swallow the map) instead of Ops mode's fixed dot. Read-only,
+same "visualize first" phasing as the rotation board's first pass — no
+legend or tooltip yet, and not clickable.
+
+Switching away from Ops cancels any in-progress route-creation gesture
+(`ui/routeBuilder.ts`'s `cancelPendingRoute()`), and the route-builder's
+own mouse handlers only run at all when `currentView === 'ops'` — arming
+a route by clicking an airport wouldn't mean anything while looking at
+the demand layer instead. Panning and zooming (below) stay live in both
+canvas modes, since seeing a market more clearly is just as useful as
+seeing operations more clearly.
 
 `projection.ts` owns the single shared `d3.geoMercator()` instance, fitted to
 an eastern-Canada bounding box and clipped to the canvas's own pixel bounds.

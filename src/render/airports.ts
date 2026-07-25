@@ -7,6 +7,7 @@ export type Airport = {
   lat: number;
   lon: number;
   utcOffsetMinutes: number;
+  population: number;
 };
 
 export const airports: Airport[] = airportsData;

@@ -145,9 +145,18 @@ the next layers (yield mix, choice model, pricing) exist to resolve.
 
 Direct-service-only per decision 1: this demand number is the ceiling
 for a route that exists, and just a visible "market size" figure for
-one that doesn't. Not yet wired into `economy.ts` or anything the
-player sees in the UI — that's the choice model (layer 4) and pricing
-loop's job, both still ahead.
+one that doesn't.
+
+**Made visible via a new "Demand" map mode** (`render/demand.ts`),
+alongside a rename of the old lone map view to "Ops" — the toggle in
+the HUD is now Ops/Demand/Rotation, all three sharing the same
+canvas-vs-`#rotation-board` swap mechanism M11 built. Demand mode draws
+all 45 city-pair arcs weighted by `dailyDemand()`, with an amber halo
+on pairs that already have scheduled service, plus airport circles
+sized by population — see HOW-IT-WORKS.md's "Rendering" section for the
+full draw order. This is still just visualization: the number isn't
+wired into `economy.ts` or anything that affects the books — that's the
+choice model (layer 4) and pricing loop's job, both still ahead.
 
 ### 2. Yield mix / travel purpose (business, leisure, VFR)
 

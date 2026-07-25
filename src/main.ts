@@ -5,6 +5,7 @@ import { drawTerminator } from './render/terminator';
 import { drawRoutes } from './render/routes';
 import { drawAirports } from './render/airports';
 import { drawAircraft } from './render/aircraft';
+import { drawDemandLayer } from './render/demand';
 import { validateSchedule } from './sim/schedule';
 import { createInitialState, type SimState } from './sim/state';
 import { step } from './sim/step';
@@ -84,29 +85,36 @@ function resize(): void {
 // time it is.
 let latestFractionalMinute = state.simMinute;
 
-// M11: which of the two main views (the map canvas, or the read-only
-// rotation board) is currently showing. The clock and sidebar panel stay
-// relevant either way, so they're not gated by this — only the actual
-// canvas drawing is, since there's no point paying for it while hidden.
-type View = 'map' | 'rotation';
-let currentView: View = 'map';
+// Which of the three main views is currently showing. The clock and
+// sidebar panel stay relevant regardless, so they're not gated by this.
+// 'ops' and 'demand' both draw on the same canvas (just different layers
+// on top of the same basemap/projection); only 'rotation' hides the canvas
+// entirely in favor of #rotation-board. See ui/rotationBoard.ts for why
+// that one gets its own DOM element instead of also being a canvas layer.
+type View = 'ops' | 'demand' | 'rotation';
+let currentView: View = 'ops';
 
 function render(): void {
   updateClock(state);
   updatePanel(state);
 
-  if (currentView !== 'map') return;
+  if (currentView === 'rotation') return;
 
   const cssWidth = window.innerWidth - PANEL_WIDTH_PX;
   const cssHeight = window.innerHeight;
 
   ctx.clearRect(0, 0, cssWidth, cssHeight);
   drawBasemap(ctx);
-  drawTerminator(ctx, latestFractionalMinute);
-  drawRoutes(ctx);
-  drawAircraft(ctx, state, latestFractionalMinute);
-  drawAirports(ctx);
-  drawRoutePreview(ctx);
+
+  if (currentView === 'ops') {
+    drawTerminator(ctx, latestFractionalMinute);
+    drawRoutes(ctx);
+    drawAircraft(ctx, state, latestFractionalMinute);
+    drawAirports(ctx);
+    drawRoutePreview(ctx);
+  } else {
+    drawDemandLayer(ctx);
+  }
 }
 
 const MINUTES_PER_DAY = 1440;
@@ -179,29 +187,33 @@ speedButtons.forEach((button) => {
   });
 });
 
-// --- View toggle (M11: map vs. rotation board) ---
+// --- View toggle (Ops / Demand / Rotation) ---
 //
 // #map and #rotation-board are siblings sized identically in style.css;
-// only one is ever un-[hidden] at a time, so switching views is just
-// flipping that attribute on both. Switching away from the map cancels
-// any in-progress route-creation gesture (ui/routeBuilder.ts) — an armed
-// or pending route stops making sense once the canvas it was drawn on is
-// no longer visible. Switching *to* the board rebuilds it, in case the
-// schedule changed while it was hidden (nothing else refreshes it, since
-// it's a plain read of state with no interactive elements yet to justify
-// keeping it live-updated every frame — see ui/rotationBoard.ts).
+// #map stays visible for both 'ops' and 'demand' (render() just draws a
+// different layer on top of the same basemap for each — see above) and
+// only gives way to #rotation-board for 'rotation'. Switching away from
+// 'ops' cancels any in-progress route-creation gesture (ui/routeBuilder.ts)
+// — an armed or pending route stops making sense once you're not looking
+// at the ops layer it was drawn on. Switching *to* the rotation board
+// rebuilds it, in case the schedule changed while it was hidden (nothing
+// else refreshes it, since it's a plain read of state with no interactive
+// elements yet to justify keeping it live-updated every frame — see
+// ui/rotationBoard.ts).
 viewToggleButtons.forEach((button) => {
   button.addEventListener('click', () => {
     const view = button.dataset.view as View;
     if (view === currentView) return;
 
     currentView = view;
-    canvas.hidden = view !== 'map';
+    canvas.hidden = view === 'rotation';
     rotationBoardEl.hidden = view !== 'rotation';
     viewToggleButtons.forEach((b) => b.classList.toggle('active', b === button));
 
-    if (view !== 'map') cancelPendingRoute();
+    if (view !== 'ops') cancelPendingRoute();
     if (view === 'rotation') updateRotationBoard(state);
+
+    render();
   });
 });
 
@@ -220,10 +232,11 @@ let translateAtDragStart: [number, number] = [0, 0];
 
 canvas.addEventListener('mousedown', (event) => {
   // M10's route-creation gesture (ui/routeBuilder.ts) gets first refusal
-  // on any click on the canvas: arming, confirming, or cancelling a route
-  // all take priority over starting a pan. Only once it says "not mine"
+  // on any click on the canvas, but only in Ops mode — arming a route by
+  // clicking an airport wouldn't mean anything while looking at the demand
+  // layer instead. Only once it says "not mine" (or isn't asked at all)
   // does an ordinary click-and-drag start panning, exactly as before.
-  if (handleRouteBuilderMouseDown(event, state)) {
+  if (currentView === 'ops' && handleRouteBuilderMouseDown(event, state)) {
     render();
     return;
   }
@@ -235,7 +248,7 @@ canvas.addEventListener('mousedown', (event) => {
 });
 
 canvas.addEventListener('mousemove', (event) => {
-  if (handleRouteBuilderMouseMove(event)) render();
+  if (currentView === 'ops' && handleRouteBuilderMouseMove(event)) render();
 });
 
 window.addEventListener('mousemove', (event) => {
