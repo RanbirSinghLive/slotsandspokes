@@ -100,19 +100,31 @@ body {
   color: #fff;
 }
 
-#fleet-table {
+.panel-table {
   width: 100%;
   border-collapse: collapse;
 }
 
-#fleet-table th,
-#fleet-table td {
+.panel-table th,
+.panel-table td {
   text-align: left;
   padding: 4px 6px 4px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-#fleet-table th {
+.panel-table th {
   color: #6b7694;
   font-weight: 400;
+}
+
+.panel-table input[type='time'] {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 2px 4px;
+  width: 100%;
+  box-sizing: border-box;
 }

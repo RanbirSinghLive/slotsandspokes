@@ -1,5 +1,5 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
-import { scheduleLegs, type ScheduleLeg } from './schedule';
+import { loadSchedule, type ScheduleLeg } from './schedule';
 
 export type AircraftStatus = 'ground' | 'airborne';
 
@@ -25,6 +25,15 @@ export type SimState = {
   cash: number;
   aircraft: Aircraft[];
   activeFlights: ActiveFlight[];
+  /**
+   * This game's own copy of the daily schedule — a fresh array from
+   * sim/schedule.ts's loadSchedule(), independent of any other game's copy
+   * and of the unedited template. step() reads departure times from here,
+   * not from a module-level constant, specifically so the M8 schedule
+   * editor's edits actually change what the sim does: mutate
+   * `state.schedule[i].departMinute` and the very next tick sees it.
+   */
+  schedule: ScheduleLeg[];
   completedToday: string[];
   todayRevenue: number;
   todayCost: number;
@@ -73,8 +82,10 @@ function earliestLegFor(tail: string, legs: ScheduleLeg[]): ScheduleLeg {
  * compare different random delay patterns run over run).
  */
 export function createInitialState(tails: string[], rngSeed: number = 1): SimState {
+  const schedule = loadSchedule();
+
   const aircraft: Aircraft[] = tails.map((tail) => {
-    const firstLeg = earliestLegFor(tail, scheduleLegs);
+    const firstLeg = earliestLegFor(tail, schedule);
     return {
       tail,
       typeCode: aircraftType.code,
@@ -89,6 +100,7 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     cash: 0,
     aircraft,
     activeFlights: [],
+    schedule,
     completedToday: [],
     todayRevenue: 0,
     todayCost: 0,

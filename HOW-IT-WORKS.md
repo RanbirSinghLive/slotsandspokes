@@ -8,9 +8,9 @@ out of sync with the code, the code is right and this needs fixing, not the
 other way around.
 
 Status: M1–M6 complete (scaffold through economy/panel). Phase 2 M7
-(headless runner) done — see "Headless runner" below. M8 (schedule editor)
-and M9 (turn times/delays) not started, though the seeded PRNG that M9 will
-need already exists (see "Randomness" below).
+(headless runner) and M8 (schedule editor) done — see their sections below.
+M9 (turn times/delays) not started, though the seeded PRNG it will need
+already exists (see "Randomness" below).
 
 ---
 
@@ -39,11 +39,14 @@ seasonally.
 - **`aircraft-types.json`** — one type right now: the Dash 8-400 (`DH4`),
   78 seats, 360kt cruise, `costPerBlockHour` and `costPerDeparture` for the
   economy model below. Multiple types are explicitly deferred.
-- **`schedule.json`** — the daily-repeating schedule: 12 legs across 3 tails
-  (`C-GVIA`, `C-FATL`, `C-GMAR`), each a hand-authored rotation that returns
-  to its own overnight base by end of day. Each entry has `legId`, `tail`,
-  `origin`, `dest`, `departMinute` (minute-of-day) — `blockMinutes` is *not*
-  stored here, it's computed at load time (see below).
+- **`schedule.json`** — the daily-repeating schedule *template*: 12 legs
+  across 3 tails (`C-GVIA`, `C-FATL`, `C-GMAR`), each a hand-authored
+  rotation that returns to its own overnight base by end of day. Each entry
+  has `legId`, `tail`, `origin`, `dest`, `departMinute` (minute-of-day) —
+  `blockMinutes` is *not* stored here, it's computed at load time (see
+  below). This file itself is never edited at runtime: `sim/schedule.ts`'s
+  `loadSchedule()` hands each new `SimState` its own fresh, independent
+  copy (`state.schedule`), which the M8 schedule editor mutates instead.
 
 ## The simulation state (`src/sim/state.ts`)
 
@@ -58,6 +61,7 @@ simMinute        — current time, see above
 cash             — running total, persists across days
 aircraft[]       — { tail, typeCode, status: 'ground'|'airborne', atAirport, activeLegId }
 activeFlights[]  — { legId, tail, origin, dest, departMinute, arriveMinute }
+schedule[]       — this game's own editable copy of the daily schedule (see M8, below)
 completedToday[] — legIds finished since the last day rollover
 todayRevenue/Cost/Margin — reset to 0 at day rollover; cash is not reset
 rngSeed          — seeded RNG state (see Randomness) — not consumed yet
@@ -83,12 +87,14 @@ order:
    specifically so that right up until this call, those fields still hold
    the just-finished day's real totals — readable from outside step()
    (the M7 headless runner, for instance) between calls.
-2. **Depart** — any scheduled leg whose `departMinute` matches
+2. **Depart** — any leg in `state.schedule` whose `departMinute` matches
    `simMinute % 1440`, flown by an aircraft that's on the ground at the
    right airport, takes off: the aircraft flips to `airborne` and an
    `ActiveFlight` is created with `blockMinutes` (computed once at schedule
    load time from great-circle distance ÷ cruise speed, in
-   `sim/schedule.ts`) added to the absolute departure minute.
+   `sim/schedule.ts`) added to the absolute departure minute. Reading from
+   `state.schedule` rather than a fixed constant is what lets the M8
+   schedule editor's edits actually change what the sim does.
 3. **Arrive** — any `ActiveFlight` whose `arriveMinute` has been reached
    lands: the aircraft flips back to `ground` at the destination, and
    `sim/economy.ts`'s `flightResult()` is applied (see Economy below).
@@ -161,9 +167,33 @@ per the pattern in CLAUDE.md's "Time" section.
 
 A real HTML sidebar, 280px wide (canvas width = `window.innerWidth - 280`,
 kept in sync via `PANEL_WIDTH_PX`). Shows cash, today's revenue/cost/margin,
-and a fleet table (tail, type, status, and either the current airport or
-`origin → dest (N min)` while airborne). Rebuilt from `state` every render —
-a pure read, same rule as the canvas layers.
+a fleet table (tail, type, status, and either the current airport or
+`origin → dest (N min)` while airborne), and the schedule table below. The
+econ/fleet parts are rebuilt from `state` every render — a pure read, same
+rule as the canvas layers.
+
+## Schedule editor (M8)
+
+The schedule table is *not* rebuilt every render like the fleet table is —
+`setupScheduleEditor()` builds its rows once at startup instead. Rebuilding
+it 60 times a second the way the fleet table is would tear out and recreate
+every `<input>` continuously, which steals keyboard focus and closes the
+browser's native time-picker mid-edit. Nothing needs it rebuilt anyway:
+`state.schedule` only ever changes through these same inputs, so there's
+nothing external for a repeated render to pick up.
+
+Each row has a real `<input type="time">` bound to one leg's `departMinute`
+(converted between "HH:MM" and minutes-of-day). Its `change` handler does
+two things: mutates that leg object in `state.schedule` directly — which
+`step()` reads from, so the very next simulated minute that reaches that
+slot uses the new time — and re-runs `validateSchedule()` on the whole
+schedule, logging to the console exactly like the M3 startup check does if
+the edit leaves an aircraft departing before it could plausibly have landed
+and turned around.
+
+Editing is departure time only for now — reassigning a leg's origin,
+destination, or tail (which would also mean recomputing `blockMinutes` and
+touching `render/routes.ts`'s route list) is out of scope for this pass.
 
 ## Randomness (`src/sim/rng.ts`)
 
@@ -176,8 +206,8 @@ identical sequence of "random" delays.
 
 ## What isn't built yet
 
-See WEEK-ONE.md's "Then, in order" (schedule editor, turn times/delay
-propagation — headless runner is now done, above) and "Deliberately
-deferred" (aircraft market, financing, maintenance, crew, competitor AI,
-multiple aircraft types, save/load, and more) — not duplicated here since
-it would just go stale twice.
+See WEEK-ONE.md's "Then, in order" (turn times/delay propagation — headless
+runner and schedule editor are now done, above) and "Deliberately deferred"
+(aircraft market, financing, maintenance, crew, competitor AI, multiple
+aircraft types, save/load, and more) — not duplicated here since it would
+just go stale twice.

@@ -46,10 +46,16 @@ function computeBlockMinutes(originIata: string, destIata: string): number {
 }
 
 /**
- * The daily schedule, loaded once with each leg's block time computed up
- * front from great-circle distance — see CLAUDE.md's note on why
- * blockMinutes is computed at load time and stored on the entry, rather
- * than recomputed on every simulated minute.
+ * The daily schedule as authored in data/schedule.json, with each leg's
+ * block time computed up front from great-circle distance — see
+ * CLAUDE.md's note on why blockMinutes is computed at load time and stored
+ * on the entry, rather than recomputed on every simulated minute.
+ *
+ * This is the unedited *template* — the set of city pairs ever flown,
+ * which render/routes.ts uses to draw the route network, and which never
+ * changes even once a player edits departure times (M8). Each SimState gets
+ * its own independent, mutable copy via loadSchedule() below; nothing
+ * mutates this array directly.
  */
 export const scheduleLegs: ScheduleLeg[] = (scheduleData as Array<Omit<ScheduleLeg, 'blockMinutes'>>).map(
   (leg) => ({
@@ -57,6 +63,17 @@ export const scheduleLegs: ScheduleLeg[] = (scheduleData as Array<Omit<ScheduleL
     blockMinutes: computeBlockMinutes(leg.origin, leg.dest),
   }),
 );
+
+/**
+ * A fresh, independent copy of the daily schedule — a new array of new leg
+ * objects, so editing one game's schedule (state.schedule) can never leak
+ * into another's. Called once by createInitialState(); the schedule editor
+ * (ui/panels.ts) mutates the copy it gets back from there, never this
+ * module's own `scheduleLegs`.
+ */
+export function loadSchedule(): ScheduleLeg[] {
+  return scheduleLegs.map((leg) => ({ ...leg }));
+}
 
 /**
  * Sanity-check that every aircraft's day is one unbroken chain: the

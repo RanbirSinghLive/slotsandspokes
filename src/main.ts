@@ -5,18 +5,23 @@ import { drawTerminator } from './render/terminator';
 import { drawRoutes } from './render/routes';
 import { drawAirports } from './render/airports';
 import { drawAircraft } from './render/aircraft';
-import { scheduleLegs, validateSchedule } from './sim/schedule';
+import { validateSchedule } from './sim/schedule';
 import { createInitialState, type SimState } from './sim/state';
 import { step } from './sim/step';
-import { updatePanel, PANEL_WIDTH_PX } from './ui/panels';
-
-validateSchedule(scheduleLegs);
+import { updatePanel, setupScheduleEditor, PANEL_WIDTH_PX } from './ui/panels';
 
 // M4 brought only one aircraft to life, to prove out the clock and the
 // depart/arrive mechanism on something small. M5 turns the rest on by
 // listing all three tails here — see the comment on createInitialState.
 const ACTIVE_TAILS = ['C-GVIA', 'C-FATL', 'C-GMAR'];
 const state: SimState = createInitialState(ACTIVE_TAILS);
+
+// Validate this game's own schedule (not just the static template) — the
+// M8 schedule editor re-runs this same check after every edit, so a change
+// that breaks a rotation gets caught the same way a broken schedule.json
+// would be caught here at startup.
+validateSchedule(state.schedule);
+setupScheduleEditor(state);
 
 const canvas = document.querySelector<HTMLCanvasElement>('#map')!;
 const ctx = canvas.getContext('2d')!;

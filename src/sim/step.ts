@@ -1,5 +1,4 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
-import { scheduleLegs } from './schedule';
 import { flightResult, type EconomyAircraftType } from './economy';
 import type { SimState, ActiveFlight } from './state';
 
@@ -33,9 +32,12 @@ const aircraftTypesByCode = new Map<string, EconomyAircraftType>(
  * outside step() (the M7 headless runner, for instance) read "yesterday's
  * numbers" cleanly between calls, instead of catching them already zeroed.
  *
- * `scheduleLegs` is "the daily repeating schedule" (CLAUDE.md), so matching
- * against `state.simMinute % MINUTES_PER_DAY` makes every leg fire again at
- * the same local-to-the-schedule time on day 1, day 2, and so on.
+ * `state.schedule` is "the daily repeating schedule" (CLAUDE.md), so
+ * matching against `state.simMinute % MINUTES_PER_DAY` makes every leg fire
+ * again at the same local-to-the-schedule time on day 1, day 2, and so on.
+ * It's read from `state` rather than a shared module-level constant so
+ * that the M8 schedule editor's edits — mutating a leg's `departMinute`
+ * directly — take effect on the very next tick that reaches this loop.
  */
 export function step(state: SimState): void {
   const minuteOfDay = state.simMinute % MINUTES_PER_DAY;
@@ -47,7 +49,7 @@ export function step(state: SimState): void {
     state.todayMargin = 0;
   }
 
-  for (const leg of scheduleLegs) {
+  for (const leg of state.schedule) {
     if (leg.departMinute !== minuteOfDay) continue;
 
     const aircraft = state.aircraft.find((a) => a.tail === leg.tail);
