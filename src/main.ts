@@ -23,12 +23,21 @@ import {
 } from './ui/routeBuilder';
 import { setupRotationBoard, updateRotationBoard } from './ui/rotationBoard';
 import { setupCommercialPanel, updateCommercialPanel } from './ui/commercial';
+import { loadSavedState, saveState, clearSavedState } from './ui/save';
 
 // M4 brought only one aircraft to life, to prove out the clock and the
 // depart/arrive mechanism on something small. M5 turns the rest on by
 // listing all three tails here — see the comment on createInitialState.
 const ACTIVE_TAILS = ['C-GVIA', 'C-FATL', 'C-GMAR'];
-const state: SimState = createInitialState(ACTIVE_TAILS);
+
+// Week three's persistence fix (see WEEK-THREE.md): resume a saved game
+// if one exists, rather than always starting fresh. A fresh game seeds
+// from Date.now(), not createInitialState()'s own fixed default (`1`) —
+// so every *new* playthrough gets its own weather/delay history, while
+// src/headless/run.ts (which never passes a seed) keeps relying on that
+// same fixed default and stays exactly as reproducible as before. Only
+// this one call site changed.
+const state: SimState = loadSavedState() ?? createInitialState(ACTIVE_TAILS, Date.now());
 
 // Validate this game's own schedule (not just the static template) — the
 // M8 schedule editor re-runs this same check after every edit, so a change
@@ -82,6 +91,19 @@ competitionAirlineDropdown.querySelectorAll<HTMLButtonElement>('button').forEach
 });
 const rotationBoardEl = document.querySelector<HTMLDivElement>('#rotation-board')!;
 const commercialPanelEl = document.querySelector<HTMLDivElement>('#commercial-panel')!;
+
+// Week three: the only way back to a fresh game, now that one persists
+// across reloads by default. Confirms first since this is irreversibly
+// destructive to whatever's currently saved — clearing the save and
+// reloading is simpler and more robust than trying to reset every piece
+// of in-memory state by hand, and a fresh load already knows to seed
+// from Date.now() when it finds nothing saved.
+const newGameButton = document.querySelector<HTMLButtonElement>('#new-game-button')!;
+newGameButton.addEventListener('click', () => {
+  if (!confirm('Start a new game? This will erase your current progress.')) return;
+  clearSavedState();
+  window.location.reload();
+});
 
 /**
  * Size the canvas's actual pixel buffer, then fit the projection to it, then
@@ -202,6 +224,14 @@ let accumulator = 0;
 let speedMultiplier = 1;
 let lastFrameTimeMs: number | null = null;
 
+// Week three's persistence fix: save once per simulated day crossed, not
+// every minute — a day-old save is a perfectly fine worst case to resume
+// from, and this is 1440x fewer localStorage writes than saving every
+// tick would be. Initialized from whatever day the game actually starts
+// on (loaded or fresh) so resuming a save doesn't immediately re-save
+// before a new day has actually passed.
+let lastSavedDay = Math.floor(state.simMinute / MINUTES_PER_DAY);
+
 function tick(nowMs: number): void {
   if (lastFrameTimeMs === null) {
     // First frame: nothing to measure a delta against yet.
@@ -217,6 +247,12 @@ function tick(nowMs: number): void {
   while (accumulator >= MS_PER_SIM_MINUTE) {
     step(state);
     accumulator -= MS_PER_SIM_MINUTE;
+  }
+
+  const currentDay = Math.floor(state.simMinute / MINUTES_PER_DAY);
+  if (currentDay !== lastSavedDay) {
+    lastSavedDay = currentDay;
+    saveState(state);
   }
 
   latestFractionalMinute = state.simMinute + accumulator / MS_PER_SIM_MINUTE;

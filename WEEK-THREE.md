@@ -55,28 +55,41 @@ not a sandboxed artifact," so it's expected infrastructure, just not
 built yet. Right now, closing the tab mid-session throws away every
 schedule edit, fare change, and marketing dollar you've spent.
 
-**Proposed fix:** serialize `SimState` to `localStorage` on some cadence
-(every simulated day is probably enough — no need for every tick) and
-offer to restore it on load. `SimState` is already required to survive
-`JSON.parse(JSON.stringify(state))` unchanged (CLAUDE.md's rule, built
-in from M1), so this is close to free — the hard part was already done
-by the constraint, not this feature.
+**Done.** Built as `src/ui/save.ts`: `loadSavedState()`/`saveState()`/
+`clearSavedState()`, a thin wrapper around `localStorage`, versioned
+under the key `airgame-save-v1` — bumped by hand whenever `SimState`'s
+shape changes in a breaking way, so an old save is simply never found
+again rather than crashing on a field that no longer matches (bare-bones
+versioning, not a migration system). `main.ts` saves once per simulated
+day *crossed* (tracked in the `tick()` loop, not every minute — 1440x
+fewer writes than that would be) and loads on startup, falling back to
+a fresh game if nothing was saved or the save didn't parse.
+`SimState`'s existing JSON-round-trip requirement (CLAUDE.md, true
+since M1) is what makes this close to free — the hard part was already
+done by that constraint, not by this feature. Every localStorage call
+is wrapped so a failure (private browsing, quota) degrades to "this one
+save didn't happen," never a crash.
 
-### 3. Every playthrough is currently identical
+A "New Game" button (confirms first, since it's irreversible) clears
+the save and reloads — the simplest way back to fresh, rather than
+resetting every piece of in-memory state by hand.
 
-`createInitialState()` defaults `rngSeed` to a fixed `1`. That's
-deliberate and correct for headless testing (same seed, same 60-day
-outcome, verified repeatedly this whole project), but it also means
-every time you open the game, you get the *identical* weather history,
-the identical delay sequence, down to the same thunderstorm on the same
-day. Fine for a single session; probably not what you want across
-multiple playtest sessions if you're trying to see how the game
-responds to different luck.
+Verified in-browser: playing for a couple of simulated days, forcing a
+full page reload, and confirming the game resumed exactly where it left
+off (same day, same cash, same schedule) rather than restarting; "New
+Game" (with `window.confirm` stubbed for the test) cleared the save and
+returned to a fresh Day 1, $0 game.
 
-**Proposed fix:** seed from something session-specific (e.g.
-`Date.now()`) by default in `main.ts` specifically — headless/tests
-keep passing an explicit seed, so determinism where it actually matters
-(reproducible test runs) is untouched.
+### 3. Every playthrough is currently identical — done, alongside item 2
+
+`createInitialState()` still defaults `rngSeed` to a fixed `1` — correct
+and unchanged for headless testing (`src/headless/run.ts` never passes
+a seed, so it keeps relying on that same default and stays exactly as
+reproducible as before). Only `main.ts`'s own call site changed, to pass
+`Date.now()` whenever there's no existing save to resume — so every
+*new* playthrough now gets its own weather/delay history, verified by
+confirming a "New Game" reset produced visibly different starting
+weather than the previous game had.
 
 ## Judgment calls, not yet decided
 
@@ -125,9 +138,11 @@ problem a real session hasn't surfaced yet.
 
 1. **Remove a route/frequency** — done. The one item that could
    actively block a session (an unwanted edit with no way back).
-2. **Persistence (localStorage save/load)** — the one item that can
-   lose a whole session's progress outright.
-3. **Non-fixed default seed** — small, cheap, unblocks varied sessions.
+2. **Persistence (localStorage save/load)** — done, including a "New
+   Game" reset. The one item that could lose a whole session's progress
+   outright.
+3. **Non-fixed default seed** — done, alongside item 2 (a new game now
+   seeds from `Date.now()`, headless stays on the fixed default).
 4. Time navigation / weather visibility / failure-state — all worth
    revisiting once a real session has actually been played against
    items 1-3, not before.

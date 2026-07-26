@@ -771,6 +771,47 @@ day 154); never more than 4 storms active across the whole map at once.
 Verified in-browser: snow particles render and drift at an airport with
 an active snowstorm, no console errors.
 
+## Persistence (`src/ui/save.ts`)
+
+Week three's playtest-readiness fix (see WEEK-THREE.md): before this,
+closing the tab threw away every schedule edit, fare change, and
+marketing dollar spent, since nothing was ever written to
+`localStorage`. `loadSavedState()`/`saveState()`/`clearSavedState()` are
+a thin wrapper around it, keyed by `airgame-save-v1` — bumped by hand
+whenever `SimState`'s shape changes in a breaking way, so an old save
+under a retired key is simply never found again rather than crashing on
+a field the current code doesn't expect (bare-bones versioning, not a
+migration system).
+
+This only works because `SimState` is already required to survive
+`JSON.parse(JSON.stringify(state))` unchanged (CLAUDE.md's rule, true
+since M1) — a save *is* exactly that round trip, just persisted across
+page loads instead of happening within the same tick. `main.ts` calls
+`saveState()` once per simulated day *crossed* (tracked in the `tick()`
+loop, not every minute — 1440x fewer writes) and `loadSavedState()`
+once at startup, falling back to a fresh game if nothing was saved or
+the save didn't parse. Every `localStorage` call is wrapped in a
+try/catch that swallows the error — a save that didn't happen (private
+browsing, quota exceeded) is a minor inconvenience, not a reason to
+crash the simulation.
+
+A fresh game now seeds from `Date.now()` (`main.ts`'s own call to
+`createInitialState()`) rather than relying on that function's fixed
+default of `1` — so every new playthrough gets its own weather/delay
+history. `src/headless/run.ts` never passes a seed at all, so it keeps
+using that same default and stays exactly as reproducible as every
+verification in this document already relies on it being.
+
+A "New Game" button in the HUD (`confirm()`s first, since it's
+irreversible) clears the save and reloads — simpler and more robust
+than resetting every piece of in-memory state by hand.
+
+Verified in-browser: playing across a simulated day boundary, forcing a
+full page reload, and confirming the game resumed at the same day/cash/
+schedule rather than restarting; "New Game" cleared the save and
+returned to a fresh Day 1 with a visibly different weather roll than
+the previous game had.
+
 ## What isn't built yet
 
 See WEEK-ONE.md's "Deliberately deferred" list (aircraft market, financing,
