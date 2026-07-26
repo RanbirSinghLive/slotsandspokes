@@ -349,9 +349,10 @@ day happened to roll.
 
 Canvas draws the map; everything else (clock, speed buttons, sidebar) is
 real DOM, per CLAUDE.md's rule against hand-rolled canvas widgets. The
-Ops/Demand/Rotation toggle in the HUD (`main.ts`'s `currentView`) picks
-what `render()` draws each frame; `basemap.ts` is the one layer shared by
-both canvas modes, drawn first and every time.
+Ops/Demand/Competition/Rotation/Commercial toggle in the HUD (`main.ts`'s
+`currentView`) picks what `render()` draws each frame; `basemap.ts` is
+the one layer shared by all three canvas modes, drawn first and every
+time.
 
 **Ops mode** (the default) — draw order back to front:
 
@@ -387,13 +388,28 @@ Toronto would swallow the map) instead of Ops mode's fixed dot. Read-only,
 same "visualize first" phasing as the rotation board's first pass — no
 legend or tooltip yet, and not clickable.
 
+**Competition mode** — `competition.ts`'s `drawCompetitionLayer()`, the
+same one thin-arc style `routes.ts` uses, but drawing a different set of
+markets depending on a second piece of state (`selectedCompetitorAirline`
+in `main.ts`, driven by a `<select>` shown only in this view):
+`null` (the default, "All competitors") draws the *union* of the
+player's own network and every competitor's — any market with a
+competitor draws red (`sim/choiceModel.ts`'s exported `competitors`
+data), whether or not the player also flies it, so a competitor-
+exclusive market shows up here even though the player has no route on
+it at all; anything the player flies alone stays the default color.
+Picking a specific airline instead dims the player's whole network to
+context and draws only that airline's own routes in red — literally
+"their route map," shared and exclusive markets both. Read-only, same
+phasing as Demand mode's first pass.
+
 Switching away from Ops cancels any in-progress route-creation gesture
 (`ui/routeBuilder.ts`'s `cancelPendingRoute()`), and the route-builder's
 own mouse handlers only run at all when `currentView === 'ops'` — arming
 a route by clicking an airport wouldn't mean anything while looking at
-the demand layer instead. Panning and zooming (below) stay live in both
-canvas modes, since seeing a market more clearly is just as useful as
-seeing operations more clearly.
+the demand or competition layer instead. Panning and zooming (below)
+stay live in all three canvas modes, since seeing a market more clearly
+is just as useful as seeing operations more clearly.
 
 `projection.ts` owns the single shared `d3.geoMercator()` instance, fitted to
 an eastern-Canada bounding box and clipped to the canvas's own pixel bounds.

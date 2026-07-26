@@ -12,7 +12,7 @@ import competitorsData from '../../data/competitors.json';
 // data existed, so adding competitors changes nothing for a market that
 // doesn't have one.
 
-type CompetitorOffering = {
+export type CompetitorOffering = {
   airline: string;
   origin: string;
   dest: string;
@@ -27,9 +27,11 @@ type CompetitorOffering = {
  * of markets big enough that a second carrier would plausibly bother,
  * per WEEK-TWO.md's "Competition" note. Fictional airline names — not
  * real carriers, per CLAUDE.md's public-sources-only rule for anything
- * that could be mistaken for real-world data.
+ * that could be mistaken for real-world data. Exported so
+ * render/competition.ts can draw each competitor's own network without
+ * duplicating this data or its shape.
  */
-const competitors = competitorsData as CompetitorOffering[];
+export const competitors = competitorsData as CompetitorOffering[];
 
 function competitorsServingMarket(origin: string, dest: string): CompetitorOffering[] {
   return competitors.filter(

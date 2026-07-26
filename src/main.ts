@@ -6,6 +6,7 @@ import { drawRoutes } from './render/routes';
 import { drawAirports } from './render/airports';
 import { drawAircraft } from './render/aircraft';
 import { drawDemandLayer } from './render/demand';
+import { drawCompetitionLayer, competitorAirlines } from './render/competition';
 import { validateSchedule } from './sim/schedule';
 import { createInitialState, type SimState } from './sim/state';
 import { step } from './sim/step';
@@ -43,6 +44,25 @@ const clockEl = document.querySelector<HTMLDivElement>('#clock')!;
 const speedButtons = document.querySelectorAll<HTMLButtonElement>('#speed-controls button');
 const viewToggleButtons = document.querySelectorAll<HTMLButtonElement>('#view-toggle .view-dropdown button');
 const viewGroups = document.querySelectorAll<HTMLDivElement>('#view-toggle .view-group');
+const competitionAirlineSelect = document.querySelector<HTMLSelectElement>('#competition-airline-select')!;
+
+for (const airline of competitorAirlines()) {
+  const option = document.createElement('option');
+  option.value = airline;
+  option.textContent = airline;
+  competitionAirlineSelect.appendChild(option);
+}
+
+// null means "All competitors" (the aggregate Competition view); a
+// specific airline name filters render/competition.ts's layer down to
+// just that carrier's own network. Lives outside render() the same way
+// currentView does, since it's persistent UI state, not simulated state.
+let selectedCompetitorAirline: string | null = null;
+
+competitionAirlineSelect.addEventListener('change', () => {
+  selectedCompetitorAirline = competitionAirlineSelect.value || null;
+  render();
+});
 const rotationBoardEl = document.querySelector<HTMLDivElement>('#rotation-board')!;
 const commercialPanelEl = document.querySelector<HTMLDivElement>('#commercial-panel')!;
 
@@ -89,14 +109,15 @@ function resize(): void {
 // time it is.
 let latestFractionalMinute = state.simMinute;
 
-// Which of the four main views is currently showing. The clock and
+// Which of the five main views is currently showing. The clock and
 // sidebar panel stay relevant regardless, so they're not gated by this.
-// 'ops' and 'demand' both draw on the same canvas (just different layers
-// on top of the same basemap/projection); 'rotation' and 'commercial' each
-// hide the canvas in favor of their own DOM element (#rotation-board,
-// #commercial-panel) — see ui/rotationBoard.ts and ui/commercial.ts for
-// why those two get real DOM instead of a canvas layer.
-type View = 'ops' | 'demand' | 'rotation' | 'commercial';
+// 'ops', 'demand', and 'competition' all draw on the same canvas (just
+// different layers on top of the same basemap/projection); 'rotation'
+// and 'commercial' each hide the canvas in favor of their own DOM element
+// (#rotation-board, #commercial-panel) — see ui/rotationBoard.ts and
+// ui/commercial.ts for why those two get real DOM instead of a canvas
+// layer.
+type View = 'ops' | 'demand' | 'competition' | 'rotation' | 'commercial';
 let currentView: View = 'ops';
 
 function render(): void {
@@ -117,8 +138,10 @@ function render(): void {
     drawAircraft(ctx, state, latestFractionalMinute);
     drawAirports(ctx);
     drawRoutePreview(ctx);
-  } else {
+  } else if (currentView === 'demand') {
     drawDemandLayer(ctx);
+  } else {
+    drawCompetitionLayer(ctx, selectedCompetitorAirline);
   }
 }
 
@@ -216,6 +239,7 @@ speedButtons.forEach((button) => {
 const VIEW_GROUP: Record<View, string> = {
   ops: 'maps',
   demand: 'maps',
+  competition: 'maps',
   rotation: 'reports',
   commercial: 'reports',
 };
@@ -278,6 +302,7 @@ viewToggleButtons.forEach((button) => {
     canvas.hidden = view === 'rotation' || view === 'commercial';
     rotationBoardEl.hidden = view !== 'rotation';
     commercialPanelEl.hidden = view !== 'commercial';
+    competitionAirlineSelect.hidden = view !== 'competition';
     viewToggleButtons.forEach((b) => b.classList.toggle('active', b === button));
     // The group trigger itself also shows which group the active view
     // belongs to, so it's visible at a glance without opening either

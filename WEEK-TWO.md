@@ -745,3 +745,46 @@ further to 14 pax and correctly added the $500 into that market's
 displayed cost, not just its booking share — the panel doesn't make
 marketing spend look free just because its cost is charged elsewhere in
 the simulation.
+
+## The Competition map mode
+
+Raised from a direct question: can an NPC airline fly some of the
+player's own routes and some exclusively its own? Turned out to already
+be mechanically true (`data/competitors.json`'s "Trillium Air" entry
+already covers both YUL-YYZ, which the player also flies, and YYZ-YOW,
+which it doesn't) — what was missing was *seeing* it. A table row per
+competitor entry could have shown the same data, but a network's shape
+(which markets cluster, which are exclusive) is exactly the kind of
+thing CLAUDE.md's "the map is not decoration" principle says a map
+should show and a table shouldn't have to.
+
+**Design review before building, at the user's request:** the original
+proposal was "highlight in red the player's own routes that have a
+competitor, default color for the rest." That would have hidden
+competitor-*exclusive* markets (like YYZ-YOW) entirely from the
+aggregate view — exactly the case that motivated the feature. Fixed by
+drawing the union of the player's network and every competitor's
+network: any market with a competitor draws red regardless of whether
+the player also flies it; any market only the player flies stays
+default. Placement (a third item in the existing Maps dropdown, next to
+Ops/Demand) and the per-airline selector (a plain `<select>`, "All
+competitors" plus one option per airline) were both judged fine as
+proposed — this game's regional scope means the airline count isn't
+likely to outgrow a simple selector.
+
+**Built as `render/competition.ts`**, following `render/demand.ts`'s
+exact pattern: a new render function, wired into `main.ts`'s existing
+Ops/Demand dispatch as a third case. Two states: `null` (aggregate,
+described above) or a specific airline name, which dims the player's
+own network to context and draws only that airline's routes — including
+both its shared and exclusive markets, answering "show me their route
+map" directly. `sim/choiceModel.ts`'s `competitors` data and a new
+exported `CompetitorOffering` type are reused as-is; no new data model
+needed, only a new lens on data that already existed.
+
+Verified in-browser: the aggregate view shows all four competitor-served
+markets in red (including YYZ-YOW, which the player doesn't fly) and
+the player's other five markets in default color; selecting "Trillium
+Air" from the dropdown shows exactly its two routes (YUL-YYZ, YYZ-YOW)
+highlighted with everything else dimmed; switching back to Ops hides
+the selector and renders normally, no console errors.
