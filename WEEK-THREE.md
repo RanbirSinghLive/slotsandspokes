@@ -235,6 +235,50 @@ immediately showed: "C-GVIA is sitting at YOW, but none of its scheduled
 legs ever depart from there -- it will never fly again until a leg (or a
 positioning move) gets it to one of: YHZ, YYT."
 
+### 8. Positioning was a warning to work around, not a game mechanic
+
+Every fix above (items 4-7) made the game correctly *tell you* a tail was
+stranded — none of them stopped it from happening. Told directly: the
+point of positioning flights was always to let the player describe the
+network they want and have the game work out how to get a plane there,
+*with a real cost*, not to force a manual routing puzzle (find a free
+tail, or hand-draw a bridging leg) before every new route. Treating that
+as a constraint on the player rather than infrastructure the game handles
+was exactly backwards.
+
+`PositioningLeg` (`sim/schedule.ts`) is a new, distinct concept from
+`ScheduleLeg`: a one-time repositioning move (`state.positioningLegs`,
+alongside the existing `state.schedule`) rather than a recurring daily
+leg — it has no market, earns no revenue, and is discarded the instant it
+departs, since it never repeats. `step()` flies it through the same
+gates as a real leg (ground/turn-time check, weather, delay roll) and
+charges its real fuel/departure cost on arrival
+(`sim/economy.ts`'s `legCost()`) with zero passengers.
+
+`ui/routeBuilder.ts`'s Add Route now checks the chosen tail's actual (or
+soon-to-be, if it's airborne) position via a new `currentOrUpcomingAirport()`
+helper, and if it doesn't match the route's origin, queues a positioning
+leg automatically — no extra click, no separate gesture. The form shows
+what's about to happen before you confirm: "Positioning: C-GVIA will fly
+YOW → YHZ first (106 min, cost only, no passengers) before this route
+starts." The Tail dropdown now updates this preview live when changed,
+too, closing the loop on the original bug report: the form no longer
+lets a tail choice go unnoticed.
+
+`validateSchedule()`'s "stranded" check (item 7) also takes
+`state.positioningLegs` now, so it stops warning about a tail that's
+*already being fixed* — a queued positioning leg headed toward one of the
+tail's own schedule origins means the situation is in progress, not
+broken.
+
+Verified in-browser: drew a fresh YHZ↔YYT route with the default tail
+(C-GVIA, sitting at YOW) selected. The form showed the positioning
+preview before confirming; after Add Route, the Fleet panel showed
+C-GVIA airborne YOW → YHZ (with a real weather-rolled delay — 18 min
+late), landing, then immediately departing again on the new YHZ → YYT
+route on its own, cost charged and no revenue on the positioning leg,
+full fare/passenger economics on the real route after.
+
 ## Judgment calls, not yet decided
 
 ### Time navigation and pacing
@@ -302,6 +346,12 @@ problem a real session hasn't surfaced yet.
    route a tail through some airport, and its remaining schedule can be
    perfectly self-consistent (chains fine, loop closes) while the aircraft
    physically sits somewhere that schedule never visits at all.
-8. Time navigation / weather visibility / failure-state — all worth
+8. **Automatic positioning flights** — done. Reframes items 4-7 from "the
+   game correctly tells you your plane is stranded" to "the game doesn't
+   let your plane get stranded in the first place." A route assigned to a
+   tail that isn't standing at its origin now gets a real, costed
+   positioning leg automatically — the point was never to make players
+   solve a routing puzzle before every new route.
+9. Time navigation / weather visibility / failure-state — all worth
    revisiting once a real session has actually been played against
-   items 1-7, not before.
+   items 1-8, not before.

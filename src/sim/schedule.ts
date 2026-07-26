@@ -23,6 +23,30 @@ export type ScheduleLeg = {
   blockMinutes: number;
 };
 
+/**
+ * A one-time repositioning move — flown once to get a tail from wherever it
+ * actually is to wherever a route it's just been assigned to needs it to
+ * start, then discarded. Distinct from ScheduleLeg in the way that matters:
+ * `departMinute` here is an absolute `simMinute` (this specific moment in
+ * this specific game), not a recurring minute-of-day, since this leg never
+ * repeats. Created automatically by ui/routeBuilder.ts whenever a route is
+ * assigned to a tail that isn't already standing at its origin — the point
+ * is for the player to describe the network they want and have the game
+ * work out how to get a plane there, not to hand-solve a routing puzzle
+ * before every new route. It still costs real money (fuel and departure
+ * cost, via sim/economy.ts's legCost()) and still carries weather/delay
+ * risk, same as any other flight — the only thing it skips is passengers
+ * and revenue, since there's no market to sell seats on.
+ */
+export type PositioningLeg = {
+  legId: string;
+  tail: string;
+  origin: string;
+  dest: string;
+  departMinute: number;
+  blockMinutes: number;
+};
+
 const TAXI_ALLOWANCE_MINUTES = 20;
 
 /**
@@ -176,6 +200,20 @@ export function nextLegId(tail: string, legs: ScheduleLeg[]): string {
 }
 
 /**
+ * Same idea as nextLegId() above, one counter per tail, but its own
+ * "-POS-" namespace so a positioning leg's id can never collide with a
+ * regular scheduled leg's.
+ */
+export function nextPositioningLegId(tail: string, positioningLegs: PositioningLeg[]): string {
+  const existingNumbers = positioningLegs
+    .filter((leg) => leg.tail === tail)
+    .map((leg) => Number(leg.legId.split('-').pop()))
+    .filter((n) => !Number.isNaN(n));
+  const nextNumber = (existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0) + 1;
+  return `${tail}-POS-${nextNumber}`;
+}
+
+/**
  * How many of `legs` serve the `origin`-`dest` market, counting both
  * directions as the same market (a leg YHZ→YQM and a leg YQM→YHZ both count)
  * — the same bidirectional definition `render/routes.ts` and
@@ -222,6 +260,15 @@ export function legsServingMarket(origin: string, dest: string, legs: ScheduleLe
  * from the loop-closure check: that one only looks at the schedule's own
  * internal shape; this one looks at the schedule against the world.
  *
+ * `positioningLegs` (also week three) keeps the "stranded" check above from
+ * crying wolf: a tail that isn't currently standing anywhere in its own
+ * rotation is only a real problem if nothing is already fixing it. The M10
+ * route builder auto-creates a positioning leg the moment it assigns a
+ * route to a tail that isn't at the route's origin (see
+ * ui/routeBuilder.ts), so the moment right after that — aircraft still
+ * physically elsewhere, positioning leg queued but not yet flown — should
+ * read as "in progress," not "broken."
+ *
  * Logs one line per problem found, or a single OK line, and also *returns*
  * the problem list (empty when the schedule is clean) — added in week
  * three so callers can show a warning somewhere a player will actually see
@@ -230,7 +277,11 @@ export function legsServingMarket(origin: string, dest: string, legs: ScheduleLe
  * player's point of view (no revenue, aircraft just sits there) unless
  * they happen to have devtools open at the moment they add it.
  */
-export function validateSchedule(legs: ScheduleLeg[], fleet: Aircraft[] = []): string[] {
+export function validateSchedule(
+  legs: ScheduleLeg[],
+  fleet: Aircraft[] = [],
+  positioningLegs: PositioningLeg[] = [],
+): string[] {
   const byTail = new Map<string, ScheduleLeg[]>();
   for (const leg of legs) {
     const group = byTail.get(leg.tail) ?? [];
@@ -276,9 +327,12 @@ export function validateSchedule(legs: ScheduleLeg[], fleet: Aircraft[] = []): s
 
     const origins = new Set(tailLegs.map((leg) => leg.origin));
     if (!origins.has(aircraft.atAirport)) {
-      problems.push(
-        `${aircraft.tail} is sitting at ${aircraft.atAirport}, but none of its scheduled legs ever depart from there -- it will never fly again until a leg (or a positioning move) gets it to one of: ${[...origins].sort().join(', ')}.`,
-      );
+      const alreadyBeingFixed = positioningLegs.some((leg) => leg.tail === aircraft.tail && origins.has(leg.dest));
+      if (!alreadyBeingFixed) {
+        problems.push(
+          `${aircraft.tail} is sitting at ${aircraft.atAirport}, but none of its scheduled legs ever depart from there -- it will never fly again until a leg (or a positioning move) gets it to one of: ${[...origins].sort().join(', ')}.`,
+        );
+      }
     }
   }
 

@@ -354,6 +354,12 @@ body {
   min-height: 1.2em;
 }
 
+#new-route-positioning-preview {
+  color: #9aa3b8;
+  margin: -4px 0 8px;
+  min-height: 1.2em;
+}
+
 .new-route-actions {
   display: flex;
   gap: 8px;

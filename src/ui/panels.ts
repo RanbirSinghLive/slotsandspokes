@@ -137,7 +137,7 @@ function removeScheduleLeg(leg: ScheduleLeg, state: SimState): void {
     removeCommercialRow(key);
   }
 
-  renderScheduleWarnings(validateSchedule(state.schedule, state.aircraft));
+  renderScheduleWarnings(validateSchedule(state.schedule, state.aircraft, state.positioningLegs));
 }
 
 /**
@@ -160,7 +160,7 @@ function buildScheduleRow(leg: ScheduleLeg, state: SimState): HTMLTableRowElemen
   departInput.value = minuteOfDayToTimeString(leg.departMinute);
   departInput.addEventListener('change', () => {
     leg.departMinute = timeStringToMinuteOfDay(departInput.value);
-    renderScheduleWarnings(validateSchedule(state.schedule, state.aircraft));
+    renderScheduleWarnings(validateSchedule(state.schedule, state.aircraft, state.positioningLegs));
     applyScheduleFilters(); // the edited time may no longer match an active Depart filter
   });
   departCell.appendChild(departInput);

@@ -6,9 +6,12 @@ import {
   computeBlockMinutes,
   defaultReturnDepartMinute,
   marketKey,
+  MIN_TURN_MINUTES,
   nextLegId,
+  nextPositioningLegId,
   recommendedFare,
   validateSchedule,
+  type PositioningLeg,
   type ScheduleLeg,
 } from '../sim/schedule';
 import { addScheduleRow, filterScheduleToRoute, minuteOfDayToTimeString, renderScheduleWarnings } from './panels';
@@ -90,6 +93,33 @@ function findExactTimeCollision(
   );
 }
 
+/**
+ * Where `tail` actually is (or will be) right now, for deciding whether
+ * assigning it to a new route needs a positioning leg first — see
+ * PositioningLeg's own comment (sim/schedule.ts) for why this exists at
+ * all. Ground and airborne aircraft need different answers: a grounded
+ * tail can reposition as soon as its turn time clears, while an airborne
+ * one can only start repositioning after it lands wherever it's already
+ * headed (its current ActiveFlight's destination) plus its own turn time —
+ * there's no such thing as diverting a flight already in the air. `null`
+ * only if `tail` isn't part of the active fleet at all.
+ */
+function currentOrUpcomingAirport(tail: string, state: SimState): { airport: string; earliestDepartMinute: number } | null {
+  const aircraft = state.aircraft.find((a) => a.tail === tail);
+  if (!aircraft) return null;
+
+  if (aircraft.status === 'ground' && aircraft.atAirport) {
+    return { airport: aircraft.atAirport, earliestDepartMinute: Math.max(state.simMinute, aircraft.groundSinceMinute + MIN_TURN_MINUTES) };
+  }
+
+  const activeFlight = state.activeFlights.find((f) => f.tail === tail);
+  if (activeFlight) {
+    return { airport: activeFlight.dest, earliestDepartMinute: activeFlight.arriveMinute + MIN_TURN_MINUTES };
+  }
+
+  return null;
+}
+
 function setArmedCursor(armed: boolean): void {
   document.querySelector<HTMLCanvasElement>('#map')!.classList.toggle('armed', armed);
 }
@@ -135,7 +165,7 @@ export function handleRouteBuilderMouseDown(event: MouseEvent, state: SimState):
       return true;
     }
     if (clicked) {
-      showForm(builderState.origin, clicked, state.schedule);
+      showForm(builderState.origin, clicked, state);
       builderState = { mode: 'confirming', origin: builderState.origin, dest: clicked };
       return true;
     }
@@ -231,13 +261,14 @@ const formTailSelect = document.querySelector<HTMLSelectElement>('#new-route-tai
 const formDepartInput = document.querySelector<HTMLInputElement>('#new-route-depart')!;
 const formReturnCheckbox = document.querySelector<HTMLInputElement>('#new-route-return')!;
 const formReturnPreview = document.querySelector<HTMLElement>('#new-route-return-preview')!;
+const formPositioningPreview = document.querySelector<HTMLElement>('#new-route-positioning-preview')!;
 const formConfirmButton = document.querySelector<HTMLButtonElement>('#new-route-confirm')!;
 const formCancelButton = document.querySelector<HTMLButtonElement>('#new-route-cancel')!;
 
 const DEFAULT_DEPART_TIME = '12:00';
 
-function showForm(origin: Airport, dest: Airport, schedule: ScheduleLeg[]): void {
-  formHeading.textContent = isExistingMarket(origin.iata, dest.iata, schedule) ? 'New Frequency' : 'New Route';
+function showForm(origin: Airport, dest: Airport, state: SimState): void {
+  formHeading.textContent = isExistingMarket(origin.iata, dest.iata, state.schedule) ? 'New Frequency' : 'New Route';
   formLabel.textContent = `${origin.iata} → ${dest.iata}`;
   formBlock.textContent = `Block time: ${computeBlockMinutes(origin.iata, dest.iata)} min`;
   formSection.hidden = false;
@@ -256,7 +287,7 @@ function showForm(origin: Airport, dest: Airport, schedule: ScheduleLeg[]): void
   // YYG->YHZ from getting created alone, with nothing to fly the aircraft
   // back into its own rotation.
   formReturnCheckbox.checked = true;
-  updateFormValidation(origin, dest, schedule);
+  updateFormValidation(origin, dest, state);
 
   // Filter the schedule table to this market *now*, while the form is
   // still open — not only after "Add Route" is clicked. Filtering only on
@@ -281,18 +312,23 @@ function hideForm(): void {
  * double-booking has no legitimate interpretation, so it's caught here in
  * the form rather than after the fact. Also keeps the return-leg preview
  * text current, so the player can see what "Add return leg too" is actually
- * about to create before they click Add Route.
+ * about to create before they click Add Route. Also shows a positioning-
+ * leg preview (week three) whenever the currently selected tail isn't
+ * standing at `origin` — see currentOrUpcomingAirport() — so the player
+ * knows *before* confirming that this route won't start earning revenue
+ * immediately, and why: a real, costed repositioning flight is happening
+ * first, not a bug.
  */
-function updateFormValidation(origin: Airport, dest: Airport, schedule: ScheduleLeg[]): void {
+function updateFormValidation(origin: Airport, dest: Airport, state: SimState): void {
   const departMinute = timeStringToMinuteOfDay(formDepartInput.value);
   const blockMinutes = computeBlockMinutes(origin.iata, dest.iata);
-  const outboundCollision = findExactTimeCollision(origin.iata, dest.iata, departMinute, schedule);
+  const outboundCollision = findExactTimeCollision(origin.iata, dest.iata, departMinute, state.schedule);
 
   let returnDepartMinute: number | null = null;
   let returnCollision: ScheduleLeg | undefined;
   if (formReturnCheckbox.checked) {
     returnDepartMinute = defaultReturnDepartMinute(departMinute, blockMinutes);
-    returnCollision = findExactTimeCollision(dest.iata, origin.iata, returnDepartMinute, schedule);
+    returnCollision = findExactTimeCollision(dest.iata, origin.iata, returnDepartMinute, state.schedule);
   }
 
   if (outboundCollision) {
@@ -309,6 +345,13 @@ function updateFormValidation(origin: Airport, dest: Airport, schedule: Schedule
   formReturnPreview.textContent =
     formReturnCheckbox.checked && returnDepartMinute !== null
       ? `Return: ${dest.iata} → ${origin.iata} at ${minuteOfDayToTimeString(returnDepartMinute)}`
+      : '';
+
+  const tail = formTailSelect.value;
+  const currentPosition = currentOrUpcomingAirport(tail, state);
+  formPositioningPreview.textContent =
+    currentPosition && currentPosition.airport !== origin.iata
+      ? `Positioning: ${tail} will fly ${currentPosition.airport} → ${origin.iata} first (${computeBlockMinutes(currentPosition.airport, origin.iata)} min, cost only, no passengers) before this route starts.`
       : '';
 }
 
@@ -339,16 +382,22 @@ export function setupRouteBuilder(state: SimState): void {
     formTailSelect.appendChild(option);
   }
 
-  // Re-check for an exact-time collision (and refresh the return-leg
-  // preview) every time the player changes the depart time or toggles the
-  // return checkbox, so the form reacts live instead of only at submission.
+  // Re-check for an exact-time collision (and refresh the return-leg and
+  // positioning-leg previews) every time the player changes the depart
+  // time, the return checkbox, or the tail itself, so the form reacts live
+  // instead of only at submission — changing the tail is exactly what
+  // decides whether a positioning leg is about to get created.
   formDepartInput.addEventListener('input', () => {
     if (builderState.mode !== 'confirming') return;
-    updateFormValidation(builderState.origin, builderState.dest, state.schedule);
+    updateFormValidation(builderState.origin, builderState.dest, state);
   });
   formReturnCheckbox.addEventListener('change', () => {
     if (builderState.mode !== 'confirming') return;
-    updateFormValidation(builderState.origin, builderState.dest, state.schedule);
+    updateFormValidation(builderState.origin, builderState.dest, state);
+  });
+  formTailSelect.addEventListener('change', () => {
+    if (builderState.mode !== 'confirming') return;
+    updateFormValidation(builderState.origin, builderState.dest, state);
   });
 
   formConfirmButton.addEventListener('click', () => {
@@ -361,6 +410,26 @@ export function setupRouteBuilder(state: SimState): void {
     // Defensive re-check: the button should already be disabled in this
     // case, but never add a duplicate timeslot regardless.
     if (findExactTimeCollision(origin.iata, dest.iata, departMinute, state.schedule)) return;
+
+    // If the chosen tail isn't standing at this route's origin, queue a
+    // one-time positioning leg to get it there first — see
+    // currentOrUpcomingAirport() and PositioningLeg's own comment
+    // (sim/schedule.ts). This is the whole point of positioning legs
+    // existing at all: describe the network you want and let the game
+    // work out how to get a plane there, rather than blocking the route or
+    // requiring a separate manual leg first.
+    const currentPosition = currentOrUpcomingAirport(tail, state);
+    if (currentPosition && currentPosition.airport !== origin.iata) {
+      const positioningLeg: PositioningLeg = {
+        legId: nextPositioningLegId(tail, state.positioningLegs),
+        tail,
+        origin: currentPosition.airport,
+        dest: origin.iata,
+        departMinute: currentPosition.earliestDepartMinute,
+        blockMinutes: computeBlockMinutes(currentPosition.airport, origin.iata),
+      };
+      state.positioningLegs.push(positioningLeg);
+    }
 
     const outboundLeg: ScheduleLeg = {
       legId: nextLegId(tail, state.schedule),
@@ -401,7 +470,7 @@ export function setupRouteBuilder(state: SimState): void {
       }
     }
 
-    renderScheduleWarnings(validateSchedule(state.schedule, state.aircraft));
+    renderScheduleWarnings(validateSchedule(state.schedule, state.aircraft, state.positioningLegs));
 
     // Fare/marketing are set at the market level (sim/state.ts's
     // RouteSettings), not per leg — a brand-new market gets a fresh entry

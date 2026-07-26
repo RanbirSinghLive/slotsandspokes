@@ -113,10 +113,19 @@ order:
    origin has active weather) added to the departure minute. Reading from
    `state.schedule` rather than a fixed constant is what lets the M8
    schedule editor's edits actually change what the sim does.
-3. **Arrive** — any `ActiveFlight` whose `arriveMinute` has been reached
+3. **Position** (week three) — the same depart gate as step 2, but against
+   `state.positioningLegs` instead: one-time repositioning moves
+   `ui/routeBuilder.ts` queues automatically when a route gets assigned to
+   a tail that isn't standing at its origin (see "Route builder," below).
+   Removed from the queue the instant it departs, since a positioning move
+   is absolute-time and never recurs.
+4. **Arrive** — any `ActiveFlight` whose `arriveMinute` has been reached
    lands: the aircraft flips back to `ground` at the destination and
-   records `groundSinceMinute` (for the *next* leg's turnaround check), and
-   `sim/economy.ts`'s `flightResult()` is applied (see Economy below).
+   records `groundSinceMinute` (for the *next* leg's turnaround check).
+   `sim/economy.ts`'s `flightResult()` is applied for a normal leg (see
+   Economy below); a positioning flight instead pays only its real
+   fuel/departure cost (`legCost()`) with zero passengers or revenue,
+   since it isn't serving any market.
 
 **Why "at or after" instead of an exact match (M9):** once delays exist, an
 aircraft can still be mid-flight or mid-turnaround at the exact minute its
@@ -622,6 +631,32 @@ extra one-way frequency on a market that already has a return, or a
 deliberate one-off repositioning move. The return leg gets its own
 exact-time-collision check, independent of the outbound leg's, since
 either one colliding should block the whole submission.
+
+**Automatic positioning flights (week three):** every fix up to this point
+(closed-loop validation, the physical-position check) made the game
+correctly *report* a stranded tail — none of them stopped it from
+happening. That was backwards: the point of positioning flights is to let
+the player describe the network they want and have the game work out how
+to get a plane there, at a real cost, not to force a routing puzzle before
+every new route. So Add Route now checks the chosen tail's current (or,
+if it's airborne, soon-to-be — see `currentOrUpcomingAirport()`) position
+against the route's origin, and if they don't match, queues a one-time
+`PositioningLeg` (`sim/schedule.ts`) automatically — no extra click. The
+form previews it before you confirm: "Positioning: C-GVIA will fly
+YOW → YHZ first (106 min, cost only, no passengers) before this route
+starts." Changing the Tail dropdown now updates this preview live, too.
+
+A `PositioningLeg` is a genuinely different kind of thing from a
+`ScheduleLeg`: it lives in its own `state.positioningLegs` array, its
+`departMinute` is an absolute `simMinute` rather than a repeating minute-
+of-day (it never recurs), and `step()` flies it through the same gates as
+a real leg (turn time, weather, delay) but charges only its real
+fuel/departure cost on arrival (`sim/economy.ts`'s `legCost()`) — no
+market, no passengers, no revenue, since there's nothing to sell seats on.
+It's removed from the queue the instant it departs. `validateSchedule()`'s
+stranded-tail check also takes `state.positioningLegs` now, so it stops
+warning about a tail that already has a positioning leg headed toward one
+of its schedule's own origins — "in progress," not "broken."
 
 Editing/removing an *existing* route stays table-driven (M8) rather than
 gaining a second, harder gesture — hit-testing a click against an

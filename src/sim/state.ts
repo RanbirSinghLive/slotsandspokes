@@ -1,5 +1,5 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
-import { loadSchedule, marketKey, recommendedFare, type ScheduleLeg } from './schedule';
+import { loadSchedule, marketKey, recommendedFare, type PositioningLeg, type ScheduleLeg } from './schedule';
 import type { WeatherEvent } from './weather';
 
 export type AircraftStatus = 'ground' | 'airborne';
@@ -48,6 +48,15 @@ export type ActiveFlight = {
    */
   fare: number;
   marketingSpend: number;
+  /**
+   * Set only on a flight step.ts created from a PositioningLeg (week
+   * three) — a one-time repositioning move with no market to sell seats
+   * on. step.ts's arrival handling checks this to charge the flight's real
+   * operating cost (fuel + departure, sim/economy.ts's legCost()) without
+   * running the passenger/revenue side of flightResult() at all, rather
+   * than pretending it has a market it doesn't.
+   */
+  isPositioning?: boolean;
 };
 
 /**
@@ -95,6 +104,15 @@ export type SimState = {
    * reuses the same entry rather than creating a second one.
    */
   routeSettings: Record<string, RouteSettings>;
+  /**
+   * One-time repositioning moves, queued but not yet flown — see
+   * PositioningLeg's own comment (sim/schedule.ts) for why these live
+   * separately from `schedule` rather than as ScheduleLeg entries. step()
+   * flies them the same way it flies a scheduled leg (weather, delay, real
+   * fuel/departure cost) and removes each one the moment it departs, since
+   * a positioning move by definition never repeats.
+   */
+  positioningLegs: PositioningLeg[];
   /**
    * Active weather by airport IATA code — a plain object, not a Map, same
    * JSON-round-trip reasoning as `routeSettings`. Absent key means clear
@@ -179,6 +197,7 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     activeFlights: [],
     schedule,
     routeSettings,
+    positioningLegs: [],
     weatherByAirport: {},
     completedToday: [],
     todayRevenue: 0,

@@ -1,5 +1,5 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
-import { flightResult, type EconomyAircraftType } from './economy';
+import { flightResult, legCost, type EconomyAircraftType } from './economy';
 import { MIN_TURN_MINUTES, legsServingMarket, marketKey } from './schedule';
 import { nextRandom } from './rng';
 import { rollDailyWeather, WEATHER_ON_TIME_PROBABILITY, WEATHER_MAX_DELAY_MINUTES } from './weather';
@@ -47,7 +47,7 @@ function rollDelayMinutes(
  * place and returns nothing, per CLAUDE.md's rule for this function — no
  * randomness, no clock reads, nothing but `state` in and `state` mutated.
  *
- * Three things happen each minute, in this order:
+ * Four things happen each minute, in this order:
  *   1. Day rollover: if this is minute 0 of a new day, today's tallies
  *      (completedToday, todayRevenue, todayCost, todayMargin) reset to zero
  *      before anything else happens.
@@ -58,12 +58,19 @@ function rollDelayMinutes(
  *      (MIN_TURN_MINUTES since it last landed), takes off — it becomes an
  *      ActiveFlight with a randomly rolled arrival delay (sim/rng.ts) and
  *      its aircraft flips to airborne.
- *   3. Arrive: any ActiveFlight whose arrival minute has been reached
+ *   3. Position (week three): same gate as a scheduled departure above,
+ *      but against `state.positioningLegs` instead — one-time repositioning
+ *      moves the M10 route builder queues up when a route gets assigned to
+ *      a tail that isn't standing at its origin (see PositioningLeg in
+ *      sim/schedule.ts). Removed from the queue the moment it departs,
+ *      since it never repeats.
+ *   4. Arrive: any ActiveFlight whose arrival minute has been reached
  *      lands — its aircraft flips back to ground at the destination and
  *      records when (`groundSinceMinute`, for the next leg's turn-time
- *      check), the flight's economics (sim/economy.ts) are applied to cash
- *      and today's running totals, and the flight is removed from the
- *      active list.
+ *      check). A positioning flight's cost (fuel + departure, no revenue —
+ *      it isn't serving a market) is applied the same as a revenue flight's
+ *      full economics (sim/economy.ts) would be, and the flight is removed
+ *      from the active list either way.
  *
  * The reset happens at the *start* of the new day rather than the end of
  * the old one deliberately: it means that right up until the moment the
@@ -166,6 +173,48 @@ export function step(state: SimState): void {
     state.activeFlights.push(activeFlight);
   }
 
+  // Positioning legs (week three, see PositioningLeg's own comment in
+  // sim/schedule.ts) depart the same way scheduled legs do above — same
+  // ground/turn-time gate, same weather/delay roll — except `departMinute`
+  // here is an absolute simMinute, not a minute-of-day, since a positioning
+  // move never repeats. Removed from the queue the instant it departs
+  // rather than tracked in `completedToday`: once it's airborne it's fully
+  // represented by its ActiveFlight, and it can never come due again.
+  for (let i = state.positioningLegs.length - 1; i >= 0; i--) {
+    const leg = state.positioningLegs[i];
+    if (state.simMinute < leg.departMinute) continue;
+
+    const aircraft = state.aircraft.find((a) => a.tail === leg.tail);
+    if (!aircraft) continue;
+    if (aircraft.status !== 'ground' || aircraft.atAirport !== leg.origin) continue;
+    if (state.simMinute < aircraft.groundSinceMinute + MIN_TURN_MINUTES) continue;
+
+    aircraft.status = 'airborne';
+    aircraft.atAirport = null;
+    aircraft.activeLegId = leg.legId;
+
+    const weatherAtOrigin = state.weatherByAirport[leg.origin];
+    const onTimeProbability = weatherAtOrigin ? WEATHER_ON_TIME_PROBABILITY : ON_TIME_PROBABILITY;
+    const maxDelayMinutes = weatherAtOrigin ? WEATHER_MAX_DELAY_MINUTES : MAX_DELAY_MINUTES;
+    const [delayMinutes, nextSeed] = rollDelayMinutes(state.rngSeed, onTimeProbability, maxDelayMinutes);
+    state.rngSeed = nextSeed;
+
+    const activeFlight: ActiveFlight = {
+      legId: leg.legId,
+      tail: leg.tail,
+      origin: leg.origin,
+      dest: leg.dest,
+      departMinute: state.simMinute,
+      arriveMinute: state.simMinute + leg.blockMinutes + delayMinutes,
+      scheduledArriveMinute: state.simMinute + leg.blockMinutes,
+      fare: 0,
+      marketingSpend: 0,
+      isPositioning: true,
+    };
+    state.activeFlights.push(activeFlight);
+    state.positioningLegs.splice(i, 1);
+  }
+
   for (let i = state.activeFlights.length - 1; i >= 0; i--) {
     const flight = state.activeFlights[i];
     if (state.simMinute < flight.arriveMinute) continue;
@@ -180,15 +229,26 @@ export function step(state: SimState): void {
       const type = aircraftTypesByCode.get(aircraft.typeCode);
       if (type) {
         const blockMinutes = flight.arriveMinute - flight.departMinute;
-        const marketFrequency = legsServingMarket(flight.origin, flight.dest, state.schedule);
-        const result = flightResult({ origin: flight.origin, dest: flight.dest, blockMinutes }, type, marketFrequency, {
-          fare: flight.fare,
-          marketingSpend: flight.marketingSpend,
-        });
-        state.cash += result.margin;
-        state.todayRevenue += result.revenue;
-        state.todayCost += result.cost;
-        state.todayMargin += result.margin;
+
+        if (flight.isPositioning) {
+          // No market, no passengers, no revenue — just the real fuel and
+          // departure cost of moving the aircraft (sim/economy.ts's
+          // legCost(), the same formula a revenue flight's cost half uses).
+          const cost = legCost(blockMinutes, type);
+          state.cash -= cost;
+          state.todayCost += cost;
+          state.todayMargin -= cost;
+        } else {
+          const marketFrequency = legsServingMarket(flight.origin, flight.dest, state.schedule);
+          const result = flightResult({ origin: flight.origin, dest: flight.dest, blockMinutes }, type, marketFrequency, {
+            fare: flight.fare,
+            marketingSpend: flight.marketingSpend,
+          });
+          state.cash += result.margin;
+          state.todayRevenue += result.revenue;
+          state.todayCost += result.cost;
+          state.todayMargin += result.margin;
+        }
       }
     }
 
