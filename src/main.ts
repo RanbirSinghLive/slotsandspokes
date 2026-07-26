@@ -44,14 +44,21 @@ const ctx = canvas.getContext('2d')!;
 const clockEl = document.querySelector<HTMLDivElement>('#clock')!;
 const speedButtons = document.querySelectorAll<HTMLButtonElement>('#speed-controls button');
 const viewToggleButtons = document.querySelectorAll<HTMLButtonElement>('#view-toggle .view-dropdown button');
-const viewGroups = document.querySelectorAll<HTMLDivElement>('#view-toggle .view-group');
-const competitionAirlineSelect = document.querySelector<HTMLSelectElement>('#competition-airline-select')!;
+// All three hover-dropdown groups share one wiring pass below — the two
+// view-switching ones (Maps, Reports) plus the Competition map's airline
+// filter, which reuses the exact same .view-group/.view-dropdown markup
+// and open/close behavior, just with a text trigger instead of an icon.
+const viewGroups = document.querySelectorAll<HTMLDivElement>('#hud .view-group');
+const competitionAirlineGroup = document.querySelector<HTMLDivElement>('#competition-airline-group')!;
+const competitionAirlineTrigger = document.querySelector<HTMLButtonElement>('#competition-airline-trigger')!;
+const competitionAirlineDropdown = document.querySelector<HTMLDivElement>('#competition-airline-dropdown')!;
 
 for (const airline of competitorAirlines()) {
-  const option = document.createElement('option');
-  option.value = airline;
-  option.textContent = airline;
-  competitionAirlineSelect.appendChild(option);
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.dataset.airline = airline;
+  button.textContent = airline;
+  competitionAirlineDropdown.appendChild(button);
 }
 
 // null means "All competitors" (the aggregate Competition view); a
@@ -60,10 +67,17 @@ for (const airline of competitorAirlines()) {
 // currentView does, since it's persistent UI state, not simulated state.
 let selectedCompetitorAirline: string | null = null;
 
-competitionAirlineSelect.addEventListener('change', () => {
-  selectedCompetitorAirline = competitionAirlineSelect.value || null;
-  hideCompetitionTooltip(); // stale position/content for whatever was hovered under the old filter
-  render();
+competitionAirlineDropdown.querySelectorAll<HTMLButtonElement>('button').forEach((button) => {
+  button.addEventListener('click', () => {
+    selectedCompetitorAirline = button.dataset.airline || null;
+    competitionAirlineTrigger.textContent = button.textContent;
+    competitionAirlineDropdown
+      .querySelectorAll<HTMLButtonElement>('button')
+      .forEach((b) => b.classList.toggle('active', b === button));
+    closeAllDropdowns(); // function declaration, hoisted — defined further down with the other view groups
+    hideCompetitionTooltip(); // stale position/content for whatever was hovered under the old filter
+    render();
+  });
 });
 const rotationBoardEl = document.querySelector<HTMLDivElement>('#rotation-board')!;
 const commercialPanelEl = document.querySelector<HTMLDivElement>('#commercial-panel')!;
@@ -304,7 +318,7 @@ viewToggleButtons.forEach((button) => {
     canvas.hidden = view === 'rotation' || view === 'commercial';
     rotationBoardEl.hidden = view !== 'rotation';
     commercialPanelEl.hidden = view !== 'commercial';
-    competitionAirlineSelect.hidden = view !== 'competition';
+    competitionAirlineGroup.hidden = view !== 'competition';
     viewToggleButtons.forEach((b) => b.classList.toggle('active', b === button));
     // The group trigger itself also shows which group the active view
     // belongs to, so it's visible at a glance without opening either

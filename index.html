@@ -79,9 +79,20 @@
           </div>
         </div>
       </div>
-      <select id="competition-airline-select" hidden>
-        <option value="">All competitors</option>
-      </select>
+      <div class="view-group" id="competition-airline-group" data-group="competition-airline" hidden>
+        <button
+          type="button"
+          class="view-group-trigger view-group-trigger--text"
+          id="competition-airline-trigger"
+          aria-haspopup="true"
+          aria-expanded="false"
+        >
+          All competitors
+        </button>
+        <div class="view-dropdown" id="competition-airline-dropdown" hidden>
+          <button type="button" data-airline="" class="active">All competitors</button>
+        </div>
+      </div>
     </div>
     <aside id="panel">
       <section id="econ-summary">

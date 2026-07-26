@@ -95,10 +95,13 @@ body {
   border-left: 1px solid rgba(255, 255, 255, 0.15);
 }
 
-/* Each of the two view groups (Maps: Ops/Demand: Reports: Rotation/
-   Commercial) is an icon button that opens a small dropdown of its two
-   views — see main.ts's view-toggle wiring. .view-group is the
-   positioning anchor for its own .view-dropdown. */
+/* Each of the two view groups (Maps: Ops/Demand/Competition; Reports:
+   Rotation/Commercial) is an icon button that opens a small dropdown of
+   its views — see main.ts's view-toggle wiring. The Competition map's
+   airline filter reuses the exact same .view-group/.view-dropdown
+   structure and hover/click behavior, just with a text trigger instead
+   of an icon (an airline name doesn't have an icon to show). .view-group
+   is the positioning anchor for its own .view-dropdown. */
 .view-group {
   position: relative;
 }
@@ -115,6 +118,13 @@ body {
 .view-group-trigger svg {
   width: 15px;
   height: 15px;
+}
+
+.view-group-trigger--text {
+  width: auto;
+  height: auto;
+  padding: 3px 8px;
+  white-space: nowrap;
 }
 
 .view-dropdown {

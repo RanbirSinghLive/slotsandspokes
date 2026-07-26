@@ -859,3 +859,21 @@ the YOW airport hovers to three slices (Trillium Air 50%, Fundy Air 33%,
 Capital Wings 17%) — each figure matching the underlying schedule and
 competitor data by hand. Also confirmed visually in-browser once the
 right pixel coordinates were found. No console errors.
+
+### The airline filter, converted to match Maps/Reports
+
+The "All competitors" control started as a plain native `<select>` —
+functional, but visually and behaviorally inconsistent with the
+Maps/Reports dropdowns right next to it (click-only, no hover, browser-
+default styling). Converted to the exact same `.view-group`/
+`.view-dropdown` markup and hover/click/outside-click behavior, just
+with a text trigger (the current selection's name) instead of an SVG
+icon — a `.view-group-trigger--text` CSS modifier handles the sizing
+difference. `main.ts`'s generic dropdown wiring already operated on
+"every `.view-group` in the HUD," so widening that one selector was
+enough to pick up this third group for free — no parallel open/close
+logic needed. Verified: hover opens and closes it exactly like the
+other two, clicking an airline updates the trigger's label and closes
+the dropdown (an early version left it open after a selection — fixed
+by calling the same `closeAllDropdowns()` the view buttons already
+use), and the Competition map's filtering is unaffected.
