@@ -34,6 +34,30 @@ const TAXI_ALLOWANCE_MINUTES = 20;
  */
 export const MIN_TURN_MINUTES = 30;
 
+/**
+ * How long after landing the M10 route builder assumes before a
+ * newly-created return leg departs, when it auto-generates one — see
+ * `defaultReturnDepartMinute()` below. Comfortably above MIN_TURN_MINUTES so
+ * the auto-generated pair doesn't itself trip the turn-time check, without
+ * requiring the player to think about it for the common case.
+ */
+const RETURN_TURN_BUFFER_MINUTES = 45;
+
+const MINUTES_PER_DAY = 1440;
+
+/**
+ * The depart time the M10 route builder proposes, by default, for a route's
+ * automatically-created return leg: land, then this route's own block time
+ * again in the other direction (symmetric, since distance doesn't care
+ * which way you fly it) plus a turnaround buffer. Wraps past midnight with
+ * `% MINUTES_PER_DAY` — a route timed close enough to midnight to wrap is an
+ * edge case the player can just retime by hand afterward, same as any other
+ * leg.
+ */
+export function defaultReturnDepartMinute(outboundDepartMinute: number, blockMinutes: number): number {
+  return (outboundDepartMinute + blockMinutes + RETURN_TURN_BUFFER_MINUTES) % MINUTES_PER_DAY;
+}
+
 const airportsByIata = new Map<string, AirportLocation>(
   (airportsData as AirportLocation[]).map((airport) => [airport.iata, airport]),
 );
@@ -173,7 +197,19 @@ export function legsServingMarket(origin: string, dest: string, legs: ScheduleLe
  * with at least MIN_TURN_MINUTES on the ground in between. A schedule that
  * fails this would make an aircraft "teleport" once M4 starts flying it —
  * a confusing bug to chase after the fact, so we catch it here at load
- * time instead. Logs one line per problem found, or a single OK line.
+ * time instead.
+ *
+ * `state.schedule` is meant to be *the* daily schedule — the same rotation
+ * repeating every day, not a one-off plan for a single day (see CLAUDE.md).
+ * That only actually holds if each tail's day is a closed loop: the last
+ * leg's destination must also be its first leg's origin, or day 2 starts
+ * with the aircraft in the wrong place and that tail's first departure
+ * silently never fires again — the same failure mode as a broken link
+ * between two legs, just one day delayed and easy to miss because the
+ * schedule looks fine for the rest of the day it was edited. Checked here
+ * too, not just link-by-link.
+ *
+ * Logs one line per problem found, or a single OK line.
  */
 export function validateSchedule(legs: ScheduleLeg[]): void {
   const byTail = new Map<string, ScheduleLeg[]>();
@@ -203,6 +239,17 @@ export function validateSchedule(legs: ScheduleLeg[]): void {
         problemFound = true;
         console.error(
           `Schedule error: ${tail} has only ${turnMinutes} minutes on the ground between ${previous.legId} and ${current.legId}`,
+        );
+      }
+    }
+
+    if (sorted.length > 0) {
+      const first = sorted[0];
+      const last = sorted[sorted.length - 1];
+      if (last.dest !== first.origin) {
+        problemFound = true;
+        console.error(
+          `Schedule error: ${tail}'s rotation doesn't close -- ${last.legId} lands at ${last.dest}, but the day restarts at ${first.origin} (${first.legId}). Add a leg back to ${first.origin}, or that first departure will never fire again.`,
         );
       }
     }

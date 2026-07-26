@@ -340,6 +340,20 @@ body {
   padding: 3px 6px;
 }
 
+.new-route-field--checkbox {
+  justify-content: flex-start;
+}
+
+.new-route-field--checkbox input[type='checkbox'] {
+  margin: 0;
+}
+
+#new-route-return-preview {
+  color: #ffd166;
+  margin: -4px 0 8px;
+  min-height: 1.2em;
+}
+
 .new-route-actions {
   display: flex;
   gap: 8px;

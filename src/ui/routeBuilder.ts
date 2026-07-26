@@ -4,13 +4,14 @@ import { projection } from '../render/projection';
 import { airports, type Airport } from '../render/airports';
 import {
   computeBlockMinutes,
+  defaultReturnDepartMinute,
   marketKey,
   nextLegId,
   recommendedFare,
   validateSchedule,
   type ScheduleLeg,
 } from '../sim/schedule';
-import { addScheduleRow, filterScheduleToRoute } from './panels';
+import { addScheduleRow, filterScheduleToRoute, minuteOfDayToTimeString } from './panels';
 import { addCommercialRow } from './commercial';
 import type { SimState } from '../sim/state';
 
@@ -228,6 +229,8 @@ const formBlock = document.querySelector<HTMLElement>('#new-route-block')!;
 const formError = document.querySelector<HTMLElement>('#new-route-error')!;
 const formTailSelect = document.querySelector<HTMLSelectElement>('#new-route-tail')!;
 const formDepartInput = document.querySelector<HTMLInputElement>('#new-route-depart')!;
+const formReturnCheckbox = document.querySelector<HTMLInputElement>('#new-route-return')!;
+const formReturnPreview = document.querySelector<HTMLElement>('#new-route-return-preview')!;
 const formConfirmButton = document.querySelector<HTMLButtonElement>('#new-route-confirm')!;
 const formCancelButton = document.querySelector<HTMLButtonElement>('#new-route-cancel')!;
 
@@ -247,7 +250,13 @@ function showForm(origin: Airport, dest: Airport, schedule: ScheduleLeg[]): void
   // second YSJ-YQB frequency after leaving the input at 13:00 from an
   // earlier route.
   formDepartInput.value = DEFAULT_DEPART_TIME;
-  checkTimeCollision(origin, dest, schedule);
+  // Defaults to checked every time the form opens, same reasoning as
+  // resetting the depart time below: adding a route almost always means
+  // "and back," and this is what stops a leg like this session's C-GVIA
+  // YYG->YHZ from getting created alone, with nothing to fly the aircraft
+  // back into its own rotation.
+  formReturnCheckbox.checked = true;
+  updateFormValidation(origin, dest, schedule);
 
   // Filter the schedule table to this market *now*, while the form is
   // still open — not only after "Add Route" is clicked. Filtering only on
@@ -265,22 +274,42 @@ function hideForm(): void {
 }
 
 /**
- * Live-check the depart time against findExactTimeCollision() (see above)
- * and hard-block submission when it collides — unlike the M8/M9 rotation
- * checks, which allow a bad edit through and just log it, this one has no
- * legitimate interpretation, so it's caught here in the form rather than
- * after the fact.
+ * Live-check the depart time (and, when the return checkbox is on, the
+ * auto-computed return leg's time too) against findExactTimeCollision() and
+ * hard-block submission when either collides — unlike the M8/M9 rotation
+ * checks, which allow a bad edit through and just log it, an exact-time
+ * double-booking has no legitimate interpretation, so it's caught here in
+ * the form rather than after the fact. Also keeps the return-leg preview
+ * text current, so the player can see what "Add return leg too" is actually
+ * about to create before they click Add Route.
  */
-function checkTimeCollision(origin: Airport, dest: Airport, schedule: ScheduleLeg[]): void {
+function updateFormValidation(origin: Airport, dest: Airport, schedule: ScheduleLeg[]): void {
   const departMinute = timeStringToMinuteOfDay(formDepartInput.value);
-  const collision = findExactTimeCollision(origin.iata, dest.iata, departMinute, schedule);
-  if (collision) {
-    formError.textContent = `${collision.tail} already departs ${origin.iata} for ${dest.iata} at this exact time (${collision.legId}). Pick a different time.`;
+  const blockMinutes = computeBlockMinutes(origin.iata, dest.iata);
+  const outboundCollision = findExactTimeCollision(origin.iata, dest.iata, departMinute, schedule);
+
+  let returnDepartMinute: number | null = null;
+  let returnCollision: ScheduleLeg | undefined;
+  if (formReturnCheckbox.checked) {
+    returnDepartMinute = defaultReturnDepartMinute(departMinute, blockMinutes);
+    returnCollision = findExactTimeCollision(dest.iata, origin.iata, returnDepartMinute, schedule);
+  }
+
+  if (outboundCollision) {
+    formError.textContent = `${outboundCollision.tail} already departs ${origin.iata} for ${dest.iata} at this exact time (${outboundCollision.legId}). Pick a different time.`;
+    formConfirmButton.disabled = true;
+  } else if (returnCollision) {
+    formError.textContent = `${returnCollision.tail} already departs ${dest.iata} for ${origin.iata} at the auto-computed return time (${minuteOfDayToTimeString(returnDepartMinute!)}, ${returnCollision.legId}). Uncheck the return leg, or pick a different depart time.`;
     formConfirmButton.disabled = true;
   } else {
     formError.textContent = '';
     formConfirmButton.disabled = false;
   }
+
+  formReturnPreview.textContent =
+    formReturnCheckbox.checked && returnDepartMinute !== null
+      ? `Return: ${dest.iata} → ${origin.iata} at ${minuteOfDayToTimeString(returnDepartMinute)}`
+      : '';
 }
 
 function timeStringToMinuteOfDay(time: string): number {
@@ -310,12 +339,16 @@ export function setupRouteBuilder(state: SimState): void {
     formTailSelect.appendChild(option);
   }
 
-  // Re-check for an exact-time collision every time the player changes the
-  // depart time, so the block (see checkTimeCollision) reacts live instead
-  // of only at submission.
+  // Re-check for an exact-time collision (and refresh the return-leg
+  // preview) every time the player changes the depart time or toggles the
+  // return checkbox, so the form reacts live instead of only at submission.
   formDepartInput.addEventListener('input', () => {
     if (builderState.mode !== 'confirming') return;
-    checkTimeCollision(builderState.origin, builderState.dest, state.schedule);
+    updateFormValidation(builderState.origin, builderState.dest, state.schedule);
+  });
+  formReturnCheckbox.addEventListener('change', () => {
+    if (builderState.mode !== 'confirming') return;
+    updateFormValidation(builderState.origin, builderState.dest, state.schedule);
   });
 
   formConfirmButton.addEventListener('click', () => {
@@ -323,21 +356,51 @@ export function setupRouteBuilder(state: SimState): void {
     const { origin, dest } = builderState;
     const tail = formTailSelect.value;
     const departMinute = timeStringToMinuteOfDay(formDepartInput.value);
+    const blockMinutes = computeBlockMinutes(origin.iata, dest.iata);
 
     // Defensive re-check: the button should already be disabled in this
     // case, but never add a duplicate timeslot regardless.
     if (findExactTimeCollision(origin.iata, dest.iata, departMinute, state.schedule)) return;
 
-    const leg: ScheduleLeg = {
+    const outboundLeg: ScheduleLeg = {
       legId: nextLegId(tail, state.schedule),
       tail,
       origin: origin.iata,
       dest: dest.iata,
       departMinute,
-      blockMinutes: computeBlockMinutes(origin.iata, dest.iata),
+      blockMinutes,
     };
-    state.schedule.push(leg);
-    addScheduleRow(leg, state);
+    state.schedule.push(outboundLeg);
+    addScheduleRow(outboundLeg, state);
+
+    // Adding a route creates its return leg too, by default — 99% of the
+    // time a player drawing A->B wants B->A as well, and the case that
+    // doesn't is exactly the case that used to strand a tail at the far
+    // end with no way back into its own rotation (see WEEK-THREE.md). The
+    // checkbox is the deliberate escape hatch for the real exception: an
+    // extra one-way frequency on a market that already has a return, or a
+    // one-off repositioning move where a return truly isn't wanted yet.
+    if (formReturnCheckbox.checked) {
+      const returnDepartMinute = defaultReturnDepartMinute(departMinute, blockMinutes);
+      // Same defensive re-check as the outbound leg above — if the
+      // auto-computed return time happens to collide, just skip adding it
+      // rather than fail the whole submission; the outbound leg (and the
+      // form's live validation, which would have already disabled Add
+      // Route in this case) still make this an edge case, not a silent one.
+      if (!findExactTimeCollision(dest.iata, origin.iata, returnDepartMinute, state.schedule)) {
+        const returnLeg: ScheduleLeg = {
+          legId: nextLegId(tail, state.schedule),
+          tail,
+          origin: dest.iata,
+          dest: origin.iata,
+          departMinute: returnDepartMinute,
+          blockMinutes,
+        };
+        state.schedule.push(returnLeg);
+        addScheduleRow(returnLeg, state);
+      }
+    }
+
     validateSchedule(state.schedule);
 
     // Fare/marketing are set at the market level (sim/state.ts's
@@ -345,6 +408,8 @@ export function setupRouteBuilder(state: SimState): void {
     // (recommendedFare() default, zero marketing spend); a second
     // frequency on a market that already has one reuses it unchanged,
     // rather than resetting whatever fare the player already set there.
+    // marketKey() is bidirectional, so this covers the return leg too —
+    // one entry for the whole market regardless of how many legs serve it.
     const key = marketKey(origin.iata, dest.iata);
     if (!state.routeSettings[key]) {
       state.routeSettings[key] = { fare: recommendedFare(origin.iata, dest.iata), marketingSpend: 0 };

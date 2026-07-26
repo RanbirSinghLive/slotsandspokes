@@ -492,6 +492,18 @@ schedule, logging to the console exactly like the M3 startup check does if
 the edit leaves an aircraft departing before it could plausibly have landed
 and turned around.
 
+**Closing the loop (week three):** `validateSchedule()` also checks, per
+tail, that the chronologically *last* leg's destination equals the *first*
+leg's origin — not just that consecutive legs chain into each other.
+`state.schedule` is supposed to be the same rotation repeating every day
+(per CLAUDE.md), so a tail whose day doesn't loop back to its own start
+looks fine on the day it's edited and then silently jams on day two: the
+aircraft simply isn't where the first leg needs it to be, and `step()`'s
+departure check (physical position must match `leg.origin`) blocks it
+forever with no error, since nothing about that check is itself broken.
+Found by playtesting, not by reading the code — a hand-added one-way leg
+stranded a tail for good with revenue silently going to zero.
+
 Editing is departure time, plus removal (week three) — reassigning a
 leg's origin, destination, or tail (which would also mean recomputing
 `blockMinutes` and touching `render/routes.ts`'s route list) is out of
@@ -573,6 +585,20 @@ already uses. There's no new rotation-fitting solver; a leg added
 somewhere the chosen tail isn't actually going to be gets caught by the
 same console error a bad manual edit would produce, and nothing prevents
 adding it anyway, for consistency with M8.
+
+**The return leg (week three):** confirming adds *two* legs by default,
+not one — the one you drew, plus its reverse, auto-timed via
+`defaultReturnDepartMinute()` (land, then the same block time back, plus a
+45-minute turn buffer) and shown live in the form ("Return: YQM → YYZ at
+14:54") before you confirm. This came from an actual playtest bug: adding
+a single one-way leg is exactly the gesture that strands a tail with no
+way back into its rotation, since nothing else in the schedule ever
+returns it to where that leg needs it to start. A checkbox ("Add return
+leg too", checked by default) opts back out for the genuine exception — an
+extra one-way frequency on a market that already has a return, or a
+deliberate one-off repositioning move. The return leg gets its own
+exact-time-collision check, independent of the outbound leg's, since
+either one colliding should block the whole submission.
 
 Editing/removing an *existing* route stays table-driven (M8) rather than
 gaining a second, harder gesture — hit-testing a click against an

@@ -122,6 +122,58 @@ disappeared from the map immediately, no reload required. Confirmed the
 console's "Schedule OK: 10 legs" (12 minus the 2 removed) was the most
 recent entry, not stale buffered history from earlier testing.
 
+### 5. Adding a route could strand a tail with no way back — done
+
+Found by actually playing: deleted C-GVIA's preset rotation, added a
+single new leg (YYG → YHZ) by hand, and the aircraft never flew it again.
+Revenue/cost stopped posting silently — no error explaining why. Root
+cause was two compounding gaps:
+
+1. `validateSchedule()` only checked a tail's legs *against each other*
+   (does leg N's destination match leg N+1's origin) — it never checked
+   that the *last* leg of a tail's day lands back where the *first* leg
+   departs from. A schedule that isn't a closed loop looks fine on the day
+   it's edited and then silently jams starting the next day, since
+   `step.ts`'s departure check requires the aircraft to physically be at
+   `leg.origin`, and nothing ever gets it back there.
+2. The M10 route builder only ever created the one leg you drew — adding
+   A→B never implied B→A, even though that's what the overwhelming
+   majority of routes actually are: a round trip, not a one-way trip.
+   Drawing a single-direction leg was the one gesture most likely to
+   produce exactly the stranded-tail bug above.
+
+Two fixes, addressing both:
+
+- `validateSchedule()` (`sim/schedule.ts`) now also checks, per tail, that
+  the chronologically last leg's destination equals the first leg's
+  origin — "the rotation doesn't close" is now its own reported error,
+  distinct from a broken link between two specific legs, and points
+  directly at which airport needs a leg back to.
+- The M10 route builder (`ui/routeBuilder.ts`) now creates the return leg
+  automatically by default whenever you add a route — a checkbox ("Add
+  return leg too", checked by default) is the escape hatch for the actual
+  exception: an extra one-way frequency on a market that already has a
+  return, or a deliberate one-off repositioning move. The return leg's
+  depart time is auto-computed (`defaultReturnDepartMinute()`: land, then
+  the same block time back, plus a 45-minute turn buffer) and shown live
+  in the form ("Return: YQM → YYZ at 14:54") before you confirm, and it's
+  independently checked for an exact-time collision the same way the
+  outbound leg already was.
+
+This doesn't add a separate "positioning flight" concept (a one-time,
+non-revenue repositioning move, distinct from the repeating schedule) —
+that idea came up in discussion but the default-bidirectional fix removes
+most of the actual need for it, since the common case now closes the loop
+by construction. Worth revisiting only if a real playtest surfaces a case
+neither fix covers (e.g. redeploying a tail to a genuinely new base with
+no round trip involved).
+
+Verified in-browser: recreated the exact stranding scenario (a single
+YYG→YHZ leg for a tail sitting at YOW) and confirmed the new closed-loop
+check reports it clearly; separately, drew a fresh YYZ↔YQM route and
+confirmed both legs appear from one confirm, with the return leg's
+auto-computed time shown in the form before submitting.
+
 ## Judgment calls, not yet decided
 
 ### Time navigation and pacing
@@ -174,6 +226,10 @@ problem a real session hasn't surfaced yet.
    outright.
 3. **Non-fixed default seed** — done, alongside item 2 (a new game now
    seeds from `Date.now()`, headless stays on the fixed default).
-4. Time navigation / weather visibility / failure-state — all worth
+4. **Ops mode's route lines reflecting the live schedule** — done.
+5. **Closed-loop schedule validation + default-bidirectional route
+   creation** — done. The one item found by actually playtesting rather
+   than by reading the code — a stranded tail with silently-zero revenue.
+6. Time navigation / weather visibility / failure-state — all worth
    revisiting once a real session has actually been played against
-   items 1-3, not before.
+   items 1-5, not before.
