@@ -1,5 +1,5 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
-import { loadSchedule, type ScheduleLeg } from './schedule';
+import { loadSchedule, marketKey, recommendedFare, type ScheduleLeg } from './schedule';
 
 export type AircraftStatus = 'ground' | 'airborne';
 
@@ -37,14 +37,37 @@ export type ActiveFlight = {
    */
   scheduledArriveMinute: number;
   /**
-   * The fare this flight is charging, copied from its ScheduleLeg at the
-   * moment it departs (see step.ts) — not re-read from state.schedule at
-   * arrival, so a fare the player changes mid-flight doesn't retroactively
-   * change what an already-departed flight charges. Week two's "Pricing"
-   * loop (sim/schedule.ts's recommendedFare(), overridable in the schedule
-   * editor).
+   * This flight's fare and marketing spend, both copied from its market's
+   * RouteSettings at the moment it departs (see step.ts) — not re-read at
+   * arrival, so a change the player makes mid-flight doesn't retroactively
+   * affect one already in the air. Together with `origin`/`dest` (to look
+   * up who's competing) and `legsServingMarket` (recomputed fresh at
+   * arrival, since adding a frequency mid-flight *should* immediately
+   * split demand differently), these are everything sim/economy.ts needs.
    */
   fare: number;
+  marketingSpend: number;
+};
+
+/**
+ * Week two's "Pricing" and "Commercial" levers, one entry per *market*
+ * (an origin-dest pair, either direction — see `marketKey()`), not per
+ * individual scheduled leg. Fare is deliberately a route-level decision:
+ * a market with two daily frequencies still has exactly one fare, not two
+ * independently adjustable ones, to keep the game's decision space
+ * manageable as more levers (marketing spend today, more later — see
+ * ui/commercial.ts) get added to this same record.
+ */
+export type RouteSettings = {
+  fare: number;
+  /**
+   * Daily dollars spent promoting this specific market — a flat cost
+   * charged once per day (see step.ts's day-rollover handling), not per
+   * flight, since it's a market-level decision, not a leg-level one. Feeds
+   * a diminishing-returns bonus into sim/choiceModel.ts's booking share;
+   * 0 means no spend and no effect, same as before this lever existed.
+   */
+  marketingSpend: number;
 };
 
 export type SimState = {
@@ -61,6 +84,16 @@ export type SimState = {
    * `state.schedule[i].departMinute` and the very next tick sees it.
    */
   schedule: ScheduleLeg[];
+  /**
+   * One RouteSettings entry per market currently served, keyed by
+   * marketKey(origin, dest) — a plain object (not a Map) so `state` keeps
+   * surviving JSON.parse(JSON.stringify(state)) unchanged, per CLAUDE.md.
+   * ui/routeBuilder.ts creates a new entry here (recommendedFare() default,
+   * zero marketing spend) whenever a leg is added to a market that didn't
+   * already have one; adding a second frequency to an existing market
+   * reuses the same entry rather than creating a second one.
+   */
+  routeSettings: Record<string, RouteSettings>;
   completedToday: string[];
   todayRevenue: number;
   todayCost: number;
@@ -123,12 +156,21 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     };
   });
 
+  const routeSettings: Record<string, RouteSettings> = {};
+  for (const leg of schedule) {
+    const key = marketKey(leg.origin, leg.dest);
+    if (!routeSettings[key]) {
+      routeSettings[key] = { fare: recommendedFare(leg.origin, leg.dest), marketingSpend: 0 };
+    }
+  }
+
   return {
     simMinute: 0,
     cash: 0,
     aircraft,
     activeFlights: [],
     schedule,
+    routeSettings,
     completedToday: [],
     todayRevenue: 0,
     todayCost: 0,

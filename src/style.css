@@ -12,11 +12,12 @@ body {
 
 /* Must match PANEL_WIDTH_PX in ui/panels.ts, which main.ts uses to size the
    canvas so the map and the sidebar share the viewport instead of the panel
-   floating on top of it. #rotation-board is a sibling that takes the exact
-   same slot — whichever of the two isn't [hidden] occupies it, no absolute
-   positioning needed. */
+   floating on top of it. #rotation-board and #commercial-panel are
+   siblings that take the exact same slot — whichever one isn't [hidden]
+   occupies it, no absolute positioning needed. */
 #map,
-#rotation-board {
+#rotation-board,
+#commercial-panel {
   display: block;
   width: calc(100vw - 280px);
   height: 100vh;
@@ -27,7 +28,8 @@ body {
    browser's own default `[hidden] { display: none }` rule (0-1-0) and the
    [hidden] attribute toggle in main.ts would silently do nothing. */
 #map[hidden],
-#rotation-board[hidden] {
+#rotation-board[hidden],
+#commercial-panel[hidden] {
   display: none;
 }
 
@@ -126,38 +128,6 @@ body {
   border-collapse: collapse;
 }
 
-/* #schedule-table specifically needs table-layout: fixed — with the
-   automatic layout the browser's default, a <input type="range">'s
-   intrinsic width (much wider than a table column has room for) pushed the
-   whole table past the panel's fixed width once the Fare column was added,
-   silently overflowing the fare slider off the right edge of the sidebar.
-   Fixed layout instead sizes every column from these percentages, and the
-   slider (flex: 1, min-width: 0 — see .fare-control below) fills whatever
-   width its own <td> actually has. */
-#schedule-table {
-  table-layout: fixed;
-}
-
-#schedule-table th:nth-child(1),
-#schedule-table td:nth-child(1) {
-  width: 15%;
-}
-
-#schedule-table th:nth-child(2),
-#schedule-table td:nth-child(2) {
-  width: 19%;
-}
-
-#schedule-table th:nth-child(3),
-#schedule-table td:nth-child(3) {
-  width: 24%;
-}
-
-#schedule-table th:nth-child(4),
-#schedule-table td:nth-child(4) {
-  width: 42%;
-}
-
 .panel-table th,
 .panel-table td {
   text-align: left;
@@ -180,29 +150,6 @@ body {
   padding: 2px 4px;
   width: 100%;
   box-sizing: border-box;
-}
-
-/* Week two's Pricing loop: the fare lever in the schedule table. A range
-   slider (not a free-text field, per WEEK-TWO.md decision 3), with a small
-   live $ readout underneath — stacked vertically, not side by side, since
-   the schedule panel's fixed 280px width leaves too little room
-   horizontally for both a usable slider *and* a readout wide enough for
-   "$230" without one starving the other. */
-.fare-control {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.fare-control input[type='range'] {
-  width: 100%;
-  accent-color: #6b7694;
-}
-
-.fare-value {
-  font-size: 11px;
-  color: #9aa3b8;
-  text-align: center;
 }
 
 .filter-row th {
@@ -382,4 +329,126 @@ body {
   font-size: 11px;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/* Week two's "Commercial" panel — one row per market, with route-level
+   levers (fare, marketing spend) plus the pax/revenue/cost/margin figures
+   those levers produce. Gets the full canvas-width area, same as the
+   rotation board, since a lever dashboard needs real room per row —
+   the schedule sidebar already fought a single fare slider for space
+   (see the Pricing loop's commit) and lost. See ui/commercial.ts. */
+#commercial-panel {
+  padding: 68px 24px 24px;
+  overflow-y: auto;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 13px;
+  color: #cdd3e0;
+}
+
+/* table-layout: fixed, same fix (and same reason) as the schedule table's
+   Fare column needed during the Pricing loop's build: automatic layout
+   let two <input type="range">'s intrinsic width push the table past its
+   container, silently overflowing it off the right edge of the screen.
+   These percentages (summing to 100) size every column explicitly instead. */
+#commercial-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+#commercial-table th:nth-child(1),
+#commercial-table td:nth-child(1) {
+  width: 14%;
+}
+
+#commercial-table th:nth-child(2),
+#commercial-table td:nth-child(2) {
+  width: 4%;
+}
+
+#commercial-table th:nth-child(3),
+#commercial-table td:nth-child(3) {
+  width: 7%;
+}
+
+#commercial-table th:nth-child(4),
+#commercial-table td:nth-child(4) {
+  width: 5%;
+}
+
+#commercial-table th:nth-child(5),
+#commercial-table td:nth-child(5) {
+  width: 11%;
+}
+
+#commercial-table th:nth-child(6),
+#commercial-table td:nth-child(6) {
+  width: 9%;
+}
+
+#commercial-table th:nth-child(7),
+#commercial-table td:nth-child(7) {
+  width: 10%;
+}
+
+#commercial-table th:nth-child(8),
+#commercial-table td:nth-child(8) {
+  width: 15%;
+}
+
+#commercial-table th:nth-child(9),
+#commercial-table td:nth-child(9) {
+  width: 12%;
+}
+
+#commercial-table th:nth-child(10),
+#commercial-table td:nth-child(10) {
+  width: 12%;
+}
+
+#commercial-table th,
+#commercial-table td {
+  text-align: left;
+  padding: 6px 10px 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+#commercial-table th {
+  color: #6b7694;
+  font-weight: 400;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.commercial-status.seat-capped {
+  color: #7fd88f;
+}
+
+.commercial-status.demand-capped {
+  color: #ffb37a;
+}
+
+/* Stacked, not side by side — same reasoning as the schedule table's fare
+   control needed: a slider wide enough to actually drag, plus a value
+   readout wide enough for "$1000/day", don't both fit in one row within
+   a ~12%-of-687px column. */
+.lever-control {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+}
+
+.lever-control input[type='range'] {
+  width: 100%;
+  accent-color: #6b7694;
+}
+
+.lever-value {
+  font-size: 11px;
+  color: #9aa3b8;
 }

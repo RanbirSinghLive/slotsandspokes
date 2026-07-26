@@ -148,18 +148,22 @@ absorb the maximum single-leg delay (45 minutes) in practice.
 
 Deliberately crude, per WEEK-ONE.md — same load factor, regardless of
 route or day — but since week two, capped by whether the route's market
-can actually support that many passengers, and priced per-leg rather
-than at one flat rate for everyone:
+can actually support that many passengers, and priced at the route
+(market) level rather than one flat rate for everyone:
 
 ```
 LOAD_FACTOR = 0.75
 demandPerFlight = dailyDemand(origin, dest) / legsServingMarket
-bookedDemand    = demandPerFlight * bookingShare(leg.fare, legsServingMarket, origin, dest)
+bookedDemand    = demandPerFlight * bookingShare(fare, legsServingMarket, origin, dest, marketingSpend)
 pax     = min(round(seats * LOAD_FACTOR), round(bookedDemand))
-revenue = pax * leg.fare
+revenue = pax * fare
 cost    = (blockMinutes / 60) * costPerBlockHour + costPerDeparture
 margin  = revenue - cost
 ```
+
+`fare` and `marketingSpend` come from `state.routeSettings[marketKey(origin, dest)]`
+(sim/state.ts's `RouteSettings`), not from the leg — see "Pricing" and
+"The Commercial panel," below, for why fare lives at the market level.
 
 `legsServingMarket` (`sim/schedule.ts`) counts every currently-scheduled
 leg between this pair, either direction — the route's total daily demand
@@ -240,41 +244,46 @@ BASE_FARE = 125    PER_NM_RATE = 0.3
 recommendedFare = round(BASE_FARE + PER_NM_RATE * distanceNm)
 ```
 
-Every `ScheduleLeg` gets a `fare` field, computed from this at load time
-(the existing template) or leg-creation time (a new route via the M10
-builder) — same pattern `blockMinutes` already uses. It's only ever a
-*default*: decision 3 in WEEK-TWO.md is explicit that fare has to be a
-player-overridable lever, not a fixed number, so the schedule table
-(`ui/panels.ts`) gained a Fare column — a range slider bounded to 50%-
-150% of that leg's own recommended fare, in $5 steps, with a live $
-readout underneath (not a free-text field, which the decision explicitly
-rules out). Dragging it mutates `leg.fare` directly, the same live-
-`state.schedule`-mutation pattern the Depart column already uses; the
-new fare takes effect on that leg's very next departure (`ActiveFlight`
-locks in the fare it departed with, so a change mid-flight doesn't
+Fare is set at the **route (market) level, not per leg** — a market
+with two daily frequencies has exactly one fare, a deliberate choice to
+keep the game's decision space manageable as more levers get added (see
+"The Commercial panel," below). Every market gets a `RouteSettings`
+entry (`sim/state.ts`) the moment its first leg exists — at game
+creation for the template schedule, or when the M10 route builder
+creates a leg on a market that doesn't have one yet — seeded with
+`recommendedFare()`'s default. It's only ever a *default*: decision 3 in
+WEEK-TWO.md is explicit that fare has to be a player-overridable lever,
+not a fixed number, so the new Commercial panel has a Fare control per
+market — a range slider bounded to 50%-150% of that market's recommended
+fare, in $5 steps, with a live $ readout (not a free-text field, which
+the decision explicitly rules out). Dragging it mutates
+`state.routeSettings[key].fare` directly; the new fare takes effect on
+that market's very next departure (`ActiveFlight` locks in the fare —
+and marketing spend — it departed with, so a change mid-flight doesn't
 retroactively alter one already in the air).
 
-`leg.fare` now feeds both halves of the yield-management tension at
-once: it's `bookingShare()`'s price term (a higher fare loses bookings
-to competitors or "stay home") *and* the multiplier on `revenue`
-directly. Verified via the headless runner and a live browser test:
-raising a fare has a completely different effect depending on whether
-the market is seat-capped or demand-capped. Ottawa-Montréal (recommended
-$150, seat-capped at 59 pax regardless of fare) gained roughly $4,425 of
-pure margin over two days from manually dragging its fare to $225 — the
-market has so much spare demand that losing booking share cost it
-nothing, since 59 seats still filled either way. A demand-capped market
-wouldn't behave the same way — raising its fare would genuinely lose it
-passengers it can't make up elsewhere, since there's no seat-cap slack to
-absorb the drop. Distance-based defaults also gently recalibrated every
-route's fare relative to the old flat $185 (short Atlantic hops now
-default cheaper, the longest leg — Québec-Halifax, already the one with
-a competitor — now defaults *more* expensive), landing total daily
-revenue at $47,962 (down slightly from $49,950) with the schedule's net
-loss over 5 days deepening slightly to $-14,563 — the pricing lever
-existing doesn't fix profitability by itself; a player actually has to
-use it, e.g. by noticing (as above) that raising fares on the two big
-seat-capped corridors is free money at today's demand levels.
+`routeSettings.fare` feeds both halves of the yield-management tension
+at once: it's `bookingShare()`'s price term (a higher fare loses
+bookings to competitors or "stay home") *and* the multiplier on
+`revenue` directly. Verified via the headless runner and a live browser
+test: raising a fare has a completely different effect depending on
+whether the market is seat-capped or demand-capped. Ottawa-Montréal
+(recommended $150, seat-capped at 59 pax regardless of fare) gained
+roughly $4,425 of pure margin over two days from manually dragging its
+fare to $225 — the market has so much spare demand that losing booking
+share cost it nothing, since 59 seats still filled either way. A
+demand-capped market wouldn't behave the same way — raising its fare
+would genuinely lose it passengers it can't make up elsewhere, since
+there's no seat-cap slack to absorb the drop. Distance-based defaults
+also gently recalibrated every route's fare relative to the old flat
+$185 (short Atlantic hops now default cheaper, the longest leg —
+Québec-Halifax, already the one with a competitor — now defaults *more*
+expensive), landing total daily revenue at $47,962 (down slightly from
+$49,950) with the schedule's net loss over 5 days deepening slightly to
+$-14,563 — the pricing lever existing doesn't fix profitability by
+itself; a player actually has to use it, e.g. by noticing (as above)
+that raising fares on the two big seat-capped corridors is free money
+at today's demand levels.
 
 Applied on **arrival**, not departure — a flight in the air hasn't earned or
 spent anything yet. `margin` is added to `state.cash`; `revenue`/`cost`/
@@ -424,14 +433,13 @@ schedule, logging to the console exactly like the M3 startup check does if
 the edit leaves an aircraft departing before it could plausibly have landed
 and turned around.
 
-Editing is departure time and fare (week two's Pricing loop, see
-"Economy" above) — reassigning a leg's origin, destination, or tail
-(which would also mean recomputing `blockMinutes` and touching
-`render/routes.ts`'s route list) is out of scope for this pass. The
-Fare column is a range slider rather than a second `<input type="time">`-
-style text field, deliberately: WEEK-TWO.md's decision 3 rules out a
-free-text price, so the control itself has to make an arbitrary value
-impossible to enter, not just discourage one.
+Editing is departure time only — reassigning a leg's origin,
+destination, or tail (which would also mean recomputing `blockMinutes`
+and touching `render/routes.ts`'s route list) is out of scope for this
+pass. Fare briefly lived here as a per-leg column during the Pricing
+loop's first pass, then moved to the route (market) level — see "The
+Commercial panel," below — once it became clear fare needed to be a
+route-level decision, not one independently adjustable per frequency.
 
 **Column filters:** a second header row holds one text input per column
 (Tail/Route/Depart). `applyScheduleFilters()` re-checks all three on every
@@ -521,13 +529,14 @@ axis. Everything that isn't a bar *is* the answer to "where's the white
 space" — no separate free-time indicator is drawn, since the gaps between
 bars already show it.
 
-`#map` and `#rotation-board` are CSS siblings sized identically; a
-"Map / Rotation" toggle in the HUD swaps which one is visible via the
-`hidden` attribute rather than absolute positioning. `main.ts`'s `render()`
-still updates the clock and sidebar panel every frame regardless of which
-view is showing, but skips all canvas drawing while the board is up
-(`if (currentView !== 'map') return;`) — there's no point paying for it
-while hidden.
+`#map`, `#rotation-board`, and `#commercial-panel` (below) are CSS
+siblings sized identically; the HUD's Ops/Demand/Rotation/Commercial
+toggle swaps which one is visible via the `hidden` attribute rather than
+absolute positioning. `main.ts`'s `render()` still updates the clock and
+sidebar panel every frame regardless of which view is showing, but skips
+all canvas drawing while the board (or the Commercial panel) is up
+(`if (currentView === 'rotation' || currentView === 'commercial') return;`)
+— there's no point paying for it while hidden.
 
 The board is read-only for now (phase 1 of a longer plan — see
 WEEK-TWO.md's "rotation board" section for phases 2–4, none of which are
@@ -539,10 +548,73 @@ Rotation view is selected (in case the schedule changed while it was
 hidden) and not on every tick, since nothing else currently mutates the
 schedule while the board itself is open.
 
-Switching away from the Map view calls `cancelPendingRoute()` (M10's route
-builder, exported for this purpose) — an armed or half-confirmed route
-gesture doesn't mean anything once the canvas it was being drawn on is no
-longer on screen.
+Switching away from the Ops view calls `cancelPendingRoute()` (M10's
+route builder, exported for this purpose) — an armed or half-confirmed
+route gesture doesn't mean anything once the canvas it was being drawn
+on is no longer on screen.
+
+## The Commercial panel (`src/ui/commercial.ts`)
+
+A fourth view, one row per market, that makes route-level revenue
+management legible and *editable* — where the rotation board and demand
+map both started read-only, this one didn't, since the whole point is
+levers to pull. Raised the same way the rotation board was: not on the
+original layers/loops list, but a real gap once the Pricing loop's
+per-leg fare slider made clear that fare (and future levers) needed a
+route-level home instead.
+
+Each row: market, frequency, pax/day, load factor, revenue, cost,
+margin, a Seat-capped/Demand-capped status, and two levers — Fare (see
+"Pricing," above) and Marketing spend. Every number comes from calling
+`sim/economy.ts`'s real `flightResult()` once per leg serving that
+market and summing the results — never a reimplementation of the pax/
+revenue/cost formula, so this panel can't quietly drift from what the
+simulation actually does. `routeSettings` is passed into that call
+directly rather than read from `state`, so a slider mid-drag shows the
+*hypothetical* result of a value not committed yet, live.
+
+**Seat-capped vs. demand-capped** is the single most useful thing this
+panel adds: a market is seat-capped when every one of its flights is
+pinned at the 78-seat aircraft's load-factor ceiling (there's more
+demand than the fleet can carry, so raising fare trades away spare
+demand nobody could fly anyway — free margin); anything short of that
+ceiling is demand-capped (every passenger is real, so raising fare costs
+real pax). Previously the only way to know which case a market was in
+was to run the headless script and read the numbers by hand.
+
+**Marketing spend** (`sim/choiceModel.ts`'s `marketingBonus()`) is the
+first lever added *because* `RouteSettings` was already a record, not a
+single `fare` field — a per-market daily dollar amount, log-scaled for
+diminishing returns, added only to *your* own utility term (competitors
+are unaffected by what you spend). Charged once per day per market at
+day-rollover (`step.ts`), not per flight, since it's a market-level
+decision that doesn't scale with how many flights happen to land that
+day. Bounded $0–$1,000 in $50 steps. More levers can join this same
+record later without changing its shape again.
+
+Same live-input build discipline as the schedule table: sliders are
+built once per market (`setupCommercialPanel()` at startup,
+`addCommercialRow()` when the M10 route builder creates a genuinely new
+market) and never rebuilt, only their numeric sibling cells
+(`refreshRow()`) — called on every slider `input` event for that row,
+and for every row when the Commercial view is selected, in case a
+frequency changed while it wasn't open.
+
+**The same layout bug as the schedule table's Fare column repeated
+itself** at a larger scale: automatic table layout let two
+`<input type="range">`s per row push the table's content width past its
+container (951px of table in a 687px panel), silently overflowing off
+the right edge of the screen with no visual sign anything was wrong.
+Same fix, this time across ten columns: `table-layout: fixed` with
+explicit per-column percentages, and each lever's slider/readout stacked
+vertically instead of side by side.
+
+Verified in-browser: dragging Québec-Halifax's fare down from $230 to
+$120 (a demand-capped market) doubled its pax from 6 to 12 and revenue
+recomputed correctly live; adding $500/day of marketing spend on top of
+that raised pax further to 14 *and* correctly added the $500 into that
+market's displayed cost — the panel doesn't let marketing spend look
+free just because it's charged elsewhere in the simulation.
 
 ## Randomness (`src/sim/rng.ts`)
 

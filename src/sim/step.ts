@@ -1,6 +1,6 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { flightResult, type EconomyAircraftType } from './economy';
-import { MIN_TURN_MINUTES, legsServingMarket } from './schedule';
+import { MIN_TURN_MINUTES, legsServingMarket, marketKey } from './schedule';
 import { nextRandom } from './rng';
 import type { SimState, ActiveFlight } from './state';
 
@@ -93,6 +93,18 @@ export function step(state: SimState): void {
     state.todayRevenue = 0;
     state.todayCost = 0;
     state.todayMargin = 0;
+
+    // Marketing spend (week two's "Commercial" panel) is a per-day, per-
+    // market cost, not a per-flight one — charged once here rather than in
+    // the arrival loop below, since a market can have zero, one, or many
+    // flights land on a given day and the spend doesn't scale with that.
+    const totalMarketingSpend = Object.values(state.routeSettings).reduce(
+      (total, settings) => total + settings.marketingSpend,
+      0,
+    );
+    state.cash -= totalMarketingSpend;
+    state.todayCost += totalMarketingSpend;
+    state.todayMargin -= totalMarketingSpend;
   }
 
   for (const leg of state.schedule) {
@@ -114,6 +126,10 @@ export function step(state: SimState): void {
     const [delayMinutes, nextSeed] = rollDelayMinutes(state.rngSeed);
     state.rngSeed = nextSeed;
 
+    // Fare and marketing spend are market-level (RouteSettings), not
+    // per-leg — every leg on this market shares the same entry.
+    const routeSettings = state.routeSettings[marketKey(leg.origin, leg.dest)];
+
     const activeFlight: ActiveFlight = {
       legId: leg.legId,
       tail: leg.tail,
@@ -125,9 +141,10 @@ export function step(state: SimState): void {
       // zero delay — the honest "should have landed by" time, for the
       // panel to compare against.
       scheduledArriveMinute: dayStart + leg.departMinute + leg.blockMinutes,
-      // Locked in at departure — see ActiveFlight's note on why this isn't
-      // re-read from state.schedule at arrival.
-      fare: leg.fare,
+      // Locked in at departure — see ActiveFlight's note on why these
+      // aren't re-read from state.routeSettings at arrival.
+      fare: routeSettings.fare,
+      marketingSpend: routeSettings.marketingSpend,
     };
     state.activeFlights.push(activeFlight);
   }
@@ -147,11 +164,10 @@ export function step(state: SimState): void {
       if (type) {
         const blockMinutes = flight.arriveMinute - flight.departMinute;
         const marketFrequency = legsServingMarket(flight.origin, flight.dest, state.schedule);
-        const result = flightResult(
-          { origin: flight.origin, dest: flight.dest, blockMinutes, fare: flight.fare },
-          type,
-          marketFrequency,
-        );
+        const result = flightResult({ origin: flight.origin, dest: flight.dest, blockMinutes }, type, marketFrequency, {
+          fare: flight.fare,
+          marketingSpend: flight.marketingSpend,
+        });
         state.cash += result.margin;
         state.todayRevenue += result.revenue;
         state.todayCost += result.cost;

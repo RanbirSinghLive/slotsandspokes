@@ -20,7 +20,6 @@ export type ScheduleLeg = {
   dest: string;
   departMinute: number;
   blockMinutes: number;
-  fare: number;
 };
 
 const TAXI_ALLOWANCE_MINUTES = 20;
@@ -75,11 +74,15 @@ const BASE_FARE = 125;
 const PER_NM_RATE = 0.3;
 
 /**
- * The game's suggested fare for a leg between two airports, from
- * great-circle distance alone. This is only ever a *default* — decision 3
- * in WEEK-TWO.md is explicit that fare is a player-overridable lever, not
- * a fixed number, so every `ScheduleLeg.fare` below starts here but can be
- * changed afterward (the M8/M10-style schedule editor, see ui/panels.ts).
+ * The game's suggested fare for a *market* (an origin-dest pair, either
+ * direction), from great-circle distance alone. Fare is set at the route
+ * level, not per individual leg — see `marketKey()` and
+ * `SimState.routeSettings` (sim/state.ts) — so a market with two daily
+ * frequencies still has exactly one fare, not two independently
+ * adjustable ones. This is only ever a *default*: decision 3 in
+ * WEEK-TWO.md is explicit that fare is a player-overridable lever, not a
+ * fixed number — see ui/commercial.ts, week two's route-level "Commercial"
+ * panel.
  */
 export function recommendedFare(originIata: string, destIata: string): number {
   const origin = airportsByIata.get(originIata);
@@ -89,6 +92,18 @@ export function recommendedFare(originIata: string, destIata: string): number {
   }
   const distanceNm = greatCircleDistanceNm(origin, dest);
   return Math.round(BASE_FARE + PER_NM_RATE * distanceNm);
+}
+
+/**
+ * The bidirectional key for "the market between these two airports" — a
+ * leg YHZ→YQM and a leg YQM→YHZ are the same market under this key, the
+ * same definition `render/routes.ts`'s route-dedup and
+ * `ui/routeBuilder.ts`'s `isExistingMarket()` already use, just centralized
+ * here since `SimState.routeSettings` (sim/state.ts) now needs the same
+ * concept as an actual lookup key, not just a comparison.
+ */
+export function marketKey(a: string, b: string): string {
+  return [a, b].sort().join('-');
 }
 
 /**
@@ -103,12 +118,9 @@ export function recommendedFare(originIata: string, destIata: string): number {
  * its own independent, mutable copy via loadSchedule() below; nothing
  * mutates this array directly.
  */
-export const scheduleLegs: ScheduleLeg[] = (
-  scheduleData as Array<Omit<ScheduleLeg, 'blockMinutes' | 'fare'>>
-).map((leg) => ({
+export const scheduleLegs: ScheduleLeg[] = (scheduleData as Array<Omit<ScheduleLeg, 'blockMinutes'>>).map((leg) => ({
   ...leg,
   blockMinutes: computeBlockMinutes(leg.origin, leg.dest),
-  fare: recommendedFare(leg.origin, leg.dest),
 }));
 
 /**

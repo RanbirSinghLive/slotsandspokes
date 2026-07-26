@@ -90,22 +90,38 @@ function utility(segment: Segment, fare: number, dailyFrequency: number): number
   return segment.intercept - segment.weightPrice * fare + segment.weightSchedule * scheduleFit;
 }
 
+// The "Commercial" panel's marketing-spend lever (ui/commercial.ts, week
+// two): daily dollars spent promoting one specific market, added as a
+// bonus only to *your* utility — a competitor's offering is unaffected by
+// what you spend, and "stay home" always stays at a fixed 0. `log2` again
+// gives diminishing returns, same reasoning as scheduleFit above: the
+// first few hundred dollars of awareness matter more than the next few
+// hundred. Zero spend contributes a zero bonus, so a market nobody has
+// ever put money into behaves exactly as it did before this lever existed.
+const MARKETING_WEIGHT = 0.5;
+const MARKETING_SCALE = 500;
+
+function marketingBonus(marketingSpend: number): number {
+  return MARKETING_WEIGHT * Math.log2(1 + marketingSpend / MARKETING_SCALE);
+}
+
 /**
  * One segment's softmax over every offering in this market: your flight,
  * every competitor serving the same market, and a fixed "stay home"
  * option at utility 0. Your share is your term over the sum of all of
- * them — standard multinomial logit. With `competitors` empty this is
- * algebraically identical to the plain logistic sigmoid of your own
- * utility, which is what this whole model was before competitor data
- * existed.
+ * them — standard multinomial logit. With `competitors` empty and
+ * `marketingSpend` zero this is algebraically identical to the plain
+ * logistic sigmoid of your own utility, which is what this whole model
+ * was before competitor data and marketing spend existed.
  */
 function segmentBookingShare(
   segment: Segment,
   fare: number,
   legsServingMarket: number,
   competitors: CompetitorOffering[],
+  marketingSpend: number,
 ): number {
-  const yourScore = Math.exp(utility(segment, fare, legsServingMarket));
+  const yourScore = Math.exp(utility(segment, fare, legsServingMarket) + marketingBonus(marketingSpend));
   const stayHomeScore = Math.exp(0);
   const competitorScore = competitors.reduce(
     (total, c) => total + Math.exp(utility(segment, c.fare, c.dailyFrequency)),
@@ -117,18 +133,27 @@ function segmentBookingShare(
 /**
  * What fraction of a market's demand books *your* flight — versus a
  * competitor's, or not travelling at all — given this flight's fare, how
- * many daily frequencies serve the market, and which market this is (to
- * look up who else is serving it). Blended across all three segments,
- * weighted by each one's share of the demand pool. `economy.ts` calls
- * this with one flat fare for everyone (no fare-by-segment lever exists
- * yet), so the segments differ only in how they individually react to
- * that same fare and frequency, not in what they pay.
+ * many daily frequencies serve the market, which market this is (to look
+ * up who else is serving it), and how much of the "Commercial" panel's
+ * marketing-spend lever is currently allocated to it. Blended across all
+ * three segments, weighted by each one's share of the demand pool.
+ * `economy.ts` calls this with one flat fare for everyone (no
+ * fare-by-segment lever exists), so the segments differ only in how they
+ * individually react to that same fare, frequency, and marketing spend —
+ * not in what they pay or what marketing they see.
  */
-export function bookingShare(fare: number, legsServingMarket: number, originIata: string, destIata: string): number {
+export function bookingShare(
+  fare: number,
+  legsServingMarket: number,
+  originIata: string,
+  destIata: string,
+  marketingSpend: number,
+): number {
   const marketCompetitors = competitorsServingMarket(originIata, destIata);
   return SEGMENTS.reduce(
     (total, segment) =>
-      total + segment.shareOfDemand * segmentBookingShare(segment, fare, legsServingMarket, marketCompetitors),
+      total +
+      segment.shareOfDemand * segmentBookingShare(segment, fare, legsServingMarket, marketCompetitors, marketingSpend),
     0,
   );
 }

@@ -2,8 +2,16 @@ import { geoPath } from 'd3-geo';
 import type { LineString } from 'geojson';
 import { projection } from '../render/projection';
 import { airports, type Airport } from '../render/airports';
-import { computeBlockMinutes, nextLegId, recommendedFare, validateSchedule, type ScheduleLeg } from '../sim/schedule';
+import {
+  computeBlockMinutes,
+  marketKey,
+  nextLegId,
+  recommendedFare,
+  validateSchedule,
+  type ScheduleLeg,
+} from '../sim/schedule';
 import { addScheduleRow, filterScheduleToRoute } from './panels';
+import { addCommercialRow } from './commercial';
 import type { SimState } from '../sim/state';
 
 const HIT_RADIUS_PX = 14;
@@ -327,11 +335,22 @@ export function setupRouteBuilder(state: SimState): void {
       dest: dest.iata,
       departMinute,
       blockMinutes: computeBlockMinutes(origin.iata, dest.iata),
-      fare: recommendedFare(origin.iata, dest.iata),
     };
     state.schedule.push(leg);
     addScheduleRow(leg, state);
     validateSchedule(state.schedule);
+
+    // Fare/marketing are set at the market level (sim/state.ts's
+    // RouteSettings), not per leg — a brand-new market gets a fresh entry
+    // (recommendedFare() default, zero marketing spend); a second
+    // frequency on a market that already has one reuses it unchanged,
+    // rather than resetting whatever fare the player already set there.
+    const key = marketKey(origin.iata, dest.iata);
+    if (!state.routeSettings[key]) {
+      state.routeSettings[key] = { fare: recommendedFare(origin.iata, dest.iata), marketingSpend: 0 };
+      addCommercialRow(origin.iata, dest.iata, state);
+    }
+
     // The Route filter is already set to this exact market — see
     // showForm() — so the new row satisfies it automatically and just
     // joins whatever else is already narrowed into view.

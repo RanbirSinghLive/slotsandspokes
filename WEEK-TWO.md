@@ -286,12 +286,18 @@ player see competitor fares/schedules") is still open — not addressed
 by this pass; `data/competitors.json` exists and feeds the choice model,
 but nothing in the UI surfaces it yet.
 
-**The override lever:** a range slider in the schedule table
-(`ui/panels.ts`), bounded to 50%-150% of that leg's own recommended
-fare in $5 steps, with a live $ readout — not a free-text field, per
-decision 3. Dragging it mutates `leg.fare` directly (same pattern the
-Depart column already uses), and the new fare takes effect on that
-leg's very next departure.
+**The override lever, revised: route-level, not per-leg.** Originally
+built as a per-leg slider in the schedule table — reverted after
+feedback that fare belongs at the route/market level, to keep the
+game's decision space manageable as more levers get added (see
+"Commercial panel," below). `fare` moved off `ScheduleLeg` entirely,
+into a new `SimState.routeSettings: Record<marketKey, RouteSettings>` —
+one entry per market (bidirectional, `sim/schedule.ts`'s new
+`marketKey()`), so a market with two daily frequencies still has
+exactly one fare, not two independently adjustable ones. The lever
+itself (a range slider, 50%-150% of that market's recommended fare, $5
+steps, live $ readout — still not free text, per decision 3) moved with
+it, into the new Commercial panel.
 
 Verified via the headless runner and a live browser test: the effect of
 raising a fare depends entirely on whether the market is seat-capped or
@@ -646,3 +652,75 @@ and that `data/schedule.json` on disk has no such leg.
 
 Not built yet, by design: phases 2–4 above, all still gated on being
 explicitly asked for.
+
+## The Commercial panel
+
+Raised the same way the rotation board was: not on the original layers/
+loops list, but a real gap once the Pricing loop landed — a per-leg fare
+slider buried in the schedule table made every route's economics
+legible one row at a time, not as a network. The actual ask was for a
+route-level dashboard: every profitability lever for a market in one
+place, plus enough diagnostic context (load factor, whether a market is
+seat- or demand-capped) to know which lever is worth pulling.
+
+**Naming:** "Ledger" was the first name floated and rejected — too
+passive/accounting for something meant to be tweaked, not just read.
+Landed on **Commercial**, the real airline-department term for the
+group that owns pricing, marketing, and distribution — pairs naturally
+with "Ops" (the map's other real-department-named view) and says what
+the panel is *for* rather than what it displays.
+
+**Fare moves to the route, not the leg.** The immediate trigger:
+fares should be a route-level decision, to keep the game's decision
+space manageable as more levers arrive — a market with two daily
+frequencies has one price, not two independently adjustable ones. This
+meant a real data-model change, not just a UI move: `fare` came off
+`ScheduleLeg` entirely and into a new `SimState.routeSettings`, one
+entry per market. `ActiveFlight` still locks in the fare (and now
+marketing spend) it departed with, same reasoning as before — a change
+mid-flight shouldn't retroactively affect one already in the air.
+
+**Marketing spend — the second lever, and the reason RouteSettings
+exists as a record rather than fare living alone.** A per-market daily
+dollar amount (`sim/choiceModel.ts`'s `marketingBonus()`, log-scaled for
+diminishing returns, added only to *your* utility term — competitors are
+unaffected by what you spend) that boosts booking share, charged once
+per day per market at day-rollover (`step.ts`), not per flight. Bounded
+0–$1,000 in $50 steps. Explicitly "and more to come": `RouteSettings` is
+built to grow, not a one-off pair of fields.
+
+**What a row shows:** market, frequency, pax/day, load factor, revenue,
+cost, margin, and a Seat-capped/Demand-capped status — the single most
+useful fact this panel adds, since it's the answer to "is raising fare
+here free money or a real trade-off" that previously required running
+the headless script and eyeballing the output by hand. All of it is
+computed by calling `sim/economy.ts`'s real `flightResult()` per leg and
+summing — never a reimplementation of the pax/revenue/cost formula, so
+the panel can't drift from what the simulation actually does. Numeric
+cells refresh live as a slider moves (a hypothetical, not-yet-committed
+value flows straight through the same real formula); the sliders
+themselves are only rebuilt when a genuinely new market appears, so a
+lever mid-drag is never torn out from under the player.
+
+**Read-only was never the plan here**, unlike Demand/Rotation's first
+passes — the whole point is edits, so the levers are live from the
+first version.
+
+**A layout bug repeated itself building this**, same root cause as the
+schedule table's Fare column during the Pricing loop's build: automatic
+table layout let `<input type="range">`'s intrinsic width push the
+table past its container (951px of content in a 687px panel, silently
+overflowing off-screen). Same fix: `table-layout: fixed` with explicit
+per-column percentages, plus stacking each slider and its readout
+vertically instead of side by side. Worth remembering as a pattern
+next time a table gains a slider column: automatic layout and range
+inputs don't mix inside a fixed-width container.
+
+Verified in-browser: dragging Québec-Halifax's fare down from $230 to
+$120 doubled its pax from 6 to 12 (a demand-capped market, so a lower
+fare directly converts to more real passengers) and revenue recomputed
+correctly ($1,440); adding $500/day of marketing spend on top raised it
+further to 14 pax and correctly added the $500 into that market's
+displayed cost, not just its booking share — the panel doesn't make
+marketing spend look free just because its cost is charged elsewhere in
+the simulation.

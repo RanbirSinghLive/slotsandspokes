@@ -15,6 +15,25 @@
       </div>
       <div id="rotation-rows"></div>
     </div>
+    <div id="commercial-panel" hidden>
+      <table id="commercial-table">
+        <thead>
+          <tr>
+            <th>Market</th>
+            <th>Freq</th>
+            <th>Pax/day</th>
+            <th>Load</th>
+            <th>Revenue</th>
+            <th>Cost</th>
+            <th>Margin</th>
+            <th>Status</th>
+            <th>Fare</th>
+            <th>Marketing</th>
+          </tr>
+        </thead>
+        <tbody id="commercial-rows"></tbody>
+      </table>
+    </div>
     <div id="hud">
       <div id="clock">Day 1 · 00:00 UTC</div>
       <div id="speed-controls">
@@ -27,6 +46,7 @@
         <button type="button" data-view="ops" class="active">Ops</button>
         <button type="button" data-view="demand">Demand</button>
         <button type="button" data-view="rotation">Rotation</button>
+        <button type="button" data-view="commercial">Commercial</button>
       </div>
     </div>
     <aside id="panel">
@@ -75,13 +95,11 @@
               <th>Tail</th>
               <th>Route</th>
               <th>Depart</th>
-              <th>Fare</th>
             </tr>
             <tr class="filter-row">
               <th><input type="text" id="schedule-filter-tail" placeholder="Filter" /></th>
               <th><input type="text" id="schedule-filter-route" placeholder="Filter" /></th>
               <th><input type="text" id="schedule-filter-depart" placeholder="Filter" /></th>
-              <th></th>
             </tr>
           </thead>
           <tbody></tbody>

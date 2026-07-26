@@ -19,6 +19,7 @@ import {
   cancelPendingRoute,
 } from './ui/routeBuilder';
 import { setupRotationBoard, updateRotationBoard } from './ui/rotationBoard';
+import { setupCommercialPanel, updateCommercialPanel } from './ui/commercial';
 
 // M4 brought only one aircraft to life, to prove out the clock and the
 // depart/arrive mechanism on something small. M5 turns the rest on by
@@ -34,6 +35,7 @@ validateSchedule(state.schedule);
 setupScheduleEditor(state);
 setupRouteBuilder(state);
 setupRotationBoard();
+setupCommercialPanel(state);
 
 const canvas = document.querySelector<HTMLCanvasElement>('#map')!;
 const ctx = canvas.getContext('2d')!;
@@ -41,6 +43,7 @@ const clockEl = document.querySelector<HTMLDivElement>('#clock')!;
 const speedButtons = document.querySelectorAll<HTMLButtonElement>('#speed-controls button');
 const viewToggleButtons = document.querySelectorAll<HTMLButtonElement>('#view-toggle button');
 const rotationBoardEl = document.querySelector<HTMLDivElement>('#rotation-board')!;
+const commercialPanelEl = document.querySelector<HTMLDivElement>('#commercial-panel')!;
 
 /**
  * Size the canvas's actual pixel buffer, then fit the projection to it, then
@@ -85,20 +88,21 @@ function resize(): void {
 // time it is.
 let latestFractionalMinute = state.simMinute;
 
-// Which of the three main views is currently showing. The clock and
+// Which of the four main views is currently showing. The clock and
 // sidebar panel stay relevant regardless, so they're not gated by this.
 // 'ops' and 'demand' both draw on the same canvas (just different layers
-// on top of the same basemap/projection); only 'rotation' hides the canvas
-// entirely in favor of #rotation-board. See ui/rotationBoard.ts for why
-// that one gets its own DOM element instead of also being a canvas layer.
-type View = 'ops' | 'demand' | 'rotation';
+// on top of the same basemap/projection); 'rotation' and 'commercial' each
+// hide the canvas in favor of their own DOM element (#rotation-board,
+// #commercial-panel) — see ui/rotationBoard.ts and ui/commercial.ts for
+// why those two get real DOM instead of a canvas layer.
+type View = 'ops' | 'demand' | 'rotation' | 'commercial';
 let currentView: View = 'ops';
 
 function render(): void {
   updateClock(state);
   updatePanel(state);
 
-  if (currentView === 'rotation') return;
+  if (currentView === 'rotation' || currentView === 'commercial') return;
 
   const cssWidth = window.innerWidth - PANEL_WIDTH_PX;
   const cssHeight = window.innerHeight;
@@ -187,31 +191,35 @@ speedButtons.forEach((button) => {
   });
 });
 
-// --- View toggle (Ops / Demand / Rotation) ---
+// --- View toggle (Ops / Demand / Rotation / Commercial) ---
 //
-// #map and #rotation-board are siblings sized identically in style.css;
-// #map stays visible for both 'ops' and 'demand' (render() just draws a
-// different layer on top of the same basemap for each — see above) and
-// only gives way to #rotation-board for 'rotation'. Switching away from
-// 'ops' cancels any in-progress route-creation gesture (ui/routeBuilder.ts)
-// — an armed or pending route stops making sense once you're not looking
-// at the ops layer it was drawn on. Switching *to* the rotation board
-// rebuilds it, in case the schedule changed while it was hidden (nothing
-// else refreshes it, since it's a plain read of state with no interactive
-// elements yet to justify keeping it live-updated every frame — see
-// ui/rotationBoard.ts).
+// #map, #rotation-board, and #commercial-panel are siblings sized
+// identically in style.css; #map stays visible for both 'ops' and
+// 'demand' (render() just draws a different layer on top of the same
+// basemap for each — see above), and only one of #rotation-board /
+// #commercial-panel is ever un-hidden at a time for their two views.
+// Switching away from 'ops' cancels any in-progress route-creation
+// gesture (ui/routeBuilder.ts) — an armed or pending route stops making
+// sense once you're not looking at the ops layer it was drawn on.
+// Switching *to* the rotation board or commercial panel refreshes it, in
+// case the schedule changed while it was hidden — the rotation board has
+// no interactive elements to lose, and the commercial panel only
+// refreshes its numeric cells, never rebuilding the fare/marketing
+// sliders themselves (see ui/commercial.ts).
 viewToggleButtons.forEach((button) => {
   button.addEventListener('click', () => {
     const view = button.dataset.view as View;
     if (view === currentView) return;
 
     currentView = view;
-    canvas.hidden = view === 'rotation';
+    canvas.hidden = view === 'rotation' || view === 'commercial';
     rotationBoardEl.hidden = view !== 'rotation';
+    commercialPanelEl.hidden = view !== 'commercial';
     viewToggleButtons.forEach((b) => b.classList.toggle('active', b === button));
 
     if (view !== 'ops') cancelPendingRoute();
     if (view === 'rotation') updateRotationBoard(state);
+    if (view === 'commercial') updateCommercialPanel(state);
 
     render();
   });
