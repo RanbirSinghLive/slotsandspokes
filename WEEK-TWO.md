@@ -698,15 +698,27 @@ per day per market at day-rollover (`step.ts`), not per flight. Bounded
 0–$1,000 in $50 steps. Explicitly "and more to come": `RouteSettings` is
 built to grow, not a one-off pair of fields.
 
-**What a row shows:** market, frequency, pax/day, load factor, revenue,
-cost, margin, and a Seat-capped/Demand-capped status — the single most
-useful fact this panel adds, since it's the answer to "is raising fare
-here free money or a real trade-off" that previously required running
-the headless script and eyeballing the output by hand. All of it is
-computed by calling `sim/economy.ts`'s real `flightResult()` per leg and
-summing — never a reimplementation of the pax/revenue/cost formula, so
-the panel can't drift from what the simulation actually does. Numeric
-cells refresh live as a slider moves (a hypothetical, not-yet-committed
+**What a row shows:** market, frequency, pax/day, load factor, **market
+share**, revenue, cost, margin, and a Seat-capped/Demand-capped status —
+the single most useful fact this panel adds, since it's the answer to
+"is raising fare here free money or a real trade-off" that previously
+required running the headless script and eyeballing the output by hand.
+Market share (`sim/choiceModel.ts`'s `trafficShare()`, added after
+market feedback) is a distinct question from booking share: it excludes
+"stay home" from the denominator entirely, answering "of the people who
+actually fly this market, what fraction fly you" rather than "what
+fraction of the whole addressable population books at all." A market
+with no direct competitor is trivially 100% by this definition — verified
+headlessly, every uncontested market in today's schedule shows exactly
+100%, while the three with a competitor show real erosion (37–63%).
+Direct-competitor-driven only for now: connecting itineraries aren't
+modeled (decision 1), so a rival reachable only by connecting through a
+third city can't yet pull share away here — worth revisiting once
+connections exist. All of it is computed by calling `sim/economy.ts`'s
+real `flightResult()` per leg and summing — never a reimplementation of
+the pax/revenue/cost formula, so the panel can't drift from what the
+simulation actually does. Numeric cells refresh live as a slider moves
+(a hypothetical, not-yet-committed
 value flows straight through the same real formula); the sliders
 themselves are only rebuilt when a genuinely new market appears, so a
 lever mid-drag is never torn out from under the player.

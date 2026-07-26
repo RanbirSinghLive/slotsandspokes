@@ -237,14 +237,15 @@ viewGroups.forEach((group) => {
     trigger.setAttribute('aria-expanded', 'true');
   }
 
+  // Click always opens (never toggles closed) rather than the more usual
+  // open/close toggle — on a mouse, hover (below) has already opened it
+  // by the time a click fires, so a toggle would immediately close what
+  // hover just opened. Touch/keyboard users, who never get a hover event
+  // first, still get a working open; closing for them still works via
+  // the document-level click-outside listener below.
   trigger.addEventListener('click', (event) => {
     event.stopPropagation(); // don't immediately re-close via the document listener below
-    if (dropdown.hidden) {
-      openThisDropdown();
-    } else {
-      dropdown.hidden = true;
-      trigger.setAttribute('aria-expanded', 'false');
-    }
+    openThisDropdown();
   });
 
   // Opening on hover (not just click) is why .view-dropdown sits flush

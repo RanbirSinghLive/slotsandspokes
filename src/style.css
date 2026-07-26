@@ -414,7 +414,7 @@ body {
 
 #commercial-table th:nth-child(1),
 #commercial-table td:nth-child(1) {
-  width: 14%;
+  width: 13%;
 }
 
 #commercial-table th:nth-child(2),
@@ -434,32 +434,37 @@ body {
 
 #commercial-table th:nth-child(5),
 #commercial-table td:nth-child(5) {
-  width: 11%;
+  width: 5%;
 }
 
 #commercial-table th:nth-child(6),
 #commercial-table td:nth-child(6) {
-  width: 9%;
+  width: 10%;
 }
 
 #commercial-table th:nth-child(7),
 #commercial-table td:nth-child(7) {
-  width: 10%;
+  width: 8%;
 }
 
 #commercial-table th:nth-child(8),
 #commercial-table td:nth-child(8) {
-  width: 15%;
+  width: 9%;
 }
 
 #commercial-table th:nth-child(9),
 #commercial-table td:nth-child(9) {
-  width: 12%;
+  width: 14%;
 }
 
 #commercial-table th:nth-child(10),
 #commercial-table td:nth-child(10) {
   width: 12%;
+}
+
+#commercial-table th:nth-child(11),
+#commercial-table td:nth-child(11) {
+  width: 13%;
 }
 
 #commercial-table th,

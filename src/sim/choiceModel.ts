@@ -106,6 +106,29 @@ function marketingBonus(marketingSpend: number): number {
 }
 
 /**
+ * The two softmax scores every segment-level share below is built from:
+ * your own offering's score, and the summed score of every competitor
+ * serving the market. Factored out once so `bookingShare` (share of the
+ * whole addressable market, "stay home" included) and `trafficShare`
+ * (share of *travelers only*, "stay home" excluded — see below) can't
+ * drift apart on how "your score" or "competitor score" is computed.
+ */
+function scores(
+  segment: Segment,
+  fare: number,
+  legsServingMarket: number,
+  competitors: CompetitorOffering[],
+  marketingSpend: number,
+): { yourScore: number; competitorScore: number } {
+  const yourScore = Math.exp(utility(segment, fare, legsServingMarket) + marketingBonus(marketingSpend));
+  const competitorScore = competitors.reduce(
+    (total, c) => total + Math.exp(utility(segment, c.fare, c.dailyFrequency)),
+    0,
+  );
+  return { yourScore, competitorScore };
+}
+
+/**
  * One segment's softmax over every offering in this market: your flight,
  * every competitor serving the same market, and a fixed "stay home"
  * option at utility 0. Your share is your term over the sum of all of
@@ -121,13 +144,30 @@ function segmentBookingShare(
   competitors: CompetitorOffering[],
   marketingSpend: number,
 ): number {
-  const yourScore = Math.exp(utility(segment, fare, legsServingMarket) + marketingBonus(marketingSpend));
+  const { yourScore, competitorScore } = scores(segment, fare, legsServingMarket, competitors, marketingSpend);
   const stayHomeScore = Math.exp(0);
-  const competitorScore = competitors.reduce(
-    (total, c) => total + Math.exp(utility(segment, c.fare, c.dailyFrequency)),
-    0,
-  );
   return yourScore / (yourScore + stayHomeScore + competitorScore);
+}
+
+/**
+ * One segment's share of *travelers*, not of the whole addressable
+ * market — the "stay home" term is excluded entirely, so this answers
+ * "of the people who fly this market, what fraction fly you" rather than
+ * "of everyone who could conceivably travel, what fraction books you."
+ * That's the conventional meaning of "market share." A market with zero
+ * competitors is trivially 100% by this definition (competitorScore is 0),
+ * regardless of how few people actually travel there at all — booking
+ * share (above) is what answers that latter question instead.
+ */
+function segmentTrafficShare(
+  segment: Segment,
+  fare: number,
+  legsServingMarket: number,
+  competitors: CompetitorOffering[],
+  marketingSpend: number,
+): number {
+  const { yourScore, competitorScore } = scores(segment, fare, legsServingMarket, competitors, marketingSpend);
+  return yourScore / (yourScore + competitorScore);
 }
 
 /**
@@ -154,6 +194,32 @@ export function bookingShare(
     (total, segment) =>
       total +
       segment.shareOfDemand * segmentBookingShare(segment, fare, legsServingMarket, marketCompetitors, marketingSpend),
+    0,
+  );
+}
+
+/**
+ * Your conventional "market share" of this route: of the people who
+ * actually travel this market (direct flights only — connecting
+ * itineraries aren't modeled, per WEEK-TWO.md decision 1, so this can't
+ * yet account for someone connecting through a third city instead), what
+ * fraction fly you rather than a direct competitor. 100% on any market
+ * with no direct competitor, regardless of how thin that market is —
+ * see `bookingShare` for the separate question of how many of the
+ * *addressable* population travel at all.
+ */
+export function trafficShare(
+  fare: number,
+  legsServingMarket: number,
+  originIata: string,
+  destIata: string,
+  marketingSpend: number,
+): number {
+  const marketCompetitors = competitorsServingMarket(originIata, destIata);
+  return SEGMENTS.reduce(
+    (total, segment) =>
+      total +
+      segment.shareOfDemand * segmentTrafficShare(segment, fare, legsServingMarket, marketCompetitors, marketingSpend),
     0,
   );
 }

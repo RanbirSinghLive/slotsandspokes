@@ -575,9 +575,18 @@ original layers/loops list, but a real gap once the Pricing loop's
 per-leg fare slider made clear that fare (and future levers) needed a
 route-level home instead.
 
-Each row: market, frequency, pax/day, load factor, revenue, cost,
-margin, a Seat-capped/Demand-capped status, and two levers — Fare (see
-"Pricing," above) and Marketing spend. Every number comes from calling
+Each row: market, frequency, pax/day, load factor, **market share**,
+revenue, cost, margin, a Seat-capped/Demand-capped status, and two
+levers — Fare (see "Pricing," above) and Marketing spend. Market share
+(`sim/choiceModel.ts`'s `trafficShare()`) answers a different question
+than `bookingShare()` does: it excludes "stay home" from the softmax
+denominator, so it's "of the people who fly this market, what fraction
+fly you" rather than "what fraction of the whole addressable population
+books at all." Any market with no direct competitor is trivially 100%.
+Direct-competitor-only for now — connecting itineraries aren't modeled
+(WEEK-TWO.md decision 1), so a rival reachable only by connecting
+through a third city can't pull share away here yet. Every number comes
+from calling
 `sim/economy.ts`'s real `flightResult()` once per leg serving that
 market and summing the results — never a reimplementation of the pax/
 revenue/cost formula, so this panel can't quietly drift from what the

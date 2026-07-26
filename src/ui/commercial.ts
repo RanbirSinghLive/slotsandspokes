@@ -1,6 +1,7 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { flightResult, LOAD_FACTOR, type EconomyAircraftType } from '../sim/economy';
 import { marketKey, recommendedFare } from '../sim/schedule';
+import { trafficShare } from '../sim/choiceModel';
 import type { RouteSettings, SimState } from '../sim/state';
 
 // Only one aircraft type exists so far — see the same note in
@@ -35,6 +36,7 @@ type RowCells = {
   freq: HTMLTableCellElement;
   pax: HTMLTableCellElement;
   load: HTMLTableCellElement;
+  share: HTMLTableCellElement;
   revenue: HTMLTableCellElement;
   cost: HTMLTableCellElement;
   margin: HTMLTableCellElement;
@@ -84,19 +86,37 @@ function summarizeMarket(origin: string, dest: string, state: SimState, routeSet
   const seatCeilingPerFlight = Math.round(aircraftType.seats * LOAD_FACTOR);
   const seatCapped = freq > 0 && pax >= seatCeilingPerFlight * freq;
 
-  return { freq, pax, revenue, cost, margin, seatCapped };
+  // Market share (sim/choiceModel.ts's trafficShare()) is a property of
+  // the market, not of any one leg on it — same fare/frequency/marketing
+  // spend feed it as bookingShare, just excluding "stay home" from the
+  // denominator, so it answers "of people who fly this market, what
+  // fraction fly you" rather than "what fraction of the addressable
+  // population books at all." Direct-competitor-driven only for now —
+  // connecting itineraries aren't modeled (WEEK-TWO.md decision 1), so a
+  // rival reachable only by connecting through a third city can't yet
+  // pull share away here.
+  const share = freq > 0 ? trafficShare(routeSettings.fare, freq, origin, dest, routeSettings.marketingSpend) : 1;
+
+  return { freq, pax, revenue, cost, margin, seatCapped, share };
 }
 
 function refreshRow(key: string, state: SimState): void {
   const row = rowsByMarket.get(key);
   if (!row) return;
   const routeSettings = state.routeSettings[key];
-  const { freq, pax, revenue, cost, margin, seatCapped } = summarizeMarket(row.origin, row.dest, state, routeSettings);
+  const { freq, pax, revenue, cost, margin, seatCapped, share } = summarizeMarket(
+    row.origin,
+    row.dest,
+    state,
+    routeSettings,
+  );
   const loadFactor = freq > 0 ? pax / (aircraftType.seats * freq) : 0;
 
   row.cells.freq.textContent = String(freq);
   row.cells.pax.textContent = String(pax);
   row.cells.load.textContent = `${Math.round(loadFactor * 100)}%`;
+  row.cells.share.textContent = `${Math.round(share * 100)}%`;
+  row.cells.share.title = 'Share of direct travelers on this market, versus a direct competitor (connections not modeled)';
   row.cells.revenue.textContent = formatMoney(revenue);
   row.cells.revenue.title = formatMoney(revenue);
   row.cells.cost.textContent = formatMoney(cost);
@@ -126,6 +146,7 @@ function buildMarketRow(key: string, origin: string, dest: string, state: SimSta
   const freqCell = document.createElement('td');
   const paxCell = document.createElement('td');
   const loadCell = document.createElement('td');
+  const shareCell = document.createElement('td');
   const revenueCell = document.createElement('td');
   const costCell = document.createElement('td');
   const marginCell = document.createElement('td');
@@ -173,7 +194,19 @@ function buildMarketRow(key: string, origin: string, dest: string, state: SimSta
   marketingControl.append(marketingSlider, marketingValue);
   marketingCell.appendChild(marketingControl);
 
-  row.append(marketCell, freqCell, paxCell, loadCell, revenueCell, costCell, marginCell, statusCell, fareCell, marketingCell);
+  row.append(
+    marketCell,
+    freqCell,
+    paxCell,
+    loadCell,
+    shareCell,
+    revenueCell,
+    costCell,
+    marginCell,
+    statusCell,
+    fareCell,
+    marketingCell,
+  );
 
   rowsByMarket.set(key, {
     origin,
@@ -182,6 +215,7 @@ function buildMarketRow(key: string, origin: string, dest: string, state: SimSta
       freq: freqCell,
       pax: paxCell,
       load: loadCell,
+      share: shareCell,
       revenue: revenueCell,
       cost: costCell,
       margin: marginCell,
