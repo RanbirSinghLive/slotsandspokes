@@ -774,17 +774,32 @@ likely to outgrow a simple selector.
 
 **Built as `render/competition.ts`**, following `render/demand.ts`'s
 exact pattern: a new render function, wired into `main.ts`'s existing
-Ops/Demand dispatch as a third case. Two states: `null` (aggregate,
-described above) or a specific airline name, which dims the player's
-own network to context and draws only that airline's routes — including
-both its shared and exclusive markets, answering "show me their route
-map" directly. `sim/choiceModel.ts`'s `competitors` data and a new
-exported `CompetitorOffering` type are reused as-is; no new data model
-needed, only a new lens on data that already existed.
+Ops/Demand dispatch as a third case. `sim/choiceModel.ts`'s `competitors`
+data and a new exported `CompetitorOffering` type are reused as-is; no
+new data model needed, only a new lens on data that already existed.
 
-Verified in-browser: the aggregate view shows all four competitor-served
-markets in red (including YYZ-YOW, which the player doesn't fly) and
-the player's other five markets in default color; selecting "Trillium
-Air" from the dropdown shows exactly its two routes (YUL-YYZ, YYZ-YOW)
-highlighted with everything else dimmed; switching back to Ops hides
-the selector and renders normally, no console errors.
+**Three-way color split, added right after shipping the first pass:**
+the initial version dimmed the player's own network to context and
+highlighted only the selected competitor set in one color — functional,
+but it collapsed two different facts ("a market only they fly" and "a
+market we're both on") into a single visual. Reworked into exactly three
+states, one color each, and — this is the part worth remembering —
+unified so the *same* three-way logic drives both the aggregate view and
+a single-airline selection, just by swapping which set counts as "the
+competitor": **yours only** (default color), **theirs only** (red — full
+visibility, not dimmed, since an exclusive competitor market is exactly
+what this view exists to surface), and **both** (amber, reusing the
+same "already exists/served" meaning amber already carries elsewhere in
+this app — `ui/routeBuilder.ts`'s new-route highlight, Demand mode's
+served-halo — rather than inventing an unrelated fourth color).
+
+Verified in-browser, down to exact pixel color via `getImageData()`: the
+aggregate view's YOW-YUL arc (both the player and Capital Wings serve it)
+samples to `#ffd166`, the amber "both" color; the YYZ-YOW arc (Trillium
+Air only, the player doesn't fly it) samples to `#e05a5a`, the red
+"theirs only" color — confirming the three states render distinctly, not
+just look plausible in a screenshot. Selecting "Trillium Air" specifically
+still shows exactly its two routes (YUL-YYZ as amber/both, YYZ-YOW as
+red/exclusive) with the player's untouched markets in default color;
+switching back to Ops hides the selector and renders normally, no
+console errors.

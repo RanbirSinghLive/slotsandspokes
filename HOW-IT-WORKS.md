@@ -389,19 +389,29 @@ same "visualize first" phasing as the rotation board's first pass — no
 legend or tooltip yet, and not clickable.
 
 **Competition mode** — `competition.ts`'s `drawCompetitionLayer()`, the
-same one thin-arc style `routes.ts` uses, but drawing a different set of
-markets depending on a second piece of state (`selectedCompetitorAirline`
-in `main.ts`, driven by a `<select>` shown only in this view):
-`null` (the default, "All competitors") draws the *union* of the
-player's own network and every competitor's — any market with a
-competitor draws red (`sim/choiceModel.ts`'s exported `competitors`
-data), whether or not the player also flies it, so a competitor-
-exclusive market shows up here even though the player has no route on
-it at all; anything the player flies alone stays the default color.
-Picking a specific airline instead dims the player's whole network to
-context and draws only that airline's own routes in red — literally
-"their route map," shared and exclusive markets both. Read-only, same
-phasing as Demand mode's first pass.
+same one thin-arc style `routes.ts` uses, but drawing every market that
+falls into exactly one of three states relative to a second piece of
+state (`selectedCompetitorAirline` in `main.ts`, driven by a `<select>`
+shown only in this view — `null` means "any competitor," the default
+"All competitors" view; a specific name means just that one carrier):
+
+- **Yours only** — default color. The competitor set being considered
+  doesn't serve this market at all.
+- **Theirs only** — red, at full visibility (not dimmed): a market the
+  player doesn't fly but the competitor set does. This is exactly what
+  the view exists to surface — e.g. Trillium Air's YYZ-YOW, which the
+  player has no route on at all — so it's drawn just as prominently as
+  anything else, not backgrounded.
+- **Both** — amber, reusing the same "already exists/served" meaning
+  amber carries elsewhere (`ui/routeBuilder.ts`'s new-route highlight,
+  Demand mode's served-halo) rather than a fourth unrelated color.
+
+The same three-way logic drives both the aggregate view and a single
+airline's — `selectedAirline === null` just swaps in the union of every
+competitor's markets as "the competitor set" instead of one airline's.
+`sim/choiceModel.ts`'s exported `competitors` data and `CompetitorOffering`
+type are reused directly, no new data model. Read-only, same phasing as
+Demand mode's first pass.
 
 Switching away from Ops cancels any in-progress route-creation gesture
 (`ui/routeBuilder.ts`'s `cancelPendingRoute()`), and the route-builder's

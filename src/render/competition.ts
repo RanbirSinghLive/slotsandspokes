@@ -7,9 +7,16 @@ import { competitors } from '../sim/choiceModel';
 
 const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]));
 
-const DEFAULT_STROKE = '#3a4258';
-const COMPETITOR_STROKE = '#e05a5a';
-const DIMMED_ALPHA = 0.35;
+// Three, and only three, states a market can be in relative to whichever
+// competitor set is currently being considered (either "any competitor,"
+// for the aggregate view, or one specific airline's own routes) — see
+// drawCompetitionLayer(). Amber reuses the same "this already exists/is
+// served" meaning it carries in ui/routeBuilder.ts's new-route highlight
+// and render/demand.ts's served-halo, rather than inventing a fourth,
+// unrelated color for "both of us fly this."
+const OWN_ONLY_STROKE = '#3a4258';
+const COMPETITOR_ONLY_STROKE = '#e05a5a';
+const BOTH_STROKE = '#ffd166';
 
 /**
  * Same bidirectional market-pair key every other "market" concept in this
@@ -59,7 +66,6 @@ function drawLine(
   origin: string,
   dest: string,
   strokeStyle: string,
-  alpha: number,
 ): void {
   const originAirport = airportsByIata.get(origin);
   const destAirport = airportsByIata.get(dest);
@@ -76,46 +82,50 @@ function drawLine(
   ctx.beginPath();
   path(line);
   ctx.strokeStyle = strokeStyle;
-  ctx.globalAlpha = alpha;
   ctx.lineWidth = 1.5;
   ctx.stroke();
 }
 
 /**
- * The "Competition" map mode. Two states, chosen by `selectedAirline`:
+ * The "Competition" map mode. `selectedAirline` picks which competitor
+ * set is being compared against your own network: `null` means "any
+ * competitor" (the aggregate view); a specific airline name means just
+ * that one carrier's routes. Either way, every market that either side
+ * flies falls into exactly one of three states, each its own color:
  *
- * - `null` (aggregate, the default): every market either you or a
- *   competitor serves gets drawn — red if a competitor is on it (whether
- *   or not you also fly it), your own default color otherwise. This is
- *   deliberately not "highlight red on top of your own network": a
- *   competitor-exclusive market (one they fly that you don't) is drawn
- *   too, in red, since it's exactly the kind of thing this view exists to
- *   surface — an open market you aren't in yet, or one already spoken for.
- * - a specific airline name: your own network dims to context, and only
- *   that airline's own routes draw in the competitor color — literally
- *   "their route map," including whichever of their routes overlap with
- *   yours and whichever don't.
+ * - **Yours only** — the competitor set doesn't serve it at all.
+ * - **Theirs only** — a market you don't fly, but they do. Drawn just as
+ *   visibly as your own routes, deliberately: a competitor-exclusive
+ *   market (like Trillium Air's YYZ-YOW, which you don't fly) is exactly
+ *   the kind of open-or-contested market this view exists to surface,
+ *   not background noise to dim out.
+ * - **Both** — a market you're already head-to-head on.
+ *
+ * Selecting a specific airline answers "show me their route map" (both
+ * their shared and exclusive markets, in one glance) without needing a
+ * separate dimmed/highlighted treatment — the three-color split already
+ * does that job.
  */
 export function drawCompetitionLayer(ctx: CanvasRenderingContext2D, selectedAirline: string | null): void {
   const path = geoPath(projection, ctx);
 
-  if (selectedAirline === null) {
-    for (const [key, { origin, dest }] of allMarketRoutes) {
-      const hasCompetitor = allCompetitorMarketKeys.has(key);
-      drawLine(ctx, path, origin, dest, hasCompetitor ? COMPETITOR_STROKE : DEFAULT_STROKE, 1);
-    }
-  } else {
-    for (const { origin, dest } of ownRoutes.values()) {
-      drawLine(ctx, path, origin, dest, DEFAULT_STROKE, DIMMED_ALPHA);
-    }
-    const forAirline = competitorRoutesByAirline.get(selectedAirline);
-    if (forAirline) {
-      for (const { origin, dest } of forAirline.values()) {
-        drawLine(ctx, path, origin, dest, COMPETITOR_STROKE, 1);
-      }
-    }
+  const competitorMarketKeys =
+    selectedAirline === null ? allCompetitorMarketKeys : new Set(competitorRoutesByAirline.get(selectedAirline)?.keys() ?? []);
+  const competitorRoutes =
+    selectedAirline === null ? allMarketRoutes : (competitorRoutesByAirline.get(selectedAirline) ?? new Map());
+
+  const everyMarketKey = new Set<string>([...ownRoutes.keys(), ...competitorMarketKeys]);
+
+  for (const key of everyMarketKey) {
+    const route = ownRoutes.get(key) ?? competitorRoutes.get(key);
+    if (!route) continue;
+
+    const flownByOwn = ownRoutes.has(key);
+    const flownByCompetitor = competitorMarketKeys.has(key);
+    const stroke = flownByOwn && flownByCompetitor ? BOTH_STROKE : flownByCompetitor ? COMPETITOR_ONLY_STROKE : OWN_ONLY_STROKE;
+
+    drawLine(ctx, path, route.origin, route.dest, stroke);
   }
 
-  ctx.globalAlpha = 1;
   drawAirports(ctx);
 }
