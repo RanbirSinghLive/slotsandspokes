@@ -173,7 +173,7 @@ function render(): void {
 
   if (currentView === 'ops') {
     drawTerminator(ctx, latestFractionalMinute);
-    drawRoutes(ctx);
+    drawRoutes(ctx, state);
     drawAircraft(ctx, state, latestFractionalMinute);
     drawAirports(ctx);
     drawWeatherEffects(ctx, state);

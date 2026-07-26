@@ -91,6 +91,37 @@ reproducible as before). Only `main.ts`'s own call site changed, to pass
 confirming a "New Game" reset produced visibly different starting
 weather than the previous game had.
 
+### 4. Ops mode's route lines never reflected your actual schedule — done
+
+Not a missing feature — a real bug, raised because Ops mode's connector
+lines kept showing routes regardless of adding or removing them.
+`render/routes.ts` built its route list *once*, from `scheduleLegs` (the
+static `data/schedule.json` template, imported at module load), not
+from `state.schedule` (the live, per-game copy every edit actually
+mutates). The M10 route builder and this week's route-removal button
+were both invisible to it — Ops mode always drew the original 8 template
+markets, forever, no matter what you actually did to the schedule.
+
+Fixed by having `drawRoutes()` take `state` as a parameter and recompute
+its distinct-market list fresh on every call, straight from
+`state.schedule`, instead of caching it once at import time. Cheap: a
+dozen-ish legs and a `Map`, well within what a call already made every
+rendered frame can absorb.
+
+**The same bug exists in two more places, not yet fixed**:
+`render/demand.ts` (the "served" amber halo) and `render/competition.ts`
+(which markets count as "yours" for the yours/theirs/both coloring, and
+the frequency counts the hover tooltips show) both also import the
+static `scheduleLegs` instead of reading `state.schedule`. Same root
+cause, same fix shape — worth doing in the same pass rather than
+leaving two views quietly showing a schedule that no longer exists.
+
+Verified in-browser: removed both legs of the YQB-YSJ market via the
+schedule table's "×" buttons while watching Ops mode — the line
+disappeared from the map immediately, no reload required. Confirmed the
+console's "Schedule OK: 10 legs" (12 minus the 2 removed) was the most
+recent entry, not stale buffered history from earlier testing.
+
 ## Judgment calls, not yet decided
 
 ### Time navigation and pacing

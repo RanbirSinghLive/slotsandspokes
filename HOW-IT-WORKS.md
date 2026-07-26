@@ -364,9 +364,14 @@ time.
    centered on the antisolar point, computed from `simMinute` (declination
    from day-of-year, subsolar longitude from minute-of-day). Semi-
    transparent dark navy, so land and ocean still show through it.
-3. `routes.ts` — one thin arc per distinct city pair (dedup'd across the
-   schedule's directional legs), drawn as a 2-point `LineString` that
-   `d3.geoPath` resamples along the true geodesic.
+3. `routes.ts` — one thin arc per distinct city pair currently in
+   `state.schedule` (dedup'd across the schedule's directional legs),
+   drawn as a 2-point `LineString` that `d3.geoPath` resamples along the
+   true geodesic. Recomputed fresh every call, straight from `state`,
+   rather than cached — a week-three bug fix: this used to build its
+   route list once from the static `data/schedule.json` template at
+   import time, so adding (M10) or removing (week three) a route never
+   changed what Ops mode drew at all.
 4. `aircraft.ts` — one triangle per active flight. Position comes from
    `d3.geoInterpolate(origin, dest)(t)` at the *current fractional* simulated
    minute — not interpolated tick-to-tick, recomputed fresh every frame, so
