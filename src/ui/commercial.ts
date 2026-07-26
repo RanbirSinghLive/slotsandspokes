@@ -43,7 +43,7 @@ type RowCells = {
   status: HTMLTableCellElement;
 };
 
-const rowsByMarket = new Map<string, { origin: string; dest: string; cells: RowCells }>();
+const rowsByMarket = new Map<string, { origin: string; dest: string; row: HTMLTableRowElement; cells: RowCells }>();
 
 /**
  * Every scheduled leg on `origin`-`dest`'s market, summed through the same
@@ -211,6 +211,7 @@ function buildMarketRow(key: string, origin: string, dest: string, state: SimSta
   rowsByMarket.set(key, {
     origin,
     dest,
+    row,
     cells: {
       freq: freqCell,
       pax: paxCell,
@@ -249,6 +250,21 @@ export function addCommercialRow(origin: string, dest: string, state: SimState):
   const key = marketKey(origin, dest);
   if (rowsByMarket.has(key)) return; // an added frequency on an existing market, not a new one
   tableBody.appendChild(buildMarketRow(key, origin, dest, state));
+}
+
+/**
+ * Remove a market's row entirely — called by ui/panels.ts's schedule-row
+ * delete button when it removes the last leg serving that market, since a
+ * fare/marketing lever with nothing left to fly would otherwise linger.
+ * A market that still has other legs left keeps its row (and its
+ * settings) untouched; this is only for the "last leg on this market is
+ * gone" case.
+ */
+export function removeCommercialRow(key: string): void {
+  const entry = rowsByMarket.get(key);
+  if (!entry) return;
+  entry.row.remove();
+  rowsByMarket.delete(key);
 }
 
 /**

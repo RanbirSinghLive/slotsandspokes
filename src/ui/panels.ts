@@ -1,4 +1,5 @@
-import { validateSchedule, type ScheduleLeg } from '../sim/schedule';
+import { legsServingMarket, marketKey, validateSchedule, type ScheduleLeg } from '../sim/schedule';
+import { removeCommercialRow } from './commercial';
 import type { SimState } from '../sim/state';
 
 // Must match the width baked into #map / #panel in style.css — see the
@@ -86,6 +87,39 @@ function timeStringToMinuteOfDay(time: string): number {
   return hours * 60 + minutes;
 }
 
+// Tracked by legId so the delete button (below) can find and remove its
+// own row without a DOM search — same "keep a direct reference" reasoning
+// ui/commercial.ts's RowCells uses.
+const scheduleRowsByLegId = new Map<string, HTMLTableRowElement>();
+
+/**
+ * Remove `leg` entirely — week three's playtest-readiness gap: until now
+ * there was no way back from an unwanted route or frequency short of
+ * hand-editing data/schedule.json. Removes it from `state.schedule` (the
+ * array step() reads from) and its row from the DOM; if that was the
+ * *last* leg serving that market, also drops the now-orphaned
+ * RouteSettings entry and Commercial-panel row, since a fare/marketing
+ * lever with nothing left to fly would otherwise linger. A flight already
+ * airborne on this leg is unaffected — ActiveFlight carries its own
+ * copied data independent of `state.schedule`, per sim/state.ts.
+ */
+function removeScheduleLeg(leg: ScheduleLeg, state: SimState): void {
+  const index = state.schedule.indexOf(leg);
+  if (index === -1) return;
+  state.schedule.splice(index, 1);
+
+  scheduleRowsByLegId.get(leg.legId)?.remove();
+  scheduleRowsByLegId.delete(leg.legId);
+
+  if (legsServingMarket(leg.origin, leg.dest, state.schedule) === 0) {
+    const key = marketKey(leg.origin, leg.dest);
+    delete state.routeSettings[key];
+    removeCommercialRow(key);
+  }
+
+  validateSchedule(state.schedule);
+}
+
 /**
  * Build one schedule-table row for `leg` and append it. Shared by
  * setupScheduleEditor() (the initial build) and addScheduleRow() (M10 — a
@@ -111,7 +145,17 @@ function buildScheduleRow(leg: ScheduleLeg, state: SimState): HTMLTableRowElemen
   });
   departCell.appendChild(departInput);
 
-  row.append(tailCell, routeCell, departCell);
+  const removeCell = document.createElement('td');
+  const removeButton = document.createElement('button');
+  removeButton.type = 'button';
+  removeButton.className = 'schedule-remove-button';
+  removeButton.textContent = '×';
+  removeButton.setAttribute('aria-label', `Remove ${leg.legId}`);
+  removeButton.addEventListener('click', () => removeScheduleLeg(leg, state));
+  removeCell.appendChild(removeButton);
+
+  row.append(tailCell, routeCell, departCell, removeCell);
+  scheduleRowsByLegId.set(leg.legId, row);
   return row;
 }
 

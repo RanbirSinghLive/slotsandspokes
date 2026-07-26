@@ -23,23 +23,29 @@ can't keep, a pace you can't control.
 
 ## Confirmed gaps (checked against the code, not guessed)
 
-### 1. No way to remove a route or frequency
+### 1. No way to remove a route or frequency — done
 
-M10's route builder can only *add* a leg to `state.schedule`; M8's
-schedule editor can only edit an existing leg's departure time. There is
-no delete path anywhere — confirmed by grepping `ui/panels.ts` and
-`ui/routeBuilder.ts` for anything resembling removal. If you add a
-frequency you didn't mean to, or want to retire a route entirely, your
-only option right now is editing `data/schedule.json` by hand and
-reloading. This is the single most concrete blocker to normal play:
-route/frequency mistakes are inevitable in a schedule-editing game, and
-there's currently no way to correct one.
+Added a "×" button to each schedule-table row (`ui/panels.ts`'s
+`removeScheduleLeg()`). Removes the leg from `state.schedule` and its
+DOM row; if that was the *last* leg serving that market, also drops the
+now-orphaned `RouteSettings` entry and the Commercial-panel row
+(`ui/commercial.ts`'s new `removeCommercialRow()`) — otherwise a fare/
+marketing lever would linger for a market with nothing left to fly.
+Deliberately no confirmation dialog, matching M8/M10's existing
+"allow-then-flag" philosophy: removal is immediate, and if it breaks a
+tail's rotation, `validateSchedule()` logs it to the console the same
+way a bad manual edit already does, rather than blocking the action.
+An already-airborne flight on the removed leg is unaffected —
+`ActiveFlight` carries its own copied data independent of
+`state.schedule` (this was already true, verified rather than assumed).
 
-**Proposed fix:** a delete affordance on each schedule-table row (M8) —
-a small "×" button that removes that leg from `state.schedule` and,
-if it was the last leg on that market, removes the corresponding
-`state.routeSettings` entry too (otherwise a stale fare/marketing
-lever would linger for a market with no flights left).
+Verified in-browser: removing one of two legs on the YQB-YSJ market
+left the Commercial row in place (frequency still 1, not zero) and
+correctly logged a broken-rotation error for C-FATL (`lands at YQB on
+C-FATL-2 but C-FATL-4 departs from YSJ`) — exactly the M8-style
+flag-don't-block behavior; removing the second leg too made both rows
+disappear and resolved the rotation cleanly (`Schedule OK: 10 legs
+across 3 aircraft, no broken rotations`).
 
 ### 2. No persistence — a reload loses everything
 
@@ -117,8 +123,8 @@ problem a real session hasn't surfaced yet.
 
 ## Draft priority order (not committed)
 
-1. **Remove a route/frequency** — the one item that can actively block
-   a session (an unwanted edit with no way back).
+1. **Remove a route/frequency** — done. The one item that could
+   actively block a session (an unwanted edit with no way back).
 2. **Persistence (localStorage save/load)** — the one item that can
    lose a whole session's progress outright.
 3. **Non-fixed default seed** — small, cheap, unblocks varied sessions.

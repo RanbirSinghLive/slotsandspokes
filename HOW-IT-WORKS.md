@@ -487,13 +487,28 @@ schedule, logging to the console exactly like the M3 startup check does if
 the edit leaves an aircraft departing before it could plausibly have landed
 and turned around.
 
-Editing is departure time only — reassigning a leg's origin,
-destination, or tail (which would also mean recomputing `blockMinutes`
-and touching `render/routes.ts`'s route list) is out of scope for this
-pass. Fare briefly lived here as a per-leg column during the Pricing
-loop's first pass, then moved to the route (market) level — see "The
-Commercial panel," below — once it became clear fare needed to be a
-route-level decision, not one independently adjustable per frequency.
+Editing is departure time, plus removal (week three) — reassigning a
+leg's origin, destination, or tail (which would also mean recomputing
+`blockMinutes` and touching `render/routes.ts`'s route list) is out of
+scope for this pass. Fare briefly lived here as a per-leg column during
+the Pricing loop's first pass, then moved to the route (market) level —
+see "The Commercial panel," below — once it became clear fare needed to
+be a route-level decision, not one independently adjustable per
+frequency.
+
+**Removing a leg** (week three's playtest-readiness fix): a small "×"
+button per row calls `removeScheduleLeg()`, which splices the leg out of
+`state.schedule` and its row out of the DOM. If that was the last leg on
+its market, the now-orphaned `RouteSettings` entry and Commercial-panel
+row are dropped too (`ui/commercial.ts`'s `removeCommercialRow()`) — a
+market with no flights left shouldn't keep a lingering fare/marketing
+lever. No confirmation dialog: this matches M8/M10's existing
+allow-then-flag philosophy exactly — removal is immediate, and
+`validateSchedule()` logs a broken rotation to the console the same way
+a bad manual time edit already does, rather than blocking the action. An
+already-airborne flight on the removed leg is unaffected, since
+`ActiveFlight` (sim/state.ts) already carried its own copied data
+independent of `state.schedule`.
 
 **Column filters:** a second header row holds one text input per column
 (Tail/Route/Depart). `applyScheduleFilters()` re-checks all three on every

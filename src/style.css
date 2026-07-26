@@ -229,6 +229,35 @@ body {
   box-sizing: border-box;
 }
 
+/* Week three's remove-a-route/frequency fix: a small "x" button, narrow
+   enough to not repeat the table-overflow bug the schedule table's short-
+   lived Fare column caused during the Pricing loop's build (a slider
+   needed real width; this doesn't). */
+#schedule-table td:last-child,
+#schedule-table th:last-child {
+  width: 24px;
+  padding-right: 0;
+}
+
+.schedule-remove-button {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  line-height: 1;
+  font-family: inherit;
+  font-size: 13px;
+  color: #9aa3b8;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.schedule-remove-button:hover {
+  color: #ff8080;
+  border-color: #ff8080;
+}
+
 .filter-row th {
   padding: 0 6px 6px 0;
   font-weight: 400;
