@@ -14,6 +14,9 @@ import competitorsData from '../../data/competitors.json';
 
 export type CompetitorOffering = {
   airline: string;
+  /** Two-letter, all-caps shorthand — see sim/airline.ts's PLAYER_AIRLINE
+   * for the player's own equivalent. */
+  code: string;
   origin: string;
   dest: string;
   dailyFrequency: number;

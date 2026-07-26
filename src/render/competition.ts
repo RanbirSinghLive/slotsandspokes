@@ -1,9 +1,10 @@
-import { geoPath } from 'd3-geo';
+import { geoPath, geoInterpolate } from 'd3-geo';
 import type { LineString } from 'geojson';
 import { projection } from './projection';
-import { airports, drawAirports } from './airports';
+import { airports, drawAirports, type Airport } from './airports';
 import { scheduleLegs } from '../sim/schedule';
 import { competitors } from '../sim/choiceModel';
+import { PLAYER_AIRLINE } from '../sim/airline';
 
 const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]));
 
@@ -17,6 +18,26 @@ const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]
 const OWN_ONLY_STROKE = '#3a4258';
 const COMPETITOR_ONLY_STROKE = '#e05a5a';
 const BOTH_STROKE = '#ffd166';
+
+/**
+ * One color per airline code, for the hover tooltip's pie chart — a
+ * different concern from the three-state OWN/COMPETITOR/BOTH line colors
+ * above, since a pie needs to tell *multiple* competitors apart from each
+ * other, not just from the player. Hand-picked, no attempt at a generated
+ * palette — four airlines is few enough to just name each one. A future
+ * airline without an entry here falls back to a plain gray rather than
+ * erroring.
+ */
+const AIRLINE_COLORS: Record<string, string> = {
+  [PLAYER_AIRLINE.code]: '#4a90d9',
+  CW: '#ffb347',
+  TA: '#e05a5a',
+  BR: '#b388ff',
+};
+
+function colorForAirline(code: string): string {
+  return AIRLINE_COLORS[code] ?? '#9aa3b8';
+}
 
 /**
  * Same bidirectional market-pair key every other "market" concept in this
@@ -58,6 +79,34 @@ for (const forAirline of competitorRoutesByAirline.values()) {
  */
 export function competitorAirlines(): string[] {
   return [...competitorRoutesByAirline.keys()].sort();
+}
+
+/**
+ * The markets actually drawn for a given selection — `null` for the
+ * aggregate ("any competitor") view, a specific airline name otherwise.
+ * Shared by drawCompetitionLayer() and findCompetitionHover() so hit-
+ * testing can never test against a market that isn't actually on screen.
+ */
+function visibleMarkets(selectedAirline: string | null): Map<string, { origin: string; dest: string }> {
+  const competitorRoutes =
+    selectedAirline === null ? allMarketRoutes : (competitorRoutesByAirline.get(selectedAirline) ?? new Map());
+  const competitorMarketKeys =
+    selectedAirline === null ? allCompetitorMarketKeys : new Set(competitorRoutesByAirline.get(selectedAirline)?.keys() ?? []);
+
+  const result = new Map<string, { origin: string; dest: string }>();
+  for (const key of new Set([...ownRoutes.keys(), ...competitorMarketKeys])) {
+    const route = ownRoutes.get(key) ?? competitorRoutes.get(key);
+    if (route) result.set(key, route);
+  }
+  return result;
+}
+
+function strokeFor(key: string, selectedAirline: string | null): string {
+  const competitorMarketKeys =
+    selectedAirline === null ? allCompetitorMarketKeys : new Set(competitorRoutesByAirline.get(selectedAirline)?.keys() ?? []);
+  const flownByOwn = ownRoutes.has(key);
+  const flownByCompetitor = competitorMarketKeys.has(key);
+  return flownByOwn && flownByCompetitor ? BOTH_STROKE : flownByCompetitor ? COMPETITOR_ONLY_STROKE : OWN_ONLY_STROKE;
 }
 
 function drawLine(
@@ -109,23 +158,149 @@ function drawLine(
 export function drawCompetitionLayer(ctx: CanvasRenderingContext2D, selectedAirline: string | null): void {
   const path = geoPath(projection, ctx);
 
-  const competitorMarketKeys =
-    selectedAirline === null ? allCompetitorMarketKeys : new Set(competitorRoutesByAirline.get(selectedAirline)?.keys() ?? []);
-  const competitorRoutes =
-    selectedAirline === null ? allMarketRoutes : (competitorRoutesByAirline.get(selectedAirline) ?? new Map());
-
-  const everyMarketKey = new Set<string>([...ownRoutes.keys(), ...competitorMarketKeys]);
-
-  for (const key of everyMarketKey) {
-    const route = ownRoutes.get(key) ?? competitorRoutes.get(key);
-    if (!route) continue;
-
-    const flownByOwn = ownRoutes.has(key);
-    const flownByCompetitor = competitorMarketKeys.has(key);
-    const stroke = flownByOwn && flownByCompetitor ? BOTH_STROKE : flownByCompetitor ? COMPETITOR_ONLY_STROKE : OWN_ONLY_STROKE;
-
-    drawLine(ctx, path, route.origin, route.dest, stroke);
+  for (const [key, { origin, dest }] of visibleMarkets(selectedAirline)) {
+    drawLine(ctx, path, origin, dest, strokeFor(key, selectedAirline));
   }
 
   drawAirports(ctx);
+}
+
+export type Operator = { code: string; name: string; color: string; frequency: number };
+
+/**
+ * Every airline serving `origin`-`dest` (the player included, if they fly
+ * it), each with their total daily frequency on that market — the raw
+ * material for the hover tooltip's pie chart. Always the *complete*
+ * picture regardless of the map's current airline filter, since knowing
+ * "who else is here" is the whole point of hovering a route.
+ */
+export function operatorsForMarket(origin: string, dest: string): Operator[] {
+  const key = marketKey(origin, dest);
+  const operators: Operator[] = [];
+
+  if (ownRoutes.has(key)) {
+    const frequency = scheduleLegs.filter((leg) => marketKey(leg.origin, leg.dest) === key).length;
+    operators.push({ code: PLAYER_AIRLINE.code, name: PLAYER_AIRLINE.name, color: colorForAirline(PLAYER_AIRLINE.code), frequency });
+  }
+
+  const competitorFrequencyByCode = new Map<string, { name: string; frequency: number }>();
+  for (const c of competitors) {
+    if (marketKey(c.origin, c.dest) !== key) continue;
+    const existing = competitorFrequencyByCode.get(c.code);
+    if (existing) existing.frequency += c.dailyFrequency;
+    else competitorFrequencyByCode.set(c.code, { name: c.airline, frequency: c.dailyFrequency });
+  }
+  for (const [code, { name, frequency }] of competitorFrequencyByCode) {
+    operators.push({ code, name, color: colorForAirline(code), frequency });
+  }
+
+  return operators;
+}
+
+/**
+ * Every airline with at least one flight touching `iata` (departing or
+ * arriving), summed across all of that airport's markets — the airport-
+ * hover equivalent of operatorsForMarket() above.
+ */
+export function operatorsForAirport(iata: string): Operator[] {
+  const frequencyByCode = new Map<string, { name: string; frequency: number }>();
+
+  function add(code: string, name: string, frequency: number): void {
+    const existing = frequencyByCode.get(code);
+    if (existing) existing.frequency += frequency;
+    else frequencyByCode.set(code, { name, frequency });
+  }
+
+  for (const leg of scheduleLegs) {
+    if (leg.origin === iata || leg.dest === iata) add(PLAYER_AIRLINE.code, PLAYER_AIRLINE.name, 1);
+  }
+  for (const c of competitors) {
+    if (c.origin === iata || c.dest === iata) add(c.code, c.airline, c.dailyFrequency);
+  }
+
+  return [...frequencyByCode.entries()].map(([code, { name, frequency }]) => ({
+    code,
+    name,
+    color: colorForAirline(code),
+    frequency,
+  }));
+}
+
+const AIRPORT_HIT_RADIUS_PX = 8;
+const MARKET_HIT_RADIUS_PX = 6;
+const ARC_SAMPLE_STEPS = 24;
+
+function distanceToPointSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lengthSq = dx * dx + dy * dy;
+  const t = lengthSq === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lengthSq));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+/**
+ * Distance in screen pixels from (screenX, screenY) to the geodesic arc
+ * between two airports — sampled the same way aircraft.ts positions a
+ * flight along its route, since d3.geoPath has no built-in "distance to
+ * this path" query. Fine at this scale: a couple dozen samples per arc,
+ * at most nine arcs on screen at once.
+ */
+function distanceToArc(origin: Airport, dest: Airport, screenX: number, screenY: number): number {
+  const interpolate = geoInterpolate([origin.lon, origin.lat], [dest.lon, dest.lat]);
+  let minDist = Infinity;
+  let previous: [number, number] | null = null;
+
+  for (let i = 0; i <= ARC_SAMPLE_STEPS; i++) {
+    const [lon, lat] = interpolate(i / ARC_SAMPLE_STEPS);
+    const point = projection([lon, lat]);
+    if (!point) continue;
+    if (previous) {
+      minDist = Math.min(minDist, distanceToPointSegment(screenX, screenY, previous[0], previous[1], point[0], point[1]));
+    }
+    previous = point;
+  }
+
+  return minDist;
+}
+
+export type CompetitionHover = { type: 'airport'; iata: string } | { type: 'market'; origin: string; dest: string };
+
+/**
+ * What's under the cursor in Competition mode, for the hover tooltip:
+ * an airport takes priority (a point is a smaller, more precise target
+ * than a line), then the nearest visible market arc within its hit
+ * radius, respecting the current airline filter — only testing against
+ * whatever `drawCompetitionLayer()` actually drew, since there's nothing
+ * to hover on an arc that isn't on screen. `null` if neither is close
+ * enough.
+ */
+export function findCompetitionHover(screenX: number, screenY: number, selectedAirline: string | null): CompetitionHover | null {
+  let nearestIata: string | null = null;
+  let nearestAirportDist = AIRPORT_HIT_RADIUS_PX;
+  for (const airport of airports) {
+    const point = projection([airport.lon, airport.lat]);
+    if (!point) continue;
+    const dist = Math.hypot(point[0] - screenX, point[1] - screenY);
+    if (dist < nearestAirportDist) {
+      nearestAirportDist = dist;
+      nearestIata = airport.iata;
+    }
+  }
+  if (nearestIata) return { type: 'airport', iata: nearestIata };
+
+  let nearestMarket: { origin: string; dest: string } | null = null;
+  let nearestMarketDist = MARKET_HIT_RADIUS_PX;
+  for (const { origin, dest } of visibleMarkets(selectedAirline).values()) {
+    const originAirport = airportsByIata.get(origin);
+    const destAirport = airportsByIata.get(dest);
+    if (!originAirport || !destAirport) continue;
+    const dist = distanceToArc(originAirport, destAirport, screenX, screenY);
+    if (dist < nearestMarketDist) {
+      nearestMarketDist = dist;
+      nearestMarket = { origin, dest };
+    }
+  }
+  if (nearestMarket) return { type: 'market', origin: nearestMarket.origin, dest: nearestMarket.dest };
+
+  return null;
 }

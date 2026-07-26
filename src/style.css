@@ -524,3 +524,60 @@ body {
   font-size: 11px;
   color: #9aa3b8;
 }
+
+/* Competition mode's hover tooltip — real DOM (per CLAUDE.md's rule
+   against hand-rolled canvas widgets), positioned next to the cursor via
+   main.ts's mousemove handler rather than the mouse itself owning it. */
+#competition-tooltip {
+  position: fixed;
+  z-index: 30;
+  max-width: 260px;
+  padding: 10px 12px;
+  background: rgba(10, 12, 18, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  color: #cdd3e0;
+  pointer-events: none;
+}
+
+#competition-tooltip-title {
+  font-size: 13px;
+  color: #fff;
+  margin-bottom: 8px;
+}
+
+#competition-tooltip-body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#competition-tooltip-pie {
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+#competition-tooltip-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+#competition-tooltip-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.competition-tooltip-swatch {
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}

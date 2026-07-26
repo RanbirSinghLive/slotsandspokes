@@ -803,3 +803,59 @@ still shows exactly its two routes (YUL-YYZ as amber/both, YYZ-YOW as
 red/exclusive) with the player's untouched markets in default color;
 switching back to Ops hides the selector and renders normally, no
 console errors.
+
+### Hover tooltips + two-letter airline codes
+
+Every airline needed a real shorthand to make a tooltip legible at a
+glance — the player's own carrier included, which never had a name at
+all before now. Invented one: **Fundy Air, code FA** (`sim/airline.ts`'s
+`PLAYER_AIRLINE`), fictional per CLAUDE.md's public-sources-only rule,
+alongside the existing competitors' new codes — Capital Wings **CW**,
+Trillium Air **TA**, Bluenose Regional **BR** — added to
+`data/competitors.json`.
+
+Hovering a route or airport in Competition mode shows a small tooltip:
+every airline touching that market (or airport), each as a pie slice
+sized by daily frequency share, plus a legend line per airline (`CODE
+Name — percent% (frequency/day)`). Frequency, not passenger count or
+booking share, is the pie's basis — deliberately the simplest honest
+answer to "who operates this," not a claim about who's winning it (that
+question is what the Commercial panel's market share column, and
+eventually the choice model, already answer).
+
+**Route hover**: `render/competition.ts`'s `operatorsForMarket()` sums
+the player's own scheduled legs on that market plus every competitor's
+`dailyFrequency` there. **Airport hover**: `operatorsForAirport()` sums
+every leg (player or competitor) touching that airport in either
+direction. Both always show the *complete* picture regardless of the
+map's current airline filter — knowing who else is present is the point
+of hovering, independent of which one carrier you happen to have
+selected in the dropdown.
+
+Hit-testing an arc needed a new technique — d3.geoPath has no "distance
+from this point to the path" query, so `findCompetitionHover()` samples
+24 points along the geodesic (the same `d3.geoInterpolate` technique
+`render/aircraft.ts` uses to position a flight) and finds the nearest
+sampled segment. Airports (a point, not a line) reuse the simpler
+nearest-projected-point test `ui/routeBuilder.ts`'s arming gesture
+already established. An airport takes priority when both are close
+enough, since it's the smaller, more precise target.
+
+The tooltip itself (`ui/competitionTooltip.ts`) is real DOM per
+CLAUDE.md's rule against hand-rolled canvas widgets — a small inline SVG
+pie (hand-built wedge paths; a single operator draws as a plain circle
+rather than a degenerate 360° arc) plus an HTML legend, positioned next
+to the cursor and hidden on mouseleave or on switching away from
+Competition mode or changing the airline filter (stale content/position
+otherwise).
+
+Verified: dispatching real `mousemove` events at known coordinates (the
+`computer` tool's hover action turned out to be too imprecise for a
+6-8px hit radius, but a directly-dispatched DOM event exercises the
+exact same code path a real mouse does) confirmed all three cases —
+YYZ-YOW hovers to a single red 100% Trillium Air slice; YOW-YUL hovers to
+a two-slice pie (67% Fundy Air/2 per day, 33% Capital Wings/1 per day);
+the YOW airport hovers to three slices (Trillium Air 50%, Fundy Air 33%,
+Capital Wings 17%) — each figure matching the underlying schedule and
+competitor data by hand. Also confirmed visually in-browser once the
+right pixel coordinates were found. No console errors.

@@ -410,8 +410,33 @@ The same three-way logic drives both the aggregate view and a single
 airline's — `selectedAirline === null` just swaps in the union of every
 competitor's markets as "the competitor set" instead of one airline's.
 `sim/choiceModel.ts`'s exported `competitors` data and `CompetitorOffering`
-type are reused directly, no new data model. Read-only, same phasing as
-Demand mode's first pass.
+type are reused directly, no new data model.
+
+**Hover tooltips** (`ui/competitionTooltip.ts`) are the one interactive
+piece: hovering a route or airport shows every airline touching it as a
+pie chart sliced by daily frequency, plus a `CODE Name — percent%
+(frequency/day)` legend line per airline. Every airline now has a
+two-letter code, the player included — `sim/airline.ts`'s
+`PLAYER_AIRLINE` (`Fundy Air`, `FA`) and each competitor's new `code`
+field in `data/competitors.json` (Capital Wings `CW`, Trillium Air `TA`,
+Bluenose Regional `BR`). `render/competition.ts`'s `operatorsForMarket()`/
+`operatorsForAirport()` always return the *complete* breakdown regardless
+of the current airline filter — hovering answers "who's actually here,"
+independent of which one carrier happens to be selected in the dropdown.
+
+Hit-testing a route needed a new technique, since `d3.geoPath` has no
+"distance from a point to this path" query: `findCompetitionHover()`
+samples 24 points along the geodesic (the same `geoInterpolate()`
+technique `aircraft.ts` uses to position a flight) and finds the closest
+sampled segment. Airports reuse the simpler nearest-projected-point test
+`ui/routeBuilder.ts`'s arming gesture already established, and take
+priority when both are within range — a point is a smaller, more precise
+target than a line. The tooltip itself is real DOM (a hand-built inline
+SVG pie plus an HTML legend), per CLAUDE.md's rule against hand-rolled
+canvas widgets; it hides on mouseleave, on leaving Competition mode, or
+on changing the airline filter, so it never shows stale content or a
+stale position. Read-only otherwise, same phasing as Demand mode's first
+pass.
 
 Switching away from Ops cancels any in-progress route-creation gesture
 (`ui/routeBuilder.ts`'s `cancelPendingRoute()`), and the route-builder's

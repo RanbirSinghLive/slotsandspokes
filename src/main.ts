@@ -6,7 +6,8 @@ import { drawRoutes } from './render/routes';
 import { drawAirports } from './render/airports';
 import { drawAircraft } from './render/aircraft';
 import { drawDemandLayer } from './render/demand';
-import { drawCompetitionLayer, competitorAirlines } from './render/competition';
+import { drawCompetitionLayer, competitorAirlines, findCompetitionHover } from './render/competition';
+import { showCompetitionTooltip, hideCompetitionTooltip } from './ui/competitionTooltip';
 import { validateSchedule } from './sim/schedule';
 import { createInitialState, type SimState } from './sim/state';
 import { step } from './sim/step';
@@ -61,6 +62,7 @@ let selectedCompetitorAirline: string | null = null;
 
 competitionAirlineSelect.addEventListener('change', () => {
   selectedCompetitorAirline = competitionAirlineSelect.value || null;
+  hideCompetitionTooltip(); // stale position/content for whatever was hovered under the old filter
   render();
 });
 const rotationBoardEl = document.querySelector<HTMLDivElement>('#rotation-board')!;
@@ -313,6 +315,7 @@ viewToggleButtons.forEach((button) => {
     });
 
     if (view !== 'ops') cancelPendingRoute();
+    if (view !== 'competition') hideCompetitionTooltip();
     if (view === 'rotation') updateRotationBoard(state);
     if (view === 'commercial') updateCommercialPanel(state);
 
@@ -352,6 +355,19 @@ canvas.addEventListener('mousedown', (event) => {
 
 canvas.addEventListener('mousemove', (event) => {
   if (currentView === 'ops' && handleRouteBuilderMouseMove(event)) render();
+
+  if (currentView === 'competition') {
+    const hover = findCompetitionHover(event.clientX, event.clientY, selectedCompetitorAirline);
+    if (hover) {
+      showCompetitionTooltip(hover, event.clientX, event.clientY);
+    } else {
+      hideCompetitionTooltip();
+    }
+  }
+});
+
+canvas.addEventListener('mouseleave', () => {
+  hideCompetitionTooltip();
 });
 
 window.addEventListener('mousemove', (event) => {
