@@ -2,6 +2,7 @@ import aircraftTypesData from '../../data/aircraft-types.json';
 import { flightResult, type EconomyAircraftType } from './economy';
 import { MIN_TURN_MINUTES, legsServingMarket, marketKey } from './schedule';
 import { nextRandom } from './rng';
+import { rollDailyWeather, WEATHER_ON_TIME_PROBABILITY, WEATHER_MAX_DELAY_MINUTES } from './weather';
 import type { SimState, ActiveFlight } from './state';
 
 const MINUTES_PER_DAY = 1440;
@@ -28,12 +29,16 @@ const MAX_DELAY_MINUTES = 45;
  * [1, MAX_DELAY_MINUTES] — most delays are minor, with an occasional long
  * tail, rather than every delay length being equally likely.
  */
-function rollDelayMinutes(seed: number): [delayMinutes: number, nextSeed: number] {
+function rollDelayMinutes(
+  seed: number,
+  onTimeProbability: number,
+  maxDelayMinutes: number,
+): [delayMinutes: number, nextSeed: number] {
   const [onTimeRoll, seedAfterFirst] = nextRandom(seed);
-  if (onTimeRoll < ON_TIME_PROBABILITY) return [0, seedAfterFirst];
+  if (onTimeRoll < onTimeProbability) return [0, seedAfterFirst];
 
   const [severityRoll, seedAfterSecond] = nextRandom(seedAfterFirst);
-  const delayMinutes = Math.round(1 + severityRoll * severityRoll * (MAX_DELAY_MINUTES - 1));
+  const delayMinutes = Math.round(1 + severityRoll * severityRoll * (maxDelayMinutes - 1));
   return [delayMinutes, seedAfterSecond];
 }
 
@@ -105,6 +110,11 @@ export function step(state: SimState): void {
     state.cash -= totalMarketingSpend;
     state.todayCost += totalMarketingSpend;
     state.todayMargin -= totalMarketingSpend;
+
+    // Weather (sim/weather.ts) is a daily-scale event, not a per-minute
+    // one — origination, spread, and expiry all happen once here rather
+    // than being checked on every tick.
+    rollDailyWeather(state, state.simMinute);
   }
 
   for (const leg of state.schedule) {
@@ -123,7 +133,14 @@ export function step(state: SimState): void {
     aircraft.atAirport = null;
     aircraft.activeLegId = leg.legId;
 
-    const [delayMinutes, nextSeed] = rollDelayMinutes(state.rngSeed);
+    // Bare-bones weather effect (sim/weather.ts): a leg departing an
+    // airport with active weather rolls against worse odds — reusing
+    // M9's existing delay mechanism rather than a new aircraft state
+    // (no grounding, no diversions, no cancellations yet).
+    const weatherAtOrigin = state.weatherByAirport[leg.origin];
+    const onTimeProbability = weatherAtOrigin ? WEATHER_ON_TIME_PROBABILITY : ON_TIME_PROBABILITY;
+    const maxDelayMinutes = weatherAtOrigin ? WEATHER_MAX_DELAY_MINUTES : MAX_DELAY_MINUTES;
+    const [delayMinutes, nextSeed] = rollDelayMinutes(state.rngSeed, onTimeProbability, maxDelayMinutes);
     state.rngSeed = nextSeed;
 
     // Fare and marketing spend are market-level (RouteSettings), not

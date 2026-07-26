@@ -1,5 +1,6 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { loadSchedule, marketKey, recommendedFare, type ScheduleLeg } from './schedule';
+import type { WeatherEvent } from './weather';
 
 export type AircraftStatus = 'ground' | 'airborne';
 
@@ -94,6 +95,13 @@ export type SimState = {
    * reuses the same entry rather than creating a second one.
    */
   routeSettings: Record<string, RouteSettings>;
+  /**
+   * Active weather by airport IATA code — a plain object, not a Map, same
+   * JSON-round-trip reasoning as `routeSettings`. Absent key means clear
+   * skies; see sim/weather.ts's `rollDailyWeather()` for how entries
+   * appear, spread to nearby airports, and expire.
+   */
+  weatherByAirport: Record<string, WeatherEvent>;
   completedToday: string[];
   todayRevenue: number;
   todayCost: number;
@@ -171,6 +179,7 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     activeFlights: [],
     schedule,
     routeSettings,
+    weatherByAirport: {},
     completedToday: [],
     todayRevenue: 0,
     todayCost: 0,

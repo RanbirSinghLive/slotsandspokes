@@ -526,7 +526,8 @@ it last of everything above.
    free-text) in the schedule table. Feeds `bookingShare()`'s price
    term and revenue directly — the full yield-management tension now
    exists and is player-actionable, see the "Pricing" write-up below.
-8. Random events / operational disruption (diversion, closure)
+8. **Random events / operational disruption** — v1 done, as weather
+   (thunderstorms/snowstorms), not diversion/closure. See "Weather" below.
 
 Steps 1–2 are the deliberate exceptions to "layers before loops": the
 map gesture and the board that makes it scale don't need the economy
@@ -877,3 +878,69 @@ other two, clicking an airline updates the trigger's label and closes
 the dropdown (an early version left it open after a selection — fixed
 by calling the same `closeAllDropdowns()` the view buttons already
 use), and the Competition map's filtering is unaffected.
+
+## Weather
+
+The dependency order's item 8 ("random events / operational disruption")
+was originally scoped as diversion/airspace closure. Built instead as
+seasonal weather — thunderstorms in summer, snowstorms in winter — since
+it reuses M9's existing delay mechanism directly rather than needing a
+new aircraft state (grounded/diverted), and still delivers the same
+underlying idea: a disruption the player has to react to, not just a
+number that occasionally gets worse.
+
+**Bare-bones by design, and deliberately not:** no ground stops, no
+cancellations, no diversions to an alternate airport, no forecasting —
+weather at an airport just makes M9's `rollDelayMinutes()` roll against
+worse odds (`ON_TIME_PROBABILITY` 0.65→0.2, `MAX_DELAY_MINUTES` 45→90)
+for a leg departing from there. Reusing the exact mechanism a delayed
+flight already produces meant no new economics, no new UI beyond a
+visual cue, and no new failure modes to test.
+
+**Built as `sim/weather.ts`**: `state.weatherByAirport`, a plain
+`Record<iata, WeatherEvent>` (JSON-safe, per CLAUDE.md). Season comes
+from the same day-of-year formula `render/terminator.ts` already
+computes for the day/night terminator — summer (day 152-243) rolls
+thunderstorms, winter (day 335-59, wrapping the year boundary) rolls
+snowstorms, a fixed 8%/day origination chance per eligible airport,
+2-6 hour duration, all through the same seeded PRNG (`state.rngSeed`)
+every other random draw in `sim/` already uses — same determinism
+guarantee CLAUDE.md holds `step()` to.
+
+**Spread to adjacent airports**, per request, rather than every airport
+rolling in total isolation: two airports are "adjacent" if they're
+within 200nm — reusing `sim/geo.ts`'s existing great-circle distance,
+no new authored data. That threshold happens to carve the map into
+exactly the two clusters a real weather cell would move within — the
+Ontario/Québec group (YUL/YOW/YQB/YYZ) and the Maritime group (YHZ/YSJ/
+YFC/YQM/YYG) — with YYT (St. John's) isolated from both, matching how
+separate it actually is. Each day, active storms get a 25% chance per
+neighbor of spreading there (a fresh, independent duration, not a
+shared timer) before the day's origination roll runs.
+
+**Visual effects, also per request, and deliberately not simulated
+state**: a thunderstorm airport gets an occasional bright flash
+(`render/weather.ts`, ~5% chance per rendered frame); a snowstorm
+airport gets a handful of small drifting particles. Both are pure
+`Math.random()`/frame-count-driven decoration — CLAUDE.md's determinism
+rule is about `step()`, not rendering, and nothing needs "the flash
+looked exactly like this" to be reproducible, only "a thunderstorm was
+active here" does. Ops mode only; drawn after `drawAirports()` so the
+effect sits on top of the airport dot.
+
+**Performance**: checked via the headless runner over a full simulated
+year (525,600 calls to `step()`) — 0.57 real seconds of CPU time, no
+measurable slowdown from the pre-weather baseline. Up to 10 airports
+each holding at most one plain object is negligible next to everything
+else `step()` already does every minute; the daily roll (expire, spread,
+originate) is a handful of comparisons, not a per-tick cost.
+
+Verified via the headless runner across a full year: snowstorms only
+ever appeared on winter-window days, thunderstorms only on summer-window
+days (54 thunderstorm-days, 50 snowstorm-days out of 365); a plausible
+spread chain was visible (a Québec City thunderstorm on day 152 followed
+by one at Ottawa — its nearest neighbor — on day 154); at most 4 storms
+were ever active simultaneously across the whole map, confirming the
+expire/spread/originate balance doesn't run away. Verified in-browser:
+snow particles render and drift at an airport with an active snowstorm
+from game start, no console errors.

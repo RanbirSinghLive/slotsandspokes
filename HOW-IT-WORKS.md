@@ -93,12 +93,15 @@ place, deterministically (same state in → same state out, always — no
 order:
 
 1. **Day rollover** — if this is minute 0 of a new day,
-   `completedToday`/`todayRevenue`/`todayCost`/`todayMargin` reset to zero
-   *before* anything else this call does. `cash` does not reset. The reset
-   happens at the start of the new day rather than the end of the old one
-   specifically so that right up until this call, those fields still hold
-   the just-finished day's real totals — readable from outside step()
-   (the M7 headless runner, for instance) between calls.
+   `completedToday`/`todayRevenue`/`todayCost`/`todayMargin` reset to zero,
+   the day's total marketing spend is charged (see "The Commercial panel"),
+   and `sim/weather.ts`'s `rollDailyWeather()` expires/spreads/originates
+   storms (see "Weather," below) — all *before* anything else this call
+   does. `cash` does not reset. The reset happens at the start of the new
+   day rather than the end of the old one specifically so that right up
+   until this call, those fields still hold the just-finished day's real
+   totals — readable from outside step() (the M7 headless runner, for
+   instance) between calls.
 2. **Depart** — any leg in `state.schedule` whose `departMinute` has arrived
    ("at or after," not only the exact minute — see below), not already
    flown or in the air today, flown by an aircraft that's on the ground at
@@ -106,10 +109,10 @@ order:
    (`groundSinceMinute + MIN_TURN_MINUTES`), takes off: the aircraft flips
    to `airborne` and an `ActiveFlight` is created with `blockMinutes`
    (computed once at schedule load time from great-circle distance ÷ cruise
-   speed) plus a randomly rolled delay (M9, see below) added to the
-   departure minute. Reading from `state.schedule` rather than a fixed
-   constant is what lets the M8 schedule editor's edits actually change
-   what the sim does.
+   speed) plus a randomly rolled delay (M9, see below — worse odds if the
+   origin has active weather) added to the departure minute. Reading from
+   `state.schedule` rather than a fixed constant is what lets the M8
+   schedule editor's edits actually change what the sim does.
 3. **Arrive** — any `ActiveFlight` whose `arriveMinute` has been reached
    lands: the aircraft flips back to `ground` at the destination and
    records `groundSinceMinute` (for the *next* leg's turnaround check), and
@@ -697,6 +700,61 @@ roll stays reproducible: same state in, same state out, and a saved/
 reloaded or headlessly-rerun game produces the identical sequence of
 "random" delays. Verified: identical seed → identical 60-day outcome;
 different seed → diverges.
+
+## Weather (`src/sim/weather.ts`, `src/render/weather.ts`)
+
+Week two's "random events" layer — seasonal thunderstorms and
+snowstorms, bare-bones by design: no ground stops, no diversions, no
+cancellations. Weather at an airport just makes M9's `rollDelayMinutes()`
+(see "The tick," above) roll against worse odds for a leg departing from
+there (`ON_TIME_PROBABILITY` 0.65→0.2, `MAX_DELAY_MINUTES` 45→90) — the
+same delay mechanism a flight already uses, just fed harsher parameters,
+rather than a new aircraft state.
+
+`state.weatherByAirport: Record<iata, WeatherEvent>` (a plain object,
+JSON-safe) holds at most one active event per airport. `rollDailyWeather()`
+runs once per simulated day, from `step.ts`'s existing day-rollover
+check (alongside the marketing-spend charge), not per minute:
+
+1. **Expire** anything whose `endsAtMinute` has passed.
+2. **Spread**: every airport with an active event rolls a 25% chance,
+   independently, for each of its "adjacent" airports (within 200nm —
+   `sim/geo.ts`'s great-circle distance, no new data) to catch the same
+   `kind`, with its own fresh 2-6 hour duration. That 200nm threshold
+   happens to split the map into exactly two clusters — Ontario/Québec
+   (YUL/YOW/YQB/YYZ) and the Maritimes (YHZ/YSJ/YFC/YQM/YYG) — with YYT
+   isolated from both, matching how separate it actually is.
+3. **Originate**: season is a day-of-year lookup (the same formula
+   `terminator.ts` uses for the day/night line) — summer (day 152-243)
+   only ever rolls thunderstorms, winter (day 335-59, wrapping the year
+   boundary) only ever rolls snowstorms. Every airport with nothing
+   active gets an 8%/day chance.
+
+Every roll goes through `state.rngSeed` (`sim/rng.ts`), so weather is
+exactly as reproducible as M9's delays: same seed, same weather history.
+
+**Visuals are the one place this deliberately breaks determinism**:
+`render/weather.ts`'s `drawWeatherEffects()` (Ops mode only, drawn after
+`drawAirports()`) gives a thunderstorm airport an occasional bright
+flash (`Math.random()`, ~5% chance per rendered frame) and a snowstorm
+airport a handful of small drifting particles, driven by a plain frame
+counter. CLAUDE.md's determinism rule is about `step()`, not rendering —
+nothing needs a flash to look identical on replay, only "a thunderstorm
+was active here" does, and that part *is* in `state`.
+
+**Performance**: verified via the headless runner over a full simulated
+year (525,600 calls to `step()`) at 0.57 real CPU seconds — no
+measurable change from the pre-weather baseline. At most 10 plain
+objects, a handful of comparisons once a day; nowhere close to
+mattering next to everything else `step()` already does every minute.
+
+Verified via the headless runner across a full year: snowstorms only on
+winter-window days, thunderstorms only on summer-window days (54/50
+storm-days out of 365 respectively); a plausible spread chain (Québec
+City thunderstorm on day 152, then Ottawa — its nearest neighbor — on
+day 154); never more than 4 storms active across the whole map at once.
+Verified in-browser: snow particles render and drift at an airport with
+an active snowstorm, no console errors.
 
 ## What isn't built yet
 

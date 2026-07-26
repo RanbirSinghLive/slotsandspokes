@@ -4,6 +4,7 @@ import { drawBasemap } from './render/basemap';
 import { drawTerminator } from './render/terminator';
 import { drawRoutes } from './render/routes';
 import { drawAirports } from './render/airports';
+import { drawWeatherEffects } from './render/weather';
 import { drawAircraft } from './render/aircraft';
 import { drawDemandLayer } from './render/demand';
 import { drawCompetitionLayer, competitorAirlines, findCompetitionHover } from './render/competition';
@@ -153,6 +154,7 @@ function render(): void {
     drawRoutes(ctx);
     drawAircraft(ctx, state, latestFractionalMinute);
     drawAirports(ctx);
+    drawWeatherEffects(ctx, state);
     drawRoutePreview(ctx);
   } else if (currentView === 'demand') {
     drawDemandLayer(ctx);
