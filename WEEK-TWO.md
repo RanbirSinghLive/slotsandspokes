@@ -670,6 +670,15 @@ group that owns pricing, marketing, and distribution — pairs naturally
 with "Ops" (the map's other real-department-named view) and says what
 the panel is *for* rather than what it displays.
 
+**Navigation grouping:** with four views, a flat row of buttons stopped
+being the right HUD shape. Regrouped into two icon-triggered dropdowns —
+**Maps** (Ops, Demand: both draw on the canvas/projection) and
+**Reports** (Rotation, Commercial: both real DOM) — each trigger showing
+an SVG icon instead of a text label, per request. Picked a folded-map
+icon for Maps and a bar-chart icon for Reports; neither term is deeply
+considered, just reasonable placeholders — worth revisiting if either
+stops fitting as more views get added.
+
 **Fare moves to the route, not the leg.** The immediate trigger:
 fares should be a route-level decision, to keep the game's decision
 space manageable as more levers arrive — a market with two daily

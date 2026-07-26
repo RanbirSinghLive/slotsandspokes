@@ -41,7 +41,8 @@ const canvas = document.querySelector<HTMLCanvasElement>('#map')!;
 const ctx = canvas.getContext('2d')!;
 const clockEl = document.querySelector<HTMLDivElement>('#clock')!;
 const speedButtons = document.querySelectorAll<HTMLButtonElement>('#speed-controls button');
-const viewToggleButtons = document.querySelectorAll<HTMLButtonElement>('#view-toggle button');
+const viewToggleButtons = document.querySelectorAll<HTMLButtonElement>('#view-toggle .view-dropdown button');
+const viewGroups = document.querySelectorAll<HTMLDivElement>('#view-toggle .view-group');
 const rotationBoardEl = document.querySelector<HTMLDivElement>('#rotation-board')!;
 const commercialPanelEl = document.querySelector<HTMLDivElement>('#commercial-panel')!;
 
@@ -193,6 +194,12 @@ speedButtons.forEach((button) => {
 
 // --- View toggle (Ops / Demand / Rotation / Commercial) ---
 //
+// Grouped into two dropdowns rather than a flat row of four: "Maps"
+// (Ops, Demand — both draw on the canvas/projection) and "Reports"
+// (Rotation, Commercial — both real DOM, not canvas). Each group's
+// trigger button shows an SVG icon, not a text label, per design; the
+// two options underneath are still plain text buttons, same as before.
+//
 // #map, #rotation-board, and #commercial-panel are siblings sized
 // identically in style.css; #map stays visible for both 'ops' and
 // 'demand' (render() just draws a different layer on top of the same
@@ -206,9 +213,45 @@ speedButtons.forEach((button) => {
 // no interactive elements to lose, and the commercial panel only
 // refreshes its numeric cells, never rebuilding the fare/marketing
 // sliders themselves (see ui/commercial.ts).
+const VIEW_GROUP: Record<View, string> = {
+  ops: 'maps',
+  demand: 'maps',
+  rotation: 'reports',
+  commercial: 'reports',
+};
+
+function closeAllDropdowns(): void {
+  viewGroups.forEach((group) => {
+    group.querySelector<HTMLDivElement>('.view-dropdown')!.hidden = true;
+    group.querySelector<HTMLButtonElement>('.view-group-trigger')!.setAttribute('aria-expanded', 'false');
+  });
+}
+
+viewGroups.forEach((group) => {
+  const trigger = group.querySelector<HTMLButtonElement>('.view-group-trigger')!;
+  const dropdown = group.querySelector<HTMLDivElement>('.view-dropdown')!;
+
+  trigger.addEventListener('click', (event) => {
+    event.stopPropagation(); // don't immediately re-close via the document listener below
+    const wasHidden = dropdown.hidden;
+    closeAllDropdowns();
+    dropdown.hidden = !wasHidden;
+    trigger.setAttribute('aria-expanded', String(!wasHidden));
+  });
+});
+
+// Clicking anywhere outside a group (its trigger or its open dropdown)
+// closes whichever one is open — standard dropdown-menu behavior.
+document.addEventListener('click', (event) => {
+  const target = event.target as Node;
+  const clickedInsideAGroup = [...viewGroups].some((group) => group.contains(target));
+  if (!clickedInsideAGroup) closeAllDropdowns();
+});
+
 viewToggleButtons.forEach((button) => {
   button.addEventListener('click', () => {
     const view = button.dataset.view as View;
+    closeAllDropdowns();
     if (view === currentView) return;
 
     currentView = view;
@@ -216,6 +259,13 @@ viewToggleButtons.forEach((button) => {
     rotationBoardEl.hidden = view !== 'rotation';
     commercialPanelEl.hidden = view !== 'commercial';
     viewToggleButtons.forEach((b) => b.classList.toggle('active', b === button));
+    // The group trigger itself also shows which group the active view
+    // belongs to, so it's visible at a glance without opening either
+    // dropdown — e.g. the Maps icon stays highlighted while on Demand.
+    viewGroups.forEach((group) => {
+      const isActiveGroup = group.dataset.group === VIEW_GROUP[view];
+      group.querySelector<HTMLButtonElement>('.view-group-trigger')!.classList.toggle('active', isActiveGroup);
+    });
 
     if (view !== 'ops') cancelPendingRoute();
     if (view === 'rotation') updateRotationBoard(state);

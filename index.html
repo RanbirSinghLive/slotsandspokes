@@ -43,10 +43,32 @@
         <button type="button" data-speed="20">20×</button>
       </div>
       <div id="view-toggle">
-        <button type="button" data-view="ops" class="active">Ops</button>
-        <button type="button" data-view="demand">Demand</button>
-        <button type="button" data-view="rotation">Rotation</button>
-        <button type="button" data-view="commercial">Commercial</button>
+        <div class="view-group" data-group="maps">
+          <button type="button" class="view-group-trigger active" aria-label="Maps" aria-haspopup="true" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
+              <line x1="8" y1="2" x2="8" y2="18" />
+              <line x1="16" y1="6" x2="16" y2="22" />
+            </svg>
+          </button>
+          <div class="view-dropdown" hidden>
+            <button type="button" data-view="ops" class="active">Ops</button>
+            <button type="button" data-view="demand">Demand</button>
+          </div>
+        </div>
+        <div class="view-group" data-group="reports">
+          <button type="button" class="view-group-trigger" aria-label="Reports" aria-haspopup="true" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="20" x2="18" y2="10" />
+              <line x1="12" y1="20" x2="12" y2="4" />
+              <line x1="6" y1="20" x2="6" y2="14" />
+            </svg>
+          </button>
+          <div class="view-dropdown" hidden>
+            <button type="button" data-view="rotation">Rotation</button>
+            <button type="button" data-view="commercial">Commercial</button>
+          </div>
+        </div>
       </div>
     </div>
     <aside id="panel">

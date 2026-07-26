@@ -530,9 +530,21 @@ space" — no separate free-time indicator is drawn, since the gaps between
 bars already show it.
 
 `#map`, `#rotation-board`, and `#commercial-panel` (below) are CSS
-siblings sized identically; the HUD's Ops/Demand/Rotation/Commercial
-toggle swaps which one is visible via the `hidden` attribute rather than
-absolute positioning. `main.ts`'s `render()` still updates the clock and
+siblings sized identically; the HUD's view toggle swaps which one is
+visible via the `hidden` attribute rather than absolute positioning.
+The four views are grouped into two icon-triggered dropdowns rather than
+a flat row of buttons — **Maps** (a folded-map SVG icon; Ops, Demand)
+and **Reports** (a bar-chart SVG icon; Rotation, Commercial) — each
+group's trigger shows only the icon, not a text label, and opens a
+small popup with its two views on click. Clicking a view, or clicking
+anywhere outside an open dropdown, closes it; the trigger for whichever
+group the current view belongs to stays visually active even while its
+dropdown is closed, so it's visible at a glance which mode you're in
+without opening anything. Hit the same `[hidden]`-vs-class-selector
+specificity gotcha CLAUDE.md documents for `#map`/`#rotation-board` —
+`.view-dropdown[hidden] { display: none }` has to be explicit, or the
+dropdown's own `display: flex` rule silently wins and it never actually
+hides. `main.ts`'s `render()` still updates the clock and
 sidebar panel every frame regardless of which view is showing, but skips
 all canvas drawing while the board (or the Commercial panel) is up
 (`if (currentView === 'rotation' || currentView === 'commercial') return;`)
