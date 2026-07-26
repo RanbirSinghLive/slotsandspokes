@@ -401,7 +401,7 @@ export function setupRouteBuilder(state: SimState): void {
       }
     }
 
-    renderScheduleWarnings(validateSchedule(state.schedule));
+    renderScheduleWarnings(validateSchedule(state.schedule, state.aircraft));
 
     // Fare/marketing are set at the market level (sim/state.ts's
     // RouteSettings), not per leg — a brand-new market gets a fresh entry

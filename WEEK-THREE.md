@@ -206,6 +206,35 @@ already mid-rotation elsewhere) and confirmed both the broken-link and
 non-closing-loop errors appear immediately in the Schedule panel, in
 plain language, no devtools required.
 
+### 7. The closed-loop check alone still missed one case
+
+Found right after shipping item 6, by the same player hitting a *third*
+variant: delete every other leg for a tail, add a single YHZ↔YYT round
+trip for it, and it *still* never flies — with the Schedule panel showing
+no warning at all, since the two-leg schedule is perfectly
+self-consistent on its own terms (YHZ→YYT→YHZ chains, and the loop
+closes). What neither existing check could see: the tail's own recorded
+*physical position* (`state.aircraft`, e.g. still sitting at YOW from
+before all its other legs were deleted) was never anywhere in that
+two-leg loop to begin with. A schedule can be internally perfect and
+still never fly, if the plane assigned to it isn't standing on any of its
+own airports.
+
+`validateSchedule()` (`sim/schedule.ts`) now takes the fleet
+(`state.aircraft`) as a second argument and checks, per tail: if the
+aircraft is currently grounded, is its airport the origin of *any* of that
+tail's own legs? If not, that tail is stranded, and the message says
+exactly where it needs to get to. All four call sites (`main.ts`'s
+startup check, `ui/panels.ts`'s remove/edit handlers, `ui/routeBuilder.ts`'s
+Add Route) now pass `state.aircraft` through.
+
+Verified in-browser against the reporter's own scenario: after deleting
+every leg except a hand-added YHZ↔YYT round trip for C-GVIA (a tail
+sitting at YOW, never touched by that round trip), the Schedule panel
+immediately showed: "C-GVIA is sitting at YOW, but none of its scheduled
+legs ever depart from there -- it will never fly again until a leg (or a
+positioning move) gets it to one of: YHZ, YYT."
+
 ## Judgment calls, not yet decided
 
 ### Time navigation and pacing
@@ -267,6 +296,12 @@ problem a real session hasn't surfaced yet.
    the fleet's first aircraft, which may already have its own separate
    rotation elsewhere — the new route silently never flies, and until now
    the only sign was a `console.error` no one but a developer would see.
-7. Time navigation / weather visibility / failure-state — all worth
+7. **Validate the schedule against physical position, not just itself** —
+   done. Found immediately after item 6, by hitting the case the
+   closed-loop check alone can't catch: delete *every* leg that used to
+   route a tail through some airport, and its remaining schedule can be
+   perfectly self-consistent (chains fine, loop closes) while the aircraft
+   physically sits somewhere that schedule never visits at all.
+8. Time navigation / weather visibility / failure-state — all worth
    revisiting once a real session has actually been played against
-   items 1-6, not before.
+   items 1-7, not before.

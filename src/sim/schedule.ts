@@ -2,6 +2,7 @@ import scheduleData from '../../data/schedule.json';
 import aircraftTypesData from '../../data/aircraft-types.json';
 import airportsData from '../../data/airports.json';
 import { greatCircleDistanceNm } from './geo';
+import type { Aircraft } from './state';
 
 type AirportLocation = { iata: string; lat: number; lon: number };
 type AircraftType = {
@@ -209,6 +210,18 @@ export function legsServingMarket(origin: string, dest: string, legs: ScheduleLe
  * schedule looks fine for the rest of the day it was edited. Checked here
  * too, not just link-by-link.
  *
+ * Also checks something the two rules above can't: whether each tail's
+ * *actual current position* (`fleet`, i.e. `state.aircraft`) is anywhere in
+ * its own rotation at all. A schedule can be perfectly self-consistent —
+ * every leg chains into the next, the loop closes — and still never fly a
+ * single leg, if the aircraft assigned to it is physically sitting
+ * somewhere that schedule never visits. That happens easily once a player
+ * starts editing mid-game: delete every leg that used to bring a tail
+ * through some airport, and its schedule can still "validate clean" while
+ * being permanently unreachable from where the plane actually is. Distinct
+ * from the loop-closure check: that one only looks at the schedule's own
+ * internal shape; this one looks at the schedule against the world.
+ *
  * Logs one line per problem found, or a single OK line, and also *returns*
  * the problem list (empty when the schedule is clean) — added in week
  * three so callers can show a warning somewhere a player will actually see
@@ -217,7 +230,7 @@ export function legsServingMarket(origin: string, dest: string, legs: ScheduleLe
  * player's point of view (no revenue, aircraft just sits there) unless
  * they happen to have devtools open at the moment they add it.
  */
-export function validateSchedule(legs: ScheduleLeg[]): string[] {
+export function validateSchedule(legs: ScheduleLeg[], fleet: Aircraft[] = []): string[] {
   const byTail = new Map<string, ScheduleLeg[]>();
   for (const leg of legs) {
     const group = byTail.get(leg.tail) ?? [];
@@ -253,6 +266,19 @@ export function validateSchedule(legs: ScheduleLeg[]): string[] {
           `${tail}'s rotation doesn't close -- ${last.legId} lands at ${last.dest}, but the day restarts at ${first.origin} (${first.legId}). Add a leg back to ${first.origin}, or that first departure will never fire again.`,
         );
       }
+    }
+  }
+
+  for (const aircraft of fleet) {
+    const tailLegs = byTail.get(aircraft.tail);
+    if (!tailLegs || tailLegs.length === 0) continue; // no schedule for this tail — nothing to be stranded from
+    if (aircraft.status !== 'ground' || aircraft.atAirport === null) continue; // mid-flight right now, not stuck
+
+    const origins = new Set(tailLegs.map((leg) => leg.origin));
+    if (!origins.has(aircraft.atAirport)) {
+      problems.push(
+        `${aircraft.tail} is sitting at ${aircraft.atAirport}, but none of its scheduled legs ever depart from there -- it will never fly again until a leg (or a positioning move) gets it to one of: ${[...origins].sort().join(', ')}.`,
+      );
     }
   }
 

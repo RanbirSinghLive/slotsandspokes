@@ -43,7 +43,7 @@ const state: SimState = loadSavedState() ?? createInitialState(ACTIVE_TAILS, Dat
 // M8 schedule editor re-runs this same check after every edit, so a change
 // that breaks a rotation gets caught the same way a broken schedule.json
 // would be caught here at startup.
-renderScheduleWarnings(validateSchedule(state.schedule));
+renderScheduleWarnings(validateSchedule(state.schedule, state.aircraft));
 setupScheduleEditor(state);
 setupRouteBuilder(state);
 setupRotationBoard();

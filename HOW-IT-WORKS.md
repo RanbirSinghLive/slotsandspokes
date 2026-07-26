@@ -504,6 +504,29 @@ forever with no error, since nothing about that check is itself broken.
 Found by playtesting, not by reading the code — a hand-added one-way leg
 stranded a tail for good with revenue silently going to zero.
 
+**Validated against reality, not just itself (week three):**
+`validateSchedule()` also takes `state.aircraft` as a second argument and
+checks, per tail, whether its actual current airport (when grounded) is
+the origin of *any* of its own scheduled legs. The closed-loop check above
+only looks at the schedule's own shape — it can't see that a tail is
+stranded if every leg that used to route it through some airport gets
+deleted, leaving a perfectly self-consistent two-leg loop (say, YHZ↔YYT)
+that the aircraft, still sitting wherever its old rotation last left it,
+never actually touches. Found immediately after the closed-loop fix
+shipped, by the same player hitting exactly this case. The message names
+the tail, where it actually is, and which airports its own schedule would
+accept it at.
+
+**Warnings are visible in the UI, not just the console (week three):**
+`validateSchedule()` returns its problem list (still logs it too) instead
+of only logging it, and every call site — the startup check here, the
+remove/edit handlers below, and the M10 route builder's Add Route — routes
+that return value through `ui/panels.ts`'s `renderScheduleWarnings()`,
+which renders the list directly above the Schedule table. A
+`console.error` nobody has devtools open to see is functionally the same
+as no error at all from the player's chair; this puts it exactly where
+their attention already is right after the edit that caused it.
+
 Editing is departure time, plus removal (week three) — reassigning a
 leg's origin, destination, or tail (which would also mean recomputing
 `blockMinutes` and touching `render/routes.ts`'s route list) is out of
