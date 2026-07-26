@@ -209,9 +209,15 @@ export function legsServingMarket(origin: string, dest: string, legs: ScheduleLe
  * schedule looks fine for the rest of the day it was edited. Checked here
  * too, not just link-by-link.
  *
- * Logs one line per problem found, or a single OK line.
+ * Logs one line per problem found, or a single OK line, and also *returns*
+ * the problem list (empty when the schedule is clean) — added in week
+ * three so callers can show a warning somewhere a player will actually see
+ * it. Console-only errors turned out to be invisible in practice: a route
+ * added onto a tail that's already busy elsewhere breaks silently from the
+ * player's point of view (no revenue, aircraft just sits there) unless
+ * they happen to have devtools open at the moment they add it.
  */
-export function validateSchedule(legs: ScheduleLeg[]): void {
+export function validateSchedule(legs: ScheduleLeg[]): string[] {
   const byTail = new Map<string, ScheduleLeg[]>();
   for (const leg of legs) {
     const group = byTail.get(leg.tail) ?? [];
@@ -219,7 +225,7 @@ export function validateSchedule(legs: ScheduleLeg[]): void {
     byTail.set(leg.tail, group);
   }
 
-  let problemFound = false;
+  const problems: string[] = [];
 
   for (const [tail, tailLegs] of byTail) {
     const sorted = [...tailLegs].sort((a, b) => a.departMinute - b.departMinute);
@@ -228,18 +234,14 @@ export function validateSchedule(legs: ScheduleLeg[]): void {
       const current = sorted[i];
 
       if (previous.dest !== current.origin) {
-        problemFound = true;
-        console.error(
-          `Schedule error: ${tail} lands at ${previous.dest} on ${previous.legId} but ${current.legId} departs from ${current.origin}`,
+        problems.push(
+          `${tail} lands at ${previous.dest} on ${previous.legId} but ${current.legId} departs from ${current.origin}`,
         );
       }
 
       const turnMinutes = current.departMinute - (previous.departMinute + previous.blockMinutes);
       if (turnMinutes < MIN_TURN_MINUTES) {
-        problemFound = true;
-        console.error(
-          `Schedule error: ${tail} has only ${turnMinutes} minutes on the ground between ${previous.legId} and ${current.legId}`,
-        );
+        problems.push(`${tail} has only ${turnMinutes} minutes on the ground between ${previous.legId} and ${current.legId}`);
       }
     }
 
@@ -247,15 +249,20 @@ export function validateSchedule(legs: ScheduleLeg[]): void {
       const first = sorted[0];
       const last = sorted[sorted.length - 1];
       if (last.dest !== first.origin) {
-        problemFound = true;
-        console.error(
-          `Schedule error: ${tail}'s rotation doesn't close -- ${last.legId} lands at ${last.dest}, but the day restarts at ${first.origin} (${first.legId}). Add a leg back to ${first.origin}, or that first departure will never fire again.`,
+        problems.push(
+          `${tail}'s rotation doesn't close -- ${last.legId} lands at ${last.dest}, but the day restarts at ${first.origin} (${first.legId}). Add a leg back to ${first.origin}, or that first departure will never fire again.`,
         );
       }
     }
   }
 
-  if (!problemFound) {
+  if (problems.length === 0) {
     console.log(`Schedule OK: ${legs.length} legs across ${byTail.size} aircraft, no broken rotations.`);
+  } else {
+    for (const problem of problems) {
+      console.error(`Schedule error: ${problem}`);
+    }
   }
+
+  return problems;
 }

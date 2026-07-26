@@ -11,7 +11,7 @@ import {
   validateSchedule,
   type ScheduleLeg,
 } from '../sim/schedule';
-import { addScheduleRow, filterScheduleToRoute, minuteOfDayToTimeString } from './panels';
+import { addScheduleRow, filterScheduleToRoute, minuteOfDayToTimeString, renderScheduleWarnings } from './panels';
 import { addCommercialRow } from './commercial';
 import type { SimState } from '../sim/state';
 
@@ -401,7 +401,7 @@ export function setupRouteBuilder(state: SimState): void {
       }
     }
 
-    validateSchedule(state.schedule);
+    renderScheduleWarnings(validateSchedule(state.schedule));
 
     // Fare/marketing are set at the market level (sim/state.ts's
     // RouteSettings), not per leg — a brand-new market gets a fresh entry

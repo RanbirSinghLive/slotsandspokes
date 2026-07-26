@@ -12,7 +12,7 @@ import { showCompetitionTooltip, hideCompetitionTooltip } from './ui/competition
 import { validateSchedule } from './sim/schedule';
 import { createInitialState, type SimState } from './sim/state';
 import { step } from './sim/step';
-import { updatePanel, setupScheduleEditor, PANEL_WIDTH_PX } from './ui/panels';
+import { updatePanel, setupScheduleEditor, renderScheduleWarnings, PANEL_WIDTH_PX } from './ui/panels';
 import {
   setupRouteBuilder,
   handleRouteBuilderMouseDown,
@@ -43,7 +43,7 @@ const state: SimState = loadSavedState() ?? createInitialState(ACTIVE_TAILS, Dat
 // M8 schedule editor re-runs this same check after every edit, so a change
 // that breaks a rotation gets caught the same way a broken schedule.json
 // would be caught here at startup.
-validateSchedule(state.schedule);
+renderScheduleWarnings(validateSchedule(state.schedule));
 setupScheduleEditor(state);
 setupRouteBuilder(state);
 setupRotationBoard();

@@ -181,6 +181,31 @@ check reports it clearly; separately, drew a fresh YYZ↔YQM route and
 confirmed both legs appear from one confirm, with the return leg's
 auto-computed time shown in the form before submitting.
 
+### 6. Schedule warnings were console-only — done
+
+Found immediately after item 5, by hitting the exact case its default
+tail selection doesn't protect against: drawing a route while the fleet's
+first aircraft (whatever the Tail dropdown defaults to) is already flying
+its own separate rotation elsewhere. The new legs get tacked onto that
+same tail, `validateSchedule()` correctly flags it — but only to
+`console.error`, which no one but a developer with devtools open would
+ever see. From the player's chair this just looks like "I added a route
+and it's not registering," with zero indication why.
+
+`validateSchedule()` (`sim/schedule.ts`) now returns its list of problems
+(still logs them too, unchanged) instead of only logging them, and every
+call site (`main.ts`'s startup check, `ui/panels.ts`'s remove/edit
+handlers, `ui/routeBuilder.ts`'s Add Route) routes that return value
+through a new `renderScheduleWarnings()` in `ui/panels.ts`, which shows
+the list directly above the Schedule table — right where the player's
+attention already is after an edit. Empty list hides the box entirely.
+
+Verified in-browser: reproduced the exact scenario (drew YHZ↔YYT without
+changing the Tail dropdown off its default, so it landed on a tail
+already mid-rotation elsewhere) and confirmed both the broken-link and
+non-closing-loop errors appear immediately in the Schedule panel, in
+plain language, no devtools required.
+
 ## Judgment calls, not yet decided
 
 ### Time navigation and pacing
@@ -237,6 +262,11 @@ problem a real session hasn't surfaced yet.
 5. **Closed-loop schedule validation + default-bidirectional route
    creation** — done. The one item found by actually playtesting rather
    than by reading the code — a stranded tail with silently-zero revenue.
-6. Time navigation / weather visibility / failure-state — all worth
+6. **Schedule warnings visible in the UI, not just the console** — done.
+   Found by playtesting again: adding a route defaults its Tail dropdown to
+   the fleet's first aircraft, which may already have its own separate
+   rotation elsewhere — the new route silently never flies, and until now
+   the only sign was a `console.error` no one but a developer would see.
+7. Time navigation / weather visibility / failure-state — all worth
    revisiting once a real session has actually been played against
-   items 1-5, not before.
+   items 1-6, not before.

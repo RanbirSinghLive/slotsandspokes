@@ -15,6 +15,26 @@ const scheduleBody = document.querySelector<HTMLTableSectionElement>('#schedule-
 const scheduleFilterTail = document.querySelector<HTMLInputElement>('#schedule-filter-tail')!;
 const scheduleFilterRoute = document.querySelector<HTMLInputElement>('#schedule-filter-route')!;
 const scheduleFilterDepart = document.querySelector<HTMLInputElement>('#schedule-filter-depart')!;
+const scheduleWarningsEl = document.querySelector<HTMLUListElement>('#schedule-warnings')!;
+
+/**
+ * Show validateSchedule()'s problems (if any) directly in the Schedule
+ * panel, not just the console — a route added onto a tail that's already
+ * busy elsewhere (its own separate rotation) breaks with zero revenue and
+ * no other visible symptom, and console-only errors are easy to miss
+ * without devtools open. Every validateSchedule() call site should route
+ * its result through here so the panel never shows a stale list from
+ * before the player's latest edit.
+ */
+export function renderScheduleWarnings(problems: string[]): void {
+  scheduleWarningsEl.innerHTML = '';
+  scheduleWarningsEl.hidden = problems.length === 0;
+  for (const problem of problems) {
+    const item = document.createElement('li');
+    item.textContent = problem;
+    scheduleWarningsEl.appendChild(item);
+  }
+}
 
 function formatMoney(amount: number): string {
   const sign = amount < 0 ? '-' : '';
@@ -117,7 +137,7 @@ function removeScheduleLeg(leg: ScheduleLeg, state: SimState): void {
     removeCommercialRow(key);
   }
 
-  validateSchedule(state.schedule);
+  renderScheduleWarnings(validateSchedule(state.schedule));
 }
 
 /**
@@ -140,7 +160,7 @@ function buildScheduleRow(leg: ScheduleLeg, state: SimState): HTMLTableRowElemen
   departInput.value = minuteOfDayToTimeString(leg.departMinute);
   departInput.addEventListener('change', () => {
     leg.departMinute = timeStringToMinuteOfDay(departInput.value);
-    validateSchedule(state.schedule);
+    renderScheduleWarnings(validateSchedule(state.schedule));
     applyScheduleFilters(); // the edited time may no longer match an active Depart filter
   });
   departCell.appendChild(departInput);
