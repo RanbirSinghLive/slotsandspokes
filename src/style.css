@@ -108,7 +108,12 @@ body {
 
 .view-dropdown {
   position: absolute;
-  top: calc(100% + 6px);
+  /* Flush against the trigger (no gap) rather than offset a few pixels
+     below it — opening on hover means the mouse has to travel from the
+     trigger down into this box, and any real gap is a dead zone where
+     .view-group briefly stops being hovered, closing the dropdown before
+     the pointer ever reaches it. */
+  top: 100%;
   left: 0;
   z-index: 10;
   display: flex;

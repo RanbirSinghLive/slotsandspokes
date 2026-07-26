@@ -231,12 +231,31 @@ viewGroups.forEach((group) => {
   const trigger = group.querySelector<HTMLButtonElement>('.view-group-trigger')!;
   const dropdown = group.querySelector<HTMLDivElement>('.view-dropdown')!;
 
+  function openThisDropdown(): void {
+    closeAllDropdowns();
+    dropdown.hidden = false;
+    trigger.setAttribute('aria-expanded', 'true');
+  }
+
   trigger.addEventListener('click', (event) => {
     event.stopPropagation(); // don't immediately re-close via the document listener below
-    const wasHidden = dropdown.hidden;
-    closeAllDropdowns();
-    dropdown.hidden = !wasHidden;
-    trigger.setAttribute('aria-expanded', String(!wasHidden));
+    if (dropdown.hidden) {
+      openThisDropdown();
+    } else {
+      dropdown.hidden = true;
+      trigger.setAttribute('aria-expanded', 'false');
+    }
+  });
+
+  // Opening on hover (not just click) is why .view-dropdown sits flush
+  // against its trigger with no gap in style.css — mouseenter/mouseleave
+  // fire on `group` as a whole, which contains both the trigger and the
+  // dropdown, so moving the pointer from one into the other never counts
+  // as leaving the group; a real gap between them would.
+  group.addEventListener('mouseenter', openThisDropdown);
+  group.addEventListener('mouseleave', () => {
+    dropdown.hidden = true;
+    trigger.setAttribute('aria-expanded', 'false');
   });
 });
 
