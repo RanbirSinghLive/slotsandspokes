@@ -2,8 +2,8 @@ import { geoPath } from 'd3-geo';
 import type { LineString } from 'geojson';
 import { projection } from './projection';
 import { airports } from './airports';
-import { scheduleLegs } from '../sim/schedule';
 import { dailyDemand } from '../sim/demand';
+import type { SimState } from '../sim/state';
 
 const DEMAND_STROKE = '#4a90d9';
 const SERVED_HIGHLIGHT = '#ffd166';
@@ -35,15 +35,24 @@ for (let i = 0; i < airports.length; i++) {
 const maxDemand = Math.max(...pairs.map((p) => p.demand));
 const maxPopulation = Math.max(...airports.map((a) => a.population));
 
-// Which pairs already have at least one scheduled leg, in either direction —
-// the same bidirectional definition render/routes.ts uses for the route
-// network, so "served" here means the same thing it does there.
-const servedPairs = new Set<string>();
-for (const leg of scheduleLegs) {
-  servedPairs.add(pairKey(leg.origin, leg.dest));
-}
-
 const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]));
+
+/**
+ * Which pairs currently have at least one scheduled leg, in either
+ * direction — the same bidirectional definition render/routes.ts uses for
+ * the route network, so "served" here means the same thing it does there.
+ * Computed fresh from `state.schedule` on every call rather than cached
+ * from the static `scheduleLegs` template at import time — the same fix
+ * render/routes.ts already got: cached, this halo would never move even
+ * as routes were added or removed in-game.
+ */
+function servedPairsFrom(state: SimState): Set<string> {
+  const served = new Set<string>();
+  for (const leg of state.schedule) {
+    served.add(pairKey(leg.origin, leg.dest));
+  }
+  return served;
+}
 
 /**
  * The "Demand" map mode: every one of the 45 city pairs drawn as a
@@ -61,8 +70,9 @@ const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]
  * Read-only, like the rotation board's first pass — this answers "where's
  * the market" before any interaction gets built on top of it.
  */
-export function drawDemandLayer(ctx: CanvasRenderingContext2D): void {
+export function drawDemandLayer(ctx: CanvasRenderingContext2D, state: SimState): void {
   const path = geoPath(projection, ctx);
+  const servedPairs = servedPairsFrom(state);
 
   for (const { origin, dest, demand } of pairs) {
     const originAirport = airportsByIata.get(origin);

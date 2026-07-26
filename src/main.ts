@@ -179,9 +179,9 @@ function render(): void {
     drawWeatherEffects(ctx, state);
     drawRoutePreview(ctx);
   } else if (currentView === 'demand') {
-    drawDemandLayer(ctx);
+    drawDemandLayer(ctx, state);
   } else {
-    drawCompetitionLayer(ctx, selectedCompetitorAirline);
+    drawCompetitionLayer(ctx, selectedCompetitorAirline, state);
   }
 }
 
@@ -409,9 +409,9 @@ canvas.addEventListener('mousemove', (event) => {
   if (currentView === 'ops' && handleRouteBuilderMouseMove(event)) render();
 
   if (currentView === 'competition') {
-    const hover = findCompetitionHover(event.clientX, event.clientY, selectedCompetitorAirline);
+    const hover = findCompetitionHover(event.clientX, event.clientY, selectedCompetitorAirline, state);
     if (hover) {
-      showCompetitionTooltip(hover, event.clientX, event.clientY);
+      showCompetitionTooltip(hover, event.clientX, event.clientY, state);
     } else {
       hideCompetitionTooltip();
     }

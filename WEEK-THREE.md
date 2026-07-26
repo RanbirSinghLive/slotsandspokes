@@ -108,13 +108,20 @@ its distinct-market list fresh on every call, straight from
 dozen-ish legs and a `Map`, well within what a call already made every
 rendered frame can absorb.
 
-**The same bug exists in two more places, not yet fixed**:
-`render/demand.ts` (the "served" amber halo) and `render/competition.ts`
-(which markets count as "yours" for the yours/theirs/both coloring, and
-the frequency counts the hover tooltips show) both also import the
-static `scheduleLegs` instead of reading `state.schedule`. Same root
-cause, same fix shape — worth doing in the same pass rather than
-leaving two views quietly showing a schedule that no longer exists.
+**The same bug existed in two more places — also fixed, found by the
+player noticing "feels like stale code" after New Game**: `render/demand.ts`
+(the "served" amber halo) and `render/competition.ts` (which markets count
+as "yours" for the yours/theirs/both coloring, and the frequency counts
+the hover tooltips show) both also imported the static `scheduleLegs`
+instead of reading `state.schedule`. Both now recompute their "own routes"
+data fresh from `state.schedule` on every call, the same shape as the
+`routes.ts` fix above — `demand.ts`'s `servedPairsFrom(state)` and
+`competition.ts`'s `ownRoutesFrom(state)`, threaded through
+`drawDemandLayer()`, `drawCompetitionLayer()`, `findCompetitionHover()`,
+`operatorsForMarket()`, and `operatorsForAirport()`. Verified in-browser:
+hovering YQB in Competition mode showed "FA Fundy Air — 4/day" (all four
+of C-FATL's legs touching YQB), then dropped to "3/day" immediately after
+removing one of those legs from the schedule table — no reload.
 
 Verified in-browser: removed both legs of the YQB-YSJ market via the
 schedule table's "×" buttons while watching Ops mode — the line

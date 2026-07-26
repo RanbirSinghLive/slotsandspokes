@@ -1,6 +1,7 @@
 import { airports } from '../render/airports';
 import type { CompetitionHover, Operator } from '../render/competition';
 import { operatorsForAirport, operatorsForMarket } from '../render/competition';
+import type { SimState } from '../sim/state';
 
 const tooltip = document.querySelector<HTMLDivElement>('#competition-tooltip')!;
 const titleEl = document.querySelector<HTMLDivElement>('#competition-tooltip-title')!;
@@ -71,12 +72,12 @@ function renderOperators(title: string, operators: Operator[]): void {
  * off the pointer. Called from main.ts's mousemove handler, gated to
  * Competition mode only.
  */
-export function showCompetitionTooltip(hover: CompetitionHover, screenX: number, screenY: number): void {
+export function showCompetitionTooltip(hover: CompetitionHover, screenX: number, screenY: number, state: SimState): void {
   if (hover.type === 'airport') {
     const airport = airportsByIata.get(hover.iata);
-    renderOperators(`${hover.iata}${airport ? ` — ${airport.name}` : ''}`, operatorsForAirport(hover.iata));
+    renderOperators(`${hover.iata}${airport ? ` — ${airport.name}` : ''}`, operatorsForAirport(hover.iata, state));
   } else {
-    renderOperators(`${hover.origin} ↔ ${hover.dest}`, operatorsForMarket(hover.origin, hover.dest));
+    renderOperators(`${hover.origin} ↔ ${hover.dest}`, operatorsForMarket(hover.origin, hover.dest, state));
   }
 
   tooltip.hidden = false;

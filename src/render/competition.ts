@@ -2,9 +2,9 @@ import { geoPath, geoInterpolate } from 'd3-geo';
 import type { LineString } from 'geojson';
 import { projection } from './projection';
 import { airports, drawAirports, type Airport } from './airports';
-import { scheduleLegs } from '../sim/schedule';
 import { competitors } from '../sim/choiceModel';
 import { PLAYER_AIRLINE } from '../sim/airline';
+import type { SimState } from '../sim/state';
 
 const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]));
 
@@ -49,10 +49,24 @@ function marketKey(a: string, b: string): string {
   return [a, b].sort().join('-');
 }
 
-const ownRoutes = new Map<string, { origin: string; dest: string }>();
-for (const leg of scheduleLegs) {
-  const key = marketKey(leg.origin, leg.dest);
-  if (!ownRoutes.has(key)) ownRoutes.set(key, { origin: leg.origin, dest: leg.dest });
+// Competitor routes (data/competitors.json) never change at runtime, so
+// these stay module-level. The player's own routes are the opposite —
+// state.schedule is exactly what the player edits in-session (add/remove a
+// route or frequency) — so they're computed fresh per call by
+// ownRoutesFrom() below, never cached, the same fix render/routes.ts
+// already got: this file used to build `ownRoutes` once at import time
+// from the static `scheduleLegs` template, which meant the yours/theirs/
+// both coloring, the hover tooltip's frequency counts, and even a brand
+// new game's "New Game" reset never actually reflected what the player had
+// really built — every one of them kept showing the original 8-market
+// template forever, regardless of any in-game edit.
+function ownRoutesFrom(state: SimState): Map<string, { origin: string; dest: string }> {
+  const routes = new Map<string, { origin: string; dest: string }>();
+  for (const leg of state.schedule) {
+    const key = marketKey(leg.origin, leg.dest);
+    if (!routes.has(key)) routes.set(key, { origin: leg.origin, dest: leg.dest });
+  }
+  return routes;
 }
 
 const competitorRoutesByAirline = new Map<string, Map<string, { origin: string; dest: string }>>();
@@ -64,12 +78,8 @@ for (const c of competitors) {
 }
 
 const allCompetitorMarketKeys = new Set<string>();
-const allMarketRoutes = new Map<string, { origin: string; dest: string }>(ownRoutes);
 for (const forAirline of competitorRoutesByAirline.values()) {
-  for (const [key, route] of forAirline) {
-    allCompetitorMarketKeys.add(key);
-    if (!allMarketRoutes.has(key)) allMarketRoutes.set(key, route);
-  }
+  for (const key of forAirline.keys()) allCompetitorMarketKeys.add(key);
 }
 
 /**
@@ -86,12 +96,28 @@ export function competitorAirlines(): string[] {
  * aggregate ("any competitor") view, a specific airline name otherwise.
  * Shared by drawCompetitionLayer() and findCompetitionHover() so hit-
  * testing can never test against a market that isn't actually on screen.
+ * Takes `ownRoutes` (from ownRoutesFrom(state)) as a parameter rather than
+ * recomputing it itself, since callers that also need strokeFor() would
+ * otherwise be computing the same thing twice per call.
  */
-function visibleMarkets(selectedAirline: string | null): Map<string, { origin: string; dest: string }> {
-  const competitorRoutes =
-    selectedAirline === null ? allMarketRoutes : (competitorRoutesByAirline.get(selectedAirline) ?? new Map());
-  const competitorMarketKeys =
-    selectedAirline === null ? allCompetitorMarketKeys : new Set(competitorRoutesByAirline.get(selectedAirline)?.keys() ?? []);
+function visibleMarkets(
+  ownRoutes: Map<string, { origin: string; dest: string }>,
+  selectedAirline: string | null,
+): Map<string, { origin: string; dest: string }> {
+  let competitorRoutes: Map<string, { origin: string; dest: string }>;
+  let competitorMarketKeys: Set<string>;
+  if (selectedAirline === null) {
+    competitorRoutes = new Map(ownRoutes);
+    for (const forAirline of competitorRoutesByAirline.values()) {
+      for (const [key, route] of forAirline) {
+        if (!competitorRoutes.has(key)) competitorRoutes.set(key, route);
+      }
+    }
+    competitorMarketKeys = allCompetitorMarketKeys;
+  } else {
+    competitorRoutes = competitorRoutesByAirline.get(selectedAirline) ?? new Map();
+    competitorMarketKeys = new Set(competitorRoutesByAirline.get(selectedAirline)?.keys() ?? []);
+  }
 
   const result = new Map<string, { origin: string; dest: string }>();
   for (const key of new Set([...ownRoutes.keys(), ...competitorMarketKeys])) {
@@ -101,7 +127,11 @@ function visibleMarkets(selectedAirline: string | null): Map<string, { origin: s
   return result;
 }
 
-function strokeFor(key: string, selectedAirline: string | null): string {
+function strokeFor(
+  key: string,
+  selectedAirline: string | null,
+  ownRoutes: Map<string, { origin: string; dest: string }>,
+): string {
   const competitorMarketKeys =
     selectedAirline === null ? allCompetitorMarketKeys : new Set(competitorRoutesByAirline.get(selectedAirline)?.keys() ?? []);
   const flownByOwn = ownRoutes.has(key);
@@ -155,11 +185,12 @@ function drawLine(
  * separate dimmed/highlighted treatment — the three-color split already
  * does that job.
  */
-export function drawCompetitionLayer(ctx: CanvasRenderingContext2D, selectedAirline: string | null): void {
+export function drawCompetitionLayer(ctx: CanvasRenderingContext2D, selectedAirline: string | null, state: SimState): void {
   const path = geoPath(projection, ctx);
+  const ownRoutes = ownRoutesFrom(state);
 
-  for (const [key, { origin, dest }] of visibleMarkets(selectedAirline)) {
-    drawLine(ctx, path, origin, dest, strokeFor(key, selectedAirline));
+  for (const [key, { origin, dest }] of visibleMarkets(ownRoutes, selectedAirline)) {
+    drawLine(ctx, path, origin, dest, strokeFor(key, selectedAirline, ownRoutes));
   }
 
   drawAirports(ctx);
@@ -174,12 +205,12 @@ export type Operator = { code: string; name: string; color: string; frequency: n
  * picture regardless of the map's current airline filter, since knowing
  * "who else is here" is the whole point of hovering a route.
  */
-export function operatorsForMarket(origin: string, dest: string): Operator[] {
+export function operatorsForMarket(origin: string, dest: string, state: SimState): Operator[] {
   const key = marketKey(origin, dest);
   const operators: Operator[] = [];
 
-  if (ownRoutes.has(key)) {
-    const frequency = scheduleLegs.filter((leg) => marketKey(leg.origin, leg.dest) === key).length;
+  const frequency = state.schedule.filter((leg) => marketKey(leg.origin, leg.dest) === key).length;
+  if (frequency > 0) {
     operators.push({ code: PLAYER_AIRLINE.code, name: PLAYER_AIRLINE.name, color: colorForAirline(PLAYER_AIRLINE.code), frequency });
   }
 
@@ -202,7 +233,7 @@ export function operatorsForMarket(origin: string, dest: string): Operator[] {
  * arriving), summed across all of that airport's markets — the airport-
  * hover equivalent of operatorsForMarket() above.
  */
-export function operatorsForAirport(iata: string): Operator[] {
+export function operatorsForAirport(iata: string, state: SimState): Operator[] {
   const frequencyByCode = new Map<string, { name: string; frequency: number }>();
 
   function add(code: string, name: string, frequency: number): void {
@@ -211,7 +242,7 @@ export function operatorsForAirport(iata: string): Operator[] {
     else frequencyByCode.set(code, { name, frequency });
   }
 
-  for (const leg of scheduleLegs) {
+  for (const leg of state.schedule) {
     if (leg.origin === iata || leg.dest === iata) add(PLAYER_AIRLINE.code, PLAYER_AIRLINE.name, 1);
   }
   for (const c of competitors) {
@@ -274,7 +305,12 @@ export type CompetitionHover = { type: 'airport'; iata: string } | { type: 'mark
  * to hover on an arc that isn't on screen. `null` if neither is close
  * enough.
  */
-export function findCompetitionHover(screenX: number, screenY: number, selectedAirline: string | null): CompetitionHover | null {
+export function findCompetitionHover(
+  screenX: number,
+  screenY: number,
+  selectedAirline: string | null,
+  state: SimState,
+): CompetitionHover | null {
   let nearestIata: string | null = null;
   let nearestAirportDist = AIRPORT_HIT_RADIUS_PX;
   for (const airport of airports) {
@@ -290,7 +326,7 @@ export function findCompetitionHover(screenX: number, screenY: number, selectedA
 
   let nearestMarket: { origin: string; dest: string } | null = null;
   let nearestMarketDist = MARKET_HIT_RADIUS_PX;
-  for (const { origin, dest } of visibleMarkets(selectedAirline).values()) {
+  for (const { origin, dest } of visibleMarkets(ownRoutesFrom(state), selectedAirline).values()) {
     const originAirport = airportsByIata.get(origin);
     const destAirport = airportsByIata.get(dest);
     if (!originAirport || !destAirport) continue;
