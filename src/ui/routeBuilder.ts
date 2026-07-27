@@ -40,6 +40,63 @@ const aircraftTypesByCode = new Map<string, AircraftTypeSpec>(
   (aircraftTypesData as AircraftTypeSpec[]).map((type) => [type.code, type]),
 );
 
+// --- The armed-state hover tooltip (week four) ---
+//
+// PDEW/CAP for whichever airport the cursor is currently snapped to as a
+// candidate destination, shown *before* the second click confirms
+// anything — same real-DOM, positioned-via-mousemove shape as
+// ui/competitionTooltip.ts's tooltip.
+const routeHoverTooltip = document.querySelector<HTMLElement>('#route-hover-tooltip')!;
+const routeHoverTooltipTitle = document.querySelector<HTMLElement>('#route-hover-tooltip-title')!;
+const routeHoverTooltipBody = document.querySelector<HTMLElement>('#route-hover-tooltip-body')!;
+
+/**
+ * Same PDEW/CAP formula updateFormValidation() uses (see its own
+ * comment), just computed for a candidate that hasn't been clicked yet.
+ * Reads the confirmation form's return checkbox for whether to assume a
+ * return leg — a reasonable best guess even before the form exists for
+ * this specific candidate, since it defaults to checked every time the
+ * form opens anyway.
+ */
+function showRouteHoverTooltip(origin: Airport, candidate: Airport, screenX: number, screenY: number, state: SimState): void {
+  const tail = getSelectedTail();
+  const aircraft = tail ? state.aircraft.find((a) => a.tail === tail) : undefined;
+  const type = aircraft ? aircraftTypesByCode.get(aircraft.typeCode) : undefined;
+
+  routeHoverTooltipTitle.textContent = `${origin.iata} → ${candidate.iata}`;
+
+  if (type) {
+    const existingFrequency = legsServingMarket(origin.iata, candidate.iata, state.schedule);
+    const newFrequency = existingFrequency + (formReturnCheckbox.checked ? 2 : 1);
+    const pdew = Math.round(dailyDemand(origin.iata, candidate.iata) / newFrequency);
+    const distanceNm = greatCircleDistanceNm(origin, candidate);
+    const outOfRange = distanceNm > type.rangeNm;
+
+    routeHoverTooltipBody.textContent = outOfRange
+      ? `PDEW: ${pdew}  CAP: ${type.seats} — out of range (${Math.round(distanceNm)} nm)`
+      : `PDEW: ${pdew}  CAP: ${type.seats}`;
+    routeHoverTooltipBody.classList.toggle('out-of-range', outOfRange);
+    routeHoverTooltipBody.classList.toggle('thin-market', !outOfRange && pdew < type.seats);
+  } else {
+    routeHoverTooltipBody.textContent = '';
+    routeHoverTooltipBody.classList.remove('out-of-range', 'thin-market');
+  }
+
+  routeHoverTooltip.hidden = false;
+  routeHoverTooltip.style.left = `${screenX + 16}px`;
+  routeHoverTooltip.style.top = `${screenY + 16}px`;
+}
+
+/**
+ * Exported so main.ts can hide the tooltip on canvas `mouseleave` without
+ * cancelling the whole armed gesture the way cancelPendingRoute() would —
+ * moving the mouse off the map briefly (to the sidebar, say) shouldn't
+ * lose an in-progress route.
+ */
+export function hideRouteHoverTooltip(): void {
+  routeHoverTooltip.hidden = true;
+}
+
 /**
  * The M10 route-creation gesture: pick a plane from the Fleet panel first
  * (week three — see ui/fleetSelection.ts), click an airport to arm it,
@@ -151,6 +208,7 @@ function reset(): void {
   candidate = null;
   setArmedCursor(false);
   hideForm();
+  hideRouteHoverTooltip();
 }
 
 /**
@@ -225,14 +283,24 @@ export function handleRouteBuilderMouseDown(event: MouseEvent, state: SimState):
  * Update the live preview while armed. No-op in every other mode — returns
  * whether anything changed, so main.ts only pays for an extra render() on
  * mouse moves that actually matter (armed), not on every idle move over
- * the map the way an unconditional call would.
+ * the map the way an unconditional call would. Also shows/hides the
+ * PDEW/CAP hover tooltip (week four) for whichever airport `candidate`
+ * snaps to, so that reading is visible before the second click confirms
+ * anything.
  */
-export function handleRouteBuilderMouseMove(event: MouseEvent): boolean {
+export function handleRouteBuilderMouseMove(event: MouseEvent, state: SimState): boolean {
   if (builderState.mode !== 'armed') return false;
   const geo = projection.invert?.([event.clientX, event.clientY]);
   if (!geo) return false;
   previewGeo = geo;
   candidate = findNearestAirport(event.clientX, event.clientY);
+
+  if (candidate && candidate.iata !== builderState.origin.iata) {
+    showRouteHoverTooltip(builderState.origin, candidate, event.clientX, event.clientY, state);
+  } else {
+    hideRouteHoverTooltip();
+  }
+
   return true;
 }
 

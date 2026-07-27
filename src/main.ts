@@ -20,6 +20,7 @@ import {
   handleRouteBuilderKeyDown,
   drawRoutePreview,
   cancelPendingRoute,
+  hideRouteHoverTooltip,
 } from './ui/routeBuilder';
 import { setupRotationBoard, updateRotationBoard } from './ui/rotationBoard';
 import { setupCommercialPanel, updateCommercialPanel } from './ui/commercial';
@@ -425,7 +426,7 @@ canvas.addEventListener('mousedown', (event) => {
 });
 
 canvas.addEventListener('mousemove', (event) => {
-  if (currentView === 'ops' && handleRouteBuilderMouseMove(event)) render();
+  if (currentView === 'ops' && handleRouteBuilderMouseMove(event, state)) render();
 
   if (currentView === 'competition') {
     const hover = findCompetitionHover(event.clientX, event.clientY, selectedCompetitorAirline, state);
@@ -439,6 +440,7 @@ canvas.addEventListener('mousemove', (event) => {
 
 canvas.addEventListener('mouseleave', () => {
   hideCompetitionTooltip();
+  hideRouteHoverTooltip();
 });
 
 window.addEventListener('mousemove', (event) => {

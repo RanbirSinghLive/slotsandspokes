@@ -113,10 +113,19 @@ expect a full plane" just as quickly.
   even when the route is otherwise blocked (network gating, out of
   range) — still useful context for a market you might come back and
   draw differently.
-- **Not yet built** — a live hover readout while a route is *armed*
-  (before confirming), for whichever airport the cursor is currently
-  snapped to as a candidate destination, so the number is visible before
-  the second click, not only after. This is build-order item 2, below.
+- **Done** — a live hover readout while a route is *armed* (before
+  confirming), for whichever airport the cursor is currently snapped to
+  as a candidate destination, so the number is visible before the
+  second click, not only after (`ui/routeBuilder.ts`'s
+  `showRouteHoverTooltip()`, a real-DOM tooltip positioned via mousemove,
+  same shape as `ui/competitionTooltip.ts`'s). Also flags a candidate
+  that's beyond the selected plane's range (`.out-of-range`, red) — a
+  case the confirmation form catches too, but here it's visible before
+  even clicking the second airport. Verified in-browser: armed YOW,
+  hovered YUL → `PDEW: 626 CAP: 19` (matching the form's own number
+  exactly); hovered YYT → `PDEW: 3 CAP: 19 — out of range (954 nm)` in
+  red; canvas `mouseleave` hides the tooltip without cancelling the
+  armed gesture (re-hovering brought it right back).
 
 ## Design: layers, not modes
 
@@ -165,8 +174,11 @@ before starting rather than discovering it mid-build.
    immediately useful even before anything about layers changes. No
    architecture change — just a new readout using numbers the sim
    already computes.
-2. **Live PDEW/CAP on hover while armed.** Reuses Competition mode's
-   arc/airport hit-testing technique, generalized to Ops mode.
+2. **Live PDEW/CAP on hover while armed** — done. Turned out not to need
+   Competition mode's arc-hit-testing technique — the route builder
+   already snaps to the nearest airport for its own preview arc
+   (`candidate`), so the tooltip just reads off that existing value
+   rather than re-detecting hover itself.
 3. **Demand and Competition as toggleable overlays**, replacing the
    exclusive-mode dropdown — the large structural piece. Unifies the two
    separate hover-tooltip systems into one along the way.

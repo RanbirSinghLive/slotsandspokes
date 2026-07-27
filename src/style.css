@@ -843,3 +843,40 @@ body {
   height: 9px;
   border-radius: 2px;
 }
+
+/* Week four's route-hover tooltip — PDEW/CAP for whichever airport is
+   currently snapped to as a candidate destination while a route is
+   armed, so the reading is visible before the second click, not only
+   after. Same "real DOM, positioned via mousemove" shape as
+   #competition-tooltip. */
+#route-hover-tooltip {
+  position: fixed;
+  z-index: 30;
+  max-width: 220px;
+  padding: 8px 10px;
+  background: rgba(10, 12, 18, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  color: #cdd3e0;
+  pointer-events: none;
+}
+
+#route-hover-tooltip[hidden] {
+  display: none;
+}
+
+#route-hover-tooltip-title {
+  font-size: 13px;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+#route-hover-tooltip-body.thin-market {
+  color: #ffd166;
+}
+
+#route-hover-tooltip-body.out-of-range {
+  color: #ff8080;
+}

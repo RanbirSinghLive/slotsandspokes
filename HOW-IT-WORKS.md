@@ -692,6 +692,22 @@ changes `newFrequency`), and stays visible even when the route itself is
 blocked (network gating, out of range) — still useful context for a
 market worth trying differently.
 
+**The same reading, on hover, before you even confirm (week four):**
+while a route is *armed* (one airport clicked, cursor moving toward the
+second), a real-DOM tooltip (`ui/routeBuilder.ts`'s
+`showRouteHoverTooltip()`, positioned via mousemove the same way
+`ui/competitionTooltip.ts`'s already is) shows PDEW/CAP for whichever
+airport `candidate` — the same nearest-airport snap the preview arc
+already uses — currently points to. No new hit-testing needed:
+Competition mode's arc-distance technique turned out to be unnecessary
+here, since the route builder already tracks the hover target for its
+own preview line. A candidate beyond the selected plane's range shows
+"— out of range (954 nm)" in place of the thin-market amber, catching
+the same case the confirmation form's hard block does, just one click
+earlier. Hidden on canvas `mouseleave` without cancelling the armed
+gesture itself — moving the mouse to the sidebar to glance at the Fleet
+panel shouldn't lose an in-progress route.
+
 **A suggested depart time, not just a fixed one (week three):**
 `suggestedDepartTime()` replaces what used to be an unconditional
 `12:00` default. If the selected tail already has legs and the
