@@ -866,11 +866,12 @@ Week three's playtest-readiness fix (see WEEK-THREE.md): before this,
 closing the tab threw away every schedule edit, fare change, and
 marketing dollar spent, since nothing was ever written to
 `localStorage`. `loadSavedState()`/`saveState()`/`clearSavedState()` are
-a thin wrapper around it, keyed by `airgame-save-v1` — bumped by hand
-whenever `SimState`'s shape changes in a breaking way, so an old save
-under a retired key is simply never found again rather than crashing on
-a field the current code doesn't expect (bare-bones versioning, not a
-migration system).
+a thin wrapper around it, keyed by `airgame-save-v3` at last count —
+bumped by hand whenever `SimState`'s shape changes in a breaking way
+(most recently for the Fleet Market's `fleetMarket` field and `Aircraft`'s
+new `ownership`/`leaseCostPerDay`), so an old save under a retired key is
+simply never found again rather than crashing on a field the current
+code doesn't expect (bare-bones versioning, not a migration system).
 
 This only works because `SimState` is already required to survive
 `JSON.parse(JSON.stringify(state))` unchanged (CLAUDE.md's rule, true
@@ -884,12 +885,13 @@ try/catch that swallows the error — a save that didn't happen (private
 browsing, quota exceeded) is a minor inconvenience, not a reason to
 crash the simulation.
 
-A fresh game now seeds from `Date.now()` (`main.ts`'s own call to
-`createInitialState()`) rather than relying on that function's fixed
-default of `1` — so every new playthrough gets its own weather/delay
-history. `src/headless/run.ts` never passes a seed at all, so it keeps
-using that same default and stays exactly as reproducible as every
-verification in this document already relies on it being.
+A fresh game now seeds from `Date.now()` (`sim/state.ts`'s
+`createNewGameState()`, `main.ts`'s entry point) rather than a fixed
+default — so every new playthrough gets its own weather/delay history.
+`src/headless/run.ts` still calls the older `createInitialState()`
+instead, which never changed and keeps its own fixed default, so it stays
+exactly as reproducible as every verification in this document already
+relies on it being.
 
 A "New Game" button in the HUD (`confirm()`s first, since it's
 irreversible) clears the save and reloads — simpler and more robust
@@ -901,10 +903,61 @@ schedule rather than restarting; "New Game" cleared the save and
 returned to a fresh Day 1 with a visibly different weather roll than
 the previous game had.
 
+## The Fleet Market (`src/sim/fleetMarket.ts`, `src/ui/fleetMarket.ts`)
+
+Week three's biggest structural change: a new game now starts with
+**zero aircraft and zero schedule**, not the old fixed 3-tail/12-leg
+network. `sim/state.ts`'s `createNewGameState()` is the actual "New Game"
+entry point now — `STARTING_CASH` ($500,000) and nothing else. The old
+`createInitialState()` (full template, fixed seed) still exists
+unchanged, purely so `src/headless/run.ts` keeps simulating its known
+test network; the two are deliberately separate functions rather than
+one branching on its arguments.
+
+`data/fleet-market.json` is a small, hand-authored list of individual
+airframes (registration, age, buy price, daily lease price) — all one
+aircraft type, since "multiple aircraft types" stays out of scope
+(CLAUDE.md); this models several used airframes of that one type, not a
+type catalog. `ageYears` is pricing flavor only — older is cheaper, with
+no separate reliability/maintenance mechanic attached.
+
+The Fleet Market view (a new Reports-menu entry, real DOM like Rotation/
+Commercial) lists whatever's left in `state.fleetMarket`, plus a shared
+"Base new aircraft at" airport picker that applies to the *next* Buy or
+Lease click. Buying deducts `buyPrice` from cash immediately; leasing
+costs nothing up front and instead adds `leasePricePerDay` to a new daily
+charge in `step.ts` (same flat-per-day shape marketing spend already
+has) via the aircraft's `leaseCostPerDay` field. **Acquisition-only** —
+no sell-back, no early lease-end, matching CLAUDE.md's aircraft-trading
+still being deferred beyond just getting into a plane.
+
+Buying/leasing removes the listing and calls `ui/routeBuilder.ts`'s new
+`refreshTailOptions()` so the fresh tail is immediately selectable in
+the M10 route builder's Tail dropdown — that dropdown used to be built
+once at startup from a fleet that never changed; now it has to be
+rebuildable, since the fleet starts empty and only grows via purchase.
+Drawing a route with zero aircraft owned is explicitly blocked in the
+form ("Buy or lease an aircraft first...") rather than left to silently
+produce a route nothing can ever fly.
+
+There's no separate "pick a home airport" step — whichever airport the
+*first* purchase gets based at effectively becomes the player's starting
+base, since nothing else exists yet for it to compete with.
+
+**A balance gap this opened, not yet addressed:** the aircraft type
+itself changed too, at the player's request — the Dash 8-400 (78 seats)
+became a Beechcraft 1900D (19 seats), with `costPerBlockHour`/
+`costPerDeparture` scaled down proportionally in `data/aircraft-types.json`.
+The demand/fare model (`sim/demand.ts`, `recommendedFare()`) hasn't been
+re-tuned for a plane this much smaller — a headless run already shows
+small net losses that weren't there before the swap. Worth a proper
+headless-tuned pass before treating the economy as balanced again.
+
 ## What isn't built yet
 
-See WEEK-ONE.md's "Deliberately deferred" list (aircraft market, financing,
-maintenance, crew, competitor AI, multiple aircraft types, save/load, and
-more) — not duplicated here since it would just go stale. Everything in
-"Then, in order" (headless runner, schedule editor, turn times/delays) is
-now done.
+See WEEK-ONE.md's "Deliberately deferred" list — financing, maintenance,
+crew, competitor AI, and more — not duplicated here since it would just
+go stale. Aircraft acquisition (buying/leasing) is now built, acquisition-
+only, per WEEK-THREE.md's Fleet Market section above; selling or
+returning an aircraft is not. Everything in "Then, in order" (headless
+runner, schedule editor, turn times/delays) is done.

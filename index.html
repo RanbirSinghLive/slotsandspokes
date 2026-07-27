@@ -42,6 +42,26 @@
         <tbody id="commercial-rows"></tbody>
       </table>
     </div>
+    <div id="fleet-market-panel" hidden>
+      <div id="fleet-market-header">
+        <label>Base new aircraft at:
+          <select id="fleet-market-base-airport"></select>
+        </label>
+      </div>
+      <table id="fleet-market-table">
+        <thead>
+          <tr>
+            <th>Registration</th>
+            <th>Type</th>
+            <th>Age</th>
+            <th>Lease/day</th>
+            <th>Buy price</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="fleet-market-rows"></tbody>
+      </table>
+    </div>
     <div id="hud">
       <div id="clock">Day 1 · 00:00 UTC</div>
       <div id="speed-controls">
@@ -76,6 +96,7 @@
           <div class="view-dropdown" hidden>
             <button type="button" data-view="rotation">Rotation</button>
             <button type="button" data-view="commercial">Commercial</button>
+            <button type="button" data-view="fleet-market">Fleet Market</button>
           </div>
         </div>
       </div>

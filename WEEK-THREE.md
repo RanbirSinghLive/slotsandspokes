@@ -279,6 +279,59 @@ late), landing, then immediately departing again on the new YHZ → YYT
 route on its own, cost charged and no revenue on the positioning leg,
 full fare/passenger economics on the real route after.
 
+### 9. The Fleet Market: buy or lease, starting from nothing
+
+The other half of the same reframing as item 8: positioning flights mean
+a route can always find its way to a plane, but a new game still handed
+the player three aircraft, fully formed, flying an existing network from
+minute zero. That's the opposite of "build your own airline" — every
+aircraft in the game should be one the player chose to acquire.
+
+A new game (`sim/state.ts`'s `createNewGameState()`) now starts with
+**zero aircraft, zero schedule, zero routes**, and `STARTING_CASH`
+($500,000) to work with. The old `createInitialState()` — full 3-tail,
+12-leg template — still exists, untouched, purely so `src/headless/run.ts`
+(M7's balance-tuning tool) keeps simulating its known test network; the
+two are now separate entry points on purpose, not one function branching
+on its arguments.
+
+**The Fleet Market** (`sim/fleetMarket.ts` + `ui/fleetMarket.ts`, a new
+Reports-menu view) is a small, hand-authored list of individual airframes
+— registration, age, buy price, daily lease price — of the game's one
+aircraft type (see below). Buying deducts the price from cash outright;
+leasing costs nothing up front and instead charges `leasePricePerDay`
+every day at rollover, the same flat-daily-cost shape marketing spend
+already has (`step.ts`). **Acquisition-only for this pass** — no sell-back,
+no early lease-end — matching CLAUDE.md's aircraft-trading being
+deferred, while still granting the specific thing that was actually
+asked for: a way to *get into* a plane, not out of one.
+
+The panel has one shared "Base new aircraft at" selector (any of the 10
+airports) that applies to whichever listing you buy or lease next —
+deliberately doubling as the "pick a home airport" step from the earlier
+design discussion, rather than adding a separate one: wherever your first
+purchase gets based *is* your starting base, with no extra ceremony.
+Buying removes the listing and immediately refreshes the M10 route
+builder's Tail dropdown (`ui/routeBuilder.ts`'s new `refreshTailOptions()`)
+so the new tail is selectable right away. Drawing a route with zero
+aircraft owned is explicitly blocked in the form ("Buy or lease an
+aircraft first — see Fleet Market under the Reports menu") rather than
+left to silently do nothing.
+
+**The aircraft type itself changed too**, at the player's request: the
+Dash 8-400 (78 seats) became a Beechcraft 1900D (19 seats, `data/
+aircraft-types.json`'s `costPerBlockHour`/`costPerDeparture` scaled down
+proportionally). See "A balance gap this opened," below — the demand/fare
+model hasn't been re-tuned for a plane this much smaller yet.
+
+Verified in-browser: a fresh game showed $500,000 cash and empty Fleet/
+Schedule panels; buying C-FQAC ($650,000) based at YHZ dropped cash to
+-$150,000 and added it to the Fleet panel immediately; the route builder's
+Tail dropdown showed C-FQAC without a reload; drawing YHZ↔YQB for it
+worked with no positioning needed (already at the right airport), and
+running the clock forward showed it actually flying the route and posting
+real (if currently loss-making — see below) economics.
+
 ## Judgment calls, not yet decided
 
 ### Time navigation and pacing
@@ -352,6 +405,23 @@ problem a real session hasn't surfaced yet.
    tail that isn't standing at its origin now gets a real, costed
    positioning leg automatically — the point was never to make players
    solve a routing puzzle before every new route.
-9. Time navigation / weather visibility / failure-state — all worth
-   revisiting once a real session has actually been played against
-   items 1-8, not before.
+9. **The Fleet Market: start with 0 fleet, buy or lease into existence** —
+   done. The other half of item 8's reframing: not just *automatic*
+   positioning once you have a plane, but starting with none at all, so
+   every aircraft in the game is one the player deliberately acquired.
+10. Time navigation / weather visibility / failure-state — all worth
+    revisiting once a real session has actually been played against
+    items 1-9, not before.
+
+## A balance gap this opened, not yet addressed
+
+Swapping the aircraft type from the Dash 8-400 (78 seats) to the
+Beechcraft 1900D (19 seats) — done as part of item 9, at the player's
+request — means every existing demand/fare number in `sim/demand.ts` and
+`sim/schedule.ts`'s `recommendedFare()` is still tuned for a plane four
+times the size. A quick headless run (`npm run headless -- 5`) already
+shows small net losses that weren't there before. Worth a proper
+headless-tuned pass (per CLAUDE.md, that's what the headless runner is
+*for*) before treating the economy as balanced again — not done here
+since it wasn't what was asked, but flagging it before it's mistaken for
+"the game is just hard now."

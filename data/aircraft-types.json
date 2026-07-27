@@ -1,10 +1,10 @@
 [
   {
-    "code": "DH4",
-    "name": "Dash 8-400",
-    "seats": 78,
-    "cruiseKts": 360,
-    "costPerBlockHour": 3400,
-    "costPerDeparture": 900
+    "code": "BEH1900D",
+    "name": "Beechcraft 1900D",
+    "seats": 19,
+    "cruiseKts": 280,
+    "costPerBlockHour": 950,
+    "costPerDeparture": 300
   }
 ]

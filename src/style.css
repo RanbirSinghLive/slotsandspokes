@@ -12,12 +12,13 @@ body {
 
 /* Must match PANEL_WIDTH_PX in ui/panels.ts, which main.ts uses to size the
    canvas so the map and the sidebar share the viewport instead of the panel
-   floating on top of it. #rotation-board and #commercial-panel are
-   siblings that take the exact same slot — whichever one isn't [hidden]
-   occupies it, no absolute positioning needed. */
+   floating on top of it. #rotation-board, #commercial-panel, and
+   #fleet-market-panel are siblings that take the exact same slot —
+   whichever one isn't [hidden] occupies it, no absolute positioning needed. */
 #map,
 #rotation-board,
-#commercial-panel {
+#commercial-panel,
+#fleet-market-panel {
   display: block;
   width: calc(100vw - 280px);
   height: 100vh;
@@ -29,7 +30,8 @@ body {
    [hidden] attribute toggle in main.ts would silently do nothing. */
 #map[hidden],
 #rotation-board[hidden],
-#commercial-panel[hidden] {
+#commercial-panel[hidden],
+#fleet-market-panel[hidden] {
   display: none;
 }
 
@@ -597,6 +599,102 @@ body {
 
 .commercial-status.demand-capped {
   color: #ffb37a;
+}
+
+/* Week three's Fleet Market — a new game starts with zero aircraft, so
+   this is where the very first purchase or lease happens. Same layout
+   shape as #commercial-panel (full canvas-width area, monospace, a table
+   with real room per row), since it's the same kind of "ledger with an
+   action per row" panel. See ui/fleetMarket.ts. */
+#fleet-market-panel {
+  padding: 68px 24px 24px;
+  overflow-y: auto;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 13px;
+  color: #cdd3e0;
+}
+
+#fleet-market-header {
+  margin-bottom: 16px;
+  color: #9aa3b8;
+}
+
+#fleet-market-header select {
+  font-family: inherit;
+  font-size: inherit;
+  color: #cdd3e0;
+  background: #0a0c12;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 3px 6px;
+  margin-left: 6px;
+}
+
+#fleet-market-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+#fleet-market-table th:nth-child(1),
+#fleet-market-table td:nth-child(1) {
+  width: 16%;
+}
+
+#fleet-market-table th:nth-child(2),
+#fleet-market-table td:nth-child(2) {
+  width: 18%;
+}
+
+#fleet-market-table th:nth-child(3),
+#fleet-market-table td:nth-child(3) {
+  width: 10%;
+}
+
+#fleet-market-table th:nth-child(4),
+#fleet-market-table td:nth-child(4) {
+  width: 16%;
+}
+
+#fleet-market-table th:nth-child(5),
+#fleet-market-table td:nth-child(5) {
+  width: 16%;
+}
+
+#fleet-market-table th:nth-child(6),
+#fleet-market-table td:nth-child(6) {
+  width: 24%;
+}
+
+#fleet-market-table th,
+#fleet-market-table td {
+  text-align: left;
+  padding: 8px 10px 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#fleet-market-table th {
+  color: #6b7694;
+  font-weight: 400;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.fleet-market-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.fleet-market-actions button {
+  font-family: inherit;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  background: #3a4258;
+  border: 1px solid #6b7694;
+  color: #fff;
 }
 
 /* Stacked, not side by side — same reasoning as the schedule table's fare

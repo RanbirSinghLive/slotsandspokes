@@ -1,0 +1,6 @@
+[
+  { "registration": "C-FQAB", "typeCode": "BEH1900D", "ageYears": 3, "buyPrice": 890000, "leasePricePerDay": 700 },
+  { "registration": "C-FQAC", "typeCode": "BEH1900D", "ageYears": 8, "buyPrice": 650000, "leasePricePerDay": 550 },
+  { "registration": "C-FQAD", "typeCode": "BEH1900D", "ageYears": 15, "buyPrice": 420000, "leasePricePerDay": 380 },
+  { "registration": "C-FQAE", "typeCode": "BEH1900D", "ageYears": 21, "buyPrice": 300000, "leasePricePerDay": 300 }
+]

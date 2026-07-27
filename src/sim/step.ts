@@ -118,6 +118,15 @@ export function step(state: SimState): void {
     state.todayCost += totalMarketingSpend;
     state.todayMargin -= totalMarketingSpend;
 
+    // Fleet Market lease cost (week three) — same "flat per-day charge"
+    // shape as marketing spend above, not tied to whether the aircraft
+    // actually flew that day. 0 for every owned aircraft, so this is a
+    // no-op for the headless runner's fully-owned fleet.
+    const totalLeaseCost = state.aircraft.reduce((total, aircraft) => total + aircraft.leaseCostPerDay, 0);
+    state.cash -= totalLeaseCost;
+    state.todayCost += totalLeaseCost;
+    state.todayMargin -= totalLeaseCost;
+
     // Weather (sim/weather.ts) is a daily-scale event, not a per-minute
     // one — origination, spread, and expiry all happen once here rather
     // than being checked on every tick.

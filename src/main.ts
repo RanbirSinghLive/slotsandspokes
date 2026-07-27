@@ -10,7 +10,7 @@ import { drawDemandLayer } from './render/demand';
 import { drawCompetitionLayer, competitorAirlines, findCompetitionHover } from './render/competition';
 import { showCompetitionTooltip, hideCompetitionTooltip } from './ui/competitionTooltip';
 import { validateSchedule } from './sim/schedule';
-import { createInitialState, type SimState } from './sim/state';
+import { createNewGameState, type SimState } from './sim/state';
 import { step } from './sim/step';
 import { updatePanel, setupScheduleEditor, renderScheduleWarnings, PANEL_WIDTH_PX } from './ui/panels';
 import {
@@ -23,21 +23,16 @@ import {
 } from './ui/routeBuilder';
 import { setupRotationBoard, updateRotationBoard } from './ui/rotationBoard';
 import { setupCommercialPanel, updateCommercialPanel } from './ui/commercial';
+import { setupFleetMarket } from './ui/fleetMarket';
 import { loadSavedState, saveState, clearSavedState } from './ui/save';
 
-// M4 brought only one aircraft to life, to prove out the clock and the
-// depart/arrive mechanism on something small. M5 turns the rest on by
-// listing all three tails here — see the comment on createInitialState.
-const ACTIVE_TAILS = ['C-GVIA', 'C-FATL', 'C-GMAR'];
-
 // Week three's persistence fix (see WEEK-THREE.md): resume a saved game
-// if one exists, rather than always starting fresh. A fresh game seeds
-// from Date.now(), not createInitialState()'s own fixed default (`1`) —
-// so every *new* playthrough gets its own weather/delay history, while
-// src/headless/run.ts (which never passes a seed) keeps relying on that
-// same fixed default and stays exactly as reproducible as before. Only
-// this one call site changed.
-const state: SimState = loadSavedState() ?? createInitialState(ACTIVE_TAILS, Date.now());
+// if one exists, rather than always starting fresh. A fresh game starts
+// from createNewGameState() — zero fleet, zero schedule, seeded from
+// Date.now() so every new playthrough gets its own weather/delay history
+// (src/headless/run.ts calls the older createInitialState() instead, with
+// its own fixed default seed, and is unaffected by any of this).
+const state: SimState = loadSavedState() ?? createNewGameState();
 
 // Validate this game's own schedule (not just the static template) — the
 // M8 schedule editor re-runs this same check after every edit, so a change
@@ -48,6 +43,7 @@ setupScheduleEditor(state);
 setupRouteBuilder(state);
 setupRotationBoard();
 setupCommercialPanel(state);
+setupFleetMarket(state);
 
 const canvas = document.querySelector<HTMLCanvasElement>('#map')!;
 const ctx = canvas.getContext('2d')!;
@@ -91,6 +87,7 @@ competitionAirlineDropdown.querySelectorAll<HTMLButtonElement>('button').forEach
 });
 const rotationBoardEl = document.querySelector<HTMLDivElement>('#rotation-board')!;
 const commercialPanelEl = document.querySelector<HTMLDivElement>('#commercial-panel')!;
+const fleetMarketPanelEl = document.querySelector<HTMLDivElement>('#fleet-market-panel')!;
 
 // Week three: the only way back to a fresh game, now that one persists
 // across reloads by default. Confirms first since this is irreversibly
@@ -148,22 +145,22 @@ function resize(): void {
 // time it is.
 let latestFractionalMinute = state.simMinute;
 
-// Which of the five main views is currently showing. The clock and
+// Which of the six main views is currently showing. The clock and
 // sidebar panel stay relevant regardless, so they're not gated by this.
 // 'ops', 'demand', and 'competition' all draw on the same canvas (just
-// different layers on top of the same basemap/projection); 'rotation'
-// and 'commercial' each hide the canvas in favor of their own DOM element
-// (#rotation-board, #commercial-panel) — see ui/rotationBoard.ts and
-// ui/commercial.ts for why those two get real DOM instead of a canvas
-// layer.
-type View = 'ops' | 'demand' | 'competition' | 'rotation' | 'commercial';
+// different layers on top of the same basemap/projection); 'rotation',
+// 'commercial', and 'fleet-market' each hide the canvas in favor of their
+// own DOM element (#rotation-board, #commercial-panel,
+// #fleet-market-panel) — see ui/rotationBoard.ts, ui/commercial.ts, and
+// ui/fleetMarket.ts for why those get real DOM instead of a canvas layer.
+type View = 'ops' | 'demand' | 'competition' | 'rotation' | 'commercial' | 'fleet-market';
 let currentView: View = 'ops';
 
 function render(): void {
   updateClock(state);
   updatePanel(state);
 
-  if (currentView === 'rotation' || currentView === 'commercial') return;
+  if (currentView === 'rotation' || currentView === 'commercial' || currentView === 'fleet-market') return;
 
   const cssWidth = window.innerWidth - PANEL_WIDTH_PX;
   const cssHeight = window.innerHeight;
@@ -296,6 +293,7 @@ const VIEW_GROUP: Record<View, string> = {
   competition: 'maps',
   rotation: 'reports',
   commercial: 'reports',
+  'fleet-market': 'reports',
 };
 
 function closeAllDropdowns(): void {
@@ -353,9 +351,10 @@ viewToggleButtons.forEach((button) => {
     if (view === currentView) return;
 
     currentView = view;
-    canvas.hidden = view === 'rotation' || view === 'commercial';
+    canvas.hidden = view === 'rotation' || view === 'commercial' || view === 'fleet-market';
     rotationBoardEl.hidden = view !== 'rotation';
     commercialPanelEl.hidden = view !== 'commercial';
+    fleetMarketPanelEl.hidden = view !== 'fleet-market';
     competitionAirlineGroup.hidden = view !== 'competition';
     viewToggleButtons.forEach((b) => b.classList.toggle('active', b === button));
     // The group trigger itself also shows which group the active view

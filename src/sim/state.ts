@@ -1,5 +1,6 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { loadSchedule, marketKey, recommendedFare, type PositioningLeg, type ScheduleLeg } from './schedule';
+import { loadFleetMarket, type FleetListing } from './fleetMarket';
 import type { WeatherEvent } from './weather';
 
 export type AircraftStatus = 'ground' | 'airborne';
@@ -20,6 +21,20 @@ export type Aircraft = {
    * instantly.
    */
   groundSinceMinute: number;
+  /**
+   * Week three's Fleet Market: whether this airframe was bought outright
+   * or leased. Acquisition-only for this pass — no sell-back or early
+   * lease-end — so this never changes after ui/fleetMarket.ts creates the
+   * record.
+   */
+  ownership: 'owned' | 'leased';
+  /**
+   * 0 for an owned aircraft. For a leased one, the flat daily cost
+   * (`FleetListing.leasePricePerDay` at the moment it was leased) charged
+   * every day at rollover (see step.ts), the same "flat recurring cost"
+   * shape `RouteSettings.marketingSpend` already has.
+   */
+  leaseCostPerDay: number;
 };
 
 export type ActiveFlight = {
@@ -114,6 +129,13 @@ export type SimState = {
    */
   positioningLegs: PositioningLeg[];
   /**
+   * Week three's Fleet Market: airframes still available to buy or lease
+   * (see sim/fleetMarket.ts's FleetListing). ui/fleetMarket.ts removes a
+   * listing from here the moment it's acquired — acquisition-only, no
+   * sell-back this pass, so this array only ever shrinks.
+   */
+  fleetMarket: FleetListing[];
+  /**
    * Active weather by airport IATA code — a plain object, not a Map, same
    * JSON-round-trip reasoning as `routeSettings`. Absent key means clear
    * skies; see sim/weather.ts's `rollDailyWeather()` for how entries
@@ -166,6 +188,13 @@ function earliestLegFor(tail: string, legs: ScheduleLeg[]): ScheduleLeg {
  * which is exactly what determinism is supposed to rule out. Pass a
  * different seed explicitly (the M7 headless runner will want to, to
  * compare different random delay patterns run over run).
+ *
+ * Not used by main.ts any more — the interactive game starts from
+ * createNewGameState() below, with zero fleet and zero schedule (week
+ * three's Fleet Market). This one stays exactly as it was purely so
+ * src/headless/run.ts (M7's balance-tuning tool) keeps simulating a full,
+ * known 3-aircraft/12-leg network without needing to route through a
+ * purchase flow it has no use for.
  */
 export function createInitialState(tails: string[], rngSeed: number = 1): SimState {
   const schedule = loadSchedule();
@@ -179,6 +208,8 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
       atAirport: firstLeg.origin,
       activeLegId: null,
       groundSinceMinute: 0,
+      ownership: 'owned',
+      leaseCostPerDay: 0,
     };
   });
 
@@ -198,6 +229,48 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     schedule,
     routeSettings,
     positioningLegs: [],
+    fleetMarket: [], // no Fleet Market needed for a headless balance run
+    weatherByAirport: {},
+    completedToday: [],
+    todayRevenue: 0,
+    todayCost: 0,
+    todayMargin: 0,
+    rngSeed,
+  };
+}
+
+/**
+ * Starting capital for a genuinely new interactive game — enough to buy
+ * one Fleet Market airframe outright with a little left over, or lease two
+ * or three while routes ramp up. A pure game-balance number, not derived
+ * from anything.
+ */
+export const STARTING_CASH = 500_000;
+
+/**
+ * The state an actual new game starts from (week three's Fleet Market) —
+ * zero aircraft, zero schedule, zero routes. Nothing flies and nothing
+ * earns until the player buys or leases a first aircraft from
+ * `fleetMarket` (ui/fleetMarket.ts) and draws a route for it
+ * (ui/routeBuilder.ts); wherever that first aircraft gets based is
+ * whatever the player picks at the moment of purchase, which is what
+ * makes this also double as "choosing a home airport" without needing a
+ * separate step for it.
+ *
+ * Distinct from createInitialState() above on purpose — that one exists
+ * only to keep the headless runner's known, fully-formed test network
+ * exactly as it always was; this one is the real "New Game" entry point.
+ */
+export function createNewGameState(rngSeed: number = Date.now()): SimState {
+  return {
+    simMinute: 0,
+    cash: STARTING_CASH,
+    aircraft: [],
+    activeFlights: [],
+    schedule: [],
+    routeSettings: {},
+    positioningLegs: [],
+    fleetMarket: loadFleetMarket(),
     weatherByAirport: {},
     completedToday: [],
     todayRevenue: 0,

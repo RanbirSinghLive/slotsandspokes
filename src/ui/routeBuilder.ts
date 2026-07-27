@@ -320,6 +320,19 @@ function hideForm(): void {
  * first, not a bug.
  */
 function updateFormValidation(origin: Airport, dest: Airport, state: SimState): void {
+  // Week three's Fleet Market: a new game starts with zero aircraft, so
+  // there's nothing for the Tail dropdown to offer and nothing this route
+  // could ever be assigned to. Rather than let the player hit a confusing
+  // dead end (an empty select, a route that silently never flies), block
+  // it here with a plain explanation of what to do first.
+  if (state.aircraft.length === 0) {
+    formError.textContent = 'Buy or lease an aircraft first — see Fleet Market under the Reports menu.';
+    formConfirmButton.disabled = true;
+    formReturnPreview.textContent = '';
+    formPositioningPreview.textContent = '';
+    return;
+  }
+
   const departMinute = timeStringToMinuteOfDay(formDepartInput.value);
   const blockMinutes = computeBlockMinutes(origin.iata, dest.iata);
   const outboundCollision = findExactTimeCollision(origin.iata, dest.iata, departMinute, state.schedule);
@@ -361,6 +374,22 @@ function timeStringToMinuteOfDay(time: string): number {
 }
 
 /**
+ * Rebuild the Tail dropdown's options from `state.aircraft` — called once
+ * at startup, and again by ui/fleetMarket.ts every time a purchase or
+ * lease adds a new aircraft, since a new game starts with none at all
+ * (week three's Fleet Market) and the fleet only grows from there.
+ */
+export function refreshTailOptions(state: SimState): void {
+  formTailSelect.innerHTML = '';
+  for (const aircraft of state.aircraft) {
+    const option = document.createElement('option');
+    option.value = aircraft.tail;
+    option.textContent = aircraft.tail;
+    formTailSelect.appendChild(option);
+  }
+}
+
+/**
  * Wire up the confirmation form and populate the tail dropdown from the
  * active fleet. Called once at startup, alongside setupScheduleEditor() —
  * same "build once, mutate only via events" rule, for the same reason: a
@@ -375,12 +404,7 @@ function timeStringToMinuteOfDay(time: string): number {
  * here prevents adding it anyway, on purpose, for consistency with M8.
  */
 export function setupRouteBuilder(state: SimState): void {
-  for (const aircraft of state.aircraft) {
-    const option = document.createElement('option');
-    option.value = aircraft.tail;
-    option.textContent = aircraft.tail;
-    formTailSelect.appendChild(option);
-  }
+  refreshTailOptions(state);
 
   // Re-check for an exact-time collision (and refresh the return-leg and
   // positioning-leg previews) every time the player changes the depart
