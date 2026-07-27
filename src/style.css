@@ -388,6 +388,19 @@ body {
   margin-bottom: 10px;
 }
 
+/* PDEW/CAP (week four) — the un-minmaxed demand-vs-capacity read for
+   this market, before fare/yield/competition trim it down. Same muted
+   tone as block time normally, but flips to amber when demand can't
+   fill the plane, so a thin market reads as a caution at a glance. */
+#new-route-pdew {
+  color: #9aa3b8;
+  margin-bottom: 10px;
+}
+
+#new-route-pdew.thin-market {
+  color: #ffd166;
+}
+
 .new-route-field {
   display: flex;
   justify-content: space-between;

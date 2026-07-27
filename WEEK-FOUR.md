@@ -103,14 +103,20 @@ trying" without needing to understand any of those five other
 mechanisms first, and `PDEW: 3 CAP: 19` reads as "thin market, don't
 expect a full plane" just as quickly.
 
-**Where it shows up** — proposed, not yet built:
-- In the New Route confirmation form, alongside the existing block-time/
-  positioning/return previews — updates live as the return-leg checkbox
-  is toggled, since that changes `newFrequency`.
-- As a live hover readout while a route is *armed* (before confirming),
-  for whichever airport the cursor is currently snapped to as a
-  candidate destination — so the number is visible before you even
-  commit to a second click, not only after.
+**Where it shows up:**
+- **Done** — in the New Route confirmation form, right under Block time,
+  live as the return-leg checkbox is toggled (verified: unchecking it
+  doubled the reading, from `PDEW: 626 CAP: 19` to `PDEW: 1251 CAP: 19`
+  on YOW↔YUL — exactly halving/doubling the frequency it's divided by).
+  Turns amber (`.thin-market`) when PDEW falls under CAP — verified on
+  YFC↔YSJ, a genuinely thin market: `PDEW: 3 CAP: 19`, flagged. Shown
+  even when the route is otherwise blocked (network gating, out of
+  range) — still useful context for a market you might come back and
+  draw differently.
+- **Not yet built** — a live hover readout while a route is *armed*
+  (before confirming), for whichever airport the cursor is currently
+  snapped to as a candidate destination, so the number is visible before
+  the second click, not only after. This is build-order item 2, below.
 
 ## Design: layers, not modes
 
@@ -155,9 +161,10 @@ before starting rather than discovering it mid-build.
 
 ## Proposed build order (not committed)
 
-1. **PDEW/CAP in the New Route form.** Small, self-contained, immediately
-   useful even before anything about layers changes. No architecture
-   change — just a new readout using numbers the sim already computes.
+1. **PDEW/CAP in the New Route form** — done. Small, self-contained,
+   immediately useful even before anything about layers changes. No
+   architecture change — just a new readout using numbers the sim
+   already computes.
 2. **Live PDEW/CAP on hover while armed.** Reuses Competition mode's
    arc/airport hit-testing technique, generalized to Ops mode.
 3. **Demand and Competition as toggleable overlays**, replacing the

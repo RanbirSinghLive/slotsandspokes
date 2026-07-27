@@ -675,6 +675,23 @@ chosen tail isn't actually going to be gets caught by the same console
 error a bad manual edit would produce, and nothing prevents adding it
 anyway, for consistency with M8.
 
+**PDEW/CAP (week four):** the form also shows the market's un-minmaxed
+demand-vs-capacity ceiling — "PDEW: 626 CAP: 19" — right under Block
+time, turning amber when demand can't fill the plane. `PDEW` (Passengers
+Daily Each Way) is `round(dailyDemand(origin, dest) / newFrequency)`:
+`sim/demand.ts`'s existing gravity-model total, divided by the market's
+frequency *after* this confirm would add its leg(s) — the same
+denominator `sim/economy.ts`'s `flightResult()` already divides by, read
+before committing instead of after, so it can never drift from what the
+flight actually carries once it's flying. `CAP` is the plane's raw seat
+count, deliberately not the load-factor-adjusted ceiling — the point is
+showing the number *before* fare, yield segmentation, marketing spend,
+or competitor response apply, all of which are what the Commercial
+panel is for. Recomputes live when the return checkbox toggles (it
+changes `newFrequency`), and stays visible even when the route itself is
+blocked (network gating, out of range) — still useful context for a
+market worth trying differently.
+
 **A suggested depart time, not just a fixed one (week three):**
 `suggestedDepartTime()` replaces what used to be an unconditional
 `12:00` default. If the selected tail already has legs and the

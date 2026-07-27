@@ -4,9 +4,11 @@ import aircraftTypesData from '../../data/aircraft-types.json';
 import { projection } from '../render/projection';
 import { airports, type Airport } from '../render/airports';
 import { greatCircleDistanceNm } from '../sim/geo';
+import { dailyDemand } from '../sim/demand';
 import {
   computeBlockMinutes,
   defaultReturnDepartMinute,
+  legsServingMarket,
   marketKey,
   MIN_TURN_MINUTES,
   networkAirports,
@@ -30,10 +32,10 @@ const CANDIDATE_RING_STROKE = '#ffd166';
 const RANGE_RING_STROKE = '#4a90d9';
 
 // A minimal local view of aircraft-types.json — just what this module
-// needs (range, for the ring below), same "small local type" pattern
-// render/competition.ts's marketKey() already uses rather than importing
-// sim/economy.ts's fuller EconomyAircraftType.
-type AircraftTypeSpec = { code: string; name: string; rangeNm: number };
+// needs (range for the ring, seats for the PDEW/CAP readout below), same
+// "small local type" pattern render/competition.ts's marketKey() already
+// uses rather than importing sim/economy.ts's fuller EconomyAircraftType.
+type AircraftTypeSpec = { code: string; name: string; seats: number; rangeNm: number };
 const aircraftTypesByCode = new Map<string, AircraftTypeSpec>(
   (aircraftTypesData as AircraftTypeSpec[]).map((type) => [type.code, type]),
 );
@@ -322,6 +324,7 @@ const formSection = document.querySelector<HTMLElement>('#new-route-section')!;
 const formHeading = document.querySelector<HTMLElement>('#new-route-heading')!;
 const formLabel = document.querySelector<HTMLElement>('#new-route-label')!;
 const formBlock = document.querySelector<HTMLElement>('#new-route-block')!;
+const formPdew = document.querySelector<HTMLElement>('#new-route-pdew')!;
 const formError = document.querySelector<HTMLElement>('#new-route-error')!;
 const formTailLabel = document.querySelector<HTMLElement>('#new-route-tail-label')!;
 const formDepartInput = document.querySelector<HTMLInputElement>('#new-route-depart')!;
@@ -428,9 +431,36 @@ function updateFormValidation(origin: Airport, dest: Airport, state: SimState): 
   if (!tail || state.aircraft.length === 0) {
     formError.textContent = 'Buy or lease an aircraft first — see Fleet under the Reports menu.';
     formConfirmButton.disabled = true;
+    formPdew.textContent = '';
     formReturnPreview.textContent = '';
     formPositioningPreview.textContent = '';
     return;
+  }
+
+  const aircraft = state.aircraft.find((a) => a.tail === tail);
+  const type = aircraft ? aircraftTypesByCode.get(aircraft.typeCode) : undefined;
+
+  // Week four's PDEW/CAP readout: the un-minmaxed demand-vs-capacity
+  // ceiling for this market, shown even if the checks below end up
+  // blocking this specific attempt — still useful context for a market
+  // you might come back and draw differently. `newFrequency` is the
+  // existing schedule's frequency on this market *plus* what this
+  // confirm would add (1 leg, or 2 if the return checkbox is on) — the
+  // same denominator sim/economy.ts's flightResult() divides
+  // dailyDemand() by, just read before committing instead of after, so
+  // this can never drift from what the flight would actually carry once
+  // it's flying. CAP is the plane's raw seat count, not the load-factor-
+  // adjusted ceiling — the whole point is showing the number *before*
+  // any of the fare/yield/competition knobs apply, which is what
+  // "un-minmaxed" means here.
+  if (type) {
+    const existingFrequency = legsServingMarket(origin.iata, dest.iata, state.schedule);
+    const newFrequency = existingFrequency + (formReturnCheckbox.checked ? 2 : 1);
+    const pdew = Math.round(dailyDemand(origin.iata, dest.iata) / newFrequency);
+    formPdew.textContent = `PDEW: ${pdew}  CAP: ${type.seats}`;
+    formPdew.classList.toggle('thin-market', pdew < type.seats);
+  } else {
+    formPdew.textContent = '';
   }
 
   // Grow the network one airport at a time: a new route's origin has to
@@ -452,8 +482,6 @@ function updateFormValidation(origin: Airport, dest: Airport, state: SimState): 
   // ring drawn in drawRoutePreview()) is flatly impossible, not just
   // inadvisable — same "hard block, plain message" shape as the network
   // check above.
-  const aircraft = state.aircraft.find((a) => a.tail === tail);
-  const type = aircraft ? aircraftTypesByCode.get(aircraft.typeCode) : undefined;
   if (type) {
     const distanceNm = greatCircleDistanceNm(origin, dest);
     if (distanceNm > type.rangeNm) {
