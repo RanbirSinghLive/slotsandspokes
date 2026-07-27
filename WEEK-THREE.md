@@ -525,6 +525,10 @@ schedule table's own numbers exactly, not an approximation.
 
 ## Judgment calls, not yet decided
 
+*(Ported forward to WEEK-FOUR.md, alongside the balance-gap note below —
+none of these four are resolved here, this section is left intact as the
+original record of when and why each was raised.)*
+
 ### Time navigation and pacing
 
 Speed controls top out at 20×. A full simulated year (the weather
