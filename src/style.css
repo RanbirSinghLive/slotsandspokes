@@ -114,6 +114,43 @@ body {
   border-color: #ff8080;
 }
 
+/* Real inline confirmation for New Game, not window.confirm() — see
+   main.ts's note on why. Sits in the same HUD slot the button occupies;
+   only one of the two is ever visible at a time. */
+#new-game-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 12px;
+  color: #ff8080;
+  font-size: inherit;
+  white-space: nowrap;
+}
+
+#new-game-confirm[hidden] {
+  display: none;
+}
+
+#new-game-confirm button {
+  font-family: inherit;
+  font-size: inherit;
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+#new-game-confirm-yes {
+  background: #ff8080;
+  border: 1px solid #ff8080;
+  color: #05070c;
+}
+
+#new-game-confirm-cancel {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #9aa3b8;
+}
+
 /* Each of the two view groups (Maps: Ops/Demand/Competition; Reports:
    Rotation/Commercial) is an icon button that opens a small dropdown of
    its views — see main.ts's view-toggle wiring. The Competition map's

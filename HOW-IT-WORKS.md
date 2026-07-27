@@ -918,15 +918,22 @@ instead, which never changed and keeps its own fixed default, so it stays
 exactly as reproducible as every verification in this document already
 relies on it being.
 
-A "New Game" button in the HUD (`confirm()`s first, since it's
-irreversible) clears the save and reloads — simpler and more robust
-than resetting every piece of in-memory state by hand.
+A "New Game" button in the HUD clears the save and reloads — simpler and
+more robust than resetting every piece of in-memory state by hand. It
+confirms first, since this is irreversible, via a **real inline
+confirmation** (`#new-game-confirm`, swapped in for the button itself)
+rather than `window.confirm()` — the native dialog turned out to be
+silently blocked in this project's own preview browser, always resolving
+to "cancelled" with no visible sign anything had happened, which read
+exactly like "New Game doesn't work." Plain DOM can't be suppressed that
+way, per CLAUDE.md's panel rule anyway.
 
 Verified in-browser: playing across a simulated day boundary, forcing a
 full page reload, and confirming the game resumed at the same day/cash/
-schedule rather than restarting; "New Game" cleared the save and
-returned to a fresh Day 1 with a visibly different weather roll than
-the previous game had.
+schedule rather than restarting; New Game's inline confirmation, then
+"Yes, start over," cleared the save and returned to a fresh Day 1 with
+zero fleet and a visibly different weather roll than the previous game
+had.
 
 ## The Fleet Market (`src/sim/fleetMarket.ts`, `src/ui/fleetMarket.ts`)
 

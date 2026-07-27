@@ -95,11 +95,31 @@ const fleetMarketPanelEl = document.querySelector<HTMLDivElement>('#fleet-market
 // reloading is simpler and more robust than trying to reset every piece
 // of in-memory state by hand, and a fresh load already knows to seed
 // from Date.now() when it finds nothing saved.
+//
+// A real inline confirmation, not window.confirm(): native dialogs are
+// silently blocked in some embedded/preview browser contexts (they just
+// resolve to "cancelled" with no visible sign anything happened), which
+// made "New Game" look like it was doing nothing at all. Real DOM here
+// matches CLAUDE.md's panel rule anyway, and it can't be silently
+// suppressed the way a native dialog can.
 const newGameButton = document.querySelector<HTMLButtonElement>('#new-game-button')!;
+const newGameConfirmEl = document.querySelector<HTMLDivElement>('#new-game-confirm')!;
+const newGameConfirmYes = document.querySelector<HTMLButtonElement>('#new-game-confirm-yes')!;
+const newGameConfirmCancel = document.querySelector<HTMLButtonElement>('#new-game-confirm-cancel')!;
+
 newGameButton.addEventListener('click', () => {
-  if (!confirm('Start a new game? This will erase your current progress.')) return;
+  newGameButton.hidden = true;
+  newGameConfirmEl.hidden = false;
+});
+
+newGameConfirmYes.addEventListener('click', () => {
   clearSavedState();
   window.location.reload();
+});
+
+newGameConfirmCancel.addEventListener('click', () => {
+  newGameConfirmEl.hidden = true;
+  newGameButton.hidden = false;
 });
 
 /**

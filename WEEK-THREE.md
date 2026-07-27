@@ -377,6 +377,29 @@ Cancelled, then drew YYG→YSJ instead (YYG already in-network from the
 first route) — allowed, with the positioning-leg preview correctly
 still layering on top for the tail that needed repositioning.
 
+### 11. New Game wasn't actually clearing the fleet
+
+Reported directly: hitting New Game left previously-bought aircraft
+sitting in the Fleet panel. Root cause wasn't the reset logic itself —
+`clearSavedState()` + `window.location.reload()` were both correct — it
+was that they never ran at all. `window.confirm()` is silently blocked
+in this project's own preview browser (confirmed via the console:
+`"Page dialog suppressed (confirm)... confirm() returned false to the
+page"`), so `if (!confirm(...)) return;` always took the early return,
+every single time, with no visible sign anything had gone wrong. From the
+player's chair that's indistinguishable from "New Game is broken."
+
+Fixed by replacing the native dialog with a real inline one: clicking
+"New Game" swaps it for a small HUD row ("Erase current game?" / "Yes,
+start over" / "Cancel") built as plain DOM, same as every other panel in
+this codebase (CLAUDE.md's panel rule) — nothing here can be silently
+suppressed by the browser the way `confirm()` was.
+
+Verified in-browser: with two owned aircraft and an active schedule,
+clicked New Game, confirmed via "Yes, start over," and landed on Day 1,
+$500,000, zero aircraft, zero schedule — the actual reset finally
+running end to end.
+
 ## Judgment calls, not yet decided
 
 ### Time navigation and pacing
@@ -459,9 +482,15 @@ problem a real session hasn't surfaced yet.
     built — the player reported adding disconnected routes (YFC↔YYG, then
     YSJ↔YHZ) and the game let both through with no gate at all. Fixed:
     see its own section below.
-11. Time navigation / weather visibility / failure-state — all worth
+11. **New Game silently doing nothing** — done. `window.confirm()` is
+    silently blocked in this project's own preview/embedded browser
+    context — it always resolves to "cancelled" with no visible sign
+    anything happened, which read as "New Game doesn't actually wipe my
+    fleet." Replaced with a real inline confirmation (`#new-game-confirm`
+    in the HUD) that can't be suppressed the way a native dialog can.
+12. Time navigation / weather visibility / failure-state — all worth
     revisiting once a real session has actually been played against
-    items 1-10, not before.
+    items 1-11, not before.
 
 ## A balance gap this opened, not yet addressed
 
