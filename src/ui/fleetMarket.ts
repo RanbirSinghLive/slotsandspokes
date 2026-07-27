@@ -1,6 +1,6 @@
 import type { FleetListing } from '../sim/fleetMarket';
 import type { Aircraft, SimState } from '../sim/state';
-import { refreshTailOptions } from './routeBuilder';
+import { setSelectedTail } from './fleetSelection';
 
 const tableBody = document.querySelector<HTMLTableSectionElement>('#fleet-market-rows')!;
 
@@ -16,8 +16,9 @@ function formatMoney(amount: number): string {
 /**
  * Buy or lease `listing` — creates the Aircraft record, charges (or
  * doesn't) cash, removes the listing from `state.fleetMarket` and its row,
- * and refreshes the route builder's Tail dropdown so the new tail is
- * immediately selectable. Acquisition-only for this pass: no sell-back, no
+ * and selects the new tail (ui/fleetSelection.ts) so it's immediately
+ * ready to draw a route for — no separate click on its Fleet row needed
+ * right after buying it. Acquisition-only for this pass: no sell-back, no
  * early lease-end, so once a listing is gone it's gone for the rest of
  * this game.
  *
@@ -54,7 +55,7 @@ function acquireAircraft(listing: FleetListing, ownership: 'owned' | 'leased', s
   rowsByRegistration.get(listing.registration)?.remove();
   rowsByRegistration.delete(listing.registration);
 
-  refreshTailOptions(state);
+  setSelectedTail(aircraft.tail);
 }
 
 function buildListingRow(listing: FleetListing, state: SimState): HTMLTableRowElement {

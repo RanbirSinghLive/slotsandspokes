@@ -317,11 +317,12 @@ with, so there's nothing to reposition it *from*. The form previews this
 before you confirm: "C-FQAC has no base yet — this route will make YHZ
 its new base." That's also what ends up choosing a home base, arrived at
 implicitly through the first route you draw rather than a separate
-purchase-time decision. Buying still removes the listing and refreshes
-the route builder's Tail dropdown (`refreshTailOptions()`) immediately;
+purchase-time decision. Buying still removes the listing immediately;
 drawing a route with zero aircraft owned is still explicitly blocked in
 the form ("Buy or lease an aircraft first...") rather than left to
-silently do nothing.
+silently do nothing. (Item 12, below, later replaced the Tail dropdown
+entirely with picking a plane before you even draw — buying now
+auto-selects the new tail instead of just making it selectable.)
 
 **The aircraft type itself changed too**, at the player's request: the
 Dash 8-400 (78 seats) became a Beechcraft 1900D (19 seats, `data/
@@ -399,6 +400,67 @@ Verified in-browser: with two owned aircraft and an active schedule,
 clicked New Game, confirmed via "Yes, start over," and landed on Day 1,
 $500,000, zero aircraft, zero schedule — the actual reset finally
 running end to end.
+
+### 12. Pick a plane first, and a real range ring
+
+Two related gaps in the M10 gesture, closed together at the player's
+request. First: you could draw a whole route — click, drag, click again,
+fill out the form — before the game ever asked which plane it was for;
+the Tail dropdown just defaulted to whichever aircraft happened to be
+first in `state.aircraft`, which is exactly the failure mode a few items
+above this one were about. Second: nothing stopped a route longer than
+any real aircraft could physically fly non-stop — you could draw
+Toronto–St. John's for a regional turboprop with the same three clicks as
+Ottawa–Montréal.
+
+**Pick the plane first.** The Fleet panel's rows are now clickable
+(`ui/panels.ts`) — clicking one selects it (a second click on the same
+row deselects), tracked in a new `ui/fleetSelection.ts` (its own tiny
+module rather than living in either `panels.ts` or `routeBuilder.ts`,
+since those two already import from each other the other way — this
+avoids a circular dependency between them). `ui/routeBuilder.ts`'s
+`handleRouteBuilderMouseDown()` now refuses to arm a route at all — same
+"not our gesture" no-op as clicking empty water — unless a tail is
+already selected, and captures that tail into the arm/confirm state so
+the whole gesture stays locked to one plane even if the Fleet selection
+changes mid-gesture (`cancelIfTailChanged()` cancels the in-progress
+route rather than let it finish for the wrong aircraft, or silently swap
+tails underneath the player). The Tail dropdown in the confirmation form
+is gone; the plane is shown read-only (`#new-route-tail-label`) since
+it's already decided. Buying or leasing an aircraft (`ui/fleetMarket.ts`)
+auto-selects it, so a purchase flows straight into drawing its first
+route with no extra click.
+
+**A real range ring, not a decorative one.** The moment an airport is
+armed as an origin, `drawRoutePreview()` draws a geodesic circle — a true
+constant-great-circle-distance ring via `d3.geoCircle()`, not a flat
+pixel circle — sized to the selected plane's real range. This matters
+because the map's Mercator projection distorts distance by latitude; a
+naive on-screen circle would lie about how far the plane can actually
+reach, especially this far north. Radius is `rangeNm / 60` degrees — 60nm
+per degree of arc is the literal definition of a nautical mile, not an
+approximation the way the demand model's constants are.
+
+Range itself is enforced, not advisory, at the player's direction: the
+form blocks Add Route with a plain distance-and-limit message
+("YYT is 954 nm from YOW — beyond the Beechcraft 1900D's 700 nm range
+with a full load") whenever the destination falls outside the ring,
+alongside a defensive re-check in the confirm handler itself. 700nm is
+the aircraft's realistic full-payload range (per published spec sheets;
+its ferry range empty is closer to 1,439nm) rather than the more generous
+ferry figure — checked against every one of the map's 45 city pairs
+before deciding this: only 5 fall outside 700nm, and all but one involve
+reaching Newfoundland (YYT) from the mainland, which tracks with the real
+geography rather than crippling the map. `data/aircraft-types.json`
+gained a `rangeNm` field for this.
+
+Verified in-browser: bought an aircraft (auto-selected), armed YOW and
+watched a geodesic ring appear (visibly non-circular under Mercator, the
+correct signature of a true geodesic circle, not a flat one); clicking
+YYT (954nm, outside the ring) blocked Add Route with the exact expected
+message and a disabled button; cancelled and completed YOW→YUL instead
+(within range) — the route was added, the plane actually flew it, and
+revenue/cost posted normally.
 
 ## Judgment calls, not yet decided
 
@@ -488,9 +550,14 @@ problem a real session hasn't surfaced yet.
     anything happened, which read as "New Game doesn't actually wipe my
     fleet." Replaced with a real inline confirmation (`#new-game-confirm`
     in the HUD) that can't be suppressed the way a native dialog can.
-12. Time navigation / weather visibility / failure-state — all worth
+12. **Pick a plane before you draw, and a real range ring** — done. Two
+    real gaps in the M10 gesture: you could draw a route with no plane in
+    mind at all (the Tail dropdown only mattered after both endpoints were
+    chosen), and nothing stopped a route longer than any real aircraft
+    could actually fly in one hop. See its own section below.
+13. Time navigation / weather visibility / failure-state — all worth
     revisiting once a real session has actually been played against
-    items 1-11, not before.
+    items 1-12, not before.
 
 ## A balance gap this opened, not yet addressed
 

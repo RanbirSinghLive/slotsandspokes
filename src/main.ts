@@ -194,7 +194,7 @@ function render(): void {
     drawAircraft(ctx, state, latestFractionalMinute);
     drawAirports(ctx);
     drawWeatherEffects(ctx, state);
-    drawRoutePreview(ctx);
+    drawRoutePreview(ctx, state);
   } else if (currentView === 'demand') {
     drawDemandLayer(ctx, state);
   } else {

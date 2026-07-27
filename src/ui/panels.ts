@@ -1,5 +1,6 @@
 import { legsServingMarket, marketKey, validateSchedule, type ScheduleLeg } from '../sim/schedule';
 import { removeCommercialRow } from './commercial';
+import { getSelectedTail, setSelectedTail } from './fleetSelection';
 import type { SimState } from '../sim/state';
 
 // Must match the width baked into #map / #panel in style.css — see the
@@ -16,6 +17,7 @@ const scheduleFilterTail = document.querySelector<HTMLInputElement>('#schedule-f
 const scheduleFilterRoute = document.querySelector<HTMLInputElement>('#schedule-filter-route')!;
 const scheduleFilterDepart = document.querySelector<HTMLInputElement>('#schedule-filter-depart')!;
 const scheduleWarningsEl = document.querySelector<HTMLUListElement>('#schedule-warnings')!;
+const fleetSelectionHintEl = document.querySelector<HTMLDivElement>('#fleet-selection-hint')!;
 
 /**
  * Show validateSchedule()'s problems (if any) directly in the Schedule
@@ -55,6 +57,16 @@ export function updatePanel(state: SimState): void {
   fleetBody.innerHTML = '';
   for (const aircraft of state.aircraft) {
     const row = document.createElement('tr');
+    row.className = 'fleet-row';
+    // Week three's route-builder redesign: a plane has to be picked here,
+    // by clicking its row, *before* the map will let you arm a route for
+    // it — see ui/routeBuilder.ts. Rebuilt every frame same as the rest of
+    // this table, so the highlight is just read fresh from
+    // fleetSelection.ts each time rather than tracked separately.
+    row.classList.toggle('selected', aircraft.tail === getSelectedTail());
+    row.addEventListener('click', () => {
+      setSelectedTail(getSelectedTail() === aircraft.tail ? null : aircraft.tail);
+    });
 
     const tailCell = document.createElement('td');
     tailCell.textContent = aircraft.tail;
@@ -92,6 +104,8 @@ export function updatePanel(state: SimState): void {
     row.append(tailCell, typeCell, statusCell, whereCell);
     fleetBody.appendChild(row);
   }
+
+  fleetSelectionHintEl.hidden = getSelectedTail() !== null || state.aircraft.length === 0;
 }
 
 function pad(n: number): string {

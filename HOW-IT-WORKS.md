@@ -40,17 +40,33 @@ seasonally.
   not DST-aware), and `population` (catchment CMA/CA population, StatsCan
   2021 census — see `sim/demand.ts`, below). Coordinates verified against
   OurAirports.
-- **`aircraft-types.json`** — one type right now: the Dash 8-400 (`DH4`),
-  78 seats, 360kt cruise, `costPerBlockHour` and `costPerDeparture` for the
-  economy model below. Multiple types are explicitly deferred.
+- **`aircraft-types.json`** — one type right now: the Beechcraft 1900D
+  (`BEH1900D`), 19 seats, 280kt cruise, `costPerBlockHour` and
+  `costPerDeparture` for the economy model below, plus `rangeNm` (700 —
+  its realistic full-payload range, not the more generous empty-ferry
+  figure; see the Route builder section's range-ring writeup) for the
+  M10 route builder's range ring. Multiple types are explicitly deferred
+  — this models one type's several individual airframes (see
+  `fleet-market.json`), not a type catalog. Was the Dash 8-400 (78 seats)
+  until week three's Fleet Market swapped it, at the player's request —
+  see "A balance gap this opened" under the Fleet Market section for what
+  that swap left untuned.
+- **`fleet-market.json`** (week three) — a small, hand-authored list of
+  individual airframes available to buy or lease in a new game:
+  `registration`, `typeCode`, `ageYears`, `buyPrice`, `leasePricePerDay`.
+  See the Fleet Market section, below.
 - **`schedule.json`** — the daily-repeating schedule *template*: 12 legs
   across 3 tails (`C-GVIA`, `C-FATL`, `C-GMAR`), each a hand-authored
   rotation that returns to its own overnight base by end of day. Each entry
   has `legId`, `tail`, `origin`, `dest`, `departMinute` (minute-of-day) —
   `blockMinutes` is *not* stored here, it's computed at load time (see
-  below). This file itself is never edited at runtime: `sim/schedule.ts`'s
-  `loadSchedule()` hands each new `SimState` its own fresh, independent
-  copy (`state.schedule`), which the M8 schedule editor mutates instead.
+  below). No longer what an actual new game starts from (week three's
+  Fleet Market starts empty instead — see below); this file's only
+  remaining consumer is `src/headless/run.ts`'s `createInitialState()`
+  call, M7's balance-tuning tool, which still wants a known, fully-formed
+  network to simulate against. `sim/schedule.ts`'s `loadSchedule()` hands
+  it its own fresh, independent copy each time, never mutating this file
+  itself.
 
 ## The simulation state (`src/sim/state.ts`)
 
@@ -332,7 +348,7 @@ runtime, distance is fixed per airport pair), so nothing caches a
 matrix — it's cheap enough to call directly whenever a number is
 needed. It's visible in the map's Demand view (see "Rendering," below)
 and, as of this same milestone, caps `economy.ts`'s pax count too (see
-"Economy," above) — a route whose demand can't fill a 78-seat DH4 now
+"Economy," above) — a route whose demand can't fill the plane now
 genuinely flies half-empty instead of always reporting the same flat
 load factor. What's still missing is a real choice model: today every
 flight on a market just gets an even split of that market's demand,
@@ -592,7 +608,8 @@ frequency after leaving the input at 13:00 from an unrelated route).
 
 ## Route builder (`src/ui/routeBuilder.ts`) — M10
 
-Creating a *new* route is a map gesture, not a form: click an airport to
+Creating a *new* route is a map gesture, not a form: **pick a plane from
+the Fleet panel first** (week three — see below), click an airport to
 arm it, move the mouse (no need to hold the button — release and the arm
 state persists) to draw a live preview arc toward the cursor, and click a
 second airport to confirm. The preview is built the same way as a real
@@ -609,14 +626,54 @@ interaction, not simulated-world state. `main.ts`'s existing canvas
 (`handleRouteBuilderMouseDown`); only if it says "not mine" does the
 existing M2 pan gesture start, so the two don't fight over the same event.
 
-Confirming opens a real DOM form (per CLAUDE.md's panel rule) for tail and
-departure time. "Add Route" does nothing clever: it appends a new
-`ScheduleLeg` to `state.schedule` (the same array `step()` reads from) and
-re-runs `validateSchedule()` — exactly the mechanism M8's time-editing
-already uses. There's no new rotation-fitting solver; a leg added
-somewhere the chosen tail isn't actually going to be gets caught by the
-same console error a bad manual edit would produce, and nothing prevents
-adding it anyway, for consistency with M8.
+**Pick the plane first, not last (week three):** Add Route used to open
+a form with a Tail dropdown *after* both endpoints were already chosen —
+so you could draw a whole route before the game ever asked which plane
+it was for, and the dropdown just defaulted to `state.aircraft[0]`. Now
+`ui/panels.ts`'s Fleet rows are clickable (a second click deselects),
+tracked in a new tiny module, `ui/fleetSelection.ts`, purely to avoid a
+circular import (`panels.ts` and `routeBuilder.ts` already import from
+each other the other way). `handleRouteBuilderMouseDown()` refuses to
+arm anything at all — same silent no-op as clicking empty water — unless
+a tail is already selected, and captures it into the `armed`/`confirming`
+state so the whole gesture stays locked to that one plane. If the Fleet
+selection changes mid-gesture, `cancelIfTailChanged()` (checked on every
+mousedown and every `drawRoutePreview()` call) cancels the pending route
+rather than let it finish for a different, or no, aircraft. Buying or
+leasing (`ui/fleetMarket.ts`) auto-selects the new tail, so a purchase
+flows straight into drawing its first route. The Tail dropdown in the
+confirmation form is gone — the plane is shown read-only
+(`#new-route-tail-label`), since it was decided before the form ever
+opened.
+
+**A real range ring, not a decorative one (week three):** the moment an
+origin is armed, `drawRoutePreview()` draws a geodesic circle —
+`d3.geoCircle()`, a true constant-great-circle-distance ring, not a flat
+pixel one — sized to the selected plane's real range
+(`data/aircraft-types.json`'s new `rangeNm` field ÷ 60, since 60nm per
+degree of arc is the literal definition of a nautical mile). A flat
+pixel circle would lie about reachability here specifically because
+Mercator distorts distance by latitude, and this map sits far enough
+north for that distortion to matter. Range is enforced, not advisory:
+`updateFormValidation()` blocks Add Route with a plain message ("YYT is
+954 nm from YOW — beyond the Beechcraft 1900D's 700 nm range with a full
+load") whenever the destination falls outside it, with a matching
+defensive re-check in the confirm handler. 700nm is the type's realistic
+full-payload range from published specs (its empty ferry range is closer
+to 1,439nm) — checked against all 45 of this map's city pairs before
+picking it: only 5 fall outside 700nm, nearly all of them reaching
+Newfoundland (YYT) from the mainland, which tracks with the real
+geography rather than fragmenting the map.
+
+Confirming opens a real DOM form (per CLAUDE.md's panel rule) for
+departure time (tail is already fixed — see above). "Add Route" does
+nothing clever beyond that: it appends a new `ScheduleLeg` to
+`state.schedule` (the same array `step()` reads from) and re-runs
+`validateSchedule()` — exactly the mechanism M8's time-editing already
+uses. There's no new rotation-fitting solver; a leg added somewhere the
+chosen tail isn't actually going to be gets caught by the same console
+error a bad manual edit would produce, and nothing prevents adding it
+anyway, for consistency with M8.
 
 **The return leg (week three):** confirming adds *two* legs by default,
 not one — the one you drew, plus its reverse, auto-timed via
@@ -644,7 +701,7 @@ against the route's origin, and if they don't match, queues a one-time
 `PositioningLeg` (`sim/schedule.ts`) automatically — no extra click. The
 form previews it before you confirm: "Positioning: C-GVIA will fly
 YOW → YHZ first (106 min, cost only, no passengers) before this route
-starts." Changing the Tail dropdown now updates this preview live, too.
+starts."
 
 A `PositioningLeg` is a genuinely different kind of thing from a
 `ScheduleLeg`: it lives in its own `state.positioningLegs` array, its
@@ -975,14 +1032,13 @@ form previews this before confirming: "C-FQAC has no base yet — this
 route will make YHZ its new base." That first route is also, implicitly,
 how a home base gets chosen — no separate step for it.
 
-Buying/leasing removes the listing and calls `ui/routeBuilder.ts`'s new
-`refreshTailOptions()` so the fresh tail is immediately selectable in
-the M10 route builder's Tail dropdown — that dropdown used to be built
-once at startup from a fleet that never changed; now it has to be
-rebuildable, since the fleet starts empty and only grows via purchase.
-Drawing a route with zero aircraft owned is explicitly blocked in the
-form ("Buy or lease an aircraft first...") rather than left to silently
-produce a route nothing can ever fly.
+Buying/leasing also calls `ui/fleetSelection.ts`'s `setSelectedTail()` on
+the new aircraft — since week three's later "pick a plane first" change
+(see Route builder, below) means selecting it is what makes it drawable
+at all, a purchase now flows straight into drawing its first route with
+no extra click needed. Drawing a route with zero aircraft owned is still
+explicitly blocked in the form ("Buy or lease an aircraft first...")
+rather than left to silently produce a route nothing can ever fly.
 
 **A balance gap this opened, not yet addressed:** the aircraft type
 itself changed too, at the player's request — the Dash 8-400 (78 seats)

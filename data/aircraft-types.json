@@ -5,6 +5,7 @@
     "seats": 19,
     "cruiseKts": 280,
     "costPerBlockHour": 950,
-    "costPerDeparture": 300
+    "costPerDeparture": 300,
+    "rangeNm": 700
   }
 ]

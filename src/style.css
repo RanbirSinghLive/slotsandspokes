@@ -285,6 +285,35 @@ body {
   box-sizing: border-box;
 }
 
+/* Week three's route-builder redesign: the Fleet table's rows are now
+   the way you pick which plane a route is for, so they need to read as
+   clickable, and the chosen one needs to stand out. */
+.fleet-row {
+  cursor: pointer;
+}
+
+.fleet-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.fleet-row.selected {
+  background: rgba(255, 209, 102, 0.12);
+}
+
+.fleet-row.selected td:first-child {
+  color: #ffd166;
+}
+
+#fleet-selection-hint {
+  color: #9aa3b8;
+  font-size: 12px;
+  margin: -4px 0 8px;
+}
+
+#fleet-selection-hint[hidden] {
+  display: none;
+}
+
 /* Week three's remove-a-route/frequency fix: a small "x" button, narrow
    enough to not repeat the table-overflow bug the schedule table's short-
    lived Fare column caused during the Pricing loop's build (a slider
@@ -368,7 +397,6 @@ body {
   color: #9aa3b8;
 }
 
-.new-route-field select,
 .new-route-field input[type='time'] {
   font-family: inherit;
   font-size: inherit;
@@ -377,6 +405,13 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 4px;
   padding: 3px 6px;
+}
+
+/* Week three: the tail is chosen before the form opens (Fleet panel), so
+   it's shown here read-only rather than as an editable control. */
+#new-route-tail-label {
+  color: #ffd166;
+  font-weight: 600;
 }
 
 .new-route-field--checkbox {
