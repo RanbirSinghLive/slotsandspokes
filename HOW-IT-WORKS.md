@@ -675,6 +675,21 @@ chosen tail isn't actually going to be gets caught by the same console
 error a bad manual edit would produce, and nothing prevents adding it
 anyway, for consistency with M8.
 
+**A suggested depart time, not just a fixed one (week three):**
+`suggestedDepartTime()` replaces what used to be an unconditional
+`12:00` default. If the selected tail already has legs and the
+chronologically *last* one lands right at this route's origin, it
+suggests landing-time-plus-turn-buffer — reusing
+`defaultReturnDepartMinute()`'s exact formula, just applied to the
+tail's actual last leg instead of the leg being drawn — so a route that
+continues a tail's day slots in behind its last flight instead of
+defaulting to an unrelated fixed hour. Otherwise (no legs yet, or an
+origin that doesn't match where the day currently ends — which needs a
+positioning leg regardless) it falls back to a new `MORNING_DEPART_TIME`
+(07:00), matching `data/schedule.json`'s own convention for how a day
+actually starts. Always just a suggestion: the field stays a plain,
+editable `<input type="time">`.
+
 **The return leg (week three):** confirming adds *two* legs by default,
 not one — the one you drew, plus its reverse, auto-timed via
 `defaultReturnDepartMinute()` (land, then the same block time back, plus a
@@ -790,9 +805,16 @@ all canvas drawing while the board (or the Commercial panel) is up
 (`if (currentView === 'rotation' || currentView === 'commercial') return;`)
 — there's no point paying for it while hidden.
 
-The board is read-only for now (phase 1 of a longer plan — see
-WEEK-TWO.md's "rotation board" section for phases 2–4, none of which are
-built). Unlike the schedule table or the route-builder form, it has no
+The board is read-only, permanently now rather than "for now" (phase 1
+of what was originally a longer plan — see WEEK-TWO.md's "rotation
+board" section). Phases 2–3 (create/reschedule by dragging a bar) were
+formally shelved in week three: they would have been a second
+implementation of what the M10 map gesture already does, duplicating
+intelligence (plane selection, range, positioning, network gating) the
+map gesture has since accumulated and a from-scratch Gantt interaction
+would have to rebuild from nothing. The board stays exactly what phase 1
+already made it: a genuinely useful, read-only "where's the white
+space" diagnostic. Unlike the schedule table or the route-builder form, it has no
 live `<input>` elements to lose focus on, so `updateRotationBoard()`
 simply clears and rebuilds every row from `state` on each call, rather
 than patching in place the way M8/M10 have to. It's called once when the

@@ -462,6 +462,67 @@ message and a disabled button; cancelled and completed YOW→YUL instead
 (within range) — the route was added, the plane actually flew it, and
 revenue/cost posted normally.
 
+### 13. A smart depart-time default, and shelving two unbuilt Gantt phases
+
+Raised as a design question, resolved in the same conversation rather
+than needing its own bug report: is the Rotation Gantt too much
+complexity, and why does adding a route that continues a tail's day
+always default to noon instead of "right after the last one landed"?
+
+**The Gantt's future, not its present, was the actual complexity.**
+Checked against WEEK-TWO.md's original four-phase plan: phase 1
+(visualize-only) is all that's built, and phases 2–3 ("create from a
+gap" by click-dragging a tail's row, "reschedule by dragging") were
+always just a second implementation of what the M10 map gesture already
+does — a bar-drag interaction duplicating intelligence (plane selection,
+range, positioning, network gating) the map gesture has now accumulated
+and a from-scratch Gantt interaction would have to rebuild from nothing.
+Formally shelved in WEEK-TWO.md rather than left merely "not yet built":
+the board stays read-only, a genuinely useful "where's the white space"
+diagnostic, with no plan to grow a second, competing creation surface on
+top of it.
+
+**The actual fix, in the surface that already does the job.** Every new
+route's suggested depart time used to be a flat, context-blind `12:00`,
+regardless of what the selected tail was already doing that day. Two
+cases now, in `ui/routeBuilder.ts`'s new `suggestedDepartTime()`:
+
+- The tail already has legs, and its chronologically *last* one lands at
+  this route's origin — suggest right after that arrival, reusing
+  `defaultReturnDepartMinute()` (the exact same "land, then a turn
+  buffer" formula the auto-generated return leg already uses, just
+  applied to the tail's actual last leg instead of the leg being drawn
+  right now). This is the literal "slot in behind the previous one"
+  behavior asked for.
+- Anything else — no legs yet (a fresh pool aircraft's first route), or
+  an origin that doesn't match where the tail's day currently ends —
+  falls back to a new `MORNING_DEPART_TIME` (07:00), matching
+  `data/schedule.json`'s own convention for how every preset tail's day
+  actually starts, replacing the old arbitrary noon default. A mismatched
+  origin needs a positioning leg regardless (see item 8), so there's no
+  single "right after" time to suggest for that case anyway.
+
+Always still just a suggestion — the depart-time field stays a plain,
+editable `<input type="time">`, nothing about this is enforced.
+
+**On positioning flights, one-time vs. daily** — raised and then
+self-answered in the same conversation: one-time is correct, and already
+what's built. A closed rotation should be self-sustaining after its one
+initial positioning move; making positioning recur daily would mean
+re-flying an empty leg forever for a rotation that's supposed to already
+close on its own — exactly the "extra warning, extra clutter, every
+single day" problem raised as the reason *against* it. A rotation that
+genuinely doesn't close already surfaces as a `validateSchedule()`
+warning telling the player to fix it with a real leg, rather than a
+recurring phantom flight quietly papering over it. Nothing changed here;
+the existing design already matched the concern.
+
+Verified in-browser: a fresh pool aircraft's first route (YOW→YUL)
+suggested 07:00; after confirming (with the default return leg, landing
+back at YOW at 09:01), arming a second route from YOW suggested exactly
+09:46 (09:01 arrival + the 45-minute turn buffer) — matching the
+schedule table's own numbers exactly, not an approximation.
+
 ## Judgment calls, not yet decided
 
 ### Time navigation and pacing
@@ -555,9 +616,13 @@ problem a real session hasn't surfaced yet.
     mind at all (the Tail dropdown only mattered after both endpoints were
     chosen), and nothing stopped a route longer than any real aircraft
     could actually fly in one hop. See its own section below.
-13. Time navigation / weather visibility / failure-state — all worth
+13. **A smart depart-time default, and shelving the Rotation board's
+    unbuilt phases** — done. Raised as a design question: is the
+    Rotation Gantt too much complexity, and can a new route default to a
+    sensible time instead of always noon? See its own section below.
+14. Time navigation / weather visibility / failure-state — all worth
     revisiting once a real session has actually been played against
-    items 1-12, not before.
+    items 1-13, not before.
 
 ## A balance gap this opened, not yet addressed
 

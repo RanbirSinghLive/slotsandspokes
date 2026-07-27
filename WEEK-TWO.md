@@ -654,6 +654,25 @@ and that `data/schedule.json` on disk has no such leg.
 Not built yet, by design: phases 2–4 above, all still gated on being
 explicitly asked for.
 
+**Update (week three): phases 2–4 shelved, not just unbuilt.** Phase 2
+("create from a gap," click-drag on a tail's row) and phase 3
+("reschedule by dragging") were both a second implementation of the same
+thing the M10 map gesture does — just imagined as a Gantt-bar
+interaction instead of a map one. In the time since this was written,
+the map gesture picked up real intelligence that a from-scratch Gantt
+interaction would have to duplicate from nothing: picking a plane first
+(`ui/fleetSelection.ts`), a real range ring, automatic positioning
+flights, network-growth gating, and a depart-time default that slots a
+new leg in behind a tail's last one. Building that same intelligence a
+second time, on a different widget, for no functional gain over the map
+gesture, is exactly the kind of duplicated complexity CLAUDE.md's
+"three similar lines is better than a premature abstraction" spirit
+argues against — except backwards, since this would be a whole second
+*surface*, not just a few lines. The board stays at phase 1
+(visualize-only) on purpose now: it's a genuinely useful read-only
+"where's the white space" view, and nothing more needs building on it
+unless phase 1 itself stops being enough.
+
 ## The Commercial panel
 
 Raised the same way the rotation board was: not on the original layers/

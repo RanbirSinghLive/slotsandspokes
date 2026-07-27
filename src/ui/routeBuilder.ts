@@ -331,7 +331,36 @@ const formPositioningPreview = document.querySelector<HTMLElement>('#new-route-p
 const formConfirmButton = document.querySelector<HTMLButtonElement>('#new-route-confirm')!;
 const formCancelButton = document.querySelector<HTMLButtonElement>('#new-route-cancel')!;
 
-const DEFAULT_DEPART_TIME = '12:00';
+// A tail's first leg of the day, with nothing yet on its schedule to
+// slot in behind — matches data/schedule.json's own convention (every
+// preset tail's day starts around 06:00–07:00), not an arbitrary pick.
+const MORNING_DEPART_TIME = '07:00';
+
+/**
+ * What depart time to suggest when the form opens — always overridable,
+ * never the only option, but "always defaults to noon regardless of
+ * context" was the whole complaint this replaces. Two cases:
+ *
+ * - `tail` already has legs, and the chronologically *last* one of its
+ *   day lands at this route's `origin` — suggest right after that
+ *   arrival (`defaultReturnDepartMinute()`, the same "land, then this
+ *   much turn buffer" formula the auto-generated return leg already
+ *   uses), so a route drawn to continue a tail's day slots in behind
+ *   its last flight instead of defaulting to an unrelated fixed hour.
+ * - Anything else (no legs yet — a fresh pool aircraft's first route —
+ *   or an origin that doesn't match where the tail's day currently
+ *   ends) — suggest the morning default. A mismatched origin needs a
+ *   positioning leg anyway (see currentOrUpcomingAirport()), so there's
+ *   no single "right after" time to suggest for it.
+ */
+function suggestedDepartTime(origin: Airport, tail: string, state: SimState): string {
+  const tailLegs = state.schedule.filter((leg) => leg.tail === tail).sort((a, b) => a.departMinute - b.departMinute);
+  const lastLeg = tailLegs[tailLegs.length - 1];
+  if (lastLeg && lastLeg.dest === origin.iata) {
+    return minuteOfDayToTimeString(defaultReturnDepartMinute(lastLeg.departMinute, lastLeg.blockMinutes));
+  }
+  return MORNING_DEPART_TIME;
+}
 
 function showForm(origin: Airport, dest: Airport, state: SimState): void {
   formHeading.textContent = isExistingMarket(origin.iata, dest.iata, state.schedule) ? 'New Frequency' : 'New Route';
@@ -339,17 +368,20 @@ function showForm(origin: Airport, dest: Airport, state: SimState): void {
   formBlock.textContent = `Block time: ${computeBlockMinutes(origin.iata, dest.iata)} min`;
   // Week three: the tail was already chosen (Fleet panel) before this
   // route was even armed, so it's shown here read-only, not re-picked.
-  formTailLabel.textContent = getSelectedTail() ?? '';
+  const tail = getSelectedTail() ?? '';
+  formTailLabel.textContent = tail;
   formSection.hidden = false;
 
-  // Reset to a fixed default every time the form opens, rather than
-  // leaving whatever time a *previous* route's form was left at. Without
-  // this, a leftover time from an unrelated earlier route can silently
-  // collide with an existing leg on this new market and block the Add
-  // button with no obvious reason why — exactly what happened creating a
-  // second YSJ-YQB frequency after leaving the input at 13:00 from an
-  // earlier route.
-  formDepartInput.value = DEFAULT_DEPART_TIME;
+  // Suggest a time rather than always resetting to a fixed default —
+  // see suggestedDepartTime() above. Still always overridable, and still
+  // reset every time the form opens rather than leaving whatever time a
+  // *previous* route's form was left at: a leftover time from an
+  // unrelated earlier route could otherwise silently collide with an
+  // existing leg on this new market and block the Add button with no
+  // obvious reason why — exactly what happened creating a second
+  // YSJ-YQB frequency after leaving the input at 13:00 from an earlier
+  // route.
+  formDepartInput.value = suggestedDepartTime(origin, tail, state);
   // Defaults to checked every time the form opens, same reasoning as
   // resetting the depart time below: adding a route almost always means
   // "and back," and this is what stops a leg like this session's C-GVIA
