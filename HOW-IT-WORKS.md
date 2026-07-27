@@ -665,6 +665,24 @@ own branch, not a positioning leg — there's no real "current location" to
 fly it in from, so Add Route just sets `aircraft.atAirport` to the new
 route's origin directly, for free, right when you confirm.
 
+**Growing the network one airport at a time (week three):** a new
+route's *origin* has to already be somewhere the player flies —
+`sim/schedule.ts`'s `networkAirports()` returns every airport touched by
+`state.schedule` (both origins and destinations), and Add Route blocks
+the form (disabled button, plain error: "YSJ isn't in your network
+yet...") whenever the chosen origin isn't in that set and the set isn't
+empty. The *destination* is unrestricted — reaching a brand-new airport
+as a destination is exactly how it joins the network for the next route
+to start from. An empty network (the very first route of the game) is
+exempt, since nothing could be "already in" a network that doesn't exist
+yet. This was designed and agreed on in an earlier conversation but never
+actually wired up until a player caught two disconnected routes (YFC↔YYG,
+then YSJ↔YHZ) going through with no gate at all. It's a route-creation-
+time check, not a schedule-wide invariant — it doesn't feed into
+`validateSchedule()`'s returned problems, so an already-disconnected
+route from before this fix isn't retroactively flagged, only prevented
+going forward.
+
 Editing/removing an *existing* route stays table-driven (M8) rather than
 gaining a second, harder gesture — hit-testing a click against an
 arbitrary curve is a meaningfully bigger problem than hit-testing a point,

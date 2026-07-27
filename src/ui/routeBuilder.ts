@@ -7,6 +7,7 @@ import {
   defaultReturnDepartMinute,
   marketKey,
   MIN_TURN_MINUTES,
+  networkAirports,
   nextLegId,
   nextPositioningLegId,
   recommendedFare,
@@ -327,6 +328,21 @@ function updateFormValidation(origin: Airport, dest: Airport, state: SimState): 
   // it here with a plain explanation of what to do first.
   if (state.aircraft.length === 0) {
     formError.textContent = 'Buy or lease an aircraft first — see Fleet Market under the Reports menu.';
+    formConfirmButton.disabled = true;
+    formReturnPreview.textContent = '';
+    formPositioningPreview.textContent = '';
+    return;
+  }
+
+  // Grow the network one airport at a time: a new route's origin has to
+  // already be somewhere the player flies — reaching a brand-new airport
+  // only happens as a *destination*, which is what lets it join the
+  // network for the next route to start from. An empty network (the very
+  // first route of the game) is exempt, since nothing could possibly be
+  // "already in" it yet.
+  const network = networkAirports(state.schedule);
+  if (network.size > 0 && !network.has(origin.iata)) {
+    formError.textContent = `${origin.iata} isn't in your network yet — a new route has to start from an airport you already fly to. Fly there as a destination first, then routes can start from it.`;
     formConfirmButton.disabled = true;
     formReturnPreview.textContent = '';
     formPositioningPreview.textContent = '';

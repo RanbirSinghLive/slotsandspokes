@@ -339,6 +339,44 @@ the purchase price), and running the clock forward showed it actually
 flying the route and posting real (if currently loss-making — see below)
 economics.
 
+### 10. Growing the network one airport at a time
+
+An earlier conversation worked out this design and agreed on it in
+principle — a new route's origin has to already be somewhere the player
+flies; only its destination can be a brand-new airport, which is how
+that airport joins the network for the *next* route to start from — but
+it never actually got built. It fell through the cracks between that
+discussion and the Fleet Market work that followed it. Caught by the
+player: added a route YFC↔YYG, then added a completely disconnected
+YSJ↔YHZ, and nothing stopped it — exactly the gap the design was
+supposed to close.
+
+`networkAirports()` (`sim/schedule.ts`) is every airport touched by
+`state.schedule` — origins and destinations both, since a leg only ever
+served in one direction still means both ends are places the player
+operates. `ui/routeBuilder.ts`'s Add Route form now checks the chosen
+origin against it: if the network is non-empty and doesn't already
+contain that airport, the route is blocked with a plain explanation
+("YSJ isn't in your network yet — a new route has to start from an
+airport you already fly to..."), same disabled-button-plus-message
+pattern every other hard block in this form already uses. An empty
+network — the very first route of the game — is exempt, since nothing
+could possibly be "already in" a network that doesn't exist yet.
+
+This is a route-*creation*-time gate, not a schedule-wide invariant —
+it doesn't get folded into `validateSchedule()`'s returned problems, and
+existing disconnected routes (like the YSJ↔YHZ one already sitting in a
+saved game from before this fix) aren't retroactively flagged. It only
+stops *new* ones from being drawn going forward.
+
+Verified in-browser: fresh game, bought a plane, drew YFC↔YYG (allowed —
+first route, empty network). Bought a second plane, tried YSJ→YHZ —
+blocked with the expected message, Add Route confirmed disabled via
+`document.querySelector('#new-route-confirm').disabled === true`.
+Cancelled, then drew YYG→YSJ instead (YYG already in-network from the
+first route) — allowed, with the positioning-leg preview correctly
+still layering on top for the tail that needed repositioning.
+
 ## Judgment calls, not yet decided
 
 ### Time navigation and pacing
@@ -416,9 +454,14 @@ problem a real session hasn't surfaced yet.
    done. The other half of item 8's reframing: not just *automatic*
    positioning once you have a plane, but starting with none at all, so
    every aircraft in the game is one the player deliberately acquired.
-10. Time navigation / weather visibility / failure-state — all worth
+10. **Growing the network one airport at a time** — done. A design idea
+    from an earlier conversation that got agreed on but never actually
+    built — the player reported adding disconnected routes (YFC↔YYG, then
+    YSJ↔YHZ) and the game let both through with no gate at all. Fixed:
+    see its own section below.
+11. Time navigation / weather visibility / failure-state — all worth
     revisiting once a real session has actually been played against
-    items 1-9, not before.
+    items 1-10, not before.
 
 ## A balance gap this opened, not yet addressed
 

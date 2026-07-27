@@ -231,6 +231,26 @@ export function legsServingMarket(origin: string, dest: string, legs: ScheduleLe
 }
 
 /**
+ * Every airport the player's network currently touches — every leg's
+ * origin *and* destination, since a market served in only one direction
+ * still means both ends are places the player operates. Used by
+ * ui/routeBuilder.ts to enforce "grow one airport at a time": a new
+ * route's origin must already be in this set (its destination doesn't
+ * have to be — reaching a brand-new airport for the first time is exactly
+ * how it joins the network). An empty result means there's no network
+ * yet at all, which is what lets the very first route ever drawn start
+ * from anywhere.
+ */
+export function networkAirports(legs: ScheduleLeg[]): Set<string> {
+  const airports = new Set<string>();
+  for (const leg of legs) {
+    airports.add(leg.origin);
+    airports.add(leg.dest);
+  }
+  return airports;
+}
+
+/**
  * Sanity-check that every aircraft's day is one unbroken chain: the
  * destination of one leg must be the origin of that same tail's next leg,
  * with at least MIN_TURN_MINUTES on the ground in between. A schedule that
