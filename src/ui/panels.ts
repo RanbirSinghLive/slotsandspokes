@@ -67,7 +67,10 @@ export function updatePanel(state: SimState): void {
 
     const whereCell = document.createElement('td');
     if (aircraft.status === 'ground') {
-      whereCell.textContent = aircraft.atAirport ?? '—';
+      // null means a Fleet Market purchase that's never flown yet
+      // (ui/fleetMarket.ts) — sitting in the pool, not based anywhere
+      // until the player draws a route for it.
+      whereCell.textContent = aircraft.atAirport ?? 'Unassigned';
     } else {
       const flight = state.activeFlights.find((f) => f.tail === aircraft.tail);
       if (flight) {

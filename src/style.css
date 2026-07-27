@@ -614,22 +614,6 @@ body {
   color: #cdd3e0;
 }
 
-#fleet-market-header {
-  margin-bottom: 16px;
-  color: #9aa3b8;
-}
-
-#fleet-market-header select {
-  font-family: inherit;
-  font-size: inherit;
-  color: #cdd3e0;
-  background: #0a0c12;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  padding: 3px 6px;
-  margin-left: 6px;
-}
-
 #fleet-market-table {
   width: 100%;
   border-collapse: collapse;

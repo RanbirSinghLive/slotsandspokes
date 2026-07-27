@@ -296,27 +296,32 @@ two are now separate entry points on purpose, not one function branching
 on its arguments.
 
 **The Fleet Market** (`sim/fleetMarket.ts` + `ui/fleetMarket.ts`, a new
-Reports-menu view) is a small, hand-authored list of individual airframes
-— registration, age, buy price, daily lease price — of the game's one
-aircraft type (see below). Buying deducts the price from cash outright;
-leasing costs nothing up front and instead charges `leasePricePerDay`
-every day at rollover, the same flat-daily-cost shape marketing spend
-already has (`step.ts`). **Acquisition-only for this pass** — no sell-back,
-no early lease-end — matching CLAUDE.md's aircraft-trading being
-deferred, while still granting the specific thing that was actually
-asked for: a way to *get into* a plane, not out of one.
+Reports-menu view labeled "Fleet") is a small, hand-authored list of
+individual airframes — registration, age, buy price, daily lease price —
+of the game's one aircraft type (see below). Buying deducts the price
+from cash outright; leasing costs nothing up front and instead charges
+`leasePricePerDay` every day at rollover, the same flat-daily-cost shape
+marketing spend already has (`step.ts`). **Acquisition-only for this
+pass** — no sell-back, no early lease-end — matching CLAUDE.md's
+aircraft-trading being deferred, while still granting the specific thing
+that was actually asked for: a way to *get into* a plane, not out of one.
 
-The panel has one shared "Base new aircraft at" selector (any of the 10
-airports) that applies to whichever listing you buy or lease next —
-deliberately doubling as the "pick a home airport" step from the earlier
-design discussion, rather than adding a separate one: wherever your first
-purchase gets based *is* your starting base, with no extra ceremony.
-Buying removes the listing and immediately refreshes the M10 route
-builder's Tail dropdown (`ui/routeBuilder.ts`'s new `refreshTailOptions()`)
-so the new tail is selectable right away. Drawing a route with zero
-aircraft owned is explicitly blocked in the form ("Buy or lease an
-aircraft first — see Fleet Market under the Reports menu") rather than
-left to silently do nothing.
+**No base-airport picker at purchase** — cut immediately after the first
+pass, at the player's direction: a bought or leased aircraft joins the
+fleet with `atAirport: null`, showing "Unassigned" in the Fleet panel's
+Where column, sitting in a pool rather than pinned to a city before
+you've decided what it's for. Drawing its *first* route (M10's route
+builder) deploys it directly to that route's origin — free and
+immediate, since an unassigned aircraft was never anywhere else to begin
+with, so there's nothing to reposition it *from*. The form previews this
+before you confirm: "C-FQAC has no base yet — this route will make YHZ
+its new base." That's also what ends up choosing a home base, arrived at
+implicitly through the first route you draw rather than a separate
+purchase-time decision. Buying still removes the listing and refreshes
+the route builder's Tail dropdown (`refreshTailOptions()`) immediately;
+drawing a route with zero aircraft owned is still explicitly blocked in
+the form ("Buy or lease an aircraft first...") rather than left to
+silently do nothing.
 
 **The aircraft type itself changed too**, at the player's request: the
 Dash 8-400 (78 seats) became a Beechcraft 1900D (19 seats, `data/
@@ -325,12 +330,14 @@ proportionally). See "A balance gap this opened," below — the demand/fare
 model hasn't been re-tuned for a plane this much smaller yet.
 
 Verified in-browser: a fresh game showed $500,000 cash and empty Fleet/
-Schedule panels; buying C-FQAC ($650,000) based at YHZ dropped cash to
--$150,000 and added it to the Fleet panel immediately; the route builder's
-Tail dropdown showed C-FQAC without a reload; drawing YHZ↔YQB for it
-worked with no positioning needed (already at the right airport), and
-running the clock forward showed it actually flying the route and posting
-real (if currently loss-making — see below) economics.
+Schedule panels; buying C-FQAC ($650,000) dropped cash to -$150,000 and
+added it to the Fleet panel immediately, showing "Unassigned"; the route
+builder's Tail dropdown showed C-FQAC without a reload, and drawing
+YHZ↔YQB for it showed the "no base yet" preview, deployed it to YHZ for
+free on confirm (no positioning leg, no extra cost — cash unchanged from
+the purchase price), and running the clock forward showed it actually
+flying the route and posting real (if currently loss-making — see below)
+economics.
 
 ## Judgment calls, not yet decided
 

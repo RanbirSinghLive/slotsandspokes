@@ -1,10 +1,8 @@
-import { airports } from '../render/airports';
 import type { FleetListing } from '../sim/fleetMarket';
 import type { Aircraft, SimState } from '../sim/state';
 import { refreshTailOptions } from './routeBuilder';
 
 const tableBody = document.querySelector<HTMLTableSectionElement>('#fleet-market-rows')!;
-const baseAirportSelect = document.querySelector<HTMLSelectElement>('#fleet-market-base-airport')!;
 
 // Tracked by registration so acquireAircraft() can remove a listing's row
 // without a DOM search — same "keep a direct reference" reasoning
@@ -23,10 +21,13 @@ function formatMoney(amount: number): string {
  * early lease-end, so once a listing is gone it's gone for the rest of
  * this game.
  *
- * The aircraft is based wherever `baseAirportSelect` currently points —
- * for a brand-new game with zero fleet, whichever airport the player picks
- * for their *first* purchase is effectively choosing a home base, without
- * a separate "pick a home airport" step existing at all.
+ * `atAirport: null` — no base airport picked here on purpose. The
+ * aircraft joins the fleet unassigned, sitting in the pool shown on the
+ * Fleet panel until the player draws a route for it (ui/routeBuilder.ts):
+ * assigning a pool aircraft to a route deploys it directly to that
+ * route's origin, for free, since it was never anywhere else to begin
+ * with. That's also what ends up choosing a home base, implicitly,
+ * without a separate step for it.
  */
 function acquireAircraft(listing: FleetListing, ownership: 'owned' | 'leased', state: SimState): void {
   if (ownership === 'owned') {
@@ -40,7 +41,7 @@ function acquireAircraft(listing: FleetListing, ownership: 'owned' | 'leased', s
     tail: listing.registration,
     typeCode: listing.typeCode,
     status: 'ground',
-    atAirport: baseAirportSelect.value,
+    atAirport: null,
     activeLegId: null,
     groundSinceMinute: state.simMinute,
     ownership,
@@ -95,21 +96,13 @@ function buildListingRow(listing: FleetListing, state: SimState): HTMLTableRowEl
 }
 
 /**
- * Build the Fleet Market panel once at startup — the base-airport picker
- * (every one of the game's 10 airports, alphabetical by IATA is fine at
- * this size) and one row per listing still in `state.fleetMarket`. Same
- * "build once, mutate via events" rule as ui/panels.ts's schedule table:
- * nothing here needs a periodic rebuild, since the only thing that changes
- * it is a Buy/Lease click, already handled directly.
+ * Build the Fleet Market panel once at startup — one row per listing
+ * still in `state.fleetMarket`. Same "build once, mutate via events" rule
+ * as ui/panels.ts's schedule table: nothing here needs a periodic
+ * rebuild, since the only thing that changes it is a Buy/Lease click,
+ * already handled directly.
  */
 export function setupFleetMarket(state: SimState): void {
-  for (const airport of airports) {
-    const option = document.createElement('option');
-    option.value = airport.iata;
-    option.textContent = `${airport.iata} — ${airport.name}`;
-    baseAirportSelect.appendChild(option);
-  }
-
   for (const listing of state.fleetMarket) {
     tableBody.appendChild(buildListingRow(listing, state));
   }

@@ -362,10 +362,16 @@ function updateFormValidation(origin: Airport, dest: Airport, state: SimState): 
 
   const tail = formTailSelect.value;
   const currentPosition = currentOrUpcomingAirport(tail, state);
-  formPositioningPreview.textContent =
-    currentPosition && currentPosition.airport !== origin.iata
-      ? `Positioning: ${tail} will fly ${currentPosition.airport} → ${origin.iata} first (${computeBlockMinutes(currentPosition.airport, origin.iata)} min, cost only, no passengers) before this route starts.`
-      : '';
+  if (currentPosition && currentPosition.airport !== origin.iata) {
+    formPositioningPreview.textContent = `Positioning: ${tail} will fly ${currentPosition.airport} → ${origin.iata} first (${computeBlockMinutes(currentPosition.airport, origin.iata)} min, cost only, no passengers) before this route starts.`;
+  } else if (!currentPosition) {
+    // A Fleet Market purchase with no base yet (see ui/fleetMarket.ts) —
+    // deploying it here is free and immediate, not a positioning flight,
+    // since it was never anywhere else to begin with.
+    formPositioningPreview.textContent = `${tail} has no base yet — this route will make ${origin.iata} its new base.`;
+  } else {
+    formPositioningPreview.textContent = '';
+  }
 }
 
 function timeStringToMinuteOfDay(time: string): number {
@@ -442,6 +448,14 @@ export function setupRouteBuilder(state: SimState): void {
     // existing at all: describe the network you want and let the game
     // work out how to get a plane there, rather than blocking the route or
     // requiring a separate manual leg first.
+    //
+    // `currentPosition === null` is different: a Fleet Market purchase
+    // (ui/fleetMarket.ts) that's never flown before has no base at all,
+    // not merely a *different* one, so there's nothing to fly it in from.
+    // Deploying it here is free and immediate — this route just becomes
+    // its home base, which is also the closest thing this game has to a
+    // "pick a home airport" step, arrived at implicitly rather than as a
+    // separate purchase-time decision.
     const currentPosition = currentOrUpcomingAirport(tail, state);
     if (currentPosition && currentPosition.airport !== origin.iata) {
       const positioningLeg: PositioningLeg = {
@@ -453,6 +467,12 @@ export function setupRouteBuilder(state: SimState): void {
         blockMinutes: computeBlockMinutes(currentPosition.airport, origin.iata),
       };
       state.positioningLegs.push(positioningLeg);
+    } else if (!currentPosition) {
+      const aircraft = state.aircraft.find((a) => a.tail === tail);
+      if (aircraft) {
+        aircraft.atAirport = origin.iata;
+        aircraft.groundSinceMinute = state.simMinute;
+      }
     }
 
     const outboundLeg: ScheduleLeg = {

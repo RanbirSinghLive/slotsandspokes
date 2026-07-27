@@ -658,6 +658,13 @@ stranded-tail check also takes `state.positioningLegs` now, so it stops
 warning about a tail that already has a positioning leg headed toward one
 of its schedule's own origins — "in progress," not "broken."
 
+`currentOrUpcomingAirport()` returns `null` for one more case beyond "tail
+not found": a Fleet Market purchase that's never flown, sitting
+unassigned (see the Fleet Market section above). That's handled as its
+own branch, not a positioning leg — there's no real "current location" to
+fly it in from, so Add Route just sets `aircraft.atAirport` to the new
+route's origin directly, for free, right when you confirm.
+
 Editing/removing an *existing* route stays table-driven (M8) rather than
 gaining a second, harder gesture — hit-testing a click against an
 arbitrary curve is a meaningfully bigger problem than hit-testing a point,
@@ -921,15 +928,27 @@ aircraft type, since "multiple aircraft types" stays out of scope
 type catalog. `ageYears` is pricing flavor only — older is cheaper, with
 no separate reliability/maintenance mechanic attached.
 
-The Fleet Market view (a new Reports-menu entry, real DOM like Rotation/
-Commercial) lists whatever's left in `state.fleetMarket`, plus a shared
-"Base new aircraft at" airport picker that applies to the *next* Buy or
-Lease click. Buying deducts `buyPrice` from cash immediately; leasing
-costs nothing up front and instead adds `leasePricePerDay` to a new daily
-charge in `step.ts` (same flat-per-day shape marketing spend already
-has) via the aircraft's `leaseCostPerDay` field. **Acquisition-only** —
-no sell-back, no early lease-end, matching CLAUDE.md's aircraft-trading
-still being deferred beyond just getting into a plane.
+The Fleet Market view (a new Reports-menu entry labeled "Fleet," real DOM
+like Rotation/Commercial) lists whatever's left in `state.fleetMarket`.
+Buying deducts `buyPrice` from cash immediately; leasing costs nothing up
+front and instead adds `leasePricePerDay` to a new daily charge in
+`step.ts` (same flat-per-day shape marketing spend already has) via the
+aircraft's `leaseCostPerDay` field. **Acquisition-only** — no sell-back,
+no early lease-end, matching CLAUDE.md's aircraft-trading still being
+deferred beyond just getting into a plane.
+
+**No base-airport picker at purchase.** A bought or leased aircraft joins
+the fleet with `atAirport: null` — shown as "Unassigned" in the Fleet
+panel's Where column — sitting in a pool rather than pinned to a city
+before there's a route for it. `ui/routeBuilder.ts`'s
+`currentOrUpcomingAirport()` returns `null` for exactly this case (ground,
+no airport), which the Add Route confirm handler treats differently from
+a real mismatch: instead of queuing a costed positioning leg (see the
+Route builder section below), it deploys the aircraft directly to the
+new route's origin, for free — there's nothing to fly it in *from*. The
+form previews this before confirming: "C-FQAC has no base yet — this
+route will make YHZ its new base." That first route is also, implicitly,
+how a home base gets chosen — no separate step for it.
 
 Buying/leasing removes the listing and calls `ui/routeBuilder.ts`'s new
 `refreshTailOptions()` so the fresh tail is immediately selectable in
@@ -939,10 +958,6 @@ rebuildable, since the fleet starts empty and only grows via purchase.
 Drawing a route with zero aircraft owned is explicitly blocked in the
 form ("Buy or lease an aircraft first...") rather than left to silently
 produce a route nothing can ever fly.
-
-There's no separate "pick a home airport" step — whichever airport the
-*first* purchase gets based at effectively becomes the player's starting
-base, since nothing else exists yet for it to compete with.
 
 **A balance gap this opened, not yet addressed:** the aircraft type
 itself changed too, at the player's request — the Dash 8-400 (78 seats)
