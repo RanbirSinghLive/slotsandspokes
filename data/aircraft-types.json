@@ -7,5 +7,41 @@
     "costPerBlockHour": 950,
     "costPerDeparture": 300,
     "rangeNm": 700
+  },
+  {
+    "code": "DH8300",
+    "name": "Dash 8-300",
+    "seats": 50,
+    "cruiseKts": 270,
+    "costPerBlockHour": 1600,
+    "costPerDeparture": 450,
+    "rangeNm": 800
+  },
+  {
+    "code": "DH8400",
+    "name": "Dash 8-400 (Q400)",
+    "seats": 78,
+    "cruiseKts": 360,
+    "costPerBlockHour": 3400,
+    "costPerDeparture": 900,
+    "rangeNm": 1000
+  },
+  {
+    "code": "A220300",
+    "name": "Airbus A220-300",
+    "seats": 149,
+    "cruiseKts": 450,
+    "costPerBlockHour": 5200,
+    "costPerDeparture": 1800,
+    "rangeNm": 2500
+  },
+  {
+    "code": "A330300",
+    "name": "Airbus A330-300",
+    "seats": 280,
+    "cruiseKts": 470,
+    "costPerBlockHour": 9000,
+    "costPerDeparture": 3500,
+    "rangeNm": 6000
   }
 ]

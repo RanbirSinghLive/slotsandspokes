@@ -215,3 +215,100 @@ matter as expected: 1 and 2 stayed useful on their own, and building them
 first meant 3's hover unification had real working pieces (the route
 builder's own PDEW tooltip, Competition's operator hit-testing) to unify
 instead of designing all three from scratch at once.
+
+## An aircraft ladder, and a demand-model retune
+
+Raised directly after the PDEW/CAP work landed: with only the Beechcraft
+1900D available, PDEW/CAP visibility mostly just confirmed how thin this
+map's markets are — useful information, but not much of a *game* if
+almost every market is a trap and there's nowhere to graduate to. Two
+asks, resolved together: build out a real fleet of aircraft sizes to
+grow into, and check whether the demand numbers underlying all of this
+were actually reasonable.
+
+### The ladder
+
+Five types now, in `data/aircraft-types.json`, each real public spec-sheet
+numbers (seats, cruise) same sourcing rule as the 1900D — costs and
+range stay "deliberately crude, not fit to any real source," same as
+`economy.ts`'s other constants:
+
+| Type | Code | Seats | Cruise | Range |
+|---|---|---|---|---|
+| Beechcraft 1900D | `BEH1900D` | 19 | 280kt | 700nm |
+| Dash 8-300 | `DH8300` | 50 | 270kt | 800nm |
+| Dash 8-400 (Q400) | `DH8400` | 78 | 360kt | 1,000nm |
+| Airbus A220-300 | `A220300` | 149 | 450kt | 2,500nm |
+| Airbus A330-300 | `A330300` | 280 | 470kt | 6,000nm |
+
+`DH8400`'s cost figures (`costPerBlockHour: 3400`, `costPerDeparture:
+900`) are the *original* DH4 numbers from before the very first Fleet
+Market pass swapped the starting type down to the 1900D — free reuse,
+already "calibrated" in the sense that nothing about them was invented
+fresh.
+
+Two listings per type in `data/fleet-market.json` (12 total, all
+available from day one — no unlock gating), buy price and lease rate
+both escalating with size: 1900D $300K-$890K (unchanged) → Dash 8-300
+~$2.1M-$4.2M → Q400 ~$6.8M-$13.5M → A220 ~$31M-$42M → widebody
+~$19.5M-$34M. The widebody undercutting a new-ish A220 in price isn't a
+mistake — a 24-year-old wide-body genuinely is worth less used than a
+type still in production, and it's its own small piece of texture.
+
+**Day one is deliberately just the Beechcraft, at the player's explicit
+request.** With `STARTING_CASH` at $500,000: the cheapest 1900D
+($300,000) is affordable, but two of them ($600,000) aren't, and the
+cheapest non-1900D listing (Dash 8-300, $2.1M) is nowhere close.
+Verified in-browser: bought the cheapest 1900D, cash dropped to
+$200,000, and every remaining listing — including the *other* three
+1900Ds — was correctly unaffordable. Leasing remains open for bigger
+gauges from day one regardless (leasing has no upfront cost by design),
+which is the intended release valve: a cash-strapped new entrant can
+lease into more capacity early and accept the daily burn, or grow into
+buying gradually. Whether that burn is survivable without matching
+revenue is exactly the kind of judgment call positioning flights and
+route range already ask the player to make elsewhere.
+
+### The demand retune
+
+Asked directly: what are `sim/demand.ts`'s market sizes actually sourced
+from? Answer, precisely: the *populations* are real (StatsCan 2021
+census CMA/CA, `data/airports.json`) and the *distances* are real
+(great-circle, real coordinates) — but the constant that converts
+"these two cities are this big and this far apart" into an actual daily
+passenger count was never fit to any real O-D survey, just picked so the
+biggest pair "looked about right." That's the knob that was making
+things feel understated, and it was fair game to retune for
+playability, which is what was asked for over strict realism.
+
+Checked against all 45 city pairs before picking a number, not guessed:
+under the original `SCALING_CONSTANT` (`1.6e-8`), **31 of 45 pairs**
+worked out to under 10 passengers each-way with only a 19-seat plane
+available — barely playable, since almost the whole map was a trap.
+Tried softening `DISTANCE_EXPONENT` instead of scaling up; rejected it
+immediately — it blows up the biggest pairs (the golden triangle:
+Montréal-Toronto, Montréal-Ottawa, Toronto-Ottawa) far more than it
+helps the thin ones, since it's a distance-shaped fix applied to what's
+fundamentally a population-size problem at the thin end. Tripling
+`SCALING_CONSTANT` (to `4.8e-8`) instead, a plain multiplier that
+preserves the relative shape between pairs:
+
+- 10 pairs land in the "one full 1900D flight" zone (10-19 each-way).
+- 19 more are workable with a second frequency or a bigger gauge.
+- 16 stay genuinely thin — still a real pitfall zone, just not
+  swallowing the whole map the way it used to.
+
+**The ladder creates a second trap to match the first.** The golden
+triangle (776-2,334 each-way at the new scaling) is enormous even next
+to an A220 (149 seats) — but the choice model's `scheduleFit` term
+rewards frequency independently of raw seats, so 4-5 A220 frequencies
+beat 1-2 widebody ones on the same market. A widebody buy is a real
+strategic mistake on this map in most cases, not just an expensive
+flex — the same kind of judgment call the thin-market trap asks for, at
+the opposite end of the ladder.
+
+Verified in-browser: YFC-YQM (a thin pair) read `PDEW: 5 CAP: 19` — down
+from roughly 1.5 before the retune, matching the standalone calculation
+exactly; YHZ-YQM (a "sweet spot" pair) read `PDEW: 20 CAP: 19`, just
+over a full 1900D flight, exactly the zone the retune was aimed at
+creating more of.

@@ -14,14 +14,29 @@ const airportsByIata = new Map<string, AirportDemandInput>(
 // distance (1 = linear falloff); `SCALING_CONSTANT` just converts the
 // resulting ratio into a number of people per day. Both are deliberately
 // crude, tunable knobs in the same spirit as economy.ts's LOAD_FACTOR/
-// AVG_FARE — picked so the biggest city pair in this map (Montréal-Toronto)
-// lands in the low thousands and the smallest (Saint John-Fredericton, two
-// small cities close together) lands in the tens, not calibrated against
-// any real O-D survey. See WEEK-TWO.md's "1. O-D demand" for the rationale,
-// and its "Scaling strategy" note for why `population` lives as a plain
-// field on each airport rather than anything StatsCan-specific.
+// AVG_FARE, not calibrated against any real O-D survey — the populations
+// and distances feeding into them are real (StatsCan 2021 census CMA/CA,
+// real coordinates), but nothing converts "these two cities are this big
+// and this far apart" into an actual passenger count from any real source.
+// See WEEK-TWO.md's "1. O-D demand" for the original rationale, and its
+// "Scaling strategy" note for why `population` lives as a plain field on
+// each airport rather than anything StatsCan-specific.
+//
+// `SCALING_CONSTANT` was tripled in week four (was 1.6e-8): with only the
+// Beechcraft 1900D (19 seats) available and the original constant, 31 of
+// this map's 45 city pairs worked out to under 10 passengers each way —
+// barely playable, since almost every market was a trap. Tripling it
+// (checked against all 45 pairs before picking this number, not guessed)
+// gets 10 pairs into the "one full 1900D flight" zone (10-19 each way), 19
+// more workable with a second frequency or a bigger gauge, and leaves 16
+// genuinely thin — still a real pitfall zone, just not swallowing the
+// whole map. `DISTANCE_EXPONENT` was left alone on purpose: softening it
+// instead was tried and rejected, since it blows up the biggest pairs (the
+// golden triangle) far more than it helps the small ones, being a
+// distance-shaped adjustment applied to what's fundamentally a
+// population-size problem at the thin end.
 const DISTANCE_EXPONENT = 1;
-const SCALING_CONSTANT = 1.6e-8;
+const SCALING_CONSTANT = 4.8e-8;
 
 /**
  * The estimated number of people who want to travel between `originIata`

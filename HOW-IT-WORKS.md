@@ -40,21 +40,25 @@ seasonally.
   not DST-aware), and `population` (catchment CMA/CA population, StatsCan
   2021 census — see `sim/demand.ts`, below). Coordinates verified against
   OurAirports.
-- **`aircraft-types.json`** — one type right now: the Beechcraft 1900D
-  (`BEH1900D`), 19 seats, 280kt cruise, `costPerBlockHour` and
-  `costPerDeparture` for the economy model below, plus `rangeNm` (700 —
-  its realistic full-payload range, not the more generous empty-ferry
-  figure; see the Route builder section's range-ring writeup) for the
-  M10 route builder's range ring. Multiple types are explicitly deferred
-  — this models one type's several individual airframes (see
-  `fleet-market.json`), not a type catalog. Was the Dash 8-400 (78 seats)
-  until week three's Fleet Market swapped it, at the player's request —
-  see "A balance gap this opened" under the Fleet Market section for what
-  that swap left untuned.
-- **`fleet-market.json`** (week three) — a small, hand-authored list of
-  individual airframes available to buy or lease in a new game:
-  `registration`, `typeCode`, `ageYears`, `buyPrice`, `leasePricePerDay`.
-  See the Fleet Market section, below.
+- **`aircraft-types.json`** — five types now (week four's aircraft
+  ladder, at the player's request — multiple types were explicitly
+  deferred until then): Beechcraft 1900D (`BEH1900D`, 19 seats), Dash
+  8-300 (`DH8300`, 50), Dash 8-400/Q400 (`DH8400`, 78), Airbus A220-300
+  (`A220300`, 149), Airbus A330-300 (`A330300`, 280) — real public
+  spec-sheet seats/cruise per type, same sourcing rule as before; costs
+  and `rangeNm` stay "deliberately crude, not fit to any real source,"
+  same spirit as `economy.ts`'s other constants. `DH8400`'s cost figures
+  are the *original* DH4 numbers from before the very first Fleet Market
+  pass swapped the starting type down to the 1900D. `createInitialState()`
+  (the headless runner's own entry point, untouched by any of this) still
+  grabs index `[0]` of this array, which stays `BEH1900D` — array order
+  matters there, not just the code. See the Fleet Market section, below,
+  for the full ladder and its pricing.
+- **`fleet-market.json`** (week three, expanded week four) — a small,
+  hand-authored list of individual airframes available to buy or lease in
+  a new game: `registration`, `typeCode`, `ageYears`, `buyPrice`,
+  `leasePricePerDay`. Two listings per type now, 12 total, all available
+  from day one. See the Fleet Market section, below.
 - **`schedule.json`** — the daily-repeating schedule *template*: 12 legs
   across 3 tails (`C-GVIA`, `C-FATL`, `C-GMAR`), each a hand-authored
   rotation that returns to its own overnight base by end of day. Each entry
@@ -336,12 +340,28 @@ demand(A, B) = round(pop(A) * pop(B) / distance(A, B)^k * C)
 
 `pop` is each airport's `population` field (its catchment CMA/CA
 population); `distance` is the same great-circle distance
-`sim/geo.ts` already computes for route arcs and block time. `k = 1`
-and the scaling constant `C = 1.6e-8` are hand-picked, crude parameters
-in the same spirit as `economy.ts`'s `LOAD_FACTOR`/`AVG_FARE` — not
-calibrated against any real O-D survey, just tuned so the biggest pair
-(Montréal-Toronto) lands in the low thousands and the smallest
-(Saint John-Fredericton) lands in the tens.
+`sim/geo.ts` already computes for route arcs and block time. Both of
+those inputs are real. `k = 1` and the scaling constant `C` are not —
+they're hand-picked, crude parameters in the same spirit as
+`economy.ts`'s `LOAD_FACTOR`/`AVG_FARE`, converting a real population/
+distance pair into a passenger count with nothing calibrated against
+an actual O-D survey.
+
+`C` was `1.6e-8` through week three, then tripled to `4.8e-8` in week
+four at the player's request, once the aircraft ladder (below) made it
+obvious the original number was too conservative to play: with only
+the 19-seat Beechcraft 1900D available, 31 of this map's 45 city pairs
+worked out to under 10 passengers each way, most of the map was a trap
+rather than a market. Tripling `C` (checked against all 45 pairs before
+picking the number) gets 10 pairs into the "one full 1900D flight"
+zone (10-19 each way), 19 more workable with a second frequency or a
+bigger gauge, and leaves 16 genuinely thin — real pitfalls still exist,
+they just don't swallow the whole map. Softening `k` instead (so
+distance decays less sharply) was tried and rejected: it blows up the
+biggest pairs (the Montréal-Toronto-Ottawa "golden triangle") far more
+than it helps the smallest ones, since that's a distance-shaped fix
+applied to what's fundamentally a population-size problem at the thin
+end.
 
 This is a pure function of static data (population never changes at
 runtime, distance is fixed per airport pair), so nothing caches a
@@ -1090,11 +1110,12 @@ test network; the two are deliberately separate functions rather than
 one branching on its arguments.
 
 `data/fleet-market.json` is a small, hand-authored list of individual
-airframes (registration, age, buy price, daily lease price) — all one
-aircraft type, since "multiple aircraft types" stays out of scope
-(CLAUDE.md); this models several used airframes of that one type, not a
-type catalog. `ageYears` is pricing flavor only — older is cheaper, with
-no separate reliability/maintenance mechanic attached.
+airframes (registration, age, buy price, daily lease price). Week three
+shipped it with one aircraft type; week four added the rest of the
+ladder (below), so it now lists two used airframes per type, 12 rows
+total, all available from day one. `ageYears` is pricing flavor only —
+older is cheaper, with no separate reliability/maintenance mechanic
+attached.
 
 The Fleet Market view (a new Reports-menu entry labeled "Fleet," real DOM
 like Rotation/Commercial) lists whatever's left in `state.fleetMarket`.
@@ -1126,14 +1147,48 @@ no extra click needed. Drawing a route with zero aircraft owned is still
 explicitly blocked in the form ("Buy or lease an aircraft first...")
 rather than left to silently produce a route nothing can ever fly.
 
-**A balance gap this opened, not yet addressed:** the aircraft type
-itself changed too, at the player's request — the Dash 8-400 (78 seats)
-became a Beechcraft 1900D (19 seats), with `costPerBlockHour`/
-`costPerDeparture` scaled down proportionally in `data/aircraft-types.json`.
-The demand/fare model (`sim/demand.ts`, `recommendedFare()`) hasn't been
-re-tuned for a plane this much smaller — a headless run already shows
-small net losses that weren't there before the swap. Worth a proper
-headless-tuned pass before treating the economy as balanced again.
+**The balance gap week three opened, closed in week four:** the Dash
+8-400 became a Beechcraft 1900D at the player's request, with costs
+scaled down proportionally, but the demand model wasn't re-tuned for a
+plane this much smaller — a headless run showed small net losses that
+weren't there before the swap. Week four's aircraft ladder and demand
+retune (see below, and the O-D demand section above) is that pass: five
+types now span Beechcraft-to-widebody, and `SCALING_CONSTANT` was
+tripled so more markets are actually workable starting from a single
+1900D.
+
+**The aircraft ladder (week four).** Five types in `data/aircraft-types.json`
+now, in order of size — `BEH1900D` (19 seats, 280kt, 700nm), `DH8300`
+(Dash 8-300, 50 seats, 270kt, 800nm), `DH8400` (Dash 8-400/Q400, 78
+seats, 360kt, 1,000nm — its cost figures are the original pre-swap DH4
+numbers, reused rather than re-derived), `A220300` (Airbus A220-300,
+149 seats, 450kt, 2,500nm), and `A330300` (Airbus A330-300, the
+widebody tier, 280 seats, 470kt, 6,000nm). Seats and cruise speed come
+from real public spec sheets, same sourcing rule as the original 1900D;
+costs and range stay hand-picked, same spirit as `economy.ts`'s other
+constants. Order in the array matters beyond display — `sim/state.ts`'s
+`createInitialState()` (the headless runner's entry point) grabs index
+`[0]`, so `BEH1900D` has to stay first.
+
+Buying is deliberately constrained on day one: `STARTING_CASH` is
+$500,000, the cheapest 1900D listing is $300,000 (leaving $200,000 —
+not enough for a second one at any listed price), and the cheapest
+listing of any other type (the Dash 8-300 at $2,100,000) is nowhere
+close to affordable. A new game can only ever start with exactly one
+aircraft, and it's the smallest one. Leasing isn't gated the same way —
+any type can be leased with zero upfront cost, the daily
+`leasePricePerDay` charge being the tradeoff — so a cash-strapped
+player who wants more capacity early still has a route to it, just one
+with an ongoing cost instead of a one-time one.
+
+The ladder also creates a second judgment-call trap to match the thin-
+market one: the choice model's `scheduleFit` term
+(`sim/choiceModel.ts`) rewards flight frequency on a log curve
+independent of seats, so on this map even the biggest "golden triangle"
+markets are usually better served by several A220 frequencies than by
+one or two widebody ones. Buying the A330 is a real strategic mistake
+in most markets here, not just a bigger, safer version of the A220 —
+symmetrical to putting a 1900D on a market too thin to fill it.
 
 ## What isn't built yet
 
