@@ -733,3 +733,41 @@ amber arc with a fading label, correctly disappearing after ~4 seconds;
 the Competition overlay immediately reflected the new routes without a
 page reload; the airline filter dropdown still listed exactly the
 original three carriers, no invented fourth. Zero console errors.
+
+## A bottom-of-screen event ticker
+
+The map flash above only tells you something if you're looking at the
+map. Added a persistent, always-visible ticker (`ui/ticker.ts`) at the
+bottom of the screen for the same two "non-player" event categories —
+new weather forming, a competitor opening a route — scrolling by
+regardless of which panel is showing, so an event that happens while
+you're deep in the Commercial panel still gets announced.
+
+Deliberately duplicates its own small diff loop for "is this weather/
+route new" rather than sharing `render/competition.ts`'s existing one:
+two independent consumers polling one shared, mutating diff would race
+over which one actually "claims" a new event first, and a few
+duplicated lines per module is a lot simpler than restructuring
+already-working, already-tested code to hand out events centrally.
+Each keeps its own local "seen" state, established on the first call
+(so a fresh load or resumed save doesn't announce every pre-existing
+storm and route at once) and updated only on genuinely new
+appearances after that.
+
+Renders as one continuously-scrolling line, most recent events
+appended, capped at the last 20. The scroll animation's *duration* is
+recalculated every time the queued text changes (`scrollWidth` /
+`window.innerWidth` ÷ a fixed pixels-per-second), not a flat number, so
+the scroll *speed* stays constant whether the queue holds one message
+or twenty — a fixed duration would make a short queue zip past and a
+long one crawl.
+
+Verified in-browser: with the competitor probability still boosted
+from the flash test above, three "X opens Y–Z" messages appeared and
+scrolled correctly; switching to the Commercial panel (away from the
+map) at 20x speed confirmed the ticker keeps updating regardless of
+`panelView`. A throwaway 365-day script (deleted after, not committed)
+confirmed the weather side of the same diff logic fires correctly and
+often — dozens of winter snowstorm-formation events across the year,
+consistent with the existing weather model's known seasonal rates.
+Zero console errors.

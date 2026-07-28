@@ -770,6 +770,50 @@ errors, and the headless runner's 30-day balance check still produces
 a deterministic (same-seed, same-result) outcome at the real 3%
 probability.
 
+## The event ticker (`src/ui/ticker.ts`) — week four
+
+The map flash above only reads as news if you're actually looking at
+the map. `ui/ticker.ts` adds a persistent, always-visible strip fixed
+to the bottom of the screen (`#ticker`, `pointer-events: none` so it
+never blocks a click on whatever's underneath), scrolling the same two
+"non-player" event categories — new weather forming, a competitor
+opening a route — regardless of which panel is currently showing.
+`main.ts`'s `render()` calls `updateTicker(state)` *before* its
+`panelView !== 'map'` early return, specifically so an event while
+you're deep in the Commercial panel still gets announced.
+
+Deliberately duplicates a small "is this new" diff loop rather than
+sharing `render/competition.ts`'s existing one for the map flash: two
+independent consumers polling one shared, mutating diff would race
+over which one actually claims a new event first the moment both ran
+in the same frame. A few duplicated lines per module, each keeping its
+own local "seen" state, is simpler than restructuring already-tested
+code to hand out events centrally. Both diffs establish their baseline
+on the very first call (so a fresh load or resumed save doesn't
+announce every pre-existing storm and route at once) and only report
+genuinely new appearances after that.
+
+Renders as one continuously-scrolling line (`#ticker-track`), capped at
+the last 20 messages. The CSS animation's *duration* is recalculated
+in JS every time the queued text changes — `(scrollWidth +
+window.innerWidth) / PIXELS_PER_SECOND` — rather than left at a flat
+number, so scroll *speed* stays constant whether the queue holds one
+message or twenty; a fixed duration would make a short queue zip past
+and a long one crawl. Restarting a CSS animation cleanly requires
+setting `animation: none`, forcing a reflow (reading `offsetWidth`),
+then reapplying it — otherwise the browser just continues whatever
+frame the previous animation was already on instead of starting over.
+
+Verified in-browser (competitor probability still boosted from the
+flash test above): three "Airline opens X–Y" messages appeared and
+scrolled correctly; switching to the Commercial panel at 20x speed
+confirmed updates keep happening regardless of `panelView`. A
+throwaway 365-day script (deleted after, not committed) confirmed the
+weather side of the same diff pattern fires correctly and often —
+dozens of winter snowstorm-formation events across the year, matching
+the weather model's already-verified seasonal rates. Zero console
+errors.
+
 ## Panel (`src/ui/panels.ts`)
 
 A real HTML sidebar, 280px wide (canvas width = `window.innerWidth - 280`,

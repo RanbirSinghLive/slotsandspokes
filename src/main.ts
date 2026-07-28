@@ -26,6 +26,7 @@ import { setupRotationBoard, updateRotationBoard, hideBarTooltip } from './ui/ro
 import { setupCommercialPanel, updateCommercialPanel } from './ui/commercial';
 import { setupFleetMarket } from './ui/fleetMarket';
 import { setupOnTimePanel, updateOnTimePanel } from './ui/onTime';
+import { updateTicker } from './ui/ticker';
 import { loadSavedState, saveState, clearSavedState } from './ui/save';
 
 // Week three's persistence fix (see WEEK-THREE.md): resume a saved game
@@ -204,6 +205,10 @@ let competitionOverlayOn = false;
 function render(nowMs: number = performance.now()): void {
   updateClock(state);
   updatePanel(state);
+  // Before the panelView early-return below — an event happening while
+  // you're deep in the Commercial panel should still get announced, not
+  // silently missed until you happen to switch back to the map.
+  updateTicker(state);
 
   if (panelView !== 'map') return;
 

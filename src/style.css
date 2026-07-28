@@ -1040,3 +1040,48 @@ body {
   color: #fff;
   margin-bottom: 4px;
 }
+
+/* The bottom-of-screen event ticker (ui/ticker.ts) — non-player events
+   (new weather, a competitor opening a route) scrolling by, always
+   visible regardless of which panel is showing, same "ambient
+   awareness" reasoning the HUD's clock/cash readout already gets by
+   floating over the map instead of living inside any one panel.
+   `pointer-events: none` so this slim strip never blocks a click on
+   whatever's underneath it (the map, or the sidebar's schedule table). */
+#ticker {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 28px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  background: rgba(10, 12, 18, 0.85);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  z-index: 20;
+  pointer-events: none;
+}
+
+#ticker-track {
+  white-space: nowrap;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  color: #9aa3b8;
+  padding-left: 100%;
+}
+
+/* Starts fully off-screen right (the padding-left: 100% above) and
+   scrolls fully off-screen left — ui/ticker.ts sets the actual
+   `animation` shorthand (name, duration, timing, iteration count) in JS
+   each time the queued text changes, since the duration has to scale
+   with the new text's width to keep scroll *speed* constant; this rule
+   only needs to define what the animation itself does. */
+@keyframes ticker-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
