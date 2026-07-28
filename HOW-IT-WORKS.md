@@ -996,6 +996,30 @@ route builder, exported for this purpose) — an armed or half-confirmed
 route gesture doesn't mean anything once the canvas it was being drawn
 on is no longer on screen.
 
+**Two more M12 legibility fixes, both raised directly after using the
+board above:** a `.rotation-row-type` column now sits to the left of
+the tail label, showing `aircraft.typeCode` — the same raw code the
+Fleet panel's own Type column already shows (`ui/panels.ts`), so the two
+never need a separate lookup to stay consistent. `.rotation-axis-spacer`
+had to widen by the same amount (72px → 140px) so the hour-tick axis
+still lines up with the track's left edge instead of the row labels.
+
+Second, each bar's hover now shows a real custom tooltip
+(`#rotation-bar-tooltip`, same "real DOM, positioned via mousemove"
+shape as `#route-hover-tooltip`) instead of relying on the bar's native
+`title` — a short block time draws a narrow bar whose own inline text
+gets clipped, which is exactly the case the native tooltip couldn't
+save (slow to appear, unstyled, and the same clipped text either way).
+The tooltip's title is the route (`origin → destination`) specifically,
+not the leg ID or time — the route is the thing a tiny bar can't
+reliably show on its own, so it's the first thing the tooltip says.
+`showBarTooltip(leg, departMinute, x, y)` takes the depart time as its
+own argument rather than reading it off `leg` so the same function
+serves both a plain hover (the bar's resting `departMinute`) and a
+live drag (the drag's own `mousemove` handler calls it with the
+tentative dragged-to minute instead), which is also why the tooltip
+keeps showing the new time as a bar moves, not just when it's still.
+
 ## The Commercial panel (`src/ui/commercial.ts`)
 
 A fourth view, one row per market, that makes route-level revenue

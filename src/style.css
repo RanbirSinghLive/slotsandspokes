@@ -522,8 +522,13 @@ body {
   border-bottom: 1px solid rgba(255, 255, 255, 0.15);
 }
 
+/* M12: widened from 72px to fit .rotation-row-type + .rotation-row-label
+   side by side (68px + 72px, below) — this spacer only exists so the
+   axis's hour ticks line up with the track's left edge, not the row
+   labels themselves, so it has to grow by the same amount every time a
+   new row-label column does. */
 .rotation-axis-spacer {
-  width: 72px;
+  width: 140px;
   flex-shrink: 0;
 }
 
@@ -546,6 +551,15 @@ body {
   display: flex;
   align-items: center;
   margin-bottom: 10px;
+}
+
+/* M12: aircraft type, to the left of the tail label — dimmer color since
+   the tail is still the row's primary identifier, type is context. */
+.rotation-row-type {
+  width: 68px;
+  flex-shrink: 0;
+  color: #6b7694;
+  font-size: 11px;
 }
 
 .rotation-row-label {
@@ -919,4 +933,35 @@ body {
 
 #route-hover-tooltip-body.out-of-range {
   color: #ff8080;
+}
+
+/* M12: the rotation board's own hover tooltip, same "real DOM, positioned
+   via mousemove" shape as #route-hover-tooltip above — replaces relying on
+   a bar's native `title` (slow to appear, can't be styled, and easy to
+   miss at the small sizes a short block time draws a bar at). The route
+   is the title here on purpose: origin/destination is the thing a narrow
+   bar's own clipped text can't reliably show, so it's the first thing
+   the tooltip says, not the last. */
+#rotation-bar-tooltip {
+  position: fixed;
+  z-index: 30;
+  max-width: 220px;
+  padding: 8px 10px;
+  background: rgba(10, 12, 18, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  color: #cdd3e0;
+  pointer-events: none;
+}
+
+#rotation-bar-tooltip[hidden] {
+  display: none;
+}
+
+#rotation-bar-tooltip-title {
+  font-size: 13px;
+  color: #fff;
+  margin-bottom: 4px;
 }

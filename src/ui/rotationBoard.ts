@@ -7,6 +7,9 @@ const HOUR_TICK_INTERVAL_MINUTES = 180; // every 3 hours
 
 const axisTrack = document.querySelector<HTMLDivElement>('#rotation-axis-track')!;
 const rowsContainer = document.querySelector<HTMLDivElement>('#rotation-rows')!;
+const barTooltip = document.querySelector<HTMLDivElement>('#rotation-bar-tooltip')!;
+const barTooltipTitle = document.querySelector<HTMLDivElement>('#rotation-bar-tooltip-title')!;
+const barTooltipBody = document.querySelector<HTMLDivElement>('#rotation-bar-tooltip-body')!;
 
 function pad(n: number): string {
   return String(n).padStart(2, '0');
@@ -31,8 +34,9 @@ export function setupRotationBoard(): void {
  * One in-progress drag, module-level since a mouse can only ever drag one
  * bar at a time. `leg` is the *actual* object living in `state.schedule` —
  * iterating that array hands back real references, not copies — but we
- * deliberately don't write `leg.departMinute` until drop (see
- * commitDrag()): step() reads `state.schedule` on every simulated minute,
+ * deliberately don't write `leg.departMinute` until drop (see the
+ * `mouseup` handler below): step() reads `state.schedule` on every
+ * simulated minute,
  * including while the rotation board is open and a drag is in progress, so
  * writing a half-finished drag straight into live state would feed the
  * simulation a value the player hasn't actually committed to yet.
@@ -50,20 +54,49 @@ type DragState = {
 
 let dragState: DragState | null = null;
 
-function setBarTimingLabel(bar: HTMLDivElement, leg: ScheduleLeg, departMinute: number): void {
+/**
+ * Show the custom hover tooltip for one bar, positioned just past the
+ * cursor — the M12 replacement for relying on the bar's native `title`.
+ * The route (origin → destination) leads as the title on purpose: that's
+ * exactly the thing a short block time's narrow bar can't reliably show
+ * as its own clipped inline text, which is the whole reason this exists.
+ * Takes `departMinute` as its own argument, not read off `leg`, so the
+ * same function can show either a bar's resting time (hover) or its
+ * tentative dragged-to time (mid-drag, see the mousemove handler below).
+ */
+function showBarTooltip(leg: ScheduleLeg, departMinute: number, clientX: number, clientY: number): void {
+  barTooltipTitle.textContent = `${leg.origin} → ${leg.dest}`;
   const departTime = minuteOfDayToTimeString(departMinute);
   const arriveTime = minuteOfDayToTimeString(departMinute + leg.blockMinutes);
-  bar.title = `${leg.legId}: ${leg.origin} → ${leg.dest}, ${departTime}–${arriveTime} (${leg.blockMinutes} min)`;
+  barTooltipBody.textContent = `${leg.legId} · ${departTime}–${arriveTime} (${leg.blockMinutes} min)`;
+  barTooltip.style.left = `${clientX + 14}px`;
+  barTooltip.style.top = `${clientY + 14}px`;
+  barTooltip.hidden = false;
+}
+
+export function hideBarTooltip(): void {
+  barTooltip.hidden = true;
 }
 
 /**
- * Wire up dragging for one bar — horizontal-only, confined to its own row
- * (a leg can be retimed by dragging, but not reassigned to a different
- * tail this way; that's still a schedule-editor-table edit). Attached
- * fresh every rebuild, same "build once per render, not incrementally
- * patched" simplicity the rest of this file already uses.
+ * Wire up dragging *and* hovering for one bar — horizontal-only dragging,
+ * confined to its own row (a leg can be retimed by dragging, but not
+ * reassigned to a different tail this way; that's still a schedule-
+ * editor-table edit). Attached fresh every rebuild, same "build once per
+ * render, not incrementally patched" simplicity the rest of this file
+ * already uses.
  */
 function attachDragHandlers(bar: HTMLDivElement, leg: ScheduleLeg, track: HTMLDivElement, state: SimState): void {
+  bar.addEventListener('mouseenter', (event) => {
+    if (!dragState) showBarTooltip(leg, leg.departMinute, event.clientX, event.clientY);
+  });
+  bar.addEventListener('mousemove', (event) => {
+    if (!dragState) showBarTooltip(leg, leg.departMinute, event.clientX, event.clientY);
+  });
+  bar.addEventListener('mouseleave', () => {
+    if (!dragState) hideBarTooltip();
+  });
+
   bar.addEventListener('mousedown', (event) => {
     if (event.button !== 0) return; // left-click drags only
     event.preventDefault();
@@ -103,7 +136,7 @@ window.addEventListener('mousemove', (event) => {
   dragState.tentativeDepartMinute = newDepartMinute;
 
   bar.style.left = `${(newDepartMinute / MINUTES_PER_DAY) * 100}%`;
-  setBarTimingLabel(bar, leg, newDepartMinute);
+  showBarTooltip(leg, newDepartMinute, event.clientX, event.clientY);
 
   const hypotheticalLeg: ScheduleLeg = { ...leg, departMinute: newDepartMinute };
   const problems = tailRotationProblems(leg.tail, [...otherLegsSameTail, hypotheticalLeg]);
@@ -123,6 +156,7 @@ window.addEventListener('mouseup', () => {
   if (!dragState) return;
   const { state, leg, bar, tentativeDepartMinute, originalDepartMinute } = dragState;
   bar.classList.remove('rotation-bar--dragging');
+  hideBarTooltip(); // the bar itself is about to be rebuilt (or the mouse has moved on); a stale tooltip helps no one
 
   if (tentativeDepartMinute !== originalDepartMinute) {
     leg.departMinute = tentativeDepartMinute;
@@ -158,6 +192,13 @@ export function updateRotationBoard(state: SimState, highlightLegIds: string[] =
     const row = document.createElement('div');
     row.className = 'rotation-row';
 
+    // Same raw typeCode the Fleet panel's own Type column shows
+    // (ui/panels.ts) — no separate name lookup, so the two stay
+    // trivially consistent with each other.
+    const typeLabel = document.createElement('div');
+    typeLabel.className = 'rotation-row-type';
+    typeLabel.textContent = aircraft.typeCode;
+
     const label = document.createElement('div');
     label.className = 'rotation-row-label';
     label.textContent = aircraft.tail;
@@ -174,13 +215,12 @@ export function updateRotationBoard(state: SimState, highlightLegIds: string[] =
       bar.style.left = `${(leg.departMinute / MINUTES_PER_DAY) * 100}%`;
       bar.style.width = `${(leg.blockMinutes / MINUTES_PER_DAY) * 100}%`;
       bar.textContent = `${leg.origin} → ${leg.dest}`;
-      setBarTimingLabel(bar, leg, leg.departMinute);
       attachDragHandlers(bar, leg, track, state);
 
       track.appendChild(bar);
     }
 
-    row.append(label, track);
+    row.append(typeLabel, label, track);
     rowsContainer.appendChild(row);
   }
 

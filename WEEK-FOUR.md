@@ -425,3 +425,29 @@ board with both new legs glowing (and, as expected, immediately
 conflicting with the existing 07:00 departure — the same bug,
 reproduced live), then dragged all six legs into a single closed
 6-leg loop (YQM→YHZ→YQB→YHZ→YSJ→YHZ→YQM) with no warnings left.
+
+## Two rotation-board legibility fixes
+
+Both raised right after actually using the board above: a narrow bar's
+own inline text (`YHZ → YQB`) gets clipped once its block time is short
+relative to the full day, and the board had no way to tell two tails
+apart except their tail number.
+
+Added a `.rotation-row-type` column, left of the tail label, showing
+`aircraft.typeCode` — the same raw code the Fleet panel's own Type
+column already shows, so the two need no separate lookup to agree.
+Widened `.rotation-axis-spacer` to match (72px → 140px), so the hour
+ticks still line up with the track and not the row labels.
+
+Replaced each bar's native `title` with a real custom tooltip
+(`#rotation-bar-tooltip`, matching `#route-hover-tooltip`'s existing
+"real DOM, follows the cursor" shape) — the native tooltip was slow,
+unstyled, and showed the exact same clipped text the bar itself
+already couldn't fit. The new tooltip's title is the route
+specifically (`origin → destination`), since that's the thing a short
+bar can't reliably show on its own; the leg ID and times sit below as
+a subtitle. The same `showBarTooltip()` function drives both a plain
+hover and a live drag — the drag's own mousemove handler feeds it the
+tentative dragged-to time instead of the bar's resting one, so the
+tooltip keeps reporting the new time as the bar moves, not just once
+it stops.

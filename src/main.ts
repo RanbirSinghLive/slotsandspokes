@@ -22,7 +22,7 @@ import {
   cancelPendingRoute,
   hideRouteHoverTooltip,
 } from './ui/routeBuilder';
-import { setupRotationBoard, updateRotationBoard } from './ui/rotationBoard';
+import { setupRotationBoard, updateRotationBoard, hideBarTooltip } from './ui/rotationBoard';
 import { setupCommercialPanel, updateCommercialPanel } from './ui/commercial';
 import { setupFleetMarket } from './ui/fleetMarket';
 import { loadSavedState, saveState, clearSavedState } from './ui/save';
@@ -402,6 +402,7 @@ function switchToPanel(view: PanelView, highlightLegIds: string[] = []): void {
     hideCompetitionTooltip();
     hideRouteHoverTooltip();
   }
+  if (view !== 'rotation') hideBarTooltip(); // leaving the board mid-hover shouldn't leave its tooltip stuck on screen
   if (view === 'rotation') updateRotationBoard(state, highlightLegIds);
   if (view === 'commercial') updateCommercialPanel(state);
 
