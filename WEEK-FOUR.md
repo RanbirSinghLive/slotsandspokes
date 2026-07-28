@@ -127,46 +127,72 @@ expect a full plane" just as quickly.
   red; canvas `mouseleave` hides the tooltip without cancelling the
   armed gesture (re-hovering brought it right back).
 
-## Design: layers, not modes
+## Design: layers, not modes — done
 
-The bigger structural question. Right now `main.ts`'s `View` type treats
+The bigger structural question. `main.ts`'s `View` type used to treat
 Ops, Demand, and Competition as mutually exclusive — switching to Demand
-to check a market's size means leaving Ops mode, and losing the ability
+to check a market's size meant leaving Ops mode, and losing the ability
 to draw a route at all while looking at it.
 
-**Proposed direction:** stop treating Demand and Competition as
-alternate *modes* and start treating them as toggleable *overlays* on
-top of the one persistent Ops base layer:
+**Built as designed:** Demand and Competition stopped being alternate
+*modes* and became toggleable *overlays* on top of one persistent Map
+panel:
 
-- Ops (basemap, terminator, your own routes, aircraft, airports, weather
-  effects, the route-builder gesture) stays the permanent base — this is
-  also where all route creation already lives, so it should never be
-  something you have to switch away from to get context.
-- Demand becomes a toggle (checkbox/icon button, not a dropdown item)
-  that draws the existing demand arcs *underneath or alongside* your own
-  route lines, on the same canvas, at the same time — so "where's unmet
-  demand" and "where do I already fly" are visible together instead of
-  sequentially.
-- Competition becomes the same kind of toggle, layered on top the same
-  way, so a contested market is visible while you're literally drawing
-  a route into it.
+- The Map panel (basemap, terminator, your own routes, aircraft,
+  airports, weather effects, the route-builder gesture) is now the only
+  canvas panel — `main.ts`'s `PanelView` is just `'map' | 'rotation' |
+  'commercial' | 'fleet-market'`. Route creation always lives here, so
+  it's never something you switch away from to get context.
+- `demandOverlayOn`/`competitionOverlayOn` (plain booleans in `main.ts`,
+  toggled by two buttons in the Maps dropdown that now say "Demand" and
+  "Competition" without being exclusive-view buttons) control whether
+  `render()` layers `drawDemandLayer()` and/or `drawCompetitionLayer()`
+  on top of the base map. Competition *replaces* the plain route drawing
+  rather than adding to it (it already draws your own routes, just
+  recolored) — Demand draws underneath everything else, as background
+  arcs your own network then draws over.
+- Both `render/demand.ts` and `render/competition.ts` stopped drawing
+  airports themselves — back when each was a full-screen exclusive view
+  they had to; now the base Map panel draws them once, always, and
+  either former "mode" would have doubled them up.
+- Toggling either overlay while on a different panel (Rotation,
+  Commercial, Fleet) switches back to the Map panel — flipping one only
+  means something while looking at the map.
 - Rotation and Commercial are unaffected — they're real DOM panels, not
-  canvas layers, and this rework doesn't touch them.
+  canvas layers, and this rework didn't touch them.
 
-This also implies unifying the hover-tooltip story: Competition mode
-currently has its own separate hover system (`findCompetitionHover`,
-`showCompetitionTooltip`) that only exists in that one mode; Ops mode's
-route builder has no hover-info at all today, just the arm/preview
-gesture. Under the overlay model, one hover system in Ops mode should
-show whatever's relevant given which overlays are on — your own
-operators always, competitor operators if the Competition overlay is on,
-PDEW/CAP for the market if the Demand overlay is on or a route is
-currently armed.
+**The two hover-tooltip systems are unified**, not just layered:
+Competition mode used to have its own hover system
+(`findCompetitionHover`, `showCompetitionTooltip`) that only existed in
+that one exclusive mode; the M10 route builder's own PDEW/CAP tooltip
+(built earlier this week) only showed while armed. Now there's one
+hover system, active on the Map panel at all times, with a clear
+priority: if a route is armed, the route builder's own PDEW/CAP/range
+tooltip wins (the general one is explicitly suppressed to avoid
+stacking two tooltips); otherwise, hovering an airport or market arc
+shows who flies it — your own operator always, competitors too only if
+the Competition overlay is on. `findCompetitionHover()` and
+`showCompetitionTooltip()` both gained an `includeCompetitors` parameter
+for this: when Competition is off, competitor-only arcs aren't even
+hoverable (they're not drawn either — hovering something invisible
+would be a bug, not a feature), and the tooltip's operator legend
+filters down to just the player's own entry.
 
-This is a real architecture change, not a small patch — it touches
-`main.ts`'s view-switching machinery, the HUD's dropdown structure, and
-however the hover systems get unified. Worth being explicit about scope
-before starting rather than discovering it mid-build.
+Verified in-browser: bought a plane, drew YOW↔YUL. Turned Demand on —
+all 45 city-pair arcs appeared as a background layer, own route still
+visible on top, no double-drawn airports. Turned Competition on instead
+— "All competitors" filter reappeared, competitor-only markets (e.g.
+YOW–YQB) drew in red. Hovered YOW with Competition on: tooltip showed
+`TA Trillium Air — 50%`, `FA Fundy Air — 33%`, `CW Capital Wings — 17%`
+(all three). Turned Competition off, hovered the same airport: legend
+correctly filtered to just `FA Fundy Air — 100%`. Hovered along the
+YOW–YQB competitor-only arc with Competition off: no tooltip at all,
+confirming it's genuinely un-hoverable, not just visually hidden.
+Selected the tail, armed YOW, hovered YUL: the route builder's PDEW
+tooltip showed (`PDEW: 313 CAP: 19`) and the general operator tooltip
+stayed hidden, confirming the priority order. Switched to Rotation and
+back to Map: canvas visibility toggled correctly, and both overlay
+toggle states persisted across the switch, exactly as intended.
 
 ## Proposed build order (not committed)
 
@@ -179,10 +205,13 @@ before starting rather than discovering it mid-build.
    already snaps to the nearest airport for its own preview arc
    (`candidate`), so the tooltip just reads off that existing value
    rather than re-detecting hover itself.
-3. **Demand and Competition as toggleable overlays**, replacing the
-   exclusive-mode dropdown — the large structural piece. Unifies the two
-   separate hover-tooltip systems into one along the way.
+3. **Demand and Competition as toggleable overlays** — done, replacing
+   the exclusive-mode dropdown. The large structural piece; unified the
+   two separate hover-tooltip systems into one along the way, per its own
+   section above.
 
-Ordering is deliberate: 1 and 2 are useful on their own even if 3 never
-happens, and building them first means 3's hover unification has real
-working pieces to unify instead of building all three at once.
+All three items in this milestone are now built. Ordering turned out to
+matter as expected: 1 and 2 stayed useful on their own, and building them
+first meant 3's hover unification had real working pieces (the route
+builder's own PDEW tooltip, Competition's operator hit-testing) to unify
+instead of designing all three from scratch at once.

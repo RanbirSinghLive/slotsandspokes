@@ -50,7 +50,13 @@ const canvas = document.querySelector<HTMLCanvasElement>('#map')!;
 const ctx = canvas.getContext('2d')!;
 const clockEl = document.querySelector<HTMLDivElement>('#clock')!;
 const speedButtons = document.querySelectorAll<HTMLButtonElement>('#speed-controls button');
-const viewToggleButtons = document.querySelectorAll<HTMLButtonElement>('#view-toggle .view-dropdown button');
+// Panel-switching buttons (Map/Rotation/Commercial/Fleet, [data-view]) and
+// overlay-toggle buttons (Demand/Competition, [data-overlay]) used to be
+// the same kind of button — one exclusive View — but week four split them
+// apart: switching panels is still exclusive, but Demand/Competition are
+// now independent on/off toggles layered on top of the Map panel instead.
+const viewToggleButtons = document.querySelectorAll<HTMLButtonElement>('#view-toggle .view-dropdown button[data-view]');
+const overlayToggleButtons = document.querySelectorAll<HTMLButtonElement>('#view-toggle .view-dropdown button[data-overlay]');
 // All three hover-dropdown groups share one wiring pass below — the two
 // view-switching ones (Maps, Reports) plus the Competition map's airline
 // filter, which reuses the exact same .view-group/.view-dropdown markup
@@ -68,10 +74,10 @@ for (const airline of competitorAirlines()) {
   competitionAirlineDropdown.appendChild(button);
 }
 
-// null means "All competitors" (the aggregate Competition view); a
+// null means "All competitors" (the aggregate Competition overlay); a
 // specific airline name filters render/competition.ts's layer down to
 // just that carrier's own network. Lives outside render() the same way
-// currentView does, since it's persistent UI state, not simulated state.
+// panelView does, since it's persistent UI state, not simulated state.
 let selectedCompetitorAirline: string | null = null;
 
 competitionAirlineDropdown.querySelectorAll<HTMLButtonElement>('button').forEach((button) => {
@@ -166,41 +172,58 @@ function resize(): void {
 // time it is.
 let latestFractionalMinute = state.simMinute;
 
-// Which of the six main views is currently showing. The clock and
-// sidebar panel stay relevant regardless, so they're not gated by this.
-// 'ops', 'demand', and 'competition' all draw on the same canvas (just
-// different layers on top of the same basemap/projection); 'rotation',
+// Which panel is currently showing. The clock and sidebar panel stay
+// relevant regardless, so they're not gated by this. Only one of these
+// four is ever visible at a time — 'map' is the canvas; 'rotation',
 // 'commercial', and 'fleet-market' each hide the canvas in favor of their
 // own DOM element (#rotation-board, #commercial-panel,
 // #fleet-market-panel) — see ui/rotationBoard.ts, ui/commercial.ts, and
 // ui/fleetMarket.ts for why those get real DOM instead of a canvas layer.
-type View = 'ops' | 'demand' | 'competition' | 'rotation' | 'commercial' | 'fleet-market';
-let currentView: View = 'ops';
+//
+// Week four: Demand and Competition used to be two more entries in this
+// same exclusive list — separate full-screen "modes" you had to leave
+// the map to check. They're independent toggles now (demandOverlayOn,
+// competitionOverlayOn, below), layered on top of the 'map' panel instead
+// of replacing it, so checking a market's demand or competitive situation
+// no longer costs you the ability to draw a route while looking at it.
+type PanelView = 'map' | 'rotation' | 'commercial' | 'fleet-market';
+let panelView: PanelView = 'map';
+let demandOverlayOn = false;
+let competitionOverlayOn = false;
 
 function render(): void {
   updateClock(state);
   updatePanel(state);
 
-  if (currentView === 'rotation' || currentView === 'commercial' || currentView === 'fleet-market') return;
+  if (panelView !== 'map') return;
 
   const cssWidth = window.innerWidth - PANEL_WIDTH_PX;
   const cssHeight = window.innerHeight;
 
   ctx.clearRect(0, 0, cssWidth, cssHeight);
   drawBasemap(ctx);
+  drawTerminator(ctx, latestFractionalMinute);
 
-  if (currentView === 'ops') {
-    drawTerminator(ctx, latestFractionalMinute);
-    drawRoutes(ctx, state);
-    drawAircraft(ctx, state, latestFractionalMinute);
-    drawAirports(ctx);
-    drawWeatherEffects(ctx, state);
-    drawRoutePreview(ctx, state);
-  } else if (currentView === 'demand') {
-    drawDemandLayer(ctx, state);
-  } else {
+  // Demand draws first (a background of all 45 possible markets, sized
+  // by estimated demand) so your own network — either plain gray or, if
+  // the Competition overlay is also on, three-way colored — always draws
+  // on top of it, not the other way around.
+  if (demandOverlayOn) drawDemandLayer(ctx, state);
+
+  // The Competition overlay *replaces* the plain route drawing rather
+  // than adding to it: drawCompetitionLayer() already draws every one of
+  // your own routes too (just recolored by whether a competitor also
+  // flies it), so drawing both would double every own-route line.
+  if (competitionOverlayOn) {
     drawCompetitionLayer(ctx, selectedCompetitorAirline, state);
+  } else {
+    drawRoutes(ctx, state);
   }
+
+  drawAircraft(ctx, state, latestFractionalMinute);
+  drawAirports(ctx);
+  drawWeatherEffects(ctx, state);
+  drawRoutePreview(ctx, state);
 }
 
 const MINUTES_PER_DAY = 1440;
@@ -287,35 +310,73 @@ speedButtons.forEach((button) => {
   });
 });
 
-// --- View toggle (Ops / Demand / Rotation / Commercial) ---
+// --- Panel switching (Map / Rotation / Commercial / Fleet) and overlay
+// --- toggles (Demand / Competition) — week four
 //
-// Grouped into two dropdowns rather than a flat row of four: "Maps"
-// (Ops, Demand — both draw on the canvas/projection) and "Reports"
-// (Rotation, Commercial — both real DOM, not canvas). Each group's
-// trigger button shows an SVG icon, not a text label, per design; the
-// two options underneath are still plain text buttons, same as before.
+// Grouped into two dropdowns: "Maps" (the Map panel switch, plus the two
+// overlay toggles — all three draw on the canvas/projection) and
+// "Reports" (Rotation, Commercial, Fleet — all real DOM, not canvas).
+// Each group's trigger button shows an SVG icon, not a text label, per
+// design.
 //
-// #map, #rotation-board, and #commercial-panel are siblings sized
-// identically in style.css; #map stays visible for both 'ops' and
-// 'demand' (render() just draws a different layer on top of the same
-// basemap for each — see above), and only one of #rotation-board /
-// #commercial-panel is ever un-hidden at a time for their two views.
-// Switching away from 'ops' cancels any in-progress route-creation
-// gesture (ui/routeBuilder.ts) — an armed or pending route stops making
-// sense once you're not looking at the ops layer it was drawn on.
-// Switching *to* the rotation board or commercial panel refreshes it, in
-// case the schedule changed while it was hidden — the rotation board has
-// no interactive elements to lose, and the commercial panel only
-// refreshes its numeric cells, never rebuilding the fare/marketing
-// sliders themselves (see ui/commercial.ts).
-const VIEW_GROUP: Record<View, string> = {
-  ops: 'maps',
-  demand: 'maps',
-  competition: 'maps',
+// #map, #rotation-board, #commercial-panel, and #fleet-market-panel are
+// siblings sized identically in style.css; #map stays visible for the
+// 'map' panel regardless of which overlays are on (render() just draws
+// more or fewer layers on top of the same basemap — see above), and only
+// one of the three DOM panels is ever un-hidden at a time. Switching away
+// from 'map' cancels any in-progress route-creation gesture
+// (ui/routeBuilder.ts) — an armed or pending route stops making sense
+// once you're not looking at the layer it was drawn on. Switching *to*
+// the rotation board or commercial panel refreshes it, in case the
+// schedule changed while it was hidden — the rotation board has no
+// interactive elements to lose, and the commercial panel only refreshes
+// its numeric cells, never rebuilding the fare/marketing sliders
+// themselves (see ui/commercial.ts).
+const PANEL_GROUP: Record<PanelView, string> = {
+  map: 'maps',
   rotation: 'reports',
   commercial: 'reports',
   'fleet-market': 'reports',
 };
+
+/**
+ * Switch which panel is showing — the one place that toggles canvas vs.
+ * DOM-panel visibility, refreshes whichever panel just became visible,
+ * and cancels anything that only made sense on the panel being left.
+ * Shared by the Map/Rotation/Commercial/Fleet buttons *and* the
+ * Demand/Competition overlay toggles below, since toggling an overlay
+ * only means anything while looking at the map — flipping one implies
+ * "and show me the map," not just "remember this for later."
+ */
+function switchToPanel(view: PanelView): void {
+  if (view === panelView) return;
+
+  panelView = view;
+  canvas.hidden = view !== 'map';
+  rotationBoardEl.hidden = view !== 'rotation';
+  commercialPanelEl.hidden = view !== 'commercial';
+  fleetMarketPanelEl.hidden = view !== 'fleet-market';
+  competitionAirlineGroup.hidden = view !== 'map' || !competitionOverlayOn;
+
+  viewToggleButtons.forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+  // The group trigger itself also shows which group the active panel
+  // belongs to, so it's visible at a glance without opening either
+  // dropdown.
+  viewGroups.forEach((group) => {
+    const isActiveGroup = group.dataset.group === PANEL_GROUP[view];
+    group.querySelector<HTMLButtonElement>('.view-group-trigger')!.classList.toggle('active', isActiveGroup);
+  });
+
+  if (view !== 'map') {
+    cancelPendingRoute();
+    hideCompetitionTooltip();
+    hideRouteHoverTooltip();
+  }
+  if (view === 'rotation') updateRotationBoard(state);
+  if (view === 'commercial') updateCommercialPanel(state);
+
+  render();
+}
 
 function closeAllDropdowns(): void {
   viewGroups.forEach((group) => {
@@ -367,30 +428,37 @@ document.addEventListener('click', (event) => {
 
 viewToggleButtons.forEach((button) => {
   button.addEventListener('click', () => {
-    const view = button.dataset.view as View;
     closeAllDropdowns();
-    if (view === currentView) return;
+    switchToPanel(button.dataset.view as PanelView);
+  });
+});
 
-    currentView = view;
-    canvas.hidden = view === 'rotation' || view === 'commercial' || view === 'fleet-market';
-    rotationBoardEl.hidden = view !== 'rotation';
-    commercialPanelEl.hidden = view !== 'commercial';
-    fleetMarketPanelEl.hidden = view !== 'fleet-market';
-    competitionAirlineGroup.hidden = view !== 'competition';
-    viewToggleButtons.forEach((b) => b.classList.toggle('active', b === button));
-    // The group trigger itself also shows which group the active view
-    // belongs to, so it's visible at a glance without opening either
-    // dropdown — e.g. the Maps icon stays highlighted while on Demand.
-    viewGroups.forEach((group) => {
-      const isActiveGroup = group.dataset.group === VIEW_GROUP[view];
-      group.querySelector<HTMLButtonElement>('.view-group-trigger')!.classList.toggle('active', isActiveGroup);
-    });
+/**
+ * Demand and Competition, as independent on/off toggles rather than
+ * exclusive views (week four) — see switchToPanel()'s own comment for
+ * why flipping one also switches to the Map panel. Each toggle's `.active`
+ * class (reusing the same styling `#view-toggle button.active` already
+ * has) is the only visual "checkbox" state; there's no separate checkmark
+ * glyph.
+ */
+overlayToggleButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    closeAllDropdowns();
 
-    if (view !== 'ops') cancelPendingRoute();
-    if (view !== 'competition') hideCompetitionTooltip();
-    if (view === 'rotation') updateRotationBoard(state);
-    if (view === 'commercial') updateCommercialPanel(state);
+    if (button.dataset.overlay === 'demand') {
+      demandOverlayOn = !demandOverlayOn;
+      button.classList.toggle('active', demandOverlayOn);
+    } else if (button.dataset.overlay === 'competition') {
+      competitionOverlayOn = !competitionOverlayOn;
+      button.classList.toggle('active', competitionOverlayOn);
+      hideCompetitionTooltip(); // stale content from whatever was hovered under the old on/off state
+    }
 
+    switchToPanel('map');
+    // switchToPanel() only recomputes this when the panel actually
+    // changes — if we were already on 'map', it's still stale from
+    // *before* this toggle just flipped, so set it again unconditionally.
+    competitionAirlineGroup.hidden = panelView !== 'map' || !competitionOverlayOn;
     render();
   });
 });
@@ -410,11 +478,10 @@ let translateAtDragStart: [number, number] = [0, 0];
 
 canvas.addEventListener('mousedown', (event) => {
   // M10's route-creation gesture (ui/routeBuilder.ts) gets first refusal
-  // on any click on the canvas, but only in Ops mode — arming a route by
-  // clicking an airport wouldn't mean anything while looking at the demand
-  // layer instead. Only once it says "not mine" (or isn't asked at all)
-  // does an ordinary click-and-drag start panning, exactly as before.
-  if (currentView === 'ops' && handleRouteBuilderMouseDown(event, state)) {
+  // on any click on the map. Only once it says "not mine" (or isn't asked
+  // at all, because we're on a different panel) does an ordinary
+  // click-and-drag start panning, exactly as before.
+  if (panelView === 'map' && handleRouteBuilderMouseDown(event, state)) {
     render();
     return;
   }
@@ -425,16 +492,35 @@ canvas.addEventListener('mousedown', (event) => {
   translateAtDragStart = projection.translate();
 });
 
+/**
+ * One hover system for the whole map (week four — this used to be two:
+ * the route builder's own PDEW tooltip, active only while armed, and a
+ * separate Competition-mode-only operator tooltip that didn't exist
+ * anywhere else). Priority order: if a route is currently armed,
+ * handleRouteBuilderMouseMove() already shows its own PDEW/CAP/range
+ * tooltip for the candidate destination — showing a second, competing
+ * tooltip on top of that would just be clutter, so the general operator
+ * tooltip is suppressed whenever the route builder reports it handled
+ * the move. Otherwise, hovering an airport or a market arc shows who
+ * flies it — your own operator always, competitors too if the
+ * Competition overlay is on (`includeCompetitors`, both for what counts
+ * as hoverable at all — see findCompetitionHover()'s own comment — and
+ * for what the tooltip actually reveals).
+ */
 canvas.addEventListener('mousemove', (event) => {
-  if (currentView === 'ops' && handleRouteBuilderMouseMove(event, state)) render();
+  if (panelView !== 'map') return;
 
-  if (currentView === 'competition') {
-    const hover = findCompetitionHover(event.clientX, event.clientY, selectedCompetitorAirline, state);
-    if (hover) {
-      showCompetitionTooltip(hover, event.clientX, event.clientY, state);
-    } else {
-      hideCompetitionTooltip();
-    }
+  if (handleRouteBuilderMouseMove(event, state)) {
+    render();
+    hideCompetitionTooltip();
+    return;
+  }
+
+  const hover = findCompetitionHover(event.clientX, event.clientY, selectedCompetitorAirline, state, competitionOverlayOn);
+  if (hover) {
+    showCompetitionTooltip(hover, event.clientX, event.clientY, state, competitionOverlayOn);
+  } else {
+    hideCompetitionTooltip();
   }
 });
 

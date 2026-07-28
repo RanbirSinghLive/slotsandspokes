@@ -1,6 +1,7 @@
 import { airports } from '../render/airports';
 import type { CompetitionHover, Operator } from '../render/competition';
 import { operatorsForAirport, operatorsForMarket } from '../render/competition';
+import { PLAYER_AIRLINE } from '../sim/airline';
 import type { SimState } from '../sim/state';
 
 const tooltip = document.querySelector<HTMLDivElement>('#competition-tooltip')!;
@@ -69,15 +70,31 @@ function renderOperators(title: string, operators: Operator[]): void {
 /**
  * Show the tooltip for whatever findCompetitionHover() (render/
  * competition.ts) currently reports under the cursor, positioned just
- * off the pointer. Called from main.ts's mousemove handler, gated to
- * Competition mode only.
+ * off the pointer. Called from main.ts's mousemove handler whenever the
+ * map is showing (week four — this used to be gated to an exclusive
+ * Competition mode; now it's live on the Ops map at all times).
+ *
+ * `includeCompetitors` mirrors the Competition overlay's own on/off state
+ * — revealing competitor operators on hover is exactly what turning that
+ * overlay on is supposed to mean, so with it off this filters the
+ * legend down to just the player's own entry (if any), same as the
+ * overlay itself only drawing your own routes when it's off.
  */
-export function showCompetitionTooltip(hover: CompetitionHover, screenX: number, screenY: number, state: SimState): void {
+export function showCompetitionTooltip(
+  hover: CompetitionHover,
+  screenX: number,
+  screenY: number,
+  state: SimState,
+  includeCompetitors: boolean,
+): void {
+  const ownOnly = (operators: Operator[]): Operator[] =>
+    includeCompetitors ? operators : operators.filter((o) => o.code === PLAYER_AIRLINE.code);
+
   if (hover.type === 'airport') {
     const airport = airportsByIata.get(hover.iata);
-    renderOperators(`${hover.iata}${airport ? ` — ${airport.name}` : ''}`, operatorsForAirport(hover.iata, state));
+    renderOperators(`${hover.iata}${airport ? ` — ${airport.name}` : ''}`, ownOnly(operatorsForAirport(hover.iata, state)));
   } else {
-    renderOperators(`${hover.origin} ↔ ${hover.dest}`, operatorsForMarket(hover.origin, hover.dest, state));
+    renderOperators(`${hover.origin} ↔ ${hover.dest}`, ownOnly(operatorsForMarket(hover.origin, hover.dest, state)));
   }
 
   tooltip.hidden = false;

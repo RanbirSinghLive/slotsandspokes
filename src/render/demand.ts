@@ -11,10 +11,6 @@ const MIN_ARC_WIDTH = 0.75;
 const MAX_ARC_WIDTH = 6;
 const MIN_ARC_ALPHA = 0.25;
 const MAX_ARC_ALPHA = 0.9;
-const MIN_AIRPORT_RADIUS = 3;
-const MAX_AIRPORT_RADIUS_BONUS = 12;
-const AIRPORT_LABEL_FILL = '#9aa3b8';
-const AIRPORT_LABEL_FONT = '12px system-ui, sans-serif';
 
 function pairKey(a: string, b: string): string {
   return [a, b].sort().join('-');
@@ -33,7 +29,6 @@ for (let i = 0; i < airports.length; i++) {
 }
 
 const maxDemand = Math.max(...pairs.map((p) => p.demand));
-const maxPopulation = Math.max(...airports.map((a) => a.population));
 
 const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]));
 
@@ -55,20 +50,20 @@ function servedPairsFrom(state: SimState): Set<string> {
 }
 
 /**
- * The "Demand" map mode: every one of the 45 city pairs drawn as a
- * geodesic arc, width and opacity scaled to that pair's estimated daily
- * demand (sim/demand.ts) — the busiest markets stand out as the thickest,
- * brightest lines. A pair that already has scheduled service (same
- * "served" definition render/routes.ts uses) gets an amber halo behind its
- * arc, so it's visible at a glance which big markets are already flown and
- * which are still white space.
+ * The Demand overlay (week four — was an exclusive "mode," now a toggle
+ * layered on top of the Ops base map, see main.ts's render()): every one
+ * of the 45 city pairs drawn as a geodesic arc, width and opacity scaled
+ * to that pair's estimated daily demand (sim/demand.ts) — the busiest
+ * markets stand out as the thickest, brightest lines. A pair that already
+ * has scheduled service (same "served" definition render/routes.ts uses)
+ * gets an amber halo behind its arc, so it's visible at a glance which
+ * big markets are already flown and which are still white space.
  *
- * Airport circles are sized by population (`sqrt` scaling, so *area*
- * roughly tracks population instead of radius — otherwise Toronto would
- * visually swallow the map) rather than the fixed dot Ops mode uses.
- *
- * Read-only, like the rotation board's first pass — this answers "where's
- * the market" before any interaction gets built on top of it.
+ * Doesn't draw airports any more — main.ts's base Ops layer already draws
+ * them once, and this used to double them up (its own population-sized
+ * circles, drawn on top of or under the base layer's plain dots) back
+ * when Demand was a full-screen exclusive view with nothing else on
+ * screen to share airports with.
  */
 export function drawDemandLayer(ctx: CanvasRenderingContext2D, state: SimState): void {
   const path = geoPath(projection, ctx);
@@ -109,22 +104,4 @@ export function drawDemandLayer(ctx: CanvasRenderingContext2D, state: SimState):
   }
 
   ctx.globalAlpha = 1;
-  ctx.font = AIRPORT_LABEL_FONT;
-  ctx.textBaseline = 'middle';
-
-  for (const airport of airports) {
-    const point = projection([airport.lon, airport.lat]);
-    if (!point) continue;
-    const [x, y] = point;
-
-    const radius = MIN_AIRPORT_RADIUS + Math.sqrt(airport.population / maxPopulation) * MAX_AIRPORT_RADIUS_BONUS;
-
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, 2 * Math.PI);
-    ctx.fillStyle = '#e8ecf5';
-    ctx.fill();
-
-    ctx.fillStyle = AIRPORT_LABEL_FILL;
-    ctx.fillText(airport.iata, x + radius + 4, y);
-  }
 }

@@ -1,7 +1,7 @@
 import { geoPath, geoInterpolate } from 'd3-geo';
 import type { LineString } from 'geojson';
 import { projection } from './projection';
-import { airports, drawAirports, type Airport } from './airports';
+import { airports, type Airport } from './airports';
 import { competitors } from '../sim/choiceModel';
 import { PLAYER_AIRLINE } from '../sim/airline';
 import type { SimState } from '../sim/state';
@@ -166,11 +166,14 @@ function drawLine(
 }
 
 /**
- * The "Competition" map mode. `selectedAirline` picks which competitor
- * set is being compared against your own network: `null` means "any
- * competitor" (the aggregate view); a specific airline name means just
- * that one carrier's routes. Either way, every market that either side
- * flies falls into exactly one of three states, each its own color:
+ * The Competition overlay (week four — was an exclusive "mode," now a
+ * toggle that *replaces* the Ops base layer's plain route coloring rather
+ * than drawing alongside it — see main.ts's render()). `selectedAirline`
+ * picks which competitor set is being compared against your own network:
+ * `null` means "any competitor" (the aggregate view); a specific airline
+ * name means just that one carrier's routes. Either way, every market
+ * that either side flies falls into exactly one of three states, each its
+ * own color:
  *
  * - **Yours only** — the competitor set doesn't serve it at all.
  * - **Theirs only** — a market you don't fly, but they do. Drawn just as
@@ -184,6 +187,9 @@ function drawLine(
  * their shared and exclusive markets, in one glance) without needing a
  * separate dimmed/highlighted treatment — the three-color split already
  * does that job.
+ *
+ * Doesn't draw airports any more — main.ts's base Ops layer always draws
+ * them once, regardless of which overlays are on.
  */
 export function drawCompetitionLayer(ctx: CanvasRenderingContext2D, selectedAirline: string | null, state: SimState): void {
   const path = geoPath(projection, ctx);
@@ -192,8 +198,6 @@ export function drawCompetitionLayer(ctx: CanvasRenderingContext2D, selectedAirl
   for (const [key, { origin, dest }] of visibleMarkets(ownRoutes, selectedAirline)) {
     drawLine(ctx, path, origin, dest, strokeFor(key, selectedAirline, ownRoutes));
   }
-
-  drawAirports(ctx);
 }
 
 export type Operator = { code: string; name: string; color: string; frequency: number };
@@ -297,19 +301,26 @@ function distanceToArc(origin: Airport, dest: Airport, screenX: number, screenY:
 export type CompetitionHover = { type: 'airport'; iata: string } | { type: 'market'; origin: string; dest: string };
 
 /**
- * What's under the cursor in Competition mode, for the hover tooltip:
- * an airport takes priority (a point is a smaller, more precise target
- * than a line), then the nearest visible market arc within its hit
- * radius, respecting the current airline filter — only testing against
- * whatever `drawCompetitionLayer()` actually drew, since there's nothing
- * to hover on an arc that isn't on screen. `null` if neither is close
- * enough.
+ * What's under the cursor on the map, for the hover tooltip: an airport
+ * takes priority (a point is a smaller, more precise target than a
+ * line), then the nearest visible market arc within its hit radius.
+ * `null` if neither is close enough.
+ *
+ * `includeCompetitors` (week four — was implicitly always true back when
+ * this only ran in an exclusive Competition mode) restricts which market
+ * arcs count as hoverable to just `ownRoutes` when the Competition
+ * overlay is off: competitor-only arcs aren't drawn on screen at all in
+ * that case (`main.ts`'s render() draws plain `drawRoutes()` instead of
+ * `drawCompetitionLayer()`), so hit-testing against them would let you
+ * hover something invisible. Airports stay hoverable either way — they're
+ * always drawn, and your own operator info is always fair game.
  */
 export function findCompetitionHover(
   screenX: number,
   screenY: number,
   selectedAirline: string | null,
   state: SimState,
+  includeCompetitors: boolean,
 ): CompetitionHover | null {
   let nearestIata: string | null = null;
   let nearestAirportDist = AIRPORT_HIT_RADIUS_PX;
@@ -324,9 +335,12 @@ export function findCompetitionHover(
   }
   if (nearestIata) return { type: 'airport', iata: nearestIata };
 
+  const ownRoutes = ownRoutesFrom(state);
+  const marketsToTest = includeCompetitors ? visibleMarkets(ownRoutes, selectedAirline) : ownRoutes;
+
   let nearestMarket: { origin: string; dest: string } | null = null;
   let nearestMarketDist = MARKET_HIT_RADIUS_PX;
-  for (const { origin, dest } of visibleMarkets(ownRoutesFrom(state), selectedAirline).values()) {
+  for (const { origin, dest } of marketsToTest.values()) {
     const originAirport = airportsByIata.get(origin);
     const destAirport = airportsByIata.get(dest);
     if (!originAirport || !destAirport) continue;

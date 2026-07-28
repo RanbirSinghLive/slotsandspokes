@@ -376,28 +376,65 @@ day happened to roll.
 ## Rendering (`src/render/`, plus `main.ts`'s loop)
 
 Canvas draws the map; everything else (clock, speed buttons, sidebar) is
-real DOM, per CLAUDE.md's rule against hand-rolled canvas widgets. The
-Ops/Demand/Competition/Rotation/Commercial toggle in the HUD (`main.ts`'s
-`currentView`) picks what `render()` draws each frame; `basemap.ts` is
-the one layer shared by all three canvas modes, drawn first and every
-time.
+real DOM, per CLAUDE.md's rule against hand-rolled canvas widgets.
+`main.ts`'s `panelView` (`'map' | 'rotation' | 'commercial' |
+'fleet-market'`) picks which *panel* is showing — only one of the four —
+and, when it's `'map'`, two independent booleans (`demandOverlayOn`,
+`competitionOverlayOn`) pick which extra layers `render()` draws on top
+of the base map that frame. `basemap.ts` is the one layer always drawn
+first, every time the map panel is visible.
 
-**Ops mode** (the default) — draw order back to front:
+**This is a week-four rework.** Demand and Competition used to be two
+more entries in an exclusive `View` enum alongside Ops — full-screen
+modes you had to leave the map to check, losing the ability to draw a
+route while looking at either. They're overlays now: independent on/off
+toggles (two buttons in the Maps dropdown, no longer exclusive-view
+buttons) that layer on top of the one persistent map panel instead of
+replacing it.
+
+**The map panel** — draw order back to front, every frame:
 
 1. `basemap.ts` — land/coastlines from Natural Earth 110m TopoJSON.
 2. `terminator.ts` — the night hemisphere: a 90°-radius `d3.geoCircle`
    centered on the antisolar point, computed from `simMinute` (declination
    from day-of-year, subsolar longitude from minute-of-day). Semi-
    transparent dark navy, so land and ocean still show through it.
-3. `routes.ts` — one thin arc per distinct city pair currently in
-   `state.schedule` (dedup'd across the schedule's directional legs),
-   drawn as a 2-point `LineString` that `d3.geoPath` resamples along the
-   true geodesic. Recomputed fresh every call, straight from `state`,
-   rather than cached — a week-three bug fix: this used to build its
-   route list once from the static `data/schedule.json` template at
-   import time, so adding (M10) or removing (week three) a route never
-   changed what Ops mode drew at all.
-4. `aircraft.ts` — one triangle per active flight. Position comes from
+3. `demand.ts`'s `drawDemandLayer()`, **only if `demandOverlayOn`** — one
+   geodesic arc for every one of the 10 airports' 45 distinct pairs,
+   width and opacity scaled to that pair's `sim/demand.ts` figure
+   relative to the single busiest pair, so the big markets read as the
+   thickest, brightest lines. A pair that already has scheduled service
+   (same bidirectional "served" definition `routes.ts` uses) gets an
+   amber halo drawn behind its arc. Drawn *before* the route layer below
+   on purpose — this is background context your own network then draws
+   on top of, not the other way around. No longer draws its own
+   airports (see below).
+4. Your own network — **either** `routes.ts` (plain gray, one thin arc
+   per distinct city pair, if `competitionOverlayOn` is off) **or**
+   `competition.ts`'s `drawCompetitionLayer()` (if it's on). These are
+   mutually exclusive, not layered: `drawCompetitionLayer()` already
+   draws every one of your own routes too, just recolored by whether a
+   competitor also flies it, so drawing both would double every
+   own-route line. `drawCompetitionLayer()` draws every market that
+   falls into exactly one of three states relative to a second piece of
+   state (`selectedCompetitorAirline`, driven by a filter dropdown shown
+   only while this overlay is on — `null` means "any competitor," a
+   specific name means just that one carrier):
+   - **Yours only** — default color. The competitor set doesn't serve
+     this market at all.
+   - **Theirs only** — red, at full visibility (not dimmed): exactly
+     what the overlay exists to surface — e.g. Trillium Air's YYZ-YOW,
+     which the player has no route on at all.
+   - **Both** — amber, reusing the same "already exists/served" meaning
+     amber carries elsewhere (`ui/routeBuilder.ts`'s new-route
+     highlight, Demand's served-halo).
+
+   The same three-way logic drives both the aggregate view and a single
+   airline's — `selectedAirline === null` just swaps in the union of
+   every competitor's markets as "the competitor set." `sim/choiceModel.ts`'s
+   exported `competitors` data and `CompetitorOffering` type are reused
+   directly, no new data model.
+5. `aircraft.ts` — one triangle per active flight. Position comes from
    `d3.geoInterpolate(origin, dest)(t)` at the *current fractional* simulated
    minute — not interpolated tick-to-tick, recomputed fresh every frame, so
    it stays smooth at any speed and freezes exactly when paused. Heading
@@ -406,58 +443,52 @@ time.
    Since M9, a flight running late (`arriveMinute > scheduledArriveMinute`)
    is tinted red instead of the usual yellow — the point being to make a
    cascading delay watchable on the map itself, not just readable as text.
-5. `airports.ts` — a dot + IATA label per airport.
+6. `airports.ts` — a dot + IATA label per airport, **drawn exactly once,
+   always**, regardless of which overlays are on. Both `demand.ts` and
+   `competition.ts` used to draw their own airports (population-sized
+   circles for Demand, a plain call to the same `drawAirports()` for
+   Competition) back when each was a full-screen exclusive view with
+   nothing else on screen to share airports with; layering them
+   simultaneously would have doubled every airport dot, so both stopped
+   drawing airports themselves in the week-four rework.
+7. `weather.ts`'s `drawWeatherEffects()` — flash/particle effects at
+   airports with active weather (see "Weather," below).
+8. The route-builder's own preview (below).
 
-**Demand mode** — `demand.ts`'s `drawDemandLayer()`, on top of the same
-basemap: one geodesic arc for every one of the 10 airports' 45 distinct
-pairs, width and opacity scaled to that pair's `sim/demand.ts` figure
-relative to the single busiest pair, so the big markets read as the
-thickest, brightest lines. A pair that already has scheduled service
-(same bidirectional "served" definition `routes.ts` uses) gets an amber
-halo drawn behind its arc, so it's visible at a glance which big markets
-are already flown versus still white space. Airport circles are sized by
-`sqrt(population)` (area, not radius, tracking population — otherwise
-Toronto would swallow the map) instead of Ops mode's fixed dot. Read-only,
-same "visualize first" phasing as the rotation board's first pass — no
-legend or tooltip yet, and not clickable.
+**One unified hover system**, not two. Competition used to have its own
+separate hover system (`findCompetitionHover`, `showCompetitionTooltip`)
+that only ran in that one exclusive mode; the route builder's own
+PDEW/CAP tooltip (see "Route builder," below) only ran while a route was
+armed. Now one `mousemove` handler runs whenever `panelView === 'map'`,
+with a clear priority: if the route builder reports it handled the move
+(a route is armed), its own PDEW/CAP/range tooltip wins, and the general
+one is explicitly hidden to avoid stacking two tooltips over the same
+cursor. Otherwise, hovering an airport or market arc shows every airline
+touching it as a pie chart sliced by daily frequency, plus a `CODE Name
+— percent% (frequency/day)` legend line per airline — but only your own
+entry unless `competitionOverlayOn` is also true, in which case
+competitors show too. That's the point of the overlay: turning it on is
+the act of revealing competitive intel, so the hover tooltip has to
+respect the same on/off switch the route coloring does, not leak
+competitor data regardless of it.
 
-**Competition mode** — `competition.ts`'s `drawCompetitionLayer()`, the
-same one thin-arc style `routes.ts` uses, but drawing every market that
-falls into exactly one of three states relative to a second piece of
-state (`selectedCompetitorAirline` in `main.ts`, driven by a `<select>`
-shown only in this view — `null` means "any competitor," the default
-"All competitors" view; a specific name means just that one carrier):
+This changes *what counts as hoverable*, not just what the tooltip
+shows: `findCompetitionHover()` takes an `includeCompetitors` flag now,
+and when it's false, only `ownRoutes` count as hoverable market arcs —
+competitor-only arcs aren't drawn on screen in that state at all (see
+step 4 above), so testing hit-distance against them would let you hover
+something invisible. Airports stay hoverable either way, since they're
+always drawn and your own operator info is always fair game. Every
+airline still has a two-letter code — `sim/airline.ts`'s
+`PLAYER_AIRLINE` (`Fundy Air`, `FA`) and each competitor's `code` field
+in `data/competitors.json` (Capital Wings `CW`, Trillium Air `TA`,
+Bluenose Regional `BR`) — and `operatorsForMarket()`/
+`operatorsForAirport()` still always return the *complete* breakdown
+regardless of the airline filter; the `includeCompetitors` filtering
+happens one layer up, in `ui/competitionTooltip.ts`, not in those two
+functions themselves.
 
-- **Yours only** — default color. The competitor set being considered
-  doesn't serve this market at all.
-- **Theirs only** — red, at full visibility (not dimmed): a market the
-  player doesn't fly but the competitor set does. This is exactly what
-  the view exists to surface — e.g. Trillium Air's YYZ-YOW, which the
-  player has no route on at all — so it's drawn just as prominently as
-  anything else, not backgrounded.
-- **Both** — amber, reusing the same "already exists/served" meaning
-  amber carries elsewhere (`ui/routeBuilder.ts`'s new-route highlight,
-  Demand mode's served-halo) rather than a fourth unrelated color.
-
-The same three-way logic drives both the aggregate view and a single
-airline's — `selectedAirline === null` just swaps in the union of every
-competitor's markets as "the competitor set" instead of one airline's.
-`sim/choiceModel.ts`'s exported `competitors` data and `CompetitorOffering`
-type are reused directly, no new data model.
-
-**Hover tooltips** (`ui/competitionTooltip.ts`) are the one interactive
-piece: hovering a route or airport shows every airline touching it as a
-pie chart sliced by daily frequency, plus a `CODE Name — percent%
-(frequency/day)` legend line per airline. Every airline now has a
-two-letter code, the player included — `sim/airline.ts`'s
-`PLAYER_AIRLINE` (`Fundy Air`, `FA`) and each competitor's new `code`
-field in `data/competitors.json` (Capital Wings `CW`, Trillium Air `TA`,
-Bluenose Regional `BR`). `render/competition.ts`'s `operatorsForMarket()`/
-`operatorsForAirport()` always return the *complete* breakdown regardless
-of the current airline filter — hovering answers "who's actually here,"
-independent of which one carrier happens to be selected in the dropdown.
-
-Hit-testing a route needed a new technique, since `d3.geoPath` has no
+Hit-testing a route needed a technique since `d3.geoPath` has no
 "distance from a point to this path" query: `findCompetitionHover()`
 samples 24 points along the geodesic (the same `geoInterpolate()`
 technique `aircraft.ts` uses to position a flight) and finds the closest
@@ -466,18 +497,17 @@ sampled segment. Airports reuse the simpler nearest-projected-point test
 priority when both are within range — a point is a smaller, more precise
 target than a line. The tooltip itself is real DOM (a hand-built inline
 SVG pie plus an HTML legend), per CLAUDE.md's rule against hand-rolled
-canvas widgets; it hides on mouseleave, on leaving Competition mode, or
-on changing the airline filter, so it never shows stale content or a
-stale position. Read-only otherwise, same phasing as Demand mode's first
-pass.
+canvas widgets; it hides on mouseleave, on leaving the map panel, or on
+changing the airline filter, so it never shows stale content or a stale
+position.
 
-Switching away from Ops cancels any in-progress route-creation gesture
-(`ui/routeBuilder.ts`'s `cancelPendingRoute()`), and the route-builder's
-own mouse handlers only run at all when `currentView === 'ops'` — arming
-a route by clicking an airport wouldn't mean anything while looking at
-the demand or competition layer instead. Panning and zooming (below)
-stay live in all three canvas modes, since seeing a market more clearly
-is just as useful as seeing operations more clearly.
+Switching away from the map panel cancels any in-progress route-creation
+gesture (`ui/routeBuilder.ts`'s `cancelPendingRoute()`), and the
+route-builder's own mouse handlers only run at all when
+`panelView === 'map'` — arming a route by clicking an airport wouldn't
+mean anything on a different panel. Panning and zooming (below) stay
+live regardless of which overlays are on, since seeing a market more
+clearly is just as useful as seeing operations more clearly.
 
 `projection.ts` owns the single shared `d3.geoMercator()` instance, fitted to
 an eastern-Canada bounding box and clipped to the canvas's own pixel bounds.
@@ -817,26 +847,27 @@ axis. Everything that isn't a bar *is* the answer to "where's the white
 space" — no separate free-time indicator is drawn, since the gaps between
 bars already show it.
 
-`#map`, `#rotation-board`, and `#commercial-panel` (below) are CSS
-siblings sized identically; the HUD's view toggle swaps which one is
-visible via the `hidden` attribute rather than absolute positioning.
-The four views are grouped into two icon-triggered dropdowns rather than
-a flat row of buttons — **Maps** (a folded-map SVG icon; Ops, Demand)
-and **Reports** (a bar-chart SVG icon; Rotation, Commercial) — each
-group's trigger shows only the icon, not a text label, and opens a
-small popup with its two views on click. Clicking a view, or clicking
-anywhere outside an open dropdown, closes it; the trigger for whichever
-group the current view belongs to stays visually active even while its
-dropdown is closed, so it's visible at a glance which mode you're in
-without opening anything. Hit the same `[hidden]`-vs-class-selector
-specificity gotcha CLAUDE.md documents for `#map`/`#rotation-board` —
+`#map`, `#rotation-board`, `#commercial-panel`, and `#fleet-market-panel`
+are CSS siblings sized identically; the HUD's panel toggle swaps which
+one is visible via the `hidden` attribute rather than absolute
+positioning. The panels are grouped into two icon-triggered dropdowns
+rather than a flat row of buttons — **Maps** (a folded-map SVG icon;
+Map, plus the Demand/Competition overlay toggles — see "Rendering,"
+above, for why those stopped being panel-switch buttons in week four)
+and **Reports** (a bar-chart SVG icon; Rotation, Commercial, Fleet) —
+each group's trigger shows only the icon, not a text label, and opens a
+small popup on click. Clicking a panel button, or clicking anywhere
+outside an open dropdown, closes it; the trigger for whichever group the
+active panel belongs to stays visually active even while its dropdown
+is closed, so it's visible at a glance which one you're on without
+opening anything. Hit the same `[hidden]`-vs-class-selector specificity
+gotcha CLAUDE.md documents for `#map`/`#rotation-board` —
 `.view-dropdown[hidden] { display: none }` has to be explicit, or the
 dropdown's own `display: flex` rule silently wins and it never actually
-hides. `main.ts`'s `render()` still updates the clock and
-sidebar panel every frame regardless of which view is showing, but skips
-all canvas drawing while the board (or the Commercial panel) is up
-(`if (currentView === 'rotation' || currentView === 'commercial') return;`)
-— there's no point paying for it while hidden.
+hides. `main.ts`'s `render()` still updates the clock and sidebar panel
+every frame regardless of which panel is showing, but skips all canvas
+drawing while a DOM panel is up (`if (panelView !== 'map') return;`) —
+there's no point paying for it while hidden.
 
 The board is read-only, permanently now rather than "for now" (phase 1
 of what was originally a longer plan — see WEEK-TWO.md's "rotation
@@ -975,8 +1006,8 @@ Every roll goes through `state.rngSeed` (`sim/rng.ts`), so weather is
 exactly as reproducible as M9's delays: same seed, same weather history.
 
 **Visuals are the one place this deliberately breaks determinism**:
-`render/weather.ts`'s `drawWeatherEffects()` (Ops mode only, drawn after
-`drawAirports()`) gives a thunderstorm airport an occasional bright
+`render/weather.ts`'s `drawWeatherEffects()` (drawn on the map panel
+only, after `drawAirports()`) gives a thunderstorm airport an occasional bright
 flash (`Math.random()`, ~5% chance per rendered frame) and a snowstorm
 airport a handful of small drifting particles, driven by a plain frame
 counter. CLAUDE.md's determinism rule is about `step()`, not rendering —
