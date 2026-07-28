@@ -599,3 +599,52 @@ schedule's turn buffers partly absorb even when arrivals run late), and
 the Fleet panel caught one specific flight 77 minutes late in the air,
 a single real data point matching the age model's expected severity
 range. Zero console errors across the run.
+
+## The On-Time panel
+
+A new Reports-menu view, requested directly once the three-cause model
+above existed: per-route on-time % (the same question the HUD's
+lifetime stat next to Cash answers, just split out one market at a
+time), plus a "top delay codes" ranking of the three causes by total
+minutes.
+
+**Per-route tracking** (`SimState.onTimeByMarket`) mirrors
+`flightsDepartedTotal`/`flightsOnTimeTotal` exactly, just keyed by
+`marketKey(origin, dest)` and lazily created the first time a market's
+first leg ever departs — same "create on first use" shape
+`routeSettings` already has. Deliberately *not* deleted when a market's
+last leg is removed, unlike `routeSettings`: a route's past reliability
+is real history worth keeping even after you've dropped it, which
+`routeSettings` (active levers only) has no reason to.
+
+**Delay-code tracking** (`SimState.delayMinutesByCause`) needed
+`step.ts`'s `rollTotalDelayMinutes()` to stop collapsing straight to a
+sum — it now returns a `DelayBreakdown` (`{ age, weather, knockOn }`)
+that the caller sums itself, so each cause's minutes can be attributed
+separately before they're combined into one flight's actual delay.
+Labeled with real BTS delay-code names mapped onto whichever mechanic
+actually produces each one — not decorative relabeling, genuinely the
+closest real-world category: a knock-on delay from an earlier leg is
+literally what the BTS calls "Late Aircraft"; age/reliability is the
+classic "Carrier" delay; weather is weather. Both new fields are scoped
+to revenue flights only, same as the existing on-time counters —
+positioning moves aren't serving a market, so they have no route-
+quality story to add.
+
+The route table sorts worst-first (surfacing problems is the entire
+point, not an alphabetical ledger to scan by hand) and flags anything
+under 90% amber, under 70% red — the same #ffd166/#ff8080 colors the
+rest of the app already uses for "worth a look" and "actually broken."
+
+New required `SimState` fields meant another `ui/save.ts` version bump
+(v4 → v5).
+
+Verified in-browser: bought a 21-year-old 1900D, drew two tight
+routes (YHZ↔YQM, YHZ↔YFC) off the same tail, ran 8 simulated days at
+20x. The panel showed both markets deep red (7% and 38% on-time) and
+"Late Aircraft (knock-on)" dominating at 84% of all delay minutes —
+exactly what a single old aircraft juggling two routes on a tight
+schedule should produce, the cascade mechanic visibly overwhelming the
+other two causes rather than a flat, decorative number. Confirmed the
+new fields round-trip through a save/reload correctly. Zero console
+errors.

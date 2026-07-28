@@ -102,22 +102,31 @@ function knockOnDelayMinutes(lateAtDepartureMinutes: number): number {
 }
 
 /**
+ * One flight's delay, broken out by cause rather than pre-summed — the
+ * On-Time panel's "top delay codes" ranking (`ui/onTime.ts`) needs to
+ * attribute minutes to age/weather/knock-on individually, not just know
+ * the total that actually delayed the flight.
+ */
+export type DelayBreakdown = { age: number; weather: number; knockOn: number };
+
+/**
  * Roll a departing flight's total arrival delay from all three causes
  * above, threading `state.rngSeed` through the two that need it (age,
- * then weather). Returns [delayMinutes, nextSeed] — the same shape
- * nextRandom() itself returns, so the caller just does
- * `state.rngSeed = nextSeed`.
+ * then weather). Returns [breakdown, nextSeed] — the same second-element
+ * shape nextRandom() itself returns, so the caller just does
+ * `state.rngSeed = nextSeed`; sum `breakdown`'s three fields for the
+ * actual minutes to add to a flight's arrival time.
  */
 function rollTotalDelayMinutes(
   seed: number,
   ageYears: number,
   hasWeatherAtOrigin: boolean,
   lateAtDepartureMinutes: number,
-): [delayMinutes: number, nextSeed: number] {
-  const [ageDelay, seedAfterAge] = rollAgeDelay(seed, ageYears);
-  const [weatherDelay, seedAfterWeather] = rollWeatherDelay(seedAfterAge, hasWeatherAtOrigin);
-  const knockOnDelay = knockOnDelayMinutes(lateAtDepartureMinutes);
-  return [ageDelay + weatherDelay + knockOnDelay, seedAfterWeather];
+): [breakdown: DelayBreakdown, nextSeed: number] {
+  const [age, seedAfterAge] = rollAgeDelay(seed, ageYears);
+  const [weather, seedAfterWeather] = rollWeatherDelay(seedAfterAge, hasWeatherAtOrigin);
+  const knockOn = knockOnDelayMinutes(lateAtDepartureMinutes);
+  return [{ age, weather, knockOn }, seedAfterWeather];
 }
 
 /**
@@ -241,18 +250,33 @@ export function step(state: SimState): void {
       state.flightsOnTimeTotal += 1;
     }
 
+    // Same on-time question as the whole-airline counters just above,
+    // just split out per market for the On-Time panel (ui/onTime.ts) —
+    // lazily created the first time this market's first leg ever
+    // departs, same "create on first use" shape routeSettings uses.
+    const marketOnTimeKey = marketKey(leg.origin, leg.dest);
+    const marketOnTime = (state.onTimeByMarket[marketOnTimeKey] ??= { departed: 0, onTime: 0 });
+    marketOnTime.departed += 1;
+    if (lateAtDepartureMinutes === 0) {
+      marketOnTime.onTime += 1;
+    }
+
     const weatherAtOrigin = !!state.weatherByAirport[leg.origin];
-    const [delayMinutes, nextSeed] = rollTotalDelayMinutes(
+    const [delayBreakdown, nextSeed] = rollTotalDelayMinutes(
       state.rngSeed,
       aircraft.ageYears,
       weatherAtOrigin,
       lateAtDepartureMinutes,
     );
     state.rngSeed = nextSeed;
+    state.delayMinutesByCause.age += delayBreakdown.age;
+    state.delayMinutesByCause.weather += delayBreakdown.weather;
+    state.delayMinutesByCause.knockOn += delayBreakdown.knockOn;
+    const delayMinutes = delayBreakdown.age + delayBreakdown.weather + delayBreakdown.knockOn;
 
     // Fare and marketing spend are market-level (RouteSettings), not
     // per-leg — every leg on this market shares the same entry.
-    const routeSettings = state.routeSettings[marketKey(leg.origin, leg.dest)];
+    const routeSettings = state.routeSettings[marketOnTimeKey];
 
     const activeFlight: ActiveFlight = {
       legId: leg.legId,
@@ -295,15 +319,20 @@ export function step(state: SimState): void {
     aircraft.atAirport = null;
     aircraft.activeLegId = leg.legId;
 
+    // Rolled the same way a revenue leg is, but *not* added to
+    // onTimeByMarket or delayMinutesByCause (see their own doc comments
+    // on SimState): a positioning move isn't serving a market, so it has
+    // no route-quality story to tell.
     const weatherAtOrigin = !!state.weatherByAirport[leg.origin];
     const lateAtDepartureMinutes = state.simMinute - leg.departMinute;
-    const [delayMinutes, nextSeed] = rollTotalDelayMinutes(
+    const [delayBreakdown, nextSeed] = rollTotalDelayMinutes(
       state.rngSeed,
       aircraft.ageYears,
       weatherAtOrigin,
       lateAtDepartureMinutes,
     );
     state.rngSeed = nextSeed;
+    const delayMinutes = delayBreakdown.age + delayBreakdown.weather + delayBreakdown.knockOn;
 
     const activeFlight: ActiveFlight = {
       legId: leg.legId,

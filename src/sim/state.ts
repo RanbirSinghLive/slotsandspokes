@@ -168,6 +168,31 @@ export type SimState = {
   flightsDepartedTotal: number;
   flightsOnTimeTotal: number;
   /**
+   * The same departed/on-time counters as `flightsDepartedTotal`/
+   * `flightsOnTimeTotal` above, just split out per market
+   * (`marketKey(origin, dest)`) instead of one whole-airline total — the
+   * On-Time panel's per-route breakdown (`ui/onTime.ts`). Lazily created
+   * the first time a market's first leg ever departs, same "create on
+   * first use" shape `routeSettings` uses. Deliberately *not* deleted if
+   * every leg on a market is later removed (unlike `routeSettings`,
+   * which only tracks currently-active levers): a market's past
+   * reliability is still real history worth keeping, even for a route
+   * you've since dropped. Positioning legs don't count here either, same
+   * reasoning as the whole-airline totals — they're not serving a
+   * market.
+   */
+  onTimeByMarket: Record<string, { departed: number; onTime: number }>;
+  /**
+   * Lifetime minutes of arrival delay attributed to each of step.ts's
+   * three delay causes (age, weather, knock-on) — the On-Time panel's
+   * "top delay codes" ranking. A single flight's delay is the sum of
+   * all three, so a flight with more than one active cause adds to more
+   * than one bucket. Revenue flights only, same scope as
+   * `onTimeByMarket` above — a positioning move's delay doesn't say
+   * anything about route service quality.
+   */
+  delayMinutesByCause: { age: number; weather: number; knockOn: number };
+  /**
    * The entire state of sim/rng.ts's seeded random number generator. Not
    * used yet — nothing under sim/ calls nextRandom() until the M9 delay
    * mechanic exists — but it lives here, in `state`, from the start rather
@@ -262,6 +287,8 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     todayMargin: 0,
     flightsDepartedTotal: 0,
     flightsOnTimeTotal: 0,
+    onTimeByMarket: {},
+    delayMinutesByCause: { age: 0, weather: 0, knockOn: 0 },
     rngSeed,
   };
 }
@@ -305,6 +332,8 @@ export function createNewGameState(rngSeed: number = Date.now()): SimState {
     todayMargin: 0,
     flightsDepartedTotal: 0,
     flightsOnTimeTotal: 0,
+    onTimeByMarket: {},
+    delayMinutesByCause: { age: 0, weather: 0, knockOn: 0 },
     rngSeed,
   };
 }

@@ -12,13 +12,15 @@ body {
 
 /* Must match PANEL_WIDTH_PX in ui/panels.ts, which main.ts uses to size the
    canvas so the map and the sidebar share the viewport instead of the panel
-   floating on top of it. #rotation-board, #commercial-panel, and
-   #fleet-market-panel are siblings that take the exact same slot —
-   whichever one isn't [hidden] occupies it, no absolute positioning needed. */
+   floating on top of it. #rotation-board, #commercial-panel,
+   #fleet-market-panel, and #ontime-panel are siblings that take the exact
+   same slot — whichever one isn't [hidden] occupies it, no absolute
+   positioning needed. */
 #map,
 #rotation-board,
 #commercial-panel,
-#fleet-market-panel {
+#fleet-market-panel,
+#ontime-panel {
   display: block;
   width: calc(100vw - 280px);
   height: 100vh;
@@ -31,7 +33,8 @@ body {
 #map[hidden],
 #rotation-board[hidden],
 #commercial-panel[hidden],
-#fleet-market-panel[hidden] {
+#fleet-market-panel[hidden],
+#ontime-panel[hidden] {
   display: none;
 }
 
@@ -839,6 +842,78 @@ body {
 .lever-value {
   font-size: 11px;
   color: #9aa3b8;
+}
+
+/* The On-Time panel (ui/onTime.ts) — same layout shape as
+   #fleet-market-panel/#commercial-panel (full canvas-width area,
+   monospace, a table with real room per row), but two tables stacked
+   under their own headings instead of one, since per-route performance
+   and top delay codes are two different questions with two different
+   shapes of answer. */
+#ontime-panel {
+  padding: 68px 24px 24px;
+  overflow-y: auto;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 13px;
+  color: #cdd3e0;
+}
+
+#ontime-panel h2 {
+  margin: 0 0 12px;
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7694;
+}
+
+#ontime-panel h2:not(:first-child) {
+  margin-top: 32px;
+}
+
+#ontime-table,
+#ontime-causes-table {
+  width: 100%;
+  max-width: 640px;
+  border-collapse: collapse;
+}
+
+#ontime-table th,
+#ontime-table td,
+#ontime-causes-table th,
+#ontime-causes-table td {
+  text-align: left;
+  padding: 8px 10px 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#ontime-table th,
+#ontime-causes-table th {
+  color: #6b7694;
+  font-weight: 400;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Only bad performance gets a color — same "flag problems, leave the
+   good case alone" convention .thin-market/.out-of-range already use
+   elsewhere, rather than a third "this one's fine" color nobody needs. */
+.ontime-pct-bad {
+  color: #ff8080;
+}
+
+.ontime-pct-warn {
+  color: #ffd166;
+}
+
+.ontime-causes-share-bar {
+  display: inline-block;
+  height: 8px;
+  background: #6b7694;
+  border-radius: 2px;
+  vertical-align: middle;
+  margin-right: 8px;
 }
 
 /* Competition mode's hover tooltip — real DOM (per CLAUDE.md's rule

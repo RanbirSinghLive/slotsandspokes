@@ -65,6 +65,31 @@
         <tbody id="fleet-market-rows"></tbody>
       </table>
     </div>
+    <div id="ontime-panel" hidden>
+      <h2>On-time performance by route</h2>
+      <table id="ontime-table">
+        <thead>
+          <tr>
+            <th>Market</th>
+            <th>Departed</th>
+            <th>On-time</th>
+            <th>On-time %</th>
+          </tr>
+        </thead>
+        <tbody id="ontime-rows"></tbody>
+      </table>
+      <h2>Top delay codes</h2>
+      <table id="ontime-causes-table">
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Minutes</th>
+            <th>Share</th>
+          </tr>
+        </thead>
+        <tbody id="ontime-causes-rows"></tbody>
+      </table>
+    </div>
     <div id="hud">
       <div id="clock">Day 1 · 00:00 UTC</div>
       <div id="speed-controls">
@@ -100,6 +125,7 @@
             <button type="button" data-view="rotation">Rotation</button>
             <button type="button" data-view="commercial">Commercial</button>
             <button type="button" data-view="fleet-market">Fleet</button>
+            <button type="button" data-view="ontime">On-Time</button>
           </div>
         </div>
       </div>

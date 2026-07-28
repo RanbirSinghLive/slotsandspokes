@@ -25,6 +25,7 @@ import {
 import { setupRotationBoard, updateRotationBoard, hideBarTooltip } from './ui/rotationBoard';
 import { setupCommercialPanel, updateCommercialPanel } from './ui/commercial';
 import { setupFleetMarket } from './ui/fleetMarket';
+import { setupOnTimePanel, updateOnTimePanel } from './ui/onTime';
 import { loadSavedState, saveState, clearSavedState } from './ui/save';
 
 // Week three's persistence fix (see WEEK-THREE.md): resume a saved game
@@ -52,6 +53,7 @@ setupRouteBuilder(state, (legIds) => switchToPanel('rotation', legIds));
 setupRotationBoard();
 setupCommercialPanel(state);
 setupFleetMarket(state);
+setupOnTimePanel();
 
 const canvas = document.querySelector<HTMLCanvasElement>('#map')!;
 const ctx = canvas.getContext('2d')!;
@@ -102,6 +104,7 @@ competitionAirlineDropdown.querySelectorAll<HTMLButtonElement>('button').forEach
 const rotationBoardEl = document.querySelector<HTMLDivElement>('#rotation-board')!;
 const commercialPanelEl = document.querySelector<HTMLDivElement>('#commercial-panel')!;
 const fleetMarketPanelEl = document.querySelector<HTMLDivElement>('#fleet-market-panel')!;
+const onTimePanelEl = document.querySelector<HTMLDivElement>('#ontime-panel')!;
 
 // Week three: the only way back to a fresh game, now that one persists
 // across reloads by default. Confirms first since this is irreversibly
@@ -193,7 +196,7 @@ let latestFractionalMinute = state.simMinute;
 // competitionOverlayOn, below), layered on top of the 'map' panel instead
 // of replacing it, so checking a market's demand or competitive situation
 // no longer costs you the ability to draw a route while looking at it.
-type PanelView = 'map' | 'rotation' | 'commercial' | 'fleet-market';
+type PanelView = 'map' | 'rotation' | 'commercial' | 'fleet-market' | 'ontime';
 let panelView: PanelView = 'map';
 let demandOverlayOn = false;
 let competitionOverlayOn = false;
@@ -367,6 +370,7 @@ const PANEL_GROUP: Record<PanelView, string> = {
   rotation: 'reports',
   commercial: 'reports',
   'fleet-market': 'reports',
+  ontime: 'reports',
 };
 
 /**
@@ -386,6 +390,7 @@ function switchToPanel(view: PanelView, highlightLegIds: string[] = []): void {
   rotationBoardEl.hidden = view !== 'rotation';
   commercialPanelEl.hidden = view !== 'commercial';
   fleetMarketPanelEl.hidden = view !== 'fleet-market';
+  onTimePanelEl.hidden = view !== 'ontime';
   competitionAirlineGroup.hidden = view !== 'map' || !competitionOverlayOn;
 
   viewToggleButtons.forEach((b) => b.classList.toggle('active', b.dataset.view === view));
@@ -405,6 +410,7 @@ function switchToPanel(view: PanelView, highlightLegIds: string[] = []): void {
   if (view !== 'rotation') hideBarTooltip(); // leaving the board mid-hover shouldn't leave its tooltip stuck on screen
   if (view === 'rotation') updateRotationBoard(state, highlightLegIds);
   if (view === 'commercial') updateCommercialPanel(state);
+  if (view === 'ontime') updateOnTimePanel(state);
 
   render();
 }

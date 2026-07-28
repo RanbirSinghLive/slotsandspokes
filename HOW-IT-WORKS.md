@@ -246,6 +246,53 @@ since a "running" performance stat that blanked out every midnight
 would defeat the point — it sits next to `Cash` in the HUD for exactly
 that reason, both being the sidebar's two lifetime numbers.
 
+## The On-Time panel (`src/ui/onTime.ts`) — week four
+
+A Reports-menu view answering two questions the HUD's single lifetime
+On-time stat can't: which *routes* are actually unreliable, and *why*
+flights are delayed at all, across the whole airline.
+
+`SimState.onTimeByMarket: Record<marketKey, { departed, onTime }>`
+mirrors `flightsDepartedTotal`/`flightsOnTimeTotal` exactly, just split
+per market — lazily created the first time a market's first leg ever
+departs (`??=` in the departure loop), same "create on first use" shape
+`routeSettings` already has. Unlike `routeSettings`, an entry is never
+deleted when a market's last leg is removed: past reliability is real
+history worth keeping even for a route you've since dropped.
+
+`SimState.delayMinutesByCause: { age, weather, knockOn }` needed
+`step.ts`'s `rollTotalDelayMinutes()` to return a `DelayBreakdown`
+object instead of a pre-summed number, so each cause's contribution can
+be attributed before the three are added together into one flight's
+actual delay. The panel's "top delay codes" table ranks them by total
+minutes, using real BTS delay-code names mapped onto whichever
+mechanic actually produces each one — not decorative relabeling: a
+knock-on delay from an earlier leg is literally what the BTS calls
+"Late Aircraft"; age/reliability is the classic "Carrier" delay;
+weather is weather. Both new fields are revenue-flights-only, same
+scope the existing on-time counters already have — a positioning
+move isn't serving a market, so it has nothing to say about route
+quality.
+
+The route table sorts worst-first — surfacing problems is the whole
+point of this panel, not an alphabetical ledger — and colors anything
+under 90% amber, under 70% red (`.ontime-pct-warn`/`.ontime-pct-bad`,
+the same #ffd166/#ff8080 colors already used everywhere else in the
+app for "worth a look" and "actually broken"). Both tables are fully
+rebuilt on every view (`updateOnTimePanel()`), same "no live inputs to
+lose focus on" shape `ui/rotationBoard.ts`'s board uses, not the
+"build once, patch in place" discipline `ui/commercial.ts` needs for
+its sliders.
+
+New required `SimState` fields meant another `ui/save.ts` version bump
+(v4 → v5). Verified in-browser: one 21-year-old 1900D juggling two
+tight routes (YHZ↔YQM, YHZ↔YFC) over 8 simulated days at 20x — both
+markets landed deep red (7%, 38% on-time) and "Late Aircraft
+(knock-on)" dominated at 84% of total delay minutes, exactly the
+cascade a single old aircraft on a tight schedule should produce.
+Confirmed the new fields round-trip through a save/reload. Zero
+console errors.
+
 ## Economy (`src/sim/economy.ts`)
 
 Deliberately crude, per WEEK-ONE.md — same load factor, regardless of
