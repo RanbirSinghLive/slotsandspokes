@@ -578,6 +578,46 @@ body {
   font-size: 11px;
   white-space: nowrap;
   text-overflow: ellipsis;
+  cursor: grab;
+  user-select: none;
+}
+
+/* M12: drag-to-retime feedback. Dragging lifts the bar visually (shadow,
+   above its row's siblings) and swaps the cursor to "grabbing"; invalid
+   overrides the bar's own color the instant the hypothetical drop point
+   would break this tail's chain (see rotationBoard.ts's mousemove
+   handler) — the same #ff8080 red used everywhere else in the app for a
+   blocking problem (the New Route form's error text, schedule warnings). */
+.rotation-bar--dragging {
+  cursor: grabbing;
+  z-index: 2;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.rotation-bar--invalid {
+  background: #5a2c2c;
+  border-color: #ff8080;
+}
+
+/* A leg the route builder just created, on the very first render after
+   jumping here — a brief glow so it's obvious which bar(s) to go drag
+   into place, without needing to compare legIds by eye. Pure CSS, no
+   timer to clear it: the highlight only ever exists on the render right
+   after a route confirm (updateRotationBoard() isn't called again with
+   the same highlightLegIds), so it disappears the next time the board
+   rebuilds for any other reason. */
+.rotation-bar--new {
+  animation: rotation-bar-new-glow 1.6s ease-in-out 2;
+}
+
+@keyframes rotation-bar-new-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px #ffd166;
+  }
+  50% {
+    box-shadow: 0 0 8px 2px #ffd166;
+  }
 }
 
 /* Week two's "Commercial" panel — one row per market, with route-level

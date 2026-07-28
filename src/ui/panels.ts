@@ -135,6 +135,22 @@ function timeStringToMinuteOfDay(time: string): number {
 const scheduleRowsByLegId = new Map<string, HTMLTableRowElement>();
 
 /**
+ * Push a freshly-committed departMinute into this leg's own row, without
+ * touching any other row — the same "build once, mutate only via events"
+ * rule setupScheduleEditor() documents below, just triggered from a second
+ * place now. The M12 rotation board writes `leg.departMinute` directly
+ * (dragging a bar, not typing into this table's own `<input>`), so nothing
+ * else would ever tell this table's time input to catch up on its own;
+ * without this call the table would keep showing the pre-drag time until
+ * some unrelated edit happened to rebuild it.
+ */
+export function syncScheduleRowTime(legId: string, departMinute: number): void {
+  const row = scheduleRowsByLegId.get(legId);
+  const input = row?.querySelector<HTMLInputElement>('input[type="time"]');
+  if (input) input.value = minuteOfDayToTimeString(departMinute);
+}
+
+/**
  * Remove `leg` entirely — week three's playtest-readiness gap: until now
  * there was no way back from an unwanted route or frequency short of
  * hand-editing data/schedule.json. Removes it from `state.schedule` (the

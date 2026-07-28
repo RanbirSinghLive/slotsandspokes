@@ -619,9 +619,13 @@ function timeStringToMinuteOfDay(time: string): number {
  * re-runs validateSchedule(), exactly the way editing an existing leg's
  * time already does in M8. If the chosen tail/time doesn't actually chain
  * with that tail's other legs, the same console error catches it; nothing
- * here prevents adding it anyway, on purpose, for consistency with M8.
+ * here prevents adding it anyway, on purpose, for consistency with M8 —
+ * that's what `onRouteConfirmed` (M12) is for: main.ts uses it to jump the
+ * player straight to the rotation board with the new leg(s) highlighted,
+ * so retiming a guess that didn't land well is the very next thing that
+ * happens, not something they have to notice a warning about later.
  */
-export function setupRouteBuilder(state: SimState): void {
+export function setupRouteBuilder(state: SimState, onRouteConfirmed: (legIds: string[]) => void): void {
   // Re-check for an exact-time collision (and refresh the return-leg and
   // positioning-leg previews) every time the player changes the depart
   // time or the return checkbox, so the form reacts live instead of only
@@ -693,6 +697,7 @@ export function setupRouteBuilder(state: SimState): void {
     };
     state.schedule.push(outboundLeg);
     addScheduleRow(outboundLeg, state);
+    const createdLegIds = [outboundLeg.legId];
 
     // Adding a route creates its return leg too, by default — 99% of the
     // time a player drawing A->B wants B->A as well, and the case that
@@ -719,6 +724,7 @@ export function setupRouteBuilder(state: SimState): void {
         };
         state.schedule.push(returnLeg);
         addScheduleRow(returnLeg, state);
+        createdLegIds.push(returnLeg.legId);
       }
     }
 
@@ -741,6 +747,7 @@ export function setupRouteBuilder(state: SimState): void {
     // showForm() — so the new row satisfies it automatically and just
     // joins whatever else is already narrowed into view.
 
+    onRouteConfirmed(createdLegIds);
     reset();
   });
 

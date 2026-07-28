@@ -297,6 +297,48 @@ export function networkAirports(legs: ScheduleLeg[]): Set<string> {
  * player's point of view (no revenue, aircraft just sits there) unless
  * they happen to have devtools open at the moment they add it.
  */
+/**
+ * The chain/turn-time/closure checks validateSchedule() below applies to
+ * every tail, scoped to a single tail's own legs — pulled out on its own so
+ * the M11 rotation board's drag-to-retime preview can ask "would this
+ * tail's day still chain if this one leg landed at a new time," without
+ * involving every other tail or the whole-schedule stranded-aircraft check
+ * (that one needs the live fleet, which isn't meaningful mid-drag, before
+ * anything is actually committed).
+ */
+export function tailRotationProblems(tail: string, tailLegs: ScheduleLeg[]): string[] {
+  const problems: string[] = [];
+  const sorted = [...tailLegs].sort((a, b) => a.departMinute - b.departMinute);
+
+  for (let i = 1; i < sorted.length; i++) {
+    const previous = sorted[i - 1];
+    const current = sorted[i];
+
+    if (previous.dest !== current.origin) {
+      problems.push(
+        `${tail} lands at ${previous.dest} on ${previous.legId} but ${current.legId} departs from ${current.origin}`,
+      );
+    }
+
+    const turnMinutes = current.departMinute - (previous.departMinute + previous.blockMinutes);
+    if (turnMinutes < MIN_TURN_MINUTES) {
+      problems.push(`${tail} has only ${turnMinutes} minutes on the ground between ${previous.legId} and ${current.legId}`);
+    }
+  }
+
+  if (sorted.length > 0) {
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+    if (last.dest !== first.origin) {
+      problems.push(
+        `${tail}'s rotation doesn't close -- ${last.legId} lands at ${last.dest}, but the day restarts at ${first.origin} (${first.legId}). Add a leg back to ${first.origin}, or that first departure will never fire again.`,
+      );
+    }
+  }
+
+  return problems;
+}
+
 export function validateSchedule(
   legs: ScheduleLeg[],
   fleet: Aircraft[] = [],
@@ -312,32 +354,7 @@ export function validateSchedule(
   const problems: string[] = [];
 
   for (const [tail, tailLegs] of byTail) {
-    const sorted = [...tailLegs].sort((a, b) => a.departMinute - b.departMinute);
-    for (let i = 1; i < sorted.length; i++) {
-      const previous = sorted[i - 1];
-      const current = sorted[i];
-
-      if (previous.dest !== current.origin) {
-        problems.push(
-          `${tail} lands at ${previous.dest} on ${previous.legId} but ${current.legId} departs from ${current.origin}`,
-        );
-      }
-
-      const turnMinutes = current.departMinute - (previous.departMinute + previous.blockMinutes);
-      if (turnMinutes < MIN_TURN_MINUTES) {
-        problems.push(`${tail} has only ${turnMinutes} minutes on the ground between ${previous.legId} and ${current.legId}`);
-      }
-    }
-
-    if (sorted.length > 0) {
-      const first = sorted[0];
-      const last = sorted[sorted.length - 1];
-      if (last.dest !== first.origin) {
-        problems.push(
-          `${tail}'s rotation doesn't close -- ${last.legId} lands at ${last.dest}, but the day restarts at ${first.origin} (${first.legId}). Add a leg back to ${first.origin}, or that first departure will never fire again.`,
-        );
-      }
-    }
+    problems.push(...tailRotationProblems(tail, tailLegs));
   }
 
   for (const aircraft of fleet) {

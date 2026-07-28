@@ -41,7 +41,14 @@ const state: SimState = loadSavedState() ?? createNewGameState();
 // would be caught here at startup.
 renderScheduleWarnings(validateSchedule(state.schedule, state.aircraft, state.positioningLegs));
 setupScheduleEditor(state);
-setupRouteBuilder(state);
+// The callback fires once a route (and its optional return leg) is
+// actually added to state.schedule — see ui/routeBuilder.ts's own comment
+// on why. switchToPanel is defined further down this file as a plain
+// `function` declaration, so it's hoisted and safely callable here even
+// though this line runs before its own definition; by the time this
+// arrow function actually executes (a future route confirm), the whole
+// module has already finished evaluating.
+setupRouteBuilder(state, (legIds) => switchToPanel('rotation', legIds));
 setupRotationBoard();
 setupCommercialPanel(state);
 setupFleetMarket(state);
@@ -371,7 +378,7 @@ const PANEL_GROUP: Record<PanelView, string> = {
  * only means anything while looking at the map — flipping one implies
  * "and show me the map," not just "remember this for later."
  */
-function switchToPanel(view: PanelView): void {
+function switchToPanel(view: PanelView, highlightLegIds: string[] = []): void {
   if (view === panelView) return;
 
   panelView = view;
@@ -395,7 +402,7 @@ function switchToPanel(view: PanelView): void {
     hideCompetitionTooltip();
     hideRouteHoverTooltip();
   }
-  if (view === 'rotation') updateRotationBoard(state);
+  if (view === 'rotation') updateRotationBoard(state, highlightLegIds);
   if (view === 'commercial') updateCommercialPanel(state);
 
   render();

@@ -911,22 +911,85 @@ every frame regardless of which panel is showing, but skips all canvas
 drawing while a DOM panel is up (`if (panelView !== 'map') return;`) —
 there's no point paying for it while hidden.
 
-The board is read-only, permanently now rather than "for now" (phase 1
-of what was originally a longer plan — see WEEK-TWO.md's "rotation
-board" section). Phases 2–3 (create/reschedule by dragging a bar) were
-formally shelved in week three: they would have been a second
-implementation of what the M10 map gesture already does, duplicating
-intelligence (plane selection, range, positioning, network gating) the
-map gesture has since accumulated and a from-scratch Gantt interaction
-would have to rebuild from nothing. The board stays exactly what phase 1
-already made it: a genuinely useful, read-only "where's the white
-space" diagnostic. Unlike the schedule table or the route-builder form, it has no
-live `<input>` elements to lose focus on, so `updateRotationBoard()`
-simply clears and rebuilds every row from `state` on each call, rather
-than patching in place the way M8/M10 have to. It's called once when the
-Rotation view is selected (in case the schedule changed while it was
-hidden) and not on every tick, since nothing else currently mutates the
-schedule while the board itself is open.
+Read-only through week three, on purpose (phase 1 of a longer plan — see
+WEEK-TWO.md's "rotation board" section): phases 2–3 (create/reschedule
+by dragging a bar) were shelved at the time as a second implementation
+of what the M10 map gesture already does — duplicating the map
+gesture's plane-selection, range, positioning, and network-gating
+intelligence for no real gain.
+
+**Week four (M12) revisited that call, and the distinction turned out
+to matter.** The M10 route builder still owns everything about
+*creating* a leg (which plane, is it in range, does the network allow
+this origin, does it need a positioning move first) — none of that got
+duplicated. What's new is *retiming* an already-created leg, which
+needs none of that machinery: just "does this tail's day still chain if
+this one leg moves." That turned out to be exactly the operation
+missing from the M10 form, whose depart-time suggestion only checks
+"does this tail's chronologically-last leg land at this route's
+origin" — a route drawn from an airport the tail's day doesn't
+currently *end* at falls through to a fixed morning default regardless
+of what else that tail is already flying, which is how two out-and-back
+routes both starting from the same base ended up scheduled to leave at
+the same time (see WEEK-FOUR.md's own account of hitting exactly this
+with C-FQAB). Rather than trying to make that suggestion heuristic
+smarter — it can always be wrong in some *new* way, and the player never
+sees why a time was picked — M12 makes the board itself the fix: drop
+the new leg wherever, jump straight here, and let the player see and
+drag it into place.
+
+Dragging a bar (`attachDragHandlers()` in rotationBoard.ts) is confined
+to its own row — horizontal retiming only, never a reassignment to a
+different tail, which is still a schedule-editor-table edit. It reads a
+scratch `tentativeDepartMinute` while the mouse moves, snapping to the
+nearest whole minute, and checks it live against `tailRotationProblems()`
+(schedule.ts) — the same per-tail chain/turn-time/closure check
+`validateSchedule()` applies to every tail, pulled out on its own so
+this preview can score one tail's hypothetical placement without
+pulling in the whole-schedule stranded-aircraft check (meaningless
+mid-drag, before anything's committed) or bleeding in an unrelated
+tail's unrelated problems. The bar turns red the instant the
+hypothetical breaks the chain, green the instant it doesn't — feedback
+while the player is still deciding where to drop it, not a warning list
+to notice afterward.
+
+Deliberately *not* written back to `state.schedule` until the actual
+drop (`mouseup`): `step()` reads that array every simulated minute,
+including while the rotation board is open and a drag is mid-flight, so
+committing a half-finished drag would feed the running simulation a
+value the player hasn't actually chosen yet. On drop, the leg's real
+object gets its `departMinute` mutated in place (iterating
+`state.schedule` hands back live references, not copies, so no lookup-
+and-replace is needed), `validateSchedule()` re-runs so the sidebar's
+warning list agrees with what the board now shows, and — new problem
+this surfaced — `ui/panels.ts`'s schedule table needed its own
+`syncScheduleRowTime()` export, since that table's `<input type="time">`
+elements are built once and only ever patched by their *own* `change`
+handler (deliberately, to avoid tearing out a focused input on every
+frame); a drag commits through a completely different path, so nothing
+else would ever tell that one row to catch up without this call.
+
+**The map-to-board handoff (also M12):** confirming a route in
+`ui/routeBuilder.ts` now calls an `onRouteConfirmed(legIds)` callback
+(wired in `main.ts` to `switchToPanel('rotation', legIds)`) instead of
+just leaving the player looking at the map. `updateRotationBoard()`
+takes an optional `highlightLegIds` array and tags matching bars with a
+CSS-only amber glow (`rotation-bar--new`, a couple of keyframe pulses,
+no JS timer to clear it — the class just never gets applied again once
+something else triggers a rebuild), and scrolls the first one into
+view. The player finishes a route and lands immediately on "here's what
+you just added, go place it," rather than an easy-to-miss warning
+somewhere else.
+
+Unlike the schedule table or the route-builder form, the board has no
+persistent live `<input>` elements to lose focus on (a bar being
+dragged is the one exception, handled entirely through its own
+mousedown/mousemove/mouseup, not a rebuild), so `updateRotationBoard()`
+still simply clears and rebuilds every row from `state` on each call,
+rather than patching in place the way M8/M10 have to. It's called
+whenever the Rotation view is selected, whenever a drag commits, and
+whenever a route confirms with legs to highlight — not on every tick,
+since nothing else mutates the schedule while the board itself is open.
 
 Switching away from the Ops view calls `cancelPendingRoute()` (M10's
 route builder, exported for this purpose) — an armed or half-confirmed

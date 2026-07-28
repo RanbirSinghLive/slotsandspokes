@@ -356,3 +356,72 @@ New required fields on `SimState` meant bumping `ui/save.ts`'s
 `SAVE_KEY` to `airgame-save-v4`, per that file's own versioning
 convention — an old save is simply not found again rather than loading
 with `undefined` counters.
+
+## Drag-to-retime the rotation board, and a map-to-board handoff
+
+Traced directly back to the YHZ-YQM/YHZ-YSJ scheduling bug above: the
+M10 route builder's depart-time suggestion only checks "does this
+tail's chronologically-last leg land at this route's origin" — a
+second route drawn from an airport the tail's day doesn't currently
+*end* at falls through to a fixed 07:00 default regardless of what
+else that tail is already flying that day. Two routes both starting
+from the same base landed on the same time slot, and nothing stopped
+the add — by design, per M10's own "let it through, warn afterward"
+philosophy, same as an M8 schedule-table edit.
+
+Two ways to fix this were on the table: make the suggestion heuristic
+smarter (scan the tail's whole day for a real gap), or let the player
+place the new leg by hand with real feedback. Went with the second —
+a smarter heuristic can always be wrong in some *new* way and never
+explains itself; direct manipulation just shows the conflict while
+you're still deciding, and never needs to be smart to begin with.
+
+**The rotation board (`ui/rotationBoard.ts`) is now draggable.** It was
+deliberately left read-only through week three (creating/rescheduling
+by drag was formally shelved as a second implementation of what the
+map gesture already does — plane selection, range, positioning,
+network gating). That reasoning still holds for *creating* a leg. It
+doesn't hold for *retiming* one already created — that operation needs
+none of the map gesture's machinery, just "does this tail's day still
+chain if this leg moves," so building it isn't a duplicate of
+anything.
+
+Dragging a bar is confined to its own row (retime only, never a
+cross-tail reassignment — that's still a schedule-table edit), snaps to
+the nearest whole minute, and previews live against
+`tailRotationProblems()` — a new export from `sim/schedule.ts`, the
+same per-tail chain/turn-time/closure logic `validateSchedule()` already
+ran per tail, pulled out so the drag preview can score one tail's
+hypothetical placement without the whole-schedule stranded-aircraft
+check (meaningless mid-drag) or another tail's unrelated problems
+bleeding in. Red the instant the hypothetical breaks the chain, green
+the instant it doesn't.
+
+Nothing writes to the real `state.schedule` until the drop:
+`step()` reads that array every simulated minute, including while the
+board is open mid-drag, so a half-finished drag has no business being
+visible to the running simulation. On drop, the leg's real object gets
+its `departMinute` mutated in place and `validateSchedule()` re-runs —
+and the schedule *table* needed a new `syncScheduleRowTime()` export
+from `ui/panels.ts`, since its `<input type="time">` elements are only
+ever patched by their own `change` handler; a drag commits through an
+entirely different path, so nothing else would have told that row to
+catch up.
+
+**The other half: confirming a route on the map now jumps here.**
+`ui/routeBuilder.ts`'s confirm handler calls a new `onRouteConfirmed`
+callback (wired in `main.ts` to `switchToPanel('rotation', legIds)`)
+instead of leaving the player looking at the map with a freshly-added,
+possibly-conflicting leg they'd have to notice a warning about
+separately. The new bar(s) get a brief amber glow
+(`rotation-bar--new`) and the board scrolls to the first one — draw a
+route, land straight on "here's what you just added, go place it."
+
+Verified in-browser on the exact C-FQAB schedule the bug report came
+from: dragged the three conflicting legs into a closed loop
+(YQM→YHZ→YSJ→YHZ→YQM) by hand, warnings cleared; then drew a live
+YHZ→YQB route on the map, watched it jump straight to the rotation
+board with both new legs glowing (and, as expected, immediately
+conflicting with the existing 07:00 departure — the same bug,
+reproduced live), then dragged all six legs into a single closed
+6-leg loop (YQM→YHZ→YQB→YHZ→YSJ→YHZ→YQM) with no warnings left.
