@@ -2,7 +2,7 @@ import aircraftTypesData from '../../data/aircraft-types.json';
 import { airports, type Airport } from '../render/airports';
 import { greatCircleDistanceNm } from '../sim/geo';
 import { minuteOfDayToTimeString, renderScheduleWarnings, syncScheduleRow } from './panels';
-import { tailRotationProblems, validateSchedule, type ScheduleLeg } from '../sim/schedule';
+import { computeBlockMinutes, tailRotationProblems, validateSchedule, type ScheduleLeg } from '../sim/schedule';
 import type { SimState } from '../sim/state';
 
 const MINUTES_PER_DAY = 1440;
@@ -14,10 +14,12 @@ const barTooltip = document.querySelector<HTMLDivElement>('#rotation-bar-tooltip
 const barTooltipTitle = document.querySelector<HTMLDivElement>('#rotation-bar-tooltip-title')!;
 const barTooltipBody = document.querySelector<HTMLDivElement>('#rotation-bar-tooltip-body')!;
 
-// A minimal local view of aircraft-types.json — just rangeNm, for the
-// cross-tail drag's out-of-range check below — same "small local type"
-// pattern ui/routeBuilder.ts's own AircraftTypeSpec already uses.
-type AircraftTypeSpec = { code: string; rangeNm: number };
+// A minimal local view of aircraft-types.json — rangeNm for the cross-tail
+// drag's out-of-range check, cruiseKts so a leg reassigned to a different
+// gauge gets its blockMinutes recomputed for the *new* plane's speed
+// rather than keeping the old one's — same "small local type" pattern
+// ui/routeBuilder.ts's own AircraftTypeSpec already uses.
+type AircraftTypeSpec = { code: string; rangeNm: number; cruiseKts: number };
 const aircraftTypesByCode = new Map<string, AircraftTypeSpec>(
   (aircraftTypesData as AircraftTypeSpec[]).map((type) => [type.code, type]),
 );
@@ -99,15 +101,18 @@ let dragState: DragState | null = null;
  * The route (origin → destination) leads as the title on purpose: that's
  * exactly the thing a short block time's narrow bar can't reliably show
  * as its own clipped inline text, which is the whole reason this exists.
- * Takes `departMinute` as its own argument, not read off `leg`, so the
- * same function can show either a bar's resting time (hover) or its
- * tentative dragged-to time (mid-drag, see the mousemove handler below).
+ * Takes `departMinute` *and* `blockMinutes` as their own arguments, not
+ * read off `leg`, so the same function can show either a bar's resting
+ * state (hover) or its tentative dragged-to state (mid-drag, see the
+ * mousemove handler below) — including, since M13, a tentative block time
+ * that's shorter or longer than the leg's own, when a cross-tail drag is
+ * hovering over a row whose aircraft cruises at a different speed.
  */
-function showBarTooltip(leg: ScheduleLeg, departMinute: number, clientX: number, clientY: number): void {
+function showBarTooltip(leg: ScheduleLeg, departMinute: number, blockMinutes: number, clientX: number, clientY: number): void {
   barTooltipTitle.textContent = `${leg.origin} → ${leg.dest}`;
   const departTime = minuteOfDayToTimeString(departMinute);
-  const arriveTime = minuteOfDayToTimeString(departMinute + leg.blockMinutes);
-  barTooltipBody.textContent = `${leg.legId} · ${departTime}–${arriveTime} (${leg.blockMinutes} min)`;
+  const arriveTime = minuteOfDayToTimeString(departMinute + blockMinutes);
+  barTooltipBody.textContent = `${leg.legId} · ${departTime}–${arriveTime} (${blockMinutes} min)`;
   barTooltip.style.left = `${clientX + 14}px`;
   barTooltip.style.top = `${clientY + 14}px`;
   barTooltip.hidden = false;
@@ -127,10 +132,10 @@ export function hideBarTooltip(): void {
  */
 function attachDragHandlers(bar: HTMLDivElement, leg: ScheduleLeg, track: HTMLDivElement, state: SimState): void {
   bar.addEventListener('mouseenter', (event) => {
-    if (!dragState) showBarTooltip(leg, leg.departMinute, event.clientX, event.clientY);
+    if (!dragState) showBarTooltip(leg, leg.departMinute, leg.blockMinutes, event.clientX, event.clientY);
   });
   bar.addEventListener('mousemove', (event) => {
-    if (!dragState) showBarTooltip(leg, leg.departMinute, event.clientX, event.clientY);
+    if (!dragState) showBarTooltip(leg, leg.departMinute, leg.blockMinutes, event.clientX, event.clientY);
   });
   bar.addEventListener('mouseleave', () => {
     if (!dragState) hideBarTooltip();
@@ -201,10 +206,23 @@ window.addEventListener('mousemove', (event) => {
   const newDepartMinute = Math.max(0, Math.min(MINUTES_PER_DAY - 1, Math.round(originalDepartMinute + deltaMinutes)));
   dragState.tentativeDepartMinute = newDepartMinute;
 
-  bar.style.left = `${(newDepartMinute / MINUTES_PER_DAY) * 100}%`;
-  showBarTooltip(leg, newDepartMinute, event.clientX, event.clientY);
+  // Looked up before the tooltip/chain-check below: hovering over a
+  // different-tail row means this leg's block time is only tentative too
+  // (see the M13 note on updateRotationBoard() for why blockMinutes has
+  // to change with the gauge), and both the tooltip and the turn-time
+  // preview need that tentative value, not the leg's still-original one.
+  const candidateAircraft = dragState.state.aircraft.find((a) => a.tail === currentTail);
+  const candidateType = candidateAircraft ? aircraftTypesByCode.get(candidateAircraft.typeCode) : undefined;
+  const tentativeBlockMinutes =
+    currentTail !== originalTail && candidateType
+      ? computeBlockMinutes(leg.origin, leg.dest, candidateType.cruiseKts)
+      : leg.blockMinutes;
 
-  const hypotheticalLeg: ScheduleLeg = { ...leg, tail: currentTail, departMinute: newDepartMinute };
+  bar.style.left = `${(newDepartMinute / MINUTES_PER_DAY) * 100}%`;
+  bar.style.width = `${(tentativeBlockMinutes / MINUTES_PER_DAY) * 100}%`;
+  showBarTooltip(leg, newDepartMinute, tentativeBlockMinutes, event.clientX, event.clientY);
+
+  const hypotheticalLeg: ScheduleLeg = { ...leg, tail: currentTail, departMinute: newDepartMinute, blockMinutes: tentativeBlockMinutes };
   const destOtherLegs = dragState.state.schedule.filter((l) => l.tail === currentTail && l.legId !== leg.legId);
   let problems = tailRotationProblems(currentTail, [...destOtherLegs, hypotheticalLeg]);
   if (currentTail !== originalTail) {
@@ -212,8 +230,6 @@ window.addEventListener('mousemove', (event) => {
     problems = [...problems, ...tailRotationProblems(originalTail, sourceRemainingLegs)];
   }
 
-  const candidateAircraft = dragState.state.aircraft.find((a) => a.tail === currentTail);
-  const candidateType = candidateAircraft ? aircraftTypesByCode.get(candidateAircraft.typeCode) : undefined;
   const originAirport = airportsByIata.get(leg.origin);
   const destAirport = airportsByIata.get(leg.dest);
   const outOfRange =
@@ -245,6 +261,23 @@ window.addEventListener('mouseup', () => {
   if (tentativeDepartMinute !== originalDepartMinute || currentTail !== originalTail) {
     leg.departMinute = tentativeDepartMinute;
     leg.tail = currentTail;
+
+    // Reassigned to a different tail: this leg now flies behind a
+    // (possibly) different gauge, so its block time — locked in at
+    // whichever plane's cruise speed was flying it when it was first
+    // drawn — has to be recomputed for the new one. Everything else that
+    // depends on "which plane is this" (seats/capacity in
+    // ui/commercial.ts, cost in sim/economy.ts) already reads it fresh
+    // off `state.aircraft` via the tail at flight time, so blockMinutes
+    // was the one place a stale gauge could actually linger.
+    if (currentTail !== originalTail) {
+      const newAircraft = state.aircraft.find((a) => a.tail === currentTail);
+      const newType = newAircraft ? aircraftTypesByCode.get(newAircraft.typeCode) : undefined;
+      if (newType) {
+        leg.blockMinutes = computeBlockMinutes(leg.origin, leg.dest, newType.cruiseKts);
+      }
+    }
+
     syncScheduleRow(leg);
     renderScheduleWarnings(validateSchedule(state.schedule, state.aircraft, state.positioningLegs));
     updateRotationBoard(state);

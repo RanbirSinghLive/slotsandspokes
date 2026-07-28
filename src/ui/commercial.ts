@@ -1,12 +1,28 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { flightResult, LOAD_FACTOR, type EconomyAircraftType } from '../sim/economy';
-import { marketKey, recommendedFare } from '../sim/schedule';
+import { marketKey, recommendedFare, type ScheduleLeg } from '../sim/schedule';
 import { trafficShare } from '../sim/choiceModel';
 import type { RouteSettings, SimState } from '../sim/state';
 
-// Only one aircraft type exists so far — see the same note in
-// sim/schedule.ts and sim/step.ts.
-const aircraftType = (aircraftTypesData as EconomyAircraftType[])[0];
+// A market can be served by more than one gauge at once (week four's
+// aircraft ladder, plus M13's ability to drag a leg onto a different
+// tail) — so unlike before, this panel can't assume one type for a whole
+// market. Looked up per leg instead, same "small local map, keyed by
+// code" pattern step.ts already uses; `defaultAircraftType` only covers
+// the defensive case of a leg whose tail somehow isn't in the fleet
+// (shouldn't happen — validateSchedule() would already be flagging that
+// tail as stranded or worse — but a market summary shouldn't throw over
+// it).
+const aircraftTypesByCode = new Map<string, EconomyAircraftType>(
+  (aircraftTypesData as Array<EconomyAircraftType & { code: string }>).map((type) => [type.code, type]),
+);
+const defaultAircraftType = (aircraftTypesData as EconomyAircraftType[])[0];
+
+function aircraftTypeForLeg(leg: ScheduleLeg, state: SimState): EconomyAircraftType {
+  const aircraft = state.aircraft.find((a) => a.tail === leg.tail);
+  const type = aircraft ? aircraftTypesByCode.get(aircraft.typeCode) : undefined;
+  return type ?? defaultAircraftType;
+}
 
 const tableBody = document.querySelector<HTMLTableSectionElement>('#commercial-rows')!;
 
@@ -63,12 +79,17 @@ function summarizeMarket(origin: string, dest: string, state: SimState, routeSet
   let revenue = 0;
   let cost = 0;
   let margin = 0;
+  let totalSeats = 0;
+  let totalSeatCeiling = 0;
   for (const leg of legs) {
-    const result = flightResult({ origin: leg.origin, dest: leg.dest, blockMinutes: leg.blockMinutes }, aircraftType, freq, routeSettings);
+    const type = aircraftTypeForLeg(leg, state);
+    const result = flightResult({ origin: leg.origin, dest: leg.dest, blockMinutes: leg.blockMinutes }, type, freq, routeSettings);
     pax += result.pax;
     revenue += result.revenue;
     cost += result.cost;
     margin += result.margin;
+    totalSeats += type.seats;
+    totalSeatCeiling += Math.round(type.seats * LOAD_FACTOR);
   }
 
   // Marketing spend is a per-day, per-market cost (see step.ts's day-
@@ -83,8 +104,9 @@ function summarizeMarket(origin: string, dest: string, state: SimState, routeSet
   // there, so raising fare trades away spare demand nobody could fly
   // anyway. Anything short of that ceiling is "demand-capped": every
   // remaining passenger is real, so raising fare will cost real pax.
-  const seatCeilingPerFlight = Math.round(aircraftType.seats * LOAD_FACTOR);
-  const seatCapped = freq > 0 && pax >= seatCeilingPerFlight * freq;
+  // Summed per leg's own type rather than one type times frequency, since
+  // a market can now be served by more than one gauge at once.
+  const seatCapped = freq > 0 && pax >= totalSeatCeiling;
 
   // Market share (sim/choiceModel.ts's trafficShare()) is a property of
   // the market, not of any one leg on it — same fare/frequency/marketing
@@ -97,20 +119,20 @@ function summarizeMarket(origin: string, dest: string, state: SimState, routeSet
   // pull share away here.
   const share = freq > 0 ? trafficShare(routeSettings.fare, freq, origin, dest, routeSettings.marketingSpend) : 1;
 
-  return { freq, pax, revenue, cost, margin, seatCapped, share };
+  return { freq, pax, revenue, cost, margin, seatCapped, share, totalSeats };
 }
 
 function refreshRow(key: string, state: SimState): void {
   const row = rowsByMarket.get(key);
   if (!row) return;
   const routeSettings = state.routeSettings[key];
-  const { freq, pax, revenue, cost, margin, seatCapped, share } = summarizeMarket(
+  const { freq, pax, revenue, cost, margin, seatCapped, share, totalSeats } = summarizeMarket(
     row.origin,
     row.dest,
     state,
     routeSettings,
   );
-  const loadFactor = freq > 0 ? pax / (aircraftType.seats * freq) : 0;
+  const loadFactor = totalSeats > 0 ? pax / totalSeats : 0;
 
   row.cells.freq.textContent = String(freq);
   row.cells.pax.textContent = String(pax);

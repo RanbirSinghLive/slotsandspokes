@@ -87,27 +87,35 @@ const airportsByIata = new Map<string, AirportLocation>(
   (airportsData as AirportLocation[]).map((airport) => [airport.iata, airport]),
 );
 
-// Only one aircraft type exists so far ("more than one aircraft type" is on
-// WEEK-ONE.md's deliberately-deferred list), so every leg's block time uses
-// this one type's cruise speed. This will need to become a per-tail lookup
-// once a second type is introduced.
-const aircraftType = (aircraftTypesData as AircraftType[])[0];
+// data/schedule.json's fixed template (below) predates the week-four
+// aircraft ladder and was authored against a single type — every one of
+// its legs still computes its block time against that first type's cruise
+// speed by default, which is exactly right for it: createInitialState()
+// (the headless runner's own entry point) always builds every aircraft as
+// this same first type regardless, so there's no per-tail speed to look up
+// for that fixed network anyway. A real game's legs pass their aircraft's
+// actual cruiseKts explicitly instead — see the `cruiseKts` parameter
+// below, and ui/routeBuilder.ts's call sites for where that comes from.
+const DEFAULT_CRUISE_KTS = (aircraftTypesData as AircraftType[])[0].cruiseKts;
 
 /**
- * Block time for a leg between two airports, from great-circle distance and
- * the (only, for now) aircraft type's cruise speed — see CLAUDE.md's note
- * on this formula. Exported so the M10 route builder can compute a real
- * block time for a leg the player is creating, not just at schedule-load
- * time for the fixed template.
+ * Block time for a leg between two airports, from great-circle distance
+ * and `cruiseKts` — see CLAUDE.md's note on this formula. `cruiseKts`
+ * defaults to the fixed template's single type (see the note above) but
+ * should be passed explicitly for any leg with a real aircraft assigned,
+ * so a Q400 or A220 route isn't timed as if a 1900D were flying it.
+ * Exported so the M10 route builder can compute a real block time for a
+ * leg the player is creating, not just at schedule-load time for the
+ * fixed template.
  */
-export function computeBlockMinutes(originIata: string, destIata: string): number {
+export function computeBlockMinutes(originIata: string, destIata: string, cruiseKts: number = DEFAULT_CRUISE_KTS): number {
   const origin = airportsByIata.get(originIata);
   const dest = airportsByIata.get(destIata);
   if (!origin || !dest) {
     throw new Error(`Schedule references an unknown airport: ${originIata} -> ${destIata}`);
   }
   const distanceNm = greatCircleDistanceNm(origin, dest);
-  return Math.round(TAXI_ALLOWANCE_MINUTES + (distanceNm / aircraftType.cruiseKts) * 60);
+  return Math.round(TAXI_ALLOWANCE_MINUTES + (distanceNm / cruiseKts) * 60);
 }
 
 // Week two's "Pricing" loop — deliberately crude, same spirit as

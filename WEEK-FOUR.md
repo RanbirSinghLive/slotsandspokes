@@ -501,3 +501,52 @@ confirmation the existing whole-schedule check still applies unmodified
 — C-FQAC being physically parked at YQB while its only leg departs from
 YHZ tripped the pre-existing "stranded aircraft" warning too, with no
 changes needed to that check at all.
+
+## Changing gauge actually changes gauge
+
+Asked directly: drag a leg from a Beechcraft's row onto a Dash 8-400's,
+does it actually fly as a Dash 8-400 afterward — different speed,
+different seats, different cost — or just cosmetically move to a new
+row? Checking turned up two real gaps, both predating the M13 drag
+work entirely: `sim/schedule.ts`'s `computeBlockMinutes()` and
+`ui/commercial.ts`'s market summary both silently assumed a *single*
+aircraft type for the whole game, a leftover from before the
+aircraft-ladder milestone that nothing had gone back to fix once five
+types actually existed.
+
+**`computeBlockMinutes()`** always used `aircraftTypesData[0]`'s cruise
+speed (280kt, the 1900D) for every leg, regardless of which plane was
+actually assigned — a Q400 route was timed as if a 1900D were flying
+it, seats aside. Gave it a `cruiseKts` parameter (defaulting to that
+same first-type value, so `data/schedule.json`'s fixed template and the
+headless runner's fixed 1900D-only fleet are both unaffected) and
+updated every real call site in `ui/routeBuilder.ts` to pass the
+actually-selected tail's own cruise speed instead.
+
+**`ui/commercial.ts`** computed every market's expected pax/load/
+revenue/cost against that same hardcoded first type, for every leg on
+the market — fine when only one type existed, wrong the instant two
+different gauges serve the same market (now possible either by
+drawing routes with different planes directly, or by M13's drag). Each
+leg's revenue/cost is looked up against *its own* tail's real aircraft
+type now (`aircraftTypeForLeg()`), and the market's seat ceiling and
+load factor are summed across each leg's own seat count rather than one
+type times frequency.
+
+**The rotation-board drag itself** now recomputes the dragged leg's
+`blockMinutes` at the moment it lands on a different-gauge tail — both
+live, during the drag (so the tooltip and the bar's own width preview
+the new, tentative block time before it's committed, and the turn-time
+check scores the *correct* hypothetical arrival) and again on drop.
+Everything else that depends on "which plane is this" — seats, cost,
+revenue — was already reading the aircraft's type fresh via the tail at
+flight time, never cached per leg, so blockMinutes turned out to be the
+only place a stale gauge could actually linger once the tail changed.
+
+Verified in-browser: added a DH8400 (C-GQXA) alongside the two
+BEH1900Ds. Dragging C-FQAB's YHZ-YSJ leg (42 min at 280kt) onto C-GQXA
+live-previewed a 37-minute block time before drop (280kt → 360kt on a
+~103nm leg), committed at exactly that number, and the YHZ↔YSJ
+Commercial row updated from "one 19-seat type flying both legs" math to
+27% load / Demand-capped against a combined 97-seat capacity (19 + 78)
+— exactly the mixed-gauge number, not the old single-type one.

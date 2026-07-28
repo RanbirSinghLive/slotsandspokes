@@ -32,10 +32,12 @@ const CANDIDATE_RING_STROKE = '#ffd166';
 const RANGE_RING_STROKE = '#4a90d9';
 
 // A minimal local view of aircraft-types.json — just what this module
-// needs (range for the ring, seats for the PDEW/CAP readout below), same
-// "small local type" pattern render/competition.ts's marketKey() already
-// uses rather than importing sim/economy.ts's fuller EconomyAircraftType.
-type AircraftTypeSpec = { code: string; name: string; seats: number; rangeNm: number };
+// needs (range for the ring, seats for the PDEW/CAP readout below,
+// cruiseKts so a route's block time reflects the plane actually flying
+// it), same "small local type" pattern render/competition.ts's
+// marketKey() already uses rather than importing sim/economy.ts's fuller
+// EconomyAircraftType.
+type AircraftTypeSpec = { code: string; name: string; seats: number; rangeNm: number; cruiseKts: number };
 const aircraftTypesByCode = new Map<string, AircraftTypeSpec>(
   (aircraftTypesData as AircraftTypeSpec[]).map((type) => [type.code, type]),
 );
@@ -436,10 +438,12 @@ function suggestedDepartTime(origin: Airport, tail: string, state: SimState): st
 function showForm(origin: Airport, dest: Airport, state: SimState): void {
   formHeading.textContent = isExistingMarket(origin.iata, dest.iata, state.schedule) ? 'New Frequency' : 'New Route';
   formLabel.textContent = `${origin.iata} → ${dest.iata}`;
-  formBlock.textContent = `Block time: ${computeBlockMinutes(origin.iata, dest.iata)} min`;
   // Week three: the tail was already chosen (Fleet panel) before this
   // route was even armed, so it's shown here read-only, not re-picked.
   const tail = getSelectedTail() ?? '';
+  const aircraftForBlock = state.aircraft.find((a) => a.tail === tail);
+  const typeForBlock = aircraftForBlock ? aircraftTypesByCode.get(aircraftForBlock.typeCode) : undefined;
+  formBlock.textContent = `Block time: ${computeBlockMinutes(origin.iata, dest.iata, typeForBlock?.cruiseKts)} min`;
   formTailLabel.textContent = tail;
   formSection.hidden = false;
 
@@ -562,7 +566,7 @@ function updateFormValidation(origin: Airport, dest: Airport, state: SimState): 
   }
 
   const departMinute = timeStringToMinuteOfDay(formDepartInput.value);
-  const blockMinutes = computeBlockMinutes(origin.iata, dest.iata);
+  const blockMinutes = computeBlockMinutes(origin.iata, dest.iata, type?.cruiseKts);
   const outboundCollision = findExactTimeCollision(origin.iata, dest.iata, departMinute, state.schedule);
 
   let returnDepartMinute: number | null = null;
@@ -590,7 +594,7 @@ function updateFormValidation(origin: Airport, dest: Airport, state: SimState): 
 
   const currentPosition = currentOrUpcomingAirport(tail, state);
   if (currentPosition && currentPosition.airport !== origin.iata) {
-    formPositioningPreview.textContent = `Positioning: ${tail} will fly ${currentPosition.airport} → ${origin.iata} first (${computeBlockMinutes(currentPosition.airport, origin.iata)} min, cost only, no passengers) before this route starts.`;
+    formPositioningPreview.textContent = `Positioning: ${tail} will fly ${currentPosition.airport} → ${origin.iata} first (${computeBlockMinutes(currentPosition.airport, origin.iata, type?.cruiseKts)} min, cost only, no passengers) before this route starts.`;
   } else if (!currentPosition) {
     // A Fleet Market purchase with no base yet (see ui/fleetMarket.ts) —
     // deploying it here is free and immediate, not a positioning flight,
@@ -642,15 +646,15 @@ export function setupRouteBuilder(state: SimState, onRouteConfirmed: (legIds: st
   formConfirmButton.addEventListener('click', () => {
     if (builderState.mode !== 'confirming') return;
     const { origin, dest, tail } = builderState;
+    const aircraftForRange = state.aircraft.find((a) => a.tail === tail);
+    const typeForRange = aircraftForRange ? aircraftTypesByCode.get(aircraftForRange.typeCode) : undefined;
     const departMinute = timeStringToMinuteOfDay(formDepartInput.value);
-    const blockMinutes = computeBlockMinutes(origin.iata, dest.iata);
+    const blockMinutes = computeBlockMinutes(origin.iata, dest.iata, typeForRange?.cruiseKts);
 
     // Defensive re-checks: the button should already be disabled in
     // either case, but never add a duplicate timeslot or an impossible
     // route regardless.
     if (findExactTimeCollision(origin.iata, dest.iata, departMinute, state.schedule)) return;
-    const aircraftForRange = state.aircraft.find((a) => a.tail === tail);
-    const typeForRange = aircraftForRange ? aircraftTypesByCode.get(aircraftForRange.typeCode) : undefined;
     if (typeForRange && greatCircleDistanceNm(origin, dest) > typeForRange.rangeNm) return;
 
     // If the chosen tail isn't standing at this route's origin, queue a
@@ -676,7 +680,7 @@ export function setupRouteBuilder(state: SimState, onRouteConfirmed: (legIds: st
         origin: currentPosition.airport,
         dest: origin.iata,
         departMinute: currentPosition.earliestDepartMinute,
-        blockMinutes: computeBlockMinutes(currentPosition.airport, origin.iata),
+        blockMinutes: computeBlockMinutes(currentPosition.airport, origin.iata, typeForRange?.cruiseKts),
       };
       state.positioningLegs.push(positioningLeg);
     } else if (!currentPosition) {

@@ -992,6 +992,33 @@ once and only ever patched by their *own* `change` handler
 drag commits through a completely different path, so nothing else
 would ever tell that row to catch up without this call.
 
+**Does reassigning a leg to a different gauge actually change its
+gauge, everywhere?** Asked directly, and checking turned up two real
+gaps predating M13 entirely — both a "single aircraft type" assumption
+nobody had gone back to fix once the week-four ladder introduced four
+more. `sim/schedule.ts`'s `computeBlockMinutes()` always used
+`aircraftTypesData[0]`'s cruise speed (the 1900D's 280kt) for *every*
+leg regardless of which plane was actually flying it; `ui/commercial.ts`
+did the same for a whole market's pax/load/revenue/cost summary. Both
+now take the actual aircraft type into account — `computeBlockMinutes()`
+gained a `cruiseKts` parameter (defaulting to that same first-type value,
+so `data/schedule.json`'s fixed template and the headless runner's
+single-type fleet are unaffected), and `ui/commercial.ts` looks up each
+leg's *own* tail's type (`aircraftTypeForLeg()`) rather than one type for
+the whole market, summing seat ceiling and load factor per leg so a
+market split across two different gauges reports real combined capacity
+instead of pretending every flight is the same size.
+
+The rotation board's drag ties into this directly: landing a leg on a
+different-gauge tail recomputes its `blockMinutes` right there — live,
+during the drag itself (the tooltip and the bar's own width preview the
+new tentative block time before anything commits, and the turn-time
+check scores the correct hypothetical arrival against it), and again on
+drop. Nothing else needed to change — seats, cost, and revenue were
+already read fresh off the aircraft's type via the tail at flight time,
+never cached per leg, so `blockMinutes` was the one place a stale gauge
+could actually survive a reassignment.
+
 **The map-to-board handoff (also M12):** confirming a route in
 `ui/routeBuilder.ts` now calls an `onRouteConfirmed(legIds)` callback
 (wired in `main.ts` to `switchToPanel('rotation', legIds)`) instead of
@@ -1073,13 +1100,17 @@ directly rather than read from `state`, so a slider mid-drag shows the
 *hypothetical* result of a value not committed yet, live.
 
 **Seat-capped vs. demand-capped** is the single most useful thing this
-panel adds: a market is seat-capped when every one of its flights is
-pinned at the 78-seat aircraft's load-factor ceiling (there's more
-demand than the fleet can carry, so raising fare trades away spare
-demand nobody could fly anyway — free margin); anything short of that
-ceiling is demand-capped (every passenger is real, so raising fare costs
-real pax). Previously the only way to know which case a market was in
-was to run the headless script and read the numbers by hand.
+panel adds: a market is seat-capped when its passengers are pinned at
+the combined load-factor ceiling of every plane actually serving it
+(summed per leg's own aircraft type as of M13/M14, not one type times
+frequency — a market split across a 1900D and a Q400 sums 19 and 78
+seats' worth of ceiling, not double whichever type happens to be
+hardcoded) — there's more demand than the fleet can carry, so raising
+fare trades away spare demand nobody could fly anyway (free margin);
+anything short of that ceiling is demand-capped (every passenger is
+real, so raising fare costs real pax). Previously the only way to know
+which case a market was in was to run the headless script and read the
+numbers by hand.
 
 **Marketing spend** (`sim/choiceModel.ts`'s `marketingBonus()`) is the
 first lever added *because* `RouteSettings` was already a record, not a
