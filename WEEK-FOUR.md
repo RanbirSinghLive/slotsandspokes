@@ -550,3 +550,52 @@ live-previewed a 37-minute block time before drop (280kt → 360kt on a
 Commercial row updated from "one 19-seat type flying both legs" math to
 27% load / Demand-capped against a combined 97-seat capacity (19 + 78)
 — exactly the mixed-gauge number, not the old single-type one.
+
+## Delays get real causes: age, weather, and knock-on
+
+The delay model until now was one flat roll — 65% on time, else 1-45
+minutes skewed toward the short end, made worse by weather but
+otherwise the same number for every flight regardless of what plane or
+what day. Asked directly to start deriving it from real causes instead:
+age, weather, and the "knock-on" cascade between them, explicitly
+building this to be extended further later.
+
+**Age** is new — `Aircraft` gained an `ageYears` field, copied from
+`FleetListing.ageYears` at purchase or lease (`ui/fleetMarket.ts`), a
+number that already existed for pricing flavor but had "no separate
+reliability mechanic attached to it" per its own doc comment until now.
+Reliability degrades linearly with age from the model's *original*
+65%-on-time/45-minute-max baseline — age 0 reproduces those exact
+numbers, floored at 35% on-time so a genuinely ancient airframe still
+isn't a coin flip on every departure. Checked with a throwaway 200k-
+sample script (`nextRandom()`, deleted after, not committed — same
+pattern as the demand-model check): age 0 → 65.1% on-time (target: 65%,
+confirming continuity with the old model); age 24 (the oldest
+fleet-market listing, an A330-300) → 41.0% on-time, 18.7 min average
+delay, 93 min worst case. A real, meaningful spread, not decorative.
+
+**Weather** is the same mechanism as before (`sim/weather.ts`'s
+`WEATHER_ON_TIME_PROBABILITY`/`WEATHER_MAX_DELAY_MINUTES`), just pulled
+out into its own named cause (`rollWeatherDelay()`) instead of being
+inline-swapped against the old flat baseline.
+
+**Knock-on** is new, and deliberately *not* random: it's how many
+minutes past its scheduled slot a flight is *already* departing, times
+a flat 25% factor — carried forward as extra arrival delay on top,
+rather than a flight that departs late simply landing exactly on
+schedule for how late it left. Real rotations compound this way (a
+rushed turnaround loses its gate slot, its ATC slot, its crew's slack),
+not just shift uniformly later. No RNG draw needed: the randomness
+already happened whenever the *earlier* leg's own delay was rolled;
+this cause only propagates a fraction of it forward. `10/30/60/90`
+minutes late at departure → `3/8/15/23` minutes of added knock-on delay.
+
+All three sum into one `rollTotalDelayMinutes()`, called identically
+for scheduled legs and positioning legs (both already shared the same
+gate/roll shape). Verified in-browser: bought the oldest available
+1900D (C-FQAE, 21 years), flew it alone on a YHZ↔YSJ shuttle for 20
+simulated days at 20x — On-time settled at 72% (departures, which the
+schedule's turn buffers partly absorb even when arrivals run late), and
+the Fleet panel caught one specific flight 77 minutes late in the air,
+a single real data point matching the age model's expected severity
+range. Zero console errors across the run.

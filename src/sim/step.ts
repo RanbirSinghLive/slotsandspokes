@@ -11,25 +11,50 @@ const aircraftTypesByCode = new Map<string, EconomyAircraftType>(
   (aircraftTypesData as Array<EconomyAircraftType & { code: string }>).map((type) => [type.code, type]),
 );
 
-// Deliberately crude, same spirit as sim/economy.ts: most flights are on
-// time, and when one isn't, it's usually short with an occasional long
-// one — a fixed distribution for this phase, not something tunable from
-// the UI.
-const ON_TIME_PROBABILITY = 0.65;
-const MAX_DELAY_MINUTES = 45;
+// A departing flight's total arrival delay is the sum of three causes,
+// each addressing a different question:
+//
+//   1. Age (rollAgeDelay) — this aircraft's own baseline mechanical/
+//      operational unreliability, worse the older the airframe. A
+//      brand-new (age 0) aircraft reproduces this model's old flat
+//      65%-on-time/45-minute-max numbers almost exactly, on purpose —
+//      age is a genuine widening of the old model, not a silent re-tune
+//      of the game's whole balance in the same pass.
+//   2. Weather (rollWeatherDelay) — an airport with active weather
+//      (sim/weather.ts) rolls against far worse odds. Unchanged in
+//      spirit from before this rework.
+//   3. Knock-on (knockOnDelayMinutes) — *not* a fresh random event: a
+//      deterministic fraction of however late this flight is already
+//      departing, because an earlier leg on this same tail ate into its
+//      turn buffer. Real airline delays compound through a rotation
+//      rather than just shifting a flight's day later by a fixed
+//      amount — a rushed turnaround loses its gate slot, its ATC slot,
+//      its crew's slack — and this is the crude version of that.
+//
+// Deliberately additive and independent rather than one combined
+// distribution, so a fourth cause (maintenance events, crew, ATC) can
+// join this same list later without reshaping the first three.
+const AGE_ON_TIME_PROBABILITY_BASE = 0.65;
+const AGE_ON_TIME_PROBABILITY_PER_YEAR = 0.01;
+const AGE_ON_TIME_PROBABILITY_FLOOR = 0.35;
+const AGE_MAX_DELAY_MINUTES_BASE = 45;
+const AGE_MAX_DELAY_MINUTES_PER_YEAR = 2;
+const KNOCK_ON_FACTOR = 0.25;
 
 /**
- * Roll how many minutes late a departing flight's arrival will be. Returns
- * [delayMinutes, nextSeed] — the same shape nextRandom() itself returns, so
- * the caller just does `state.rngSeed = nextSeed`.
+ * One bernoulli-then-severity delay roll, shared by the age and weather
+ * causes below. Returns [delayMinutes, nextSeed] — the same shape
+ * nextRandom() itself returns, so the caller just does
+ * `state.rngSeed = nextSeed`.
  *
- * One random draw decides whether the flight is delayed at all. A second
- * draw, taken only when it is, decides how badly: squaring that roll
- * (severityRoll * severityRoll) skews the result toward the low end of
- * [1, MAX_DELAY_MINUTES] — most delays are minor, with an occasional long
- * tail, rather than every delay length being equally likely.
+ * One random draw decides whether this cause produces any delay at all.
+ * A second draw, taken only when it does, decides how badly: squaring
+ * that roll (severityRoll * severityRoll) skews the result toward the
+ * low end of [1, maxDelayMinutes] — most delays are minor, with an
+ * occasional long tail, rather than every delay length being equally
+ * likely.
  */
-function rollDelayMinutes(
+function rollCauseDelay(
   seed: number,
   onTimeProbability: number,
   maxDelayMinutes: number,
@@ -40,6 +65,59 @@ function rollDelayMinutes(
   const [severityRoll, seedAfterSecond] = nextRandom(seedAfterFirst);
   const delayMinutes = Math.round(1 + severityRoll * severityRoll * (maxDelayMinutes - 1));
   return [delayMinutes, seedAfterSecond];
+}
+
+/**
+ * Cause 1: age. Reliability degrades linearly with age from the model's
+ * original 65%-on-time/45-minute-max baseline (age 0 reproduces it
+ * almost exactly), floored so a genuinely ancient airframe still isn't a
+ * coin flip on every single departure.
+ */
+function rollAgeDelay(seed: number, ageYears: number): [delayMinutes: number, nextSeed: number] {
+  const onTimeProbability = Math.max(
+    AGE_ON_TIME_PROBABILITY_FLOOR,
+    AGE_ON_TIME_PROBABILITY_BASE - AGE_ON_TIME_PROBABILITY_PER_YEAR * ageYears,
+  );
+  const maxDelayMinutes = AGE_MAX_DELAY_MINUTES_BASE + AGE_MAX_DELAY_MINUTES_PER_YEAR * ageYears;
+  return rollCauseDelay(seed, onTimeProbability, maxDelayMinutes);
+}
+
+/** Cause 2: weather. Clear skies at the origin contribute nothing. */
+function rollWeatherDelay(seed: number, hasWeatherAtOrigin: boolean): [delayMinutes: number, nextSeed: number] {
+  if (!hasWeatherAtOrigin) return [0, seed];
+  return rollCauseDelay(seed, WEATHER_ON_TIME_PROBABILITY, WEATHER_MAX_DELAY_MINUTES);
+}
+
+/**
+ * Cause 3: knock-on. `lateAtDepartureMinutes` is how far past its
+ * scheduled slot this flight is *actually* departing — zero for a flight
+ * that got away on time, whatever the reason; positive only when an
+ * earlier leg on this same tail was still occupying it past that slot.
+ * No random draw: this cause is entirely a function of state already
+ * determined by the time this flight departs, not a fresh event of its
+ * own.
+ */
+function knockOnDelayMinutes(lateAtDepartureMinutes: number): number {
+  return Math.round(Math.max(0, lateAtDepartureMinutes) * KNOCK_ON_FACTOR);
+}
+
+/**
+ * Roll a departing flight's total arrival delay from all three causes
+ * above, threading `state.rngSeed` through the two that need it (age,
+ * then weather). Returns [delayMinutes, nextSeed] — the same shape
+ * nextRandom() itself returns, so the caller just does
+ * `state.rngSeed = nextSeed`.
+ */
+function rollTotalDelayMinutes(
+  seed: number,
+  ageYears: number,
+  hasWeatherAtOrigin: boolean,
+  lateAtDepartureMinutes: number,
+): [delayMinutes: number, nextSeed: number] {
+  const [ageDelay, seedAfterAge] = rollAgeDelay(seed, ageYears);
+  const [weatherDelay, seedAfterWeather] = rollWeatherDelay(seedAfterAge, hasWeatherAtOrigin);
+  const knockOnDelay = knockOnDelayMinutes(lateAtDepartureMinutes);
+  return [ageDelay + weatherDelay + knockOnDelay, seedAfterWeather];
 }
 
 /**
@@ -149,24 +227,27 @@ export function step(state: SimState): void {
     aircraft.atAirport = null;
     aircraft.activeLegId = leg.legId;
 
-    // On-time performance (HUD stat next to Cash): this leg was due at
+    // On-time performance (HUD stat next to Cash) and the knock-on delay
+    // cause below share the same number: this leg was due at
     // dayStart + leg.departMinute, and it can never depart *before* that
-    // (the `minuteOfDay < leg.departMinute` check above rules it out) —
-    // so "on time or early" collapses to "departed at exactly its due
-    // minute," and anything later means it sat waiting on a late aircraft.
+    // (the `minuteOfDay < leg.departMinute` check above rules it out), so
+    // how far past it this flight is actually departing is both "how
+    // late is this one" and "how much upstream pressure is still
+    // carrying forward" — a late aircraft sat waiting on an earlier leg,
+    // not a fresh event of its own.
+    const lateAtDepartureMinutes = state.simMinute - (dayStart + leg.departMinute);
     state.flightsDepartedTotal += 1;
-    if (state.simMinute === dayStart + leg.departMinute) {
+    if (lateAtDepartureMinutes === 0) {
       state.flightsOnTimeTotal += 1;
     }
 
-    // Bare-bones weather effect (sim/weather.ts): a leg departing an
-    // airport with active weather rolls against worse odds — reusing
-    // M9's existing delay mechanism rather than a new aircraft state
-    // (no grounding, no diversions, no cancellations yet).
-    const weatherAtOrigin = state.weatherByAirport[leg.origin];
-    const onTimeProbability = weatherAtOrigin ? WEATHER_ON_TIME_PROBABILITY : ON_TIME_PROBABILITY;
-    const maxDelayMinutes = weatherAtOrigin ? WEATHER_MAX_DELAY_MINUTES : MAX_DELAY_MINUTES;
-    const [delayMinutes, nextSeed] = rollDelayMinutes(state.rngSeed, onTimeProbability, maxDelayMinutes);
+    const weatherAtOrigin = !!state.weatherByAirport[leg.origin];
+    const [delayMinutes, nextSeed] = rollTotalDelayMinutes(
+      state.rngSeed,
+      aircraft.ageYears,
+      weatherAtOrigin,
+      lateAtDepartureMinutes,
+    );
     state.rngSeed = nextSeed;
 
     // Fare and marketing spend are market-level (RouteSettings), not
@@ -194,11 +275,13 @@ export function step(state: SimState): void {
 
   // Positioning legs (week three, see PositioningLeg's own comment in
   // sim/schedule.ts) depart the same way scheduled legs do above — same
-  // ground/turn-time gate, same weather/delay roll — except `departMinute`
-  // here is an absolute simMinute, not a minute-of-day, since a positioning
-  // move never repeats. Removed from the queue the instant it departs
-  // rather than tracked in `completedToday`: once it's airborne it's fully
-  // represented by its ActiveFlight, and it can never come due again.
+  // ground/turn-time gate, same three-cause delay roll — except
+  // `departMinute` here is an absolute simMinute, not a minute-of-day,
+  // since a positioning move never repeats: "late at departure" is just
+  // `simMinute - leg.departMinute` directly, no day-start offset needed.
+  // Removed from the queue the instant it departs rather than tracked in
+  // `completedToday`: once it's airborne it's fully represented by its
+  // ActiveFlight, and it can never come due again.
   for (let i = state.positioningLegs.length - 1; i >= 0; i--) {
     const leg = state.positioningLegs[i];
     if (state.simMinute < leg.departMinute) continue;
@@ -212,10 +295,14 @@ export function step(state: SimState): void {
     aircraft.atAirport = null;
     aircraft.activeLegId = leg.legId;
 
-    const weatherAtOrigin = state.weatherByAirport[leg.origin];
-    const onTimeProbability = weatherAtOrigin ? WEATHER_ON_TIME_PROBABILITY : ON_TIME_PROBABILITY;
-    const maxDelayMinutes = weatherAtOrigin ? WEATHER_MAX_DELAY_MINUTES : MAX_DELAY_MINUTES;
-    const [delayMinutes, nextSeed] = rollDelayMinutes(state.rngSeed, onTimeProbability, maxDelayMinutes);
+    const weatherAtOrigin = !!state.weatherByAirport[leg.origin];
+    const lateAtDepartureMinutes = state.simMinute - leg.departMinute;
+    const [delayMinutes, nextSeed] = rollTotalDelayMinutes(
+      state.rngSeed,
+      aircraft.ageYears,
+      weatherAtOrigin,
+      lateAtDepartureMinutes,
+    );
     state.rngSeed = nextSeed;
 
     const activeFlight: ActiveFlight = {

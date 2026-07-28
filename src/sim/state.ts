@@ -35,6 +35,17 @@ export type Aircraft = {
    * shape `RouteSettings.marketingSpend` already has.
    */
   leaseCostPerDay: number;
+  /**
+   * Copied from `FleetListing.ageYears` at acquisition (ui/fleetMarket.ts)
+   * and never updated after — a deliberate simplification, not an
+   * oversight: an aircraft doesn't get older as sim days pass, it's just
+   * "however old it was when it joined the fleet," for now. Feeds one of
+   * step.ts's three delay causes (age, weather, knock-on) — an older
+   * airframe rolls worse on-time odds and a longer worst case when it
+   * isn't, on top of whatever weather or cascading lateness it's also
+   * carrying.
+   */
+  ageYears: number;
 };
 
 export type ActiveFlight = {
@@ -220,6 +231,10 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
       groundSinceMinute: 0,
       ownership: 'owned',
       leaseCostPerDay: 0,
+      // A brand-new airframe for the headless runner's fixed fleet — age
+      // 0 is also the delay model's baseline, so this reproduces its
+      // pre-age-mechanic numbers rather than silently shifting them.
+      ageYears: 0,
     };
   });
 

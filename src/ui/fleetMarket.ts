@@ -47,6 +47,7 @@ function acquireAircraft(listing: FleetListing, ownership: 'owned' | 'leased', s
     groundSinceMinute: state.simMinute,
     ownership,
     leaseCostPerDay: ownership === 'leased' ? listing.leasePricePerDay : 0,
+    ageYears: listing.ageYears,
   };
   state.aircraft.push(aircraft);
 

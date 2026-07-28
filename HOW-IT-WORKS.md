@@ -163,20 +163,68 @@ instead means a late aircraft departs the moment it's actually ready — the
 whole mechanism that lets one delay push a later one back rather than the
 schedule quietly giving up on that leg.
 
-**Delay rolling** (`step.ts`'s `rollDelayMinutes()`): a fixed, non-tunable
-distribution — 65% of flights are exactly on time; the rest get a delay of
-1–45 minutes, skewed toward the short end (rolled as `severity²` so small
-delays are far more common than the maximum). Two draws from `sim/rng.ts`'s
-`nextRandom()` per roll (one for "delayed at all," one for "how much" when
-it is), threading `state.rngSeed` forward each time — same reasoning as
-always: a delay has to be reproducible from `state` alone.
+**Delay rolling** (`step.ts`'s `rollTotalDelayMinutes()`, reworked at the
+player's explicit request to stop being one flat random roll): a
+departing flight's total arrival delay is the *sum* of three named
+causes, not one distribution —
 
-One concrete traced example (seed 3, single aircraft): a leg rolled a
-27-minute arrival delay, landing at minute 6401 against a scheduled 6374.
-Its next leg was due to depart at 6420, but `6401 + 30 (MIN_TURN_MINUTES) =
-6431` came out later than that — so it departed at 6431, 11 minutes late,
-gated by the turnaround rule rather than the original schedule. That's the
-cascade mechanic, confirmed by hand arithmetic against the actual output.
+- **Age** (`rollAgeDelay()`) — every aircraft's own baseline mechanical/
+  operational unreliability, worse the older it is. `Aircraft.ageYears`
+  (new: copied from `FleetListing.ageYears` at acquisition,
+  `ui/fleetMarket.ts` — that field already existed for Fleet Market
+  pricing flavor, now doing double duty) drives an on-time probability
+  that degrades linearly from 65% at age 0 down to a 35% floor, and a
+  worst-case severity that grows from 45 minutes upward with age. Age 0
+  reproduces this model's *original* 65%/45 numbers almost exactly — a
+  deliberate choice, so age is a genuine widening of the old model
+  rather than a silent re-tune of the game's whole balance in the same
+  pass. Checked with a throwaway 200k-sample script (`nextRandom()`,
+  same disposable-script pattern the demand-model retune used, deleted
+  after, never committed): age 0 → 65.1% on-time; age 24 (the oldest
+  Fleet Market listing, an A330-300) → 41.0% on-time, 18.7 min average
+  delay, 93 min worst case.
+- **Weather** (`rollWeatherDelay()`) — unchanged in mechanism from
+  before this rework, just pulled out into its own named function: an
+  airport with active weather (`sim/weather.ts`) rolls against far
+  worse odds; clear skies contribute nothing.
+- **Knock-on** (`knockOnDelayMinutes()`) — *not* a fresh random draw.
+  25% of however many minutes a flight is *already* departing late
+  (because an earlier leg on the same tail ate into its turn buffer)
+  carries forward as *additional* arrival delay, rather than a late
+  departure simply landing exactly on schedule for how late it left.
+  Zero for a flight that got away on time. The randomness already
+  happened when the upstream delay was rolled; this cause only
+  propagates a fraction of it forward, which is what actually produces
+  a cascade that compounds through a rotation instead of one that just
+  shifts uniformly later.
+
+Age and weather each still take two draws from `sim/rng.ts`'s
+`nextRandom()` (one for "delayed at all," one for "how much" when it
+is), threading `state.rngSeed` forward each time — same reasoning as
+always: a delay has to be reproducible from `state` alone. Knock-on
+needs no draw of its own; it's a pure function of state already
+determined by the moment a flight departs.
+
+One concrete traced example (seed 3, single age-0 aircraft, predating
+this rework but still exact — age 0's on-time/severity numbers are
+unchanged, and this was the day's first delay for that tail, so weather
+and knock-on both contributed zero): a leg rolled a 27-minute arrival
+delay, landing at minute 6401 against a scheduled 6374. Its next leg
+was due to depart at 6420, but `6401 + 30 (MIN_TURN_MINUTES) = 6431`
+came out later than that — so it departed at 6431, 11 minutes late,
+gated by the turnaround rule rather than the original schedule. That's
+the cascade mechanic, confirmed by hand arithmetic against the actual
+output — and, per the note above, also exactly the quantity
+`knockOnDelayMinutes()` now reads to push that *next* leg's own arrival
+delay a bit further still.
+
+Verified in-browser after the rework: bought the oldest available
+1900D (C-FQAE, 21 years) and flew it alone on a short shuttle for 20
+simulated days at 20x speed — On-time (the HUD stat, departure-side)
+settled at 72%, and the Fleet panel's live status caught one specific
+flight 77 minutes late in the air, consistent with a 21-year-old
+airframe's expected age-driven severity range. Zero console errors
+across the run.
 
 A full-year run (3 aircraft, several seeds) never produced a "stranded"
 aircraft — a tail sitting at the wrong airport for its next scheduled
@@ -1160,11 +1208,13 @@ different seed → diverges.
 
 Week two's "random events" layer — seasonal thunderstorms and
 snowstorms, bare-bones by design: no ground stops, no diversions, no
-cancellations. Weather at an airport just makes M9's `rollDelayMinutes()`
-(see "The tick," above) roll against worse odds for a leg departing from
-there (`ON_TIME_PROBABILITY` 0.65→0.2, `MAX_DELAY_MINUTES` 45→90) — the
-same delay mechanism a flight already uses, just fed harsher parameters,
-rather than a new aircraft state.
+cancellations. Weather at an airport is one of the three causes
+`rollTotalDelayMinutes()` sums (see "The tick," above, for the other
+two — age and knock-on): a leg departing from there rolls against
+much worse odds (`WEATHER_ON_TIME_PROBABILITY` 0.2, `WEATHER_MAX_DELAY_MINUTES`
+90, vs. a fresh age-0 aircraft's baseline 65%/45) via the exact same
+bernoulli-then-severity shape the age cause uses, just with harsher
+parameters — no new aircraft state needed.
 
 `state.weatherByAirport: Record<iata, WeatherEvent>` (a plain object,
 JSON-safe) holds at most one active event per airport. `rollDailyWeather()`
