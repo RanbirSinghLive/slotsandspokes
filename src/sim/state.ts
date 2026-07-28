@@ -1,6 +1,7 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { loadSchedule, marketKey, recommendedFare, type PositioningLeg, type ScheduleLeg } from './schedule';
 import { loadFleetMarket, type FleetListing } from './fleetMarket';
+import { loadCompetitorRoutes, type CompetitorOffering } from './competitors';
 import type { WeatherEvent } from './weather';
 
 export type AircraftStatus = 'ground' | 'airborne';
@@ -147,6 +148,20 @@ export type SimState = {
    */
   fleetMarket: FleetListing[];
   /**
+   * Week four's competitor AI (sim/competitors.ts): every competitor
+   * route currently in service, seeded from `data/competitors.json` and
+   * grown over time by `rollCompetitorRouteOpenings()` (called once per
+   * simulated day from step.ts's day-rollover, alongside the weather
+   * roll). Unlike `fleetMarket` above, this array only ever grows —
+   * competitors don't retire routes in this pass. Read by
+   * `sim/choiceModel.ts` (via `bookingShare()`/`trafficShare()`) for
+   * live competitive pressure, and by `render/competition.ts` for the
+   * map layer and the "a competitor just opened a route" flash
+   * (`CompetitorOffering.openedAtMinute` is what that flash compares
+   * against `state.simMinute`).
+   */
+  competitorRoutes: CompetitorOffering[];
+  /**
    * Active weather by airport IATA code — a plain object, not a Map, same
    * JSON-round-trip reasoning as `routeSettings`. Absent key means clear
    * skies; see sim/weather.ts's `rollDailyWeather()` for how entries
@@ -280,6 +295,11 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     routeSettings,
     positioningLegs: [],
     fleetMarket: [], // no Fleet Market needed for a headless balance run
+    // Same competitive landscape the real game starts with, growing the
+    // same way over time (step()'s day-rollover doesn't know or care
+    // that this is the headless runner) — the balance-tuning tool should
+    // face the same competitive pressure a real playthrough does.
+    competitorRoutes: loadCompetitorRoutes(),
     weatherByAirport: {},
     completedToday: [],
     todayRevenue: 0,
@@ -325,6 +345,7 @@ export function createNewGameState(rngSeed: number = Date.now()): SimState {
     routeSettings: {},
     positioningLegs: [],
     fleetMarket: loadFleetMarket(),
+    competitorRoutes: loadCompetitorRoutes(),
     weatherByAirport: {},
     completedToday: [],
     todayRevenue: 0,

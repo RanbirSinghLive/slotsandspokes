@@ -3,6 +3,7 @@ import { flightResult, legCost, type EconomyAircraftType } from './economy';
 import { MIN_TURN_MINUTES, legsServingMarket, marketKey } from './schedule';
 import { nextRandom } from './rng';
 import { rollDailyWeather, WEATHER_ON_TIME_PROBABILITY, WEATHER_MAX_DELAY_MINUTES } from './weather';
+import { rollCompetitorRouteOpenings } from './competitors';
 import type { SimState, ActiveFlight } from './state';
 
 const MINUTES_PER_DAY = 1440;
@@ -218,6 +219,12 @@ export function step(state: SimState): void {
     // one — origination, spread, and expiry all happen once here rather
     // than being checked on every tick.
     rollDailyWeather(state, state.simMinute);
+
+    // Week four's competitor AI (sim/competitors.ts): once a day, each
+    // competitor airline has a small independent chance to open one new
+    // route. Same daily cadence as weather, for the same reason — this
+    // is a day-scale event, not something worth re-checking every minute.
+    rollCompetitorRouteOpenings(state, state.simMinute);
   }
 
   for (const leg of state.schedule) {
@@ -375,10 +382,13 @@ export function step(state: SimState): void {
           state.todayMargin -= cost;
         } else {
           const marketFrequency = legsServingMarket(flight.origin, flight.dest, state.schedule);
-          const result = flightResult({ origin: flight.origin, dest: flight.dest, blockMinutes }, type, marketFrequency, {
-            fare: flight.fare,
-            marketingSpend: flight.marketingSpend,
-          });
+          const result = flightResult(
+            { origin: flight.origin, dest: flight.dest, blockMinutes },
+            type,
+            marketFrequency,
+            { fare: flight.fare, marketingSpend: flight.marketingSpend },
+            state.competitorRoutes,
+          );
           state.cash += result.margin;
           state.todayRevenue += result.revenue;
           state.todayCost += result.cost;

@@ -648,3 +648,88 @@ schedule should produce, the cascade mechanic visibly overwhelming the
 other two causes rather than a flat, decorative number. Confirmed the
 new fields round-trip through a save/reload correctly. Zero console
 errors.
+
+## A calendar, a competitor AI, and a map that announces it
+
+Three things, requested together: real calendar dates instead of "Day
+N"; competitors that actually open new routes while the game is
+running instead of a fixed roster that never changes; and a visible
+flash on the map the moment one of them does.
+
+**Calendar dates** — simMinute 0 is now fixed at January 1, 2027;
+`main.ts`'s `updateClock()` walks the UTC calendar forward from there
+instead of counting "Day N." `Date` only ever appears in this one
+display function, never in `sim/` — the same "local time exists only
+for display" boundary CLAUDE.md already draws around each airport's UTC
+offset, just for the calendar instead of the clock.
+
+**The competitor AI was the real work.** Competitor service
+(`data/competitors.json`) had been static since week two — fixed
+routes, fixed fares, loaded once and never touched again; `SimState`
+had no competitor field at all, and `sim/choiceModel.ts`'s
+`bookingShare()`/`trafficShare()` read the frozen JSON import directly.
+Making competitors dynamic meant threading a live competitor list
+through the whole chain that used to assume a static one:
+
+- New `sim/competitors.ts` owns the type (`CompetitorOffering`, now
+  with an `openedAtMinute` field) and `loadCompetitorRoutes()` (a
+  per-game mutable copy, same shape as `loadSchedule()`/
+  `loadFleetMarket()`), plus the AI itself,
+  `rollCompetitorRouteOpenings()` — called once a day from step.ts's
+  day-rollover, alongside the weather roll. Each of the three
+  competitor airlines gets an independent 3%-per-day chance to open one
+  new route on a market it doesn't already serve, picked by a weighted
+  random draw favoring higher-demand pairs (`dailyDemand()`) without
+  being deterministic about always taking the single biggest one. A new
+  route starts small (frequency 1) at this map's own
+  `recommendedFare()` — the same default a player's own new route gets.
+  The airline roster itself never grows: only the three carriers
+  already in `data/competitors.json` can expand, nothing invents a
+  fourth.
+- `sim/choiceModel.ts`'s `bookingShare()`/`trafficShare()` gained a
+  `competitorRoutes` parameter instead of reading a fixed import, and
+  `sim/economy.ts`'s `flightResult()` gained one too, threaded down
+  from every caller (`step.ts`, `ui/commercial.ts`) — this is what
+  actually makes a newly-opened competitor route apply real
+  competitive pressure to the player's own bookings and market share,
+  not just a cosmetic line on the map.
+- `render/competition.ts` used to build its competitor-routes-by-
+  airline map once at import time, from the static data — the exact
+  bug `ownRoutesFrom()`'s own doc comment already flagged and fixed for
+  the player's *own* routes back in week two ("built once from a
+  snapshot, never reflects reality again"). Same fix, same file, now
+  applied to the other side of the map too: recomputed fresh from
+  `state.competitorRoutes` on every call.
+- New required `SimState` field meant another `ui/save.ts` version bump
+  (v5 → v6).
+
+**The map flash** answers "how do I even notice this happened":
+`CompetitorOffering.openedAtMinute` is a pure `state` fact, but *when*
+to flash it is inherently a real-time perception question, not a
+sim-time one — a fixed sim-minute window would be instant at 20x speed
+and sluggish at 1x. `render/competition.ts`'s new
+`drawNewCompetitorRouteFlashes()` tracks "have I already shown this
+one" using wall-clock `performance.now()` timestamps kept in the render
+layer itself (never written to `state` — the same category of
+transient, UI-owned bookkeeping as `ui/rotationBoard.ts`'s drag state or
+`main.ts`'s `latestFractionalMinute`), diffing `state.competitorRoutes`
+against what it's already seen. A newly-discovered route gets a
+pulsing, fading amber arc plus a small "Airline opens X–Y" label for
+about 4 real seconds, drawn unconditionally on the map panel — not
+gated behind the Competition or Demand overlay toggles, since a rival
+opening a route is worth noticing even if you weren't specifically
+looking at the competitive layer.
+
+Verified with a throwaway 120-simulated-day script (`nextRandom()`,
+deleted after, not committed — same disposable-script pattern this
+session's other model checks used): competitor routes grew from the
+seed 4 to 9 over 120 days, each new entry correctly weighted toward
+bigger markets (mostly golden-triangle pairs), each stamped with a real
+`openedAtMinute`, no duplicate markets per airline. Verified live in
+the browser (temporarily boosting the daily probability for the test,
+reverted after): "Jan 1, 2027" shows correctly in the HUD; two
+competitor routes opened within seconds and both flashed a pulsing
+amber arc with a fading label, correctly disappearing after ~4 seconds;
+the Competition overlay immediately reflected the new routes without a
+page reload; the airline filter dropdown still listed exactly the
+original three carriers, no invented fourth. Zero console errors.

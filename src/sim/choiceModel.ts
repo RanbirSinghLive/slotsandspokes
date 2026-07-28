@@ -1,4 +1,4 @@
-import competitorsData from '../../data/competitors.json';
+import type { CompetitorOffering } from './competitors';
 
 // The "connective piece" from WEEK-TWO.md's Layers — the standard technique
 // for this is a multinomial logit: score every option a traveler could pick
@@ -11,33 +11,21 @@ import competitorsData from '../../data/competitors.json';
 // utility — which is also exactly what this looked like before competitor
 // data existed, so adding competitors changes nothing for a market that
 // doesn't have one.
+//
+// Week four (M14): competitor service used to be static, non-reactive
+// data (fixed schedules and fares, authored once, never adapting to
+// anything). `bookingShare()`/`trafficShare()` below now take a live
+// `competitorRoutes` list instead of reading a fixed import directly, so
+// they reflect `state.competitorRoutes` — which the competitor AI
+// (`sim/competitors.ts`) can grow over time — rather than only ever
+// seeing `data/competitors.json`'s original four seed routes.
 
-export type CompetitorOffering = {
-  airline: string;
-  /** Two-letter, all-caps shorthand — see sim/airline.ts's PLAYER_AIRLINE
-   * for the player's own equivalent. */
-  code: string;
-  origin: string;
-  dest: string;
-  dailyFrequency: number;
-  fare: number;
-};
-
-/**
- * Static, non-reactive competitor service (WEEK-TWO.md layer 3) — fixed
- * schedules and fares, authored once, never adapting to anything the
- * player does. Deliberately small: real competition only on the handful
- * of markets big enough that a second carrier would plausibly bother,
- * per WEEK-TWO.md's "Competition" note. Fictional airline names — not
- * real carriers, per CLAUDE.md's public-sources-only rule for anything
- * that could be mistaken for real-world data. Exported so
- * render/competition.ts can draw each competitor's own network without
- * duplicating this data or its shape.
- */
-export const competitors = competitorsData as CompetitorOffering[];
-
-function competitorsServingMarket(origin: string, dest: string): CompetitorOffering[] {
-  return competitors.filter(
+function competitorsServingMarket(
+  origin: string,
+  dest: string,
+  allCompetitorRoutes: CompetitorOffering[],
+): CompetitorOffering[] {
+  return allCompetitorRoutes.filter(
     (c) => (c.origin === origin && c.dest === dest) || (c.origin === dest && c.dest === origin),
   );
 }
@@ -193,8 +181,9 @@ export function bookingShare(
   originIata: string,
   destIata: string,
   marketingSpend: number,
+  competitorRoutes: CompetitorOffering[],
 ): number {
-  const marketCompetitors = competitorsServingMarket(originIata, destIata);
+  const marketCompetitors = competitorsServingMarket(originIata, destIata, competitorRoutes);
   return SEGMENTS.reduce(
     (total, segment) =>
       total +
@@ -219,8 +208,9 @@ export function trafficShare(
   originIata: string,
   destIata: string,
   marketingSpend: number,
+  competitorRoutes: CompetitorOffering[],
 ): number {
-  const marketCompetitors = competitorsServingMarket(originIata, destIata);
+  const marketCompetitors = competitorsServingMarket(originIata, destIata, competitorRoutes);
   return SEGMENTS.reduce(
     (total, segment) =>
       total +

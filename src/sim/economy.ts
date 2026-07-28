@@ -1,5 +1,6 @@
 import { dailyDemand } from './demand';
 import { bookingShare } from './choiceModel';
+import type { CompetitorOffering } from './competitors';
 import type { RouteSettings } from './state';
 
 export type EconomyLeg = {
@@ -68,11 +69,19 @@ export function flightResult(
   type: EconomyAircraftType,
   legsServingMarket: number,
   routeSettings: RouteSettings,
+  competitorRoutes: CompetitorOffering[],
 ): FlightResult {
   const demandPerFlight = dailyDemand(leg.origin, leg.dest) / legsServingMarket;
   const bookedDemand =
     demandPerFlight *
-    bookingShare(routeSettings.fare, legsServingMarket, leg.origin, leg.dest, routeSettings.marketingSpend);
+    bookingShare(
+      routeSettings.fare,
+      legsServingMarket,
+      leg.origin,
+      leg.dest,
+      routeSettings.marketingSpend,
+      competitorRoutes,
+    );
   const pax = Math.min(Math.round(type.seats * LOAD_FACTOR), Math.round(bookedDemand));
   const revenue = pax * routeSettings.fare;
   const cost = legCost(leg.blockMinutes, type);

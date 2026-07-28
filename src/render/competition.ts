@@ -2,7 +2,6 @@ import { geoPath, geoInterpolate } from 'd3-geo';
 import type { LineString } from 'geojson';
 import { projection } from './projection';
 import { airports, type Airport } from './airports';
-import { competitors } from '../sim/choiceModel';
 import { PLAYER_AIRLINE } from '../sim/airline';
 import type { SimState } from '../sim/state';
 
@@ -69,26 +68,46 @@ function ownRoutesFrom(state: SimState): Map<string, { origin: string; dest: str
   return routes;
 }
 
-const competitorRoutesByAirline = new Map<string, Map<string, { origin: string; dest: string }>>();
-for (const c of competitors) {
-  const key = marketKey(c.origin, c.dest);
-  const forAirline = competitorRoutesByAirline.get(c.airline) ?? new Map();
-  if (!forAirline.has(key)) forAirline.set(key, { origin: c.origin, dest: c.dest });
-  competitorRoutesByAirline.set(c.airline, forAirline);
+// Week four (M14): competitor routes used to never change at runtime, so
+// these were built once at import time from the static data. The
+// competitor AI (sim/competitors.ts) can now grow state.competitorRoutes
+// mid-game, so these are recomputed fresh from `state` on every call
+// instead — the same fix ownRoutesFrom() above already got (see its own
+// comment) for the exact same reason: anything built once from a
+// snapshot silently stops reflecting reality the moment that snapshot
+// changes.
+function competitorRoutesByAirlineFrom(state: SimState): Map<string, Map<string, { origin: string; dest: string }>> {
+  const byAirline = new Map<string, Map<string, { origin: string; dest: string }>>();
+  for (const c of state.competitorRoutes) {
+    const key = marketKey(c.origin, c.dest);
+    const forAirline = byAirline.get(c.airline) ?? new Map();
+    if (!forAirline.has(key)) forAirline.set(key, { origin: c.origin, dest: c.dest });
+    byAirline.set(c.airline, forAirline);
+  }
+  return byAirline;
 }
 
-const allCompetitorMarketKeys = new Set<string>();
-for (const forAirline of competitorRoutesByAirline.values()) {
-  for (const key of forAirline.keys()) allCompetitorMarketKeys.add(key);
+function allCompetitorMarketKeysFrom(byAirline: Map<string, Map<string, { origin: string; dest: string }>>): Set<string> {
+  const keys = new Set<string>();
+  for (const forAirline of byAirline.values()) {
+    for (const key of forAirline.keys()) keys.add(key);
+  }
+  return keys;
 }
 
 /**
- * Every airline with at least one competitor entry, sorted — exported so
+ * Every airline with at least one competitor route, sorted — exported so
  * main.ts can populate the per-airline selector without duplicating
- * data/competitors.json's shape or re-deriving this list itself.
+ * data/competitors.json's shape or re-deriving this list itself. The
+ * roster itself (which airline *names* exist) never grows after game
+ * start — the competitor AI only adds routes for the three airlines
+ * already in `data/competitors.json`, never invents a new one — so
+ * calling this once at startup, as main.ts already does, stays valid
+ * for the whole game even though the routes each airline serves keep
+ * changing underneath it.
  */
-export function competitorAirlines(): string[] {
-  return [...competitorRoutesByAirline.keys()].sort();
+export function competitorAirlines(state: SimState): string[] {
+  return [...competitorRoutesByAirlineFrom(state).keys()].sort();
 }
 
 /**
@@ -96,13 +115,17 @@ export function competitorAirlines(): string[] {
  * aggregate ("any competitor") view, a specific airline name otherwise.
  * Shared by drawCompetitionLayer() and findCompetitionHover() so hit-
  * testing can never test against a market that isn't actually on screen.
- * Takes `ownRoutes` (from ownRoutesFrom(state)) as a parameter rather than
- * recomputing it itself, since callers that also need strokeFor() would
- * otherwise be computing the same thing twice per call.
+ * Takes `ownRoutes` (from ownRoutesFrom(state)) and the freshly-computed
+ * `competitorRoutesByAirline`/`allCompetitorMarketKeys` as parameters
+ * rather than recomputing any of them itself, since callers that also
+ * need strokeFor() would otherwise be computing the same thing twice per
+ * call.
  */
 function visibleMarkets(
   ownRoutes: Map<string, { origin: string; dest: string }>,
   selectedAirline: string | null,
+  competitorRoutesByAirline: Map<string, Map<string, { origin: string; dest: string }>>,
+  allCompetitorMarketKeys: Set<string>,
 ): Map<string, { origin: string; dest: string }> {
   let competitorRoutes: Map<string, { origin: string; dest: string }>;
   let competitorMarketKeys: Set<string>;
@@ -131,6 +154,8 @@ function strokeFor(
   key: string,
   selectedAirline: string | null,
   ownRoutes: Map<string, { origin: string; dest: string }>,
+  competitorRoutesByAirline: Map<string, Map<string, { origin: string; dest: string }>>,
+  allCompetitorMarketKeys: Set<string>,
 ): string {
   const competitorMarketKeys =
     selectedAirline === null ? allCompetitorMarketKeys : new Set(competitorRoutesByAirline.get(selectedAirline)?.keys() ?? []);
@@ -194,9 +219,11 @@ function drawLine(
 export function drawCompetitionLayer(ctx: CanvasRenderingContext2D, selectedAirline: string | null, state: SimState): void {
   const path = geoPath(projection, ctx);
   const ownRoutes = ownRoutesFrom(state);
+  const competitorRoutesByAirline = competitorRoutesByAirlineFrom(state);
+  const allCompetitorMarketKeys = allCompetitorMarketKeysFrom(competitorRoutesByAirline);
 
-  for (const [key, { origin, dest }] of visibleMarkets(ownRoutes, selectedAirline)) {
-    drawLine(ctx, path, origin, dest, strokeFor(key, selectedAirline, ownRoutes));
+  for (const [key, { origin, dest }] of visibleMarkets(ownRoutes, selectedAirline, competitorRoutesByAirline, allCompetitorMarketKeys)) {
+    drawLine(ctx, path, origin, dest, strokeFor(key, selectedAirline, ownRoutes, competitorRoutesByAirline, allCompetitorMarketKeys));
   }
 }
 
@@ -219,7 +246,7 @@ export function operatorsForMarket(origin: string, dest: string, state: SimState
   }
 
   const competitorFrequencyByCode = new Map<string, { name: string; frequency: number }>();
-  for (const c of competitors) {
+  for (const c of state.competitorRoutes) {
     if (marketKey(c.origin, c.dest) !== key) continue;
     const existing = competitorFrequencyByCode.get(c.code);
     if (existing) existing.frequency += c.dailyFrequency;
@@ -249,7 +276,7 @@ export function operatorsForAirport(iata: string, state: SimState): Operator[] {
   for (const leg of state.schedule) {
     if (leg.origin === iata || leg.dest === iata) add(PLAYER_AIRLINE.code, PLAYER_AIRLINE.name, 1);
   }
-  for (const c of competitors) {
+  for (const c of state.competitorRoutes) {
     if (c.origin === iata || c.dest === iata) add(c.code, c.airline, c.dailyFrequency);
   }
 
@@ -336,7 +363,16 @@ export function findCompetitionHover(
   if (nearestIata) return { type: 'airport', iata: nearestIata };
 
   const ownRoutes = ownRoutesFrom(state);
-  const marketsToTest = includeCompetitors ? visibleMarkets(ownRoutes, selectedAirline) : ownRoutes;
+  let marketsToTest = ownRoutes;
+  if (includeCompetitors) {
+    const competitorRoutesByAirline = competitorRoutesByAirlineFrom(state);
+    marketsToTest = visibleMarkets(
+      ownRoutes,
+      selectedAirline,
+      competitorRoutesByAirline,
+      allCompetitorMarketKeysFrom(competitorRoutesByAirline),
+    );
+  }
 
   let nearestMarket: { origin: string; dest: string } | null = null;
   let nearestMarketDist = MARKET_HIT_RADIUS_PX;
@@ -353,4 +389,123 @@ export function findCompetitionHover(
   if (nearestMarket) return { type: 'market', origin: nearestMarket.origin, dest: nearestMarket.dest };
 
   return null;
+}
+
+// --- "A competitor just opened a route" flash (week four, M14) ---
+//
+// The competitor AI (sim/competitors.ts) stamps every route it opens with
+// `openedAtMinute`, but *when* that flash should actually play on screen
+// is a real-time question, not a sim-time one: at 20x speed a fixed
+// sim-minute window would flicker past in milliseconds, and at 1x it
+// would linger far longer than intended. So this tracks "have I already
+// drawn this route's opening" using wall-clock `performance.now()`
+// timestamps kept here in the render layer, not in `state` — the same
+// category of transient, UI-owned bookkeeping as ui/rotationBoard.ts's
+// drag state or main.ts's `latestFractionalMinute`, never written back.
+
+const FLASH_DURATION_MS = 4000;
+const NEW_ROUTE_FLASH_STROKE = '#ffd166'; // same amber "new/highlighted" language as BOTH_STROKE above
+
+type ActiveFlash = { origin: string; dest: string; airline: string; startedAtMs: number };
+
+function competitorRouteIdentity(origin: string, dest: string, code: string): string {
+  return `${code}:${marketKey(origin, dest)}`;
+}
+
+// Seeded from whatever's already in state.competitorRoutes the first
+// time this runs (a fresh page load, or a resumed save with routes the
+// AI already opened in a previous session) so those don't all flash at
+// once the instant the map first renders — only routes that appear
+// *after* that first call are genuinely "new."
+let hasSeenInitialCompetitorRoutes = false;
+const seenCompetitorRouteKeys = new Set<string>();
+let activeFlashes: ActiveFlash[] = [];
+
+function noteNewCompetitorRoutes(state: SimState, nowMs: number): void {
+  if (!hasSeenInitialCompetitorRoutes) {
+    for (const c of state.competitorRoutes) {
+      seenCompetitorRouteKeys.add(competitorRouteIdentity(c.origin, c.dest, c.code));
+    }
+    hasSeenInitialCompetitorRoutes = true;
+    return;
+  }
+
+  for (const c of state.competitorRoutes) {
+    const id = competitorRouteIdentity(c.origin, c.dest, c.code);
+    if (seenCompetitorRouteKeys.has(id)) continue;
+    seenCompetitorRouteKeys.add(id);
+    activeFlashes.push({ origin: c.origin, dest: c.dest, airline: c.airline, startedAtMs: nowMs });
+  }
+
+  if (activeFlashes.length > 0) {
+    activeFlashes = activeFlashes.filter((flash) => nowMs - flash.startedAtMs < FLASH_DURATION_MS);
+  }
+}
+
+/**
+ * Draw every currently-active "new competitor route" flash: a pulsing,
+ * fading amber arc between the two airports, plus a small label naming
+ * the airline, so a route opening reads as *news* the moment it happens
+ * rather than a line that was simply always there. Always drawn on the
+ * map panel regardless of the Competition/Demand overlay toggles —
+ * "a rival just opened a route" is worth surfacing even if you weren't
+ * specifically looking at the competitive layer, the same "the map is
+ * not decoration" reasoning CLAUDE.md already applies to everything else
+ * drawn on it.
+ *
+ * `noteNewCompetitorRoutes()` (which does the actual diffing against
+ * `state.competitorRoutes`) only runs while this is being called, i.e.
+ * only while the map panel is actually visible — main.ts's render()
+ * simply doesn't call this at all otherwise. A route opened while the
+ * player was on a different panel is caught the moment they switch back,
+ * rather than being silently missed.
+ */
+export function drawNewCompetitorRouteFlashes(ctx: CanvasRenderingContext2D, state: SimState, nowMs: number): void {
+  noteNewCompetitorRoutes(state, nowMs);
+  if (activeFlashes.length === 0) return;
+
+  const path = geoPath(projection, ctx);
+
+  for (const flash of activeFlashes) {
+    const originAirport = airportsByIata.get(flash.origin);
+    const destAirport = airportsByIata.get(flash.dest);
+    if (!originAirport || !destAirport) continue;
+
+    const progress = (nowMs - flash.startedAtMs) / FLASH_DURATION_MS; // 0 (just opened) to 1 (about to expire)
+    const pulse = 0.5 + 0.5 * Math.sin(progress * Math.PI * 6); // a few pulses over the flash's lifetime
+    const fadeAlpha = 1 - progress;
+
+    const line: LineString = {
+      type: 'LineString',
+      coordinates: [
+        [originAirport.lon, originAirport.lat],
+        [destAirport.lon, destAirport.lat],
+      ],
+    };
+
+    ctx.save();
+    ctx.globalAlpha = fadeAlpha;
+    ctx.beginPath();
+    path(line);
+    ctx.strokeStyle = NEW_ROUTE_FLASH_STROKE;
+    ctx.lineWidth = 2 + pulse * 2.5;
+    ctx.stroke();
+    ctx.restore();
+
+    const interpolate = geoInterpolate([originAirport.lon, originAirport.lat], [destAirport.lon, destAirport.lat]);
+    const midpoint = projection(interpolate(0.5));
+    if (!midpoint) continue;
+
+    ctx.save();
+    ctx.globalAlpha = fadeAlpha;
+    ctx.font = '12px ui-monospace, Consolas, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(10, 12, 18, 0.85)';
+    const label = `${flash.airline} opens ${flash.origin}–${flash.dest}`;
+    const textWidth = ctx.measureText(label).width;
+    ctx.fillRect(midpoint[0] - textWidth / 2 - 6, midpoint[1] - 20, textWidth + 12, 16);
+    ctx.fillStyle = NEW_ROUTE_FLASH_STROKE;
+    ctx.fillText(label, midpoint[0], midpoint[1] - 8);
+    ctx.restore();
+  }
 }

@@ -7,7 +7,7 @@ import { drawAirports } from './render/airports';
 import { drawWeatherEffects } from './render/weather';
 import { drawAircraft } from './render/aircraft';
 import { drawDemandLayer } from './render/demand';
-import { drawCompetitionLayer, competitorAirlines, findCompetitionHover } from './render/competition';
+import { drawCompetitionLayer, competitorAirlines, findCompetitionHover, drawNewCompetitorRouteFlashes } from './render/competition';
 import { showCompetitionTooltip, hideCompetitionTooltip } from './ui/competitionTooltip';
 import { validateSchedule } from './sim/schedule';
 import { createNewGameState, type SimState } from './sim/state';
@@ -75,7 +75,7 @@ const competitionAirlineGroup = document.querySelector<HTMLDivElement>('#competi
 const competitionAirlineTrigger = document.querySelector<HTMLButtonElement>('#competition-airline-trigger')!;
 const competitionAirlineDropdown = document.querySelector<HTMLDivElement>('#competition-airline-dropdown')!;
 
-for (const airline of competitorAirlines()) {
+for (const airline of competitorAirlines(state)) {
   const button = document.createElement('button');
   button.type = 'button';
   button.dataset.airline = airline;
@@ -201,7 +201,7 @@ let panelView: PanelView = 'map';
 let demandOverlayOn = false;
 let competitionOverlayOn = false;
 
-function render(): void {
+function render(nowMs: number = performance.now()): void {
   updateClock(state);
   updatePanel(state);
 
@@ -234,20 +234,39 @@ function render(): void {
   drawAirports(ctx);
   drawWeatherEffects(ctx, state);
   drawRoutePreview(ctx, state);
+
+  // Always drawn, regardless of the Demand/Competition overlay toggles —
+  // "a rival just opened a route" is news worth surfacing on the plain
+  // map too, not something gated behind a specific layer being on.
+  drawNewCompetitorRouteFlashes(ctx, state, nowMs);
 }
 
 const MINUTES_PER_DAY = 1440;
+
+// simMinute 0 is fixed at January 1, 2027 — requested directly, replacing
+// the old "Day N" counter with a real calendar. `Date` only ever appears
+// here, in display code, never in sim/: this is exactly the same "local
+// time exists only for display" rule CLAUDE.md already applies to each
+// airport's UTC offset, just for calendar dates instead of clock time —
+// step() itself still knows nothing but simMinute.
+const SIMULATION_START_UTC_MS = Date.UTC(2027, 0, 1);
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function pad(n: number): string {
   return String(n).padStart(2, '0');
 }
 
+function formatCalendarDate(dayIndex: number): string {
+  const date = new Date(SIMULATION_START_UTC_MS + dayIndex * MINUTES_PER_DAY * 60_000);
+  return `${MONTH_NAMES[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
+}
+
 function updateClock(state: SimState): void {
-  const dayNumber = Math.floor(state.simMinute / MINUTES_PER_DAY) + 1;
+  const dayIndex = Math.floor(state.simMinute / MINUTES_PER_DAY);
   const minuteOfDay = state.simMinute % MINUTES_PER_DAY;
   const hours = Math.floor(minuteOfDay / 60);
   const minutes = minuteOfDay % 60;
-  clockEl.textContent = `Day ${dayNumber} · ${pad(hours)}:${pad(minutes)} UTC`;
+  clockEl.textContent = `${formatCalendarDate(dayIndex)} · ${pad(hours)}:${pad(minutes)} UTC`;
 }
 
 window.addEventListener('resize', resize);
@@ -307,7 +326,7 @@ function tick(nowMs: number): void {
   }
 
   latestFractionalMinute = state.simMinute + accumulator / MS_PER_SIM_MINUTE;
-  render();
+  render(nowMs);
   requestAnimationFrame(tick);
 }
 

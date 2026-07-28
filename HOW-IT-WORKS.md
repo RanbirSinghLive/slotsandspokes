@@ -20,9 +20,18 @@ are still brainstorm-stage, not built.
 
 Everything in `src/sim/` measures time as `simMinute`: an integer count of
 minutes since the start of day 0, UTC. There is no `Date` object anywhere in
-the simulation. `Math.floor(simMinute / 1440)` is the day number (0-based
-internally, displayed as 1-based); `simMinute % 1440` is the minute of that
-day, which is what the daily-repeating schedule is authored against.
+the simulation. `Math.floor(simMinute / 1440)` is the day index (0-based);
+`simMinute % 1440` is the minute of that day, which is what the daily-
+repeating schedule is authored against.
+
+The HUD showed this as "Day N" through week three. Week four fixed
+`simMinute` 0 at January 1, 2027 and displays a real calendar date
+instead (`main.ts`'s `updateClock()`/`formatCalendarDate()`) — the one
+and only place a `Date` object appears anywhere in this codebase,
+deliberately: it's display formatting, exactly the same "local time
+exists only for display" carve-out CLAUDE.md already grants each
+airport's UTC offset, not a change to what `step()` itself knows or
+needs (still nothing but a plain integer).
 
 The browser compresses time: 125ms of real time = 1 simulated minute at 1×
 speed (`MS_PER_SIM_MINUTE` in `main.ts`). The speed buttons (Pause/1×/4×/20×)
@@ -361,13 +370,17 @@ pull. Frequency's effect (from the previous milestone) is unchanged:
 adding a daily frequency to a market still measurably raises its booking
 share today, no pricing lever required to see it.
 
-**Static competitors** (`data/competitors.json`, week two's "Competition"
-layer) exist on four markets so far — three on the busy Ottawa-Montréal-
+**Competitors** (`data/competitors.json`, week two's "Competition"
+layer) started on four markets — three on the busy Ottawa-Montréal-
 Toronto triangle (one of which, YYZ-YOW, the player's fleet doesn't even
-fly yet) and one on the smaller Québec-Halifax route — fixed schedules
-and fares, authored once, never reacting to anything the player does
-(fictional airline names, not real carriers, per CLAUDE.md's public-
-sources-only rule). Verified via the headless runner: the two big,
+fly yet) and one on the smaller Québec-Halifax route (fictional airline
+names, not real carriers, per CLAUDE.md's public-sources-only rule).
+**Static through week three** — fixed schedules and fares, authored
+once, never reacting to anything the player did. Week four's competitor
+AI (see "Rendering," below, and `sim/competitors.ts`) changed that: the
+same three airlines now open new routes on their own over the course of
+a game, so this four-market snapshot is a starting point rather than
+the whole competitive picture forever. Verified via the headless runner: the two big,
 seat-capped Ontario/Quebec legs are unaffected (booking share drops to
 roughly half against Trillium Air, but there was so much spare demand
 there that 59 seats still fill regardless) — but Québec-Halifax, which
@@ -568,9 +581,14 @@ replacing it.
 
    The same three-way logic drives both the aggregate view and a single
    airline's — `selectedAirline === null` just swaps in the union of
-   every competitor's markets as "the competitor set." `sim/choiceModel.ts`'s
-   exported `competitors` data and `CompetitorOffering` type are reused
-   directly, no new data model.
+   every competitor's markets as "the competitor set." `CompetitorOffering`
+   now lives in `sim/competitors.ts` (week four — see below), and this
+   file's own `competitorRoutesByAirline`/`allCompetitorMarketKeys` are
+   recomputed fresh from `state.competitorRoutes` on every call rather
+   than built once at import time, for the same reason `ownRoutesFrom()`
+   just above already had to be: a snapshot built once silently stops
+   reflecting reality the moment the underlying data can change, and
+   since week four it can.
 5. `aircraft.ts` — one triangle per active flight. Position comes from
    `d3.geoInterpolate(origin, dest)(t)` at the *current fractional* simulated
    minute — not interpolated tick-to-tick, recomputed fresh every frame, so
@@ -654,6 +672,103 @@ the cursor, clamped to 0.5×–20× of the fitted scale.
 The accumulator loop (`main.ts`) turns real frame time into whole simulated
 minutes (`step()` calls) plus a continuous fractional minute for rendering,
 per the pattern in CLAUDE.md's "Time" section.
+
+## The competitor AI (`src/sim/competitors.ts`) — week four
+
+Competitor service was static from week two through week three — fixed
+routes and fares in `data/competitors.json`, loaded once, never
+touched again; `SimState` had no competitor field at all, and
+`sim/choiceModel.ts` read the frozen JSON import directly. Requested
+directly: make competitors actually open new routes while a game is
+running.
+
+**The data moved.** `CompetitorOffering` (the type) and
+`loadCompetitorRoutes()` (a fresh per-game copy, same shape as
+`sim/schedule.ts`'s `loadSchedule()`) now live in `sim/competitors.ts`,
+not `sim/choiceModel.ts`. Every seed route gets a new
+`openedAtMinute` field, stamped with a sentinel
+(`PRE_EXISTING_OPENED_AT_MINUTE`, a large finite negative number — not
+`-Infinity`, since `JSON.stringify(-Infinity)` produces `null` and
+would silently break `SimState`'s JSON-round-trip requirement) so the
+render layer's "just opened" flash (below) never mistakes an original
+route for news. `SimState.competitorRoutes` holds each game's own
+mutable copy — a new required field, another `ui/save.ts` version bump
+(v5 → v6).
+
+**The AI itself**, `rollCompetitorRouteOpenings(state, dayStartMinute)`,
+runs once a day from `step.ts`'s day-rollover, right alongside
+`rollDailyWeather()` — same cadence, same reasoning: this is a day-scale
+event, not worth re-checking every minute. The roster (which airline
+*names* can act) is derived from whichever airlines already have at
+least one route, so this never invents a fourth carrier — only the
+three from `data/competitors.json` can expand. Each gets an independent
+3%-per-day roll (`nextRandom()`, threading `state.rngSeed` forward, same
+determinism rule as every other random model in `sim/`); on a hit, it
+picks one of its not-yet-served markets via a demand-weighted random
+draw (`dailyDemand()` as the weight, so bigger markets are more likely
+targets without it being deterministic about always taking the single
+biggest one) and adds a new route at frequency 1, priced at this map's
+own `recommendedFare()` — the same default a player's own new route
+gets. Verified with a throwaway 120-simulated-day script (`nextRandom()`,
+deleted after, not committed): the seed 4 routes grew to 9, each
+correctly weighted toward the busiest (golden-triangle) pairs, no
+airline ever duplicating a market it already served.
+
+**Wiring this into the choice model was the bigger change.**
+`sim/choiceModel.ts`'s `bookingShare()`/`trafficShare()` used to read a
+fixed import directly; both now take a `competitorRoutes` parameter
+instead, and `sim/economy.ts`'s `flightResult()` gained the same
+parameter, threaded down from every caller (`step.ts`'s arrival
+handling, `ui/commercial.ts`'s market summary) as `state.competitorRoutes`.
+Without this, a newly-opened competitor route would only ever be a
+cosmetic line on the map — this is what actually makes it steal real
+booking share and market share from the player the moment it opens.
+`render/competition.ts` needed the equivalent fix on the drawing side:
+its `competitorRoutesByAirline`/`allCompetitorMarketKeys` used to be
+built once at import time from the static data (the exact "snapshot
+never reflects reality again" bug `ownRoutesFrom()`'s own comment
+already documented and fixed for the player's *own* routes back in
+week two) — now recomputed fresh from `state.competitorRoutes` on every
+call, so the Competition overlay and its hover tooltips pick up an
+AI-opened route immediately, no reload needed.
+
+**The map flash.** `CompetitorOffering.openedAtMinute` is a plain
+`state` fact, but *when* to actually flash it on screen is a real-time
+question, not a sim-time one — a fixed sim-minute window would flicker
+past instantly at 20x speed and linger too long at 1x.
+`render/competition.ts`'s `drawNewCompetitorRouteFlashes()` tracks
+"have I already shown this route's opening" using wall-clock
+`performance.now()` timestamps kept entirely in the render layer —
+never written to `state`, the same category of transient, UI-owned
+bookkeeping as `ui/rotationBoard.ts`'s drag state or this file's own
+`latestFractionalMinute` — by diffing `state.competitorRoutes` against
+what it's already seen. The very first call just records whatever's
+already there (so a fresh page load or a resumed save doesn't flash
+every pre-existing route at once); anything that shows up after that is
+genuinely new. A newly-discovered route gets a pulsing, fading amber
+arc (`#ffd166`, the same "new/highlighted" color already used for
+"served by both" in the overlay above) plus a small "Airline opens
+X–Y" label, for about 4 real seconds, drawn unconditionally on the map
+panel — not gated behind the Competition or Demand overlay toggles,
+since a rival opening a route is news worth noticing even if you
+weren't specifically looking at the competitive layer. `main.ts`'s
+`render()` gained an optional `nowMs` parameter (defaulting to
+`performance.now()`, so its many incidental call sites — button
+clicks, panel switches — don't need to change) so the main `tick()`
+loop can pass through the exact `requestAnimationFrame` timestamp it
+already has, rather than the flash animation reading a second, slightly
+different clock.
+
+Verified live in the browser (temporarily boosting the daily open
+probability to make the test fast, reverted before committing): two
+competitor routes opened within seconds of a fresh game starting, each
+correctly drawing a pulsing amber arc with a fading label that
+disappeared after ~4 seconds; the Competition overlay's route count
+jumped immediately to match, with no page reload; the airline filter
+dropdown still listed exactly the original three carriers. Zero console
+errors, and the headless runner's 30-day balance check still produces
+a deterministic (same-seed, same-result) outcome at the real 3%
+probability.
 
 ## Panel (`src/ui/panels.ts`)
 

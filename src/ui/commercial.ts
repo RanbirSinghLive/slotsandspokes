@@ -83,7 +83,13 @@ function summarizeMarket(origin: string, dest: string, state: SimState, routeSet
   let totalSeatCeiling = 0;
   for (const leg of legs) {
     const type = aircraftTypeForLeg(leg, state);
-    const result = flightResult({ origin: leg.origin, dest: leg.dest, blockMinutes: leg.blockMinutes }, type, freq, routeSettings);
+    const result = flightResult(
+      { origin: leg.origin, dest: leg.dest, blockMinutes: leg.blockMinutes },
+      type,
+      freq,
+      routeSettings,
+      state.competitorRoutes,
+    );
     pax += result.pax;
     revenue += result.revenue;
     cost += result.cost;
@@ -117,7 +123,7 @@ function summarizeMarket(origin: string, dest: string, state: SimState, routeSet
   // connecting itineraries aren't modeled (WEEK-TWO.md decision 1), so a
   // rival reachable only by connecting through a third city can't yet
   // pull share away here.
-  const share = freq > 0 ? trafficShare(routeSettings.fare, freq, origin, dest, routeSettings.marketingSpend) : 1;
+  const share = freq > 0 ? trafficShare(routeSettings.fare, freq, origin, dest, routeSettings.marketingSpend, state.competitorRoutes) : 1;
 
   return { freq, pax, revenue, cost, margin, seatCapped, share, totalSeats };
 }
