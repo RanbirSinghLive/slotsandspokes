@@ -147,6 +147,16 @@ export type SimState = {
   todayCost: number;
   todayMargin: number;
   /**
+   * Lifetime counters (never reset, unlike the todayX fields above) behind
+   * the "on-time performance" HUD stat next to Cash: every scheduled leg
+   * that actually departs increments `flightsDepartedTotal`, and
+   * `flightsOnTimeTotal` only when it left at or before its scheduled
+   * minute — see step.ts's departure loop for where "on time" is decided.
+   * Positioning legs don't count either way; they're not real service.
+   */
+  flightsDepartedTotal: number;
+  flightsOnTimeTotal: number;
+  /**
    * The entire state of sim/rng.ts's seeded random number generator. Not
    * used yet — nothing under sim/ calls nextRandom() until the M9 delay
    * mechanic exists — but it lives here, in `state`, from the start rather
@@ -235,6 +245,8 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     todayRevenue: 0,
     todayCost: 0,
     todayMargin: 0,
+    flightsDepartedTotal: 0,
+    flightsOnTimeTotal: 0,
     rngSeed,
   };
 }
@@ -276,6 +288,8 @@ export function createNewGameState(rngSeed: number = Date.now()): SimState {
     todayRevenue: 0,
     todayCost: 0,
     todayMargin: 0,
+    flightsDepartedTotal: 0,
+    flightsOnTimeTotal: 0,
     rngSeed,
   };
 }

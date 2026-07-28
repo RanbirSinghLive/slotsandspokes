@@ -303,11 +303,34 @@ function tick(nowMs: number): void {
 
 requestAnimationFrame(tick);
 
+// Remembers whatever speed was active before a pause, so unpausing (either
+// the Pause button or the spacebar, below) resumes at that speed instead of
+// always snapping back to 1x.
+let speedBeforePause = 1;
+
 speedButtons.forEach((button) => {
   button.addEventListener('click', () => {
     speedMultiplier = Number(button.dataset.speed);
+    if (speedMultiplier !== 0) speedBeforePause = speedMultiplier;
     speedButtons.forEach((b) => b.classList.toggle('active', b === button));
   });
+});
+
+function togglePause(): void {
+  speedMultiplier = speedMultiplier === 0 ? speedBeforePause : 0;
+  speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === speedMultiplier));
+}
+
+// Spacebar pause/resume. Ignored while a real DOM input has focus (schedule
+// filters, fare fields, the New Route form, etc.) so typing a space into
+// one of those doesn't also pause the game out from under the player.
+window.addEventListener('keydown', (event) => {
+  if (event.code !== 'Space') return;
+  const target = event.target as HTMLElement | null;
+  const tag = target?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return;
+  event.preventDefault(); // stop the page itself from scrolling on Space
+  togglePause();
 });
 
 // --- Panel switching (Map / Rotation / Commercial / Fleet) and overlay

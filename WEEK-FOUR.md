@@ -312,3 +312,47 @@ from roughly 1.5 before the retune, matching the standalone calculation
 exactly; YHZ-YQM (a "sweet spot" pair) read `PDEW: 20 CAP: 19`, just
 over a full 1900D flight, exactly the zone the retune was aimed at
 creating more of.
+
+## Spacebar pause, and an on-time performance stat
+
+Two small additions, both requested directly: a keyboard shortcut for
+Pause, and a "star metric" next to Cash showing how punctual the
+airline actually is.
+
+**Spacebar pause** (`main.ts`) — a `keydown` listener toggles
+`speedMultiplier` between 0 and whatever it was before pausing
+(`speedBeforePause`, updated whenever a non-zero speed button is
+clicked), so unpausing resumes at 4x if that's where the player was,
+not always snapping back to 1x. Ignored while a real DOM input has
+focus (`INPUT`/`TEXTAREA`/`SELECT`/`contentEditable`), so typing a
+space into the schedule filters or a fare field doesn't yank the game
+to a halt mid-keystroke. `event.preventDefault()` also stops the page
+itself from scrolling on Space, which is the browser's own default for
+that key.
+
+**On-time performance %** — "on time or early" turned out to have a
+real, non-trivial signal already in `step.ts`, not something that
+needed inventing: a scheduled leg can never depart *before*
+`dayStart + leg.departMinute` (the `minuteOfDay < leg.departMinute`
+guard rules that out), but it also can't depart until its aircraft is
+actually on the ground and past its turn time — so a flight whose
+aircraft is still working off delay from an earlier leg genuinely
+departs late, not just arrives late. "On time" collapses cleanly to
+"departed at exactly its due minute."
+
+Two new lifetime counters on `SimState`, `flightsDepartedTotal` and
+`flightsOnTimeTotal` — lifetime, not daily, unlike `todayRevenue` and
+its siblings, since a "running" performance stat that reset to blank
+every midnight would defeat the point. Incremented right in the
+scheduled-leg departure loop in `step.ts` (not the positioning-leg one
+— repositioning moves aren't real service, same reasoning that already
+excludes them from revenue). The HUD (`panels.ts`) reads
+`Math.round((flightsOnTimeTotal / flightsDepartedTotal) * 100)` and
+shows "—" until the first flight has actually departed, sitting right
+under Cash in the sidebar — both are lifetime numbers, so they read
+together naturally.
+
+New required fields on `SimState` meant bumping `ui/save.ts`'s
+`SAVE_KEY` to `airgame-save-v4`, per that file's own versioning
+convention — an old save is simply not found again rather than loading
+with `undefined` counters.

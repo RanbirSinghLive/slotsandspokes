@@ -29,6 +29,13 @@ speed (`MS_PER_SIM_MINUTE` in `main.ts`). The speed buttons (Pause/1×/4×/20×)
 just multiply how fast an accumulator fills up; `step()` itself always
 advances by exactly one minute per call regardless of speed.
 
+The spacebar toggles pause too (week four), not just the Pause button —
+a `keydown` listener flips `speedMultiplier` between 0 and whatever it
+was before pausing (`speedBeforePause`), so resuming lands back on 4x
+or 20x rather than always resetting to 1x. Ignored while a real DOM
+input has focus, so it doesn't hijack a space typed into a fare field
+or the schedule filters.
+
 Daylight saving is out of scope — each airport has one fixed
 `utcOffsetMinutes` (see Data files below), and nothing in the sim adjusts it
 seasonally.
@@ -175,6 +182,21 @@ A full-year run (3 aircraft, several seeds) never produced a "stranded"
 aircraft — a tail sitting at the wrong airport for its next scheduled
 leg — because the schedule's turn buffers (46–59 minutes) comfortably
 absorb the maximum single-leg delay (45 minutes) in practice.
+
+**On-time performance (week four).** The 11-minutes-late cascade above
+is exactly what the HUD's On-time % stat (next to Cash) measures on the
+*departure* side, not arrival: a leg can never depart before
+`dayStart + leg.departMinute` (the "not due yet" check above rules that
+out), so "on time" collapses to "departed at exactly its due minute,"
+and a leg whose aircraft is still working off an earlier delay departs
+late by construction, the same cascade traced above. Two new lifetime
+counters on `SimState`, `flightsDepartedTotal`/`flightsOnTimeTotal`,
+incremented right in this departure loop (not the positioning-leg loop
+below — repositioning moves aren't real service, same exclusion revenue
+already gets). Lifetime rather than reset-per-day like `todayRevenue`,
+since a "running" performance stat that blanked out every midnight
+would defeat the point — it sits next to `Cash` in the HUD for exactly
+that reason, both being the sidebar's two lifetime numbers.
 
 ## Economy (`src/sim/economy.ts`)
 
@@ -1054,12 +1076,14 @@ Week three's playtest-readiness fix (see WEEK-THREE.md): before this,
 closing the tab threw away every schedule edit, fare change, and
 marketing dollar spent, since nothing was ever written to
 `localStorage`. `loadSavedState()`/`saveState()`/`clearSavedState()` are
-a thin wrapper around it, keyed by `airgame-save-v3` at last count —
+a thin wrapper around it, keyed by `airgame-save-v4` at last count —
 bumped by hand whenever `SimState`'s shape changes in a breaking way
-(most recently for the Fleet Market's `fleetMarket` field and `Aircraft`'s
-new `ownership`/`leaseCostPerDay`), so an old save under a retired key is
-simply never found again rather than crashing on a field the current
-code doesn't expect (bare-bones versioning, not a migration system).
+(most recently week four's `flightsDepartedTotal`/`flightsOnTimeTotal`
+counters, below; before that, the Fleet Market's `fleetMarket` field and
+`Aircraft`'s new `ownership`/`leaseCostPerDay`), so an old save under a
+retired key is simply never found again rather than crashing on a field
+the current code doesn't expect (bare-bones versioning, not a migration
+system).
 
 This only works because `SimState` is already required to survive
 `JSON.parse(JSON.stringify(state))` unchanged (CLAUDE.md's rule, true

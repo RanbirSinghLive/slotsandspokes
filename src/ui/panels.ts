@@ -8,6 +8,7 @@ import type { SimState } from '../sim/state';
 export const PANEL_WIDTH_PX = 280;
 
 const cashEl = document.querySelector<HTMLSpanElement>('#panel-cash')!;
+const otpEl = document.querySelector<HTMLSpanElement>('#panel-otp')!;
 const revenueEl = document.querySelector<HTMLSpanElement>('#panel-revenue')!;
 const costEl = document.querySelector<HTMLSpanElement>('#panel-cost')!;
 const marginEl = document.querySelector<HTMLSpanElement>('#panel-margin')!;
@@ -50,6 +51,10 @@ function formatMoney(amount: number): string {
  */
 export function updatePanel(state: SimState): void {
   cashEl.textContent = formatMoney(state.cash);
+  otpEl.textContent =
+    state.flightsDepartedTotal === 0
+      ? '—'
+      : `${Math.round((state.flightsOnTimeTotal / state.flightsDepartedTotal) * 100)}%`;
   revenueEl.textContent = formatMoney(state.todayRevenue);
   costEl.textContent = formatMoney(state.todayCost);
   marginEl.textContent = formatMoney(state.todayMargin);

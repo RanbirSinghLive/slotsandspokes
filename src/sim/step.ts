@@ -149,6 +149,16 @@ export function step(state: SimState): void {
     aircraft.atAirport = null;
     aircraft.activeLegId = leg.legId;
 
+    // On-time performance (HUD stat next to Cash): this leg was due at
+    // dayStart + leg.departMinute, and it can never depart *before* that
+    // (the `minuteOfDay < leg.departMinute` check above rules it out) —
+    // so "on time or early" collapses to "departed at exactly its due
+    // minute," and anything later means it sat waiting on a late aircraft.
+    state.flightsDepartedTotal += 1;
+    if (state.simMinute === dayStart + leg.departMinute) {
+      state.flightsOnTimeTotal += 1;
+    }
+
     // Bare-bones weather effect (sim/weather.ts): a leg departing an
     // airport with active weather rolls against worse odds — reusing
     // M9's existing delay mechanism rather than a new aircraft state
