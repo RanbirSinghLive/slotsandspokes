@@ -20,6 +20,17 @@ export type FlightResult = {
   revenue: number;
   cost: number;
   margin: number;
+  /**
+   * How this flight changed the market's shared same-day recapture pool
+   * (`state.spilloverByMarket`, sim/state.ts) — positive if this flight
+   * was seat-capped and added its own recoverable spill to it, negative
+   * if it had spare room and drew from what an earlier flight on this
+   * market left behind. The caller (sim/step.ts, ui/commercial.ts) is
+   * the one that actually owns the pool; flightResult() stays a pure
+   * function of its inputs, same as before, just reporting the delta
+   * rather than mutating anything itself.
+   */
+  spilloverDelta: number;
 };
 
 // Deliberately crude for now, per WEEK-ONE.md: every flight pays the same
@@ -30,6 +41,20 @@ export type FlightResult = {
 // pinned at this ceiling (seat-capped — more demand exists than the plane
 // can hold) or below it (demand-capped — raising fare will cost real pax).
 export const LOAD_FACTOR = 0.75;
+
+/**
+ * Spill and recapture (week four, requested directly): a seat-capped
+ * flight's overflow demand doesn't just vanish. Real airline revenue
+ * management distinguishes "spill" (total overflow) from "recapture"
+ * (the fraction of it the *same* airline gets back on one of its own
+ * other flights, rather than losing it to a competitor or a traveler
+ * giving up) — this is that fraction. Deliberately crude, same spirit
+ * as `LOAD_FACTOR`/`AVG_FARE`: a flat rate, not fit to any real study,
+ * picked to make recapture a real but partial rescue rather than either
+ * "spill is always fully recovered" (too generous) or "recapture
+ * doesn't exist" (the old behavior this replaces).
+ */
+const RECAPTURE_RATE = 0.4;
 
 /**
  * The block-hours-and-departure cost of one leg, independent of how many
@@ -54,15 +79,26 @@ export function legCost(blockMinutes: number, type: EconomyAircraftType): number
  * `bookingShare()` (`sim/choiceModel.ts`, week two's "connective piece")
  * actually books — some people, given `routeSettings.fare`,
  * `routeSettings.marketingSpend`, and this market's frequency, choose a
- * competitor or not to travel at all rather than fly you. `pax` is
- * whichever is smaller: the old flat load-factor figure (still the
- * ceiling on a market with plenty of demand to go around), or this
- * flight's actual booked count. `routeSettings.fare` feeds both the choice
- * model's price term *and* revenue directly — raising it trades booked
- * passengers for margin per passenger, the core yield-management tension.
- * Marketing spend, by contrast, is a pure cost-for-share trade (see
- * sim/step.ts's day-rollover handling for where that cost is charged —
- * once per day per market, not per flight).
+ * competitor or not to travel at all rather than fly you. `routeSettings.fare`
+ * feeds both the choice model's price term *and* revenue directly —
+ * raising it trades booked passengers for margin per passenger, the core
+ * yield-management tension. Marketing spend, by contrast, is a pure
+ * cost-for-share trade (see sim/step.ts's day-rollover handling for where
+ * that cost is charged — once per day per market, not per flight).
+ *
+ * `spilloverAvailable` is this market's shared recapture pool as of right
+ * now (today, before this flight) — see `SimState.spilloverByMarket`.
+ * Two outcomes, mutually exclusive:
+ *   - This flight's own booked demand exceeds its seats: it's seat-capped
+ *     at the old flat ceiling, same as before, but now a `RECAPTURE_RATE`
+ *     fraction of the overflow it couldn't carry gets deposited into the
+ *     pool for a later flight on this same market to pick up, instead of
+ *     the whole overflow just vanishing.
+ *   - This flight has spare room: it tops up with whatever's waiting in
+ *     the pool (capped at however much room is actually left), on top of
+ *     its own booked demand — recovered passengers who couldn't get the
+ *     earlier flight, still flying you rather than a competitor.
+ * `pax` never exceeds the seat ceiling either way.
  */
 export function flightResult(
   leg: EconomyLeg,
@@ -70,6 +106,7 @@ export function flightResult(
   legsServingMarket: number,
   routeSettings: RouteSettings,
   competitorRoutes: CompetitorOffering[],
+  spilloverAvailable: number,
 ): FlightResult {
   const demandPerFlight = dailyDemand(leg.origin, leg.dest) / legsServingMarket;
   const bookedDemand =
@@ -82,8 +119,23 @@ export function flightResult(
       routeSettings.marketingSpend,
       competitorRoutes,
     );
-  const pax = Math.min(Math.round(type.seats * LOAD_FACTOR), Math.round(bookedDemand));
+  const seatCeiling = Math.round(type.seats * LOAD_FACTOR);
+  const roundedBooked = Math.round(bookedDemand);
+
+  let pax: number;
+  let spilloverDelta: number;
+  if (roundedBooked > seatCeiling) {
+    pax = seatCeiling;
+    const spill = roundedBooked - seatCeiling;
+    spilloverDelta = Math.round(spill * RECAPTURE_RATE);
+  } else {
+    const spareCapacity = seatCeiling - roundedBooked;
+    const recaptured = Math.min(spareCapacity, spilloverAvailable);
+    pax = roundedBooked + recaptured;
+    spilloverDelta = -recaptured;
+  }
+
   const revenue = pax * routeSettings.fare;
   const cost = legCost(leg.blockMinutes, type);
-  return { pax, revenue, cost, margin: revenue - cost };
+  return { pax, revenue, cost, margin: revenue - cost, spilloverDelta };
 }

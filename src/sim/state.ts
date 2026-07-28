@@ -208,6 +208,19 @@ export type SimState = {
    */
   delayMinutesByCause: { age: number; weather: number; knockOn: number };
   /**
+   * Week four's spill-and-recapture (sim/economy.ts's `flightResult()`):
+   * how many recoverable passengers are currently waiting, per market,
+   * for a later flight on that same market today to pick up — deposited
+   * by an earlier, seat-capped flight's overflow, drawn down by a later
+   * flight with spare room. Reset to `{}` at day-rollover (step.ts),
+   * same as `todayRevenue` and friends: unclaimed spill doesn't carry
+   * into tomorrow, since nobody's actually holding a seat for anyone —
+   * a passenger who couldn't fly today needed to rebook, which stays out
+   * of scope. Positioning legs never touch this; they don't serve a
+   * market, same reasoning as `onTimeByMarket` above.
+   */
+  spilloverByMarket: Record<string, number>;
+  /**
    * The entire state of sim/rng.ts's seeded random number generator. Not
    * used yet — nothing under sim/ calls nextRandom() until the M9 delay
    * mechanic exists — but it lives here, in `state`, from the start rather
@@ -309,6 +322,7 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     flightsOnTimeTotal: 0,
     onTimeByMarket: {},
     delayMinutesByCause: { age: 0, weather: 0, knockOn: 0 },
+    spilloverByMarket: {},
     rngSeed,
   };
 }
@@ -355,6 +369,7 @@ export function createNewGameState(rngSeed: number = Date.now()): SimState {
     flightsOnTimeTotal: 0,
     onTimeByMarket: {},
     delayMinutesByCause: { age: 0, weather: 0, knockOn: 0 },
+    spilloverByMarket: {},
     rngSeed,
   };
 }

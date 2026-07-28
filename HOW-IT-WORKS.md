@@ -310,10 +310,18 @@ can actually support that many passengers, and priced at the route
 (market) level rather than one flat rate for everyone:
 
 ```
-LOAD_FACTOR = 0.75
+LOAD_FACTOR    = 0.75
+RECAPTURE_RATE = 0.4
 demandPerFlight = dailyDemand(origin, dest) / legsServingMarket
-bookedDemand    = demandPerFlight * bookingShare(fare, legsServingMarket, origin, dest, marketingSpend)
-pax     = min(round(seats * LOAD_FACTOR), round(bookedDemand))
+bookedDemand    = demandPerFlight * bookingShare(fare, legsServingMarket, origin, dest, marketingSpend, competitorRoutes)
+seatCeiling     = round(seats * LOAD_FACTOR)
+if bookedDemand > seatCeiling:
+  pax             = seatCeiling
+  spilloverDelta  = round((bookedDemand - seatCeiling) * RECAPTURE_RATE)  // deposited for a later flight
+else:
+  recaptured      = min(seatCeiling - bookedDemand, spilloverAvailable)   // drawn from an earlier flight's spill
+  pax             = bookedDemand + recaptured
+  spilloverDelta  = -recaptured
 revenue = pax * fare
 cost    = (blockMinutes / 60) * costPerBlockHour + costPerDeparture
 margin  = revenue - cost
@@ -322,6 +330,46 @@ margin  = revenue - cost
 `fare` and `marketingSpend` come from `state.routeSettings[marketKey(origin, dest)]`
 (sim/state.ts's `RouteSettings`), not from the leg — see "Pricing" and
 "The Commercial panel," below, for why fare lives at the market level.
+
+**Spill and recapture (week four)** — added after being asked directly
+whether demand should use connecting flights, and recommending this
+instead as the smaller, more surgical fix: until this, a seat-capped
+flight's overflow demand was simply deleted (`pax` hard-capped, the
+remainder went nowhere). Real airline revenue management distinguishes
+total overflow ("spill") from the fraction the *same* airline recovers
+on one of its own other flights ("recapture") rather than losing it to
+a competitor or a traveler giving up — `RECAPTURE_RATE` (0.4, a flat
+crude constant, same spirit as `LOAD_FACTOR`) is that fraction.
+`flightResult()` stays a pure function (no `state` access): it takes
+`spilloverAvailable` as an input and reports `spilloverDelta` as an
+output, and the caller (`step.ts`'s arrival handling, or
+`ui/commercial.ts`'s preview, each with its own pool — see "The
+Commercial panel," below) is the one that actually reads and writes
+`SimState.spilloverByMarket`, reset to `{}` at day-rollover alongside
+`todayRevenue` and friends, since unclaimed spill doesn't carry into
+tomorrow.
+
+One deliberate consequence: the pool is keyed by the same bidirectional
+`marketKey()` `dailyDemand()`/`legsServingMarket()` already use, so a
+spilled leg in one direction can be recaptured by spare room on the
+*return* leg. Not a new inconsistency — the same "a market's demand
+doesn't care which way you're flying" simplification this model
+already had, just carried through consistently rather than inventing a
+new directional distinction nothing else respects.
+
+Verified directly against `flightResult()`: a thin slice fed an
+artificial 20-passenger pool topped up to exactly its 14-seat ceiling,
+drawing precisely 13 and leaving 7 behind — the boundary math is
+exact. A throwaway multi-day script confirmed the pool genuinely
+accumulates during real `step()` runs on the fixed headless network
+(YOW-YUL and YUL-YYZ built up 850+ pax of unclaimed spill), even though
+that network's total cash came back byte-for-byte unchanged — every
+leg on every one of its saturated markets turned out to already be
+seat-capped in *both* directions, so there was nothing to recapture
+into. A legitimate outcome for an oversaturated fixed network, caught
+by checking the pool's actual activity rather than trusting the
+top-line number alone. Deterministic across repeated 60-day headless
+runs.
 
 `legsServingMarket` (`sim/schedule.ts`) counts every currently-scheduled
 leg between this pair, either direction — the route's total daily demand
@@ -1352,6 +1400,14 @@ revenue/cost formula, so this panel can't quietly drift from what the
 simulation actually does. `routeSettings` is passed into that call
 directly rather than read from `state`, so a slider mid-drag shows the
 *hypothetical* result of a value not committed yet, live.
+
+Since spill-and-recapture (week four, see "Economy," above), this
+market's legs are sorted by depart time first — approximating the same
+chronological order `step.ts` actually processes arrivals in — and the
+loop threads its own local `previewSpillover` variable through each
+`flightResult()` call, not `state.spilloverByMarket`: this is a
+hypothetical full-day run-through, not a read of wherever the real,
+currently-playing day happens to be.
 
 **Seat-capped vs. demand-capped** is the single most useful thing this
 panel adds: a market is seat-capped when its passengers are pinned at

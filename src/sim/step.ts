@@ -193,6 +193,10 @@ export function step(state: SimState): void {
     state.todayRevenue = 0;
     state.todayCost = 0;
     state.todayMargin = 0;
+    // Spill-and-recapture's shared pool (sim/economy.ts's flightResult())
+    // is scoped to one day: unclaimed spill doesn't carry into tomorrow,
+    // since nobody's actually holding a seat for anyone.
+    state.spilloverByMarket = {};
 
     // Marketing spend (week two's "Commercial" panel) is a per-day, per-
     // market cost, not a per-flight one — charged once here rather than in
@@ -382,13 +386,17 @@ export function step(state: SimState): void {
           state.todayMargin -= cost;
         } else {
           const marketFrequency = legsServingMarket(flight.origin, flight.dest, state.schedule);
+          const key = marketKey(flight.origin, flight.dest);
+          const spilloverAvailable = state.spilloverByMarket[key] ?? 0;
           const result = flightResult(
             { origin: flight.origin, dest: flight.dest, blockMinutes },
             type,
             marketFrequency,
             { fare: flight.fare, marketingSpend: flight.marketingSpend },
             state.competitorRoutes,
+            spilloverAvailable,
           );
+          state.spilloverByMarket[key] = spilloverAvailable + result.spilloverDelta;
           state.cash += result.margin;
           state.todayRevenue += result.revenue;
           state.todayCost += result.cost;

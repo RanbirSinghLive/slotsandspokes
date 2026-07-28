@@ -771,3 +771,58 @@ confirmed the weather side of the same diff logic fires correctly and
 often — dozens of winter snowstorm-formation events across the year,
 consistent with the existing weather model's known seasonal rates.
 Zero console errors.
+
+## Spill and recapture
+
+Discussed first, not just built: asked whether demand should be able to
+use connecting flights, and whether spill-and-recapture would make
+things more realistic. Recommended recapture first — connections are a
+much bigger structural lift (itinerary tracking, minimum connect time,
+a schedule-quality penalty in the choice model), while a seat-capped
+market's overflow demand was, until now, just deleted outright
+(`flightResult()` hard-capped `pax` and the remainder went nowhere).
+Recapture is the smaller, more surgical fix, and a real building block
+connections would need anyway.
+
+`sim/economy.ts`'s `flightResult()` gained a `spilloverAvailable` input
+and a `spilloverDelta` output, staying a pure function (no `state`
+dependency) — the caller owns the actual pool. A seat-capped flight
+deposits `RECAPTURE_RATE` (40%, a flat crude constant, same spirit as
+`LOAD_FACTOR`) of its own overflow into the pool; a flight with spare
+room draws from it, up to whatever room is actually left. The rest of
+a spill (the other 60%) is genuinely lost — flew a competitor, or
+didn't travel — same as before this existed.
+
+New `SimState.spilloverByMarket: Record<marketKey, number>` holds each
+market's shared pool, reset to `{}` at day-rollover (unclaimed spill
+doesn't carry into tomorrow — nobody's holding a seat for anyone).
+`step.ts`'s arrival handling reads and writes it directly;
+`ui/commercial.ts`'s market-summary preview keeps its own *local*
+variable instead (a hypothetical full-day run-through, not a read of
+wherever the real, currently-playing day happens to be), sorting a
+market's legs by depart time first to approximate the same
+chronological order step.ts actually processes arrivals in. Another
+required `SimState` field, another `ui/save.ts` version bump (v6 → v7).
+
+One deliberate consequence worth flagging: the pool is keyed by the
+same bidirectional `marketKey()` `dailyDemand()` and `legsServingMarket()`
+already use — a spilled YHZ→YQM passenger can, in this model, be
+"recaptured" by spare room on the YQM→YHZ return. That's not a new
+inconsistency; it's the same "a market's demand doesn't care which way
+you're flying" simplification the rest of the economy model already
+has, just carried through consistently rather than introducing a new
+directional distinction nothing else respects.
+
+Verified: a direct `flightResult()` check confirmed the boundary math
+exactly (a thin slice with an artificial 20-pax pool correctly topped
+up to precisely its 14-seat ceiling, drawing exactly 13 and leaving 7
+behind). A throwaway multi-day script confirmed the pool actually
+accumulates during real `step()` runs (YOW-YUL and YUL-YYZ built up
+850+ pax of unclaimed spill on the fixed headless network) — though
+that network's final cash came back byte-for-byte identical to before,
+because every leg on every one of its saturated markets turned out to
+already be seat-capped in *both* directions, leaving nothing to
+recapture into; a legitimate outcome for an oversaturated network, not
+a bug, confirmed by checking the pool activity directly rather than
+just the top-line number. Deterministic across repeated 60-day headless
+runs.

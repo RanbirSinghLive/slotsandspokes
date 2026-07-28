@@ -70,9 +70,14 @@ const rowsByMarket = new Map<string, { origin: string; dest: string; row: HTMLTa
  * show the *hypothetical* result of a value not committed yet.
  */
 function summarizeMarket(origin: string, dest: string, state: SimState, routeSettings: RouteSettings) {
-  const legs = state.schedule.filter(
-    (leg) => (leg.origin === origin && leg.dest === dest) || (leg.origin === dest && leg.dest === origin),
-  );
+  // Sorted by depart time to approximate the same chronological order
+  // step.ts's arrivals actually process spill-and-recapture in — a
+  // hypothetical full-day preview, not a live read of `state`'s own
+  // mid-day pool (see `previewSpillover` below), so it needs its own
+  // stand-in for "which flight happens first."
+  const legs = state.schedule
+    .filter((leg) => (leg.origin === origin && leg.dest === dest) || (leg.origin === dest && leg.dest === origin))
+    .sort((a, b) => a.departMinute - b.departMinute);
   const freq = legs.length;
 
   let pax = 0;
@@ -81,6 +86,10 @@ function summarizeMarket(origin: string, dest: string, state: SimState, routeSet
   let margin = 0;
   let totalSeats = 0;
   let totalSeatCeiling = 0;
+  // Local to this preview, not `state.spilloverByMarket` — that pool
+  // reflects wherever the real, currently-running day actually is, not
+  // a clean full-day-from-scratch hypothetical.
+  let previewSpillover = 0;
   for (const leg of legs) {
     const type = aircraftTypeForLeg(leg, state);
     const result = flightResult(
@@ -89,7 +98,9 @@ function summarizeMarket(origin: string, dest: string, state: SimState, routeSet
       freq,
       routeSettings,
       state.competitorRoutes,
+      previewSpillover,
     );
+    previewSpillover += result.spilloverDelta;
     pax += result.pax;
     revenue += result.revenue;
     cost += result.cost;
