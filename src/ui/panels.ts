@@ -135,19 +135,27 @@ function timeStringToMinuteOfDay(time: string): number {
 const scheduleRowsByLegId = new Map<string, HTMLTableRowElement>();
 
 /**
- * Push a freshly-committed departMinute into this leg's own row, without
- * touching any other row — the same "build once, mutate only via events"
- * rule setupScheduleEditor() documents below, just triggered from a second
- * place now. The M12 rotation board writes `leg.departMinute` directly
- * (dragging a bar, not typing into this table's own `<input>`), so nothing
- * else would ever tell this table's time input to catch up on its own;
- * without this call the table would keep showing the pre-drag time until
- * some unrelated edit happened to rebuild it.
+ * Push a leg's freshly-committed depart time — and, since M13, its tail —
+ * into its own row, without touching any other row: the same "build once,
+ * mutate only via events" rule setupScheduleEditor() documents below, just
+ * triggered from a second place now. The rotation board writes
+ * `leg.departMinute`/`leg.tail` directly (dragging a bar, not typing into
+ * or picking from this table's own cells), so nothing else would ever
+ * tell this row to catch up on its own; without this call the table would
+ * keep showing the pre-drag time and tail until some unrelated edit
+ * happened to rebuild it. Re-applies the schedule filters afterward, same
+ * reasoning as the depart-time `<input>`'s own `change` handler below —
+ * a leg reassigned to a different tail may no longer match an active Tail
+ * filter.
  */
-export function syncScheduleRowTime(legId: string, departMinute: number): void {
-  const row = scheduleRowsByLegId.get(legId);
-  const input = row?.querySelector<HTMLInputElement>('input[type="time"]');
-  if (input) input.value = minuteOfDayToTimeString(departMinute);
+export function syncScheduleRow(leg: ScheduleLeg): void {
+  const row = scheduleRowsByLegId.get(leg.legId);
+  if (!row) return;
+  const tailCell = row.querySelector<HTMLTableCellElement>('.schedule-tail-cell');
+  if (tailCell) tailCell.textContent = leg.tail;
+  const input = row.querySelector<HTMLInputElement>('input[type="time"]');
+  if (input) input.value = minuteOfDayToTimeString(leg.departMinute);
+  applyScheduleFilters();
 }
 
 /**
@@ -187,6 +195,7 @@ function buildScheduleRow(leg: ScheduleLeg, state: SimState): HTMLTableRowElemen
   const row = document.createElement('tr');
 
   const tailCell = document.createElement('td');
+  tailCell.className = 'schedule-tail-cell';
   tailCell.textContent = leg.tail;
 
   const routeCell = document.createElement('td');

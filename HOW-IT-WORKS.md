@@ -938,9 +938,7 @@ sees why a time was picked — M12 makes the board itself the fix: drop
 the new leg wherever, jump straight here, and let the player see and
 drag it into place.
 
-Dragging a bar (`attachDragHandlers()` in rotationBoard.ts) is confined
-to its own row — horizontal retiming only, never a reassignment to a
-different tail, which is still a schedule-editor-table edit. It reads a
+Dragging a bar (`attachDragHandlers()` in rotationBoard.ts) reads a
 scratch `tentativeDepartMinute` while the mouse moves, snapping to the
 nearest whole minute, and checks it live against `tailRotationProblems()`
 (schedule.ts) — the same per-tail chain/turn-time/closure check
@@ -953,21 +951,46 @@ hypothetical breaks the chain, green the instant it doesn't — feedback
 while the player is still deciding where to drop it, not a warning list
 to notice afterward.
 
+**M12 confined this to one row (retime only); M13 lifted that**, once
+asked directly whether a leg could move to a *different* tail. A bar
+now reparents into whichever row the cursor is over
+(`findRowTrackAt(clientY)`, checked against a `rowTracksByTail` list
+rebuilt alongside the rows every render) — since `.rotation-bar` is
+absolutely positioned relative to its containing track, moving the DOM
+node into a different track re-anchors it there for free. The live
+check widened to match: pulling a leg out of the middle of a tail's
+closed loop can break *that* tail just as easily as it can the one
+gaining a leg, so when the candidate tail differs from the original,
+`tailRotationProblems()` runs twice — once for the destination with the
+leg hypothetically added, once for the origin with it hypothetically
+removed — and a hard `rangeNm` check (the same limit the route builder
+enforces when a route is first drawn) flags a leg dropped onto a plane
+that physically can't fly that distance, red for the same reason, not
+a separate mechanism.
+
 Deliberately *not* written back to `state.schedule` until the actual
 drop (`mouseup`): `step()` reads that array every simulated minute,
 including while the rotation board is open and a drag is mid-flight, so
 committing a half-finished drag would feed the running simulation a
 value the player hasn't actually chosen yet. On drop, the leg's real
-object gets its `departMinute` mutated in place (iterating
-`state.schedule` hands back live references, not copies, so no lookup-
-and-replace is needed), `validateSchedule()` re-runs so the sidebar's
-warning list agrees with what the board now shows, and — new problem
-this surfaced — `ui/panels.ts`'s schedule table needed its own
-`syncScheduleRowTime()` export, since that table's `<input type="time">`
-elements are built once and only ever patched by their *own* `change`
-handler (deliberately, to avoid tearing out a focused input on every
-frame); a drag commits through a completely different path, so nothing
-else would ever tell that one row to catch up without this call.
+object gets its `departMinute` — and, if it changed rows, its `tail` —
+mutated in place (iterating `state.schedule` hands back live
+references, not copies, so no lookup-and-replace is needed);
+`legId` is left exactly as it was even after a tail reassignment, on
+purpose — nothing in the sim parses a legId's prefix for meaning, and
+renaming it would mean updating every place that keys off it (the
+schedule table's row map, `activeFlights`, `completedToday`) for no
+functional gain. `validateSchedule()` re-runs so the sidebar's warning
+list agrees with what the board now shows, and — new problem this
+surfaced — `ui/panels.ts`'s schedule table needed its own
+`syncScheduleRow()` export (`syncScheduleRowTime()`'s M13 successor,
+now syncing the Tail cell too via a new `.schedule-tail-cell` class,
+and re-applying the schedule filters since a reassigned leg may no
+longer match an active Tail filter), since that table's cells are built
+once and only ever patched by their *own* `change` handler
+(deliberately, to avoid tearing out a focused input on every frame); a
+drag commits through a completely different path, so nothing else
+would ever tell that row to catch up without this call.
 
 **The map-to-board handoff (also M12):** confirming a route in
 `ui/routeBuilder.ts` now calls an `onRouteConfirmed(legIds)` callback

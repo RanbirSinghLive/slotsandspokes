@@ -451,3 +451,53 @@ hover and a live drag — the drag's own mousemove handler feeds it the
 tentative dragged-to time instead of the bar's resting one, so the
 tooltip keeps reporting the new time as the bar moves, not just once
 it stops.
+
+## Dragging a leg between two tails' rows
+
+The M12 drag was deliberately confined to one row — horizontal retiming
+only. Asked directly whether it could also reassign a leg to a
+*different* aircraft, tested against two BEH1900Ds sharing the board.
+
+A bar now reparents into whichever row the cursor is over mid-drag
+(`findRowTrackAt()`, checking `clientY` against each row's own track
+rect — tracked in a small `rowTracksByTail` list rebuilt alongside the
+rows). Since `.rotation-bar` is absolutely positioned relative to its
+containing track, moving the DOM node into a different track re-anchors
+it there for free — no extra positioning math needed beyond what
+retiming already does.
+
+The live red/green check got wider to match: dropping a leg on a new
+tail can just as easily break the tail *losing* it (pulling a leg out
+of the middle of a closed loop breaks that loop, not just the one
+gaining a leg) as it can the destination, so both get checked —
+`tailRotationProblems()` against the candidate tail with the leg
+hypothetically added, and (only when the tail actually changed) the
+original tail with it hypothetically removed. Also added: a hard
+range check against the candidate aircraft's `rangeNm` — the same limit
+the route builder enforces when a route is first drawn, so dragging a
+leg onto a plane that physically can't fly that distance shows red too,
+not just a scheduling conflict.
+
+On drop, the leg's real `tail` field gets reassigned in place — its
+`legId` stays exactly as it was (still prefixed with its *original*
+tail), a deliberate simplification: nothing in the sim parses a legId's
+prefix for meaning, it's just a stable identifier, and renaming it
+would have meant updating every place that keys off it (the schedule
+table's row map, in-flight `activeFlights`, `completedToday`) for no
+functional gain. `ui/panels.ts`'s schedule table needed a small
+expansion to match — `syncScheduleRowTime()` became `syncScheduleRow()`,
+now syncing the Tail cell too (a new `.schedule-tail-cell` class marks
+it), and re-applying the schedule filters afterward, since a
+reassigned leg may no longer match an active Tail filter.
+
+Verified in-browser: added a second BEH1900D (C-FQAC, parked at YQB,
+zero legs — a fresh empty row) alongside C-FQAB's four-leg schedule.
+Dragged C-FQAB's YHZ→YSJ leg down onto C-FQAC's empty row; it reparented
+correctly, went red mid-drag (a lone one-way leg never closes its own
+loop), and on drop produced exactly the expected fallout: C-FQAB's
+remaining three legs no longer chain (a warning naming precisely which
+pair broke), C-FQAC's new lone leg doesn't close either, and — a nice
+confirmation the existing whole-schedule check still applies unmodified
+— C-FQAC being physically parked at YQB while its only leg departs from
+YHZ tripped the pre-existing "stranded aircraft" warning too, with no
+changes needed to that check at all.
