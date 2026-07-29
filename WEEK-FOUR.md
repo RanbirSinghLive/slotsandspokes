@@ -826,3 +826,73 @@ recapture into; a legitimate outcome for an oversaturated network, not
 a bug, confirmed by checking the pool activity directly rather than
 just the top-line number. Deterministic across repeated 60-day headless
 runs.
+
+## Nine new airports, and the map's first hard airport constraint
+
+Added: YDF (Deer Lake), YQX (Gander), YYR (Goose Bay), YQY (Sydney),
+YUY (Rouyn-Noranda), YBG (Saguenay–Bagotville), YTZ (Billy Bishop
+Toronto City), and two US airports, LGA (LaGuardia) and BOS (Boston
+Logan) — 19 airports total, up from 10.
+
+**Sourcing, per CLAUDE.md's rule:** every coordinate came from
+OurAirports (fetched directly, not recalled from memory). Population
+used each airport's real catchment — StatsCan 2021 census CA/CMA for
+the Canadian ones (Corner Brook CA for Deer Lake specifically, since
+that's the region the airport actually serves, not the small town of
+Deer Lake itself; Cape Breton CA for Sydney; standalone town figures
+for Rouyn-Noranda and Happy Valley-Goose Bay, which don't have a larger
+CA wrapping them), and the 2020 US Census MSA for the two American
+ones — New York-Newark-Jersey City (20.1M) and Boston-Cambridge-Newton
+(4.94M). Toronto reuses YYZ's existing Toronto CMA figure, since YTZ is
+the same city's second airport. UTC offsets: Newfoundland Time
+(−210) for the island communities (Deer Lake, Gander — same zone as
+existing YYT), Atlantic Time (−240) for Goose Bay (mainland Labrador
+uses Atlantic Time, not Newfoundland Time, despite being the same
+province) and Sydney, Eastern Time (−300) for the Quebec/Ontario/US
+entries.
+
+**The map's fixed viewport had to grow.** `render/projection.ts`'s
+`EASTERN_CANADA_BOUNDS` was a hardcoded box (42°N–50°N) that Goose Bay
+(53.3°N) and LaGuardia (40.8°N) both fall outside of — widened to
+39°N–54°N, 81°W–51°W with a few degrees of padding on every edge, so
+nothing new sits flush against the frame.
+
+**Airport constraints are a new concept, not just new data.** YTZ's
+real-world Dash 8/Q400 restriction and LGA's own size limits became
+`Airport.maxAircraftType` (`"DH8400"`, `"A220300"`) — the largest type
+allowed to operate there. Rather than a separate numeric "size" field,
+`sim/schedule.ts`'s `isAircraftTypeAllowedAt()` reads size straight off
+`data/aircraft-types.json`'s own array order (already authored
+smallest-to-largest for the aircraft ladder), so a fifth tier added
+later needs no separate ranking to stay in sync. Absent
+`maxAircraftType` (every other airport) fails open — unconstrained,
+same as today.
+
+Enforced in three places, each matching how this codebase already
+treats the *other* hard aircraft limit (range):
+- **Route builder** — a route into or out of a too-large-for-the-plane
+  airport is a flat "no," same shape as the existing range check: the
+  Add Route button disables with a plain explanation, and the confirm
+  handler re-checks defensively before ever touching `state.schedule`.
+- **Rotation board** — dragging a leg onto a different-gauge tail that
+  violates either endpoint's constraint flags the bar red, the same
+  "allow the drop, just flag it" treatment the existing range check
+  already gets there (a drag's commit never blocks on anything).
+- **`validateSchedule()`** — an already-assigned leg that violates a
+  constraint (however it got there) is now a standing warning in the
+  sidebar, not just a one-time hint during a drag someone might not
+  have noticed.
+
+Verified: `isAircraftTypeAllowedAt()` checked directly against every
+relevant pairing (YTZ with all five types, LGA with all five, BOS and
+YHZ — both unconstrained — with the A330-300) matched expectations
+exactly. Live in-browser: selecting an A220-300 and trying to draw
+YHZ→YTZ produced the exact expected error text and a disabled Add
+Route button; switching to a DH8400 for the same route cleared both.
+The full 19-airport map renders correctly at the new, wider bounds,
+including Goose Bay near the top and LGA/BOS at the bottom. Headless
+30-day cash shifted slightly ($194,253 → $200,919) and stayed
+deterministic across repeated runs — expected, since the competitor
+AI's candidate-market pool grew from 45 pairs to 171 the moment more
+airports existed, which changes which market the same RNG roll happens
+to land on, not a sign of anything broken.

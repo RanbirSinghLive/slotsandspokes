@@ -7,7 +7,12 @@ import type { Polygon } from 'geojson';
  * which trips everyone up the first time because it's the opposite of the
  * "lat, lon" order most maps quote in.
  *
- * This covers eastern Canada roughly 42°N–50°N, 80°W–51°W, per WEEK-ONE.md.
+ * Originally just eastern Canada, roughly 42°N–50°N, 80°W–51°W, per
+ * WEEK-ONE.md. Widened when the map grew a Labrador airport (YYR, at
+ * 53.3°N — north of the old top edge) and two US ones (LGA at 40.8°N,
+ * south of the old bottom edge) — 39°N–54°N, 81°W–51°W now, with a
+ * couple of degrees of padding on every edge so nothing airport sits
+ * flush against the frame.
  *
  * The ring is listed clockwise (as seen on an ordinary lon-x/lat-y plot):
  * bottom-left, top-left, top-right, bottom-right, back to start. d3-geo
@@ -25,11 +30,11 @@ const EASTERN_CANADA_BOUNDS: Polygon = {
   type: 'Polygon',
   coordinates: [
     [
-      [-80, 42],
-      [-80, 50],
-      [-51, 50],
-      [-51, 42],
-      [-80, 42],
+      [-81, 39],
+      [-81, 54],
+      [-51, 54],
+      [-51, 39],
+      [-81, 39],
     ],
   ],
 };

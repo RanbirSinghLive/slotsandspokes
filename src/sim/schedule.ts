@@ -4,7 +4,7 @@ import airportsData from '../../data/airports.json';
 import { greatCircleDistanceNm } from './geo';
 import type { Aircraft } from './state';
 
-type AirportLocation = { iata: string; lat: number; lon: number };
+type AirportLocation = { iata: string; lat: number; lon: number; maxAircraftType?: string };
 type AircraftType = {
   code: string;
   name: string;
@@ -86,6 +86,36 @@ export function defaultReturnDepartMinute(outboundDepartMinute: number, blockMin
 const airportsByIata = new Map<string, AirportLocation>(
   (airportsData as AirportLocation[]).map((airport) => [airport.iata, airport]),
 );
+
+// Aircraft types are authored smallest-to-largest in data/aircraft-types.json
+// (see CLAUDE.md's aircraft ladder) — that array's own order already *is*
+// a size ranking, so airport constraints (below) don't need a separate
+// numeric "size" field anywhere.
+const aircraftTypeCodesBySize = (aircraftTypesData as { code: string }[]).map((type) => type.code);
+
+/**
+ * Whether `typeCode` is small enough to operate at `iata`, per that
+ * airport's own `maxAircraftType` (`data/airports.json`, week four) —
+ * a real runway/gate constraint some airports have (Billy Bishop's YTZ,
+ * LaGuardia's LGA), modeled the same crude "hard limit, full stop" way
+ * range already is, rather than degrees of inconvenience. No constraint
+ * (`maxAircraftType` absent) or an unrecognized type/airport code both
+ * fail open (true) rather than block on a data gap. Used by the M10
+ * route builder (hard-blocks drawing a too-large route), the M13
+ * rotation board (flags a too-large drag red, same "allow, then flag"
+ * treatment reassignment already gets), and `validateSchedule()` below
+ * (a persistent warning for an already-assigned leg that violates it).
+ */
+export function isAircraftTypeAllowedAt(iata: string, typeCode: string): boolean {
+  const maxType = airportsByIata.get(iata)?.maxAircraftType;
+  if (!maxType) return true;
+
+  const typeRank = aircraftTypeCodesBySize.indexOf(typeCode);
+  const maxRank = aircraftTypeCodesBySize.indexOf(maxType);
+  if (typeRank === -1 || maxRank === -1) return true;
+
+  return typeRank <= maxRank;
+}
 
 // data/schedule.json's fixed template (below) predates the week-four
 // aircraft ladder and was authored against a single type — every one of
@@ -363,6 +393,23 @@ export function validateSchedule(
 
   for (const [tail, tailLegs] of byTail) {
     problems.push(...tailRotationProblems(tail, tailLegs));
+  }
+
+  // Week four's airport constraints (Airport.maxAircraftType): a leg
+  // already assigned to a tail whose aircraft is too large for one of
+  // its two airports — same "too large, full stop" check the route
+  // builder and rotation board use before a change is even made, run
+  // here too so a violation stays visible as a standing warning rather
+  // than only ever being a fleeting red flash during a drag.
+  const typeCodeByTail = new Map(fleet.map((aircraft) => [aircraft.tail, aircraft.typeCode]));
+  for (const leg of legs) {
+    const typeCode = typeCodeByTail.get(leg.tail);
+    if (!typeCode) continue; // tail isn't part of the active fleet yet
+    for (const iata of [leg.origin, leg.dest]) {
+      if (!isAircraftTypeAllowedAt(iata, typeCode)) {
+        problems.push(`${leg.tail} (${typeCode}) is too large for ${iata} on ${leg.legId} (${leg.origin} → ${leg.dest}).`);
+      }
+    }
   }
 
   for (const aircraft of fleet) {

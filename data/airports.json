@@ -8,5 +8,14 @@
   { "iata": "YFC", "name": "Fredericton",        "lat": 45.8687, "lon": -66.5299, "utcOffsetMinutes": -240, "population": 108610 },
   { "iata": "YQM", "name": "Greater Moncton",    "lat": 46.1132, "lon": -64.6772, "utcOffsetMinutes": -240, "population": 157717 },
   { "iata": "YYG", "name": "Charlottetown",      "lat": 46.2889, "lon": -63.1252, "utcOffsetMinutes": -240, "population": 78858 },
-  { "iata": "YYT", "name": "St. John's",         "lat": 47.6186, "lon": -52.7519, "utcOffsetMinutes": -210, "population": 212579 }
+  { "iata": "YYT", "name": "St. John's",         "lat": 47.6186, "lon": -52.7519, "utcOffsetMinutes": -210, "population": 212579 },
+  { "iata": "YDF", "name": "Deer Lake",          "lat": 49.2110, "lon": -57.3910, "utcOffsetMinutes": -210, "population": 29762 },
+  { "iata": "YQX", "name": "Gander",             "lat": 48.9367, "lon": -54.5681, "utcOffsetMinutes": -210, "population": 13414 },
+  { "iata": "YYR", "name": "Goose Bay",          "lat": 53.3192, "lon": -60.4258, "utcOffsetMinutes": -240, "population": 8010 },
+  { "iata": "YQY", "name": "Sydney",             "lat": 46.1611, "lon": -60.0498, "utcOffsetMinutes": -240, "population": 98318 },
+  { "iata": "YUY", "name": "Rouyn-Noranda",      "lat": 48.2061, "lon": -78.8356, "utcOffsetMinutes": -300, "population": 42313 },
+  { "iata": "YBG", "name": "Saguenay–Bagotville","lat": 48.3301, "lon": -70.9920, "utcOffsetMinutes": -300, "population": 161567 },
+  { "iata": "YTZ", "name": "Billy Bishop Toronto","lat": 43.6279, "lon": -79.3955, "utcOffsetMinutes": -300, "population": 6202225, "maxAircraftType": "DH8400" },
+  { "iata": "LGA", "name": "LaGuardia",          "lat": 40.7772, "lon": -73.8726, "utcOffsetMinutes": -300, "population": 20140470, "maxAircraftType": "A220300" },
+  { "iata": "BOS", "name": "Boston Logan",       "lat": 42.3620, "lon": -71.0079, "utcOffsetMinutes": -300, "population": 4941632 }
 ]

@@ -2,7 +2,13 @@ import aircraftTypesData from '../../data/aircraft-types.json';
 import { airports, type Airport } from '../render/airports';
 import { greatCircleDistanceNm } from '../sim/geo';
 import { minuteOfDayToTimeString, renderScheduleWarnings, syncScheduleRow } from './panels';
-import { computeBlockMinutes, tailRotationProblems, validateSchedule, type ScheduleLeg } from '../sim/schedule';
+import {
+  computeBlockMinutes,
+  isAircraftTypeAllowedAt,
+  tailRotationProblems,
+  validateSchedule,
+  type ScheduleLeg,
+} from '../sim/schedule';
 import type { SimState } from '../sim/state';
 
 const MINUTES_PER_DAY = 1440;
@@ -238,7 +244,17 @@ window.addEventListener('mousemove', (event) => {
     !!destAirport &&
     greatCircleDistanceNm(originAirport, destAirport) > candidateType.rangeNm;
 
-  bar.classList.toggle('rotation-bar--invalid', problems.length > 0 || outOfRange);
+  // Week four's airport size constraints (Airport.maxAircraftType) get
+  // the same "allow the drop, just flag it" treatment every other
+  // in-progress-drag problem here already gets — not a hard block,
+  // unlike the route builder's version of this same check, since a
+  // drag's commit never blocks on anything (see the mouseup handler
+  // below).
+  const violatesAirportConstraint =
+    !!candidateType &&
+    (!isAircraftTypeAllowedAt(leg.origin, candidateType.code) || !isAircraftTypeAllowedAt(leg.dest, candidateType.code));
+
+  bar.classList.toggle('rotation-bar--invalid', problems.length > 0 || outOfRange || violatesAirportConstraint);
 });
 
 /**

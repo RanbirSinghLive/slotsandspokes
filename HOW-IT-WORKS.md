@@ -51,11 +51,20 @@ seasonally.
 
 ## Data files (`data/`)
 
-- **`airports.json`** — 10 airports across eastern Canada. Each has `iata`,
-  `name`, `lat`/`lon`, `utcOffsetMinutes` (winter/standard time, fixed,
-  not DST-aware), and `population` (catchment CMA/CA population, StatsCan
-  2021 census — see `sim/demand.ts`, below). Coordinates verified against
-  OurAirports.
+- **`airports.json`** — 19 airports (10 originally, plus week four's YDF,
+  YQX, YYR, YQY, YUY, YBG, YTZ, LGA, and BOS). Each has `iata`, `name`,
+  `lat`/`lon`, `utcOffsetMinutes` (winter/standard time, fixed, not
+  DST-aware), and `population` (catchment CMA/CA population for Canadian
+  airports, StatsCan 2021 census; 2020 US Census MSA for the two
+  American ones — see `sim/demand.ts`, below). Coordinates verified
+  against OurAirports directly (fetched, not recalled). Deer Lake and
+  Sydney use their broader catchment's population (Corner Brook CA,
+  Cape Breton CA) rather than the small named town's own, since that's
+  the region the airport actually serves; Goose Bay and Rouyn-Noranda
+  use their own standalone town/city figure, having no larger CA above
+  them; Toronto's two airports (YYZ, YTZ) share one Toronto CMA number.
+  Some airports also carry a `maxAircraftType` — see "Airport
+  constraints" under `sim/schedule.ts`, below.
 - **`aircraft-types.json`** — five types now (week four's aircraft
   ladder, at the player's request — multiple types were explicitly
   deferred until then): Beechcraft 1900D (`BEH1900D`, 19 seats), Dash
@@ -713,9 +722,13 @@ live regardless of which overlays are on, since seeing a market more
 clearly is just as useful as seeing operations more clearly.
 
 `projection.ts` owns the single shared `d3.geoMercator()` instance, fitted to
-an eastern-Canada bounding box and clipped to the canvas's own pixel bounds.
-Pan drags `projection.translate()`; scroll zooms `projection.scale()` toward
-the cursor, clamped to 0.5×–20× of the fitted scale.
+a fixed bounding box and clipped to the canvas's own pixel bounds. Widened
+in week four (39°N–54°N, 81°W–51°W, up from 42°N–50°N/80°W–51°W) once two
+of the nine new airports fell outside the old eastern-Canada-only box —
+Goose Bay (53.3°N) north of the old top edge, LaGuardia (40.8°N) south of
+the old bottom one. Pan drags `projection.translate()`; scroll zooms
+`projection.scale()` toward the cursor, clamped to 0.5×–20× of the fitted
+scale.
 
 The accumulator loop (`main.ts`) turns real frame time into whole simulated
 minutes (`step()` calls) plus a continuous fractional minute for rendering,
@@ -979,6 +992,50 @@ this, a leftover time from an unrelated earlier route could silently
 collide with an existing leg on a new market and block Add with no
 obvious reason why (this happened for real: creating a second YSJ-YQB
 frequency after leaving the input at 13:00 from an unrelated route).
+
+## Airport constraints (`src/sim/schedule.ts`) — week four
+
+New alongside the nine new airports: some real airports have a real
+runway or gate limit on what can land there, and now this map does
+too. `Airport.maxAircraftType` (`data/airports.json`) names the
+largest type allowed to operate there — YTZ (Billy Bishop Toronto
+City) is capped at `"DH8400"` (its real Dash 8/Q400 restriction), LGA
+at `"A220300"`. Every other airport has no field at all and is
+unconstrained, same as before this existed.
+
+"Largest" needed a size ordering, and rather than invent a separate
+numeric field, `isAircraftTypeAllowedAt(iata, typeCode)` reads it
+straight off `data/aircraft-types.json`'s own array order — the
+aircraft ladder is already authored smallest-to-largest (see CLAUDE.md
+and WEEK-FOUR.md's own aircraft-ladder section), so a type's position
+in that array *is* its rank. `typeRank <= maxRank` is the whole check;
+an absent constraint or an unrecognized code both fail open (true)
+rather than block on a data gap.
+
+Enforced in three places, deliberately mirroring how this codebase
+already treats the *other* hard aircraft limit, range:
+- **`ui/routeBuilder.ts`** — a route into or out of a too-small airport
+  is a flat "no," exactly like the existing range check: `Add Route`
+  disables with a plain explanation (`updateFormValidation()`), and the
+  confirm handler re-checks defensively before ever touching
+  `state.schedule`, the same "belt and suspenders" shape the range
+  check already has there.
+- **`ui/rotationBoard.ts`** — dragging a leg onto a different-gauge
+  tail that violates either endpoint's constraint flags the bar red,
+  same "allow the drop, just flag it" treatment the existing range
+  check gets there — a drag's commit never blocks on anything, so this
+  doesn't either.
+- **`validateSchedule()`** — a leg already assigned to a tail whose
+  aircraft violates one of its two airports' constraints (however it
+  got that way) is a standing warning in the sidebar, not just a
+  one-time red flash during a drag someone might not have caught.
+
+Verified directly: `isAircraftTypeAllowedAt()` checked against all five
+aircraft types at YTZ and at LGA, plus an unconstrained airport (BOS)
+against the biggest type, matched expectations in every case. Live
+in-browser: arming a route with an A220-300 selected and confirming
+into YTZ produced the exact expected error and a disabled Add Route
+button; switching to a DH8400 for the identical route cleared both.
 
 ## Route builder (`src/ui/routeBuilder.ts`) — M10
 

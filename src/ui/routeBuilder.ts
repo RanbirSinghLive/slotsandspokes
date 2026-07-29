@@ -8,6 +8,7 @@ import { dailyDemand } from '../sim/demand';
 import {
   computeBlockMinutes,
   defaultReturnDepartMinute,
+  isAircraftTypeAllowedAt,
   legsServingMarket,
   marketKey,
   MIN_TURN_MINUTES,
@@ -565,6 +566,25 @@ function updateFormValidation(origin: Airport, dest: Airport, state: SimState): 
     }
   }
 
+  // Week four: airport size constraints (Airport.maxAircraftType) are
+  // just as much a hard "no" as range — a real runway or gate limit,
+  // not a matter of degree — so this gets the exact same block-and-
+  // explain treatment rather than just a warning.
+  if (type) {
+    const blockedIata = !isAircraftTypeAllowedAt(origin.iata, type.code)
+      ? origin.iata
+      : !isAircraftTypeAllowedAt(dest.iata, type.code)
+        ? dest.iata
+        : null;
+    if (blockedIata) {
+      formError.textContent = `${blockedIata} only takes aircraft up to a smaller size than the ${type.name} — too large to operate there.`;
+      formConfirmButton.disabled = true;
+      formReturnPreview.textContent = '';
+      formPositioningPreview.textContent = '';
+      return;
+    }
+  }
+
   const departMinute = timeStringToMinuteOfDay(formDepartInput.value);
   const blockMinutes = computeBlockMinutes(origin.iata, dest.iata, type?.cruiseKts);
   const outboundCollision = findExactTimeCollision(origin.iata, dest.iata, departMinute, state.schedule);
@@ -656,6 +676,12 @@ export function setupRouteBuilder(state: SimState, onRouteConfirmed: (legIds: st
     // route regardless.
     if (findExactTimeCollision(origin.iata, dest.iata, departMinute, state.schedule)) return;
     if (typeForRange && greatCircleDistanceNm(origin, dest) > typeForRange.rangeNm) return;
+    if (
+      typeForRange &&
+      (!isAircraftTypeAllowedAt(origin.iata, typeForRange.code) || !isAircraftTypeAllowedAt(dest.iata, typeForRange.code))
+    ) {
+      return;
+    }
 
     // If the chosen tail isn't standing at this route's origin, queue a
     // one-time positioning leg to get it there first — see
