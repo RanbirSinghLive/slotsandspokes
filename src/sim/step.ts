@@ -4,6 +4,10 @@ import { MIN_TURN_MINUTES, legsServingMarket, marketKey } from './schedule';
 import { nextRandom } from './rng';
 import { rollDailyWeather, WEATHER_ON_TIME_PROBABILITY, WEATHER_MAX_DELAY_MINUTES } from './weather';
 import { rollCompetitorRouteOpenings } from './competitors';
+import { applyDailyLoanInterest } from './loans';
+import { flightSatisfactionScore } from './nps';
+import { applyDailyReputationChange } from './reputation';
+import { recordDailyCashHistory } from './forecast';
 import type { SimState, ActiveFlight } from './state';
 
 const MINUTES_PER_DAY = 1440;
@@ -189,10 +193,24 @@ export function step(state: SimState): void {
   const dayStart = state.simMinute - minuteOfDay;
 
   if (minuteOfDay === 0) {
+    // Week five's Reputation mechanic: read *yesterday's* On-Time/NPS
+    // performance before todayFlightsDeparted and friends get reset just
+    // below — same "read the just-finished day's real totals before
+    // they're cleared" ordering this block already relies on for
+    // todayRevenue/todayCost/todayMargin elsewhere in main.ts/step.ts.
+    applyDailyReputationChange(state);
+    // Week five's runway forecast (sim/forecast.ts): same "read it before
+    // today's own charges touch Cash" timing as the reputation call just
+    // above — this is what makes each entry "yesterday's closing balance."
+    recordDailyCashHistory(state);
+
     state.completedToday = [];
     state.todayRevenue = 0;
     state.todayCost = 0;
     state.todayMargin = 0;
+    state.todayFlightsDeparted = 0;
+    state.todayFlightsOnTime = 0;
+    state.todayNpsPoints = 0;
     // Spill-and-recapture's shared pool (sim/economy.ts's flightResult())
     // is scoped to one day: unclaimed spill doesn't carry into tomorrow,
     // since nobody's actually holding a seat for anyone.
@@ -229,6 +247,12 @@ export function step(state: SimState): void {
     // route. Same daily cadence as weather, for the same reason — this
     // is a day-scale event, not something worth re-checking every minute.
     rollCompetitorRouteOpenings(state, state.simMinute);
+
+    // Week five's loan mechanic (sim/loans.ts): compound interest on every
+    // outstanding loan, once a day, same cadence as weather and the
+    // competitor AI above. Charged to each loan's own balance, not to Cash
+    // directly — see applyDailyLoanInterest()'s own comment for why.
+    applyDailyLoanInterest(state);
   }
 
   for (const leg of state.schedule) {
@@ -257,8 +281,10 @@ export function step(state: SimState): void {
     // not a fresh event of its own.
     const lateAtDepartureMinutes = state.simMinute - (dayStart + leg.departMinute);
     state.flightsDepartedTotal += 1;
+    state.todayFlightsDeparted += 1;
     if (lateAtDepartureMinutes === 0) {
       state.flightsOnTimeTotal += 1;
+      state.todayFlightsOnTime += 1;
     }
 
     // Same on-time question as the whole-airline counters just above,
@@ -288,6 +314,21 @@ export function step(state: SimState): void {
     // Fare and marketing spend are market-level (RouteSettings), not
     // per-leg — every leg on this market shares the same entry.
     const routeSettings = state.routeSettings[marketOnTimeKey];
+
+    // Week five's NPS quality signal (sim/nps.ts): every input this needs —
+    // this flight's just-rolled delay, its fare, and its aircraft's age —
+    // is already known by this point in the loop, so it's scored the same
+    // moment the on-time counters above are.
+    const satisfactionScore = flightSatisfactionScore(
+      delayMinutes,
+      routeSettings.fare,
+      aircraft.ageYears,
+      leg.origin,
+      leg.dest,
+      state.competitorRoutes,
+    );
+    state.npsPointsTotal += satisfactionScore;
+    state.todayNpsPoints += satisfactionScore;
 
     const activeFlight: ActiveFlight = {
       legId: leg.legId,

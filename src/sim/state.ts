@@ -3,6 +3,7 @@ import { loadSchedule, marketKey, recommendedFare, type PositioningLeg, type Sch
 import { loadFleetMarket, type FleetListing } from './fleetMarket';
 import { loadCompetitorRoutes, type CompetitorOffering } from './competitors';
 import type { WeatherEvent } from './weather';
+import type { Loan } from './loans';
 
 export type AircraftStatus = 'ground' | 'airborne';
 
@@ -173,6 +174,18 @@ export type SimState = {
   todayCost: number;
   todayMargin: number;
   /**
+   * Week five's Reputation mechanic (sim/reputation.ts): today's own
+   * departed/on-time/NPS-point counts, reset to zero at day-rollover same
+   * as `todayRevenue` and friends above — *not* the lifetime totals below,
+   * which barely move day to day once a game has run a while. Read (and
+   * only then reset) by `applyDailyReputationChange()` at the *start* of
+   * the next day's rollover, so Reputation reacts to how yesterday
+   * actually went rather than a slow-moving lifetime average.
+   */
+  todayFlightsDeparted: number;
+  todayFlightsOnTime: number;
+  todayNpsPoints: number;
+  /**
    * Lifetime counters (never reset, unlike the todayX fields above) behind
    * the "on-time performance" HUD stat next to Cash: every scheduled leg
    * that actually departs increments `flightsDepartedTotal`, and
@@ -197,6 +210,30 @@ export type SimState = {
    * market.
    */
   onTimeByMarket: Record<string, { departed: number; onTime: number }>;
+  /**
+   * Week five's second HUD quality signal (see sim/nps.ts and
+   * WEEK-FIVE.md's "Reputation" design): the running sum of every revenue
+   * flight's `flightSatisfactionScore()` at the moment it departs.
+   * Divided by `flightsDepartedTotal` above — deliberately the *same*
+   * denominator On-Time performance uses, since it's the same population
+   * (revenue departures only; positioning moves don't count here either,
+   * same reasoning `onTimeByMarket` already documents) — to get the
+   * lifetime average NPS shown in the sidebar. A lifetime average rather
+   * than a trailing window, same "simplest first pass" shape the On-Time
+   * stat already has; a more reactive trailing-window version is a real
+   * future refinement, not this one.
+   */
+  npsPointsTotal: number;
+  /**
+   * Week five's second resource besides Cash (sim/reputation.ts): an
+   * unbounded running score, moved up or down once per simulated day by
+   * `applyDailyReputationChange()` based on that day's On-Time percentage
+   * and average NPS (see `todayFlightsDeparted`/`todayFlightsOnTime`/
+   * `todayNpsPoints` above). Starts at 0 — a brand-new airline with no
+   * track record yet, not already "good" or "bad." Nothing spends this
+   * yet; it exists so a future tech tree has something real to draw down.
+   */
+  reputation: number;
   /**
    * Lifetime minutes of arrival delay attributed to each of step.ts's
    * three delay causes (age, weather, knock-on) — the On-Time panel's
@@ -230,6 +267,28 @@ export type SimState = {
    * here.
    */
   rngSeed: number;
+  /**
+   * Week five's failure state (see WEEK-FIVE.md): outstanding loans, taken
+   * via ui/loans.ts's pop-up whenever Cash drops to zero or below. Each
+   * loan's balance compounds daily (sim/loans.ts's
+   * applyDailyLoanInterest(), called from step.ts's day-rollover) until
+   * it's repaid in full and removed. Capped at MAX_LOANS (20) outstanding
+   * at once — needing a 21st while already at that cap is what
+   * sim/loans.ts's isInsolvent() calls game over.
+   */
+  loans: Loan[];
+  /**
+   * Week five's runway forecast (sim/forecast.ts): the last
+   * CASH_HISTORY_MAX_DAYS days' worth of closing Cash balances, oldest
+   * first, recorded once per simulated day at the top of step.ts's
+   * day-rollover — before that day's own charges apply, so each entry is
+   * genuinely "yesterday's closing balance." Capped at a rolling window
+   * (older entries shifted out) rather than kept for the whole game, both
+   * because a whole-game history would grow `SimState` unboundedly and
+   * because a forecast should react to the *recent* trend, not a game
+   * that's been profitable for months averaging out a rough current week.
+   */
+  cashHistory: number[];
 };
 
 // Only one aircraft type exists so far, so every aircraft record uses it.
@@ -318,12 +377,19 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     todayRevenue: 0,
     todayCost: 0,
     todayMargin: 0,
+    todayFlightsDeparted: 0,
+    todayFlightsOnTime: 0,
+    todayNpsPoints: 0,
     flightsDepartedTotal: 0,
     flightsOnTimeTotal: 0,
     onTimeByMarket: {},
+    npsPointsTotal: 0,
+    reputation: 0,
     delayMinutesByCause: { age: 0, weather: 0, knockOn: 0 },
     spilloverByMarket: {},
     rngSeed,
+    loans: [],
+    cashHistory: [],
   };
 }
 
@@ -365,11 +431,18 @@ export function createNewGameState(rngSeed: number = Date.now()): SimState {
     todayRevenue: 0,
     todayCost: 0,
     todayMargin: 0,
+    todayFlightsDeparted: 0,
+    todayFlightsOnTime: 0,
+    todayNpsPoints: 0,
     flightsDepartedTotal: 0,
     flightsOnTimeTotal: 0,
     onTimeByMarket: {},
+    npsPointsTotal: 0,
+    reputation: 0,
     delayMinutesByCause: { age: 0, weather: 0, knockOn: 0 },
     spilloverByMarket: {},
     rngSeed,
+    loans: [],
+    cashHistory: [],
   };
 }

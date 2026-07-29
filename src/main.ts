@@ -26,7 +26,10 @@ import { setupRotationBoard, updateRotationBoard, hideBarTooltip } from './ui/ro
 import { setupCommercialPanel, updateCommercialPanel } from './ui/commercial';
 import { setupFleetMarket } from './ui/fleetMarket';
 import { setupOnTimePanel, updateOnTimePanel } from './ui/onTime';
+import { setupExecutivePanel, updateExecutivePanel } from './ui/executive';
 import { updateTicker } from './ui/ticker';
+import { setupLoans, updateLoans } from './ui/loans';
+import { isInsolvent } from './sim/loans';
 import { loadSavedState, saveState, clearSavedState } from './ui/save';
 
 // Week three's persistence fix (see WEEK-THREE.md): resume a saved game
@@ -55,6 +58,8 @@ setupRotationBoard();
 setupCommercialPanel(state);
 setupFleetMarket(state);
 setupOnTimePanel();
+setupExecutivePanel();
+setupLoans(state);
 
 const canvas = document.querySelector<HTMLCanvasElement>('#map')!;
 const ctx = canvas.getContext('2d')!;
@@ -106,6 +111,7 @@ const rotationBoardEl = document.querySelector<HTMLDivElement>('#rotation-board'
 const commercialPanelEl = document.querySelector<HTMLDivElement>('#commercial-panel')!;
 const fleetMarketPanelEl = document.querySelector<HTMLDivElement>('#fleet-market-panel')!;
 const onTimePanelEl = document.querySelector<HTMLDivElement>('#ontime-panel')!;
+const executivePanelEl = document.querySelector<HTMLDivElement>('#executive-panel')!;
 
 // Week three: the only way back to a fresh game, now that one persists
 // across reloads by default. Confirms first since this is irreversibly
@@ -197,7 +203,7 @@ let latestFractionalMinute = state.simMinute;
 // competitionOverlayOn, below), layered on top of the 'map' panel instead
 // of replacing it, so checking a market's demand or competitive situation
 // no longer costs you the ability to draw a route while looking at it.
-type PanelView = 'map' | 'rotation' | 'commercial' | 'fleet-market' | 'ontime';
+type PanelView = 'map' | 'rotation' | 'commercial' | 'fleet-market' | 'ontime' | 'executive';
 let panelView: PanelView = 'map';
 let demandOverlayOn = false;
 let competitionOverlayOn = false;
@@ -209,6 +215,14 @@ function render(nowMs: number = performance.now()): void {
   // you're deep in the Commercial panel should still get announced, not
   // silently missed until you happen to switch back to the map.
   updateTicker(state);
+
+  // Same reasoning as updateTicker() above: the loan pop-up and the
+  // game-over screen are global overlays, not part of any one panel, so
+  // they need to keep refreshing regardless of which panel is showing.
+  // Pausing on insolvency (see tick() below) is handled separately from
+  // this refresh, since render() can run before speedMultiplier itself is
+  // declared (resize()'s very first call, at startup).
+  updateLoans(state);
 
   if (panelView !== 'map') return;
 
@@ -330,6 +344,15 @@ function tick(nowMs: number): void {
     saveState(state);
   }
 
+  // Week five's failure state: the instant every loan slot is spoken for
+  // and Cash is still gone, force a stop — there's nothing left to decide,
+  // so nothing should keep flying in the background behind the game-over
+  // screen ui/loans.ts is about to show.
+  if (isInsolvent(state) && speedMultiplier !== 0) {
+    speedMultiplier = 0;
+    speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === 0));
+  }
+
   latestFractionalMinute = state.simMinute + accumulator / MS_PER_SIM_MINUTE;
   render(nowMs);
   requestAnimationFrame(tick);
@@ -395,6 +418,7 @@ const PANEL_GROUP: Record<PanelView, string> = {
   commercial: 'reports',
   'fleet-market': 'reports',
   ontime: 'reports',
+  executive: 'reports',
 };
 
 /**
@@ -415,6 +439,7 @@ function switchToPanel(view: PanelView, highlightLegIds: string[] = []): void {
   commercialPanelEl.hidden = view !== 'commercial';
   fleetMarketPanelEl.hidden = view !== 'fleet-market';
   onTimePanelEl.hidden = view !== 'ontime';
+  executivePanelEl.hidden = view !== 'executive';
   competitionAirlineGroup.hidden = view !== 'map' || !competitionOverlayOn;
 
   viewToggleButtons.forEach((b) => b.classList.toggle('active', b.dataset.view === view));
@@ -435,6 +460,7 @@ function switchToPanel(view: PanelView, highlightLegIds: string[] = []): void {
   if (view === 'rotation') updateRotationBoard(state, highlightLegIds);
   if (view === 'commercial') updateCommercialPanel(state);
   if (view === 'ontime') updateOnTimePanel(state);
+  if (view === 'executive') updateExecutivePanel(state);
 
   render();
 }

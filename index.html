@@ -90,6 +90,27 @@
         <tbody id="ontime-causes-rows"></tbody>
       </table>
     </div>
+    <div id="executive-panel" hidden>
+      <section id="loans-section" hidden>
+        <h2>Loans <span id="loans-count"></span></h2>
+        <table id="loans-table" class="panel-table">
+          <thead>
+            <tr>
+              <th>Loan</th>
+              <th>Balance</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="loans-rows"></tbody>
+        </table>
+      </section>
+      <section id="executive-forecast-section">
+        <h2>Financial runway</h2>
+        <canvas id="executive-chart" width="1040" height="400"></canvas>
+        <div id="executive-summary"></div>
+        <div id="executive-delta"></div>
+      </section>
+    </div>
     <div id="hud">
       <div id="clock">Day 1 · 00:00 UTC</div>
       <div id="speed-controls">
@@ -126,6 +147,7 @@
             <button type="button" data-view="commercial">Commercial</button>
             <button type="button" data-view="fleet-market">Fleet</button>
             <button type="button" data-view="ontime">On-Time</button>
+            <button type="button" data-view="executive">Executive</button>
           </div>
         </div>
       </div>
@@ -154,6 +176,8 @@
       <section id="econ-summary">
         <div class="econ-row"><span class="econ-label">Cash</span><span id="panel-cash" class="econ-value"></span></div>
         <div class="econ-row"><span class="econ-label">On-time</span><span id="panel-otp" class="econ-value"></span></div>
+        <div class="econ-row"><span class="econ-label">NPS</span><span id="panel-nps" class="econ-value"></span></div>
+        <div class="econ-row"><span class="econ-label">Reputation</span><span id="panel-reputation" class="econ-value"></span></div>
         <h2>Today</h2>
         <div class="econ-row"><span class="econ-label">Revenue</span><span id="panel-revenue" class="econ-value"></span></div>
         <div class="econ-row"><span class="econ-label">Cost</span><span id="panel-cost" class="econ-value"></span></div>
@@ -221,6 +245,35 @@
     </aside>
     <div id="ticker">
       <div id="ticker-track"></div>
+    </div>
+    <div id="loan-offer-modal" class="modal-overlay" hidden>
+      <div class="modal-box">
+        <h2>Cash is out</h2>
+        <p>
+          Cash has hit <span id="loan-offer-cash"></span>. A lender will
+          front <span id="loan-offer-amount"></span> to keep flying —
+          interest compounds daily, so the longer it sits unpaid the more
+          it costs to clear.
+        </p>
+        <p class="modal-subtle">Outstanding loans: <span id="loan-offer-count"></span></p>
+        <div class="modal-actions">
+          <button type="button" id="loan-offer-take">Take the loan</button>
+          <button type="button" id="loan-offer-dismiss">Not now</button>
+        </div>
+      </div>
+    </div>
+    <div id="game-over-modal" class="modal-overlay" hidden>
+      <div class="modal-box modal-box--game-over">
+        <h2>Insolvent</h2>
+        <p>
+          Cash is gone and every one of the 20 loan slots is already
+          spoken for — there's no more credit left to draw on. This
+          airline is finished.
+        </p>
+        <div class="modal-actions">
+          <button type="button" id="game-over-new-game">Start a new game</button>
+        </div>
+      </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

@@ -9,6 +9,8 @@ export const PANEL_WIDTH_PX = 280;
 
 const cashEl = document.querySelector<HTMLSpanElement>('#panel-cash')!;
 const otpEl = document.querySelector<HTMLSpanElement>('#panel-otp')!;
+const npsEl = document.querySelector<HTMLSpanElement>('#panel-nps')!;
+const reputationEl = document.querySelector<HTMLSpanElement>('#panel-reputation')!;
 const revenueEl = document.querySelector<HTMLSpanElement>('#panel-revenue')!;
 const costEl = document.querySelector<HTMLSpanElement>('#panel-cost')!;
 const marginEl = document.querySelector<HTMLSpanElement>('#panel-margin')!;
@@ -55,6 +57,16 @@ export function updatePanel(state: SimState): void {
     state.flightsDepartedTotal === 0
       ? '—'
       : `${Math.round((state.flightsOnTimeTotal / state.flightsDepartedTotal) * 100)}%`;
+  if (state.flightsDepartedTotal === 0) {
+    npsEl.textContent = '—';
+  } else {
+    const nps = Math.round(state.npsPointsTotal / state.flightsDepartedTotal);
+    npsEl.textContent = nps > 0 ? `+${nps}` : `${nps}`;
+  }
+  // Always a real number, unlike On-time/NPS above — 0 is a genuine
+  // starting Reputation (a new airline with no track record), not a
+  // placeholder for "no data yet" — see sim/reputation.ts.
+  reputationEl.textContent = `${Math.round(state.reputation)}`;
   revenueEl.textContent = formatMoney(state.todayRevenue);
   costEl.textContent = formatMoney(state.todayCost);
   marginEl.textContent = formatMoney(state.todayMargin);

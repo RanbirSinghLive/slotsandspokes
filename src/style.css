@@ -20,7 +20,8 @@ body {
 #rotation-board,
 #commercial-panel,
 #fleet-market-panel,
-#ontime-panel {
+#ontime-panel,
+#executive-panel {
   display: block;
   width: calc(100vw - 280px);
   height: 100vh;
@@ -34,7 +35,8 @@ body {
 #rotation-board[hidden],
 #commercial-panel[hidden],
 #fleet-market-panel[hidden],
-#ontime-panel[hidden] {
+#ontime-panel[hidden],
+#executive-panel[hidden] {
   display: none;
 }
 
@@ -1084,4 +1086,168 @@ body {
   to {
     transform: translateX(-100%);
   }
+}
+
+/* Week five's loan mechanic. #loans-count sits inline in the section's own
+   <h2>, so it just needs to read as secondary, not a whole new heading
+   style. */
+#loans-count {
+  color: #6b7694;
+  font-weight: 400;
+  font-size: 11px;
+}
+
+.loan-repay-button {
+  font-family: inherit;
+  font-size: 12px;
+  color: #9aa3b8;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.loan-repay-button:hover:not(:disabled) {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.loan-repay-button:disabled {
+  color: #4a5266;
+  border-color: rgba(255, 255, 255, 0.08);
+  cursor: default;
+}
+
+/* Shared shape for both the loan-offer pop-up and the game-over screen —
+   the first real centered modal in this codebase (#new-game-confirm, the
+   only other confirmation dialog so far, sits inline in the HUD bar
+   instead). A full-viewport backdrop, same z-index tier as #ticker, high
+   enough to sit above the map and every panel. */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 7, 12, 0.75);
+  z-index: 30;
+}
+
+.modal-overlay[hidden] {
+  display: none;
+}
+
+.modal-box {
+  max-width: 360px;
+  padding: 20px 24px;
+  background: #0a0c12;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 13px;
+  color: #cdd3e0;
+}
+
+.modal-box h2 {
+  margin: 0 0 10px;
+  font-size: 15px;
+  color: #fff;
+}
+
+.modal-box p {
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+
+.modal-subtle {
+  color: #6b7694;
+  font-size: 12px;
+}
+
+/* The game-over screen is the one modal you can't dismiss without
+   starting over — a slightly harder red border marks that it's not just
+   another routine pop-up, same #ff8080 the rest of the app already uses
+   for "actually broken." */
+.modal-box--game-over {
+  border-color: #ff8080;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.modal-actions button {
+  font-family: inherit;
+  font-size: inherit;
+  border-radius: 4px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+#loan-offer-take,
+#game-over-new-game {
+  background: #3a4258;
+  border: 1px solid #6b7694;
+  color: #fff;
+}
+
+#loan-offer-dismiss {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #9aa3b8;
+}
+
+/* Week five's executive ledger — same padding/font shape as #ontime-panel,
+   the Reports panel it sits alongside. Houses two sections: Loans
+   (ui/loans.ts's own concern) and the financial runway forecast
+   (ui/executive.ts) — kept as separate modules, just sharing one screen. */
+#executive-panel {
+  padding: 68px 24px 24px;
+  overflow-y: auto;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 13px;
+  color: #cdd3e0;
+}
+
+#executive-panel h2 {
+  margin: 0 0 12px;
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7694;
+}
+
+#executive-panel #loans-section {
+  margin-bottom: 32px;
+  max-width: 520px;
+}
+
+#executive-chart {
+  display: block;
+  width: 520px;
+  height: 200px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+}
+
+#executive-summary {
+  margin-top: 12px;
+  font-size: 14px;
+}
+
+/* Same #ff8080 the rest of the app already uses for "worth worrying
+   about" — a zero-cash date approaching, not decorative. */
+#executive-summary.executive-summary--warning {
+  color: #ff8080;
+}
+
+#executive-delta {
+  margin-top: 4px;
+  color: #6b7694;
+  font-size: 12px;
 }
