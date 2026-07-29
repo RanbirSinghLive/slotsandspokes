@@ -290,6 +290,33 @@ v9 → v10.
 Nothing spends Reputation yet — that's the tech tree, still ahead on
 this list.
 
+**A real playtest turned up a genuine bug in this, fixed the same
+day:** a one-plane operation flying 2 real routes hit -100 Reputation
+in just two simulated weeks, despite lifetime On-Time sitting at 63%
+and NPS at only -2 — numbers that read as "mildly rough," not
+"catastrophic." The cause wasn't the weights, it was sample size:
+`applyDailyReputationChange()` reacts to *that one day's* raw on-time
+percentage, and with only 2 departures a day, "today's OTP" can only
+ever be 0%, 50%, or 100% — a single delayed flight (routine at this
+fleet size) swings a whole day to 0%, which at `OTP_WEIGHT = 50` is a
+-40-point day on its own. A handful of ordinary bad days like that
+easily compounds to -100, even though the smoothed lifetime stats
+shown in the HUD look fine.
+
+**Fix:** a new `REPUTATION_MIN_SAMPLE_FLIGHTS` (10) confidence factor —
+`min(1, todayFlightsDeparted / 10)` — multiplies the whole day's delta.
+A large, established carrier's daily numbers are a real signal and
+still land at full strength; a small carrier's noisy 2-flight day gets
+scaled down proportionally instead of hitting like a real 40-point
+swing. Verified directly: the reported shape (2 departures, 0%
+on-time, avg NPS -10) now lands at exactly -8.40 instead of the old
+-40.00; the same bad day at 20 departures (an established operation)
+still lands at the full, undampened -42.00, confirming the fix targets
+small samples specifically, not the weights in general; a *good* 2-
+flight day is dampened the same way (+3.60 instead of +18), confirming
+the confidence factor applies symmetrically rather than only softening
+losses.
+
 **Built as designed** (`sim/forecast.ts` + `ui/executive.ts`, in what
 was first a standalone "Finances" Reports panel, later folded into the
 Executive ledger below): `SimState` gained `cashHistory`, a rolling

@@ -28,6 +28,24 @@ const OTP_WEIGHT = 50;
 const NPS_WEIGHT = 0.2;
 
 /**
+ * Found in playtesting: a one-plane, few-flights-a-day operation has a
+ * tiny, noisy daily sample — with 2 departures, "today's on-time %" can
+ * only ever be 0%, 50%, or 100%, nothing in between. Reacting to that raw
+ * number at full strength meant a single delayed flight (routine at this
+ * fleet size) could swing a whole day's Reputation by -40 or more, and a
+ * handful of ordinary bad days over two real weeks drove Reputation to
+ * -100 even though the *lifetime* On-Time/NPS stats shown in the HUD
+ * looked only mildly rough. The fix isn't the weights — a large,
+ * established carrier's daily numbers are a real signal — it's that a
+ * small carrier's aren't yet. REPUTATION_MIN_SAMPLE_FLIGHTS is the
+ * departure count at which a day's delta counts at full strength; below
+ * it, the whole day's swing is scaled down proportionally, same
+ * "deliberately crude, not fit to any real study" spirit as every other
+ * constant here.
+ */
+const REPUTATION_MIN_SAMPLE_FLIGHTS = 10;
+
+/**
  * Called once per simulated day, from step.ts's day-rollover — but
  * *before* the today-scoped counters it reads (`todayFlightsDeparted`,
  * `todayFlightsOnTime`, `todayNpsPoints`) get reset to zero for the new
@@ -45,6 +63,7 @@ export function applyDailyReputationChange(state: SimState): void {
   const otpPct = state.todayFlightsOnTime / state.todayFlightsDeparted;
   const avgNps = state.todayNpsPoints / state.todayFlightsDeparted;
 
-  const delta = (otpPct - OTP_BASELINE) * OTP_WEIGHT + avgNps * NPS_WEIGHT;
-  state.reputation += delta;
+  const rawDelta = (otpPct - OTP_BASELINE) * OTP_WEIGHT + avgNps * NPS_WEIGHT;
+  const confidence = Math.min(1, state.todayFlightsDeparted / REPUTATION_MIN_SAMPLE_FLIGHTS);
+  state.reputation += rawDelta * confidence;
 }
