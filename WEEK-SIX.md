@@ -116,11 +116,178 @@ executive/missions/tech-tree line of work for this week's attention.
 
 ---
 
+## Brainstormed next additions, not yet spec'd
+
+Raised directly, as a "what's logically next beyond what's already
+spec'd" pass — none of this is decided, just captured so it isn't
+lost. Roughly cheapest/most-connected-to-existing-systems first:
+
+- **Seasonal demand.** `sim/demand.ts`'s gravity model is flat day to
+  day, but weather already runs on a real seasonal cycle (more storms
+  in winter). A seasonal multiplier — a summer leisure spike, a
+  holiday VFR bump — would hit the existing 3-segment choice model
+  differently per segment (business flat, leisure/VFR swinging), which
+  is exactly the "no new architecture, just a new multiplier" shape
+  this project favors. Probably the cheapest item on this whole list.
+- **More ancillary revenue beyond bag fees.** Belly cargo/freight is a
+  real historical regional-carrier revenue stream and would slot into
+  the same trade-off framing already decided for bag fees in
+  WEEK-FIVE.md (available anytime, costs Reputation to run).
+- **Real financial statements**, not just Today's P&L. Loans exist now
+  (a liability), so a proper period statement — monthly close, assets
+  vs. liabilities — is a natural next step for the Executive ledger.
+  Also hands a concrete answer to this doc's still-open "what does a
+  CFO actually do" question: maybe the CFO's unlock isn't a number
+  tweak at all, it's *better financial reporting* (forecast accuracy,
+  a real balance sheet) — a genuine bonus that doesn't require
+  inventing a fake stat to modify.
+- **A rolled-up scorecard**, once missions exist. The original
+  complaint that started WEEK-FIVE.md was "no clear goal." Missions
+  answer that per-target; a single "how's this airline actually doing"
+  number (blending Cash trend, Reputation, on-time) is the natural
+  capstone once there's more than one thing to blend.
+- **Maintenance/reliability events.** The age-delay model already
+  treats an old airframe as less reliable — the obvious next step is
+  an actual AOG event (unscheduled maintenance grounds a plane for a
+  day), turning "this plane is old" from a delay-minutes stat into a
+  real scheduling stake. This is also the most natural source for the
+  cancellation mechanic discussed below. **Explicitly gated by
+  CLAUDE.md** ("do not build... maintenance planning... until
+  explicitly asked") — needs that gate lifted before it's fair game.
+- **Crew.** Same gate as maintenance, a much bigger lift (duty time,
+  fatigue, a labor cost line) — a "someday," not a "next."
+- **Sound.** Been on WEEK-ONE.md's deferred list since the very first
+  milestone and never revisited. Even a minimal ambient pass is low
+  risk relative to everything else here.
+- **A day-ahead briefing.** WEEK-FOUR.md floated an ambient "weather is
+  happening" indicator and it got dropped as not needed (WEEK-FIVE.md)
+  — a proper day-ahead *forecast* (tomorrow's weather, which routes are
+  exposed) is a different, arguably more useful idea than the
+  ambient-indicator version that got cut.
+
+## Reliability, reframed: on-time vs. cancellations
+
+Raised directly: on-time currently means exactly one thing — departed
+at its due minute, over every flight that ever departs — because
+nothing in this sim can fail to depart at all. Real airlines (and the
+BTS delay-code naming this project already borrows) track two separate
+things: **On-Time Performance**, computed only over flights that
+operated, and **Completion Factor**, the fraction of scheduled
+departures that happened at all. A cancelled flight isn't "late," it's
+a different failure mode, and blending the two into one number would
+hide exactly the thing worth knowing — a carrier that's always on time
+when it flies but cancels constantly is a very different airline from
+one that's chronically 40 minutes late.
+
+**Proposed reconciliation:** keep the two separate at the raw-stat
+layer, combine them only downstream. On-time keeps meaning exactly
+what it means today, untouched. A new **Completion Factor** sits next
+to it in the HUD — same lifetime shape, `completed / scheduled`. The
+two only combine at NPS and Reputation, which is where "how good is
+this airline, overall" already gets summarized.
+
+- **NPS:** a cancellation should score worse than any delay, not sit on
+  the same continuum — a rebooked/stranded passenger is more upset than
+  one who's 90 minutes late. A flat, large negative contribution
+  (something like -80) rather than stretching the existing delay curve
+  to cover it, since that curve floors at -50 even for a catastrophic
+  delay — cancellation needs headroom to read as strictly worse.
+- **Reputation:** the daily formula currently reads
+  `todayFlightsOnTime/todayFlightsDeparted` — a cancelled flight never
+  departs, so it'd silently vanish from that ratio entirely unless
+  added on purpose. Needs a third term for cancellation rate, and the
+  small-sample dampening built for the exact same reason
+  (`REPUTATION_MIN_SAMPLE_FLIGHTS`) should apply to it too — one
+  cancelled flight out of 2 scheduled shouldn't read as a 50%
+  Completion Factor collapse for a one-plane operation.
+
+**What actually causes a cancellation** is the real open question. A
+bare random chance is the wrong model — nothing to look at, nothing the
+player can affect or learn from, and it breaks the "deliberately crude
+but real-sourced" rule this sim follows everywhere else. Two candidate
+causes are already half-built and would give a cancellation somewhere
+real to come from:
+
+- **Severe weather, escalated.** Weather already worsens delay odds but
+  never stops a flight outright — real airports do close above some
+  storm severity. Giving weather events a severity tier, where the
+  worst tier cancels rather than delays, is the smallest possible
+  new-machinery cost.
+- **A mechanical event**, extending the age-delay model. An old
+  airframe already rolls worse delay odds; letting a bad-enough roll on
+  that same curve become an outright cancellation instead of a long
+  delay is a small conceptual step — and it's arguably the first sliver
+  of the maintenance system above, not a separate thing.
+
+**Undecided:** does a cancelled flight still cost anything? Real
+airlines still eat crew/gate costs on a cancellation, just not fuel.
+Leaning toward zeroing the whole leg out first — fewer moving parts —
+and only adding partial-cost realism if it turns out to matter for
+balance.
+
+## The map-overlay UI rework — getting out of ledger-after-ledger
+
+Raised directly: the game feels like it's going "deeper and deeper into
+ledgers," and the drift is traceable to one specific place. Demand and
+Competition (WEEK-FOUR.md) are already built the way Paradox-style
+strategy games do it — map *lenses*: the base map never disappears, a
+layer toggles on top of it, switching away is instant because you were
+never anywhere else. WEEK-FOUR.md literally calls this "layers, not
+modes."
+
+Every other Report — Rotation, Commercial, Fleet Market, On-Time, and
+now the Executive ledger — is built the opposite way:
+`main.ts`'s `switchToPanel()` sets `canvas.hidden = true` and swaps in
+a full-bleed DOM panel. That's not a layer on the map, it's navigating
+away from it to a different destination. Five of this game's seven
+views hide the map outright; only two treat it as a lens. The "layers,
+not modes" fix from WEEK-FOUR never got extended past Demand/
+Competition to the other five.
+
+**What Paradox's own ledger screens actually do** (EU4's Ledger, CK3's
+Realm screen, Stellaris' Situation Log) isn't "always show the full
+map" either — those screens cover most of the view too. The real
+pattern: the map dims/blurs behind rather than vanishing (a continuity
+cue — still the same world, not a different page); the screen is a
+bounded floating card that's closed (Escape, an X, click-outside), not
+navigated to via a persistent nav bar; the top resource bar never
+disappears on any screen; the simulation keeps running behind an open
+one. This project already has two of those four right — the sidebar
+never hides, and nothing in `tick()` is gated by which panel is open.
+
+**Proposed fix:** generalize the `.modal-overlay`/`.modal-box` pattern
+already built for the loan-offer/game-over pop-ups (a dimmed backdrop,
+a floating card, not a full-screen takeover) to the five Reports
+panels — same dimmed-map-behind treatment, same floating-card sizing
+(not full `100vw`/`100vh`), same "this is a window you opened, not a
+page you navigated to" feel. Demand/Competition stay exactly as they
+are, since they're correctly lenses already, not windows.
+
+**Rotation is the one genuine edge case** worth naming: it's a
+timeline/Gantt view, and nothing about it benefits from being
+spatially overlaid on lat/long. Still a floating card, not forced into
+a lens just for consistency's sake — Paradox has plenty of screens
+like this too (a character sheet isn't map-anchored either).
+
+**Scope, honestly:** this is a real architecture change, not a CSS
+tweak — canvas visibility, the dropdown active-state logic, and the
+route-builder's "cancel on leaving the map" behavior are all currently
+written around "which view is active" rather than "is a window open,"
+and all of it needs rethinking around the new model. Smaller than it
+sounds, though, since most of the actual card/backdrop styling already
+exists from the loan modals.
+
+---
+
 ## Proposed build order (not committed)
 
 Roughly in dependency order — each item mostly needs the one before it
 to already exist, unlike WEEK-FIVE.md's list where several items were
-independent:
+independent. Everything in the three sections above (brainstormed
+additions, cancellations, the map-overlay rework) is captured but not
+yet slotted into this ordering — none of it has been decided as "next"
+over the C-suite/missions/tech-tree line already below, just recorded
+so it isn't lost:
 
 1. **Decide the C-suite bonus/malus mapping** — a design pass, not
    code: what does each of COO/CFO/CCO/CEO actually modify? Blocks
