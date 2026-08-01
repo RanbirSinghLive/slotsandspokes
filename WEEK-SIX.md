@@ -562,6 +562,71 @@ correctly disabled/priced Unlock buttons, and zero console errors.
 
 ---
 
+## Built: the balance sweep, and what it immediately found
+
+`src/headless/sweep.ts` (`npm run sweep -- <lever> [days]`) runs the
+headless network many times over, changing exactly one lever per run, and
+prints revenue/cost/margin per day plus cumulative cash for each value,
+marking where margin peaks. `run.ts` only ever answered "how does one
+configuration do" — this answers "does moving this number help, and where
+does it stop helping," which is the question balance decisions actually
+turn on.
+
+Every run in a sweep uses the **same RNG seed** deliberately: different
+seeds would mean different weather, competitor openings and fuel price
+history per row, so the differences between rows would be mostly noise
+instead of the lever. Three levers so far — fare (a multiplier on every
+market's recommended fare), marketing (daily spend per market), and
+fuel-efficiency (the tech tree's real cumulative multipliers). All three
+are `SimState` fields, which is why this needed **no changes to `sim/`
+at all**. Module-level constants (`LOAD_FACTOR`, `RECAPTURE_RATE`,
+`FUEL_SHARE_OF_BLOCK_HOUR_COST`) are deliberately *not* sweepable yet —
+that needs a tunables layer letting something outside the sim override
+them, which is its own design decision, not something to smuggle in.
+
+### Finding 1: fare has no optimum — "charge more" is always correct
+
+Swept 0.6x to 5x the recommended fare over 120 days. Margin climbs
+monotonically the entire way, never turning over: $6,910/day at the
+recommended fare, $41,227/day at 5x. Six times the profit for doing
+nothing but raising the price.
+
+The cause is **not** a weak choice model. Diagnosing per market showed
+`sim/choiceModel.ts` responds to price exactly as designed — the thin
+Maritime routes fall from 9 booked to 0 across that range. The problem is
+capacity: the headless network's two trunk markets carry 3,752 and 4,668
+pax/day of demand against a 19-seat Beech 1900D with a 14-seat ceiling.
+Even at **5x fare** those markets still book 53 and 16 per flight — above
+the cap. They are seat-capped at every price in the range, so price
+changes cost literally zero passengers and revenue scales linearly with
+fare forever.
+
+So the real finding is a **demand/capacity mismatch, not a pricing bug**:
+`recommendedFare()` sits far below the point where demand becomes the
+binding constraint on the routes that matter. The pricing tension the
+game is built around is entirely masked on exactly the routes a player
+flies most. Not yet fixed — the options (raise `recommendedFare()`, scale
+`sim/demand.ts`'s gravity output down, or accept that a 19-seater on a
+Montreal–Toronto-sized market is simply the wrong aircraft and let the
+Fleet Market answer it) are a real balance decision, not a one-line tweak.
+
+### Finding 2: marketing is close to worthless
+
+Peaks at $50/day ($6,970 vs $6,910 at zero spend — inside the noise),
+then declines steadily to $3,353/day at $800. This follows directly from
+Finding 1: on seat-capped markets, buying more awareness cannot produce
+more passengers, so the spend is close to pure cost. Marketing probably
+can't be judged fairly until the capacity mismatch is resolved.
+
+### Finding 3: the tech tree's fuel branch is sensibly balanced
+
+The full five-tier branch moves margin from $6,910 to $7,959/day, about
++15%, with revenue untouched. Meaningful enough to be worth the
+Reputation, not so large it trivializes the economy — the one result of
+the three that needed no follow-up.
+
+---
+
 ## Proposed build order (not committed)
 
 Roughly in dependency order — each item mostly needs the one before it

@@ -1,0 +1,216 @@
+import { writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { createInitialState, type SimState } from '../sim/state';
+import { step } from '../sim/step';
+
+/**
+ * Balance-tuning sweep: run the same simulated network many times over,
+ * changing exactly one lever each time, and print what it did to the
+ * economy. CLAUDE.md says the headless runner "is how this project's
+ * economy gets tuned" — run.ts answers "how does one configuration do
+ * over N days," which is a different and much weaker question than "does
+ * moving this number make things better or worse, and where does it peak."
+ * That second question is what actually governs balance decisions, and
+ * it's what this file exists to answer.
+ *
+ *   npm run sweep -- fare
+ *   npm run sweep -- marketing 200
+ *
+ * Every run in a sweep uses the *same* RNG seed on purpose (see
+ * SWEEP_SEED). Different seeds would mean different weather, different
+ * competitor route openings and a different fuel price history in every
+ * row, so the differences between rows would be mostly noise rather than
+ * the lever being swept. Holding the seed fixed makes each row a genuine
+ * like-for-like comparison — the one thing that differs is the lever.
+ */
+
+const MINUTES_PER_DAY = 1440;
+const ACTIVE_TAILS = ['C-GVIA', 'C-FATL', 'C-GMAR'];
+const SWEEP_SEED = 1;
+const DEFAULT_DAYS = 120;
+
+/**
+ * One thing worth sweeping. `apply` mutates a freshly created state
+ * before any time is simulated, so a lever can only set up starting
+ * conditions — it can't reach into the middle of a run.
+ *
+ * Every lever here is deliberately something that already lives on
+ * `SimState`, which is why this file needs no changes to sim/ at all.
+ * Module-level constants (economy.ts's LOAD_FACTOR and RECAPTURE_RATE,
+ * fuel.ts's FUEL_SHARE_OF_BLOCK_HOUR_COST) are *not* sweepable this way
+ * — they'd need a tunables layer that lets something outside the sim
+ * override them, which is a real design decision worth making on its own
+ * rather than smuggling in here.
+ */
+type Lever = {
+  name: string;
+  description: string;
+  values: number[];
+  apply: (state: SimState, value: number) => void;
+  /** How a value appears in the results table — a raw number is rarely the clearest form. */
+  format: (value: number) => string;
+};
+
+const LEVERS: Lever[] = [
+  {
+    name: 'fare',
+    description: "Multiplier on every market's recommended fare",
+    // Deliberately spans far past anything a player would plausibly
+    // charge (up to 5x the recommended fare). A sweep range that stops
+    // before the curve turns over tells you nothing about where the
+    // optimum is — and this one has to go a long way out before it does.
+    values: [0.6, 0.8, 1.0, 1.5, 2, 2.5, 3, 4, 5],
+    apply: (state, multiplier) => {
+      for (const settings of Object.values(state.routeSettings)) {
+        settings.fare = Math.round(settings.fare * multiplier);
+      }
+    },
+    format: (v) => `${v.toFixed(2)}x`,
+  },
+  {
+    name: 'marketing',
+    description: 'Daily marketing spend on every market',
+    values: [0, 50, 100, 200, 400, 800],
+    apply: (state, spend) => {
+      for (const settings of Object.values(state.routeSettings)) {
+        settings.marketingSpend = spend;
+      }
+    },
+    format: (v) => `$${v}/day`,
+  },
+  {
+    // The exact cumulative multipliers data/tech-tree.json's five fuel
+    // efficiency tiers actually produce, in order — so each row answers
+    // "what is tier N of that branch really worth over a full run,"
+    // rather than sweeping a range of round numbers nothing in the game
+    // can actually reach.
+    name: 'fuel-efficiency',
+    description: 'Cumulative tech tree fuel efficiency, by tiers unlocked',
+    values: [1, 0.95, 0.912, 0.8664, 0.8144, 0.7737],
+    apply: (state, multiplier) => {
+      state.fuelEfficiencyMultiplier = multiplier;
+    },
+    format: (v) => (v === 1 ? 'none' : `-${Math.round((1 - v) * 100)}%`),
+  },
+];
+
+type SweepRow = {
+  value: number;
+  finalCash: number;
+  avgDailyRevenue: number;
+  avgDailyCost: number;
+  avgDailyMargin: number;
+  legsFlown: number;
+};
+
+/**
+ * One full run at one lever value. Totals are read once per day, right
+ * after that day's final minute — at that exact point `state.simMinute`
+ * is `day * 1440` and minute 0 of the *next* day hasn't been processed,
+ * so step()'s day-rollover reset hasn't fired yet and todayRevenue/Cost
+ * still hold the day that just finished. run.ts relies on the same
+ * timing for the same reason.
+ */
+function runOne(lever: Lever, value: number, days: number): SweepRow {
+  const state = createInitialState(ACTIVE_TAILS, SWEEP_SEED);
+  lever.apply(state, value);
+
+  let totalRevenue = 0;
+  let totalCost = 0;
+  let legsFlown = 0;
+
+  for (let day = 1; day <= days; day++) {
+    for (let minute = 0; minute < MINUTES_PER_DAY; minute++) {
+      step(state);
+    }
+    totalRevenue += state.todayRevenue;
+    totalCost += state.todayCost;
+    legsFlown += state.completedToday.length;
+  }
+
+  return {
+    value,
+    // createInitialState() starts at zero cash (unlike a real new game),
+    // so this is simply cumulative profit over the whole run.
+    finalCash: state.cash,
+    avgDailyRevenue: totalRevenue / days,
+    avgDailyCost: totalCost / days,
+    avgDailyMargin: (totalRevenue - totalCost) / days,
+    legsFlown,
+  };
+}
+
+function money(amount: number): string {
+  const sign = amount < 0 ? '-' : '';
+  return `${sign}$${Math.abs(Math.round(amount)).toLocaleString()}`;
+}
+
+function printTable(lever: Lever, rows: SweepRow[]): void {
+  const header = [lever.name, 'Revenue/day', 'Cost/day', 'Margin/day', 'Cumulative', 'Legs'];
+  const body = rows.map((row) => [
+    lever.format(row.value),
+    money(row.avgDailyRevenue),
+    money(row.avgDailyCost),
+    money(row.avgDailyMargin),
+    money(row.finalCash),
+    String(row.legsFlown),
+  ]);
+
+  // The whole point of the sweep is spotting where the curve peaks, so
+  // mark it rather than making the reader scan the column by eye.
+  const bestIndex = rows.reduce((best, row, i) => (row.avgDailyMargin > rows[best].avgDailyMargin ? i : best), 0);
+
+  const widths = header.map((_, col) => Math.max(header[col].length, ...body.map((r) => r[col].length)));
+  const line = (cells: string[]) => cells.map((cell, i) => cell.padStart(widths[i])).join('  ');
+
+  console.log('');
+  console.log(`  ${lever.description}`);
+  console.log('');
+  console.log(`  ${line(header)}`);
+  console.log(`  ${widths.map((w) => '-'.repeat(w)).join('  ')}`);
+  body.forEach((cells, i) => {
+    console.log(`  ${line(cells)}${i === bestIndex ? '   <- best margin' : ''}`);
+  });
+  console.log('');
+}
+
+const leverName = process.argv[2];
+const lever = LEVERS.find((l) => l.name === leverName);
+
+if (!lever) {
+  console.log('');
+  console.log('  Usage: npm run sweep -- <lever> [days]');
+  console.log('');
+  console.log('  Levers:');
+  for (const l of LEVERS) {
+    console.log(`    ${l.name.padEnd(16)} ${l.description}`);
+  }
+  console.log('');
+  process.exit(leverName ? 1 : 0);
+}
+
+const days = Number(process.argv[3]) || DEFAULT_DAYS;
+
+console.log(`Sweeping "${lever.name}" across ${lever.values.length} values, ${days} days each, seed ${SWEEP_SEED}...`);
+const rows = lever.values.map((value) => runOne(lever, value, days));
+
+printTable(lever, rows);
+
+const csv = [
+  `${lever.name},revenuePerDay,costPerDay,marginPerDay,cumulativeCash,legsFlown`,
+  ...rows.map((r) =>
+    [
+      r.value,
+      Math.round(r.avgDailyRevenue),
+      Math.round(r.avgDailyCost),
+      Math.round(r.avgDailyMargin),
+      Math.round(r.finalCash),
+      r.legsFlown,
+    ].join(','),
+  ),
+].join('\n');
+
+const outputPath = fileURLToPath(new URL(`../../sweep-${lever.name}.csv`, import.meta.url));
+writeFileSync(outputPath, csv + '\n');
+console.log(`  Wrote ${outputPath}`);
+console.log('');
