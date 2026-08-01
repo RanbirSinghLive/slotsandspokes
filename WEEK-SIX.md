@@ -734,6 +734,39 @@ Departure $600 = Flying $3,100, plus Fixed $300 = $3,400 total, matching
 the headline figure exactly, with fuel at 35.6% of block cost (the 35%
 share times a +2% fuel price index). Zero console errors.
 
+### Built: sampled delay distributions
+
+The Dev tab's second half, and the same principle as the cost tree taken
+further. Rather than *describing* what the delay model does — "the
+severity roll is squared, which skews toward the low end" — it samples
+the real functions 40,000 times each and draws what actually comes out.
+A shape is much easier to read off a histogram than off a sentence, and
+sampled output can't fall out of date when a constant changes.
+
+Four scenarios: age 0, 10 and 20 years, plus weather. Each shows its
+on-time share, mean delay when late, and a 14-bucket histogram of delay
+severity. Zero-delay draws are counted separately rather than binned —
+most flights are on time, so including them would flatten the severity
+shape into one enormous first bar and hide everything worth seeing.
+
+These are computed once at startup, not per frame: unlike the cost tree,
+they characterize the *model*, not the running game, so nothing about
+them moves as a game plays out.
+
+Getting there needed a refactor first: the delay functions were private
+to `sim/step.ts`, which was carrying both the tick loop and the entire
+delay model. They're now `sim/delays.ts` — a pure move, no logic change,
+verified by diffing 60 days of headless output before and after (byte
+identical). That also means the distributions can be sampled without
+exporting step()'s internals to a UI module.
+
+What the sampling confirms, as measured rather than asserted: on-time
+shares of 65.0% / 54.8% / 45.2% at ages 0/10/20 and 20.0% under weather,
+matching the 0.65 / 0.55 / 0.45 / 0.20 constants exactly; mean delay when
+late rising 16 → 22 → 29 minutes with age; and the squaring skew putting
+27.9% of all delays in the lowest of 14 buckets, against the 7.1% a
+uniform distribution would give.
+
 ---
 
 ## Proposed build order (not committed)
