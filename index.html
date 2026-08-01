@@ -205,6 +205,18 @@
           <div id="rotation-rows"></div>
         </div>
         <div id="commercial-panel" hidden>
+          <section id="fare-policy-section">
+            <h2>Fare policy</h2>
+            <p class="fare-policy-description">
+              Prices every market from its recommended fare, so you set this once instead of
+              per route. Override an individual market below only when it needs to differ.
+            </p>
+            <div class="lever-control">
+              <input type="range" id="fare-policy-slider" min="50" max="250" step="5" value="100" />
+              <span class="lever-value" id="fare-policy-value"></span>
+            </div>
+            <div id="fare-policy-status"></div>
+          </section>
           <table id="commercial-table">
             <thead>
               <tr>

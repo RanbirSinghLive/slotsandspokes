@@ -15,13 +15,13 @@ import {
   networkAirports,
   nextLegId,
   nextPositioningLegId,
-  recommendedFare,
   validateSchedule,
   type PositioningLeg,
   type ScheduleLeg,
 } from '../sim/schedule';
 import { addScheduleRow, filterScheduleToRoute, minuteOfDayToTimeString, renderScheduleWarnings } from './panels';
 import { addCommercialRow } from './commercial';
+import { policyFare } from '../sim/pricing';
 import { getSelectedTail } from './fleetSelection';
 import { hideCompetitionTooltip } from './competitionTooltip';
 import type { SimState } from '../sim/state';
@@ -817,14 +817,22 @@ export function setupRouteBuilder(state: SimState, onRouteConfirmed: (legIds: st
 
     // Fare/marketing are set at the market level (sim/state.ts's
     // RouteSettings), not per leg — a brand-new market gets a fresh entry
-    // (recommendedFare() default, zero marketing spend); a second
+    // (policy fare, zero marketing spend); a second
     // frequency on a market that already has one reuses it unchanged,
     // rather than resetting whatever fare the player already set there.
     // marketKey() is bidirectional, so this covers the return leg too —
     // one entry for the whole market regardless of how many legs serve it.
     const key = marketKey(origin.iata, dest.iata);
     if (!state.routeSettings[key]) {
-      state.routeSettings[key] = { fare: recommendedFare(origin.iata, dest.iata), marketingSpend: 0 };
+      // Priced by the airline-wide policy (sim/pricing.ts), not by bare
+      // recommendedFare() — a new route should open at whatever the rest
+      // of the network is charging, not silently ignore the policy and
+      // need a manual correction straight after being drawn.
+      state.routeSettings[key] = {
+        fare: policyFare(state, origin.iata, dest.iata),
+        fareIsOverridden: false,
+        marketingSpend: 0,
+      };
       addCommercialRow(origin.iata, dest.iata, state);
     }
 

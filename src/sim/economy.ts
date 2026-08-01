@@ -195,7 +195,12 @@ export function flightResult(
   fuelEfficiencyMultiplier: number,
   marketDailyDemand: number,
   legsServingMarket: number,
-  routeSettings: RouteSettings,
+  // Narrowed to the two levers this actually prices from, rather than the
+  // whole RouteSettings: `fareIsOverridden` is bookkeeping for the fare
+  // policy UI (sim/pricing.ts) and has no business in the economics. It
+  // also lets step.ts pass a flight's own locked-in fare/spend directly
+  // without inventing a value for a field that means nothing here.
+  routeSettings: Pick<RouteSettings, 'fare' | 'marketingSpend'>,
   competitorRoutes: CompetitorOffering[],
   spilloverAvailable: number,
 ): FlightResult {

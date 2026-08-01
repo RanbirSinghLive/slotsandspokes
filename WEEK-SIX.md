@@ -946,9 +946,65 @@ aircraft big enough to absorb the growth, the same spend is worth
 That interaction is the point: marketing and fleet planning are now
 complementary decisions rather than independent sliders.
 
-**Still unresolved, and the deeper issue** (raised directly): fare and
-marketing are both per-market sliders with a findable static optimum,
-which is busy work rather than a decision — see the next section.
+---
+
+## Fare: recalibrated, and turned into a policy
+
+Raised directly, and the complaint was exact: a per-market fare slider is
+busy work, not a decision. Three things made it so.
+
+1. **Nothing reacts.** Competitor fares are fixed JSON and never respond,
+   so a static optimum exists permanently — find it once, never revisit.
+2. **The UI hands you the answer.** The Commercial panel previews margin
+   live as you drag, so finding the optimum isn't even a search.
+3. **It's the same puzzle N times.** Per-market pricing across twenty
+   markets is twenty identical drags. The chore *grows with your
+   network*, so the mechanic got more tedious the better you played.
+
+(3) is the real complaint; (1) and (2) are why it isn't interesting even
+once.
+
+### Fixed first: the baseline was recommending a bad price
+
+`recommendedFare()`'s two constants were raised 1.5x (125 → 190 base,
+0.30 → 0.45 per nm). The sweep had margin peaking at ~2.5x the old
+recommendation, meaning a player who never touched fare was leaving well
+over half the achievable margin on the table — "recommended" was
+recommending badly.
+
+Deliberately **not** moved all the way to the measured optimum: the curve
+is flat at its peak (2.0x scored $13,217 against the peak's $13,390, a
+1.3% difference), so a default sitting exactly there would make pricing
+pointless. After the change the default scores $11,168 against a $13,745
+optimum — about 23% upside for tuning, enough to be worth doing, not so
+much that ignoring it is ruinous.
+
+### Then: fare became an airline-wide policy
+
+`SimState.farePolicyMultiplier` is one number that prices the entire
+network through `recommendedFare()`, which is already distance-aware — so
+a single control prices twenty markets sensibly rather than needing
+twenty drags. Per-market override stays available via each row's own
+slider for the cases that genuinely differ, and
+`RouteSettings.fareIsOverridden` marks those so a policy change sweeps
+everything *except* them. A per-row Reset puts a market back on policy.
+
+Touching a market's own slider is what overrides it — an explicit
+"override this market" checkbox would be a second click for something the
+drag already unambiguously means.
+
+This addresses (3) only. A static optimum found once is still a static
+optimum; what would actually remove it is competitors responding to
+price, which is competitor AI and gated by CLAUDE.md until asked for
+directly. Noted as the natural follow-up rather than smuggled in here.
+
+Verified in the browser on a two-market game: policy at 100/150/75%
+re-prices both markets proportionally and returns exactly ($230/$237 →
+$345/$356 → $173/$178 → $230/$237), preserving the distance difference
+between them. Overriding one market pins it at $290 while policy moves
+the other to $356; Reset rejoins it at the current policy price ($345);
+and the status line tracks "1 of 2 following policy, 1 overridden"
+throughout. Zero console errors.
 
 ---
 

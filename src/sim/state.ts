@@ -100,6 +100,14 @@ export type ActiveFlight = {
 export type RouteSettings = {
   fare: number;
   /**
+   * Whether this market's fare was set by hand, rather than following the
+   * airline-wide policy (`SimState.farePolicyMultiplier`, sim/pricing.ts).
+   * `applyFarePolicy()` re-prices every market where this is false and
+   * leaves the rest alone — so changing policy sweeps the network without
+   * clobbering the handful of routes deliberately priced differently.
+   */
+  fareIsOverridden: boolean;
+  /**
    * Daily dollars spent promoting this specific market — a flat cost
    * charged once per day (see step.ts's day-rollover handling), not per
    * flight, since it's a market-level decision, not a leg-level one. Feeds
@@ -358,6 +366,14 @@ export type SimState = {
    * so it was never part of `todayCost` and including it here would break
    * that sum.
    */
+  /**
+   * Week six's airline-wide fare policy (sim/pricing.ts): a multiplier on
+   * `recommendedFare()` applied to every market not individually
+   * overridden. 1 means "charge exactly what's recommended." One number
+   * prices the whole network, which is what stops fare-setting from being
+   * the same slider-drag repeated once per market.
+   */
+  farePolicyMultiplier: number;
   todayCostByCategory: {
     /** Fuel, after the price index and any tech tree efficiency upgrades. */
     fuel: number;
@@ -435,7 +451,11 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
   for (const leg of schedule) {
     const key = marketKey(leg.origin, leg.dest);
     if (!routeSettings[key]) {
-      routeSettings[key] = { fare: recommendedFare(leg.origin, leg.dest), marketingSpend: 0 };
+      routeSettings[key] = {
+        fare: recommendedFare(leg.origin, leg.dest),
+        fareIsOverridden: false,
+        marketingSpend: 0,
+      };
     }
   }
 
@@ -477,6 +497,7 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     unlockedTechNodeIds: [],
     marketDemand: {},
     demandGrowthMultiplier: 1,
+    farePolicyMultiplier: 1,
     todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0 },
   };
 }
@@ -538,6 +559,7 @@ export function createNewGameState(rngSeed: number = Date.now()): SimState {
     unlockedTechNodeIds: [],
     marketDemand: {},
     demandGrowthMultiplier: 1,
+    farePolicyMultiplier: 1,
     todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0 },
   };
 }

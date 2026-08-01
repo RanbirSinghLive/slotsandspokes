@@ -157,8 +157,18 @@ export function computeBlockMinutes(originIata: string, destIata: string, cruise
 // currently shares the identical fixed 20/50/30 split (sim/choiceModel.ts),
 // so a skew term would multiply every route by the same constant and add
 // nothing real; worth revisiting once yield mix actually varies by route.
-const BASE_FARE = 125;
-const PER_NM_RATE = 0.3;
+// Week six recalibration: both terms were raised 1.5x (was 125 / 0.30).
+// The balance sweep (src/headless/sweep.ts) found margin peaking at ~2.5x
+// the old recommended fare, meaning a player who never touched the fare
+// slider was leaving well over half the achievable margin on the table —
+// so "recommended" was recommending a bad price. Deliberately *not*
+// moved all the way to the measured optimum: a default sitting exactly at
+// the peak would make pricing pointless, since the curve is flat there
+// (2.0x scored $13,217 against the peak's $13,390, a 1.3% difference).
+// 1.5x leaves the optimum about 21% above the default — enough that
+// tuning fare is a real gain, not so much that ignoring it is ruinous.
+const BASE_FARE = 190;
+const PER_NM_RATE = 0.45;
 
 /**
  * The game's suggested fare for a *market* (an origin-dest pair, either
