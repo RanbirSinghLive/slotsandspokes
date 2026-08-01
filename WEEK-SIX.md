@@ -244,38 +244,206 @@ views hide the map outright; only two treat it as a lens. The "layers,
 not modes" fix from WEEK-FOUR never got extended past Demand/
 Competition to the other five.
 
-**What Paradox's own ledger screens actually do** (EU4's Ledger, CK3's
-Realm screen, Stellaris' Situation Log) isn't "always show the full
-map" either — those screens cover most of the view too. The real
-pattern: the map dims/blurs behind rather than vanishing (a continuity
-cue — still the same world, not a different page); the screen is a
-bounded floating card that's closed (Escape, an X, click-outside), not
-navigated to via a persistent nav bar; the top resource bar never
-disappears on any screen; the simulation keeps running behind an open
-one. This project already has two of those four right — the sidebar
-never hides, and nothing in `tick()` is gated by which panel is open.
+### Decided: unify the ledgers into one tabbed sidebar
 
-**Proposed fix:** generalize the `.modal-overlay`/`.modal-box` pattern
-already built for the loan-offer/game-over pop-ups (a dimmed backdrop,
-a floating card, not a full-screen takeover) to the five Reports
-panels — same dimmed-map-behind treatment, same floating-card sizing
-(not full `100vw`/`100vh`), same "this is a window you opened, not a
-page you navigated to" feel. Demand/Competition stay exactly as they
-are, since they're correctly lenses already, not windows.
+The sidebar (`<aside id="panel">`) already does the one thing that
+matters — it's docked beside the canvas, never over it. Rather than
+generalizing the loan modal's dimmed-backdrop pattern to all five
+Reports panels (the option floated earlier), the simpler fix is to
+give the sidebar its own internal tab bar — Fleet, Schedule, Rotation,
+Commercial, On-Time, Executive — and have tab content replace *within*
+the sidebar, the way a browser dev-tools panel or an IDE's side panel
+works. The map next to it never disappears, because there's nothing
+left that needs to cover it. The top HUD's "Reports" dropdown goes
+away entirely — no reason for a second navigation surface once the
+sidebar has its own tabs.
 
-**Rotation is the one genuine edge case** worth naming: it's a
-timeline/Gantt view, and nothing about it benefits from being
-spatially overlaid on lat/long. Still a floating card, not forced into
-a lens just for consistency's sake — Paradox has plenty of screens
-like this too (a character sheet isn't map-anchored either).
+The persistent header — Cash, On-time, NPS, Reputation, Today's
+Revenue/Cost/Margin — stays exactly where it is, above the tabs,
+visible regardless of which tab is selected. That's already the "top
+resource bar never disappears" rule Paradox's own ledger screens
+follow; nothing about it changes.
 
-**Scope, honestly:** this is a real architecture change, not a CSS
-tweak — canvas visibility, the dropdown active-state logic, and the
-route-builder's "cancel on leaving the map" behavior are all currently
-written around "which view is active" rather than "is a window open,"
-and all of it needs rethinking around the new model. Smaller than it
-sounds, though, since most of the actual card/backdrop styling already
-exists from the loan modals.
+### Decided: Rotation stays in the tab system, with its own expand affordance
+
+Rotation is a timeline/Gantt view — genuinely wider than the other
+five tables, and nothing about it benefits from being spatially
+overlaid on lat/long. Rather than carving it out as a separate
+full-screen destination (breaking the "one system" goal this whole
+rework is for), it stays a normal tab like the rest, docked at the
+same width — but gains its own expand control in its header, a small
+maximize-style icon that temporarily widens just that tab's content
+well beyond the sidebar's normal width (pushing the map correspondingly
+narrower, not to zero), with a matching collapse control to return to
+the shared docked width. Every other tab never needs this; Rotation is
+the one view where "give me more room right now" is a real, occasional
+ask, not the default state.
+
+### Decided: the New Route form becomes a map-anchored popover
+
+The New Route confirmation currently lives in this same sidebar,
+appearing and disappearing as a route gets armed and drawn. It isn't a
+ledger — it's a live map interaction, tied to the exact two points just
+clicked — so it doesn't belong in the tab system either. It becomes its
+own small popover anchored to the map itself (Google-Maps
+info-window-style: appears right where you're actively working,
+dismisses on cancel/confirm/click-away), rather than competing with
+Fleet/Schedule for the same sidebar space.
+
+### Decided: the map layers become their own click-toggled popover
+
+Demand and Competition move out of the "Maps" dropdown and get a
+dedicated small popover, anchored to its own trigger button — vertically
+stacked toggle rows, opens and closes strictly on click (not today's
+`mouseenter`-opens behavior), closes on a second click or click-away.
+Once ledgers no longer live behind a "Map" panel-switch button (the
+canvas never hides, so there's nothing to switch back to), that button
+drops out entirely and the popover collapses down to exactly Demand and
+Competition — a real layers picker, not a nav menu that happens to also
+hold two toggles. Visually it should read with more weight than
+today's plain bordered dropdown — a rounded floating card, closer to
+Google's actual layers picker than a nav-menu holdover.
+
+### Built as designed
+
+All three phases shipped, in the order proposed: sidebar tab
+unification first, then the New Route popover, then the layers
+picker. Both "still open" questions above got resolved along the way
+rather than staying open:
+
+- **Sidebar width settled at 420px at rest** (up from 280px), 900px for
+  Rotation's expanded state — both exported from `ui/panels.ts` as
+  `PANEL_WIDTH_PX`/`PANEL_WIDTH_EXPANDED_PX`, read by a `--panel-width`
+  CSS custom property that `#map` and `#panel` both size against, so
+  the canvas and the sidebar can never drift out of sync.
+- **Fleet Market joined the tab bar**, as the "Market" tab — the
+  table-plus-buttons argument won out, no separate destination left
+  over.
+
+`main.ts`'s `PanelView`/`switchToPanel()` became `SidebarTab`/
+`switchToSidebarTab()` — the map is no longer part of the switch at
+all; `render()` draws it unconditionally every frame regardless of
+which tab is open, and `canvas.hidden` is gone entirely. The former
+full-screen panels (`#rotation-board`, `#commercial-panel`,
+`#fleet-market-panel`, `#ontime-panel`, `#executive-panel`) kept their
+existing element IDs and internal structure — only their CSS treatment
+and DOM position changed (nested inside `#sidebar-tab-content` now,
+not top-level siblings of `#map`) — so none of `ui/rotationBoard.ts`,
+`ui/commercial.ts`, `ui/fleetMarket.ts`, `ui/onTime.ts`, or
+`ui/executive.ts` needed any changes at all. A new `#fleet-tab`
+wrapper was the one genuinely new container, holding Fleet + Schedule
+together as the default tab.
+
+**Rotation's expand affordance** works exactly as decided: a small
+"⤢ Expand" button inside the tab widens the sidebar to 900px (and
+correspondingly narrows the map); "⤡ Collapse" returns it, and
+switching to any other tab auto-collapses it too. A `MIN_MAP_WIDTH_PX`
+(200) clamp — found necessary during testing, not anticipated in the
+original design — keeps the map from being squeezed to nothing on a
+narrower browser window, re-clamping on every `resize()` call so
+shrinking the actual window while expanded doesn't leave the map and
+sidebar out of sync.
+
+**The New Route popover** anchors to the destination airport's own
+projected screen point (not the raw click position), matching the
+"anchored to the place" Google-Maps feel. Two real bugs turned up
+during verification, both fixed:
+- Its overflow-clamp was measuring the popover's height *before*
+  `updateFormValidation()` had populated the return-leg/positioning-leg
+  preview text, so it clamped against a shorter box than what actually
+  rendered and still spilled past the bottom of the screen on routes
+  near the edge. Fixed by positioning last, after validation runs.
+- The armed-state PDEW tooltip and the general airport/market hover
+  tooltip both stayed visible underneath the newly-shown popover —
+  harmless when the form lived safely in the sidebar, but a visible
+  overlap now that both float near the same map point. `showForm()`
+  hides both explicitly.
+
+**The layers picker** (Demand/Competition) now opens and closes
+strictly on click — `isLayersPicker` in `main.ts` skips attaching the
+hover-open/close listeners for the Maps group specifically, while the
+Competition airline filter keeps its original hover behavior
+unchanged. Visual weight came from a small gap from the trigger plus a
+drop shadow (`[data-group='maps'] .view-dropdown`), rather than new
+icons — a deliberate scope cut, not an oversight.
+
+**One regression found and fixed along the way, unrelated to any of
+the three phases directly:** widening the sidebar to 420px meant the
+HUD bar's own un-constrained width could now extend into the sidebar's
+territory on a narrower browser window — and since `#panel` comes
+later in the DOM with no explicit z-index, it silently won that
+overlap, eating clicks meant for whatever HUD button sat underneath.
+Fixed by giving `#hud` a `max-width` tied to the same `--panel-width`
+variable plus `flex-wrap`, so it wraps onto a second line instead of
+disappearing under the sidebar.
+
+Verified in-browser end-to-end: bought an aircraft from the new Market
+tab, selected it, armed and confirmed a real route (including the
+positioning-leg and return-leg preview text), landed on Rotation with
+the new legs highlighted, checked Commercial/On-Time/Executive all
+render correctly and horizontally scroll where their tables are wider
+than the sidebar, confirmed the map keeps animating live under every
+tab (not just Fleet), and confirmed Rotation's expand/collapse and the
+layers picker's click-only open/close all behave exactly as designed.
+Zero console errors throughout. No `SimState` shape change, so no
+`SAVE_KEY` bump was needed — this was purely a UI reorganization, same
+as the Executive ledger consolidation earlier.
+
+**Follow-up refinement, requested directly after seeing it running:**
+the tab bar moved to sit above Cash/On-time/NPS/Reputation instead of
+below it — the first thing in the sidebar now, not a divider partway
+down it — and each tab became an icon (a send/plane glyph for Fleet, a
+horizontal-bars glyph for Rotation, a trending-up line for Commercial,
+a shopping cart for Fleet Market, a clock for On-Time, a briefcase for
+Executive) with a native `title` attribute for the hover description,
+the same "aria-label plus a real title, no custom tooltip component"
+shape the Maps/Reports HUD icons already used before week six removed
+Reports. No JS logic changed — `switchToSidebarTab()` and its
+`data-tab` wiring are untouched; this was markup and CSS only (moving
+`#sidebar-tabs` earlier in `<aside id="panel">`, and resizing its
+buttons from text pills to 32px icon squares). Verified in-browser
+without disturbing an in-progress game already loaded from a save:
+confirmed all six buttons render with the right icon/title/aria-label,
+confirmed the tab bar sits above `#econ-summary` in the actual layout
+(not just the markup), and confirmed clicking still switches panes
+correctly. Zero console errors.
+
+**Second follow-up: a seventh tab for New Game/Save/Load.** These used
+to be a single "New Game" button (plus its own inline confirm) floating
+in the HUD bar, with no manual Save or Load at all — saving already
+happened automatically once per simulated day (`ui/save.ts`), but
+nothing let the player force one, or deliberately step back to it. All
+three moved into a new "Game" tab (a floppy-disk icon), owned by a new
+`ui/gameControls.ts` module rather than bolted onto `main.ts`, matching
+the "one file per concern" shape every other tab already follows.
+`ui/save.ts` gained one new export, `hasSavedState()`, so the Load
+button can disable itself and read honestly as "nothing to load yet"
+rather than silently doing what New Game does (a reload with no save
+present falls through to `createNewGameState()` either way — Load
+disabling itself is what keeps that distinct from New Game instead of
+becoming a confusing second way to do the same thing). Load reuses the
+exact mechanism a save already resumes through — `window.location.reload()`,
+which `main.ts`'s own `loadSavedState() ?? createNewGameState()` picks
+up fresh — so no new load path had to be built at all, just a
+deliberate way to trigger the one that already exists. Load and New
+Game both kept the "real inline confirmation, not `window.confirm()`"
+shape New Game's already had, since native dialogs are silently
+blocked in some embedded/preview contexts; Save needed no confirm at
+all, since it can't lose anything.
+
+Verified in-browser carefully, since Load and New Game are both
+semi-destructive to a real in-progress save: clicked Save Game first
+(confirmed the status line updated with a real timestamp), which made
+the subsequent Load test safe — clicking "Yes, reload" afterward could
+only ever restore the exact state just saved, never lose anything.
+Confirmed the reload genuinely discarded the extra sim-time that had
+ticked by *between* Save and Load (the clock came back earlier than
+where it had drifted to, not where it was at the moment of reload),
+proving the discard-since-last-save behavior is real, not a no-op.
+Confirmed Load's and New Game's confirm/cancel both work correctly
+without ever clicking New Game's own "Yes, start over" (which would
+have genuinely erased a real save with no way back). Zero console
+errors throughout.
 
 ---
 
@@ -283,11 +451,11 @@ exists from the loan modals.
 
 Roughly in dependency order — each item mostly needs the one before it
 to already exist, unlike WEEK-FIVE.md's list where several items were
-independent. Everything in the three sections above (brainstormed
-additions, cancellations, the map-overlay rework) is captured but not
-yet slotted into this ordering — none of it has been decided as "next"
-over the C-suite/missions/tech-tree line already below, just recorded
-so it isn't lost:
+independent. The map-overlay UI rework (above) is done, built out of
+band from this ordering since it was asked for directly. Brainstormed
+additions and the cancellations design are still just captured, not
+slotted in — neither has been decided as "next" over the C-suite/
+missions/tech-tree line below, just recorded so they aren't lost:
 
 1. **Decide the C-suite bonus/malus mapping** — a design pass, not
    code: what does each of COO/CFO/CCO/CEO actually modify? Blocks

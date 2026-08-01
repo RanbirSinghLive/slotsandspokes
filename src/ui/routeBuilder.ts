@@ -23,6 +23,7 @@ import {
 import { addScheduleRow, filterScheduleToRoute, minuteOfDayToTimeString, renderScheduleWarnings } from './panels';
 import { addCommercialRow } from './commercial';
 import { getSelectedTail } from './fleetSelection';
+import { hideCompetitionTooltip } from './competitionTooltip';
 import type { SimState } from '../sim/state';
 
 const HIT_RADIUS_PX = 14;
@@ -92,9 +93,9 @@ function showRouteHoverTooltip(origin: Airport, candidate: Airport, screenX: num
 
 /**
  * Exported so main.ts can hide the tooltip on canvas `mouseleave` without
- * cancelling the whole armed gesture the way cancelPendingRoute() would —
- * moving the mouse off the map briefly (to the sidebar, say) shouldn't
- * lose an in-progress route.
+ * cancelling the whole armed gesture the way reset() would — moving the
+ * mouse off the map briefly (to the sidebar, say) shouldn't lose an
+ * in-progress route.
  */
 export function hideRouteHoverTooltip(): void {
   routeHoverTooltip.hidden = true;
@@ -212,16 +213,6 @@ function reset(): void {
   setArmedCursor(false);
   hideForm();
   hideRouteHoverTooltip();
-}
-
-/**
- * Cancel any in-progress arm/confirm gesture from outside this module —
- * main.ts calls this when switching away from the Map view (M11), since
- * an armed or pending route makes no sense once the canvas it was drawn
- * on is hidden.
- */
-export function cancelPendingRoute(): void {
-  reset();
 }
 
 /**
@@ -391,7 +382,7 @@ export function drawRoutePreview(ctx: CanvasRenderingContext2D, state: SimState)
 
 // --- The confirmation form (real DOM, per CLAUDE.md's panel rule) ---
 
-const formSection = document.querySelector<HTMLElement>('#new-route-section')!;
+const formSection = document.querySelector<HTMLElement>('#new-route-popover')!;
 const formHeading = document.querySelector<HTMLElement>('#new-route-heading')!;
 const formLabel = document.querySelector<HTMLElement>('#new-route-label')!;
 const formBlock = document.querySelector<HTMLElement>('#new-route-block')!;
@@ -436,6 +427,34 @@ function suggestedDepartTime(origin: Airport, tail: string, state: SimState): st
   return MORNING_DEPART_TIME;
 }
 
+// Week six: the form used to be a fixed section in the sidebar, always in
+// the same place regardless of where on the map the route actually was.
+// Now it's a small floating popover, Google-Maps-info-window-style,
+// anchored to the destination airport that was just clicked — appearing
+// right where you're actively working instead of off in a side panel.
+const POPOVER_OFFSET_PX = 16;
+
+/**
+ * Position the popover near (screenX, screenY) — the destination
+ * airport's own projected point, not the raw click position, so it
+ * anchors to the place rather than to wherever the cursor happened to be
+ * within the snap radius. Corrected *after* an initial placement, not
+ * computed once up front, since the form's own height varies with its
+ * content (an error message, the positioning-leg preview) — a route drawn
+ * near the right or bottom edge of the screen would otherwise render
+ * partly off it.
+ */
+function positionPopover(screenX: number, screenY: number): void {
+  formSection.style.left = `${screenX + POPOVER_OFFSET_PX}px`;
+  formSection.style.top = `${screenY + POPOVER_OFFSET_PX}px`;
+
+  const rect = formSection.getBoundingClientRect();
+  const overflowX = rect.right - window.innerWidth;
+  const overflowY = rect.bottom - window.innerHeight;
+  if (overflowX > 0) formSection.style.left = `${screenX + POPOVER_OFFSET_PX - overflowX - 8}px`;
+  if (overflowY > 0) formSection.style.top = `${screenY + POPOVER_OFFSET_PX - overflowY - 8}px`;
+}
+
 function showForm(origin: Airport, dest: Airport, state: SimState): void {
   formHeading.textContent = isExistingMarket(origin.iata, dest.iata, state.schedule) ? 'New Frequency' : 'New Route';
   formLabel.textContent = `${origin.iata} → ${dest.iata}`;
@@ -447,6 +466,15 @@ function showForm(origin: Airport, dest: Airport, state: SimState): void {
   formBlock.textContent = `Block time: ${computeBlockMinutes(origin.iata, dest.iata, typeForBlock?.cruiseKts)} min`;
   formTailLabel.textContent = tail;
   formSection.hidden = false;
+  // The armed-state hover tooltip (PDEW/CAP for the candidate) has nothing
+  // left to add once the form itself is showing the same numbers, and the
+  // general airport/market hover tooltip (whatever was last hovered on
+  // the way to this click) has even less reason to still be up — now
+  // that both float near the same map point instead of one living safely
+  // in the sidebar, leaving either up would just mean it overlapping the
+  // form.
+  hideRouteHoverTooltip();
+  hideCompetitionTooltip();
 
   // Suggest a time rather than always resetting to a fixed default —
   // see suggestedDepartTime() above. Still always overridable, and still
@@ -465,6 +493,15 @@ function showForm(origin: Airport, dest: Airport, state: SimState): void {
   // back into its own rotation.
   formReturnCheckbox.checked = true;
   updateFormValidation(origin, dest, state);
+
+  // Positioned last, after updateFormValidation() above has already set
+  // the return-leg/positioning-leg preview text (and possibly an error
+  // message) — the popover's real height depends on which of those are
+  // showing, so measuring it any earlier (e.g., right after `hidden =
+  // false`) would clamp against a shorter box than what's actually about
+  // to render, and it could still spill past the bottom of the screen.
+  const destPoint = projection([dest.lon, dest.lat]);
+  if (destPoint) positionPopover(destPoint[0], destPoint[1]);
 
   // Filter the schedule table to this market *now*, while the form is
   // still open — not only after "Add Route" is clicked. Filtering only on

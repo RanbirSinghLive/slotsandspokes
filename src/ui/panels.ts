@@ -3,9 +3,16 @@ import { removeCommercialRow } from './commercial';
 import { getSelectedTail, setSelectedTail } from './fleetSelection';
 import type { SimState } from '../sim/state';
 
-// Must match the width baked into #map / #panel in style.css — see the
-// comment there.
-export const PANEL_WIDTH_PX = 280;
+// Must match the --panel-width custom property's default value in
+// style.css — see the comment there. Week six: widened from 280 to fit a
+// tab bar and ledger-style content (Rotation, Commercial, etc.) that used
+// to get the full canvas-width area to themselves.
+export const PANEL_WIDTH_PX = 420;
+
+// Rotation's own expand affordance (main.ts's expandRotation()) — wider
+// still, since a 24-hour Gantt timeline needs real room to drag a bar
+// around precisely, more than the other tabs' plain tables need.
+export const PANEL_WIDTH_EXPANDED_PX = 900;
 
 const cashEl = document.querySelector<HTMLSpanElement>('#panel-cash')!;
 const otpEl = document.querySelector<HTMLSpanElement>('#panel-otp')!;

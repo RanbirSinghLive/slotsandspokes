@@ -56,3 +56,18 @@ export function clearSavedState(): void {
     // Ignored deliberately, same reasoning as saveState().
   }
 }
+
+/**
+ * Whether a save actually exists right now — the Game tab's own "Load
+ * Game" button (ui/gameControls.ts) reads this to disable itself rather
+ * than silently doing the same thing "New Game" does (a reload with
+ * nothing to load falls through to createNewGameState() just like New
+ * Game would, which isn't what clicking "Load" should mean).
+ */
+export function hasSavedState(): boolean {
+  try {
+    return localStorage.getItem(SAVE_KEY) !== null;
+  } catch {
+    return false;
+  }
+}

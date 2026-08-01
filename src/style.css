@@ -1,5 +1,12 @@
 :root {
   color-scheme: dark;
+  /* Week six: must match PANEL_WIDTH_PX in ui/panels.ts. main.ts's
+     setPanelWidth() overwrites this at runtime (Rotation's expand
+     affordance widens it to PANEL_WIDTH_EXPANDED_PX) — both #map and
+     #panel read the same variable, so the canvas and the sidebar can
+     never drift out of sync with each other the way two separately
+     updated numbers could. */
+  --panel-width: 420px;
 }
 
 html,
@@ -10,28 +17,27 @@ body {
   overflow: hidden;
 }
 
-/* Must match PANEL_WIDTH_PX in ui/panels.ts, which main.ts uses to size the
-   canvas so the map and the sidebar share the viewport instead of the panel
-   floating on top of it. #rotation-board, #commercial-panel,
-   #fleet-market-panel, and #ontime-panel are siblings that take the exact
-   same slot — whichever one isn't [hidden] occupies it, no absolute
-   positioning needed. */
-#map,
-#rotation-board,
-#commercial-panel,
-#fleet-market-panel,
-#ontime-panel,
-#executive-panel {
+/* Week six: the map is no longer one of several exclusive "panels" that
+   take turns occupying this slot — it renders unconditionally now (see
+   main.ts's render()), so it just needs to fill whatever room the
+   sidebar (--panel-width, above) leaves it. */
+#map {
   display: block;
-  width: calc(100vw - 280px);
+  width: calc(100vw - var(--panel-width));
   height: 100vh;
   box-sizing: border-box;
 }
 
-/* Without this, the ID selector above (specificity 1-0-0) would beat the
-   browser's own default `[hidden] { display: none }` rule (0-1-0) and the
-   [hidden] attribute toggle in main.ts would silently do nothing. */
-#map[hidden],
+/* #fleet-tab, #rotation-board, #commercial-panel, #fleet-market-panel,
+   #ontime-panel, and #executive-panel are the sidebar's tab-content
+   panes now (#sidebar-tab-content, inside <aside id="panel">) — siblings
+   that take the same slot there, whichever one isn't [hidden]. Without
+   this override, the ID selectors below (specificity 1-0-0) would beat
+   the browser's own default `[hidden] { display: none }` rule (0-1-0)
+   and the [hidden] attribute toggle in main.ts would silently do
+   nothing — same gotcha as #map used to share with them back when they
+   were full-screen panels instead. */
+#fleet-tab[hidden],
 #rotation-board[hidden],
 #commercial-panel[hidden],
 #fleet-market-panel[hidden],
@@ -46,6 +52,7 @@ body {
   left: 12px;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   padding: 8px 12px;
   background: rgba(10, 12, 18, 0.7);
@@ -54,6 +61,14 @@ body {
   font-family: ui-monospace, Consolas, monospace;
   font-size: 13px;
   color: #cdd3e0;
+  /* Week six: the sidebar grew from 280px to --panel-width (420px, more
+     while Rotation is expanded) — without this, the HUD bar's natural
+     width could extend into the sidebar's own space on a narrower
+     window, and #panel (later in the DOM, so it wins the overlap)
+     would silently eat clicks meant for whatever HUD button sat under
+     it. Wrapping instead of overlapping keeps every control reachable
+     regardless of window width. */
+  max-width: calc(100vw - var(--panel-width) - 24px);
 }
 
 #competition-airline-select {
@@ -102,40 +117,83 @@ body {
   border-left: 1px solid rgba(255, 255, 255, 0.15);
 }
 
+/* Week six: New Game, Save, and Load all moved from a lone HUD button
+   into their own sidebar tab (ui/gameControls.ts) — Save and Load didn't
+   exist as manual actions at all before this. */
+#game-tab section {
+  margin-bottom: 24px;
+}
+
+.game-tab-description {
+  margin: 0 0 8px;
+  color: #9aa3b8;
+  font-size: 12px;
+}
+
+#save-game-button,
+#load-game-button,
 #new-game-button {
   font-family: inherit;
-  font-size: inherit;
+  font-size: 13px;
   color: #9aa3b8;
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 4px;
-  padding: 3px 8px;
-  margin-left: 12px;
+  padding: 4px 10px;
   cursor: pointer;
 }
 
+#save-game-button:hover,
+#load-game-button:hover:not(:disabled) {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+#load-game-button:disabled {
+  color: #4a5266;
+  border-color: rgba(255, 255, 255, 0.08);
+  cursor: default;
+}
+
+#save-game-status {
+  margin-top: 8px;
+  min-height: 1.2em;
+  color: #6b7694;
+  font-size: 12px;
+}
+
+/* New Game's own hover stays a deliberate red warning — unlike Save or
+   Load, it's the one action here that erases the save outright rather
+   than just reading from or writing to it. */
 #new-game-button:hover {
   color: #ff8080;
   border-color: #ff8080;
 }
 
-/* Real inline confirmation for New Game, not window.confirm() — see
-   main.ts's note on why. Sits in the same HUD slot the button occupies;
-   only one of the two is ever visible at a time. */
+/* Real inline confirmation for Load and New Game, not window.confirm()
+   — native dialogs are silently blocked in some embedded/preview
+   browser contexts (they just resolve to "cancelled" with no visible
+   sign anything happened), which would make either button look like it
+   was doing nothing at all. Real DOM here matches CLAUDE.md's panel
+   rule anyway, and it can't be silently suppressed the way a native
+   dialog can. */
+#load-game-confirm,
 #new-game-confirm {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  margin-left: 12px;
+  margin-top: 8px;
   color: #ff8080;
-  font-size: inherit;
-  white-space: nowrap;
+  font-size: 12px;
 }
 
+#load-game-confirm[hidden],
 #new-game-confirm[hidden] {
   display: none;
 }
 
+#load-game-confirm button,
 #new-game-confirm button {
   font-family: inherit;
   font-size: inherit;
@@ -144,12 +202,14 @@ body {
   cursor: pointer;
 }
 
+#load-game-confirm-yes,
 #new-game-confirm-yes {
   background: #ff8080;
   border: 1px solid #ff8080;
   color: #05070c;
 }
 
+#load-game-confirm-cancel,
 #new-game-confirm-cancel {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -222,11 +282,31 @@ body {
   width: 100%;
 }
 
+/* Week six: the map-layers picker (Demand/Competition) is a deliberate
+   on/off control now, not a nav menu — Google Maps' own layers button is
+   the reference point, so it gets more visual weight than the plain
+   hover dropdowns: a small gap and its own shadow so it reads as a
+   floating card that popped up, not a menu flush against its trigger
+   (which only mattered for the hover-to-open groups — see main.ts's
+   isLayersPicker). */
+[data-group='maps'] .view-dropdown {
+  top: calc(100% + 6px);
+  padding: 8px;
+  gap: 6px;
+  min-width: 140px;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+[data-group='maps'] .view-dropdown button {
+  padding: 5px 8px;
+}
+
 #panel {
   position: fixed;
   top: 0;
   right: 0;
-  width: 280px;
+  width: var(--panel-width);
   height: 100vh;
   box-sizing: border-box;
   padding: 16px;
@@ -235,6 +315,73 @@ body {
   font-family: ui-monospace, Consolas, monospace;
   font-size: 13px;
   color: #cdd3e0;
+  display: flex;
+  flex-direction: column;
+  /* Only #sidebar-tab-content scrolls, below — #econ-summary and
+     #sidebar-tabs stay fixed in place above it regardless. */
+  overflow: hidden;
+}
+
+/* Week six: the tab bar that replaced the old "Reports" HUD dropdown, now
+   sitting above Cash/On-time/etc. rather than below — the first thing in
+   the sidebar, not a divider partway down it. Fleet, Rotation, Commercial,
+   Fleet Market, On-Time, and Executive all live here — clicking one swaps
+   which pane shows inside #sidebar-tab-content, instead of hiding the map
+   to show a separate full-screen panel the way each of these used to.
+   Icon-only, same "aria-label plus a real `title` for the hover
+   description" shape #view-toggle's Maps/Reports icon buttons already
+   used — a native title tooltip is a fine amount of ceremony for a single
+   short line, not worth a custom tooltip component the way the rotation
+   board's bar tooltip needed. */
+#sidebar-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex-shrink: 0;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#sidebar-tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: #9aa3b8;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+#sidebar-tabs button svg {
+  width: 17px;
+  height: 17px;
+}
+
+#sidebar-tabs button:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+#sidebar-tabs button.active {
+  background: #3a4258;
+  border-color: #6b7694;
+  color: #fff;
+}
+
+/* The one part of the sidebar that actually scrolls — a tab's content can
+   run long (a big fleet, a busy schedule), but the tab bar and the Cash/
+   On-time/NPS/Reputation header above it should never scroll out of
+   reach because of it. `min-height: 0` is required here: a flex child
+   defaults to never shrinking below its own content's natural height,
+   which would otherwise make this div (and #panel around it) grow
+   instead of scrolling. */
+#sidebar-tab-content {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -374,12 +521,29 @@ body {
   cursor: crosshair;
 }
 
-#new-route-section {
+/* Week six: a floating popover anchored to the destination airport that
+   was just clicked (ui/routeBuilder.ts's positionPopover()), Google-Maps
+   info-window-style, rather than a fixed section in the sidebar always in
+   the same place regardless of where on the map the route actually is.
+   No dimmed backdrop the way the loan modals get — this doesn't block
+   anything else, it's a contextual popover on the map itself, not an
+   interruption. */
+#new-route-popover {
+  position: fixed;
+  z-index: 25;
+  max-width: 280px;
   padding: 10px;
-  margin: 4px 0 20px;
-  background: rgba(255, 209, 102, 0.08);
+  background: #0e1016;
   border: 1px solid rgba(255, 209, 102, 0.3);
   border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 13px;
+  color: #cdd3e0;
+}
+
+#new-route-popover[hidden] {
+  display: none;
 }
 
 #new-route-label {
@@ -511,13 +675,35 @@ body {
 }
 
 /* M11: the rotation board — a Gantt-style read-only view of the schedule,
-   one row per tail. See ui/rotationBoard.ts. */
+   one row per tail. See ui/rotationBoard.ts. Week six: lives in the
+   sidebar's tab system now, not a full-screen panel of its own — hence
+   no more fixed padding to clear the old HUD bar, and no independent
+   scroll (#sidebar-tab-content, its container, handles that). Cramped at
+   the sidebar's normal width by design: #rotation-tab-header's expand
+   button (below) is the answer, not shrinking the track further to
+   compensate. */
 #rotation-board {
-  padding: 68px 24px 24px;
-  overflow-y: auto;
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: 13px;
-  color: #cdd3e0;
+  padding-top: 4px;
+}
+
+#rotation-tab-header {
+  margin-bottom: 12px;
+}
+
+#rotation-expand-toggle {
+  font-family: inherit;
+  font-size: 12px;
+  color: #9aa3b8;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+#rotation-expand-toggle:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
 .rotation-axis {
@@ -641,82 +827,26 @@ body {
 
 /* Week two's "Commercial" panel — one row per market, with route-level
    levers (fare, marketing spend) plus the pax/revenue/cost/margin figures
-   those levers produce. Gets the full canvas-width area, same as the
-   rotation board, since a lever dashboard needs real room per row —
-   the schedule sidebar already fought a single fare slider for space
-   (see the Pricing loop's commit) and lost. See ui/commercial.ts. */
+   those levers produce. See ui/commercial.ts. Week six: lives in the
+   sidebar's tab system now, narrower than the full canvas-width area it
+   used to get — an 11-column table with two slider columns genuinely
+   doesn't fit that width, so this scrolls horizontally (overflow-x)
+   rather than trying to cram every column into it. */
 #commercial-panel {
-  padding: 68px 24px 24px;
-  overflow-y: auto;
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: 13px;
-  color: #cdd3e0;
+  overflow-x: auto;
 }
 
-/* table-layout: fixed, same fix (and same reason) as the schedule table's
-   Fare column needed during the Pricing loop's build: automatic layout
-   let two <input type="range">'s intrinsic width push the table past its
-   container, silently overflowing it off the right edge of the screen.
-   These percentages (summing to 100) size every column explicitly instead. */
+/* table-layout was `fixed` with explicit per-column percentages before
+   week six, sized against the old full-width container — at the
+   sidebar's width those percentages would crush every column illegibly
+   rather than the table just scrolling. Back to natural `auto` sizing
+   (each column as wide as its own content/sliders actually need) lets
+   the table overflow #commercial-panel's box instead, which is what
+   that panel's own new `overflow-x: auto` is there to handle. */
 #commercial-table {
   width: 100%;
+  min-width: 700px;
   border-collapse: collapse;
-  table-layout: fixed;
-}
-
-#commercial-table th:nth-child(1),
-#commercial-table td:nth-child(1) {
-  width: 13%;
-}
-
-#commercial-table th:nth-child(2),
-#commercial-table td:nth-child(2) {
-  width: 4%;
-}
-
-#commercial-table th:nth-child(3),
-#commercial-table td:nth-child(3) {
-  width: 7%;
-}
-
-#commercial-table th:nth-child(4),
-#commercial-table td:nth-child(4) {
-  width: 5%;
-}
-
-#commercial-table th:nth-child(5),
-#commercial-table td:nth-child(5) {
-  width: 5%;
-}
-
-#commercial-table th:nth-child(6),
-#commercial-table td:nth-child(6) {
-  width: 10%;
-}
-
-#commercial-table th:nth-child(7),
-#commercial-table td:nth-child(7) {
-  width: 8%;
-}
-
-#commercial-table th:nth-child(8),
-#commercial-table td:nth-child(8) {
-  width: 9%;
-}
-
-#commercial-table th:nth-child(9),
-#commercial-table td:nth-child(9) {
-  width: 14%;
-}
-
-#commercial-table th:nth-child(10),
-#commercial-table td:nth-child(10) {
-  width: 12%;
-}
-
-#commercial-table th:nth-child(11),
-#commercial-table td:nth-child(11) {
-  width: 13%;
 }
 
 #commercial-table th,
@@ -724,9 +854,7 @@ body {
   text-align: left;
   padding: 6px 10px 6px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  overflow: hidden;
   white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 #commercial-table th {
@@ -746,52 +874,19 @@ body {
 }
 
 /* Week three's Fleet Market — a new game starts with zero aircraft, so
-   this is where the very first purchase or lease happens. Same layout
-   shape as #commercial-panel (full canvas-width area, monospace, a table
-   with real room per row), since it's the same kind of "ledger with an
-   action per row" panel. See ui/fleetMarket.ts. */
+   this is where the very first purchase or lease happens. See
+   ui/fleetMarket.ts. Week six: same "sidebar tab, not a full-screen
+   panel" treatment as Commercial above — natural table width plus
+   horizontal scroll on the panel, rather than fixed percentage columns
+   sized for the old full-width layout. */
 #fleet-market-panel {
-  padding: 68px 24px 24px;
-  overflow-y: auto;
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: 13px;
-  color: #cdd3e0;
+  overflow-x: auto;
 }
 
 #fleet-market-table {
   width: 100%;
+  min-width: 560px;
   border-collapse: collapse;
-  table-layout: fixed;
-}
-
-#fleet-market-table th:nth-child(1),
-#fleet-market-table td:nth-child(1) {
-  width: 16%;
-}
-
-#fleet-market-table th:nth-child(2),
-#fleet-market-table td:nth-child(2) {
-  width: 18%;
-}
-
-#fleet-market-table th:nth-child(3),
-#fleet-market-table td:nth-child(3) {
-  width: 10%;
-}
-
-#fleet-market-table th:nth-child(4),
-#fleet-market-table td:nth-child(4) {
-  width: 16%;
-}
-
-#fleet-market-table th:nth-child(5),
-#fleet-market-table td:nth-child(5) {
-  width: 16%;
-}
-
-#fleet-market-table th:nth-child(6),
-#fleet-market-table td:nth-child(6) {
-  width: 24%;
 }
 
 #fleet-market-table th,
@@ -846,18 +941,14 @@ body {
   color: #9aa3b8;
 }
 
-/* The On-Time panel (ui/onTime.ts) — same layout shape as
-   #fleet-market-panel/#commercial-panel (full canvas-width area,
-   monospace, a table with real room per row), but two tables stacked
-   under their own headings instead of one, since per-route performance
-   and top delay codes are two different questions with two different
-   shapes of answer. */
+/* The On-Time panel (ui/onTime.ts) — two tables stacked under their own
+   headings instead of one, since per-route performance and top delay
+   codes are two different questions with two different shapes of
+   answer. Week six: lives in the sidebar's tab system now; the old
+   640px max-width cap is gone since the sidebar itself is already
+   narrower than that. */
 #ontime-panel {
-  padding: 68px 24px 24px;
-  overflow-y: auto;
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: 13px;
-  color: #cdd3e0;
+  overflow-x: auto;
 }
 
 #ontime-panel h2 {
@@ -876,7 +967,6 @@ body {
 #ontime-table,
 #ontime-causes-table {
   width: 100%;
-  max-width: 640px;
   border-collapse: collapse;
 }
 
@@ -1200,16 +1290,14 @@ body {
   color: #9aa3b8;
 }
 
-/* Week five's executive ledger — same padding/font shape as #ontime-panel,
-   the Reports panel it sits alongside. Houses two sections: Loans
+/* Week five's executive ledger. Houses two sections: Loans
    (ui/loans.ts's own concern) and the financial runway forecast
-   (ui/executive.ts) — kept as separate modules, just sharing one screen. */
+   (ui/executive.ts) — kept as separate modules, just sharing one screen.
+   Week six: lives in the sidebar's tab system now — overflow-x so the
+   420px-wide sidebar can still scroll to see the full 520px-wide chart
+   canvas rather than clipping it. */
 #executive-panel {
-  padding: 68px 24px 24px;
-  overflow-y: auto;
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: 13px;
-  color: #cdd3e0;
+  overflow-x: auto;
 }
 
 #executive-panel h2 {

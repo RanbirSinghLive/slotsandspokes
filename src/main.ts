@@ -12,14 +12,19 @@ import { showCompetitionTooltip, hideCompetitionTooltip } from './ui/competition
 import { validateSchedule } from './sim/schedule';
 import { createNewGameState, type SimState } from './sim/state';
 import { step } from './sim/step';
-import { updatePanel, setupScheduleEditor, renderScheduleWarnings, PANEL_WIDTH_PX } from './ui/panels';
+import {
+  updatePanel,
+  setupScheduleEditor,
+  renderScheduleWarnings,
+  PANEL_WIDTH_PX,
+  PANEL_WIDTH_EXPANDED_PX,
+} from './ui/panels';
 import {
   setupRouteBuilder,
   handleRouteBuilderMouseDown,
   handleRouteBuilderMouseMove,
   handleRouteBuilderKeyDown,
   drawRoutePreview,
-  cancelPendingRoute,
   hideRouteHoverTooltip,
 } from './ui/routeBuilder';
 import { setupRotationBoard, updateRotationBoard, hideBarTooltip } from './ui/rotationBoard';
@@ -30,7 +35,8 @@ import { setupExecutivePanel, updateExecutivePanel } from './ui/executive';
 import { updateTicker } from './ui/ticker';
 import { setupLoans, updateLoans } from './ui/loans';
 import { isInsolvent } from './sim/loans';
-import { loadSavedState, saveState, clearSavedState } from './ui/save';
+import { setupGameControls, updateGameControls } from './ui/gameControls';
+import { loadSavedState, saveState } from './ui/save';
 
 // Week three's persistence fix (see WEEK-THREE.md): resume a saved game
 // if one exists, rather than always starting fresh. A fresh game starts
@@ -48,34 +54,35 @@ renderScheduleWarnings(validateSchedule(state.schedule, state.aircraft, state.po
 setupScheduleEditor(state);
 // The callback fires once a route (and its optional return leg) is
 // actually added to state.schedule — see ui/routeBuilder.ts's own comment
-// on why. switchToPanel is defined further down this file as a plain
+// on why. switchToSidebarTab is defined further down this file as a plain
 // `function` declaration, so it's hoisted and safely callable here even
 // though this line runs before its own definition; by the time this
 // arrow function actually executes (a future route confirm), the whole
 // module has already finished evaluating.
-setupRouteBuilder(state, (legIds) => switchToPanel('rotation', legIds));
+setupRouteBuilder(state, (legIds) => switchToSidebarTab('rotation', legIds));
 setupRotationBoard();
 setupCommercialPanel(state);
 setupFleetMarket(state);
 setupOnTimePanel();
 setupExecutivePanel();
 setupLoans(state);
+setupGameControls(state);
 
 const canvas = document.querySelector<HTMLCanvasElement>('#map')!;
 const ctx = canvas.getContext('2d')!;
 const clockEl = document.querySelector<HTMLDivElement>('#clock')!;
 const speedButtons = document.querySelectorAll<HTMLButtonElement>('#speed-controls button');
-// Panel-switching buttons (Map/Rotation/Commercial/Fleet, [data-view]) and
-// overlay-toggle buttons (Demand/Competition, [data-overlay]) used to be
-// the same kind of button — one exclusive View — but week four split them
-// apart: switching panels is still exclusive, but Demand/Competition are
-// now independent on/off toggles layered on top of the Map panel instead.
-const viewToggleButtons = document.querySelectorAll<HTMLButtonElement>('#view-toggle .view-dropdown button[data-view]');
+// Demand/Competition (week four): independent on/off toggles layered on
+// top of the map, not exclusive views — see the overlay-toggle wiring
+// below. Week six: the ledgers that used to be exclusive "views" replacing
+// the map (Rotation/Commercial/Fleet Market/On-Time/Executive) moved into
+// sidebar tabs instead (see switchToSidebarTab() below) — the map is no
+// longer something you ever navigate away from.
 const overlayToggleButtons = document.querySelectorAll<HTMLButtonElement>('#view-toggle .view-dropdown button[data-overlay]');
-// All three hover-dropdown groups share one wiring pass below — the two
-// view-switching ones (Maps, Reports) plus the Competition map's airline
-// filter, which reuses the exact same .view-group/.view-dropdown markup
-// and open/close behavior, just with a text trigger instead of an icon.
+// Both hover-dropdown groups share one wiring pass below — the Maps
+// (Demand/Competition) group and the Competition map's airline filter,
+// which reuses the exact same .view-group/.view-dropdown markup and
+// open/close behavior, just with a text trigger instead of an icon.
 const viewGroups = document.querySelectorAll<HTMLDivElement>('#hud .view-group');
 const competitionAirlineGroup = document.querySelector<HTMLDivElement>('#competition-airline-group')!;
 const competitionAirlineTrigger = document.querySelector<HTMLButtonElement>('#competition-airline-trigger')!;
@@ -92,7 +99,7 @@ for (const airline of competitorAirlines(state)) {
 // null means "All competitors" (the aggregate Competition overlay); a
 // specific airline name filters render/competition.ts's layer down to
 // just that carrier's own network. Lives outside render() the same way
-// panelView does, since it's persistent UI state, not simulated state.
+// sidebarTab does, since it's persistent UI state, not simulated state.
 let selectedCompetitorAirline: string | null = null;
 
 competitionAirlineDropdown.querySelectorAll<HTMLButtonElement>('button').forEach((button) => {
@@ -107,48 +114,58 @@ competitionAirlineDropdown.querySelectorAll<HTMLButtonElement>('button').forEach
     render();
   });
 });
+// Week six: sidebar tabs. Each of these used to be a full-screen panel
+// that replaced the map (`canvas.hidden = true`); now they're content
+// panes inside the sidebar (#sidebar-tab-content) that replace each other,
+// while the map stays visible and interactive underneath the whole time.
+// Same element IDs as before — only their CSS treatment and DOM position
+// changed — so nothing in ui/rotationBoard.ts, ui/commercial.ts,
+// ui/fleetMarket.ts, ui/onTime.ts, or ui/executive.ts needed to change.
+const fleetTabEl = document.querySelector<HTMLDivElement>('#fleet-tab')!;
 const rotationBoardEl = document.querySelector<HTMLDivElement>('#rotation-board')!;
 const commercialPanelEl = document.querySelector<HTMLDivElement>('#commercial-panel')!;
 const fleetMarketPanelEl = document.querySelector<HTMLDivElement>('#fleet-market-panel')!;
 const onTimePanelEl = document.querySelector<HTMLDivElement>('#ontime-panel')!;
 const executivePanelEl = document.querySelector<HTMLDivElement>('#executive-panel')!;
+const gameTabEl = document.querySelector<HTMLDivElement>('#game-tab')!;
+const sidebarTabButtons = document.querySelectorAll<HTMLButtonElement>('#sidebar-tabs button');
+const rotationExpandToggle = document.querySelector<HTMLButtonElement>('#rotation-expand-toggle')!;
 
-// Week three: the only way back to a fresh game, now that one persists
-// across reloads by default. Confirms first since this is irreversibly
-// destructive to whatever's currently saved — clearing the save and
-// reloading is simpler and more robust than trying to reset every piece
-// of in-memory state by hand, and a fresh load already knows to seed
-// from Date.now() when it finds nothing saved.
+// Week six: the sidebar's width is no longer a fixed constant — it grows
+// while the Rotation tab is expanded (see rotationExpandToggle's handler,
+// further down) so that timeline gets real room to work in. Both
+// resize()'s canvas sizing and the CSS `--panel-width` custom property
+// (style.css's #map/#panel both read it) come from this one variable, so
+// they can never drift apart the way two separately-updated numbers could.
 //
-// A real inline confirmation, not window.confirm(): native dialogs are
-// silently blocked in some embedded/preview browser contexts (they just
-// resolve to "cancelled" with no visible sign anything happened), which
-// made "New Game" look like it was doing nothing at all. Real DOM here
-// matches CLAUDE.md's panel rule anyway, and it can't be silently
-// suppressed the way a native dialog can.
-const newGameButton = document.querySelector<HTMLButtonElement>('#new-game-button')!;
-const newGameConfirmEl = document.querySelector<HTMLDivElement>('#new-game-confirm')!;
-const newGameConfirmYes = document.querySelector<HTMLButtonElement>('#new-game-confirm-yes')!;
-const newGameConfirmCancel = document.querySelector<HTMLButtonElement>('#new-game-confirm-cancel')!;
+// `desiredPanelWidthPx` is what was actually asked for (PANEL_WIDTH_PX or
+// PANEL_WIDTH_EXPANDED_PX); `currentPanelWidthPx` is that same number,
+// clamped so the map never gets squeezed away to nothing on a narrower
+// window — Rotation's 900px expanded width would otherwise leave zero (or
+// negative) room for the map on a laptop-width browser window. Recomputed
+// on every resize() call too, not just when the width is first set, so
+// shrinking the actual browser window while Rotation is expanded doesn't
+// leave the two out of sync with each other.
+const MIN_MAP_WIDTH_PX = 200;
+let desiredPanelWidthPx = PANEL_WIDTH_PX;
+let currentPanelWidthPx = PANEL_WIDTH_PX;
 
-newGameButton.addEventListener('click', () => {
-  newGameButton.hidden = true;
-  newGameConfirmEl.hidden = false;
-});
+function applyPanelWidth(): void {
+  currentPanelWidthPx = Math.min(desiredPanelWidthPx, window.innerWidth - MIN_MAP_WIDTH_PX);
+  document.documentElement.style.setProperty('--panel-width', `${currentPanelWidthPx}px`);
+}
 
-newGameConfirmYes.addEventListener('click', () => {
-  clearSavedState();
-  window.location.reload();
-});
-
-newGameConfirmCancel.addEventListener('click', () => {
-  newGameConfirmEl.hidden = true;
-  newGameButton.hidden = false;
-});
+function setPanelWidth(px: number): void {
+  desiredPanelWidthPx = px;
+  applyPanelWidth();
+  resize();
+}
 
 /**
  * Size the canvas's actual pixel buffer, then fit the projection to it, then
- * draw. Called once at startup and again on every resize.
+ * draw. Called once at startup and again on every resize (including a
+ * Rotation-tab expand/collapse, via setPanelWidth() above, since that
+ * changes how much width the canvas actually has).
  *
  * Why devicePixelRatio matters: a CSS pixel and a physical screen pixel are
  * not the same thing on most displays today. A "retina"/HiDPI screen might
@@ -167,7 +184,8 @@ newGameConfirmCancel.addEventListener('click', () => {
  * but it lands on a high-enough-resolution buffer to look sharp.
  */
 function resize(): void {
-  const cssWidth = window.innerWidth - PANEL_WIDTH_PX;
+  applyPanelWidth(); // re-clamp in case the window itself was resized, not just the panel
+  const cssWidth = window.innerWidth - currentPanelWidthPx;
   const cssHeight = window.innerHeight;
   const dpr = window.devicePixelRatio || 1;
 
@@ -189,44 +207,32 @@ function resize(): void {
 // time it is.
 let latestFractionalMinute = state.simMinute;
 
-// Which panel is currently showing. The clock and sidebar panel stay
-// relevant regardless, so they're not gated by this. Only one of these
-// four is ever visible at a time — 'map' is the canvas; 'rotation',
-// 'commercial', and 'fleet-market' each hide the canvas in favor of their
-// own DOM element (#rotation-board, #commercial-panel,
-// #fleet-market-panel) — see ui/rotationBoard.ts, ui/commercial.ts, and
-// ui/fleetMarket.ts for why those get real DOM instead of a canvas layer.
-//
-// Week four: Demand and Competition used to be two more entries in this
-// same exclusive list — separate full-screen "modes" you had to leave
-// the map to check. They're independent toggles now (demandOverlayOn,
-// competitionOverlayOn, below), layered on top of the 'map' panel instead
-// of replacing it, so checking a market's demand or competitive situation
-// no longer costs you the ability to draw a route while looking at it.
-type PanelView = 'map' | 'rotation' | 'commercial' | 'fleet-market' | 'ontime' | 'executive';
-let panelView: PanelView = 'map';
+// Week six: which sidebar tab is showing. The map itself is no longer part
+// of this switch at all — it renders unconditionally now, every frame,
+// regardless of which tab is open (see render(), below) — only the
+// sidebar's own content pane changes. Demand and Competition stay
+// independent on/off toggles layered on top of the map (unchanged from
+// week four), since they were already built the right way for this: a
+// layer you toggle, not a destination you navigate to.
+type SidebarTab = 'fleet' | 'rotation' | 'commercial' | 'fleet-market' | 'ontime' | 'executive' | 'game';
+let sidebarTab: SidebarTab = 'fleet';
 let demandOverlayOn = false;
 let competitionOverlayOn = false;
 
 function render(nowMs: number = performance.now()): void {
   updateClock(state);
   updatePanel(state);
-  // Before the panelView early-return below — an event happening while
-  // you're deep in the Commercial panel should still get announced, not
-  // silently missed until you happen to switch back to the map.
   updateTicker(state);
 
-  // Same reasoning as updateTicker() above: the loan pop-up and the
-  // game-over screen are global overlays, not part of any one panel, so
-  // they need to keep refreshing regardless of which panel is showing.
-  // Pausing on insolvency (see tick() below) is handled separately from
-  // this refresh, since render() can run before speedMultiplier itself is
-  // declared (resize()'s very first call, at startup).
+  // The loan pop-up and the game-over screen are global overlays, not
+  // part of any one sidebar tab, so they need to keep refreshing
+  // regardless of which one is showing. Pausing on insolvency (see tick()
+  // below) is handled separately from this refresh, since render() can
+  // run before speedMultiplier itself is declared (resize()'s very first
+  // call, at startup).
   updateLoans(state);
 
-  if (panelView !== 'map') return;
-
-  const cssWidth = window.innerWidth - PANEL_WIDTH_PX;
+  const cssWidth = window.innerWidth - currentPanelWidthPx;
   const cssHeight = window.innerHeight;
 
   ctx.clearRect(0, 0, cssWidth, cssHeight);
@@ -390,80 +396,93 @@ window.addEventListener('keydown', (event) => {
   togglePause();
 });
 
-// --- Panel switching (Map / Rotation / Commercial / Fleet) and overlay
-// --- toggles (Demand / Competition) — week four
+// --- Sidebar tabs (Fleet / Rotation / Commercial / Fleet Market /
+// --- On-Time / Executive) and overlay toggles (Demand / Competition) —
+// --- week six
 //
-// Grouped into two dropdowns: "Maps" (the Map panel switch, plus the two
-// overlay toggles — all three draw on the canvas/projection) and
-// "Reports" (Rotation, Commercial, Fleet — all real DOM, not canvas).
-// Each group's trigger button shows an SVG icon, not a text label, per
-// design.
-//
-// #map, #rotation-board, #commercial-panel, and #fleet-market-panel are
-// siblings sized identically in style.css; #map stays visible for the
-// 'map' panel regardless of which overlays are on (render() just draws
-// more or fewer layers on top of the same basemap — see above), and only
-// one of the three DOM panels is ever un-hidden at a time. Switching away
-// from 'map' cancels any in-progress route-creation gesture
-// (ui/routeBuilder.ts) — an armed or pending route stops making sense
-// once you're not looking at the layer it was drawn on. Switching *to*
-// the rotation board or commercial panel refreshes it, in case the
-// schedule changed while it was hidden — the rotation board has no
-// interactive elements to lose, and the commercial panel only refreshes
-// its numeric cells, never rebuilding the fare/marketing sliders
-// themselves (see ui/commercial.ts).
-const PANEL_GROUP: Record<PanelView, string> = {
-  map: 'maps',
-  rotation: 'reports',
-  commercial: 'reports',
-  'fleet-market': 'reports',
-  ontime: 'reports',
-  executive: 'reports',
-};
+// Week four made Demand/Competition independent layers on top of the map
+// instead of exclusive "modes." Week six extends that same idea to every
+// other Report: they used to be exclusive views that hid the canvas
+// entirely (`canvas.hidden = true`) and showed a different full-screen DOM
+// panel instead; now they're tabs *inside the sidebar*, and the map just
+// renders unconditionally, every frame, regardless of which tab is
+// showing (see render(), above) — there's no "switching away" from it to
+// undo anymore, so a route gesture in progress on the map is never
+// force-cancelled by picking a different tab the way it used to be by
+// picking a different panel.
 
 /**
- * Switch which panel is showing — the one place that toggles canvas vs.
- * DOM-panel visibility, refreshes whichever panel just became visible,
- * and cancels anything that only made sense on the panel being left.
- * Shared by the Map/Rotation/Commercial/Fleet buttons *and* the
- * Demand/Competition overlay toggles below, since toggling an overlay
- * only means anything while looking at the map — flipping one implies
- * "and show me the map," not just "remember this for later."
+ * Switch which sidebar tab is showing — refreshes whichever one just
+ * became visible, in case its data changed while it was hidden (the
+ * rotation board has no interactive elements to lose; the commercial
+ * panel only refreshes its numeric cells, never rebuilding the fare/
+ * marketing sliders themselves — see ui/commercial.ts). Called by the
+ * sidebar's own tab buttons *and* by ui/routeBuilder.ts's
+ * onRouteConfirmed callback, which jumps straight to Rotation with the
+ * new leg(s) highlighted.
  */
-function switchToPanel(view: PanelView, highlightLegIds: string[] = []): void {
-  if (view === panelView) return;
+function switchToSidebarTab(tab: SidebarTab, highlightLegIds: string[] = []): void {
+  if (tab === sidebarTab) return;
 
-  panelView = view;
-  canvas.hidden = view !== 'map';
-  rotationBoardEl.hidden = view !== 'rotation';
-  commercialPanelEl.hidden = view !== 'commercial';
-  fleetMarketPanelEl.hidden = view !== 'fleet-market';
-  onTimePanelEl.hidden = view !== 'ontime';
-  executivePanelEl.hidden = view !== 'executive';
-  competitionAirlineGroup.hidden = view !== 'map' || !competitionOverlayOn;
+  // Leaving Rotation always collapses it back to the shared tab width —
+  // "give me more room" (see expandRotation() below) only means anything
+  // while actually looking at the timeline.
+  if (sidebarTab === 'rotation' && rotationExpanded) collapseRotation();
 
-  viewToggleButtons.forEach((b) => b.classList.toggle('active', b.dataset.view === view));
-  // The group trigger itself also shows which group the active panel
-  // belongs to, so it's visible at a glance without opening either
-  // dropdown.
-  viewGroups.forEach((group) => {
-    const isActiveGroup = group.dataset.group === PANEL_GROUP[view];
-    group.querySelector<HTMLButtonElement>('.view-group-trigger')!.classList.toggle('active', isActiveGroup);
-  });
+  sidebarTab = tab;
+  fleetTabEl.hidden = tab !== 'fleet';
+  rotationBoardEl.hidden = tab !== 'rotation';
+  commercialPanelEl.hidden = tab !== 'commercial';
+  fleetMarketPanelEl.hidden = tab !== 'fleet-market';
+  onTimePanelEl.hidden = tab !== 'ontime';
+  executivePanelEl.hidden = tab !== 'executive';
+  gameTabEl.hidden = tab !== 'game';
 
-  if (view !== 'map') {
-    cancelPendingRoute();
-    hideCompetitionTooltip();
-    hideRouteHoverTooltip();
-  }
-  if (view !== 'rotation') hideBarTooltip(); // leaving the board mid-hover shouldn't leave its tooltip stuck on screen
-  if (view === 'rotation') updateRotationBoard(state, highlightLegIds);
-  if (view === 'commercial') updateCommercialPanel(state);
-  if (view === 'ontime') updateOnTimePanel(state);
-  if (view === 'executive') updateExecutivePanel(state);
+  sidebarTabButtons.forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+
+  if (tab !== 'rotation') hideBarTooltip(); // leaving the board mid-hover shouldn't leave its tooltip stuck on screen
+  if (tab === 'rotation') updateRotationBoard(state, highlightLegIds);
+  if (tab === 'commercial') updateCommercialPanel(state);
+  if (tab === 'ontime') updateOnTimePanel(state);
+  if (tab === 'executive') updateExecutivePanel(state);
+  if (tab === 'game') updateGameControls();
 
   render();
 }
+
+sidebarTabButtons.forEach((button) => {
+  button.addEventListener('click', () => switchToSidebarTab(button.dataset.tab as SidebarTab));
+});
+
+/**
+ * Rotation's own expand affordance: normally docked at the same width as
+ * every other tab, but a 24-hour Gantt timeline genuinely needs more room
+ * than that to drag a bar around with any precision. Widens the sidebar
+ * (and shrinks the map correspondingly — it never disappears, just gets
+ * narrower) rather than carving Rotation back out as a separate
+ * full-screen destination, which would have undone the whole point of
+ * folding it into the tab system in the first place. Every other tab
+ * never needs this — "give me more room right now" is a Rotation-specific,
+ * occasional ask, not the default state.
+ */
+let rotationExpanded = false;
+
+function expandRotation(): void {
+  rotationExpanded = true;
+  rotationExpandToggle.textContent = '⤡ Collapse';
+  setPanelWidth(PANEL_WIDTH_EXPANDED_PX);
+}
+
+function collapseRotation(): void {
+  rotationExpanded = false;
+  rotationExpandToggle.textContent = '⤢ Expand';
+  setPanelWidth(PANEL_WIDTH_PX);
+}
+
+rotationExpandToggle.addEventListener('click', () => {
+  if (rotationExpanded) collapseRotation();
+  else expandRotation();
+});
 
 function closeAllDropdowns(): void {
   viewGroups.forEach((group) => {
@@ -482,27 +501,42 @@ viewGroups.forEach((group) => {
     trigger.setAttribute('aria-expanded', 'true');
   }
 
-  // Click always opens (never toggles closed) rather than the more usual
-  // open/close toggle — on a mouse, hover (below) has already opened it
-  // by the time a click fires, so a toggle would immediately close what
-  // hover just opened. Touch/keyboard users, who never get a hover event
-  // first, still get a working open; closing for them still works via
-  // the document-level click-outside listener below.
-  trigger.addEventListener('click', (event) => {
-    event.stopPropagation(); // don't immediately re-close via the document listener below
-    openThisDropdown();
-  });
-
-  // Opening on hover (not just click) is why .view-dropdown sits flush
-  // against its trigger with no gap in style.css — mouseenter/mouseleave
-  // fire on `group` as a whole, which contains both the trigger and the
-  // dropdown, so moving the pointer from one into the other never counts
-  // as leaving the group; a real gap between them would.
-  group.addEventListener('mouseenter', openThisDropdown);
-  group.addEventListener('mouseleave', () => {
+  function closeThisDropdown(): void {
     dropdown.hidden = true;
     trigger.setAttribute('aria-expanded', 'false');
+  }
+
+  // Week six: the map-layers group (Demand/Competition) is a deliberate
+  // on/off picker now — Google Maps' own layers button works this way —
+  // so it opens and closes strictly on click, never on hover. The
+  // Competition airline filter keeps the original hover-opens-on-mouse
+  // behavior below, since it's a plain single-select list you're just
+  // browsing, not a set of toggles worth a deliberate open/close.
+  const isLayersPicker = group.dataset.group === 'maps';
+
+  trigger.addEventListener('click', (event) => {
+    event.stopPropagation(); // don't immediately re-close via the document listener below
+    // Click always *opens* for the hover-opened groups (never toggles
+    // closed) — hover has already opened it by the time a click fires, so
+    // a toggle would immediately close what hover just opened. The
+    // layers picker has no hover-open to race against, so its click is a
+    // real open/close toggle instead.
+    if (isLayersPicker && !dropdown.hidden) {
+      closeThisDropdown();
+    } else {
+      openThisDropdown();
+    }
   });
+
+  if (!isLayersPicker) {
+    // Opening on hover (not just click) is why .view-dropdown sits flush
+    // against its trigger with no gap in style.css — mouseenter/mouseleave
+    // fire on `group` as a whole, which contains both the trigger and the
+    // dropdown, so moving the pointer from one into the other never counts
+    // as leaving the group; a real gap between them would.
+    group.addEventListener('mouseenter', openThisDropdown);
+    group.addEventListener('mouseleave', closeThisDropdown);
+  }
 });
 
 // Clicking anywhere outside a group (its trigger or its open dropdown)
@@ -513,20 +547,13 @@ document.addEventListener('click', (event) => {
   if (!clickedInsideAGroup) closeAllDropdowns();
 });
 
-viewToggleButtons.forEach((button) => {
-  button.addEventListener('click', () => {
-    closeAllDropdowns();
-    switchToPanel(button.dataset.view as PanelView);
-  });
-});
-
 /**
- * Demand and Competition, as independent on/off toggles rather than
- * exclusive views (week four) — see switchToPanel()'s own comment for
- * why flipping one also switches to the Map panel. Each toggle's `.active`
- * class (reusing the same styling `#view-toggle button.active` already
- * has) is the only visual "checkbox" state; there's no separate checkmark
- * glyph.
+ * Demand and Competition, as independent on/off toggles layered on the
+ * map. Each toggle's `.active` class (reusing the same styling
+ * `#view-toggle button.active` already has) is the only visual
+ * "checkbox" state; there's no separate checkmark glyph. Unlike week
+ * four, flipping one doesn't need to "switch to the Map panel" anymore —
+ * the map is always showing regardless of which sidebar tab is open.
  */
 overlayToggleButtons.forEach((button) => {
   button.addEventListener('click', () => {
@@ -541,11 +568,7 @@ overlayToggleButtons.forEach((button) => {
       hideCompetitionTooltip(); // stale content from whatever was hovered under the old on/off state
     }
 
-    switchToPanel('map');
-    // switchToPanel() only recomputes this when the panel actually
-    // changes — if we were already on 'map', it's still stale from
-    // *before* this toggle just flipped, so set it again unconditionally.
-    competitionAirlineGroup.hidden = panelView !== 'map' || !competitionOverlayOn;
+    competitionAirlineGroup.hidden = !competitionOverlayOn;
     render();
   });
 });
@@ -565,10 +588,11 @@ let translateAtDragStart: [number, number] = [0, 0];
 
 canvas.addEventListener('mousedown', (event) => {
   // M10's route-creation gesture (ui/routeBuilder.ts) gets first refusal
-  // on any click on the map. Only once it says "not mine" (or isn't asked
-  // at all, because we're on a different panel) does an ordinary
-  // click-and-drag start panning, exactly as before.
-  if (panelView === 'map' && handleRouteBuilderMouseDown(event, state)) {
+  // on any click on the map. Only once it says "not mine" does an
+  // ordinary click-and-drag start panning, exactly as before. The map is
+  // always live now (week six), so there's no "different panel" case to
+  // exempt this from anymore — every click on the canvas reaches here.
+  if (handleRouteBuilderMouseDown(event, state)) {
     render();
     return;
   }
@@ -595,8 +619,6 @@ canvas.addEventListener('mousedown', (event) => {
  * for what the tooltip actually reveals).
  */
 canvas.addEventListener('mousemove', (event) => {
-  if (panelView !== 'map') return;
-
   if (handleRouteBuilderMouseMove(event, state)) {
     render();
     hideCompetitionTooltip();

@@ -23,93 +23,28 @@
       <div id="rotation-bar-tooltip-title"></div>
       <div id="rotation-bar-tooltip-body"></div>
     </div>
-    <div id="rotation-board" hidden>
-      <div class="rotation-axis">
-        <div class="rotation-axis-spacer"></div>
-        <div id="rotation-axis-track" class="rotation-axis-track"></div>
+    <div id="new-route-popover" class="map-popover" hidden>
+      <h2 id="new-route-heading">New Route</h2>
+      <div id="new-route-label"></div>
+      <div id="new-route-block"></div>
+      <div id="new-route-pdew"></div>
+      <div class="new-route-field">Tail
+        <span id="new-route-tail-label"></span>
       </div>
-      <div id="rotation-rows"></div>
-    </div>
-    <div id="commercial-panel" hidden>
-      <table id="commercial-table">
-        <thead>
-          <tr>
-            <th>Market</th>
-            <th>Freq</th>
-            <th>Pax/day</th>
-            <th>Load</th>
-            <th>Share</th>
-            <th>Revenue</th>
-            <th>Cost</th>
-            <th>Margin</th>
-            <th>Status</th>
-            <th>Fare</th>
-            <th>Marketing</th>
-          </tr>
-        </thead>
-        <tbody id="commercial-rows"></tbody>
-      </table>
-    </div>
-    <div id="fleet-market-panel" hidden>
-      <table id="fleet-market-table">
-        <thead>
-          <tr>
-            <th>Registration</th>
-            <th>Type</th>
-            <th>Age</th>
-            <th>Lease/day</th>
-            <th>Buy price</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="fleet-market-rows"></tbody>
-      </table>
-    </div>
-    <div id="ontime-panel" hidden>
-      <h2>On-time performance by route</h2>
-      <table id="ontime-table">
-        <thead>
-          <tr>
-            <th>Market</th>
-            <th>Departed</th>
-            <th>On-time</th>
-            <th>On-time %</th>
-          </tr>
-        </thead>
-        <tbody id="ontime-rows"></tbody>
-      </table>
-      <h2>Top delay codes</h2>
-      <table id="ontime-causes-table">
-        <thead>
-          <tr>
-            <th>Code</th>
-            <th>Minutes</th>
-            <th>Share</th>
-          </tr>
-        </thead>
-        <tbody id="ontime-causes-rows"></tbody>
-      </table>
-    </div>
-    <div id="executive-panel" hidden>
-      <section id="loans-section" hidden>
-        <h2>Loans <span id="loans-count"></span></h2>
-        <table id="loans-table" class="panel-table">
-          <thead>
-            <tr>
-              <th>Loan</th>
-              <th>Balance</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="loans-rows"></tbody>
-        </table>
-      </section>
-      <section id="executive-forecast-section">
-        <h2>Financial runway</h2>
-        <canvas id="executive-chart" width="1040" height="400"></canvas>
-        <div id="executive-summary"></div>
-        <div id="executive-delta"></div>
-      </section>
+      <label class="new-route-field">Depart
+        <input type="time" id="new-route-depart" value="12:00" />
+      </label>
+      <label class="new-route-field new-route-field--checkbox">
+        <input type="checkbox" id="new-route-return" checked />
+        Add return leg too
+      </label>
+      <div id="new-route-return-preview"></div>
+      <div id="new-route-positioning-preview"></div>
+      <div id="new-route-error"></div>
+      <div class="new-route-actions">
+        <button type="button" id="new-route-confirm">Add Route</button>
+        <button type="button" id="new-route-cancel">Cancel</button>
+      </div>
     </div>
     <div id="hud">
       <div id="clock">Day 1 · 00:00 UTC</div>
@@ -129,25 +64,8 @@
             </svg>
           </button>
           <div class="view-dropdown" hidden>
-            <button type="button" data-view="map" class="active">Map</button>
             <button type="button" data-overlay="demand">Demand</button>
             <button type="button" data-overlay="competition">Competition</button>
-          </div>
-        </div>
-        <div class="view-group" data-group="reports">
-          <button type="button" class="view-group-trigger" aria-label="Reports" aria-haspopup="true" aria-expanded="false">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="18" y1="20" x2="18" y2="10" />
-              <line x1="12" y1="20" x2="12" y2="4" />
-              <line x1="6" y1="20" x2="6" y2="14" />
-            </svg>
-          </button>
-          <div class="view-dropdown" hidden>
-            <button type="button" data-view="rotation">Rotation</button>
-            <button type="button" data-view="commercial">Commercial</button>
-            <button type="button" data-view="fleet-market">Fleet</button>
-            <button type="button" data-view="ontime">On-Time</button>
-            <button type="button" data-view="executive">Executive</button>
           </div>
         </div>
       </div>
@@ -165,14 +83,55 @@
           <button type="button" data-airline="" class="active">All competitors</button>
         </div>
       </div>
-      <button type="button" id="new-game-button">New Game</button>
-      <div id="new-game-confirm" hidden>
-        <span>Erase current game?</span>
-        <button type="button" id="new-game-confirm-yes">Yes, start over</button>
-        <button type="button" id="new-game-confirm-cancel">Cancel</button>
-      </div>
     </div>
     <aside id="panel">
+      <div id="sidebar-tabs">
+        <button type="button" data-tab="fleet" class="active" aria-label="Fleet" title="Fleet — your aircraft and schedule">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 2 11 13" />
+            <path d="M22 2 15 22 11 13 2 9 22 2Z" />
+          </svg>
+        </button>
+        <button type="button" data-tab="rotation" aria-label="Rotation" title="Rotation — the daily flight timeline">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="4" y1="6" x2="14" y2="6" />
+            <line x1="4" y1="12" x2="20" y2="12" />
+            <line x1="4" y1="18" x2="10" y2="18" />
+          </svg>
+        </button>
+        <button type="button" data-tab="commercial" aria-label="Commercial" title="Commercial — fares and marketing by market">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+            <polyline points="17 6 23 6 23 12" />
+          </svg>
+        </button>
+        <button type="button" data-tab="fleet-market" aria-label="Fleet Market" title="Fleet Market — buy or lease aircraft">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="9" cy="21" r="1" />
+            <circle cx="20" cy="21" r="1" />
+            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+          </svg>
+        </button>
+        <button type="button" data-tab="ontime" aria-label="On-Time" title="On-Time — reliability by route">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+        </button>
+        <button type="button" data-tab="executive" aria-label="Executive" title="Executive — loans and financial runway">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+          </svg>
+        </button>
+        <button type="button" data-tab="game" aria-label="Game" title="Game — new, save, and load">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
+            <polyline points="17 21 17 13 7 13 7 21" />
+            <polyline points="7 3 7 8 15 8" />
+          </svg>
+        </button>
+      </div>
       <section id="econ-summary">
         <div class="econ-row"><span class="econ-label">Cash</span><span id="panel-cash" class="econ-value"></span></div>
         <div class="econ-row"><span class="econ-label">On-time</span><span id="panel-otp" class="econ-value"></span></div>
@@ -183,65 +142,165 @@
         <div class="econ-row"><span class="econ-label">Cost</span><span id="panel-cost" class="econ-value"></span></div>
         <div class="econ-row"><span class="econ-label">Margin</span><span id="panel-margin" class="econ-value"></span></div>
       </section>
-      <section id="new-route-section" hidden>
-        <h2 id="new-route-heading">New Route</h2>
-        <div id="new-route-label"></div>
-        <div id="new-route-block"></div>
-        <div id="new-route-pdew"></div>
-        <div class="new-route-field">Tail
-          <span id="new-route-tail-label"></span>
+      <div id="sidebar-tab-content">
+        <div id="fleet-tab">
+          <section id="fleet-section">
+            <h2>Fleet</h2>
+            <div id="fleet-selection-hint" hidden>Click an aircraft to draw a route for it.</div>
+            <table id="fleet-table" class="panel-table">
+              <thead>
+                <tr>
+                  <th>Tail</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Where</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </section>
+          <section id="schedule-section">
+            <h2>Schedule</h2>
+            <ul id="schedule-warnings" hidden></ul>
+            <table id="schedule-table" class="panel-table">
+              <thead>
+                <tr>
+                  <th>Tail</th>
+                  <th>Route</th>
+                  <th>Depart</th>
+                  <th></th>
+                </tr>
+                <tr class="filter-row">
+                  <th><input type="text" id="schedule-filter-tail" placeholder="Filter" /></th>
+                  <th><input type="text" id="schedule-filter-route" placeholder="Filter" /></th>
+                  <th><input type="text" id="schedule-filter-depart" placeholder="Filter" /></th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </section>
         </div>
-        <label class="new-route-field">Depart
-          <input type="time" id="new-route-depart" value="12:00" />
-        </label>
-        <label class="new-route-field new-route-field--checkbox">
-          <input type="checkbox" id="new-route-return" checked />
-          Add return leg too
-        </label>
-        <div id="new-route-return-preview"></div>
-        <div id="new-route-positioning-preview"></div>
-        <div id="new-route-error"></div>
-        <div class="new-route-actions">
-          <button type="button" id="new-route-confirm">Add Route</button>
-          <button type="button" id="new-route-cancel">Cancel</button>
+        <div id="rotation-board" hidden>
+          <div id="rotation-tab-header">
+            <button type="button" id="rotation-expand-toggle">⤢ Expand</button>
+          </div>
+          <div class="rotation-axis">
+            <div class="rotation-axis-spacer"></div>
+            <div id="rotation-axis-track" class="rotation-axis-track"></div>
+          </div>
+          <div id="rotation-rows"></div>
         </div>
-      </section>
-      <section id="fleet-section">
-        <h2>Fleet</h2>
-        <div id="fleet-selection-hint" hidden>Click an aircraft to draw a route for it.</div>
-        <table id="fleet-table" class="panel-table">
-          <thead>
-            <tr>
-              <th>Tail</th>
-              <th>Type</th>
-              <th>Status</th>
-              <th>Where</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </section>
-      <section id="schedule-section">
-        <h2>Schedule</h2>
-        <ul id="schedule-warnings" hidden></ul>
-        <table id="schedule-table" class="panel-table">
-          <thead>
-            <tr>
-              <th>Tail</th>
-              <th>Route</th>
-              <th>Depart</th>
-              <th></th>
-            </tr>
-            <tr class="filter-row">
-              <th><input type="text" id="schedule-filter-tail" placeholder="Filter" /></th>
-              <th><input type="text" id="schedule-filter-route" placeholder="Filter" /></th>
-              <th><input type="text" id="schedule-filter-depart" placeholder="Filter" /></th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </section>
+        <div id="commercial-panel" hidden>
+          <table id="commercial-table">
+            <thead>
+              <tr>
+                <th>Market</th>
+                <th>Freq</th>
+                <th>Pax/day</th>
+                <th>Load</th>
+                <th>Share</th>
+                <th>Revenue</th>
+                <th>Cost</th>
+                <th>Margin</th>
+                <th>Status</th>
+                <th>Fare</th>
+                <th>Marketing</th>
+              </tr>
+            </thead>
+            <tbody id="commercial-rows"></tbody>
+          </table>
+        </div>
+        <div id="fleet-market-panel" hidden>
+          <table id="fleet-market-table">
+            <thead>
+              <tr>
+                <th>Registration</th>
+                <th>Type</th>
+                <th>Age</th>
+                <th>Lease/day</th>
+                <th>Buy price</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="fleet-market-rows"></tbody>
+          </table>
+        </div>
+        <div id="ontime-panel" hidden>
+          <h2>On-time performance by route</h2>
+          <table id="ontime-table">
+            <thead>
+              <tr>
+                <th>Market</th>
+                <th>Departed</th>
+                <th>On-time</th>
+                <th>On-time %</th>
+              </tr>
+            </thead>
+            <tbody id="ontime-rows"></tbody>
+          </table>
+          <h2>Top delay codes</h2>
+          <table id="ontime-causes-table">
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Minutes</th>
+                <th>Share</th>
+              </tr>
+            </thead>
+            <tbody id="ontime-causes-rows"></tbody>
+          </table>
+        </div>
+        <div id="executive-panel" hidden>
+          <section id="loans-section" hidden>
+            <h2>Loans <span id="loans-count"></span></h2>
+            <table id="loans-table" class="panel-table">
+              <thead>
+                <tr>
+                  <th>Loan</th>
+                  <th>Balance</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="loans-rows"></tbody>
+            </table>
+          </section>
+          <section id="executive-forecast-section">
+            <h2>Financial runway</h2>
+            <canvas id="executive-chart" width="1040" height="400"></canvas>
+            <div id="executive-summary"></div>
+            <div id="executive-delta"></div>
+          </section>
+        </div>
+        <div id="game-tab" hidden>
+          <section id="save-game-section">
+            <h2>Save</h2>
+            <p class="game-tab-description">Save happens automatically once a simulated day, but you can force one right now.</p>
+            <button type="button" id="save-game-button">Save Game</button>
+            <div id="save-game-status"></div>
+          </section>
+          <section id="load-game-section">
+            <h2>Load</h2>
+            <p class="game-tab-description">Reload your last save, discarding anything that's happened since.</p>
+            <button type="button" id="load-game-button">Load Game</button>
+            <div id="load-game-confirm" hidden>
+              <span>Reload from your last save? Anything since then will be lost.</span>
+              <button type="button" id="load-game-confirm-yes">Yes, reload</button>
+              <button type="button" id="load-game-confirm-cancel">Cancel</button>
+            </div>
+          </section>
+          <section id="new-game-section">
+            <h2>New Game</h2>
+            <p class="game-tab-description">Erase this save entirely and start a brand-new airline.</p>
+            <button type="button" id="new-game-button">New Game</button>
+            <div id="new-game-confirm" hidden>
+              <span>Erase current game?</span>
+              <button type="button" id="new-game-confirm-yes">Yes, start over</button>
+              <button type="button" id="new-game-confirm-cancel">Cancel</button>
+            </div>
+          </section>
+        </div>
+      </div>
     </aside>
     <div id="ticker">
       <div id="ticker-track"></div>

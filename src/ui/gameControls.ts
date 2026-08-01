@@ -1,0 +1,94 @@
+import { saveState, clearSavedState, hasSavedState } from './save';
+import type { SimState } from '../sim/state';
+
+/**
+ * Week six: New Game, Save, and Load, all moved into their own sidebar
+ * tab — New Game used to be a standalone HUD button; there was no manual
+ * Save or Load at all before this (saving already happened automatically
+ * once per simulated day, per ui/save.ts, but nothing let the player
+ * force one, or deliberately step back to the last one).
+ */
+
+const saveGameButton = document.querySelector<HTMLButtonElement>('#save-game-button')!;
+const saveGameStatus = document.querySelector<HTMLDivElement>('#save-game-status')!;
+
+const loadGameButton = document.querySelector<HTMLButtonElement>('#load-game-button')!;
+const loadGameConfirmEl = document.querySelector<HTMLDivElement>('#load-game-confirm')!;
+const loadGameConfirmYes = document.querySelector<HTMLButtonElement>('#load-game-confirm-yes')!;
+const loadGameConfirmCancel = document.querySelector<HTMLButtonElement>('#load-game-confirm-cancel')!;
+
+// Same "real inline confirmation, not window.confirm()" reasoning New
+// Game's own confirm already documented — native dialogs are silently
+// blocked in some embedded/preview browser contexts.
+const newGameButton = document.querySelector<HTMLButtonElement>('#new-game-button')!;
+const newGameConfirmEl = document.querySelector<HTMLDivElement>('#new-game-confirm')!;
+const newGameConfirmYes = document.querySelector<HTMLButtonElement>('#new-game-confirm-yes')!;
+const newGameConfirmCancel = document.querySelector<HTMLButtonElement>('#new-game-confirm-cancel')!;
+
+function pad(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
+function formatClockTime(date: Date): string {
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+/**
+ * Wire up all three controls. Called once at startup, same as every
+ * other panel's setup function — `state` is captured once here rather
+ * than threaded through each handler separately, since none of these
+ * three actions need anything else from the running game.
+ */
+export function setupGameControls(state: SimState): void {
+  saveGameButton.addEventListener('click', () => {
+    saveState(state);
+    saveGameStatus.textContent = `Saved at ${formatClockTime(new Date())}.`;
+    updateGameControls(); // a save now just made Load meaningful, if it wasn't already
+  });
+
+  loadGameButton.addEventListener('click', () => {
+    if (loadGameButton.disabled) return; // nothing saved yet — see updateGameControls()
+    loadGameButton.hidden = true;
+    loadGameConfirmEl.hidden = false;
+  });
+
+  loadGameConfirmYes.addEventListener('click', () => {
+    // No explicit "read the save and apply it" step needed — main.ts's
+    // own `loadSavedState() ?? createNewGameState()` runs fresh on any
+    // page load, so reloading *is* how this game loads a save, the exact
+    // same path a browser refresh already takes.
+    window.location.reload();
+  });
+
+  loadGameConfirmCancel.addEventListener('click', () => {
+    loadGameConfirmEl.hidden = true;
+    loadGameButton.hidden = false;
+  });
+
+  newGameButton.addEventListener('click', () => {
+    newGameButton.hidden = true;
+    newGameConfirmEl.hidden = false;
+  });
+
+  newGameConfirmYes.addEventListener('click', () => {
+    clearSavedState();
+    window.location.reload();
+  });
+
+  newGameConfirmCancel.addEventListener('click', () => {
+    newGameConfirmEl.hidden = true;
+    newGameButton.hidden = false;
+  });
+
+  updateGameControls();
+}
+
+/**
+ * Refresh whatever depends on whether a save currently exists — called
+ * once at startup and again whenever the Game tab becomes visible, in
+ * case a day rolled over (an automatic save) or Save Game was clicked
+ * while looking at a different tab.
+ */
+export function updateGameControls(): void {
+  loadGameButton.disabled = !hasSavedState();
+}
