@@ -897,6 +897,59 @@ correctly telling you the market simply isn't built rather than blaming
 fare or capacity — and by day 16 had grown to 26 actual, 24 booked, with
 the choice-model gap now visible as its own step. No console errors.
 
+### Fixed: marketing spend was structurally worthless
+
+Measured per market on a matured 120-day game, marketing's return was
+**0.00x on nearly every market** — best case 0.50x. Not a mistuned
+constant; the shape was wrong. It failed in a pincer:
+
+- On a **big** market the extra booking share was worth exactly nothing,
+  because those flights were already seat-capped. Buying share you can't
+  seat is buying nothing.
+- On a **small** market the share gain was real but absolutely tiny — a
+  passenger or two — against a cost quoted in flat dollars.
+
+There was no market size at which a flat daily fee bought enough share to
+pay for itself.
+
+The fix routes marketing through **market stimulation** rather than only
+through booking share: spend now multiplies the rate at which a market
+matures toward its potential (`log2` diminishing returns, $200/day
+doubles it, $800/day roughly triples it). Marketing becomes an investment
+that permanently grows a market rather than a per-day purchase of a
+sliver of share. The old booking-share bonus stays as a secondary effect.
+
+An additive version was tried first — marketing buying "virtual seats" of
+presence, so cost would scale with market size automatically — and
+measured net-negative everywhere: small markets are already at full
+saturation from their own aircraft so extra presence bought nothing, and
+trunk markets are so large that any plausible daily spend is a rounding
+error. The useful band was too narrow. A rate multiplier applies wherever
+a market is still growing, which is exactly the period the spend is meant
+to shorten.
+
+Result — marketing now has a real interior optimum, and a genuine
+interaction with fleet capacity:
+
+| spend/market/day | margin, 19-seat fleet | margin, 78-seat fleet |
+| --- | --- | --- |
+| $0 | $5,851 | -$3,596 |
+| $100 | **$5,920** | -$1,970 |
+| $200 | $5,686 | **-$1,622** |
+| $800 | $2,954 | -$3,263 |
+
+Capacity-starved, marketing is barely worth anything (peaks at +$69) —
+correctly, since you can't carry the demand you're creating. Given
+aircraft big enough to absorb the growth, the same spend is worth
++$1,974/day at its peak. Over-spending is punished at both gauges.
+
+That interaction is the point: marketing and fleet planning are now
+complementary decisions rather than independent sliders.
+
+**Still unresolved, and the deeper issue** (raised directly): fare and
+marketing are both per-market sliders with a findable static optimum,
+which is busy work rather than a decision — see the next section.
+
 ---
 
 ## Proposed build order (not committed)
