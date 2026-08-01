@@ -2,7 +2,8 @@ import { geoPath } from 'd3-geo';
 import type { LineString } from 'geojson';
 import { projection } from './projection';
 import { airports } from './airports';
-import { dailyDemand } from '../sim/demand';
+import { potentialDailyDemand } from '../sim/demand';
+import { actualDailyDemand, currentPotentialDemand } from '../sim/marketDemand';
 import type { SimState } from '../sim/state';
 
 const DEMAND_STROKE = '#4a90d9';
@@ -12,23 +13,35 @@ const MAX_ARC_WIDTH = 6;
 const MIN_ARC_ALPHA = 0.25;
 const MAX_ARC_ALPHA = 0.9;
 
+// Week six: potential is drawn as a wide, faint arc and actual demand as
+// a solid one on top of it, so the gap between them *is* the headroom —
+// a fat ghost with a thin bright core is a big market nobody has built
+// yet, and the two converging means a market near maturity. That gap is
+// the single most useful thing this layer can show now that demand grows
+// (sim/marketDemand.ts), and it's exactly the kind of thing CLAUDE.md
+// asks the map to teach that a table wouldn't.
+const POTENTIAL_ALPHA = 0.22;
+
 function pairKey(a: string, b: string): string {
   return [a, b].sort().join('-');
 }
 
-// Every distinct pair among the 10 airports, each with its estimated daily
-// demand (sim/demand.ts) — computed once at module load since population
-// and distance never change at runtime. 45 pairs for 10 airports.
-const pairs: { origin: string; dest: string; demand: number }[] = [];
+// Every distinct pair among the 10 airports. 45 pairs for 10 airports.
+// Only the pair list is static now — the demand figures themselves move
+// day to day, so they're read per frame inside drawDemandLayer() rather
+// than baked in here at module load the way they used to be.
+const pairs: { origin: string; dest: string }[] = [];
 for (let i = 0; i < airports.length; i++) {
   for (let j = i + 1; j < airports.length; j++) {
-    const origin = airports[i].iata;
-    const dest = airports[j].iata;
-    pairs.push({ origin, dest, demand: dailyDemand(origin, dest) });
+    pairs.push({ origin: airports[i].iata, dest: airports[j].iata });
   }
 }
 
-const maxDemand = Math.max(...pairs.map((p) => p.demand));
+// The busiest pair's *potential*, which is static — so the arc scale
+// stays fixed as markets grow into it. Scaling to the current busiest
+// actual instead would rescale the whole map every day and make growth
+// impossible to see, since every arc would grow together.
+const maxPotential = Math.max(...pairs.map((p) => potentialDailyDemand(p.origin, p.dest)));
 
 const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]));
 
@@ -69,14 +82,21 @@ export function drawDemandLayer(ctx: CanvasRenderingContext2D, state: SimState):
   const path = geoPath(projection, ctx);
   const servedPairs = servedPairsFrom(state);
 
-  for (const { origin, dest, demand } of pairs) {
+  for (const { origin, dest } of pairs) {
     const originAirport = airportsByIata.get(origin);
     const destAirport = airportsByIata.get(dest);
     if (!originAirport || !destAirport) continue;
 
-    const t = demand / maxDemand; // 0..1, relative to the single busiest pair
-    const width = MIN_ARC_WIDTH + t * (MAX_ARC_WIDTH - MIN_ARC_WIDTH);
-    const alpha = MIN_ARC_ALPHA + t * (MAX_ARC_ALPHA - MIN_ARC_ALPHA);
+    const potential = currentPotentialDemand(state, origin, dest);
+    const actual = actualDailyDemand(state, origin, dest);
+
+    // Both widths share the same scale (the busiest pair's potential), so
+    // the two arcs on one market are directly comparable by eye.
+    const potentialT = potential / maxPotential;
+    const actualT = actual / maxPotential;
+    const potentialWidth = MIN_ARC_WIDTH + potentialT * (MAX_ARC_WIDTH - MIN_ARC_WIDTH);
+    const actualWidth = MIN_ARC_WIDTH + actualT * (MAX_ARC_WIDTH - MIN_ARC_WIDTH);
+    const actualAlpha = MIN_ARC_ALPHA + actualT * (MAX_ARC_ALPHA - MIN_ARC_ALPHA);
 
     const line: LineString = {
       type: 'LineString',
@@ -91,15 +111,24 @@ export function drawDemandLayer(ctx: CanvasRenderingContext2D, state: SimState):
       path(line);
       ctx.strokeStyle = SERVED_HIGHLIGHT;
       ctx.globalAlpha = 0.35;
-      ctx.lineWidth = width + 3;
+      ctx.lineWidth = potentialWidth + 3;
       ctx.stroke();
     }
 
+    // Potential first, underneath — the "how big could this get" ghost.
     ctx.beginPath();
     path(line);
     ctx.strokeStyle = DEMAND_STROKE;
-    ctx.globalAlpha = alpha;
-    ctx.lineWidth = width;
+    ctx.globalAlpha = POTENTIAL_ALPHA;
+    ctx.lineWidth = potentialWidth;
+    ctx.stroke();
+
+    // Actual on top — what really flies today.
+    ctx.beginPath();
+    path(line);
+    ctx.strokeStyle = DEMAND_STROKE;
+    ctx.globalAlpha = actualAlpha;
+    ctx.lineWidth = actualWidth;
     ctx.stroke();
   }
 

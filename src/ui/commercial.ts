@@ -2,6 +2,7 @@ import aircraftTypesData from '../../data/aircraft-types.json';
 import { flightResult, LOAD_FACTOR, type EconomyAircraftType } from '../sim/economy';
 import { marketKey, recommendedFare, type ScheduleLeg } from '../sim/schedule';
 import { trafficShare } from '../sim/choiceModel';
+import { actualDailyDemand } from '../sim/marketDemand';
 import type { RouteSettings, SimState } from '../sim/state';
 
 // A market can be served by more than one gauge at once (week four's
@@ -97,6 +98,7 @@ function summarizeMarket(origin: string, dest: string, state: SimState, routeSet
       type,
       state.fuelPriceIndex,
       state.fuelEfficiencyMultiplier,
+      actualDailyDemand(state, leg.origin, leg.dest),
       freq,
       routeSettings,
       state.competitorRoutes,

@@ -1454,3 +1454,107 @@ body {
   color: #6b7694;
   font-size: 12px;
 }
+
+/* Week six's Dev tab (ui/devTools.ts) — a live cost decomposition, built
+   to make the economy legible while it's being tuned. Every number here
+   is read from state rather than described, so nothing can go stale. */
+#dev-panel section {
+  margin-bottom: 24px;
+}
+
+#dev-panel h2 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7694;
+}
+
+.dev-note {
+  margin: 0 0 12px;
+  color: #6b7694;
+  font-size: 12px;
+}
+
+.dev-totals {
+  display: flex;
+  gap: 20px;
+}
+
+.dev-total {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dev-total-label {
+  color: #6b7694;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.dev-total-value {
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dev-total-value.dev-negative {
+  color: #ff8080;
+}
+
+/* Label, amount and share on one line, with the proportion bar spanning
+   underneath — grid rather than flex so every row's columns line up
+   regardless of how long each label happens to be. */
+.dev-row {
+  display: grid;
+  grid-template-columns: 1fr auto 44px;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 13px;
+  cursor: help;
+}
+
+.dev-row--depth1 {
+  padding-left: 16px;
+  color: #9aa3b8;
+}
+
+.dev-row--depth0 {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 4px;
+}
+
+.dev-row-amount,
+.dev-row-share {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.dev-row-share {
+  color: #6b7694;
+  font-size: 12px;
+}
+
+.dev-row-bar-track {
+  grid-column: 1 / -1;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.dev-row-bar {
+  height: 100%;
+  border-radius: 2px;
+  background: #4a90d9;
+  transition: width 120ms linear;
+}
+
+#dev-fuel-drivers {
+  margin-top: 14px;
+  color: #6b7694;
+  font-size: 12px;
+}

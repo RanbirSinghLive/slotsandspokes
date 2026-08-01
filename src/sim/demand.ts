@@ -39,21 +39,28 @@ const DISTANCE_EXPONENT = 1;
 const SCALING_CONSTANT = 4.8e-8;
 
 /**
- * The estimated number of people who want to travel between `originIata`
- * and `destIata` on an average day, in *either* direction combined — this
- * is a property of the city pair, not of a specific flight or airline.
- * Direct-service-only per WEEK-TWO.md's decision 1: this is the ceiling for
- * a route that exists, and just a visible "market size" figure for one that
- * doesn't yet.
+ * The *potential* daily demand for a city pair — how many people would
+ * travel between `originIata` and `destIata` on an average day if the
+ * market were fully mature and well served, in either direction combined.
+ * A property of the city pair, not of any airline.
+ *
+ * Week six renamed this from `dailyDemand()` to make an important
+ * distinction explicit: this is **latent** demand, not the traffic
+ * actually flying today. A market nobody serves doesn't carry this many
+ * passengers — it carries almost none, and grows toward this figure only
+ * as airlines actually fly it (see sim/marketDemand.ts). Everything that
+ * books passengers reads *actual* demand; this is the ceiling it climbs
+ * toward, and the "how big could this get" figure the map shows for a
+ * market that doesn't exist yet.
  *
  * A pure function of static data (population, great-circle distance), so
  * it's cheap to call as often as needed rather than caching a matrix.
  */
-export function dailyDemand(originIata: string, destIata: string): number {
+export function potentialDailyDemand(originIata: string, destIata: string): number {
   const origin = airportsByIata.get(originIata);
   const dest = airportsByIata.get(destIata);
   if (!origin || !dest) {
-    throw new Error(`dailyDemand: unknown airport in pair ${originIata}-${destIata}`);
+    throw new Error(`potentialDailyDemand: unknown airport in pair ${originIata}-${destIata}`);
   }
   if (origin.iata === dest.iata) return 0;
 
@@ -61,3 +68,25 @@ export function dailyDemand(originIata: string, destIata: string): number {
   const gravity = (origin.population * dest.population) / Math.pow(distanceNm, DISTANCE_EXPONENT);
   return Math.round(gravity * SCALING_CONSTANT);
 }
+
+/**
+ * Every unordered airport pair — 45 for this map's 10 airports. Static
+ * geography, computed once at module load rather than on every use.
+ *
+ * Lives here rather than in any one consumer because two separate places
+ * now need the same "every market that could exist" list: the competitor
+ * AI picking a market to open (sim/competitors.ts) and the daily market
+ * stimulation/decay pass (sim/marketDemand.ts). Two hand-maintained
+ * copies of the same derivation is exactly the drift this codebase
+ * avoids elsewhere.
+ */
+export const ALL_MARKET_PAIRS: [string, string][] = (() => {
+  const codes = (airportsData as AirportDemandInput[]).map((airport) => airport.iata);
+  const pairs: [string, string][] = [];
+  for (let i = 0; i < codes.length; i++) {
+    for (let j = i + 1; j < codes.length; j++) {
+      pairs.push([codes[i], codes[j]]);
+    }
+  }
+  return pairs;
+})();

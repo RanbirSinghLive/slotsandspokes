@@ -1,6 +1,5 @@
 import competitorsData from '../../data/competitors.json';
-import airportsData from '../../data/airports.json';
-import { dailyDemand } from './demand';
+import { potentialDailyDemand, ALL_MARKET_PAIRS } from './demand';
 import { marketKey, recommendedFare } from './schedule';
 import { nextRandom } from './rng';
 import type { SimState } from './state';
@@ -62,26 +61,11 @@ export function loadCompetitorRoutes(): CompetitorOffering[] {
 // other random model in sim/.
 const NEW_ROUTE_PROBABILITY_PER_DAY = 0.03;
 
-const AIRPORT_CODES = (airportsData as { iata: string }[]).map((airport) => airport.iata);
-
-// Every unordered pair of airports, computed once — 45 for this map's 10
-// airports. Static (doesn't depend on any game's state), so this is
-// module-level rather than recomputed on every roll.
-const ALL_MARKET_PAIRS: [string, string][] = (() => {
-  const pairs: [string, string][] = [];
-  for (let i = 0; i < AIRPORT_CODES.length; i++) {
-    for (let j = i + 1; j < AIRPORT_CODES.length; j++) {
-      pairs.push([AIRPORT_CODES[i], AIRPORT_CODES[j]]);
-    }
-  }
-  return pairs;
-})();
-
 /**
  * Weighted pick among `items` — `roll` (already in [0, 1) from
  * nextRandom()) lands in one of `weights`' proportional slices. Falls
  * back to a uniform pick if every weight is zero (shouldn't happen here,
- * since dailyDemand() is never negative and every pair has at least some
+ * since potentialDailyDemand() is never negative and every pair has at least some
  * population product, but a real fallback beats a NaN from a 0/0
  * division if it ever did).
  */
@@ -107,10 +91,12 @@ function pickWeighted<T>(items: T[], weights: number[], roll: number): T {
  * chance to open exactly one new route on a market it doesn't already
  * serve.
  *
- * Candidates are weighted by dailyDemand() (sim/demand.ts), so
- * competitors plausibly expand into the same lucrative pairs a player
- * would be drawn to, without being deterministic about always picking
- * the single biggest one. A freshly-opened route starts small
+ * Candidates are weighted by potentialDailyDemand() (sim/demand.ts) —
+ * *potential*, not the stimulated actual demand, on purpose: a
+ * competitor sizing up a market should be drawn to how big it could get,
+ * the same judgment a player makes, not to how little traffic it happens
+ * to carry while nobody serves it. Weighted rather than deterministic so
+ * they don't all pile onto the single biggest pair. A freshly-opened route starts small
  * (dailyFrequency 1) at this map's recommendedFare() (sim/schedule.ts) —
  * the same default a player's own new route gets — and is stamped with
  * `dayStartMinute` as its `openedAtMinute`, which is what lets
@@ -131,7 +117,7 @@ export function rollCompetitorRouteOpenings(state: SimState, dayStartMinute: num
     const candidates = ALL_MARKET_PAIRS.filter(([a, b]) => !servedKeys.has(marketKey(a, b)));
     if (candidates.length === 0) continue; // this airline already serves every possible market
 
-    const weights = candidates.map(([a, b]) => dailyDemand(a, b));
+    const weights = candidates.map(([a, b]) => potentialDailyDemand(a, b));
     const [pickRoll, seedAfterPick] = nextRandom(state.rngSeed);
     state.rngSeed = seedAfterPick;
     const [origin, dest] = pickWeighted(candidates, weights, pickRoll);

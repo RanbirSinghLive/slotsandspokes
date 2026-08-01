@@ -1,4 +1,3 @@
-import { dailyDemand } from './demand';
 import { bookingShare } from './choiceModel';
 import { FUEL_SHARE_OF_BLOCK_HOUR_COST } from './fuel';
 import type { CompetitorOffering } from './competitors';
@@ -32,6 +31,12 @@ export type FlightResult = {
    * rather than mutating anything itself.
    */
   spilloverDelta: number;
+  /**
+   * `cost` above, itemized — so the caller can attribute this flight's
+   * spending to the right categories (`SimState.todayCostByCategory`)
+   * without recomputing the formula itself.
+   */
+  costBreakdown: CostBreakdown;
 };
 
 // Deliberately crude for now, per WEEK-ONE.md: every flight pays the same
@@ -77,10 +82,45 @@ export function legCost(
   fuelPriceIndex: number,
   fuelEfficiencyMultiplier: number,
 ): number {
+  const { fuel, blockNonFuel, departure } = legCostBreakdown(
+    blockMinutes,
+    type,
+    fuelPriceIndex,
+    fuelEfficiencyMultiplier,
+  );
+  return fuel + blockNonFuel + departure;
+}
+
+/**
+ * The same three components of a leg's cost, itemized rather than summed —
+ * week six's cost attribution (`SimState.todayCostByCategory`). `legCost()`
+ * above is literally the sum of these three, so the total and the
+ * breakdown can never disagree about what a flight cost: there's only one
+ * formula, and the total is derived from the parts rather than computed
+ * alongside them.
+ */
+export type CostBreakdown = {
+  /** The fuel-sensitive slice, after the price index and any efficiency upgrades. */
+  fuel: number;
+  /** Everything else bundled into costPerBlockHour — crew, maintenance, overhead. */
+  blockNonFuel: number;
+  /** The flat per-departure charge, independent of how long the leg is. */
+  departure: number;
+};
+
+export function legCostBreakdown(
+  blockMinutes: number,
+  type: EconomyAircraftType,
+  fuelPriceIndex: number,
+  fuelEfficiencyMultiplier: number,
+): CostBreakdown {
   const blockHourCost = (blockMinutes / 60) * type.costPerBlockHour;
-  const fuelPortion = blockHourCost * FUEL_SHARE_OF_BLOCK_HOUR_COST;
-  const nonFuelPortion = blockHourCost - fuelPortion;
-  return nonFuelPortion + fuelPortion * fuelPriceIndex * fuelEfficiencyMultiplier + type.costPerDeparture;
+  const baseFuelPortion = blockHourCost * FUEL_SHARE_OF_BLOCK_HOUR_COST;
+  return {
+    fuel: baseFuelPortion * fuelPriceIndex * fuelEfficiencyMultiplier,
+    blockNonFuel: blockHourCost - baseFuelPortion,
+    departure: type.costPerDeparture,
+  };
 }
 
 /**
@@ -88,12 +128,20 @@ export function legCost(
  * arrival (see sim/step.ts) — a flight in the air hasn't earned or spent
  * anything yet as far as the books are concerned.
  *
+ * `marketDailyDemand` is how many people *actually* fly this market on an
+ * average day right now — week six's stimulated figure from
+ * `sim/marketDemand.ts`'s `actualDailyDemand()`, not the gravity model's
+ * potential. Passed in rather than looked up here so this stays a pure
+ * function of its inputs, and so the caller decides whether it's reading
+ * live state or previewing a hypothetical.
+ *
  * `legsServingMarket` is how many scheduled legs (either direction, see
  * `sim/schedule.ts`'s `legsServingMarket()`) currently split this leg's
- * market between them — the route's total daily demand (week two's
- * `sim/demand.ts`) is divided evenly across all of them, so a second
- * frequency on an already-thin market doesn't create new passengers, it
- * just splits the same ones two ways. Of that per-flight slice, only
+ * market between them — that demand is divided evenly across all of them,
+ * so a second frequency on an already-thin market doesn't create new
+ * passengers, it just splits the same ones two ways. (Adding frequency
+ * does grow the market, but over days, through stimulation — not
+ * instantly within one flight's economics.) Of that per-flight slice, only
  * `bookingShare()` (`sim/choiceModel.ts`, week two's "connective piece")
  * actually books — some people, given `routeSettings.fare`,
  * `routeSettings.marketingSpend`, and this market's frequency, choose a
@@ -123,12 +171,13 @@ export function flightResult(
   type: EconomyAircraftType,
   fuelPriceIndex: number,
   fuelEfficiencyMultiplier: number,
+  marketDailyDemand: number,
   legsServingMarket: number,
   routeSettings: RouteSettings,
   competitorRoutes: CompetitorOffering[],
   spilloverAvailable: number,
 ): FlightResult {
-  const demandPerFlight = dailyDemand(leg.origin, leg.dest) / legsServingMarket;
+  const demandPerFlight = marketDailyDemand / legsServingMarket;
   const bookedDemand =
     demandPerFlight *
     bookingShare(
@@ -156,6 +205,7 @@ export function flightResult(
   }
 
   const revenue = pax * routeSettings.fare;
-  const cost = legCost(leg.blockMinutes, type, fuelPriceIndex, fuelEfficiencyMultiplier);
-  return { pax, revenue, cost, margin: revenue - cost, spilloverDelta };
+  const costBreakdown = legCostBreakdown(leg.blockMinutes, type, fuelPriceIndex, fuelEfficiencyMultiplier);
+  const cost = costBreakdown.fuel + costBreakdown.blockNonFuel + costBreakdown.departure;
+  return { pax, revenue, cost, margin: revenue - cost, spilloverDelta, costBreakdown };
 }

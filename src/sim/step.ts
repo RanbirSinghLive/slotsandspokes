@@ -1,10 +1,11 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
-import { flightResult, legCost, type EconomyAircraftType } from './economy';
+import { flightResult, legCostBreakdown, type EconomyAircraftType } from './economy';
 import { MIN_TURN_MINUTES, legsServingMarket, marketKey } from './schedule';
 import { nextRandom } from './rng';
 import { rollDailyWeather, WEATHER_ON_TIME_PROBABILITY, WEATHER_MAX_DELAY_MINUTES } from './weather';
 import { rollCompetitorRouteOpenings } from './competitors';
 import { rollDailyFuelPrice } from './fuel';
+import { rollDailyMarketDemand, actualDailyDemand } from './marketDemand';
 import { applyDailyLoanInterest } from './loans';
 import { flightSatisfactionScore } from './nps';
 import { applyDailyReputationChange } from './reputation';
@@ -209,6 +210,9 @@ export function step(state: SimState): void {
     state.todayRevenue = 0;
     state.todayCost = 0;
     state.todayMargin = 0;
+    // Week six's cost attribution — reset in lockstep with todayCost
+    // above, since these five are exactly that number split up.
+    state.todayCostByCategory = { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0 };
     state.todayFlightsDeparted = 0;
     state.todayFlightsOnTime = 0;
     state.todayNpsPoints = 0;
@@ -227,6 +231,7 @@ export function step(state: SimState): void {
     );
     state.cash -= totalMarketingSpend;
     state.todayCost += totalMarketingSpend;
+    state.todayCostByCategory.marketing += totalMarketingSpend;
     state.todayMargin -= totalMarketingSpend;
 
     // Fleet Market lease cost (week three) — same "flat per-day charge"
@@ -236,6 +241,7 @@ export function step(state: SimState): void {
     const totalLeaseCost = state.aircraft.reduce((total, aircraft) => total + aircraft.leaseCostPerDay, 0);
     state.cash -= totalLeaseCost;
     state.todayCost += totalLeaseCost;
+    state.todayCostByCategory.lease += totalLeaseCost;
     state.todayMargin -= totalLeaseCost;
 
     // Weather (sim/weather.ts) is a daily-scale event, not a per-minute
@@ -253,6 +259,12 @@ export function step(state: SimState): void {
     // weather and the competitor AI above — fuel prices move day to day
     // in this model, not minute to minute.
     rollDailyFuelPrice(state);
+
+    // Week six's market stimulation (sim/marketDemand.ts): markets grow
+    // toward their potential where they're actually flown and decay back
+    // toward the floor where they aren't. Same daily cadence as the rolls
+    // above, but unlike them entirely deterministic — no random draws.
+    rollDailyMarketDemand(state);
 
     // Week five's loan mechanic (sim/loans.ts): compound interest on every
     // outstanding loan, once a day, same cadence as weather and the
@@ -427,9 +439,18 @@ export function step(state: SimState): void {
           // No market, no passengers, no revenue — just the real fuel and
           // departure cost of moving the aircraft (sim/economy.ts's
           // legCost(), the same formula a revenue flight's cost half uses).
-          const cost = legCost(blockMinutes, type, state.fuelPriceIndex, state.fuelEfficiencyMultiplier);
+          const breakdown = legCostBreakdown(
+            blockMinutes,
+            type,
+            state.fuelPriceIndex,
+            state.fuelEfficiencyMultiplier,
+          );
+          const cost = breakdown.fuel + breakdown.blockNonFuel + breakdown.departure;
           state.cash -= cost;
           state.todayCost += cost;
+          state.todayCostByCategory.fuel += breakdown.fuel;
+          state.todayCostByCategory.blockNonFuel += breakdown.blockNonFuel;
+          state.todayCostByCategory.departure += breakdown.departure;
           state.todayMargin -= cost;
         } else {
           const marketFrequency = legsServingMarket(flight.origin, flight.dest, state.schedule);
@@ -440,6 +461,7 @@ export function step(state: SimState): void {
             type,
             state.fuelPriceIndex,
             state.fuelEfficiencyMultiplier,
+            actualDailyDemand(state, flight.origin, flight.dest),
             marketFrequency,
             { fare: flight.fare, marketingSpend: flight.marketingSpend },
             state.competitorRoutes,
@@ -449,6 +471,9 @@ export function step(state: SimState): void {
           state.cash += result.margin;
           state.todayRevenue += result.revenue;
           state.todayCost += result.cost;
+          state.todayCostByCategory.fuel += result.costBreakdown.fuel;
+          state.todayCostByCategory.blockNonFuel += result.costBreakdown.blockNonFuel;
+          state.todayCostByCategory.departure += result.costBreakdown.departure;
           state.todayMargin += result.margin;
         }
       }

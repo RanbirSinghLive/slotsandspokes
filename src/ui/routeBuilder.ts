@@ -4,7 +4,7 @@ import aircraftTypesData from '../../data/aircraft-types.json';
 import { projection } from '../render/projection';
 import { airports, type Airport } from '../render/airports';
 import { greatCircleDistanceNm } from '../sim/geo';
-import { dailyDemand } from '../sim/demand';
+import { actualDailyDemand, currentPotentialDemand } from '../sim/marketDemand';
 import {
   computeBlockMinutes,
   defaultReturnDepartMinute,
@@ -72,15 +72,27 @@ function showRouteHoverTooltip(origin: Airport, candidate: Airport, screenX: num
   if (type) {
     const existingFrequency = legsServingMarket(origin.iata, candidate.iata, state.schedule);
     const newFrequency = existingFrequency + (formReturnCheckbox.checked ? 2 : 1);
-    const pdew = Math.round(dailyDemand(origin.iata, candidate.iata) / newFrequency);
+    const pdew = Math.round(actualDailyDemand(state, origin.iata, candidate.iata) / newFrequency);
+    const potentialPdew = Math.round(currentPotentialDemand(state, origin.iata, candidate.iata) / newFrequency);
     const distanceNm = greatCircleDistanceNm(origin, candidate);
     const outOfRange = distanceNm > type.rangeNm;
 
+    // "now → potential" (week six): with market stimulation, what a
+    // market carries today and what it could carry once built are very
+    // different numbers, and the second is the one route choice actually
+    // turns on. Collapses to a single figure on a market already at
+    // maturity, where the two are equal.
+    const pdewText = potentialPdew > pdew ? `PDEW: ${pdew} → ${potentialPdew}` : `PDEW: ${pdew}`;
+
     routeHoverTooltipBody.textContent = outOfRange
-      ? `PDEW: ${pdew}  CAP: ${type.seats} — out of range (${Math.round(distanceNm)} nm)`
-      : `PDEW: ${pdew}  CAP: ${type.seats}`;
+      ? `${pdewText}  CAP: ${type.seats} — out of range (${Math.round(distanceNm)} nm)`
+      : `${pdewText}  CAP: ${type.seats}`;
     routeHoverTooltipBody.classList.toggle('out-of-range', outOfRange);
-    routeHoverTooltipBody.classList.toggle('thin-market', !outOfRange && pdew < type.seats);
+    // Thin now means "can never fill this aircraft even fully grown" —
+    // testing today's actual instead would fire on virtually every market
+    // in the early game, since they all start at the virgin floor, and a
+    // warning that's always on is no warning at all.
+    routeHoverTooltipBody.classList.toggle('thin-market', !outOfRange && potentialPdew < type.seats);
   } else {
     routeHoverTooltipBody.textContent = '';
     routeHoverTooltipBody.classList.remove('out-of-range', 'thin-market');
@@ -556,8 +568,8 @@ function updateFormValidation(origin: Airport, dest: Airport, state: SimState): 
   // you might come back and draw differently. `newFrequency` is the
   // existing schedule's frequency on this market *plus* what this
   // confirm would add (1 leg, or 2 if the return checkbox is on) — the
-  // same denominator sim/economy.ts's flightResult() divides
-  // dailyDemand() by, just read before committing instead of after, so
+  // same denominator sim/economy.ts's flightResult() divides the
+  // market's demand by, just read before committing instead of after, so
   // this can never drift from what the flight would actually carry once
   // it's flying. CAP is the plane's raw seat count, not the load-factor-
   // adjusted ceiling — the whole point is showing the number *before*
@@ -566,9 +578,15 @@ function updateFormValidation(origin: Airport, dest: Airport, state: SimState): 
   if (type) {
     const existingFrequency = legsServingMarket(origin.iata, dest.iata, state.schedule);
     const newFrequency = existingFrequency + (formReturnCheckbox.checked ? 2 : 1);
-    const pdew = Math.round(dailyDemand(origin.iata, dest.iata) / newFrequency);
-    formPdew.textContent = `PDEW: ${pdew}  CAP: ${type.seats}`;
-    formPdew.classList.toggle('thin-market', pdew < type.seats);
+    const pdew = Math.round(actualDailyDemand(state, origin.iata, dest.iata) / newFrequency);
+    const potentialPdew = Math.round(currentPotentialDemand(state, origin.iata, dest.iata) / newFrequency);
+    formPdew.textContent =
+      potentialPdew > pdew
+        ? `PDEW: ${pdew} now → ${potentialPdew} potential  CAP: ${type.seats}`
+        : `PDEW: ${pdew}  CAP: ${type.seats}`;
+    // See the hover tooltip's own note: thin is judged on potential, not
+    // on what the market happens to carry before anyone has built it.
+    formPdew.classList.toggle('thin-market', potentialPdew < type.seats);
   } else {
     formPdew.textContent = '';
   }

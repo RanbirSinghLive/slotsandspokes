@@ -327,6 +327,49 @@ export type SimState = {
    * never charged for twice.
    */
   unlockedTechNodeIds: string[];
+  /**
+   * Week six's market stimulation model (sim/marketDemand.ts): how many
+   * people actually fly each market on an average day right now, keyed by
+   * `marketKey(origin, dest)` — a plain object, not a Map, same
+   * JSON-round-trip reasoning as `routeSettings`. This is the number that
+   * books passengers; `potentialDailyDemand()` (sim/demand.ts) is only the
+   * ceiling it grows toward. Populated for all 45 pairs by the first
+   * day-rollover; before that, readers fall back to the virgin floor.
+   */
+  marketDemand: Record<string, number>;
+  /**
+   * Accumulated global growth in *potential* demand — 1 at the start of a
+   * game, drifting up ~2%/year (sim/marketDemand.ts). Multiplied into
+   * every market's gravity-model potential, so the ceiling markets grow
+   * toward is itself slowly rising rather than fixed. Deliberately one
+   * global figure rather than per market: nothing varies growth by
+   * geography yet, and 45 near-identical numbers would be 45 chances to
+   * drift apart for no gain.
+   */
+  demandGrowthMultiplier: number;
+  /**
+   * Week six's cost attribution: the same dollars `todayCost` already
+   * totals, split by where they went. Reset to zero at day-rollover
+   * alongside `todayCost` itself, and **guaranteed to sum to it** — every
+   * place that adds to `todayCost` adds to exactly one category here too.
+   *
+   * Loan interest is deliberately absent: it compounds onto each loan's
+   * own balance rather than being charged out of Cash (see sim/loans.ts),
+   * so it was never part of `todayCost` and including it here would break
+   * that sum.
+   */
+  todayCostByCategory: {
+    /** Fuel, after the price index and any tech tree efficiency upgrades. */
+    fuel: number;
+    /** The non-fuel half of block-hour cost — crew, maintenance, overhead. */
+    blockNonFuel: number;
+    /** Flat per-departure charges. */
+    departure: number;
+    /** Daily marketing spend, summed across every market. */
+    marketing: number;
+    /** Daily lease cost, summed across every leased airframe. */
+    lease: number;
+  };
 };
 
 // Only one aircraft type exists so far, so every aircraft record uses it.
@@ -432,6 +475,9 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     fuelPriceHistory: [],
     fuelEfficiencyMultiplier: 1,
     unlockedTechNodeIds: [],
+    marketDemand: {},
+    demandGrowthMultiplier: 1,
+    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0 },
   };
 }
 
@@ -490,5 +536,8 @@ export function createNewGameState(rngSeed: number = Date.now()): SimState {
     fuelPriceHistory: [],
     fuelEfficiencyMultiplier: 1,
     unlockedTechNodeIds: [],
+    marketDemand: {},
+    demandGrowthMultiplier: 1,
+    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0 },
   };
 }

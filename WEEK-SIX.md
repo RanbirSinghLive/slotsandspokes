@@ -627,6 +627,115 @@ the three that needed no follow-up.
 
 ---
 
+## Built: market stimulation — potential vs actual PDEW
+
+The fix for Finding 1 above, and the diagnosis that produced it was
+sharper than the sweep's own: the problem wasn't really pricing, it was
+that **an empty world has no decisions in it.** Every market started at
+its full gravity-model size, uncontested, so route choice collapsed into
+"pick the biggest number" and the seat cap did the rest.
+
+There are no legacy incumbents in this world — every airline, player and
+AI alike, starts from scratch — so the model splits demand in two:
+
+- **Potential** (`potentialDailyDemand()`, renamed from `dailyDemand()`)
+  — how big a city pair could get, from population and distance, plus
+  slow global growth (`demandGrowthMultiplier`, ~2%/year).
+- **Actual** (`sim/marketDemand.ts`, stored per market on
+  `SimState.marketDemand`) — who actually flies today. This is what books
+  passengers now; potential is only the ceiling it climbs toward.
+
+**A virgin market starts at an absolute floor of 10 PDEW, not a fraction
+of potential.** That's the decision the whole thing turns on. A
+percentage would leave trunk markets hundreds of passengers deep per
+flight — still seat-capped, still no pricing tension — while rounding the
+thinnest markets down to about one passenger a day. A flat floor puts
+every market in the same playable band on day one, which is what makes a
+19-seat aircraft the right tool for all of them early.
+
+**Growth is driven by seats offered relative to potential**, which is
+what stops the no-brainer from simply reappearing at the biggest market.
+One daily 19-seater against 9 potential PDEW saturates a market outright;
+the same aircraft against 4,668 is 0.4% of it and barely moves the
+needle. Verified over 120 simulated days: the thin Maritime markets reach
+96-100% of potential while YUL-YYZ and YOW-YUL, flown the whole time,
+reach only 16% and 13%. Trunk routes now genuinely require real capacity
+before they respond — which finally gives the Fleet Market a purpose
+beyond being a shopping list.
+
+Decay (requested directly) runs at 0.015/day toward the floor, slower
+than growth: a market built to 52 PDEW and then abandoned falls to 37
+after 30 days, 27 after 60, 17 after 120. Stimulation is an investment
+you can lose by walking away, not one that evaporates the moment a
+schedule gap appears.
+
+Because actual demand is a property of the **market**, not of an airline,
+stimulation is a public good — everyone flying a market grows it for
+everyone serving it. Verified incidentally in testing: a competitor
+opened YQB-YUL and grew it to 126 PDEW while the player flew nothing
+there. Open a big market early and you pay to build demand a rival can
+enter and share. Nothing in the model assumes a single player, so it
+survives competitors becoming real airlines later.
+
+**Result — the pricing tension exists now.** The fare sweep turns over
+instead of climbing forever:
+
+| fare | before | after |
+| --- | --- | --- |
+| 1.0x | $6,910/day | $5,851/day |
+| 2.5x | $21,486/day | **$13,390/day (peak)** |
+| 5.0x | $41,227/day | -$1,085/day |
+
+Overpricing now genuinely loses money. Still open, deliberately not
+fixed in this pass: the optimum sits at ~2.5x, so `recommendedFare()` is
+still calibrated well below where a player should actually price. The
+gap should probably be closed to something like 20-30% — enough that
+tuning fare is a real gain, not enough that ignoring it is ruinous.
+
+Marketing is still net-negative at every level tested (best at $0/day),
+so the earlier read that it's near-worthless survives the change and
+needs its own pass. Fuel efficiency's full tech branch is now worth about
++18% margin.
+
+UI: the Demand map layer draws potential as a wide faint arc with actual
+solid on top, so the gap between them *is* the headroom — a fat ghost
+with a thin bright core is a big market nobody has built. Route-builder
+readouts became "PDEW: 5 now → 20 potential  CAP: 19". The thin-market
+warning now tests *potential* against seat count rather than today's
+actual, which would otherwise fire on nearly every market in the early
+game and mean nothing.
+
+## Built: cost attribution and a Dev tab
+
+`SimState.todayCostByCategory` splits the same dollars `todayCost`
+already totalled into fuel, non-fuel block, departure, marketing and
+lease. `legCostBreakdown()` (sim/economy.ts) itemizes a leg's cost and
+`legCost()` is now literally the sum of its three parts, so a total and
+its breakdown cannot disagree — there's one formula, not two.
+
+Loan interest is deliberately excluded: it compounds onto each loan's
+balance rather than being charged out of Cash, so it was never part of
+`todayCost`, and including it would break the sum. Verified across 60
+simulated days with all five categories exercised: worst
+`|sum - todayCost|` was 3.6e-12, i.e. floating-point noise.
+
+The Dev tab (`ui/devTools.ts`, wrench icon) renders that live as a cost
+tree with proportion bars and hover explanations. **Every leaf reads a
+real number out of state** rather than describing the model — a
+hand-authored diagram of the formulas would rot the first time a constant
+changed, which is exactly the drift `ui/commercial.ts` already avoids by
+calling the real `flightResult()`. It refreshes every frame rather than
+on tab-select, since watching cost accumulate through a day is the point.
+Temporary by intent: one file, one tab button, one markup block.
+
+Verified end to end in the browser — leased an aircraft, opened
+YHZ-YQM, ran several simulated days: Fuel $884 + Block $1,616 +
+Departure $600 = Flying $3,100, plus Fixed $300 = $3,400 total, matching
+the headline figure exactly, with fuel at 35.6% of block cost (the 35%
+share times a +2% fuel price index). Zero console errors.
+
+---
+
 ## Proposed build order (not committed)
 
 Roughly in dependency order — each item mostly needs the one before it

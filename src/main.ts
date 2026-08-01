@@ -34,6 +34,7 @@ import { setupOnTimePanel, updateOnTimePanel } from './ui/onTime';
 import { setupExecutivePanel, updateExecutivePanel } from './ui/executive';
 import { setupFuelPricePanel, updateFuelPricePanel } from './ui/fuelPrice';
 import { setupTechTreePanel, updateTechTreePanel } from './ui/techTree';
+import { setupDevPanel, updateDevPanel } from './ui/devTools';
 import { updateTicker } from './ui/ticker';
 import { setupLoans, updateLoans } from './ui/loans';
 import { isInsolvent } from './sim/loans';
@@ -69,6 +70,7 @@ setupOnTimePanel();
 setupExecutivePanel();
 setupFuelPricePanel();
 setupTechTreePanel(state);
+setupDevPanel();
 setupLoans(state);
 setupGameControls(state);
 
@@ -132,6 +134,7 @@ const fleetMarketPanelEl = document.querySelector<HTMLDivElement>('#fleet-market
 const onTimePanelEl = document.querySelector<HTMLDivElement>('#ontime-panel')!;
 const executivePanelEl = document.querySelector<HTMLDivElement>('#executive-panel')!;
 const techTreePanelEl = document.querySelector<HTMLDivElement>('#tech-tree-panel')!;
+const devPanelEl = document.querySelector<HTMLDivElement>('#dev-panel')!;
 const gameTabEl = document.querySelector<HTMLDivElement>('#game-tab')!;
 const sidebarTabButtons = document.querySelectorAll<HTMLButtonElement>('#sidebar-tabs button');
 const rotationExpandToggle = document.querySelector<HTMLButtonElement>('#rotation-expand-toggle')!;
@@ -219,7 +222,16 @@ let latestFractionalMinute = state.simMinute;
 // independent on/off toggles layered on top of the map (unchanged from
 // week four), since they were already built the right way for this: a
 // layer you toggle, not a destination you navigate to.
-type SidebarTab = 'fleet' | 'rotation' | 'commercial' | 'fleet-market' | 'ontime' | 'executive' | 'techtree' | 'game';
+type SidebarTab =
+  | 'fleet'
+  | 'rotation'
+  | 'commercial'
+  | 'fleet-market'
+  | 'ontime'
+  | 'executive'
+  | 'techtree'
+  | 'dev'
+  | 'game';
 let sidebarTab: SidebarTab = 'fleet';
 let demandOverlayOn = false;
 let competitionOverlayOn = false;
@@ -236,6 +248,13 @@ function render(nowMs: number = performance.now()): void {
   // run before speedMultiplier itself is declared (resize()'s very first
   // call, at startup).
   updateLoans(state);
+
+  // The Dev tab is the one panel that refreshes every frame rather than
+  // on tab-select — watching cost accumulate across a simulated day is
+  // the whole point of it, so a snapshot taken when the tab opened would
+  // be useless. Gated on it actually being visible so it costs nothing
+  // the rest of the time.
+  if (sidebarTab === 'dev') updateDevPanel(state);
 
   const cssWidth = window.innerWidth - currentPanelWidthPx;
   const cssHeight = window.innerHeight;
@@ -442,6 +461,7 @@ function switchToSidebarTab(tab: SidebarTab, highlightLegIds: string[] = []): vo
   onTimePanelEl.hidden = tab !== 'ontime';
   executivePanelEl.hidden = tab !== 'executive';
   techTreePanelEl.hidden = tab !== 'techtree';
+  devPanelEl.hidden = tab !== 'dev';
   gameTabEl.hidden = tab !== 'game';
 
   sidebarTabButtons.forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
