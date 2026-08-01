@@ -362,6 +362,7 @@
           it costs to clear.
         </p>
         <p class="modal-subtle">Outstanding loans: <span id="loan-offer-count"></span></p>
+        <p class="modal-warning" id="loan-offer-floor"></p>
         <div class="modal-actions">
           <button type="button" id="loan-offer-take">Take the loan</button>
           <button type="button" id="loan-offer-dismiss">Not now</button>
@@ -371,11 +372,7 @@
     <div id="game-over-modal" class="modal-overlay" hidden>
       <div class="modal-box modal-box--game-over">
         <h2>Insolvent</h2>
-        <p>
-          Cash is gone and every one of the 20 loan slots is already
-          spoken for — there's no more credit left to draw on. This
-          airline is finished.
-        </p>
+        <p id="game-over-reason"></p>
         <div class="modal-actions">
           <button type="button" id="game-over-new-game">Start a new game</button>
         </div>

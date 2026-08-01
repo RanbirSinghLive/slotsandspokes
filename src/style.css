@@ -1255,6 +1255,15 @@ body {
   font-size: 12px;
 }
 
+/* How much room is left before the cash floor ends the game — same
+   #ff8080 the rest of the app uses for "actually broken," since running
+   past it is now genuinely fatal rather than just uncomfortable. */
+.modal-warning {
+  margin: 0;
+  color: #ff8080;
+  font-size: 12px;
+}
+
 /* The game-over screen is the one modal you can't dismiss without
    starting over — a slightly harder red border marks that it's not just
    another routine pop-up, same #ff8080 the rest of the app already uses

@@ -804,7 +804,7 @@ inside 1,150 nm, so nothing above the Dash 8-400 is range-constrained at
 all. Genuinely leveraging the A330 needs a bigger map, which is out of
 scope this milestone.
 
-## Open bug: negative cash has no floor
+## Fixed: negative cash had no floor
 
 Found while testing: a game left running reached **-$3,996,581 in cash
 with "Outstanding loans: 0/20"** — nearly twice the maximum debt the loan
@@ -825,11 +825,33 @@ fires, the game never ends, and cash falls without limit. **Declining
 loans is strictly better than taking them**: you get unlimited free
 credit at 0% instead of $100k at 0.5%/day compounding.
 
-Not fixed yet — the right fix changes when the game ends, which is a real
-design decision rather than a patch. Candidates: treat cash below the
-total credit line (-$2M) as insolvency regardless of loan count; make the
-offer non-dismissable while cash is negative; or auto-draw a loan and
-only game-over when the cap is genuinely exhausted.
+**Fixed with a hard floor** (chosen over making the offer
+non-dismissable, or auto-drawing loans, as the smallest change that
+leaves the existing offer flow alone). `CASH_FLOOR` is the total credit
+line negated — `-(LOAN_PRINCIPAL * MAX_LOANS)`, i.e. -$2,000,000 — and
+`isInsolvent()` now returns true below it regardless of loan count. The
+reasoning is that below the floor, drawing *every* remaining loan still
+wouldn't get Cash back to zero, so no sequence of borrowing could rescue
+the airline; there is genuinely nothing left to decide.
+
+Derived from the two loan constants rather than typed as its own number,
+so changing the principal or the cap moves the floor with them.
+
+Two supporting UI changes, since a floor the player can't see would just
+be an ambush:
+
+- The loan offer now shows how much room is left before the floor — e.g.
+  "Below -$2,000,000 the airline is finished — $1,936,000 of room left."
+- The game-over screen names *which* condition ended the run. "You ran
+  past the floor without borrowing" and "you borrowed everything and
+  still ran out" are different mistakes, and its old text only described
+  the second.
+
+Verified at the boundary in isolation (-$1,999,999 alive, -$2,000,000
+game over, the -$3,996,581 case now fatal, and the original
+loans-exhausted rule still firing), then end to end in the browser by
+leasing the entire fleet market and letting the lease charges drain a
+real game.
 
 ---
 

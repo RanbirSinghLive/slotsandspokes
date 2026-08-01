@@ -102,11 +102,33 @@ export function applyDailyLoanInterest(state: SimState): void {
 }
 
 /**
- * The game's actual failure state: Cash has hit zero again, and there's
- * no more credit left to draw on because all MAX_LOANS slots are already
- * taken. ui/loans.ts checks this every frame to decide whether to show the
- * loan offer (still room to borrow) or the game-over screen (there isn't).
+ * How far negative Cash can go before the game ends regardless of how
+ * many loans have been taken — the total credit line, negated. Below
+ * this, drawing every remaining loan slot still wouldn't get Cash back
+ * to zero, so no sequence of borrowing could rescue the airline.
+ *
+ * This exists because the loan-count condition alone had a hole (found
+ * in testing, see WEEK-SIX.md): declining the offer sets ui/loans.ts's
+ * `dismissedForThisDip`, which only resets once Cash climbs back above
+ * zero — and for an airline that's losing money, it never does. So the
+ * offer stopped reappearing, the loan count stayed at 0, `isInsolvent()`
+ * never fired, and Cash fell without limit; a test game reached nearly
+ * -$4M with zero loans outstanding. That made *declining* strictly
+ * better than accepting: unlimited free credit at 0% versus $100k at
+ * 0.5%/day compounding. A floor closes it without touching the offer
+ * flow itself.
+ */
+export const CASH_FLOOR = -(LOAN_PRINCIPAL * MAX_LOANS);
+
+/**
+ * The game's actual failure state, either way it can be reached: Cash
+ * has fallen past the whole credit line (CASH_FLOOR above — nothing
+ * could bring it back), or Cash has hit zero with every MAX_LOANS slot
+ * already spoken for. ui/loans.ts checks this every frame to decide
+ * whether to show the loan offer (still room to borrow, still above the
+ * floor) or the game-over screen.
  */
 export function isInsolvent(state: SimState): boolean {
+  if (state.cash <= CASH_FLOOR) return true;
   return state.cash <= 0 && state.loans.length >= MAX_LOANS;
 }

@@ -1,4 +1,4 @@
-import { takeLoan, repayLoan, isInsolvent, MAX_LOANS, LOAN_PRINCIPAL } from '../sim/loans';
+import { takeLoan, repayLoan, isInsolvent, MAX_LOANS, LOAN_PRINCIPAL, CASH_FLOOR } from '../sim/loans';
 import { clearSavedState } from './save';
 import type { SimState } from '../sim/state';
 
@@ -10,10 +10,12 @@ const loanOfferModal = document.querySelector<HTMLDivElement>('#loan-offer-modal
 const loanOfferAmountEl = document.querySelector<HTMLSpanElement>('#loan-offer-amount')!;
 const loanOfferCashEl = document.querySelector<HTMLSpanElement>('#loan-offer-cash')!;
 const loanOfferCountEl = document.querySelector<HTMLSpanElement>('#loan-offer-count')!;
+const loanOfferFloorEl = document.querySelector<HTMLParagraphElement>('#loan-offer-floor')!;
 const takeLoanButton = document.querySelector<HTMLButtonElement>('#loan-offer-take')!;
 const dismissLoanButton = document.querySelector<HTMLButtonElement>('#loan-offer-dismiss')!;
 
 const gameOverModal = document.querySelector<HTMLDivElement>('#game-over-modal')!;
+const gameOverReasonEl = document.querySelector<HTMLParagraphElement>('#game-over-reason')!;
 const gameOverNewGameButton = document.querySelector<HTMLButtonElement>('#game-over-new-game')!;
 
 function formatMoney(amount: number): string {
@@ -117,6 +119,16 @@ export function setupLoans(state: SimState): void {
 export function updateLoans(state: SimState): boolean {
   const insolvent = isInsolvent(state);
   gameOverModal.hidden = !insolvent;
+  if (insolvent) {
+    // Two different ways to get here (see sim/loans.ts's isInsolvent()),
+    // and which one it was is genuinely useful to know — "you ran past
+    // the floor without borrowing" and "you borrowed everything and
+    // still ran out" are different mistakes.
+    gameOverReasonEl.textContent =
+      state.cash <= CASH_FLOOR
+        ? `Cash has fallen to ${formatMoney(state.cash)}, past the ${formatMoney(CASH_FLOOR)} total credit line — even drawing every remaining loan couldn't bring it back to zero. This airline is finished.`
+        : `Cash is gone and every one of the ${MAX_LOANS} loan slots is already spoken for — there's no more credit left to draw on. This airline is finished.`;
+  }
 
   if (state.cash > 0) dismissedForThisDip = false;
 
@@ -125,6 +137,10 @@ export function updateLoans(state: SimState): boolean {
   if (shouldOfferLoan) {
     loanOfferCashEl.textContent = formatMoney(state.cash);
     loanOfferCountEl.textContent = `${state.loans.length}/${MAX_LOANS}`;
+    // Declining used to be free — Cash could fall forever. Now there's a
+    // floor, so the player needs to see it coming rather than being
+    // game-overed without warning.
+    loanOfferFloorEl.textContent = `Below ${formatMoney(CASH_FLOOR)} the airline is finished — ${formatMoney(state.cash - CASH_FLOOR)} of room left.`;
   }
 
   renderLoansTable(state);
