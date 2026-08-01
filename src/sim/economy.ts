@@ -1,5 +1,6 @@
 import { dailyDemand } from './demand';
 import { bookingShare } from './choiceModel';
+import { FUEL_SHARE_OF_BLOCK_HOUR_COST } from './fuel';
 import type { CompetitorOffering } from './competitors';
 import type { RouteSettings } from './state';
 
@@ -60,9 +61,26 @@ const RECAPTURE_RATE = 0.4;
  * The block-hours-and-departure cost of one leg, independent of how many
  * passengers it carries. Exported so ui/commercial.ts can show a market's
  * expected cost without duplicating this formula.
+ *
+ * Week six's fuel price mechanic (sim/fuel.ts) splits costPerBlockHour
+ * into a fixed slice (crew, maintenance, overhead — still blended into
+ * that one flat figure, not modeled separately) and a fuel-sensitive
+ * slice (FUEL_SHARE_OF_BLOCK_HOUR_COST), rather than touching the
+ * aircraft-type data itself: `fuelPriceIndex` (1.0 = baseline) multiplies
+ * directly into that fuel slice, and `fuelEfficiencyMultiplier` (1.0 =
+ * no mitigation adopted, lower is better) multiplies on top of it — the
+ * hook a future tech tree's fuel-efficiency initiatives can turn down.
  */
-export function legCost(blockMinutes: number, type: EconomyAircraftType): number {
-  return (blockMinutes / 60) * type.costPerBlockHour + type.costPerDeparture;
+export function legCost(
+  blockMinutes: number,
+  type: EconomyAircraftType,
+  fuelPriceIndex: number,
+  fuelEfficiencyMultiplier: number,
+): number {
+  const blockHourCost = (blockMinutes / 60) * type.costPerBlockHour;
+  const fuelPortion = blockHourCost * FUEL_SHARE_OF_BLOCK_HOUR_COST;
+  const nonFuelPortion = blockHourCost - fuelPortion;
+  return nonFuelPortion + fuelPortion * fuelPriceIndex * fuelEfficiencyMultiplier + type.costPerDeparture;
 }
 
 /**
@@ -103,6 +121,8 @@ export function legCost(blockMinutes: number, type: EconomyAircraftType): number
 export function flightResult(
   leg: EconomyLeg,
   type: EconomyAircraftType,
+  fuelPriceIndex: number,
+  fuelEfficiencyMultiplier: number,
   legsServingMarket: number,
   routeSettings: RouteSettings,
   competitorRoutes: CompetitorOffering[],
@@ -136,6 +156,6 @@ export function flightResult(
   }
 
   const revenue = pax * routeSettings.fare;
-  const cost = legCost(leg.blockMinutes, type);
+  const cost = legCost(leg.blockMinutes, type, fuelPriceIndex, fuelEfficiencyMultiplier);
   return { pax, revenue, cost, margin: revenue - cost, spilloverDelta };
 }

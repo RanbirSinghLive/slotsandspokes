@@ -124,6 +124,14 @@
             <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
           </svg>
         </button>
+        <button type="button" data-tab="techtree" aria-label="Tech Tree" title="Tech Tree — spend Reputation on lasting upgrades">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="6" y1="3" x2="6" y2="15" />
+            <circle cx="18" cy="6" r="3" />
+            <circle cx="6" cy="18" r="3" />
+            <path d="M18 9a9 9 0 0 1-9 9" />
+          </svg>
+        </button>
         <button type="button" data-tab="game" aria-label="Game" title="Game — new, save, and load">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
@@ -270,6 +278,19 @@
             <canvas id="executive-chart" width="1040" height="400"></canvas>
             <div id="executive-summary"></div>
             <div id="executive-delta"></div>
+          </section>
+          <section id="fuel-price-section">
+            <h2>Fuel price</h2>
+            <canvas id="fuel-price-chart" width="1040" height="300"></canvas>
+            <div id="fuel-price-summary"></div>
+            <div id="fuel-price-delta"></div>
+          </section>
+        </div>
+        <div id="tech-tree-panel" hidden>
+          <section id="tech-tree-fuel-section">
+            <h2>Fuel Efficiency</h2>
+            <div id="tech-tree-fuel-summary"></div>
+            <div id="tech-tree-fuel-branch" class="tech-branch"></div>
           </section>
         </div>
         <div id="game-tab" hidden>

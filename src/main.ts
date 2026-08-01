@@ -32,6 +32,8 @@ import { setupCommercialPanel, updateCommercialPanel } from './ui/commercial';
 import { setupFleetMarket } from './ui/fleetMarket';
 import { setupOnTimePanel, updateOnTimePanel } from './ui/onTime';
 import { setupExecutivePanel, updateExecutivePanel } from './ui/executive';
+import { setupFuelPricePanel, updateFuelPricePanel } from './ui/fuelPrice';
+import { setupTechTreePanel, updateTechTreePanel } from './ui/techTree';
 import { updateTicker } from './ui/ticker';
 import { setupLoans, updateLoans } from './ui/loans';
 import { isInsolvent } from './sim/loans';
@@ -65,6 +67,8 @@ setupCommercialPanel(state);
 setupFleetMarket(state);
 setupOnTimePanel();
 setupExecutivePanel();
+setupFuelPricePanel();
+setupTechTreePanel(state);
 setupLoans(state);
 setupGameControls(state);
 
@@ -127,6 +131,7 @@ const commercialPanelEl = document.querySelector<HTMLDivElement>('#commercial-pa
 const fleetMarketPanelEl = document.querySelector<HTMLDivElement>('#fleet-market-panel')!;
 const onTimePanelEl = document.querySelector<HTMLDivElement>('#ontime-panel')!;
 const executivePanelEl = document.querySelector<HTMLDivElement>('#executive-panel')!;
+const techTreePanelEl = document.querySelector<HTMLDivElement>('#tech-tree-panel')!;
 const gameTabEl = document.querySelector<HTMLDivElement>('#game-tab')!;
 const sidebarTabButtons = document.querySelectorAll<HTMLButtonElement>('#sidebar-tabs button');
 const rotationExpandToggle = document.querySelector<HTMLButtonElement>('#rotation-expand-toggle')!;
@@ -214,7 +219,7 @@ let latestFractionalMinute = state.simMinute;
 // independent on/off toggles layered on top of the map (unchanged from
 // week four), since they were already built the right way for this: a
 // layer you toggle, not a destination you navigate to.
-type SidebarTab = 'fleet' | 'rotation' | 'commercial' | 'fleet-market' | 'ontime' | 'executive' | 'game';
+type SidebarTab = 'fleet' | 'rotation' | 'commercial' | 'fleet-market' | 'ontime' | 'executive' | 'techtree' | 'game';
 let sidebarTab: SidebarTab = 'fleet';
 let demandOverlayOn = false;
 let competitionOverlayOn = false;
@@ -436,6 +441,7 @@ function switchToSidebarTab(tab: SidebarTab, highlightLegIds: string[] = []): vo
   fleetMarketPanelEl.hidden = tab !== 'fleet-market';
   onTimePanelEl.hidden = tab !== 'ontime';
   executivePanelEl.hidden = tab !== 'executive';
+  techTreePanelEl.hidden = tab !== 'techtree';
   gameTabEl.hidden = tab !== 'game';
 
   sidebarTabButtons.forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
@@ -444,7 +450,11 @@ function switchToSidebarTab(tab: SidebarTab, highlightLegIds: string[] = []): vo
   if (tab === 'rotation') updateRotationBoard(state, highlightLegIds);
   if (tab === 'commercial') updateCommercialPanel(state);
   if (tab === 'ontime') updateOnTimePanel(state);
-  if (tab === 'executive') updateExecutivePanel(state);
+  if (tab === 'executive') {
+    updateExecutivePanel(state);
+    updateFuelPricePanel(state);
+  }
+  if (tab === 'techtree') updateTechTreePanel(state);
   if (tab === 'game') updateGameControls();
 
   render();

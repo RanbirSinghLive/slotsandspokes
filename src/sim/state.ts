@@ -4,6 +4,7 @@ import { loadFleetMarket, type FleetListing } from './fleetMarket';
 import { loadCompetitorRoutes, type CompetitorOffering } from './competitors';
 import type { WeatherEvent } from './weather';
 import type { Loan } from './loans';
+import { FUEL_PRICE_BASELINE } from './fuel';
 
 export type AircraftStatus = 'ground' | 'airborne';
 
@@ -289,6 +290,43 @@ export type SimState = {
    * that's been profitable for months averaging out a rough current week.
    */
   cashHistory: number[];
+  /**
+   * Week six's fuel price mechanic (sim/fuel.ts): a unitless index where
+   * 1.0 is baseline — a flight's fuel-sensitive cost slice (see
+   * legCost()) scales directly with this. Moved by a slow random walk,
+   * rolled once per simulated day (rollDailyFuelPrice(), called from
+   * step.ts's day-rollover), not read or written anywhere else.
+   */
+  fuelPriceIndex: number;
+  /**
+   * Recent daily closing fuelPriceIndex values, oldest first — same
+   * rolling-window shape as cashHistory above, just a longer window (see
+   * FUEL_PRICE_HISTORY_MAX_DAYS). This is the "anyone looking to guess
+   * direction" history the Executive panel's fuel chart reads directly,
+   * with no smoothing or forecasting applied on top — the point is to
+   * show the real, noisy signal and let the player do the guessing.
+   */
+  fuelPriceHistory: number[];
+  /**
+   * A multiplier on the fuel-sensitive slice of every flight's cost, 1.0
+   * meaning "no mitigation adopted yet" — lower is better (less fuel
+   * burned for the same flying). Nothing sets this below 1.0 yet; it
+   * exists so a future tech tree's fuel-efficiency initiatives have
+   * something real to turn down, same "exists so a future tech tree has
+   * something real to draw down" reasoning `reputation` above already
+   * has.
+   */
+  fuelEfficiencyMultiplier: number;
+  /**
+   * Week six's tech tree (sim/techTree.ts): IDs of every TechNode unlocked
+   * so far, in whatever order the player bought them — a plain string
+   * array, not a Set, same JSON-round-trip reasoning every other
+   * collection on this type already follows. `fuelEfficiencyMultiplier`
+   * above is the actual effect; this is just the record of what's been
+   * paid for, so the UI can show locked/unlocked state and so a node is
+   * never charged for twice.
+   */
+  unlockedTechNodeIds: string[];
 };
 
 // Only one aircraft type exists so far, so every aircraft record uses it.
@@ -390,6 +428,10 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     rngSeed,
     loans: [],
     cashHistory: [],
+    fuelPriceIndex: FUEL_PRICE_BASELINE,
+    fuelPriceHistory: [],
+    fuelEfficiencyMultiplier: 1,
+    unlockedTechNodeIds: [],
   };
 }
 
@@ -444,5 +486,9 @@ export function createNewGameState(rngSeed: number = Date.now()): SimState {
     rngSeed,
     loans: [],
     cashHistory: [],
+    fuelPriceIndex: FUEL_PRICE_BASELINE,
+    fuelPriceHistory: [],
+    fuelEfficiencyMultiplier: 1,
+    unlockedTechNodeIds: [],
   };
 }

@@ -95,6 +95,8 @@ function summarizeMarket(origin: string, dest: string, state: SimState, routeSet
     const result = flightResult(
       { origin: leg.origin, dest: leg.dest, blockMinutes: leg.blockMinutes },
       type,
+      state.fuelPriceIndex,
+      state.fuelEfficiencyMultiplier,
       freq,
       routeSettings,
       state.competitorRoutes,

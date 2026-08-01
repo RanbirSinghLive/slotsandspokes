@@ -447,6 +447,121 @@ errors throughout.
 
 ---
 
+## Crew and fuel prices: discussed, fuel built
+
+Asked directly: how could hiring/training pilots, flight attendants, and
+mechanics, and fuel prices, be modeled? Two genuinely different kinds of
+mechanic:
+
+- **Crew (pilots, FAs, mechanics)** is personnel with constraints and
+  progression, and the honest version of it (duty-time limits, rest
+  requirements, a second scheduling problem running alongside the
+  rotation board) is a real "someday" lift, same conclusion the
+  brainstormed-additions entry above already reached. A crude version
+  was sketched — a per-base crew pool, hired the same way the Fleet
+  Market already works, a coarse pilot qualification tier instead of
+  per-type ratings, mechanics as shared maintenance capacity rather than
+  per-tail — but **not built this pass**. Mechanics in particular only
+  have something real to affect once the cancellation/AOG mechanic
+  (below, "Reliability, reframed") exists, so crew should sequence after
+  that, not before.
+- **Fuel price** is an exogenous cost pressure, not personnel — closer in
+  shape to weather than to hiring. This one was built.
+
+### Built: a fuel price index with history, tracked so its direction is guessable
+
+`sim/fuel.ts`: `fuelPriceIndex` is a unitless multiplier (1.0 = baseline)
+rather than a $/gallon figure — avoids needing a burn-rate number per
+aircraft type on top of what `data/aircraft-types.json` already carries.
+It moves by a slow random walk, rolled once per simulated day from
+step.ts's day-rollover (same cadence as weather): a uniform step of up to
+±1.5%/day, pulled back toward baseline by 2% of however far it's drifted,
+clamped to [0.5, 2.0]. The reversion is the deliberate answer to "track it
+so anyone can guess direction" — a pure random walk would make the
+history genuinely unguessable, but a mean-reverting one gives an
+attentive player a real, if noisy, signal: a price that's drifted far
+from baseline is more likely than not heading back. `fuelPriceHistory`
+keeps the last 60 daily closes (`state.cashHistory`'s own rolling-window
+shape, just a longer window, since spotting a cycle benefits from more of
+it) with no smoothing or forecast fitted on top — the Executive panel's
+new "Fuel price" section (`ui/fuelPrice.ts`, below the cash runway chart)
+draws the raw history plus today's live index against a baseline
+reference line, deliberately with no projection line the way the cash
+chart has: the series is mean-reverting, not trending, so a straight-line
+forecast would misrepresent it.
+
+`sim/economy.ts`'s `legCost()` splits each aircraft type's flat
+`costPerBlockHour` into a fixed slice and a fuel-sensitive slice
+(`FUEL_SHARE_OF_BLOCK_HOUR_COST`, a flat 35% applied uniformly rather than
+tuned per type — regional/narrowbody direct-operating-cost studies
+commonly put fuel in the 25%-40% range, 35% is the unresearched middle of
+that band) rather than touching the hand-authored aircraft-type data
+directly. `fuelPriceIndex` multiplies the fuel slice; a new
+`fuelEfficiencyMultiplier` field on `SimState` (1.0 = no mitigation
+adopted, lower is better) multiplies on top of it and is the hook a
+future tech tree's fuel-efficiency initiatives can turn down — nothing
+sets it below 1.0 yet, same "exists so a future system has something real
+to draw down" reasoning `reputation` already has. `flightResult()` and
+every call site (`step.ts`'s revenue and positioning-leg cost paths,
+`ui/commercial.ts`'s market preview) were updated to thread the index and
+multiplier through; the headless runner's CSV gained a `fuelPriceIndex`
+column for balance-tuning visibility.
+
+This is a breaking `SimState` shape change (three new required fields),
+so `ui/save.ts`'s `SAVE_KEY` was bumped to `v12` — any save from before
+this change is simply not found again (falls back to a fresh game)
+rather than crashing on the missing fields, per that file's own
+versioning convention.
+
+Verified via `npm run headless -- 200`: `fuelPriceIndex` stayed inside
+[0.915, 1.031] over 200 simulated days (no runaway drift, clamps never
+needed), and daily cost tracked the rolled index as expected. Verified in
+the browser: the Executive tab's new Fuel price chart renders real
+history and a live-updating summary/trend line with zero console errors.
+
+### Built: the Tech Tree tab, with Fuel Efficiency as its first branch
+
+The tech tree's own "carried forward" section above says it needs "at
+least a couple of real, concrete nodes worth unlocking before the tree
+itself is worth building" — the fuel-efficiency hook just built (above)
+is that node list. This is the first branch, built as its own new
+sidebar tab (`ui/techTree.ts`, a git-branch icon, sitting between
+Executive and Game) rather than folded into the Executive ledger the
+carried-forward section had guessed it would live in — a tech tree is
+its own kind of screen (a chain of purchasable nodes), not a ledger
+section, and the existing tab system already makes adding one cheap.
+
+`data/tech-tree.json` holds five linear tiers, each themed on a real
+historical aviation efficiency milestone, EU4-tech-tooltip style — High-
+Bypass Turbofans (1970s wide-body engines), Winglets (NASA's Whitcomb
+research), Digital Engine Control (FADEC, standard by the 1990s),
+Composite Airframes (787/A350), and Geared Turbofans (Pratt & Whitney's
+PW1000G, 2016). Each multiplies `fuelEfficiencyMultiplier` down by a
+further 4-6%; unlocking all five compounds to about a 23% cut in
+fuel-sensitive cost. `sim/techTree.ts` holds the rules: a node needs its
+branch's previous tier already owned and enough Reputation banked, and
+unlocking spends Reputation once for a permanent effect — a deliberate
+choice against this doc's other standing option (an ongoing Reputation
+drag), reasoned as the right shape for a genuine investment like an
+efficiency upgrade, as opposed to a customer-hostile lever like ancillary
+bag fees, which should stay an ongoing-drag toggle instead per the
+existing design note above. Costs escalate per tier (100/180/300/480/700
+Reputation), the EU4 "each tier costs more than the last" shape.
+
+New state: `unlockedTechNodeIds` (which nodes are owned) alongside the
+already-existing `fuelEfficiencyMultiplier` (the effect). Another
+breaking `SimState` shape change, so `SAVE_KEY` bumped again, v12 → v13.
+
+Verified with a standalone script exercising `sim/techTree.ts` directly:
+prerequisite gating blocks tier 2 before tier 1 is owned, costs deduct
+correctly, effects stack multiplicatively (cumulative multiplier 0.7737
+after all five, matching the ~23% figure above), a node can't be bought
+twice, and the resulting state survives a JSON round-trip. Verified in
+the browser: the tab renders all five cards with real flavor text,
+correctly disabled/priced Unlock buttons, and zero console errors.
+
+---
+
 ## Proposed build order (not committed)
 
 Roughly in dependency order — each item mostly needs the one before it

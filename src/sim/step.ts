@@ -4,6 +4,7 @@ import { MIN_TURN_MINUTES, legsServingMarket, marketKey } from './schedule';
 import { nextRandom } from './rng';
 import { rollDailyWeather, WEATHER_ON_TIME_PROBABILITY, WEATHER_MAX_DELAY_MINUTES } from './weather';
 import { rollCompetitorRouteOpenings } from './competitors';
+import { rollDailyFuelPrice } from './fuel';
 import { applyDailyLoanInterest } from './loans';
 import { flightSatisfactionScore } from './nps';
 import { applyDailyReputationChange } from './reputation';
@@ -248,6 +249,11 @@ export function step(state: SimState): void {
     // is a day-scale event, not something worth re-checking every minute.
     rollCompetitorRouteOpenings(state, state.simMinute);
 
+    // Week six's fuel price mechanic (sim/fuel.ts): same daily cadence as
+    // weather and the competitor AI above — fuel prices move day to day
+    // in this model, not minute to minute.
+    rollDailyFuelPrice(state);
+
     // Week five's loan mechanic (sim/loans.ts): compound interest on every
     // outstanding loan, once a day, same cadence as weather and the
     // competitor AI above. Charged to each loan's own balance, not to Cash
@@ -421,7 +427,7 @@ export function step(state: SimState): void {
           // No market, no passengers, no revenue — just the real fuel and
           // departure cost of moving the aircraft (sim/economy.ts's
           // legCost(), the same formula a revenue flight's cost half uses).
-          const cost = legCost(blockMinutes, type);
+          const cost = legCost(blockMinutes, type, state.fuelPriceIndex, state.fuelEfficiencyMultiplier);
           state.cash -= cost;
           state.todayCost += cost;
           state.todayMargin -= cost;
@@ -432,6 +438,8 @@ export function step(state: SimState): void {
           const result = flightResult(
             { origin: flight.origin, dest: flight.dest, blockMinutes },
             type,
+            state.fuelPriceIndex,
+            state.fuelEfficiencyMultiplier,
             marketFrequency,
             { fare: flight.fare, marketingSpend: flight.marketingSpend },
             state.competitorRoutes,

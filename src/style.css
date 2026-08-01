@@ -1314,7 +1314,8 @@ body {
   max-width: 520px;
 }
 
-#executive-chart {
+#executive-chart,
+#fuel-price-chart {
   display: block;
   width: 520px;
   height: 200px;
@@ -1323,7 +1324,12 @@ body {
   border-radius: 6px;
 }
 
-#executive-summary {
+#fuel-price-chart {
+  height: 150px;
+}
+
+#executive-summary,
+#fuel-price-summary {
   margin-top: 12px;
   font-size: 14px;
 }
@@ -1334,8 +1340,117 @@ body {
   color: #ff8080;
 }
 
-#executive-delta {
+#executive-delta,
+#fuel-price-delta {
   margin-top: 4px;
+  color: #6b7694;
+  font-size: 12px;
+}
+
+/* Week six's fuel price mechanic — same spacing shape #loans-section
+   already uses to separate itself from the section above it. */
+#fuel-price-section {
+  margin-top: 32px;
+  max-width: 520px;
+}
+
+/* Week six's Tech Tree tab (ui/techTree.ts) — one branch (Fuel
+   Efficiency) built so far, each node its own card in a vertical chain. */
+#tech-tree-fuel-summary {
+  margin-bottom: 16px;
+  color: #9aa3b8;
+  font-size: 13px;
+}
+
+.tech-branch {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tech-node {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* A locked-but-not-yet-affordable/prereq-blocked node reads as dimmer,
+   not hidden — the flavor text is worth reading even before it's
+   reachable, same "show the whole tree, not just the unlockable edge"
+   spirit as a Paradox-style tech tree. */
+.tech-node:not(.tech-node--unlocked) {
+  opacity: 0.85;
+}
+
+.tech-node--unlocked {
+  border-color: rgba(127, 216, 143, 0.5);
+  background: rgba(127, 216, 143, 0.06);
+}
+
+.tech-node-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.tech-node-tier {
+  color: #6b7694;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tech-node-name {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.tech-node-flavor {
+  margin: 0 0 8px;
+  color: #9aa3b8;
+  font-size: 12px;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+.tech-node-effect {
+  margin-bottom: 10px;
+  color: #7fd88f;
+  font-size: 13px;
+}
+
+.tech-node-unlock {
+  font-family: inherit;
+  font-size: 13px;
+  color: #9aa3b8;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.tech-node-unlock:hover:not(:disabled) {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.tech-node-unlock:disabled {
+  color: #4a5266;
+  border-color: rgba(255, 255, 255, 0.08);
+  cursor: default;
+}
+
+.tech-node--unlocked .tech-node-unlock:disabled {
+  color: #7fd88f;
+  border-color: rgba(127, 216, 143, 0.4);
+}
+
+.tech-node-status {
+  margin-top: 6px;
+  min-height: 1.2em;
   color: #6b7694;
   font-size: 12px;
 }

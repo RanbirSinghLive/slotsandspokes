@@ -11,7 +11,7 @@ const days = Number(process.argv[2]) || 365;
 
 const state = createInitialState(ACTIVE_TAILS);
 
-const rows: string[] = ['day,cash,revenue,cost,margin,legsFlown'];
+const rows: string[] = ['day,cash,revenue,cost,margin,legsFlown,fuelPriceIndex'];
 
 for (let day = 1; day <= days; day++) {
   for (let minute = 0; minute < MINUTES_PER_DAY; minute++) {
@@ -31,6 +31,7 @@ for (let day = 1; day <= days; day++) {
       Math.round(state.todayCost),
       Math.round(state.todayMargin),
       state.completedToday.length,
+      state.fuelPriceIndex.toFixed(3),
     ].join(','),
   );
 }
