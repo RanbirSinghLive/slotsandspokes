@@ -1562,10 +1562,18 @@ body {
   transition: width 120ms linear;
 }
 
-#dev-fuel-drivers {
+#dev-fuel-drivers,
+#dev-revenue-note {
   margin-top: 14px;
   color: #6b7694;
   font-size: 12px;
+}
+
+/* The funnel's bars are a share of market potential rather than of a
+   cost total, so they get their own colour — amber reads as "passengers"
+   against the blue the cost tree already uses for dollars. */
+#dev-revenue-funnel .dev-row-bar {
+  background: #ffd166;
 }
 
 /* Sampled delay distributions — one block per scenario, each a row of

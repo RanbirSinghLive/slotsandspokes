@@ -37,6 +37,28 @@ export type FlightResult = {
    * without recomputing the formula itself.
    */
   costBreakdown: CostBreakdown;
+  /**
+   * The intermediate passenger counts this flight's `pax` was arrived at
+   * through, in order. Exposed for the same reason `costBreakdown` is:
+   * the Dev tab's revenue funnel (ui/devTools.ts) needs to show *where*
+   * passengers are lost, and recomputing these outside this function
+   * would be a second copy of the formula free to drift from the real
+   * one.
+   */
+  demandBreakdown: DemandBreakdown;
+};
+
+export type DemandBreakdown = {
+  /** This flight's share of the market's actual daily demand, after splitting across frequencies. */
+  allocatedDemand: number;
+  /** How many of those actually book *you*, after the choice model weighs fare, frequency, marketing and competitors. */
+  bookedDemand: number;
+  /** The most this aircraft will carry — seats times LOAD_FACTOR. */
+  seatCeiling: number;
+  /** Booked passengers turned away because the aircraft was full. Zero when there was spare room. */
+  spilled: number;
+  /** Passengers picked up from the market's shared recapture pool. Zero when this flight was itself full. */
+  recaptured: number;
 };
 
 // Deliberately crude for now, per WEEK-ONE.md: every flight pays the same
@@ -193,13 +215,15 @@ export function flightResult(
 
   let pax: number;
   let spilloverDelta: number;
+  let spilled = 0;
+  let recaptured = 0;
   if (roundedBooked > seatCeiling) {
     pax = seatCeiling;
-    const spill = roundedBooked - seatCeiling;
-    spilloverDelta = Math.round(spill * RECAPTURE_RATE);
+    spilled = roundedBooked - seatCeiling;
+    spilloverDelta = Math.round(spilled * RECAPTURE_RATE);
   } else {
     const spareCapacity = seatCeiling - roundedBooked;
-    const recaptured = Math.min(spareCapacity, spilloverAvailable);
+    recaptured = Math.min(spareCapacity, spilloverAvailable);
     pax = roundedBooked + recaptured;
     spilloverDelta = -recaptured;
   }
@@ -207,5 +231,19 @@ export function flightResult(
   const revenue = pax * routeSettings.fare;
   const costBreakdown = legCostBreakdown(leg.blockMinutes, type, fuelPriceIndex, fuelEfficiencyMultiplier);
   const cost = costBreakdown.fuel + costBreakdown.blockNonFuel + costBreakdown.departure;
-  return { pax, revenue, cost, margin: revenue - cost, spilloverDelta, costBreakdown };
+  return {
+    pax,
+    revenue,
+    cost,
+    margin: revenue - cost,
+    spilloverDelta,
+    costBreakdown,
+    demandBreakdown: {
+      allocatedDemand: demandPerFlight,
+      bookedDemand: roundedBooked,
+      seatCeiling,
+      spilled,
+      recaptured,
+    },
+  };
 }

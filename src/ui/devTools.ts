@@ -1,3 +1,7 @@
+import aircraftTypesData from '../../data/aircraft-types.json';
+import { flightResult, type EconomyAircraftType } from '../sim/economy';
+import { actualDailyDemand, currentPotentialDemand } from '../sim/marketDemand';
+import { marketKey, legsServingMarket, type ScheduleLeg } from '../sim/schedule';
 import { rollAgeDelay, rollWeatherDelay, ageDelayParameters } from '../sim/delays';
 import { WEATHER_ON_TIME_PROBABILITY, WEATHER_MAX_DELAY_MINUTES } from '../sim/weather';
 import type { SimState } from '../sim/state';
@@ -93,7 +97,8 @@ function money(amount: number): string {
   return `${sign}$${Math.abs(Math.round(amount)).toLocaleString()}`;
 }
 
-function buildRow(spec: CostRowSpec): HTMLDivElement {
+/** Shared by the cost tree and the revenue funnel — same row shape, different numbers in it. */
+function buildRow(spec: { label: string; depth: number; hint: string }, refs: RowRefs[]): HTMLDivElement {
   const row = document.createElement('div');
   row.className = `dev-row dev-row--depth${spec.depth}`;
   row.title = spec.hint;
@@ -115,9 +120,172 @@ function buildRow(spec: CostRowSpec): HTMLDivElement {
   barTrack.appendChild(bar);
 
   row.append(label, amount, share, barTrack);
-  rowRefs.push({ amount, share, bar });
+  refs.push({ amount, share, bar });
   return row;
 }
+
+// ---------------------------------------------------------------------
+// Revenue funnel
+//
+// The mirror of the cost tree: where do passengers *go*? A market's
+// potential demand gets whittled down at four distinct stages before it
+// becomes revenue, and knowing which stage is doing the whittling is the
+// difference between "raise fare", "add a bigger aircraft" and "this
+// market just isn't built yet" — three completely different fixes that
+// all look identical from the Commercial panel's output alone.
+//
+// Every figure comes from the same sim/economy.ts's flightResult() the
+// simulation itself runs, via its `demandBreakdown`, rather than
+// recomputing the chain here. Same anti-drift reasoning as the cost
+// tree, and the same reason ui/commercial.ts calls the real function
+// instead of reimplementing it.
+// ---------------------------------------------------------------------
+
+const funnelEl = document.querySelector<HTMLDivElement>('#dev-revenue-funnel')!;
+const funnelNoteEl = document.querySelector<HTMLDivElement>('#dev-revenue-note')!;
+
+const aircraftTypesByCode = new Map<string, EconomyAircraftType & { code: string }>(
+  (aircraftTypesData as Array<EconomyAircraftType & { code: string }>).map((type) => [type.code, type]),
+);
+const defaultAircraftType = (aircraftTypesData as Array<EconomyAircraftType & { code: string }>)[0];
+
+function aircraftTypeForLeg(leg: ScheduleLeg, state: SimState): EconomyAircraftType {
+  const aircraft = state.aircraft.find((a) => a.tail === leg.tail);
+  return (aircraft && aircraftTypesByCode.get(aircraft.typeCode)) || defaultAircraftType;
+}
+
+type FunnelTotals = {
+  potential: number;
+  actual: number;
+  booked: number;
+  carried: number;
+  recaptured: number;
+  pax: number;
+  revenue: number;
+  seatsOffered: number;
+  markets: number;
+};
+
+/**
+ * A full-day hypothetical across every market currently served, not a
+ * live read of today's partial totals — the funnel is about the shape of
+ * the schedule as configured, so it shouldn't swing wildly depending on
+ * what time of day you happen to open the tab.
+ *
+ * Legs are walked per market in departure order so the shared spill pool
+ * fills and drains in the same sequence step.ts's arrivals would produce;
+ * ui/commercial.ts's own preview does exactly this, for the same reason.
+ */
+function computeFunnel(state: SimState): FunnelTotals {
+  const totals: FunnelTotals = {
+    potential: 0,
+    actual: 0,
+    booked: 0,
+    carried: 0,
+    recaptured: 0,
+    pax: 0,
+    revenue: 0,
+    seatsOffered: 0,
+    markets: 0,
+  };
+
+  const legsByMarket = new Map<string, ScheduleLeg[]>();
+  for (const leg of state.schedule) {
+    const key = marketKey(leg.origin, leg.dest);
+    const existing = legsByMarket.get(key);
+    if (existing) existing.push(leg);
+    else legsByMarket.set(key, [leg]);
+  }
+
+  for (const legs of legsByMarket.values()) {
+    const [first] = legs;
+    totals.markets += 1;
+    // Market-level quantities, counted once per market rather than once
+    // per leg — potential and actual demand belong to the city pair, not
+    // to any individual flight on it.
+    totals.potential += currentPotentialDemand(state, first.origin, first.dest);
+    totals.actual += actualDailyDemand(state, first.origin, first.dest);
+
+    const settings = state.routeSettings[marketKey(first.origin, first.dest)];
+    if (!settings) continue;
+
+    const frequency = legsServingMarket(first.origin, first.dest, state.schedule);
+    let previewSpillover = 0;
+    for (const leg of [...legs].sort((a, b) => a.departMinute - b.departMinute)) {
+      const type = aircraftTypeForLeg(leg, state);
+      const result = flightResult(
+        { origin: leg.origin, dest: leg.dest, blockMinutes: leg.blockMinutes },
+        type,
+        state.fuelPriceIndex,
+        state.fuelEfficiencyMultiplier,
+        actualDailyDemand(state, leg.origin, leg.dest),
+        frequency,
+        settings,
+        state.competitorRoutes,
+        previewSpillover,
+      );
+      previewSpillover += result.spilloverDelta;
+
+      const d = result.demandBreakdown;
+      totals.booked += d.bookedDemand;
+      totals.carried += Math.min(d.bookedDemand, d.seatCeiling);
+      totals.recaptured += d.recaptured;
+      totals.seatsOffered += d.seatCeiling;
+      totals.pax += result.pax;
+      totals.revenue += result.revenue;
+    }
+  }
+
+  return totals;
+}
+
+type FunnelRowSpec = {
+  label: string;
+  depth: number;
+  hint: string;
+  value: (t: FunnelTotals) => number;
+};
+
+const FUNNEL_ROWS: FunnelRowSpec[] = [
+  {
+    label: 'Market potential',
+    depth: 0,
+    hint: 'Total latent demand across every market you serve — what these city pairs would carry if fully mature. The ceiling everything below is measured against.',
+    value: (t) => t.potential,
+  },
+  {
+    label: 'Actual demand',
+    depth: 1,
+    hint: 'What those markets actually carry today. The gap to potential is market you have not built yet — it closes as you keep flying, and reopens if you stop.',
+    value: (t) => t.actual,
+  },
+  {
+    label: 'Booked on you',
+    depth: 1,
+    hint: 'After the choice model: everyone else picked a competitor or chose not to travel. A big drop here means your fare, frequency or marketing is losing the comparison — not that the market is small.',
+    value: (t) => t.booked,
+  },
+  {
+    label: 'Carried (seat cap)',
+    depth: 1,
+    hint: 'Booked passengers clipped to what your aircraft can hold (seats x load factor). A drop here is pure capacity — a bigger gauge or more frequency is the fix, not a lower fare.',
+    value: (t) => t.carried,
+  },
+  {
+    label: 'Recaptured',
+    depth: 1,
+    hint: 'Passengers spilled from a full earlier flight who got a later one on the same market instead. Added back, so this row is a gain rather than a loss.',
+    value: (t) => t.recaptured,
+  },
+  {
+    label: 'Passengers flown',
+    depth: 0,
+    hint: 'What actually flies: carried plus recaptured. Multiply by fare for revenue.',
+    value: (t) => t.pax,
+  },
+];
+
+const funnelRowRefs: RowRefs[] = [];
 
 // ---------------------------------------------------------------------
 // Delay distributions
@@ -261,7 +429,8 @@ function buildHistogram(scenario: DelayScenario): HTMLDivElement {
 
 /** Build the fixed row structure once at startup — only the numbers change after this. */
 export function setupDevPanel(): void {
-  for (const spec of COST_ROWS) treeEl.appendChild(buildRow(spec));
+  for (const spec of COST_ROWS) treeEl.appendChild(buildRow(spec, rowRefs));
+  for (const spec of FUNNEL_ROWS) funnelEl.appendChild(buildRow(spec, funnelRowRefs));
   for (const scenario of DELAY_SCENARIOS) histogramsEl.appendChild(buildHistogram(scenario));
 }
 
@@ -292,4 +461,31 @@ export function updateDevPanel(state: SimState): void {
   const priceText = pricePct === 0 ? 'at baseline' : `${pricePct > 0 ? '+' : ''}${pricePct}% vs baseline`;
   const efficiencyText = efficiencyPct === 0 ? 'no upgrades' : `-${efficiencyPct}% from tech tree`;
   fuelDriversEl.textContent = `Fuel price ${priceText} · efficiency ${efficiencyText}`;
+
+  updateFunnel(state);
+}
+
+function updateFunnel(state: SimState): void {
+  const funnel = computeFunnel(state);
+
+  // Every row is a share of market potential, so the bars read as one
+  // continuously narrowing funnel rather than each row being relative to
+  // the one above it.
+  FUNNEL_ROWS.forEach((spec, i) => {
+    const value = spec.value(funnel);
+    const refs = funnelRowRefs[i];
+    refs.amount.textContent = Math.round(value).toLocaleString();
+    const share = funnel.potential > 0 ? value / funnel.potential : 0;
+    refs.share.textContent = funnel.potential > 0 ? `${Math.round(share * 100)}%` : '—';
+    refs.bar.style.width = `${Math.min(100, share * 100)}%`;
+  });
+
+  if (funnel.markets === 0) {
+    funnelNoteEl.textContent = 'No markets served yet.';
+    return;
+  }
+  funnelNoteEl.textContent =
+    `${funnel.markets} market${funnel.markets === 1 ? '' : 's'} · ` +
+    `${Math.round(funnel.seatsOffered).toLocaleString()} sellable seats/day · ` +
+    `${money(funnel.revenue)}/day at current fares`;
 }

@@ -853,6 +853,50 @@ loans-exhausted rule still firing), then end to end in the browser by
 leasing the entire fleet market and letting the lease charges drain a
 real game.
 
+### Built: the revenue funnel
+
+The mirror of the cost tree, and the last of the four dev tools. A
+market's potential demand gets whittled down at four distinct stages
+before it becomes revenue, and knowing *which* stage is doing the
+whittling is the difference between three completely different fixes
+that all look identical from the Commercial panel's output:
+
+| stage | what the gap above it means | the fix |
+| --- | --- | --- |
+| Market potential | — | — |
+| Actual demand | market isn't built yet | keep flying it |
+| Booked on you | lost to a competitor or to not travelling | fare, frequency, marketing |
+| Carried (seat cap) | aircraft was full | bigger gauge or more frequency |
+| Recaptured | *added back* — spill picked up by a later flight | — |
+| Passengers flown | | |
+
+`FlightResult` gained a `demandBreakdown` (allocated demand, booked
+demand, seat ceiling, spilled, recaptured) for the same reason it gained
+`costBreakdown`: recomputing the chain in the UI would be a second copy
+of the formula, free to drift from the real one. The panel aggregates a
+full-day hypothetical across every served market, walking each market's
+legs in departure order so the shared spill pool fills and drains in the
+same sequence step.ts would produce — the same approach
+`ui/commercial.ts` already uses, for the same reason.
+
+Bars are amber rather than the cost tree's blue, and every row is scaled
+to market potential rather than to the row above it, so the whole thing
+reads as one continuously narrowing funnel.
+
+Verified two ways. Arithmetically, across all 12 legs of a 120-day
+headless game: `pax` always equals `min(booked, ceiling) + recaptured`,
+`spilled` always equals `max(0, booked - ceiling)`, spill and recapture
+are never both non-zero, and 6 of 12 legs were seat-capped with the other
+6 recapturing — zero mismatches. That run also shows the mechanic working
+as designed: the trunk legs book 150-177 passengers against a 14-seat
+ceiling while the thin ones are demand-limited.
+
+Then live in the browser on a fresh game: a virgin YHZ-YQM opened at 10
+of 40 potential with *every* loss at the potential-to-actual stage —
+correctly telling you the market simply isn't built rather than blaming
+fare or capacity — and by day 16 had grown to 26 actual, 24 booked, with
+the choice-model gap now visible as its own step. No console errors.
+
 ---
 
 ## Proposed build order (not committed)
