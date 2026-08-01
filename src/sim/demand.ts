@@ -70,7 +70,7 @@ export function potentialDailyDemand(originIata: string, destIata: string): numb
 }
 
 /**
- * Every unordered airport pair — 45 for this map's 10 airports. Static
+ * Every unordered airport pair — 171 for this map's 19 airports. Static
  * geography, computed once at module load rather than on every use.
  *
  * Lives here rather than in any one consumer because two separate places

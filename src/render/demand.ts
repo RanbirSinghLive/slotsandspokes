@@ -26,7 +26,7 @@ function pairKey(a: string, b: string): string {
   return [a, b].sort().join('-');
 }
 
-// Every distinct pair among the 10 airports. 45 pairs for 10 airports.
+// Every distinct pair among the map's airports (171 for 19 airports).
 // Only the pair list is static now — the demand figures themselves move
 // day to day, so they're read per frame inside drawDemandLayer() rather
 // than baked in here at module load the way they used to be.

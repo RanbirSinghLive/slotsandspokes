@@ -767,6 +767,70 @@ late rising 16 → 22 → 29 minutes with age; and the squaring skew putting
 27.9% of all delays in the lowest of 14 buckets, against the 7.1% a
 uniform distribution would give.
 
+### Built: aircraft ranges cut to full-payload figures
+
+Raised directly — the Beech 1900D could reach most of the map nonstop,
+which flattened the fleet ladder into "buy whatever, it goes everywhere."
+
+The published `rangeNm` figures were the brochure numbers, which assume
+max fuel and a reduced (often near-empty) cabin. This game always flies a
+full load, so the honest figure is **range with a full cabin and
+reserves**, which is substantially shorter — the "marketing hype" gap.
+Recalibrated on that basis, checked against all 171 pairs on the map
+rather than guessed (the same way `sim/demand.ts`'s SCALING_CONSTANT was
+originally tuned):
+
+| type | was | now | map coverage |
+| --- | --- | --- | --- |
+| Beech 1900D | 700 | **380** | 80% → **41%** |
+| Dash 8-300 | 800 | **600** | 87% → **74%** |
+| Dash 8-400 | 1000 | **850** | 97% → **90%** |
+| A220-300 | 2500 | **2400** | 100% |
+| A330-300 | 6000 | **5500** | 100% |
+
+The 1900D takes by far the biggest cut, and it's also the best-documented
+case: its max-payload range really is around 380 nm against a brochure
+figure several times that. The ladder now actually steps —
+41% → 74% → 90% → 100% — instead of starting at 80%.
+
+Verified the default `data/schedule.json` still flies: its longest leg is
+YHZ-YQB at 349 nm, inside the new 380. And confirmed in the browser that
+a route legal before is now blocked, with the existing error text already
+framing it correctly: "YTZ is 686 nm from YHZ — beyond the Beechcraft
+1900D's 380 nm range with a full load."
+
+The two widebody cuts are cosmetic on this map — everything is already
+inside 1,150 nm, so nothing above the Dash 8-400 is range-constrained at
+all. Genuinely leveraging the A330 needs a bigger map, which is out of
+scope this milestone.
+
+## Open bug: negative cash has no floor
+
+Found while testing: a game left running reached **-$3,996,581 in cash
+with "Outstanding loans: 0/20"** — nearly twice the maximum debt the loan
+system can even issue.
+
+Each loan is a fixed `LOAN_PRINCIPAL` of $100,000 (not a cap — exactly
+that amount), so 20 outstanding loans is $2M of total credit. That part
+works as designed. The bug is the failure condition:
+
+```
+isInsolvent = cash <= 0 && loans.length >= MAX_LOANS
+```
+
+Declining a loan sets `dismissedForThisDip` and the offer stops
+reappearing until cash climbs back above zero — which, if you're losing
+money, it never does. So the loan count stays at 0, `isInsolvent()` never
+fires, the game never ends, and cash falls without limit. **Declining
+loans is strictly better than taking them**: you get unlimited free
+credit at 0% instead of $100k at 0.5%/day compounding.
+
+Not fixed yet — the right fix changes when the game ends, which is a real
+design decision rather than a patch. Candidates: treat cash below the
+total credit line (-$2M) as insolvency regardless of loan count; make the
+offer non-dismissable while cash is negative; or auto-draw a loan and
+only game-over when the cap is genuinely exhausted.
+
 ---
 
 ## Proposed build order (not committed)

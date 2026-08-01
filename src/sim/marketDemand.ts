@@ -169,7 +169,7 @@ function serviceSaturation(seatsOffered: number, potential: number): number {
  * random draws at all, unlike its neighbors in that block. Whether a
  * market grows or decays is entirely a function of who is flying it.
  *
- * Walks all 45 pairs rather than only those currently served, because an
+ * Walks every pair rather than only those currently served, because an
  * abandoned market still needs its decay applied — "nobody flies this any
  * more" is exactly the case that has to keep being processed.
  */

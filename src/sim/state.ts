@@ -333,7 +333,7 @@ export type SimState = {
    * `marketKey(origin, dest)` — a plain object, not a Map, same
    * JSON-round-trip reasoning as `routeSettings`. This is the number that
    * books passengers; `potentialDailyDemand()` (sim/demand.ts) is only the
-   * ceiling it grows toward. Populated for all 45 pairs by the first
+   * ceiling it grows toward. Populated for every pair by the first
    * day-rollover; before that, readers fall back to the virgin floor.
    */
   marketDemand: Record<string, number>;
