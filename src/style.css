@@ -2291,28 +2291,57 @@ body {
   color: #ff8080;
 }
 
-/* A small hoverable "i" that carries an explanation which used to be a
-   paragraph of body text. Decision-critical numbers never live in here —
-   only the prose explaining them. */
+/* The ⓘ mark: a real button, so it's tappable and keyboard-focusable
+   rather than hover-only. Native `title` tooltips were tried first and
+   failed in testing — a second of stationary hover before they appear,
+   unstyleable, and nothing at all on touch. See ui/infoTooltip.ts. */
 .info-mark {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 13px;
-  height: 13px;
-  margin-left: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 50%;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  margin-left: 5px;
+  font-family: inherit;
   font-size: 9px;
   font-style: italic;
+  line-height: 1;
   color: #6b7694;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
   cursor: help;
   vertical-align: middle;
 }
 
-.info-mark:hover {
+.info-mark:hover,
+.info-mark:focus-visible {
   color: #cdd3e0;
-  border-color: rgba(255, 255, 255, 0.5);
+  border-color: rgba(255, 255, 255, 0.55);
+  outline: none;
+}
+
+/* Same floating-card treatment as the map's own tooltips, so an
+   explanation looks like every other piece of hover content. */
+#info-tooltip {
+  position: fixed;
+  z-index: 30;
+  max-width: 280px;
+  padding: 8px 10px;
+  background: rgba(10, 12, 18, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  color: #cdd3e0;
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 1.5;
+  pointer-events: none;
+}
+
+#info-tooltip[hidden] {
+  display: none;
 }
 
 /* Week six phase two: flavour text is real content but a returning player

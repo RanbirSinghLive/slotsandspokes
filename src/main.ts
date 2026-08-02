@@ -39,6 +39,7 @@ import { setupDevPanel, updateDevPanel } from './ui/devTools';
 import { setupMissionsPanel, updateMissionsPanel } from './ui/missions';
 import { setupCrewPanel, updateCrewPanel } from './ui/crew';
 import { setupAirportsPanel, updateAirportsPanel } from './ui/airports';
+import { setupInfoTooltips } from './ui/infoTooltip';
 import { updateTicker } from './ui/ticker';
 import { setupLoans, updateLoans } from './ui/loans';
 import { isInsolvent } from './sim/loans';
@@ -79,6 +80,7 @@ setupDevPanel();
 setupMissionsPanel(state);
 setupCrewPanel(state);
 setupAirportsPanel();
+setupInfoTooltips();
 setupLoans(state);
 setupGameControls(state);
 

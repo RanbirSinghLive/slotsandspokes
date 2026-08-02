@@ -1639,6 +1639,34 @@ Hover-only content is invisible on touch and undiscoverable generally, so
 every figure you'd actually act on stayed on screen — only the prose
 explaining it hides.
 
+### Correction: native `title` was the wrong mechanism
+
+Reported straight after: the tooltips didn't appear in testing. The
+markup was correct — thirteen headings, thirteen marks, all wired — but
+a native `title` attribute needs roughly a second of *stationary* hover
+before the browser shows it, can't be styled to match anything else on
+screen, and does nothing at all on touch. Text nobody can find is text
+that may as well have been deleted, so folding thirteen paragraphs into
+that mechanism moved them out of the way without keeping them reachable.
+
+Replaced with `ui/infoTooltip.ts`, using the same custom-tooltip pattern
+the map already uses three times over (route hover, competition,
+rotation bars): appears instantly, styled like the rest of the app,
+clamped back inside the viewport since the sidebar's marks sit close to
+the right edge. The mark itself became a real `<button>` carrying
+`data-info` rather than a `<span>` with a `title`, so it's tappable and
+keyboard-focusable and reveals the same text on focus.
+
+Listeners are delegated from `#panel` rather than attached per mark:
+several panels rebuild their DOM wholesale on refresh, so per-element
+listeners would either leak or vanish depending on which.
+
+Verified by real `mouseover`: the tooltip shows with the right text,
+stays inside the viewport, and hides on leave. The focus path could not
+be exercised in the test browser — `document.hasFocus()` is false there,
+so the browser suppresses `focusin` even with `activeElement` set — but
+a manually dispatched `focusin` does reach the handler and show it.
+
 ---
 
 ## Proposed build order (not committed)
