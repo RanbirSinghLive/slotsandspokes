@@ -1,13 +1,13 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { flightResult, legCostBreakdown, type EconomyAircraftType } from './economy';
 import { MIN_TURN_MINUTES, legsServingMarket, marketKey } from './schedule';
-import { rollDailyWeather } from './weather';
+import { rollDailyWeather, isAirportClosed } from './weather';
 import { rollTotalDelayMinutes } from './delays';
 import { rollCompetitorRouteOpenings } from './competitors';
 import { rollDailyFuelPrice } from './fuel';
 import { rollDailyMarketDemand, actualDailyDemand } from './marketDemand';
 import { checkMissions } from './missions';
-import { rollDailyCrew, maintenanceAgeFactor, cabinServiceShare } from './crew';
+import { rollDailyCrew, rollDailyMechanicalGroundings, maintenanceAgeFactor, cabinServiceShare } from './crew';
 import {
   payExecutiveBonuses,
   executiveDelayMultiplier,
@@ -19,7 +19,7 @@ import { CANCELLATION_NPS_SCORE } from './nps';
 import { resolveTargetIfDue } from './targets';
 import { applyDailyLoanInterest } from './loans';
 import { flightSatisfactionScore } from './nps';
-import { applyDailyReputationChange } from './reputation';
+import { applyDailyReputationChange, REPUTATION_FLOOR } from './reputation';
 import { recordDailyCashHistory } from './forecast';
 import type { SimState, ActiveFlight } from './state';
 
@@ -100,6 +100,12 @@ export function step(state: SimState): void {
     // the same rollover keeps the two from being read in a half-applied
     // state by anything downstream.
     resolveTargetIfDue(state);
+    // Both of the above can push Reputation down — the daily quality
+    // delta and a missed service target — and they're the only two
+    // things that ever do unprompted (spending it is UI-gated to what
+    // you can afford). Clamping once here covers both without threading
+    // a helper through every module that touches the number.
+    state.reputation = Math.max(REPUTATION_FLOOR, state.reputation);
     // Week five's runway forecast (sim/forecast.ts): same "read it before
     // today's own charges touch Cash" timing as the reputation call just
     // above — this is what makes each entry "yesterday's closing balance."
@@ -157,6 +163,9 @@ export function step(state: SimState): void {
     // crewed. Must run after the todayCost reset above, since it charges
     // salary into it.
     rollDailyCrew(state);
+    // Rolled after the crew pass so a tail already grounded for crew
+    // isn't grounded twice and counted under two causes.
+    rollDailyMechanicalGroundings(state);
 
     // Week six's C-suite: any executive bonus that has come due.
     payExecutiveBonuses(state);
@@ -170,8 +179,20 @@ export function step(state: SimState): void {
       if (!state.aircraft.some((a) => a.tail === leg.tail)) continue; // no aircraft assigned — not really scheduled
       state.todayFlightsScheduled += 1;
       state.flightsScheduledTotal += 1;
-      if (!state.groundedTails.includes(leg.tail)) continue;
 
+      // Three causes, checked in the order they'd actually stop a flight:
+      // no crew to fly it, no serviceable aircraft, or nowhere to fly it
+      // from. Each leg counts once, under the first that applies.
+      const cause = state.groundedTails.includes(leg.tail)
+        ? 'crew'
+        : state.mechanicalGroundedTails.includes(leg.tail)
+          ? 'mechanical'
+          : isAirportClosed(state, leg.origin)
+            ? 'weather'
+            : null;
+      if (cause === null) continue;
+
+      state.cancellationsByCause[cause] += 1;
       state.todayFlightsCancelled += 1;
       state.flightsCancelledTotal += 1;
       // A cancelled flight still has an unhappy passenger attached, so it
@@ -221,9 +242,11 @@ export function step(state: SimState): void {
 
     const aircraft = state.aircraft.find((a) => a.tail === leg.tail);
     if (!aircraft) continue; // this tail isn't part of the active fleet yet
-    // Couldn't be crewed today — already counted as a cancellation at
-    // rollover, so it simply never departs.
+    // Cancelled at rollover for one of the three causes above, so it
+    // simply never departs.
     if (state.groundedTails.includes(leg.tail)) continue;
+    if (state.mechanicalGroundedTails.includes(leg.tail)) continue;
+    if (isAirportClosed(state, leg.origin)) continue;
     if (aircraft.status !== 'ground' || aircraft.atAirport !== leg.origin) continue;
     if (state.simMinute < aircraft.groundSinceMinute + MIN_TURN_MINUTES) continue; // still turning around
 

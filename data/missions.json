@@ -5,5 +5,54 @@
     "objective": "Buy or lease your first aircraft.",
     "flavor": "Trans-Canada Air Lines began in 1937 with two Lockheed Model 10A Electras and a single Boeing Stearman biplane. Its first revenue flight, on 1 September that year, ran Vancouver to Seattle in fifty minutes carrying mail and two passengers. Every flag carrier starts with somebody signing for one aeroplane.",
     "reputationReward": 50
+  },
+  {
+    "id": "first-route",
+    "name": "Scheduled Service",
+    "objective": "Put your first route on the schedule.",
+    "flavor": "The St. Petersburg–Tampa Airboat Line opened on 1 January 1914 and is generally counted the first scheduled aeroplane service anywhere. Tony Jannus flew a former mayor across Tampa Bay in about twenty-three minutes; the seat had been auctioned for four hundred dollars. The line lasted four months.",
+    "reputationReward": 60
+  },
+  {
+    "id": "five-airports",
+    "name": "A Network, Not a Route",
+    "objective": "Serve five different airports.",
+    "flavor": "Western Canada Airways was founded in 1926 to fly where there was nothing to fly to. Within a year it was hauling men and machinery into Fort Churchill through a subarctic winter — the sort of work that turns a collection of routes into a network somebody depends on.",
+    "reputationReward": 100
+  },
+  {
+    "id": "crew-twenty",
+    "name": "Payroll",
+    "objective": "Have twenty people on the books across all disciplines.",
+    "flavor": "Maritime Central Airways started in Charlottetown in 1941 and spent two decades stitching together the Atlantic provinces. An airline stops being one person's aeroplane at roughly the point the payroll outgrows the flight deck.",
+    "reputationReward": 100
+  },
+  {
+    "id": "cash-milestone",
+    "name": "In the Black",
+    "objective": "Bank $750,000 — half again your starting capital.",
+    "flavor": "Taken as a whole and across its entire history, the airline industry has returned less capital than it consumed. Individual carriers have made fortunes; the sector has mostly funded other people's travel. Getting meaningfully ahead of where you started is rarer than it sounds.",
+    "reputationReward": 120
+  },
+  {
+    "id": "five-aircraft",
+    "name": "A Real Fleet",
+    "objective": "Operate five aircraft at once.",
+    "flavor": "Fleet size is where an airline's problems change shape. One aeroplane is a schedule; five is a rotation, a crew roster, a maintenance programme, and the discovery that a single delay in the morning is still with you at supper.",
+    "reputationReward": 150
+  },
+  {
+    "id": "on-time-90",
+    "name": "Ninety Percent",
+    "objective": "Reach 90% lifetime on-time performance across at least 100 departures.",
+    "flavor": "American carriers only began publishing on-time figures in September 1987, after passengers made enough noise that the regulator obliged them to. Punctuality stopped being a private operational matter the moment it became a number anyone could look up.",
+    "reputationReward": 180
+  },
+  {
+    "id": "first-executive",
+    "name": "Somebody Else's Problem",
+    "objective": "Appoint your first executive.",
+    "flavor": "There is a point in every growing airline where the person who chose the aircraft, drew the routes and set the fares can no longer also be the person watching the defect log. The first real appointment is an admission that the operation has outgrown one desk.",
+    "reputationReward": 200
   }
 ]

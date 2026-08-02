@@ -1360,6 +1360,116 @@ and worth nothing to one flying new.
 
 ---
 
+## Fixed: the Reputation cliff
+
+Measured after the C-suite landed, because Reputation had quietly gone
+from gating nothing to gating three systems — the tech tree, the C-suite
+and service targets:
+
+| on-time | completion | NPS | rep/day | days to afford a 300-rep COO |
+| --- | --- | --- | --- | --- |
+| 51% | 100% | 9 | -10.8 | never |
+| 65% | 100% | 10 | -2.3 | never |
+| 75% | 98% | 15 | -0.7 | never |
+| 80% | 98% | 20 | +3.8 | 80 |
+| 90% | 100% | 30 | +13.4 | 23 |
+
+Below roughly 78% on-time the daily delta is negative, so a struggling
+airline didn't merely fail to accrue — it banked an ever-deepening
+deficit with no floor. A hundred rough days left it near -1000, and even
+an excellent airline then needed seventy-odd days of climbing just to
+reach zero. Past failure permanently taxed future success, and the tools
+that would help dig out were exactly the ones the deficit locked away.
+
+**Fixed with a floor at zero.** It doesn't soften the standard — a
+mediocre airline still accrues nothing, which is the intended message —
+but the compounding stops, and the moment it improves it starts building
+immediately. Negative Reputation had no mechanic attached to it anyway;
+nothing cost more or behaved worse for being in deficit, so it was
+unbounded punishment with no gameplay behind it.
+
+## Built: seven more missions
+
+The architecture existed with exactly one mission in it. Now eight, each
+one JSON entry plus one predicate, roughly in the order a game would meet
+them: first aircraft, first route, five airports, twenty crew, $750k
+banked, five aircraft, 90% on-time over 100 departures, first executive.
+Rewards run 50 to 200 Reputation.
+
+Flavour is real aviation history throughout — the St. Petersburg–Tampa
+Airboat Line's twenty-three-minute first service in 1914, Western Canada
+Airways flying into Fort Churchill in 1927, Maritime Central Airways out
+of Charlottetown, and the 1987 rule that first made American carriers
+publish on-time figures.
+
+They also matter more than they did an hour ago: with the Reputation
+floor in place, missions are the reliable early income that gets a new
+airline to its first tech node or executive.
+
+## Built: weather and mechanical cancellations
+
+The remaining two causes from the original cancellation design, now that
+Completion Factor, the NPS penalty and the Reputation term all exist to
+receive them. Both feed the same machinery the crew-shortage cause
+already used.
+
+- **Severe weather** closes an airport outright. Storms gained a
+  severity tier; the worst grounds everything departing from there.
+- **Unscheduled maintenance** (AOG) strands an airframe for the day, with
+  a daily per-aircraft chance scaling on *effective* age — so it reads
+  off the same maintenance staffing the delay model already uses.
+
+`cancellationsByCause` mirrors `delayMinutesByCause`, and the On-Time
+panel now shows completion factor and the three causes beside the delay
+codes. Splitting them matters because each has a different answer:
+reserve depth for crew, maintenance staffing and younger metal for
+mechanical, and nothing at all for weather.
+
+Measured over 180 days, the causes stay proportionate and each responds
+to its own lever:
+
+| fleet age | reserve | crew | mechanical | weather | completion |
+| --- | --- | --- | --- | --- | --- |
+| 0 | 1.25 | 0 | 0 | 2 | 99.9% |
+| 20 | 1.25 | 0 | 76 | 4 | 96.3% |
+| 20 | 1.00 | 720 | 40 | 3 | 64.7% |
+
+### Two things worth recording from getting there
+
+**Severe weather started at 18% and had to come down to 4%.** At 18% it
+wiped out 27% of the schedule and moved the optimum on two unrelated
+sweep levers. Sub-day closure windows were tried as the alternative and
+rejected: weather in this sim is deliberately day-scale, and storms are
+created spanning the start of the day, so a real window meant closures
+only ever caught the small hours and the mechanic never fired at all.
+Matching the model's existing treatment and making severe weather rare is
+consistent with how the rest of that file already behaves — and weather
+is the one cause with no player lever against it, which is its own
+argument for keeping it a background risk.
+
+**The AOG roll skipped already-grounded aircraft, and that was a real
+bug.** Skipping made the *number* of random draws consumed per day depend
+on how many aircraft happened to be crew-grounded, which changed the
+entire downstream seeded history — weather, delays, competitor openings —
+between two runs differing only in reserve depth. It silently broke the
+balance sweep's core guarantee. Now every aircraft is rolled and the
+result discarded for grounded ones, so the draw count is constant.
+
+### Open: margin now favours under-staffing in the fixture
+
+Worth flagging rather than quietly tuning. With crew as a large fixed
+cost, the reference network's *margin* peaks at reserve 1.05 (77.7%
+completion) rather than 1.25 (99.9%) — cancelling its marginal flights
+saves more variable cost than it loses in revenue. Completion factor and
+Reputation still order correctly, and in a real game Reputation gates the
+tech tree and C-suite, so reliability pays in ways the sweep doesn't
+measure. But raw margin currently points the wrong way, and that's a
+balance question rather than a bug: it may be the fixture's tight
+schedule (56% on-time even fully staffed), or it may mean the marginal
+flight genuinely doesn't earn its keep at current fares.
+
+---
+
 ## Proposed build order (not committed)
 
 Roughly in dependency order — each item mostly needs the one before it

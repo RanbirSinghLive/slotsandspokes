@@ -171,6 +171,22 @@ const TARGET_MECHANICS_PER_AIRCRAFT = 3;
 const MAINTENANCE_FACTOR_WORST = 1.4;
 const MAINTENANCE_FACTOR_BEST = 0.6;
 
+/**
+ * Week six's third cancellation cause: an unscheduled maintenance event
+ * that takes an airframe out of service for the day (AOG — "aircraft on
+ * ground"). The daily chance per aircraft scales with *effective* age, so
+ * it reads off the same maintenance staffing the delay model already
+ * uses: a neglected old airframe strands itself far more often than a
+ * well-kept one.
+ *
+ * WEEK-SIX.md's cancellation design named this as its second candidate
+ * cause precisely because the age curve already existed — this is that
+ * curve's tail, expressed as "doesn't fly today" rather than "flies very
+ * late."
+ */
+const AOG_PROBABILITY_PER_EFFECTIVE_YEAR = 0.0025;
+const AOG_PROBABILITY_MAX = 0.06;
+
 const MINUTES_PER_DAY = 1440;
 
 export type CrewPools = {
@@ -513,4 +529,40 @@ export function rollDailyCrew(state: SimState): void {
 
   const flying = new Set(crewableTails(state, availablePilots, availableCabin));
   state.groundedTails = state.aircraft.filter((a) => !flying.has(a.tail)).map((a) => a.tail);
+}
+
+/**
+ * Roll each aircraft for an unscheduled maintenance grounding. Called
+ * once per simulated day from step.ts's day-rollover, after the crew pass
+ * — a tail already grounded for lack of crew isn't rolled again, since it
+ * wasn't going to fly either way and double-counting it would inflate the
+ * mechanical cancellation figures.
+ */
+export function rollDailyMechanicalGroundings(state: SimState): void {
+  const factor = maintenanceAgeFactor(state);
+  const grounded: string[] = [];
+
+  for (const aircraft of state.aircraft) {
+    // Every aircraft is rolled every day, including ones already grounded
+    // for crew, and the result is discarded for those rather than the
+    // draw being skipped.
+    //
+    // That matters more than it looks. Skipping the draw would make the
+    // *number* of random numbers consumed per day depend on how many
+    // aircraft happened to be crew-grounded, which changes the entire
+    // downstream seeded history — weather, delays, competitor openings —
+    // between two runs that differ only in reserve depth. It silently
+    // broke the balance sweep's core guarantee that the only thing
+    // differing between rows is the lever being swept, and produced a
+    // reserve curve that looked like under-staffing was profitable.
+    const [roll, nextSeed] = nextRandom(state.rngSeed);
+    state.rngSeed = nextSeed;
+    if (state.groundedTails.includes(aircraft.tail)) continue;
+
+    const effectiveAge = aircraft.ageYears * factor;
+    const probability = Math.min(AOG_PROBABILITY_MAX, effectiveAge * AOG_PROBABILITY_PER_EFFECTIVE_YEAR);
+    if (roll < probability) grounded.push(aircraft.tail);
+  }
+
+  state.mechanicalGroundedTails = grounded;
 }

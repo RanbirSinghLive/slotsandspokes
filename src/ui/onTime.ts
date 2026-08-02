@@ -2,6 +2,21 @@ import type { SimState } from '../sim/state';
 
 const marketRowsBody = document.querySelector<HTMLTableSectionElement>('#ontime-rows')!;
 const causeRowsBody = document.querySelector<HTMLTableSectionElement>('#ontime-causes-rows')!;
+const cancelRowsBody = document.querySelector<HTMLTableSectionElement>('#ontime-cancel-rows')!;
+const completionEl = document.querySelector<HTMLDivElement>('#ontime-completion')!;
+
+/**
+ * Week six: cancellations, broken out the same way delay minutes are.
+ * Each cause has a different answer available — reserve depth for crew,
+ * maintenance staffing and younger airframes for mechanical, and nothing
+ * at all for weather — so which one dominates is the whole point of
+ * showing them apart rather than as one number.
+ */
+const CANCEL_CAUSE_LABELS: [keyof SimState['cancellationsByCause'], string][] = [
+  ['crew', 'Crew shortage'],
+  ['mechanical', 'Unscheduled maintenance'],
+  ['weather', 'Airport closed'],
+];
 
 // Below BAD_THRESHOLD: red, matching the app's existing "flag a real
 // problem" color (#ff8080, same as schedule warnings and out-of-range
@@ -119,5 +134,38 @@ export function updateOnTimePanel(state: SimState): void {
 
     row.append(labelCell, minutesCell, shareCell);
     causeRowsBody.appendChild(row);
+  }
+
+  const completion =
+    state.flightsScheduledTotal > 0
+      ? (state.flightsScheduledTotal - state.flightsCancelledTotal) / state.flightsScheduledTotal
+      : 1;
+  completionEl.textContent =
+    state.flightsScheduledTotal === 0
+      ? 'Nothing scheduled yet.'
+      : `${Math.round(completion * 100)}% completion factor — ${state.flightsCancelledTotal.toLocaleString()} of ` +
+        `${state.flightsScheduledTotal.toLocaleString()} scheduled departures cancelled.`;
+
+  cancelRowsBody.innerHTML = '';
+  const totalCancelled = state.flightsCancelledTotal;
+  for (const [key, label] of CANCEL_CAUSE_LABELS) {
+    const count = state.cancellationsByCause[key];
+    const share = totalCancelled > 0 ? count / totalCancelled : 0;
+    const row = document.createElement('tr');
+
+    const labelCell = document.createElement('td');
+    labelCell.textContent = label;
+
+    const countCell = document.createElement('td');
+    countCell.textContent = count.toLocaleString();
+
+    const shareCell = document.createElement('td');
+    const bar = document.createElement('span');
+    bar.className = 'ontime-causes-share-bar';
+    bar.style.width = `${Math.round(share * MAX_SHARE_BAR_PX)}px`;
+    shareCell.append(bar, document.createTextNode(`${Math.round(share * 100)}%`));
+
+    row.append(labelCell, countCell, shareCell);
+    cancelRowsBody.appendChild(row);
   }
 }

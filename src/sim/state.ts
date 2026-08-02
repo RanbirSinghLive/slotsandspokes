@@ -408,6 +408,21 @@ export type SimState = {
    */
   groundedTails: string[];
   /**
+   * Tails grounded today by an unscheduled maintenance event, kept
+   * separate from crew groundings above so cancellations can be
+   * attributed to the right cause. Rolled after the crew pass, and never
+   * for a tail already grounded for crew.
+   */
+  mechanicalGroundedTails: string[];
+  /**
+   * Lifetime cancellations by cause — the same shape (and the same
+   * purpose) as `delayMinutesByCause`. Three causes, each with a
+   * different answer available to the player: crew shortages are
+   * answered by reserve depth, mechanical events by maintenance
+   * staffing and younger airframes, and weather by nothing at all.
+   */
+  cancellationsByCause: { crew: number; mechanical: number; weather: number };
+  /**
    * Week six's cancellations: legs that should have operated today and
    * didn't. `flightsScheduled*` counts what was on the books, so
    * Completion Factor is `completed / scheduled` — the separate reliability
@@ -579,6 +594,8 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     pendingTraining: [],
     reserveDepth: 1.15,
     groundedTails: [],
+    mechanicalGroundedTails: [],
+    cancellationsByCause: { crew: 0, mechanical: 0, weather: 0 },
     flightsScheduledTotal: 0,
     flightsCancelledTotal: 0,
     todayFlightsScheduled: 0,
@@ -669,6 +686,8 @@ export function createNewGameState(rngSeed: number = Date.now()): SimState {
     pendingTraining: [],
     reserveDepth: 1.15,
     groundedTails: [],
+    mechanicalGroundedTails: [],
+    cancellationsByCause: { crew: 0, mechanical: 0, weather: 0 },
     flightsScheduledTotal: 0,
     flightsCancelledTotal: 0,
     todayFlightsScheduled: 0,

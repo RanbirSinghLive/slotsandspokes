@@ -63,6 +63,31 @@ const COMPLETION_FACTOR_WEIGHT = 120;
 const REPUTATION_MIN_SAMPLE_FLIGHTS = 10;
 
 /**
+ * Reputation can't go below zero.
+ *
+ * Measured after the C-suite landed: below roughly 78% on-time the daily
+ * delta is negative, so a struggling airline didn't just fail to accrue —
+ * it banked an ever-deepening deficit. A hundred rough days left it around
+ * -1000, and even a genuinely excellent airline (+13/day at 90% on-time)
+ * then needed seventy-odd days of climbing just to reach zero before it
+ * could save toward anything. Past failure permanently taxed future
+ * success, and it compounded without limit.
+ *
+ * That mattered much more once Reputation started gating three separate
+ * systems — the tech tree, the C-suite and service targets. The tools
+ * that would help an airline dig out were exactly the ones its deficit
+ * locked it out of.
+ *
+ * A floor at zero fixes the compounding without softening the standard:
+ * a mediocre airline still accrues nothing, which is the intended
+ * message, but the moment it improves it starts building immediately.
+ * Negative Reputation had no mechanic attached to it anyway — nothing
+ * cost more or behaved worse for being in deficit — so it was pure
+ * unbounded punishment.
+ */
+export const REPUTATION_FLOOR = 0;
+
+/**
  * Called once per simulated day, from step.ts's day-rollover — but
  * *before* the today-scoped counters it reads (`todayFlightsDeparted`,
  * `todayFlightsOnTime`, `todayNpsPoints`) get reset to zero for the new

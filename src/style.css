@@ -2109,3 +2109,38 @@ body {
   color: #6b7694;
   font-size: 11px;
 }
+
+/* Week six: the cancellations half of the On-Time panel, sharing the
+   delay-codes table's own styling. */
+#ontime-cancel-table {
+  border-collapse: collapse;
+  min-width: 320px;
+}
+
+#ontime-cancel-table th,
+#ontime-cancel-table td {
+  text-align: left;
+  padding: 6px 10px 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  white-space: nowrap;
+}
+
+#ontime-cancel-table th {
+  color: #6b7694;
+  font-weight: 400;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ontime-note {
+  margin: 0 0 8px;
+  color: #9aa3b8;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+#ontime-completion {
+  margin-bottom: 12px;
+  font-size: 13px;
+}
