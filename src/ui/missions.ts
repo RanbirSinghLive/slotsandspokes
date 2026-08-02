@@ -41,15 +41,22 @@ function buildMissionCard(id: string, name: string, objective: string, flavor: s
   const card = document.createElement('div');
   card.className = 'mission-card';
 
-  const header = document.createElement('div');
-  header.className = 'mission-header';
+  // Flavour is collapsed by default (week six phase two). It's real
+  // content — the history is the reason these are worth reading — but a
+  // returning player scanning for what's left to do doesn't want eight
+  // paragraphs in the way. Click the header to expand.
+  const header = document.createElement('button');
+  header.type = 'button';
+  header.className = 'mission-header expandable-header';
   const nameEl = document.createElement('span');
   nameEl.className = 'mission-name';
   nameEl.textContent = name;
   const rewardEl = document.createElement('span');
   rewardEl.className = 'mission-reward';
   rewardEl.textContent = `+${reward} Reputation`;
-  header.append(nameEl, rewardEl);
+  const chevron = document.createElement('span');
+  chevron.className = 'expand-chevron';
+  header.append(nameEl, chevron, rewardEl);
 
   const objectiveEl = document.createElement('div');
   objectiveEl.className = 'mission-objective';
@@ -60,6 +67,11 @@ function buildMissionCard(id: string, name: string, objective: string, flavor: s
   const flavorEl = document.createElement('p');
   flavorEl.className = 'mission-flavor';
   flavorEl.textContent = flavor;
+  flavorEl.hidden = true;
+  header.addEventListener('click', () => {
+    flavorEl.hidden = !flavorEl.hidden;
+    header.classList.toggle('expanded', !flavorEl.hidden);
+  });
 
   const statusEl = document.createElement('div');
   statusEl.className = 'mission-status';

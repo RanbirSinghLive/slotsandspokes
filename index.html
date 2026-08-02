@@ -231,11 +231,7 @@
         </div>
         <div id="commercial-panel" hidden>
           <section id="fare-policy-section">
-            <h2>Fare policy</h2>
-            <p class="fare-policy-description">
-              Prices every market from its recommended fare, so you set this once instead of
-              per route. Override an individual market below only when it needs to differ.
-            </p>
+                    <h2 title="Prices every market from its recommended fare, so you set this once instead of per route. Override an individual market below only when it needs to differ.">Fare policy <span class="info-mark">i</span></h2>
             <div class="lever-control">
               <input type="range" id="fare-policy-slider" min="50" max="250" step="5" value="100" />
               <span class="lever-value" id="fare-policy-value"></span>
@@ -300,11 +296,7 @@
             </thead>
             <tbody id="ontime-causes-rows"></tbody>
           </table>
-          <h2>Cancellations</h2>
-          <p class="ontime-note">
-            The other half of reliability. On-time only describes flights that operated —
-            completion factor is how many operated at all.
-          </p>
+                  <h2 title="The other half of reliability. On-time only describes flights that operated — completion factor is how many operated at all.">Cancellations <span class="info-mark">i</span></h2>
           <div id="ontime-completion"></div>
           <table id="ontime-cancel-table">
             <thead>
@@ -319,11 +311,7 @@
         </div>
         <div id="executive-panel" hidden>
           <section id="executive-suite-section">
-            <h2>The C-suite</h2>
-            <p class="exec-note">
-              Four chairs, paid for in Reputation rather than cash. Replacing an incumbent costs the
-              new appointment's full price and resets any bonus escalation they'd built up.
-            </p>
+                    <h2 title="Four chairs, paid for in Reputation rather than cash. Replacing an incumbent costs the new appointment&#x27;s full price and resets any bonus escalation they&#x27;d built up.">The C-suite <span class="info-mark">i</span></h2>
             <div id="executive-effects"></div>
             <div id="executive-slots"></div>
           </section>
@@ -418,11 +406,7 @@
             <button type="button" id="crew-train-button">Send to training</button>
           </section>
           <section id="crew-cabin-training-section">
-            <h2>Recurrent service training</h2>
-            <p class="crew-note">
-              Cabin crew come off the line while training, so this counts against your staffing
-              minimum. It lapses over time and has to be kept up.
-            </p>
+                    <h2 title="Cabin crew come off the line while training, so this counts against your staffing minimum. It lapses over time and has to be kept up.">Recurrent service training <span class="info-mark">i</span></h2>
             <div class="crew-form-row">
               <input type="number" id="crew-cabin-train-count" min="1" max="99" value="2" />
             </div>
@@ -440,16 +424,11 @@
         </div>
         <div id="missions-panel" hidden>
           <section id="missions-section">
-            <h2>Missions</h2>
-            <p class="missions-note">Objectives worth chasing. Each pays Reputation once, the moment it's met.</p>
+                    <h2 title="Objectives worth chasing. Each pays Reputation once, the moment it&#x27;s met.">Missions <span class="info-mark">i</span></h2>
             <div id="missions-list"></div>
           </section>
           <section id="targets-section">
-            <h2>Service target</h2>
-            <p class="missions-note">
-              Commit publicly to a standard and be held to it over 30 days. The more ambitious the
-              promise, the more Reputation it pays — and the more missing it costs.
-            </p>
+                    <h2 title="Commit publicly to a standard and be held to it over 30 days. The more ambitious the promise, the more Reputation it pays — and the more missing it costs.">Service target <span class="info-mark">i</span></h2>
             <div id="target-setup">
               <label class="target-row">
                 <span class="target-label">On-time</span>
@@ -478,33 +457,28 @@
             </div>
           </section>
           <section id="dev-cost-section">
-            <h2>Where the money went</h2>
-            <p class="dev-note">Live, from state — hover any row for what it is. Resets each simulated day.</p>
+                    <h2 title="Live, from state — hover any row for what it is. Resets each simulated day.">Where the money went <span class="info-mark">i</span></h2>
             <div id="dev-cost-tree"></div>
             <div id="dev-fuel-drivers"></div>
           </section>
           <section id="dev-revenue-section">
-            <h2>Where the passengers went</h2>
-            <p class="dev-note">A full day at the current schedule and fares, across every market you serve. Each row is a share of market potential.</p>
+                    <h2 title="A full day at the current schedule and fares, across every market you serve. Each row is a share of market potential.">Where the passengers went <span class="info-mark">i</span></h2>
             <div id="dev-revenue-funnel"></div>
             <div id="dev-revenue-note"></div>
           </section>
           <section id="dev-delay-section">
-            <h2>Delay rolls</h2>
-            <p class="dev-note">Sampled from the real functions, not described — 40,000 draws each. Hover a bar for its range.</p>
+                    <h2 title="Sampled from the real functions, not described — 40,000 draws each. Hover a bar for its range.">Delay rolls <span class="info-mark">i</span></h2>
             <div id="dev-delay-histograms"></div>
           </section>
         </div>
         <div id="game-tab" hidden>
           <section id="save-game-section">
-            <h2>Save</h2>
-            <p class="game-tab-description">Save happens automatically once a simulated day, but you can force one right now.</p>
+                    <h2 title="Save happens automatically once a simulated day, but you can force one right now.">Save <span class="info-mark">i</span></h2>
             <button type="button" id="save-game-button">Save Game</button>
             <div id="save-game-status"></div>
           </section>
           <section id="load-game-section">
-            <h2>Load</h2>
-            <p class="game-tab-description">Reload your last save, discarding anything that's happened since.</p>
+                    <h2 title="Reload your last save, discarding anything that&#x27;s happened since.">Load <span class="info-mark">i</span></h2>
             <button type="button" id="load-game-button">Load Game</button>
             <div id="load-game-confirm" hidden>
               <span>Reload from your last save? Anything since then will be lost.</span>
@@ -513,8 +487,7 @@
             </div>
           </section>
           <section id="new-game-section">
-            <h2>New Game</h2>
-            <p class="game-tab-description">Erase this save entirely and start a brand-new airline.</p>
+                    <h2 title="Erase this save entirely and start a brand-new airline.">New Game <span class="info-mark">i</span></h2>
             <button type="button" id="new-game-button">New Game</button>
             <div id="new-game-confirm" hidden>
               <span>Erase current game?</span>

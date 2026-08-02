@@ -2314,3 +2314,62 @@ body {
   color: #cdd3e0;
   border-color: rgba(255, 255, 255, 0.5);
 }
+
+/* Week six phase two: flavour text is real content but a returning player
+   scanning a list doesn't want eight paragraphs in the way, so every
+   flavour block collapses behind its own header. A <button> rather than a
+   <div> so it's keyboard-reachable and announces itself as interactive —
+   the whole point of hiding content is that you can find it again. */
+.expandable-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  margin: 0 0 4px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.expand-chevron {
+  flex: 1;
+  color: #4a5266;
+  font-size: 9px;
+}
+
+.expand-chevron::before {
+  content: '▸';
+}
+
+.expandable-header.expanded .expand-chevron::before {
+  content: '▾';
+}
+
+.expandable-header:hover .expand-chevron {
+  color: #9aa3b8;
+}
+
+/* Cards get tighter now that the prose inside them is optional. */
+.mission-card,
+.exec-candidate,
+.tech-node {
+  padding: 9px 11px;
+  margin-bottom: 7px;
+}
+
+.mission-flavor[hidden],
+.exec-candidate-flavor[hidden],
+.tech-node-flavor[hidden] {
+  display: none;
+}
+
+/* The mission reward sat at the right of a flex header; the chevron now
+   takes the flexible middle, so the reward just needs to stop shrinking. */
+.mission-reward,
+.exec-candidate-background {
+  flex: none;
+}

@@ -1605,6 +1605,40 @@ neighbours, hovering it reports "Outstation · 2 departures/day · +4%
 connectivity", LGA reports "Not served by you · 0/6 slots held", and both
 controlled fields carry their rings. Zero console errors.
 
+### Phase two: the text treatment
+
+Three moves, applied uniformly rather than tab by tab.
+
+**All 13 explanatory prose blocks became heading tooltips.** Every
+`<p class="*-note">` folded into a `title` on its own heading, with a
+small ⓘ marking that there's something to read. These were all "why this
+matters" explainers a returning player never needs again.
+
+Worth recording a mistake: the first pass used a `DOTALL` regex whose
+heading capture spanned intervening markup, so notes paired with distant
+headings — the New Route popover ended up captioned with the fare policy
+explainer. Reverted and redone with an adjacency-safe pattern (heading
+text may not contain `<`, only whitespace between the `</h2>` and the
+`<p>`), then every pairing verified by printing heading against tooltip.
+
+**Flavour text collapses behind its own header** across missions,
+executives and the tech tree — the three systems carrying ~4,470
+characters of it between them. The header became a `<button>` rather than
+a `<div>` so it's keyboard-reachable and announces itself as
+interactive; hiding content is only acceptable if it can be found again.
+
+Measured on the Missions tab: **1,823px fully expanded down to 895px
+collapsed**, a saving of 928px — roughly half the panel.
+
+**Cards tightened** now that the prose inside them is optional, and the
+Airports presence table had already gone to the map in phase one.
+
+The rule this pass establishes, and the reason nothing decision-critical
+moved: **tooltips carry explanation, never the numbers a decision needs.**
+Hover-only content is invisible on touch and undiscoverable generally, so
+every figure you'd actually act on stayed on screen — only the prose
+explaining it hides.
+
 ---
 
 ## Proposed build order (not committed)

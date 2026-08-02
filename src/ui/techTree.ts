@@ -28,19 +28,27 @@ function buildCard(node: TechNode, state: SimState): HTMLDivElement {
   const card = document.createElement('div');
   card.className = 'tech-node';
 
-  const header = document.createElement('div');
-  header.className = 'tech-node-header';
+  const header = document.createElement('button');
+  header.type = 'button';
+  header.className = 'tech-node-header expandable-header';
   const tierEl = document.createElement('span');
   tierEl.className = 'tech-node-tier';
   tierEl.textContent = `Tier ${node.tier}`;
   const nameEl = document.createElement('span');
   nameEl.className = 'tech-node-name';
   nameEl.textContent = node.name;
-  header.append(tierEl, nameEl);
+  const chevron = document.createElement('span');
+  chevron.className = 'expand-chevron';
+  header.append(tierEl, nameEl, chevron);
 
   const flavorEl = document.createElement('p');
   flavorEl.className = 'tech-node-flavor';
   flavorEl.textContent = node.flavor;
+  flavorEl.hidden = true;
+  header.addEventListener('click', () => {
+    flavorEl.hidden = !flavorEl.hidden;
+    header.classList.toggle('expanded', !flavorEl.hidden);
+  });
 
   const effectEl = document.createElement('div');
   effectEl.className = 'tech-node-effect';

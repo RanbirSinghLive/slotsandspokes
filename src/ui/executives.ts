@@ -53,19 +53,27 @@ function candidateCard(state: SimState, candidate: ExecutiveCandidate, isIncumbe
   const card = document.createElement('div');
   card.className = `exec-candidate${isIncumbent ? ' exec-candidate--appointed' : ''}`;
 
-  const header = document.createElement('div');
-  header.className = 'exec-candidate-header';
+  const header = document.createElement('button');
+  header.type = 'button';
+  header.className = 'exec-candidate-header expandable-header';
   const name = document.createElement('span');
   name.className = 'exec-candidate-name';
   name.textContent = candidate.name;
   const background = document.createElement('span');
   background.className = 'exec-candidate-background';
   background.textContent = candidate.background;
-  header.append(name, background);
+  const chevron = document.createElement('span');
+  chevron.className = 'expand-chevron';
+  header.append(name, chevron, background);
 
   const flavor = document.createElement('p');
   flavor.className = 'exec-candidate-flavor';
   flavor.textContent = candidate.flavor;
+  flavor.hidden = true;
+  header.addEventListener('click', () => {
+    flavor.hidden = !flavor.hidden;
+    header.classList.toggle('expanded', !flavor.hidden);
+  });
 
   const effect = document.createElement('div');
   effect.className = 'exec-candidate-effect';
