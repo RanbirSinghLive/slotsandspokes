@@ -2271,3 +2271,46 @@ body {
   color: #6b7694;
   font-size: 11px;
 }
+
+/* Week six phase one: the airline's own presence at a hovered airport,
+   below the operator legend. The map dots encode the same numbers
+   visually; this is the exact reading of them. */
+#competition-tooltip-presence {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  color: #9aa3b8;
+  font-size: 11px;
+}
+
+#competition-tooltip-presence:empty {
+  display: none;
+}
+
+#competition-tooltip-presence.presence-over {
+  color: #ff8080;
+}
+
+/* A small hoverable "i" that carries an explanation which used to be a
+   paragraph of body text. Decision-critical numbers never live in here —
+   only the prose explaining them. */
+.info-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  margin-left: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  font-size: 9px;
+  font-style: italic;
+  color: #6b7694;
+  cursor: help;
+  vertical-align: middle;
+}
+
+.info-mark:hover {
+  color: #cdd3e0;
+  border-color: rgba(255, 255, 255, 0.5);
+}

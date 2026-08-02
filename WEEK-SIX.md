@@ -1555,6 +1555,58 @@ Zero console errors.
 
 ---
 
+## Getting data out of the menus — phase one
+
+Raised directly, with a diagnosis worth recording: the sidebar had grown
+to **12 tabs**, **13 explanatory prose blocks** and about **4,470
+characters of flavour text**, while the map drew ten layers of which only
+two were optional. The panels had become a documentation reader.
+
+The principle agreed for sorting it out:
+
+> **Read spatial state on the map; set non-spatial policy in menus.**
+
+Anything you *look at* that has a location belongs on the map. Anything
+you *set* — fare policy, hiring, tech nodes, slot purchases — stays a
+form. The New Route popover already proved the hybrid works when the form
+itself is spatially anchored.
+
+### Phase one: airport presence moved to the map
+
+The Airports tab was a table of IATA codes describing *places*, which is
+about as anti-map as data gets. It now reads off the dots:
+
+- **Radius grows with daily departures**, on the same log curve the
+  connectivity multiplier itself uses — so what you see matches what you
+  earn — capped so a mega-hub can't swallow its neighbours.
+- **Served airports are brighter**; unserved ones recede.
+- **A faint halo at Base and Hub level**, so the shape of the network
+  reads without comparing dot sizes.
+- **A slot ring** at the two controlled fields: amber while you hold
+  slots to spare, red the moment departures exceed them, grey when you
+  hold none.
+- **Hovering gives the exact numbers** — level, departures, connectivity
+  uplift, slot holdings — appended to the operator tooltip that already
+  existed for airports rather than adding a third competing one.
+
+The tab keeps the slot *purchase* form, which is a form and belongs in a
+menu, plus a single summary line naming your strongest field. It went
+from a full table with two prose blocks to two cards and one sentence.
+
+The first ⓘ affordance also lands here: the slot explainer became a
+tooltip on the heading. The rule it establishes for the rest of the
+condensing pass — **tooltips carry explanation, never the numbers a
+decision needs**, since hover-only content is invisible on touch and
+undiscoverable generally.
+
+Verified in the browser on a three-airport network: YHZ at two
+departures renders visibly larger and brighter than its unserved
+neighbours, hovering it reports "Outstation · 2 departures/day · +4%
+connectivity", LGA reports "Not served by you · 0/6 slots held", and both
+controlled fields carry their rings. Zero console errors.
+
+---
+
 ## Proposed build order (not committed)
 
 Roughly in dependency order — each item mostly needs the one before it

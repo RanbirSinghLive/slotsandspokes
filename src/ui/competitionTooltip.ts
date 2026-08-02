@@ -2,12 +2,15 @@ import { airports } from '../render/airports';
 import type { CompetitionHover, Operator } from '../render/competition';
 import { operatorsForAirport, operatorsForMarket } from '../render/competition';
 import { PLAYER_AIRLINE } from '../sim/airline';
+import { airportPresence } from '../render/airports';
+import { connectivityFactor } from '../sim/airports';
 import type { SimState } from '../sim/state';
 
 const tooltip = document.querySelector<HTMLDivElement>('#competition-tooltip')!;
 const titleEl = document.querySelector<HTMLDivElement>('#competition-tooltip-title')!;
 const pieEl = document.querySelector<HTMLDivElement>('#competition-tooltip-pie')!;
 const legendEl = document.querySelector<HTMLUListElement>('#competition-tooltip-legend')!;
+const presenceEl = document.querySelector<HTMLDivElement>('#competition-tooltip-presence')!;
 
 const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]));
 
@@ -68,6 +71,35 @@ function renderOperators(title: string, operators: Operator[]): void {
 }
 
 /**
+ * Week six: the airline's own presence at this airport — level,
+ * departures, the connectivity uplift that concentration earns, and slot
+ * holdings where the field is controlled. This is the data the Airports
+ * tab used to show as a table of IATA codes; it belongs on the map,
+ * where the places actually are, and the dots already encode the same
+ * numbers visually (render/airports.ts).
+ */
+function renderPresence(iata: string, state: SimState): void {
+  const p = airportPresence(state, iata);
+  const parts: string[] = [];
+
+  if (p.departures === 0) {
+    parts.push('Not served by you');
+  } else {
+    const uplift = Math.round((connectivityFactor(state, iata) - 1) * 100);
+    parts.push(`${p.level} · ${p.departures} departure${p.departures === 1 ? '' : 's'}/day`);
+    if (uplift > 0) parts.push(`+${uplift}% connectivity`);
+  }
+
+  if (p.slotControlled) {
+    const over = p.departures > p.slotsOwned;
+    parts.push(`${p.slotsOwned}/${p.slotsTotal} slots held${over ? ' — over capacity' : ''}`);
+  }
+
+  presenceEl.textContent = parts.join(' · ');
+  presenceEl.classList.toggle('presence-over', p.slotControlled && p.departures > p.slotsOwned);
+}
+
+/**
  * Show the tooltip for whatever findCompetitionHover() (render/
  * competition.ts) currently reports under the cursor, positioned just
  * off the pointer. Called from main.ts's mousemove handler whenever the
@@ -93,7 +125,9 @@ export function showCompetitionTooltip(
   if (hover.type === 'airport') {
     const airport = airportsByIata.get(hover.iata);
     renderOperators(`${hover.iata}${airport ? ` — ${airport.name}` : ''}`, ownOnly(operatorsForAirport(hover.iata, state)));
+    renderPresence(hover.iata, state);
   } else {
+    presenceEl.textContent = '';
     renderOperators(`${hover.origin} ↔ ${hover.dest}`, ownOnly(operatorsForMarket(hover.origin, hover.dest, state)));
   }
 

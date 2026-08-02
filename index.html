@@ -14,6 +14,7 @@
         <div id="competition-tooltip-pie"></div>
         <ul id="competition-tooltip-legend"></ul>
       </div>
+      <div id="competition-tooltip-presence"></div>
     </div>
     <div id="route-hover-tooltip" hidden>
       <div id="route-hover-tooltip-title"></div>
@@ -360,18 +361,15 @@
           </section>
         </div>
         <div id="airports-panel" hidden>
+          <section id="airports-slots-section">
+            <h2 title="Only the fields that are genuinely slot-coordinated in real life. Every departure needs a slot; everywhere else on the map grows without asking.">
+              Slot-controlled airports <span class="info-mark">i</span>
+            </h2>
+            <div id="airports-slots"></div>
+          </section>
           <section id="airports-presence-section">
             <h2>Presence</h2>
-            <div id="airports-presence"></div>
-            <div id="airports-presence-note"></div>
-          </section>
-          <section id="airports-slots-section">
-            <h2>Slot-controlled airports</h2>
-            <p class="airports-note">
-              Only the fields that are genuinely slot-coordinated in real life. Every departure needs a
-              slot; everywhere else on the map grows without asking.
-            </p>
-            <div id="airports-slots"></div>
+            <p class="airports-note" id="airports-presence-note"></p>
           </section>
         </div>
         <div id="crew-panel" hidden>

@@ -300,7 +300,7 @@ function render(nowMs: number = performance.now()): void {
   }
 
   drawAircraft(ctx, state, latestFractionalMinute);
-  drawAirports(ctx);
+  drawAirports(ctx, state);
   drawWeatherEffects(ctx, state);
   drawRoutePreview(ctx, state);
 

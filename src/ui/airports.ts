@@ -2,7 +2,6 @@ import {
   allAirports,
   slotControlledAirports,
   dailyDeparturesAt,
-  airportLevel,
   connectivityFactor,
   slotsOwned,
   slotsTotal,
@@ -17,59 +16,47 @@ import type { SimState } from '../sim/state';
  * The Airports tab: what the airline looks like *at each field* rather
  * than route by route.
  *
- * Two halves. The presence table shows every airport the airline touches,
- * its level, and the connectivity multiplier that concentration earns —
- * which is the argument for building a hub rather than scattering
- * departures. The slots half only concerns the two fields on this map
- * that are genuinely slot-controlled in life, and is where growth there
- * gets bought.
+ * Slots are the substance of it: buying growth at the two fields that are
+ * genuinely slot-coordinated in life. Presence itself moved to the map in
+ * phase one of the menu-condensing pass — see renderPresence() below for
+ * why a table of IATA codes was the wrong home for it.
  */
 
-const presenceEl = document.querySelector<HTMLDivElement>('#airports-presence')!;
-const presenceNoteEl = document.querySelector<HTMLDivElement>('#airports-presence-note')!;
+const presenceNoteEl = document.querySelector<HTMLParagraphElement>('#airports-presence-note')!;
 const slotsEl = document.querySelector<HTMLDivElement>('#airports-slots')!;
 
 function money(amount: number): string {
   return `$${Math.round(amount).toLocaleString()}`;
 }
 
+/**
+ * Presence itself moved to the map in week six's phase one — the dots
+ * are sized by departures, carry a halo at Base/Hub level and a slot ring
+ * where the field is controlled, and hovering one gives level,
+ * connectivity and slot holdings (render/airports.ts,
+ * ui/competitionTooltip.ts). A table of IATA codes describing *places*
+ * was the least spatial way to show spatial data.
+ *
+ * What's left here is a one-line summary, so the tab still answers "where
+ * am I strongest" without making you scan the map for it.
+ */
 function renderPresence(state: SimState): void {
-  // Only airports the airline actually touches — listing all nineteen
-  // with zeroes would bury the handful that matter.
   const served = allAirports()
-    .map((airport) => ({
-      iata: airport.iata,
-      name: airport.name,
-      departures: dailyDeparturesAt(state, airport.iata),
-    }))
+    .map((airport) => ({ iata: airport.iata, departures: dailyDeparturesAt(state, airport.iata) }))
     .filter((a) => a.departures > 0)
     .sort((a, b) => b.departures - a.departures);
 
   if (served.length === 0) {
-    presenceEl.innerHTML = '';
-    presenceNoteEl.textContent = 'No departures scheduled anywhere yet.';
+    presenceNoteEl.textContent = 'No departures scheduled anywhere yet. Airport dots on the map grow with your presence.';
     return;
   }
 
-  presenceEl.innerHTML = served
-    .map((a) => {
-      const factor = connectivityFactor(state, a.iata);
-      const uplift = Math.round((factor - 1) * 100);
-      return `
-        <div class="airport-row">
-          <span class="airport-code">${a.iata}</span>
-          <span class="airport-name">${a.name}</span>
-          <span class="airport-level">${airportLevel(a.departures)}</span>
-          <span class="airport-departures">${a.departures}/day</span>
-          <span class="${uplift > 0 ? 'airport-uplift' : 'airport-uplift-none'}">${uplift > 0 ? `+${uplift}%` : '—'}</span>
-        </div>`;
-    })
-    .join('');
-
   const best = served[0];
+  const uplift = Math.round((connectivityFactor(state, best.iata) - 1) * 100);
   presenceNoteEl.textContent =
-    `Concentration pays: revenue on a flight is lifted by the average of its two ends' factors. ` +
-    `Your strongest field is ${best.iata} at ${best.departures} departures a day.`;
+    `${served.length} airport${served.length === 1 ? '' : 's'} served. Strongest is ${best.iata} at ` +
+    `${best.departures} departures a day${uplift > 0 ? `, worth +${uplift}% on revenue there` : ''}. ` +
+    `Hover any airport on the map for its level, connectivity and slots.`;
 }
 
 function renderSlots(state: SimState): void {
