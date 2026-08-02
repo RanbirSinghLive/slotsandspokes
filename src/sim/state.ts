@@ -8,6 +8,7 @@ import { FUEL_PRICE_BASELINE } from './fuel';
 import type { TargetCommitment, TargetResult } from './targets';
 import { createCrewPools, crewRequirement, type CrewPools, type PendingHire, type PendingTraining } from './crew';
 import { createExecutiveSlots, type ExecutiveSlots } from './executives';
+import { isSlotControlled } from './airports';
 
 export type AircraftStatus = 'ground' | 'airborne';
 
@@ -408,6 +409,14 @@ export type SimState = {
    */
   groundedTails: string[];
   /**
+   * Slots purchased at each slot-controlled airport, keyed by IATA — a
+   * plain object, same JSON-round-trip reasoning as `routeSettings`. Only
+   * LGA and YYZ are controlled on this map (see data/airports.json's
+   * `slotsTotal`), matching the two fields that really are coordinated in
+   * life; everywhere else grows without asking.
+   */
+  slotsOwned: Record<string, number>;
+  /**
    * Tails grounded today by an unscheduled maintenance event, kept
    * separate from crew groundings above so cancellations can be
    * attributed to the right cause. Rolled after the crew pass, and never
@@ -594,6 +603,7 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     pendingTraining: [],
     reserveDepth: 1.15,
     groundedTails: [],
+    slotsOwned: {},
     mechanicalGroundedTails: [],
     cancellationsByCause: { crew: 0, mechanical: 0, weather: 0 },
     flightsScheduledTotal: 0,
@@ -618,6 +628,16 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
   state.crew.pilotsByTier = [...requirement.targetPilotsByTier] as [number, number, number];
   state.crew.cabinCrew = requirement.targetCabinCrew;
   state.crew.mechanics = requirement.targetMechanics;
+
+  // Same reasoning as the crew above: this fixture's schedule already
+  // flies from slot-controlled airports, so it needs to hold the slots
+  // for them or the balance tools would model an airline permanently over
+  // capacity. A real new game owns none, because buying them is the
+  // mechanic (sim/airports.ts).
+  for (const leg of state.schedule) {
+    if (!isSlotControlled(leg.origin)) continue;
+    state.slotsOwned[leg.origin] = (state.slotsOwned[leg.origin] ?? 0) + 1;
+  }
 
   return state;
 }
@@ -686,6 +706,7 @@ export function createNewGameState(rngSeed: number = Date.now()): SimState {
     pendingTraining: [],
     reserveDepth: 1.15,
     groundedTails: [],
+    slotsOwned: {},
     mechanicalGroundedTails: [],
     cancellationsByCause: { crew: 0, mechanical: 0, weather: 0 },
     flightsScheduledTotal: 0,

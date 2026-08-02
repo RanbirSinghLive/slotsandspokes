@@ -1,4 +1,5 @@
 import airportsData from '../../data/airports.json';
+import suppressedMarketsData from '../../data/suppressed-markets.json';
 import { greatCircleDistanceNm } from './geo';
 
 type AirportDemandInput = { iata: string; lat: number; lon: number; population: number };
@@ -39,6 +40,33 @@ const DISTANCE_EXPONENT = 1;
 const SCALING_CONSTANT = 4.8e-8;
 
 /**
+ * Markets the gravity model gets badly wrong, suppressed to zero demand.
+ *
+ * This is a **soft** restriction on purpose: nothing stops a route being
+ * drawn on a suppressed market, it simply carries nobody, so the mistake
+ * costs money rather than being forbidden outright. That keeps the rule
+ * out of the route builder's constraint logic and lets it read as a
+ * property of the world rather than an arbitrary ban.
+ *
+ * The register exists because these will accumulate. A gravity model
+ * multiplied by population and divided by distance always misbehaves
+ * where two airports serve the same city — enormous populations at
+ * almost no distance — and this map already has one such pair. Each entry
+ * carries its own reason so the next person to read the list can tell a
+ * deliberate balance decision from an accident.
+ */
+type SuppressedMarket = { origin: string; dest: string; reason: string };
+
+const suppressedByKey = new Map<string, SuppressedMarket>(
+  (suppressedMarketsData as SuppressedMarket[]).map((m) => [[m.origin, m.dest].sort().join('-'), m]),
+);
+
+/** The reason this market is suppressed, or undefined if it isn't — for the UI to explain itself. */
+export function suppressedMarketReason(originIata: string, destIata: string): string | undefined {
+  return suppressedByKey.get([originIata, destIata].sort().join('-'))?.reason;
+}
+
+/**
  * The *potential* daily demand for a city pair — how many people would
  * travel between `originIata` and `destIata` on an average day if the
  * market were fully mature and well served, in either direction combined.
@@ -63,6 +91,7 @@ export function potentialDailyDemand(originIata: string, destIata: string): numb
     throw new Error(`potentialDailyDemand: unknown airport in pair ${originIata}-${destIata}`);
   }
   if (origin.iata === dest.iata) return 0;
+  if (suppressedByKey.has([originIata, destIata].sort().join('-'))) return 0;
 
   const distanceNm = greatCircleDistanceNm(origin, dest);
   const gravity = (origin.population * dest.population) / Math.pow(distanceNm, DISTANCE_EXPONENT);

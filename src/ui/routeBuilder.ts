@@ -5,6 +5,8 @@ import { projection } from '../render/projection';
 import { airports, type Airport } from '../render/airports';
 import { greatCircleDistanceNm } from '../sim/geo';
 import { actualDailyDemand, currentPotentialDemand } from '../sim/marketDemand';
+import { suppressedMarketReason } from '../sim/demand';
+import { isSlotControlled, remainingSlotCapacity, slotsOwned, slotsTotal } from '../sim/airports';
 import {
   computeBlockMinutes,
   defaultReturnDepartMinute,
@@ -82,7 +84,12 @@ function showRouteHoverTooltip(origin: Airport, candidate: Airport, screenX: num
     // different numbers, and the second is the one route choice actually
     // turns on. Collapses to a single figure on a market already at
     // maturity, where the two are equal.
-    const pdewText = potentialPdew > pdew ? `PDEW: ${pdew} → ${potentialPdew}` : `PDEW: ${pdew}`;
+    const suppressed = suppressedMarketReason(origin.iata, candidate.iata);
+    const pdewText = suppressed
+      ? 'No market — same city'
+      : potentialPdew > pdew
+        ? `PDEW: ${pdew} → ${potentialPdew}`
+        : `PDEW: ${pdew}`;
 
     routeHoverTooltipBody.textContent = outOfRange
       ? `${pdewText}  CAP: ${type.seats} — out of range (${Math.round(distanceNm)} nm)`
@@ -580,8 +587,13 @@ function updateFormValidation(origin: Airport, dest: Airport, state: SimState): 
     const newFrequency = existingFrequency + (formReturnCheckbox.checked ? 2 : 1);
     const pdew = Math.round(actualDailyDemand(state, origin.iata, dest.iata) / newFrequency);
     const potentialPdew = Math.round(currentPotentialDemand(state, origin.iata, dest.iata) / newFrequency);
-    formPdew.textContent =
-      potentialPdew > pdew
+    // A suppressed market (sim/demand.ts) carries nobody. Deliberately
+    // still buildable — the restriction is soft — but saying so plainly
+    // beats letting someone discover it from an empty P&L.
+    const suppressed = suppressedMarketReason(origin.iata, dest.iata);
+    formPdew.textContent = suppressed
+      ? `No market: ${suppressed}`
+      : potentialPdew > pdew
         ? `PDEW: ${pdew} now → ${potentialPdew} potential  CAP: ${type.seats}`
         : `PDEW: ${pdew}  CAP: ${type.seats}`;
     // See the hover tooltip's own note: thin is judged on potential, not
@@ -600,6 +612,27 @@ function updateFormValidation(origin: Airport, dest: Airport, state: SimState): 
   const network = networkAirports(state.schedule);
   if (network.size > 0 && !network.has(origin.iata)) {
     formError.textContent = `${origin.iata} isn't in your network yet — a new route has to start from an airport you already fly to. Fly there as a destination first, then routes can start from it.`;
+    formConfirmButton.disabled = true;
+    formReturnPreview.textContent = '';
+    formPositioningPreview.textContent = '';
+    return;
+  }
+
+  // Week six: departures from a slot-controlled airport need slots to
+  // put them in. Same "hard block, plain message" shape as the network
+  // check above — you can buy more in the Airports tab, so this is a
+  // constraint with a purchasable answer rather than a dead end. Both
+  // ends are checked, since a return leg departs from the destination.
+  const addingReturn = formReturnCheckbox.checked;
+  for (const [airport, departuresAdded] of [
+    [origin.iata, 1],
+    [dest.iata, addingReturn ? 1 : 0],
+  ] as [string, number][]) {
+    if (departuresAdded === 0 || !isSlotControlled(airport)) continue;
+    if (remainingSlotCapacity(state, airport) >= departuresAdded) continue;
+    formError.textContent =
+      `${airport} is slot-controlled and you hold ${slotsOwned(state, airport)} of ${slotsTotal(airport)} slots, ` +
+      `all in use. Buy another in the Airports tab before adding a departure here.`;
     formConfirmButton.disabled = true;
     formReturnPreview.textContent = '';
     formPositioningPreview.textContent = '';

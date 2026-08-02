@@ -4,6 +4,7 @@ import { marketKey, type ScheduleLeg } from '../sim/schedule';
 import { applyFarePolicy, policyFare, FARE_POLICY_MIN, FARE_POLICY_MAX } from '../sim/pricing';
 import { trafficShare } from '../sim/choiceModel';
 import { actualDailyDemand } from '../sim/marketDemand';
+import { routeConnectivityMultiplier } from '../sim/airports';
 import type { RouteSettings, SimState } from '../sim/state';
 
 // A market can be served by more than one gauge at once (week four's
@@ -145,6 +146,7 @@ function summarizeMarket(origin: string, dest: string, state: SimState, routeSet
       state.fuelPriceIndex,
       state.fuelEfficiencyMultiplier,
       actualDailyDemand(state, leg.origin, leg.dest),
+      routeConnectivityMultiplier(state, leg.origin, leg.dest),
       freq,
       routeSettings,
       state.competitorRoutes,

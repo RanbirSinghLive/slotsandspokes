@@ -211,6 +211,12 @@ export function flightResult(
   fuelPriceIndex: number,
   fuelEfficiencyMultiplier: number,
   marketDailyDemand: number,
+  /**
+   * Revenue multiplier from hub concentration at this flight's two ends
+   * (sim/airports.ts). 1 means no benefit. Passed in rather than derived
+   * here so this stays a pure function of its inputs.
+   */
+  connectivityMultiplier: number,
   legsServingMarket: number,
   // Narrowed to the two levers this actually prices from, rather than the
   // whole RouteSettings: `fareIsOverridden` is bookkeeping for the fare
@@ -250,7 +256,7 @@ export function flightResult(
     spilloverDelta = -recaptured;
   }
 
-  const revenue = pax * routeSettings.fare;
+  const revenue = pax * routeSettings.fare * connectivityMultiplier;
   const costBreakdown = legCostBreakdown(leg.blockMinutes, type, fuelPriceIndex, fuelEfficiencyMultiplier);
   const cost = costBreakdown.fuel + costBreakdown.blockNonFuel + costBreakdown.departure;
   return {

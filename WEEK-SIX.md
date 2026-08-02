@@ -1470,6 +1470,91 @@ flight genuinely doesn't earn its keep at current fares.
 
 ---
 
+## The suppressed-markets register
+
+`data/suppressed-markets.json` — markets the gravity model gets badly
+wrong, forced to zero demand, each with its own written reason. The
+register exists because these will accumulate, and a bare zero six months
+from now would be indistinguishable from a bug.
+
+First entry: **YTZ-YYZ**. Both serve Toronto, 11 nm apart, and the
+gravity model reads a same-city pair as two full metro populations at
+almost no distance. It is by far the largest "market" on the map and
+entirely an artefact — flying it would have been an exploit rather than a
+strategy.
+
+Deliberately a **soft** restriction: nothing stops the route being drawn,
+it simply carries nobody, so the mistake costs money rather than being
+forbidden. That keeps the rule out of the route builder's constraint
+logic and lets it read as a property of the world. The builder does
+explain itself though — hovering shows "No market — same city" and the
+confirmation popover gives the full reason, since discovering this from
+an empty P&L would be worse than being told.
+
+## Built: the Airports tab
+
+What the airline looks like at each *field* rather than route by route.
+
+### Presence and connectivity
+
+Every airport the airline touches, with a level derived from daily
+departures (Unserved / Outstation / Focus city / Base / Hub) and the
+**connectivity multiplier** that concentration earns on revenue.
+
+That multiplier is a deliberate stand-in for something this sim doesn't
+model. Real airlines concentrate flying at hubs because a passenger
+arriving on one flight can leave on another, and connecting itineraries
+remain the heaviest structural lift on any list here (WEEK-TWO.md
+decision 1, still unbuilt). This gives the *benefit* of a hub without the
+machinery of tracking itineraries through one — it rewards concentration
+over scattering, which is the strategic pressure a hub is supposed to
+create.
+
+| departures/day | level | multiplier |
+| --- | --- | --- |
+| 1 | Outstation | x1.019 |
+| 4 | Focus city | x1.060 |
+| 8 | Base | x1.095 |
+| 12 | Hub | x1.120 |
+| 40 | Hub | x1.208 |
+
+A flight earns the *average* of its two ends rather than the product, so
+hub-to-outstation gets half the benefit of hub-to-hub instead of the two
+compounding. Capped at 1.25: this is a proxy, not a measurement, and an
+uncapped network effect would make a single mega-hub strictly correct and
+every other shape of airline wrong.
+
+### Slots
+
+Only at the two fields on this map that really are slot-coordinated —
+**LGA and YYZ**. Everywhere else grows without asking. Every departure
+needs a slot; prices escalate 40% per slot already held ($45,000 →
+$63,000 → $88,200 → ...), which is both scarcity and a brake on buying a
+whole airport at once.
+
+Enforced in the route builder as a hard block with a purchasable answer,
+the same shape the range and network checks already use — you're told
+which airport, how many you hold, and where to buy more. Existing
+schedules aren't retroactively grounded.
+
+`createInitialState()` grants itself the slots its own schedule needs,
+same reasoning as the crew it staffs: the fixture exists to be a working
+airline, and modelling one permanently over capacity would distort every
+balance measurement taken from it. A real new game owns none, because
+buying them is the mechanic.
+
+### Verified
+
+Suppression returns zero in both directions with the reason retrievable,
+and leaves every other market untouched (YUL-YYZ still 4,668). Slot
+pricing escalates as designed and correctly refuses at 6/6; the fixture
+covers its own YYZ departure exactly. In the browser both controlled
+airports list with live counts, buying updates holdings and price in
+place, and the presence table reads empty on a fresh game as it should.
+Zero console errors.
+
+---
+
 ## Proposed build order (not committed)
 
 Roughly in dependency order — each item mostly needs the one before it

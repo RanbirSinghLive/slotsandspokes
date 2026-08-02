@@ -38,6 +38,7 @@ import { setupTechTreePanel, updateTechTreePanel } from './ui/techTree';
 import { setupDevPanel, updateDevPanel } from './ui/devTools';
 import { setupMissionsPanel, updateMissionsPanel } from './ui/missions';
 import { setupCrewPanel, updateCrewPanel } from './ui/crew';
+import { setupAirportsPanel, updateAirportsPanel } from './ui/airports';
 import { updateTicker } from './ui/ticker';
 import { setupLoans, updateLoans } from './ui/loans';
 import { isInsolvent } from './sim/loans';
@@ -77,6 +78,7 @@ setupTechTreePanel(state);
 setupDevPanel();
 setupMissionsPanel(state);
 setupCrewPanel(state);
+setupAirportsPanel();
 setupLoans(state);
 setupGameControls(state);
 
@@ -140,6 +142,7 @@ const fleetMarketPanelEl = document.querySelector<HTMLDivElement>('#fleet-market
 const onTimePanelEl = document.querySelector<HTMLDivElement>('#ontime-panel')!;
 const executivePanelEl = document.querySelector<HTMLDivElement>('#executive-panel')!;
 const techTreePanelEl = document.querySelector<HTMLDivElement>('#tech-tree-panel')!;
+const airportsPanelEl = document.querySelector<HTMLDivElement>('#airports-panel')!;
 const crewPanelEl = document.querySelector<HTMLDivElement>('#crew-panel')!;
 const missionsPanelEl = document.querySelector<HTMLDivElement>('#missions-panel')!;
 const devPanelEl = document.querySelector<HTMLDivElement>('#dev-panel')!;
@@ -238,6 +241,7 @@ type SidebarTab =
   | 'ontime'
   | 'executive'
   | 'techtree'
+  | 'airports'
   | 'crew'
   | 'missions'
   | 'dev'
@@ -270,6 +274,7 @@ function render(nowMs: number = performance.now()): void {
   // complete on any tick.
   if (sidebarTab === 'missions') updateMissionsPanel(state);
   if (sidebarTab === 'crew') updateCrewPanel(state);
+  if (sidebarTab === 'airports') updateAirportsPanel(state);
 
   const cssWidth = window.innerWidth - currentPanelWidthPx;
   const cssHeight = window.innerHeight;
@@ -476,6 +481,7 @@ function switchToSidebarTab(tab: SidebarTab, highlightLegIds: string[] = []): vo
   onTimePanelEl.hidden = tab !== 'ontime';
   executivePanelEl.hidden = tab !== 'executive';
   techTreePanelEl.hidden = tab !== 'techtree';
+  airportsPanelEl.hidden = tab !== 'airports';
   crewPanelEl.hidden = tab !== 'crew';
   missionsPanelEl.hidden = tab !== 'missions';
   devPanelEl.hidden = tab !== 'dev';

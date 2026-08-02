@@ -2144,3 +2144,130 @@ body {
   margin-bottom: 12px;
   font-size: 13px;
 }
+
+/* Week six's Airports tab (sim/airports.ts, ui/airports.ts): presence and
+   connectivity per field, plus slots at the two real slot-controlled ones. */
+#airports-panel section {
+  margin-bottom: 26px;
+}
+
+#airports-panel h2 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7694;
+}
+
+.airports-note,
+#airports-presence-note {
+  margin: 0 0 10px;
+  color: #9aa3b8;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+#airports-presence-note {
+  margin: 10px 0 0;
+}
+
+.airport-row {
+  display: grid;
+  grid-template-columns: 42px 1fr auto auto 46px;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 12px;
+}
+
+.airport-code {
+  color: #cdd3e0;
+  font-weight: 500;
+}
+
+.airport-name {
+  color: #6b7694;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.airport-level {
+  color: #9aa3b8;
+  white-space: nowrap;
+}
+
+.airport-departures {
+  color: #9aa3b8;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The connectivity uplift is the reason to concentrate, so it gets the
+   same green everything else beneficial uses. */
+.airport-uplift {
+  color: #7fd88f;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.airport-uplift-none {
+  color: #4a5266;
+  text-align: right;
+}
+
+.airport-slot-block {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.airport-slot-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.airport-slot-counts {
+  margin-bottom: 8px;
+  color: #9aa3b8;
+  font-size: 12px;
+}
+
+.airport-slot-over {
+  margin-left: 8px;
+  color: #ff8080;
+}
+
+.airport-slot-buy {
+  font-family: inherit;
+  font-size: 12px;
+  color: #9aa3b8;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 3px 9px;
+  cursor: pointer;
+}
+
+.airport-slot-buy:hover:not(:disabled) {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.airport-slot-buy:disabled {
+  color: #4a5266;
+  border-color: rgba(255, 255, 255, 0.08);
+  cursor: default;
+}
+
+.airport-slot-note {
+  margin-top: 6px;
+  color: #6b7694;
+  font-size: 11px;
+}

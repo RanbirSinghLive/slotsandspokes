@@ -132,6 +132,14 @@
             <path d="M18 9a9 9 0 0 1-9 9" />
           </svg>
         </button>
+        <button type="button" data-tab="airports" aria-label="Airports" title="Airports — presence, connectivity and slots">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2v20" />
+            <path d="M4 8h16" />
+            <circle cx="12" cy="8" r="0.6" />
+            <path d="M7 22h10" />
+          </svg>
+        </button>
         <button type="button" data-tab="crew" aria-label="Crew" title="Crew — pilots, cabin crew, mechanics and reserves">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
@@ -349,6 +357,21 @@
             <h2>Fuel Efficiency</h2>
             <div id="tech-tree-fuel-summary"></div>
             <div id="tech-tree-fuel-branch" class="tech-branch"></div>
+          </section>
+        </div>
+        <div id="airports-panel" hidden>
+          <section id="airports-presence-section">
+            <h2>Presence</h2>
+            <div id="airports-presence"></div>
+            <div id="airports-presence-note"></div>
+          </section>
+          <section id="airports-slots-section">
+            <h2>Slot-controlled airports</h2>
+            <p class="airports-note">
+              Only the fields that are genuinely slot-coordinated in real life. Every departure needs a
+              slot; everywhere else on the map grows without asking.
+            </p>
+            <div id="airports-slots"></div>
           </section>
         </div>
         <div id="crew-panel" hidden>

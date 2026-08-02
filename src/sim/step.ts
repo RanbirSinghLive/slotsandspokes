@@ -2,6 +2,7 @@ import aircraftTypesData from '../../data/aircraft-types.json';
 import { flightResult, legCostBreakdown, type EconomyAircraftType } from './economy';
 import { MIN_TURN_MINUTES, legsServingMarket, marketKey } from './schedule';
 import { rollDailyWeather, isAirportClosed } from './weather';
+import { routeConnectivityMultiplier } from './airports';
 import { rollTotalDelayMinutes } from './delays';
 import { rollCompetitorRouteOpenings } from './competitors';
 import { rollDailyFuelPrice } from './fuel';
@@ -448,6 +449,7 @@ export function step(state: SimState): void {
             state.fuelPriceIndex,
             state.fuelEfficiencyMultiplier,
             actualDailyDemand(state, flight.origin, flight.dest),
+            routeConnectivityMultiplier(state, flight.origin, flight.dest),
             marketFrequency,
             { fare: flight.fare, marketingSpend: flight.marketingSpend },
             state.competitorRoutes,

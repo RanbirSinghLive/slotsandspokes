@@ -1,6 +1,7 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { flightResult, type EconomyAircraftType } from '../sim/economy';
 import { actualDailyDemand, currentPotentialDemand } from '../sim/marketDemand';
+import { routeConnectivityMultiplier } from '../sim/airports';
 import { marketKey, legsServingMarket, type ScheduleLeg } from '../sim/schedule';
 import { rollAgeDelay, rollWeatherDelay, ageDelayParameters } from '../sim/delays';
 import { WEATHER_ON_TIME_PROBABILITY, WEATHER_MAX_DELAY_MINUTES } from '../sim/weather';
@@ -219,6 +220,7 @@ function computeFunnel(state: SimState): FunnelTotals {
         state.fuelPriceIndex,
         state.fuelEfficiencyMultiplier,
         actualDailyDemand(state, leg.origin, leg.dest),
+        routeConnectivityMultiplier(state, leg.origin, leg.dest),
         frequency,
         settings,
         state.competitorRoutes,
