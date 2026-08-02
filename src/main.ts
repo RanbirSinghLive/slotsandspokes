@@ -32,6 +32,7 @@ import { setupCommercialPanel, updateCommercialPanel } from './ui/commercial';
 import { setupFleetMarket } from './ui/fleetMarket';
 import { setupOnTimePanel, updateOnTimePanel } from './ui/onTime';
 import { setupExecutivePanel, updateExecutivePanel } from './ui/executive';
+import { setupExecutivesPanel, updateExecutivesPanel } from './ui/executives';
 import { setupFuelPricePanel, updateFuelPricePanel } from './ui/fuelPrice';
 import { setupTechTreePanel, updateTechTreePanel } from './ui/techTree';
 import { setupDevPanel, updateDevPanel } from './ui/devTools';
@@ -70,6 +71,7 @@ setupCommercialPanel(state);
 setupFleetMarket(state);
 setupOnTimePanel();
 setupExecutivePanel();
+setupExecutivesPanel();
 setupFuelPricePanel();
 setupTechTreePanel(state);
 setupDevPanel();
@@ -486,6 +488,7 @@ function switchToSidebarTab(tab: SidebarTab, highlightLegIds: string[] = []): vo
   if (tab === 'commercial') updateCommercialPanel(state);
   if (tab === 'ontime') updateOnTimePanel(state);
   if (tab === 'executive') {
+    updateExecutivesPanel(state);
     updateExecutivePanel(state);
     updateFuelPricePanel(state);
   }

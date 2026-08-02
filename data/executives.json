@@ -1,0 +1,56 @@
+[
+  {
+    "id": "ceo-hargrave",
+    "role": "ceo",
+    "name": "Diane Hargrave",
+    "background": "Turnaround chief executive",
+    "flavor": "Took two regional carriers off the brink and sold one of them. Opens doors that don't open for operators, and knows exactly which quarter to open them in.",
+    "reputationCost": 500,
+    "effect": { "kind": "annual-bonus", "amount": 200000, "escalation": 1.4 }
+  },
+  {
+    "id": "coo-flightops",
+    "role": "coo",
+    "name": "Marcus Oyelaran",
+    "background": "Flight operations",
+    "flavor": "Twenty years running control centres. Believes most delays are decisions, not weather, and reschedules a rotation faster than anyone can explain why it broke.",
+    "reputationCost": 300,
+    "effect": { "kind": "flight-ops", "delayMultiplier": 0.85 }
+  },
+  {
+    "id": "coo-inflight",
+    "role": "coo",
+    "name": "Priya Raghunathan",
+    "background": "Inflight service",
+    "flavor": "Came up through the cabin and never stopped thinking like it. Rewrote a legacy carrier's onboard standards and made the crew like the new ones better.",
+    "reputationCost": 300,
+    "effect": { "kind": "inflight", "npsBonus": 8 }
+  },
+  {
+    "id": "coo-maintenance",
+    "role": "coo",
+    "name": "Errol Vance",
+    "background": "Maintenance and engineering",
+    "flavor": "A licensed engineer who still reads the defect log himself. Reckons a well-kept airframe owes you nothing and a neglected one takes it out of your schedule.",
+    "reputationCost": 300,
+    "effect": { "kind": "maintenance", "ageFactorMultiplier": 0.85 }
+  },
+  {
+    "id": "cfo-adeyemi",
+    "role": "cfo",
+    "name": "Simone Adeyemi",
+    "background": "Airline finance",
+    "flavor": "Structured aircraft debt for a decade before deciding she would rather spend it than arrange it. Finds money in the working capital nobody else was looking at.",
+    "reputationCost": 350,
+    "effect": { "kind": "monthly-bonus", "amount": 18000, "escalation": 1.08 }
+  },
+  {
+    "id": "cco-lindqvist",
+    "role": "cco",
+    "name": "Tomas Lindqvist",
+    "background": "Commercial and distribution",
+    "flavor": "Built a low-cost carrier's entire distribution strategy on other people's channels. Gets the airline talked about without paying rate card for it.",
+    "reputationCost": 250,
+    "effect": { "kind": "free-marketing", "dailyAllowance": 400 }
+  }
+]

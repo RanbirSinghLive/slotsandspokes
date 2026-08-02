@@ -1980,3 +1980,132 @@ body {
   font-size: 12px;
   line-height: 1.5;
 }
+
+/* Week six's C-suite (sim/executives.ts, ui/executives.ts) — four slots
+   at the top of the Executive tab, bought with Reputation. */
+#executive-suite-section {
+  margin-bottom: 32px;
+  max-width: 520px;
+}
+
+.exec-note,
+#executive-effects {
+  margin: 0 0 12px;
+  color: #9aa3b8;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.exec-slot {
+  margin-bottom: 18px;
+}
+
+.exec-slot-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 5px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.exec-slot-title {
+  font-size: 13px;
+  color: #cdd3e0;
+}
+
+.exec-slot-status {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7694;
+}
+
+.exec-slot-status--filled {
+  color: #7fd88f;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+}
+
+.exec-candidate {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Same green the tech tree and missions already use for "this is yours". */
+.exec-candidate--appointed {
+  border-color: rgba(127, 216, 143, 0.5);
+  background: rgba(127, 216, 143, 0.06);
+}
+
+.exec-candidate-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.exec-candidate-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.exec-candidate-background {
+  color: #6b7694;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.exec-candidate-flavor {
+  margin: 0 0 6px;
+  color: #9aa3b8;
+  font-size: 12px;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+.exec-candidate-effect {
+  margin-bottom: 8px;
+  color: #7fd88f;
+  font-size: 12px;
+}
+
+.exec-appoint-button {
+  font-family: inherit;
+  font-size: 12px;
+  color: #9aa3b8;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 3px 9px;
+  cursor: pointer;
+}
+
+.exec-appoint-button:hover:not(:disabled) {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.exec-appoint-button:disabled {
+  color: #4a5266;
+  border-color: rgba(255, 255, 255, 0.08);
+  cursor: default;
+}
+
+.exec-candidate--appointed .exec-appoint-button:disabled {
+  color: #7fd88f;
+  border-color: rgba(127, 216, 143, 0.4);
+}
+
+.exec-candidate-shortfall,
+.exec-slot-note {
+  margin-top: 6px;
+  color: #6b7694;
+  font-size: 11px;
+}

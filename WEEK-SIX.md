@@ -1284,6 +1284,82 @@ and the type says so.
 
 ---
 
+## Built: the C-suite
+
+Four slots — CEO, COO, CFO, CCO — each holding at most one appointment,
+paid for in **Reputation**. Placeholder effects by design; the point of
+this pass was the architecture and the interface.
+
+That currency choice is the design decision. Reputation is earned slowly
+by running a good airline and until now had exactly one spender, the tech
+tree. Executives make it a real second — and two of the four convert
+Reputation back into *cash*, so a well-regarded airline can borrow
+against its own standing. It also puts the whole C-suite out of reach
+early: you have to have been good at something first.
+
+### The open question, finally answerable
+
+This doc carried "what do a COO's, CFO's, CCO's and CEO's bonuses
+actually *modify*?" as a blocker for weeks, with the note that nothing in
+the codebase had an obvious "operations quality" lever waiting for a
+multiplier. **That stopped being true this week.** Crew, maintenance,
+delays, NPS and marketing spend are all now real systems with real
+numbers, so every executive attaches to something that already existed
+rather than needing a stat invented for them:
+
+| slot | candidate | effect | attaches to |
+| --- | --- | --- | --- |
+| CEO | Turnaround chief executive | $200k/year, +40% per payout | cash directly |
+| COO | Flight operations | -15% delay on every flight | the delay roll |
+| COO | Inflight service | +8 NPS per departure | the NPS scorer |
+| COO | Maintenance and engineering | -15% further on effective airframe age | the maintenance age factor |
+| CFO | Airline finance | $18k/month, +8% per payout | cash directly |
+| CCO | Commercial and distribution | covers the first $400/day of marketing | the marketing charge |
+
+The COO has three backgrounds because that's where the interesting choice
+is — the same chair pointed at three different problems. The others have
+one candidate each for now.
+
+### Details worth recording
+
+- **Bonuses escalate and seniority belongs to the incumbent.** Each
+  payout multiplies the last, so an executive kept on grows more
+  valuable; replacing one resets `payoutsMade` to zero. Replacing also
+  costs the new appointment's full price with no refund, which is what
+  stops slot-shopping being free.
+- **Bonuses credit Cash and revenue, never `todayCost`.** They're income,
+  and folding them in as a negative cost would break the invariant that
+  the cost categories sum to `todayCost`.
+- **The CCO subsidises the marketing *charge*, not the spend.** The
+  promotion still counts in full toward stimulation and booking share —
+  the airline is doing the marketing, it just isn't paying for all of it.
+- **The flight-ops COO scales the summed delay, not each cause.** Delay
+  attribution stays the raw picture of *why* flights run late, with the
+  executive's effect visible as the gap between that and what actually
+  happened.
+
+### Verified
+
+Measured over 120 days against an identical seed: the inflight COO moves
+average NPS 9.1 → 16.6 (+7.5, slightly under its +8 because cancellations
+score flat and take no bonus); the flight-ops COO moves on-time 51% → 53%
+and cuts *raw* delay minutes 5.3% even though it doesn't touch the
+attribution — because fewer real delays means less knock-on cascading
+into later legs, which is the emergent behaviour you'd want. The CFO pays
+13 escalating instalments over 400 days ($18,000 → $45,327); the CEO pays
+one ($200,000). The CCO drops marketing charged from $2,400 to $2,000 a
+day on a $400 allowance.
+
+**The maintenance COO measured as doing nothing at first** — worth
+recording, because it isn't a bug. `createInitialState()`'s fixture flies
+age-0 aircraft, and effective age is `age x factor`, so zero times
+anything stays zero. Re-run at age 20 it cuts age-attributed delay 4.6%.
+That's a genuinely nice emergent pairing rather than a flaw: the
+maintenance chair is worth most to an operator flying cheap old metal,
+and worth nothing to one flying new.
+
+---
+
 ## Proposed build order (not committed)
 
 Roughly in dependency order — each item mostly needs the one before it

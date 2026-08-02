@@ -7,6 +7,7 @@ import type { Loan } from './loans';
 import { FUEL_PRICE_BASELINE } from './fuel';
 import type { TargetCommitment, TargetResult } from './targets';
 import { createCrewPools, crewRequirement, type CrewPools, type PendingHire, type PendingTraining } from './crew';
+import { createExecutiveSlots, type ExecutiveSlots } from './executives';
 
 export type AircraftStatus = 'ground' | 'airborne';
 
@@ -377,6 +378,13 @@ export type SimState = {
    */
   farePolicyMultiplier: number;
   /**
+   * Week six's C-suite (sim/executives.ts): four slots, each holding at
+   * most one appointment. Paid for in Reputation, which makes the C-suite
+   * its second real spender alongside the tech tree — and makes it
+   * unreachable until the airline has been good at something.
+   */
+  executives: ExecutiveSlots;
+  /**
    * Week six's crew model (sim/crew.ts): headcount pools, never named
    * individuals. Pilots are tiered because type ratings gate the fleet
    * ladder; cabin crew and mechanics are untiered.
@@ -565,6 +573,7 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     marketDemand: {},
     demandGrowthMultiplier: 1,
     farePolicyMultiplier: 1,
+    executives: createExecutiveSlots(),
     crew: createCrewPools(),
     pendingHires: [],
     pendingTraining: [],
@@ -654,6 +663,7 @@ export function createNewGameState(rngSeed: number = Date.now()): SimState {
     marketDemand: {},
     demandGrowthMultiplier: 1,
     farePolicyMultiplier: 1,
+    executives: createExecutiveSlots(),
     crew: createCrewPools(),
     pendingHires: [],
     pendingTraining: [],

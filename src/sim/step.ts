@@ -8,6 +8,13 @@ import { rollDailyFuelPrice } from './fuel';
 import { rollDailyMarketDemand, actualDailyDemand } from './marketDemand';
 import { checkMissions } from './missions';
 import { rollDailyCrew, maintenanceAgeFactor, cabinServiceShare } from './crew';
+import {
+  payExecutiveBonuses,
+  executiveDelayMultiplier,
+  executiveNpsBonus,
+  executiveMaintenanceMultiplier,
+  executiveFreeMarketing,
+} from './executives';
 import { CANCELLATION_NPS_SCORE } from './nps';
 import { resolveTargetIfDue } from './targets';
 import { applyDailyLoanInterest } from './loans';
@@ -124,10 +131,15 @@ export function step(state: SimState): void {
       (total, settings) => total + settings.marketingSpend,
       0,
     );
-    state.cash -= totalMarketingSpend;
-    state.todayCost += totalMarketingSpend;
-    state.todayCostByCategory.marketing += totalMarketingSpend;
-    state.todayMargin -= totalMarketingSpend;
+    // A CCO covers the first slice of the marketing bill (sim/executives.ts).
+    // The *spend* still counts in full toward stimulation and booking
+    // share — the airline is still doing the marketing, it just isn't
+    // paying for all of it — so only the charge is reduced.
+    const chargedMarketing = Math.max(0, totalMarketingSpend - executiveFreeMarketing(state));
+    state.cash -= chargedMarketing;
+    state.todayCost += chargedMarketing;
+    state.todayCostByCategory.marketing += chargedMarketing;
+    state.todayMargin -= chargedMarketing;
 
     // Fleet Market lease cost (week three) — same "flat per-day charge"
     // shape as marketing spend above, not tied to whether the aircraft
@@ -145,6 +157,9 @@ export function step(state: SimState): void {
     // crewed. Must run after the todayCost reset above, since it charges
     // salary into it.
     rollDailyCrew(state);
+
+    // Week six's C-suite: any executive bonus that has come due.
+    payExecutiveBonuses(state);
 
     // Cancellations. Everything on the schedule that has an aircraft is a
     // scheduled departure; the ones whose aircraft couldn't be crewed
@@ -257,13 +272,20 @@ export function step(state: SimState): void {
       aircraft.ageYears,
       weatherAtOrigin,
       lateAtDepartureMinutes,
-      maintenanceAgeFactor(state),
+      maintenanceAgeFactor(state) * executiveMaintenanceMultiplier(state),
     );
     state.rngSeed = nextSeed;
     state.delayMinutesByCause.age += delayBreakdown.age;
     state.delayMinutesByCause.weather += delayBreakdown.weather;
     state.delayMinutesByCause.knockOn += delayBreakdown.knockOn;
-    const delayMinutes = delayBreakdown.age + delayBreakdown.weather + delayBreakdown.knockOn;
+    // A flight-ops COO scales the whole rolled delay down. Applied to
+    // the summed total rather than to each cause, so the per-cause
+    // attribution the On-Time panel reports stays the raw picture of
+    // *why* flights run late, with the executive's effect visible as the
+    // gap between that and what actually happened.
+    const delayMinutes = Math.round(
+      (delayBreakdown.age + delayBreakdown.weather + delayBreakdown.knockOn) * executiveDelayMultiplier(state),
+    );
 
     // Fare and marketing spend are market-level (RouteSettings), not
     // per-leg — every leg on this market shares the same entry.
@@ -281,7 +303,7 @@ export function step(state: SimState): void {
       leg.dest,
       state.competitorRoutes,
       cabinServiceShare(state.crew),
-    );
+    ) + executiveNpsBonus(state);
     state.npsPointsTotal += satisfactionScore;
     state.todayNpsPoints += satisfactionScore;
     state.npsScoredFlightsTotal += 1;
@@ -340,7 +362,7 @@ export function step(state: SimState): void {
       aircraft.ageYears,
       weatherAtOrigin,
       lateAtDepartureMinutes,
-      maintenanceAgeFactor(state),
+      maintenanceAgeFactor(state) * executiveMaintenanceMultiplier(state),
     );
     state.rngSeed = nextSeed;
     const delayMinutes = delayBreakdown.age + delayBreakdown.weather + delayBreakdown.knockOn;
