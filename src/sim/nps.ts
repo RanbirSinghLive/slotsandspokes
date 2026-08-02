@@ -66,6 +66,16 @@ function competitorFaresForMarket(origin: string, dest: string, competitorRoutes
  * every input this needs (this flight's rolled delay, its fare, its
  * aircraft's age) is already known by then.
  */
+/**
+ * What a cancellation scores, per cancelled flight. Flat and large rather
+ * than an extension of the delay curve below, which floors at -50 even
+ * for a catastrophic delay: a cancellation isn't a very late flight, it's
+ * a different failure entirely — a passenger rebooked or stranded rather
+ * than merely kept waiting — and it needs headroom to read as strictly
+ * worse than any delay can be.
+ */
+export const CANCELLATION_NPS_SCORE = -80;
+
 export function flightSatisfactionScore(
   delayMinutes: number,
   fare: number,

@@ -6,6 +6,7 @@ import type { WeatherEvent } from './weather';
 import type { Loan } from './loans';
 import { FUEL_PRICE_BASELINE } from './fuel';
 import type { TargetCommitment, TargetResult } from './targets';
+import { createCrewPools, crewRequirement, type CrewPools, type PendingHire, type PendingTraining } from './crew';
 
 export type AircraftStatus = 'ground' | 'airborne';
 
@@ -376,6 +377,48 @@ export type SimState = {
    */
   farePolicyMultiplier: number;
   /**
+   * Week six's crew model (sim/crew.ts): headcount pools, never named
+   * individuals. Pilots are tiered because type ratings gate the fleet
+   * ladder; cabin crew and mechanics are untiered.
+   */
+  crew: CrewPools;
+  /** Recruitment ordered and paid for, not yet turned up — the lead time is the mechanic. */
+  pendingHires: PendingHire[];
+  /** Pilots currently away upgrading a tier. Already removed from `crew`, since losing their capacity is the real cost. */
+  pendingTraining: PendingTraining[];
+  /**
+   * How much crew the player chooses to carry above the bare operating
+   * minimum, 1 meaning none at all. Cost is linear in this; protection
+   * against a bad disruption day is a threshold — which is what makes it
+   * a real decision rather than a slider with an obvious best setting.
+   */
+  reserveDepth: number;
+  /**
+   * Tails that couldn't be crewed today, recomputed each day-rollover by
+   * `rollDailyCrew()`. step.ts refuses to depart their legs, and every
+   * leg they were scheduled to fly counts as a cancellation.
+   */
+  groundedTails: string[];
+  /**
+   * Week six's cancellations: legs that should have operated today and
+   * didn't. `flightsScheduled*` counts what was on the books, so
+   * Completion Factor is `completed / scheduled` — the separate reliability
+   * axis from On-Time, which only ever describes flights that did operate.
+   */
+  flightsScheduledTotal: number;
+  flightsCancelledTotal: number;
+  todayFlightsScheduled: number;
+  todayFlightsCancelled: number;
+  /**
+   * How many flights NPS has been scored over — departures *plus*
+   * cancellations, since a cancelled flight has a very unhappy passenger
+   * attached to it and would otherwise vanish from the average entirely.
+   * Deliberately a separate denominator from `flightsDepartedTotal`,
+   * which On-Time still uses.
+   */
+  npsScoredFlightsTotal: number;
+  todayNpsScoredFlights: number;
+  /**
    * Week six's missions (sim/missions.ts): ids of every mission whose
    * condition has been met and whose Reputation has been paid out. A
    * plain string array, same JSON-round-trip reasoning as
@@ -407,6 +450,8 @@ export type SimState = {
     marketing: number;
     /** Daily lease cost, summed across every leased airframe. */
     lease: number;
+    /** Daily crew salaries, everyone on the books whether or not they flew. */
+    crew: number;
   };
 };
 
@@ -481,7 +526,7 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     }
   }
 
-  return {
+  const state: SimState = {
     simMinute: 0,
     cash: 0,
     aircraft,
@@ -520,11 +565,35 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     marketDemand: {},
     demandGrowthMultiplier: 1,
     farePolicyMultiplier: 1,
+    crew: createCrewPools(),
+    pendingHires: [],
+    pendingTraining: [],
+    reserveDepth: 1.15,
+    groundedTails: [],
+    flightsScheduledTotal: 0,
+    flightsCancelledTotal: 0,
+    todayFlightsScheduled: 0,
+    todayFlightsCancelled: 0,
+    npsScoredFlightsTotal: 0,
+    todayNpsScoredFlights: 0,
     completedMissionIds: [],
     activeTarget: null,
     lastTargetResult: null,
-    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0 },
+    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0 },
   };
+
+  // Staff this fixture to its own reserve target. Unlike a real new game
+  // — which starts with no crew on purpose, since hiring into a fleet is
+  // part of the mechanic (sim/crew.ts) — this one exists to be a fully
+  // formed, working airline for the balance tools. Left unstaffed, every
+  // aircraft would be grounded and the headless runner would simulate an
+  // airline that never flies.
+  const requirement = crewRequirement(state);
+  state.crew.pilotsByTier = [...requirement.targetPilotsByTier] as [number, number, number];
+  state.crew.cabinCrew = requirement.targetCabinCrew;
+  state.crew.mechanics = requirement.targetMechanics;
+
+  return state;
 }
 
 /**
@@ -585,9 +654,20 @@ export function createNewGameState(rngSeed: number = Date.now()): SimState {
     marketDemand: {},
     demandGrowthMultiplier: 1,
     farePolicyMultiplier: 1,
+    crew: createCrewPools(),
+    pendingHires: [],
+    pendingTraining: [],
+    reserveDepth: 1.15,
+    groundedTails: [],
+    flightsScheduledTotal: 0,
+    flightsCancelledTotal: 0,
+    todayFlightsScheduled: 0,
+    todayFlightsCancelled: 0,
+    npsScoredFlightsTotal: 0,
+    todayNpsScoredFlights: 0,
     completedMissionIds: [],
     activeTarget: null,
     lastTargetResult: null,
-    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0 },
+    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0 },
   };
 }

@@ -132,6 +132,14 @@
             <path d="M18 9a9 9 0 0 1-9 9" />
           </svg>
         </button>
+        <button type="button" data-tab="crew" aria-label="Crew" title="Crew — pilots, cabin crew, mechanics and reserves">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
+        </button>
         <button type="button" data-tab="missions" aria-label="Missions" title="Missions — objectives and service targets">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="9" />
@@ -156,6 +164,7 @@
         <div class="econ-row"><span class="econ-label">Cash</span><span id="panel-cash" class="econ-value"></span></div>
         <div class="econ-row"><span class="econ-label">On-time</span><span id="panel-otp" class="econ-value"></span></div>
         <div class="econ-row"><span class="econ-label">NPS</span><span id="panel-nps" class="econ-value"></span></div>
+        <div class="econ-row"><span class="econ-label">Completion</span><span id="panel-completion" class="econ-value"></span></div>
         <div class="econ-row"><span class="econ-label">Reputation</span><span id="panel-reputation" class="econ-value"></span></div>
         <h2>Today</h2>
         <div class="econ-row"><span class="econ-label">Revenue</span><span id="panel-revenue" class="econ-value"></span></div>
@@ -315,6 +324,60 @@
             <h2>Fuel Efficiency</h2>
             <div id="tech-tree-fuel-summary"></div>
             <div id="tech-tree-fuel-branch" class="tech-branch"></div>
+          </section>
+        </div>
+        <div id="crew-panel" hidden>
+          <section id="crew-pools-section">
+            <h2>Establishment</h2>
+            <div id="crew-pools"></div>
+            <div id="crew-salary"></div>
+            <div id="crew-grounded"></div>
+          </section>
+          <section id="crew-reserve-section">
+            <h2>Reserve depth</h2>
+            <div class="lever-control">
+              <input type="range" id="crew-reserve-slider" min="100" max="140" step="5" value="115" />
+              <span class="lever-value" id="crew-reserve-value"></span>
+            </div>
+            <div id="crew-reserve-note"></div>
+          </section>
+          <section id="crew-hire-section">
+            <h2>Recruit</h2>
+            <div class="crew-form-row">
+              <select id="crew-hire-role">
+                <option value="pilot">Pilots</option>
+                <option value="cabin">Cabin crew</option>
+                <option value="mechanic">Mechanics</option>
+              </select>
+              <select id="crew-hire-tier">
+                <option value="1">Light turboprop</option>
+                <option value="2">Regional</option>
+                <option value="3">Mainline jet</option>
+              </select>
+              <input type="number" id="crew-hire-count" min="1" max="99" value="4" />
+            </div>
+            <div id="crew-hire-cost"></div>
+            <button type="button" id="crew-hire-button">Recruit</button>
+          </section>
+          <section id="crew-train-section">
+            <h2>Train up a tier</h2>
+            <div class="crew-form-row">
+              <select id="crew-train-tier">
+                <option value="1">Light turboprop &rarr; Regional</option>
+                <option value="2">Regional &rarr; Mainline jet</option>
+              </select>
+              <input type="number" id="crew-train-count" min="1" max="99" value="2" />
+            </div>
+            <div id="crew-train-cost"></div>
+            <button type="button" id="crew-train-button">Send to training</button>
+          </section>
+          <section id="crew-maintenance-section">
+            <h2>Maintenance cover</h2>
+            <div id="crew-maintenance"></div>
+          </section>
+          <section id="crew-pending-section">
+            <h2>Pipeline</h2>
+            <div id="crew-pending"></div>
           </section>
         </div>
         <div id="missions-panel" hidden>

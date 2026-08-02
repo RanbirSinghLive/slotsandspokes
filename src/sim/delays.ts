@@ -83,8 +83,19 @@ export function ageDelayParameters(ageYears: number): { onTimeProbability: numbe
  * almost exactly), floored so a genuinely ancient airframe still isn't a
  * coin flip on every single departure.
  */
-export function rollAgeDelay(seed: number, ageYears: number): [delayMinutes: number, nextSeed: number] {
-  const { onTimeProbability, maxDelayMinutes } = ageDelayParameters(ageYears);
+export function rollAgeDelay(
+  seed: number,
+  ageYears: number,
+  maintenanceFactor = 1,
+): [delayMinutes: number, nextSeed: number] {
+  // Week six: mechanics scale *effective* age rather than adding a fourth
+  // delay cause. A well-maintained airframe genuinely behaves younger
+  // than its years and a neglected one older, so folding maintenance into
+  // the age term says what's actually happening — and it gives mechanics
+  // a real job without waiting for a full maintenance system.
+  // Defaults to 1 so anything not passing a factor (tests, the histogram
+  // sampler in ui/devTools.ts) reproduces the pre-crew numbers exactly.
+  const { onTimeProbability, maxDelayMinutes } = ageDelayParameters(ageYears * maintenanceFactor);
   return rollCauseDelay(seed, onTimeProbability, maxDelayMinutes);
 }
 
@@ -128,8 +139,9 @@ export function rollTotalDelayMinutes(
   ageYears: number,
   hasWeatherAtOrigin: boolean,
   lateAtDepartureMinutes: number,
+  maintenanceFactor = 1,
 ): [breakdown: DelayBreakdown, nextSeed: number] {
-  const [age, seedAfterAge] = rollAgeDelay(seed, ageYears);
+  const [age, seedAfterAge] = rollAgeDelay(seed, ageYears, maintenanceFactor);
   const [weather, seedAfterWeather] = rollWeatherDelay(seedAfterAge, hasWeatherAtOrigin);
   const knockOn = knockOnDelayMinutes(lateAtDepartureMinutes);
   return [{ age, weather, knockOn }, seedAfterWeather];

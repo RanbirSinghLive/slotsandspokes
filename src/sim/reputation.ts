@@ -28,6 +28,23 @@ const OTP_WEIGHT = 50;
 const NPS_WEIGHT = 0.2;
 
 /**
+ * Week six's third term: Completion Factor, the fraction of scheduled
+ * departures that actually operated. Real carriers cancel a small
+ * percentage of flights even in a good month, so the neutral point sits
+ * just below 1 rather than at it.
+ *
+ * Weighted harder than on-time (120 against 50) on purpose. A cancelled
+ * flight isn't a very late one — it's a different, worse failure, and an
+ * airline that cancels 10% of its schedule should be punished more than
+ * one that runs 10 percentage points later than average. Without a term
+ * of its own, cancellations would vanish from this formula entirely: a
+ * cancelled flight never departs, so it can't appear in the
+ * onTime/departed ratio above.
+ */
+const COMPLETION_FACTOR_BASELINE = 0.98;
+const COMPLETION_FACTOR_WEIGHT = 120;
+
+/**
  * Found in playtesting: a one-plane, few-flights-a-day operation has a
  * tiny, noisy daily sample — with 2 departures, "today's on-time %" can
  * only ever be 0%, 50%, or 100%, nothing in between. Reacting to that raw
@@ -58,12 +75,28 @@ const REPUTATION_MIN_SAMPLE_FLIGHTS = 10;
  * left untouched rather than guessing.
  */
 export function applyDailyReputationChange(state: SimState): void {
-  if (state.todayFlightsDeparted === 0) return;
+  if (state.todayFlightsDeparted === 0 && state.todayFlightsScheduled === 0) return;
 
-  const otpPct = state.todayFlightsOnTime / state.todayFlightsDeparted;
-  const avgNps = state.todayNpsPoints / state.todayFlightsDeparted;
+  const otpPct = state.todayFlightsDeparted > 0 ? state.todayFlightsOnTime / state.todayFlightsDeparted : 0;
+  // NPS is scored over departures *and* cancellations, so it needs its own
+  // denominator — see SimState.npsScoredFlightsTotal.
+  const avgNps = state.todayNpsScoredFlights > 0 ? state.todayNpsPoints / state.todayNpsScoredFlights : 0;
+  const completionFactor =
+    state.todayFlightsScheduled > 0
+      ? (state.todayFlightsScheduled - state.todayFlightsCancelled) / state.todayFlightsScheduled
+      : 1;
 
-  const rawDelta = (otpPct - OTP_BASELINE) * OTP_WEIGHT + avgNps * NPS_WEIGHT;
-  const confidence = Math.min(1, state.todayFlightsDeparted / REPUTATION_MIN_SAMPLE_FLIGHTS);
+  const rawDelta =
+    (otpPct - OTP_BASELINE) * OTP_WEIGHT +
+    (completionFactor - COMPLETION_FACTOR_BASELINE) * COMPLETION_FACTOR_WEIGHT +
+    avgNps * NPS_WEIGHT;
+  // The same small-sample dampening applies to the completion term for
+  // exactly the reason it applies to on-time: one cancelled flight out of
+  // two scheduled shouldn't read as a 50% collapse for a one-plane
+  // operation. Scheduled rather than departed as the sample size here,
+  // since a day where everything cancelled has zero departures but is
+  // very much a real result.
+  const sample = Math.max(state.todayFlightsDeparted, state.todayFlightsScheduled);
+  const confidence = Math.min(1, sample / REPUTATION_MIN_SAMPLE_FLIGHTS);
   state.reputation += rawDelta * confidence;
 }

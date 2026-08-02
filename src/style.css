@@ -1852,3 +1852,124 @@ body {
 .target-result--missed {
   color: #ff8080;
 }
+
+/* Week six's Crew tab (ui/crew.ts): pools rather than named individuals,
+   with bulk recruitment and the reserve-depth lever. */
+#crew-panel section {
+  margin-bottom: 24px;
+}
+
+#crew-panel h2 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7694;
+}
+
+.crew-pool-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 4px 0;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.crew-pool-label {
+  color: #cdd3e0;
+}
+
+.crew-pool-need {
+  color: #6b7694;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* Short of the operating minimum — aircraft will be grounded, which
+   cancels flights, so this is the same red as everything else broken. */
+.crew-short {
+  color: #ff8080;
+}
+
+.crew-ok {
+  color: #7fd88f;
+  font-variant-numeric: tabular-nums;
+}
+
+#crew-salary,
+#crew-reserve-note,
+#crew-hire-cost,
+#crew-train-cost,
+#crew-maintenance {
+  margin-top: 8px;
+  color: #9aa3b8;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+#crew-grounded {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #6b7694;
+}
+
+.crew-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.crew-form-row select,
+.crew-form-row input {
+  font-family: inherit;
+  font-size: 12px;
+  color: #cdd3e0;
+  background: #0a0c12;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 3px 6px;
+}
+
+.crew-form-row select:disabled {
+  color: #4a5266;
+}
+
+.crew-form-row input[type='number'] {
+  width: 56px;
+}
+
+#crew-hire-button,
+#crew-train-button {
+  margin-top: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  color: #9aa3b8;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+#crew-hire-button:hover:not(:disabled),
+#crew-train-button:hover:not(:disabled) {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+#crew-hire-button:disabled,
+#crew-train-button:disabled {
+  color: #4a5266;
+  border-color: rgba(255, 255, 255, 0.08);
+  cursor: default;
+}
+
+.crew-pending-row {
+  padding: 3px 0;
+  color: #9aa3b8;
+  font-size: 12px;
+}

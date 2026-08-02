@@ -6,7 +6,8 @@
     "cruiseKts": 280,
     "costPerBlockHour": 950,
     "costPerDeparture": 300,
-    "rangeNm": 380
+    "rangeNm": 380,
+    "crewTier": 1
   },
   {
     "code": "DH8300",
@@ -15,7 +16,8 @@
     "cruiseKts": 270,
     "costPerBlockHour": 1600,
     "costPerDeparture": 450,
-    "rangeNm": 600
+    "rangeNm": 600,
+    "crewTier": 2
   },
   {
     "code": "DH8400",
@@ -24,7 +26,8 @@
     "cruiseKts": 360,
     "costPerBlockHour": 3400,
     "costPerDeparture": 900,
-    "rangeNm": 850
+    "rangeNm": 850,
+    "crewTier": 2
   },
   {
     "code": "A220300",
@@ -33,7 +36,8 @@
     "cruiseKts": 450,
     "costPerBlockHour": 5200,
     "costPerDeparture": 1800,
-    "rangeNm": 2400
+    "rangeNm": 2400,
+    "crewTier": 3
   },
   {
     "code": "A330300",
@@ -42,6 +46,7 @@
     "cruiseKts": 470,
     "costPerBlockHour": 9000,
     "costPerDeparture": 3500,
-    "rangeNm": 5500
+    "rangeNm": 5500,
+    "crewTier": 3
   }
 ]

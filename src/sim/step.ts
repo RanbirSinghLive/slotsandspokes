@@ -7,6 +7,8 @@ import { rollCompetitorRouteOpenings } from './competitors';
 import { rollDailyFuelPrice } from './fuel';
 import { rollDailyMarketDemand, actualDailyDemand } from './marketDemand';
 import { checkMissions } from './missions';
+import { rollDailyCrew, maintenanceAgeFactor } from './crew';
+import { CANCELLATION_NPS_SCORE } from './nps';
 import { resolveTargetIfDue } from './targets';
 import { applyDailyLoanInterest } from './loans';
 import { flightSatisfactionScore } from './nps';
@@ -102,7 +104,10 @@ export function step(state: SimState): void {
     state.todayMargin = 0;
     // Week six's cost attribution — reset in lockstep with todayCost
     // above, since these five are exactly that number split up.
-    state.todayCostByCategory = { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0 };
+    state.todayCostByCategory = { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0 };
+    state.todayFlightsScheduled = 0;
+    state.todayFlightsCancelled = 0;
+    state.todayNpsScoredFlights = 0;
     state.todayFlightsDeparted = 0;
     state.todayFlightsOnTime = 0;
     state.todayNpsPoints = 0;
@@ -133,6 +138,35 @@ export function step(state: SimState): void {
     state.todayCost += totalLeaseCost;
     state.todayCostByCategory.lease += totalLeaseCost;
     state.todayMargin -= totalLeaseCost;
+
+    // Week six's crew model (sim/crew.ts): deliver recruitment and
+    // training that has come due, pay every head on the books, then roll
+    // today's disruption and work out which aircraft can actually be
+    // crewed. Must run after the todayCost reset above, since it charges
+    // salary into it.
+    rollDailyCrew(state);
+
+    // Cancellations. Everything on the schedule that has an aircraft is a
+    // scheduled departure; the ones whose aircraft couldn't be crewed
+    // today never operate. Counted once here rather than discovered leg
+    // by leg later, so Completion Factor is known for the whole day up
+    // front and the departure loop below just declines to fly them.
+    for (const leg of state.schedule) {
+      if (!state.aircraft.some((a) => a.tail === leg.tail)) continue; // no aircraft assigned — not really scheduled
+      state.todayFlightsScheduled += 1;
+      state.flightsScheduledTotal += 1;
+      if (!state.groundedTails.includes(leg.tail)) continue;
+
+      state.todayFlightsCancelled += 1;
+      state.flightsCancelledTotal += 1;
+      // A cancelled flight still has an unhappy passenger attached, so it
+      // scores for NPS — over its own denominator, since it never
+      // departed and mustn't distort On-Time.
+      state.npsPointsTotal += CANCELLATION_NPS_SCORE;
+      state.todayNpsPoints += CANCELLATION_NPS_SCORE;
+      state.npsScoredFlightsTotal += 1;
+      state.todayNpsScoredFlights += 1;
+    }
 
     // Weather (sim/weather.ts) is a daily-scale event, not a per-minute
     // one — origination, spread, and expiry all happen once here rather
@@ -172,6 +206,9 @@ export function step(state: SimState): void {
 
     const aircraft = state.aircraft.find((a) => a.tail === leg.tail);
     if (!aircraft) continue; // this tail isn't part of the active fleet yet
+    // Couldn't be crewed today — already counted as a cancellation at
+    // rollover, so it simply never departs.
+    if (state.groundedTails.includes(leg.tail)) continue;
     if (aircraft.status !== 'ground' || aircraft.atAirport !== leg.origin) continue;
     if (state.simMinute < aircraft.groundSinceMinute + MIN_TURN_MINUTES) continue; // still turning around
 
@@ -220,6 +257,7 @@ export function step(state: SimState): void {
       aircraft.ageYears,
       weatherAtOrigin,
       lateAtDepartureMinutes,
+      maintenanceAgeFactor(state),
     );
     state.rngSeed = nextSeed;
     state.delayMinutesByCause.age += delayBreakdown.age;
@@ -245,6 +283,8 @@ export function step(state: SimState): void {
     );
     state.npsPointsTotal += satisfactionScore;
     state.todayNpsPoints += satisfactionScore;
+    state.npsScoredFlightsTotal += 1;
+    state.todayNpsScoredFlights += 1;
     if (state.activeTarget) state.activeTarget.npsPoints += satisfactionScore;
 
     const activeFlight: ActiveFlight = {
@@ -299,6 +339,7 @@ export function step(state: SimState): void {
       aircraft.ageYears,
       weatherAtOrigin,
       lateAtDepartureMinutes,
+      maintenanceAgeFactor(state),
     );
     state.rngSeed = nextSeed;
     const delayMinutes = delayBreakdown.age + delayBreakdown.weather + delayBreakdown.knockOn;

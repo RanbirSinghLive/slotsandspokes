@@ -39,6 +39,7 @@ const FUEL_PRICE_REVERSION_STRENGTH = 0.02;
  */
 export const FUEL_SHARE_OF_BLOCK_HOUR_COST = 0.35;
 
+
 /**
  * Recent daily closing fuel price index values, oldest first — same
  * rolling-window shape as sim/forecast.ts's CASH_HISTORY_MAX_DAYS, just a

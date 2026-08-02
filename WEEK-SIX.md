@@ -1110,6 +1110,136 @@ playthrough before trusting either number.
 
 ---
 
+## Built: crew, reserves, and crew-shortage cancellations
+
+CLAUDE.md gates crew rostering until asked directly; this was asked for
+directly, which is why it hadn't been built alongside fuel.
+
+The design constraint that mattered most was avoiding the failure mode
+where staffing is a **tax** — every aircraft costs more per day, click
+hire, nothing else changes. Four things stop that: hiring has a lead
+time, tiers gate the fleet ladder, training trades capacity now for
+capability later, and crew are paid whether or not they fly.
+
+### Three disciplines, modelled differently
+
+Deliberately not three copies of the same thing:
+
+- **Pilots** are a *threshold* — below complement the aircraft doesn't
+  fly. Tiered (light turboprop / regional / mainline jet), because type
+  ratings are the real progression gate in aviation. A tier-N pilot can
+  fly anything rated N or below.
+- **Cabin crew** are a threshold too, but untiered. Complement is **one
+  per fifty seats** — an actual regulatory standard (FAA and Transport
+  Canada both), so 1 on the Beech, 2 on a Q400, 6 on an A330, straight
+  from seat counts already in the data.
+- **Mechanics** are a *continuum*, not a threshold: shared capacity
+  across the fleet rather than something consumed per flight. Running
+  thin doesn't stop you flying, it makes airframes behave older than they
+  are — `maintenanceAgeFactor()` scales effective age into the existing
+  age-delay cause, which is what gives mechanics a real job without
+  waiting for a full maintenance system.
+
+Pools, never named individuals. A real roster means duty times, rest
+rules and pairing — a second scheduling problem beside the rotation
+board, and out of scope permanently.
+
+### Reserve depth, and why cancellations came with it
+
+Reserve depth replaced what was originally going to be a fixed crew-ratio
+constant — raised directly, and a better idea: a hidden constant becomes
+the player's decision. 1.0 is exactly enough crew to cover the schedule
+with normal days off; 1.4 is 40% more. Each day a disruption fraction is
+drawn (up to 20%: sickness, rest, recurrent training) and reserve depth
+is what absorbs it. Shortfalls are proportional — losing 5% of crew
+grounds roughly 5% of the fleet.
+
+**Cost is linear in depth; protection is a threshold.** That's what makes
+it a decision rather than a slider with an obvious best setting, and the
+sweep finds a genuine interior optimum:
+
+| reserve | heads | salary/day | completion | on-time | margin/day |
+| --- | --- | --- | --- | --- | --- |
+| 1.00 | 33 | $4,185 | 66.7% | 39% | $5,755 |
+| 1.05 | 36 | $4,550 | 80.0% | 46% | $7,137 |
+| 1.15 | 40 | $5,065 | 93.3% | 50% | $8,438 |
+| **1.25** | 43 | $5,430 | 100% | 54% | **$9,082** |
+| 1.40 | 47 | $5,945 | 100% | 54% | $8,567 |
+
+The max daily disruption was tuned to 20% specifically to put that peak
+mid-slider: at 15% the safe point sat at 1.15 and everything above was
+strictly dominated, and at 25% deeper was always better and the optimum
+vanished off the end.
+
+This is also why **cancellations were built in the same pass**. Reserves
+trade cost against on-time *and* cancellations, and cancellations didn't
+exist — so half the lever's value would have been missing. Only the
+crew-shortage slice was built, not the whole design above: weather
+severity tiers and mechanical events can join later using the same
+machinery. What that machinery is:
+
+- **Completion Factor** as its own HUD stat beside On-Time
+  (`completed / scheduled`), the second reliability axis.
+- **A flat -80 NPS** per cancellation, per the existing design — not an
+  extension of the delay curve, which floors at -50 even for a
+  catastrophic delay. NPS now divides by its own denominator
+  (`npsScoredFlightsTotal` = departures *plus* cancellations), since a
+  cancelled flight never departs and would otherwise vanish from the
+  average. On-Time deliberately keeps the departures denominator.
+- **A third Reputation term** for completion factor, weighted 120 against
+  on-time's 50 — a cancellation isn't a very late flight, it's worse.
+  The same small-sample dampening applies, for the same reason.
+
+### The double-charging problem
+
+`costPerBlockHour` already included crew — the Dev tab's cost tree says
+so in as many words. Adding salaries on top would have double-charged and
+quietly broken the economy, so this is a **carve-out**: 30% of block-hour
+cost moved out into explicit salaries. Measured rather than guessed, using
+the cost attribution built earlier this week — total daily cost on the
+reference fleet moved $16,938 → $18,208, about +7.5%, so crew is a real
+new cost rather than a stealth re-tune of everything else.
+
+Salaries are calibrated as a *share* of operating cost (~25%) rather than
+to real absolute figures, the same way LOAD_FACTOR and the fuel share
+work. Real regional salaries in absolute dollars would make a 19-seat
+operation structurally unprofitable — arguably true in reality, but a
+poor starting aircraft for a game.
+
+### Hiring is bulk
+
+Not a Fleet-Market-style candidate table: that works at twelve aircraft
+but not at forty pilots, and crew are pools rather than individuals
+anyway, so named candidates would pretend at a granularity the sim
+doesn't have. Order a count at a tier, pay up front, they arrive in 10
+days. Training moves pilots up one tier over 21 days and removes them
+from the pool immediately — losing their capacity is the real cost.
+
+`createInitialState()` now staffs itself to target, since the headless
+fixture exists to be a working airline; left unstaffed every aircraft
+would be grounded and the balance tools would simulate an airline that
+never flies. A real new game still starts with no crew, because hiring
+into a fleet is the mechanic.
+
+### Verified
+
+Hiring lands exactly on day 10 and not before; training returns pilots
+one tier up exactly on day 21 with the pipeline cleared; state survives a
+JSON round trip. Sweeping reserve depth reproduces the table above.
+Browser: pools show have-vs-need with shortfalls in red, the reserve
+slider re-derives target headcount live, bulk recruitment queues all
+three disciplines with countdowns, and the tier selector correctly
+disables for untiered roles. Zero console errors.
+
+**One bug found and fixed during testing:** `startTraining()` subtracted
+from a pool without checking availability, so training more pilots than
+you had drove the count negative and would have corrupted every
+requirement and salary calculation downstream. Now guarded, matching
+`repayLoan()`'s existing "silently does nothing if it can't" shape.
+`hireCrew()` needs no guard — it only ever adds.
+
+---
+
 ## Proposed build order (not committed)
 
 Roughly in dependency order — each item mostly needs the one before it
