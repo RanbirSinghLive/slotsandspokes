@@ -1669,6 +1669,83 @@ a manually dispatched `focusin` does reach the handler and show it.
 
 ---
 
+## The utilisation pivot — phase A
+
+Raised directly: mothball the Gantt, and model every frequency as a share
+of an aircraft driven by block time against a usable plane day of
+06:00-22:00. The reasons given — easier to add frequencies, visible
+unused aeroplane, and a clear read on whether 5% spare justifies another
+airframe — all hold up against the numbers:
+
+| market | type | round trip | % of a plane | max freq/plane |
+| --- | --- | --- | --- | --- |
+| YHZ-YQM | Beech 1900D | 138 min | 14.4% | 6 |
+| YUL-YYZ | Beech 1900D | 218 min | 22.7% | 4 |
+| YHZ-YYT | Q400 | 258 min | 26.9% | 3 |
+| YYZ-YYT | Q400 | 482 min | 50.2% | 1 |
+
+And the long-haul case the pivot was partly for falls out with no special
+handling: a 9-hour-each-way turn is **1.19 aircraft**, which a timeline
+model could only ever call an impossible schedule.
+
+### The conflict, and how it's resolved
+
+CLAUDE.md is explicit that the map exists chiefly to show "how a delay on
+one sector cascades through the rest of that aircraft's day." Percentages
+have no sequence, so a pure utilisation model would delete the cascade
+and `delayMinutesByCause.knockOn` with it.
+
+The resolution is to **split planning from operating**. Planning — what
+the player touches — is frequencies and percentages, no times. Operating
+is unchanged: step() still flies real legs at real times and still
+cascades delays. The player stops *authoring* the timeline; the sim
+derives it. Watching an aircraft fall behind on the map still works, and
+arguably reads better than a Gantt did.
+
+### Decided
+
+- **Frequencies pool per base**, not per tail. A per-tail figure can't
+  answer "have I a spare aeroplane's worth of gaps scattered about",
+  which is the question the pivot exists to make answerable.
+- **Bases are assigned explicitly**, not inferred from wherever the first
+  route started. This is what lets an airline fly a multi-leg loop —
+  `YUL-YFC-YQM-YFC-YQM-YUL` — while being based at YUL only.
+- That example forces one thing: a frequency **can't** be a per-market
+  round trip, since it flies YFC-YQM legs that never touch the base. It
+  has to be a **rotation: an ordered chain starting and ending at its
+  base**. A simple out-and-back is just the two-leg case, and continuity
+  stays automatic either way.
+- **No schedule view at all.** Route data moves to the Commercial tab,
+  which becomes a Routes tab. Fare policy's home still to be decided.
+
+### Phase A, built
+
+`sim/utilisation.ts` plus an explicit `Aircraft.baseAirport`, and a
+pooled per-base reading in the Fleet tab. Nothing removed yet — the point
+of doing A first is to find out whether the reading is as useful as it
+looks before tearing anything out.
+
+It is. On the reference network:
+
+```
+  YQB   1 ac  456/960m  47.5%  spare 0.53 aircraft
+  YOW   1 ac  354/960m  36.9%  spare 0.63 aircraft
+  YHZ   1 ac  294/960m  30.6%  spare 0.69 aircraft
+```
+
+Three aircraft, none more than half worked, roughly two-thirds of an
+airframe idle at every base — a fact the Gantt technically contained and
+never once communicated.
+
+### Still to come
+
+- **B** — route builder creates rotations; sim derives times by packing.
+- **C** — delete the Rotation tab, positioning legs, and the half of
+  `validateSchedule` that rotations make structurally impossible.
+- **D** — Commercial becomes Routes, carrying the aggregated route data.
+
+---
+
 ## Proposed build order (not committed)
 
 Roughly in dependency order — each item mostly needs the one before it

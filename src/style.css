@@ -2402,3 +2402,69 @@ body {
 .exec-candidate-background {
   flex: none;
 }
+
+/* Week six's utilisation pivot, phase one: how full each based fleet's
+   day is (sim/utilisation.ts). Pooled per base, because the question is
+   "have I a spare aeroplane's worth of gaps", not "is this tail busy". */
+#fleet-utilisation {
+  margin-bottom: 12px;
+}
+
+.util-row {
+  display: grid;
+  grid-template-columns: 44px 40px 1fr;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 12px;
+}
+
+.util-base {
+  color: #cdd3e0;
+  font-weight: 500;
+}
+
+.util-pct {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #cdd3e0;
+}
+
+.util-note {
+  color: #6b7694;
+}
+
+.util-bar-track {
+  grid-column: 1 / -1;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.util-bar {
+  height: 100%;
+  border-radius: 2px;
+  background: #4a90d9;
+}
+
+/* Over 100% means the rotation can't be flown daily by the based fleet —
+   the same red everything else genuinely broken uses. */
+.util-row--over .util-pct,
+.util-row--over .util-note {
+  color: #ff8080;
+}
+
+.util-row--over .util-bar {
+  background: #ff8080;
+}
+
+.fleet-base-select {
+  font-family: inherit;
+  font-size: 11px;
+  color: #cdd3e0;
+  background: #0a0c12;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 3px;
+  padding: 1px 3px;
+}

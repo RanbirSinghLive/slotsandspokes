@@ -1,6 +1,8 @@
 import { legsServingMarket, marketKey, validateSchedule, type ScheduleLeg } from '../sim/schedule';
 import { removeCommercialRow } from './commercial';
 import { getSelectedTail, setSelectedTail } from './fleetSelection';
+import { utilisationByBase } from '../sim/utilisation';
+import { airports } from '../render/airports';
 import type { SimState } from '../sim/state';
 
 // Must match the --panel-width custom property's default value in
@@ -23,6 +25,7 @@ const revenueEl = document.querySelector<HTMLSpanElement>('#panel-revenue')!;
 const costEl = document.querySelector<HTMLSpanElement>('#panel-cost')!;
 const marginEl = document.querySelector<HTMLSpanElement>('#panel-margin')!;
 const fleetBody = document.querySelector<HTMLTableSectionElement>('#fleet-table tbody')!;
+const fleetUtilisationEl = document.querySelector<HTMLDivElement>('#fleet-utilisation')!;
 const scheduleBody = document.querySelector<HTMLTableSectionElement>('#schedule-table tbody')!;
 const scheduleFilterTail = document.querySelector<HTMLInputElement>('#schedule-filter-tail')!;
 const scheduleFilterRoute = document.querySelector<HTMLInputElement>('#schedule-filter-route')!;
@@ -137,11 +140,77 @@ export function updatePanel(state: SimState): void {
       }
     }
 
-    row.append(tailCell, typeCell, statusCell, whereCell);
+    // Base is an explicit assignment now, not something inferred from
+    // wherever the first route happened to start (see Aircraft.baseAirport).
+    // A <select> rather than a click-through so it reads as a setting.
+    const baseCell = document.createElement('td');
+    const baseSelect = document.createElement('select');
+    baseSelect.className = 'fleet-base-select';
+    const none = document.createElement('option');
+    none.value = '';
+    none.textContent = '—';
+    baseSelect.appendChild(none);
+    for (const airport of airports) {
+      const option = document.createElement('option');
+      option.value = airport.iata;
+      option.textContent = airport.iata;
+      baseSelect.appendChild(option);
+    }
+    baseSelect.value = aircraft.baseAirport ?? '';
+    // Stop the row's own select-this-tail handler firing when the dropdown
+    // is used — picking a base isn't picking a plane to draw a route for.
+    baseSelect.addEventListener('click', (event) => event.stopPropagation());
+    baseSelect.addEventListener('change', () => {
+      aircraft.baseAirport = baseSelect.value || null;
+    });
+    baseCell.appendChild(baseSelect);
+
+    row.append(tailCell, typeCell, statusCell, whereCell, baseCell);
     fleetBody.appendChild(row);
   }
 
+  renderUtilisation(state);
+
   fleetSelectionHintEl.hidden = getSelectedTail() !== null || state.aircraft.length === 0;
+}
+
+/**
+ * Week six's utilisation pivot, phase one: how much of each based fleet's
+ * day is actually being flown, pooled per base rather than per tail.
+ * Per-tail figures can't answer "have I a spare aeroplane's worth of gaps
+ * scattered about", which is the question the whole pivot exists to make
+ * answerable — see sim/utilisation.ts.
+ */
+function renderUtilisation(state: SimState): void {
+  const bases = utilisationByBase(state);
+  if (bases.length === 0) {
+    fleetUtilisationEl.innerHTML = '';
+    return;
+  }
+
+  fleetUtilisationEl.innerHTML = bases
+    .map((b) => {
+      const pct = Math.round(b.share * 100);
+      const label = b.base === '' ? 'Unbased' : b.base;
+      const spare = b.spareAircraft;
+      // The headline reading: spare capacity expressed in aircraft, since
+      // "0.05 of a plane" is what tells you another airframe is a bad buy
+      // and "0.9" tells you it very nearly isn't.
+      const note =
+        b.base === ''
+          ? `${b.aircraft.length} aircraft with no base — assign one before they can be worked.`
+          : spare >= 0
+            ? `${spare.toFixed(2)} aircraft spare`
+            : `${Math.abs(spare).toFixed(2)} aircraft short — this rotation can't be flown daily`;
+      return `
+        <div class="util-row${b.share > 1 ? ' util-row--over' : ''}">
+          <span class="util-base">${label}</span>
+          <span class="util-pct">${pct}%</span>
+          <span class="util-note">${note}</span>
+          <div class="util-bar-track"><div class="util-bar" style="width:${Math.min(100, pct)}%"></div></div>
+        </div>`;
+    })
+    .join('');
 }
 
 function pad(n: number): string {

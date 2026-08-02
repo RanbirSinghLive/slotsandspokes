@@ -48,6 +48,10 @@ function acquireAircraft(listing: FleetListing, ownership: 'owned' | 'leased', s
     ownership,
     leaseCostPerDay: ownership === 'leased' ? listing.leasePricePerDay : 0,
     ageYears: listing.ageYears,
+    // Unbased on arrival. Basing is an explicit decision now (Fleet tab)
+    // rather than something inferred from wherever the first route
+    // happened to start — see Aircraft.baseAirport.
+    baseAirport: null,
   };
   state.aircraft.push(aircraft);
 

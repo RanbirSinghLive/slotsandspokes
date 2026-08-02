@@ -53,6 +53,18 @@ export type Aircraft = {
    * carrying.
    */
   ageYears: number;
+  /**
+   * Week six's utilisation pivot: the airport this aircraft is based at,
+   * assigned explicitly rather than inferred from wherever its first
+   * route happened to start. A rotation begins and ends at its base, so
+   * this is what makes continuity automatic — and it lets an airline fly
+   * a multi-leg loop like YUL-YFC-YQM-YFC-YQM-YUL without accidentally
+   * basing itself at every airport along the way.
+   *
+   * Null on an aircraft that hasn't been given one yet; such an airframe
+   * can't be worked until it has.
+   */
+  baseAirport: string | null;
 };
 
 export type ActiveFlight = {
@@ -543,6 +555,10 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
       // 0 is also the delay model's baseline, so this reproduces its
       // pre-age-mechanic numbers rather than silently shifting them.
       ageYears: 0,
+      // The fixture's rotations already start and end somewhere sensible,
+      // so base it where its first leg departs — same reasoning as the
+      // crew and slots it grants itself.
+      baseAirport: firstLeg.origin,
     };
   });
 
