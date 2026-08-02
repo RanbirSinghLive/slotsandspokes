@@ -5,6 +5,7 @@ import { loadCompetitorRoutes, type CompetitorOffering } from './competitors';
 import type { WeatherEvent } from './weather';
 import type { Loan } from './loans';
 import { FUEL_PRICE_BASELINE } from './fuel';
+import type { TargetCommitment, TargetResult } from './targets';
 
 export type AircraftStatus = 'ground' | 'airborne';
 
@@ -374,6 +375,27 @@ export type SimState = {
    * the same slider-drag repeated once per market.
    */
   farePolicyMultiplier: number;
+  /**
+   * Week six's missions (sim/missions.ts): ids of every mission whose
+   * condition has been met and whose Reputation has been paid out. A
+   * plain string array, same JSON-round-trip reasoning as
+   * `unlockedTechNodeIds`, and the thing ui/ticker.ts diffs to announce a
+   * completion the moment it happens.
+   */
+  completedMissionIds: string[];
+  /**
+   * Week six's targets (sim/targets.ts): the service standard the player
+   * has publicly committed to, or null when none is running. Carries its
+   * own window-scoped departure/on-time/NPS counters, which step.ts
+   * increments alongside the today- and lifetime-scoped ones.
+   */
+  activeTarget: TargetCommitment | null;
+  /**
+   * How the last commitment turned out, kept after it resolves so the UI
+   * can report it rather than having a promise silently disappear. Null
+   * until one has ever run to completion.
+   */
+  lastTargetResult: TargetResult | null;
   todayCostByCategory: {
     /** Fuel, after the price index and any tech tree efficiency upgrades. */
     fuel: number;
@@ -498,6 +520,9 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     marketDemand: {},
     demandGrowthMultiplier: 1,
     farePolicyMultiplier: 1,
+    completedMissionIds: [],
+    activeTarget: null,
+    lastTargetResult: null,
     todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0 },
   };
 }
@@ -560,6 +585,9 @@ export function createNewGameState(rngSeed: number = Date.now()): SimState {
     marketDemand: {},
     demandGrowthMultiplier: 1,
     farePolicyMultiplier: 1,
+    completedMissionIds: [],
+    activeTarget: null,
+    lastTargetResult: null,
     todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0 },
   };
 }

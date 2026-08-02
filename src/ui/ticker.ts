@@ -1,3 +1,4 @@
+import { loadMissions } from '../sim/missions';
 import type { SimState } from '../sim/state';
 
 const tickerTrack = document.querySelector<HTMLDivElement>('#ticker-track')!;
@@ -115,7 +116,34 @@ function pollCompetitorEvents(state: SimState): void {
  * return, so an event happening while you're deep in the Commercial
  * panel still gets announced rather than silently missed.
  */
+let hasSeenInitialMissions = false;
+const seenMissionIds = new Set<string>();
+
+/**
+ * Week six's missions: same "diff against what I already announced"
+ * shape as weather and competitor routes above, each with its own local
+ * bookkeeping. The first call establishes a baseline so a resumed save
+ * doesn't replay every mission ever completed as fresh news.
+ */
+function pollMissionEvents(state: SimState): void {
+  if (!hasSeenInitialMissions) {
+    for (const id of state.completedMissionIds) seenMissionIds.add(id);
+    hasSeenInitialMissions = true;
+    return;
+  }
+
+  for (const id of state.completedMissionIds) {
+    if (seenMissionIds.has(id)) continue;
+    seenMissionIds.add(id);
+    const mission = loadMissions().find((m) => m.id === id);
+    if (mission) {
+      pushEvent(state.simMinute, `Mission complete: ${mission.name} (+${mission.reputationReward} Reputation)`);
+    }
+  }
+}
+
 export function updateTicker(state: SimState): void {
   pollWeatherEvents(state);
   pollCompetitorEvents(state);
+  pollMissionEvents(state);
 }

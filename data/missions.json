@@ -1,0 +1,9 @@
+[
+  {
+    "id": "first-aircraft",
+    "name": "Wheels Up",
+    "objective": "Buy or lease your first aircraft.",
+    "flavor": "Trans-Canada Air Lines began in 1937 with two Lockheed Model 10A Electras and a single Boeing Stearman biplane. Its first revenue flight, on 1 September that year, ran Vancouver to Seattle in fifty minutes carrying mail and two passengers. Every flag carrier starts with somebody signing for one aeroplane.",
+    "reputationReward": 50
+  }
+]

@@ -132,6 +132,13 @@
             <path d="M18 9a9 9 0 0 1-9 9" />
           </svg>
         </button>
+        <button type="button" data-tab="missions" aria-label="Missions" title="Missions — objectives and service targets">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9" />
+            <circle cx="12" cy="12" r="4.5" />
+            <circle cx="12" cy="12" r="0.6" />
+          </svg>
+        </button>
         <button type="button" data-tab="dev" aria-label="Dev" title="Dev — live cost breakdown (development tool)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z" />
@@ -308,6 +315,36 @@
             <h2>Fuel Efficiency</h2>
             <div id="tech-tree-fuel-summary"></div>
             <div id="tech-tree-fuel-branch" class="tech-branch"></div>
+          </section>
+        </div>
+        <div id="missions-panel" hidden>
+          <section id="missions-section">
+            <h2>Missions</h2>
+            <p class="missions-note">Objectives worth chasing. Each pays Reputation once, the moment it's met.</p>
+            <div id="missions-list"></div>
+          </section>
+          <section id="targets-section">
+            <h2>Service target</h2>
+            <p class="missions-note">
+              Commit publicly to a standard and be held to it over 30 days. The more ambitious the
+              promise, the more Reputation it pays — and the more missing it costs.
+            </p>
+            <div id="target-setup">
+              <label class="target-row">
+                <span class="target-label">On-time</span>
+                <input type="range" id="target-otp-slider" min="80" max="99" step="1" value="85" />
+                <span class="lever-value" id="target-otp-value"></span>
+              </label>
+              <label class="target-row">
+                <span class="target-label">Avg NPS</span>
+                <input type="range" id="target-nps-slider" min="0" max="60" step="1" value="10" />
+                <span class="lever-value" id="target-nps-value"></span>
+              </label>
+              <div id="target-stake"></div>
+              <button type="button" id="target-commit">Commit to this</button>
+            </div>
+            <div id="target-active" hidden></div>
+            <div id="target-last-result"></div>
           </section>
         </div>
         <div id="dev-panel" hidden>

@@ -1008,6 +1008,108 @@ throughout. Zero console errors.
 
 ---
 
+## Built: missions and targets
+
+The complaint that started this whole line of work (WEEK-FIVE.md) was
+"no clear goal." Every system built since has been machinery *for* an
+answer rather than the answer itself. This is the answer.
+
+Two deliberately separate mechanics sharing one currency: **missions are
+the game telling you what's worth doing; targets are you telling the game
+what you intend to do.** Both pay Reputation, which now has a real
+spender (the tech tree) so the currency goes somewhere.
+
+### Missions
+
+Authored content, split the way every data-driven thing in this project
+is: `data/missions.json` holds the hand-written parts (name, objective,
+flavour, reward) and `sim/missions.ts` holds the *conditions* as real
+code, because a completion condition is a predicate over `SimState` and
+there's no sane way to put that in JSON without inventing a query
+language nobody asked for. Adding a mission is one JSON entry plus one
+line in `MISSION_CONDITIONS`.
+
+Checked every tick rather than once a day — the conditions are trivial
+reads, and "you bought your first aircraft" landing a simulated day late
+would feel broken for what is most players' first contact with the
+system. Completions announce themselves in the ticker, using the same
+"diff against what I already announced" shape weather and competitor
+routes already use.
+
+**No acceptance step this pass.** The original sketch had missions being
+accepted before they count, but nothing in the current set has a cost or
+risk to weigh, so an accept button would be a click that changes nothing.
+Worth adding when there's a mission where declining is a real choice.
+
+First mission, *Wheels Up* — buy or lease your first aircraft, +50
+Reputation — themed on Trans-Canada Air Lines, which began in 1937 with
+two Lockheed Model 10A Electras and a single Boeing Stearman biplane, and
+flew its first revenue service that September from Vancouver to Seattle
+in fifty minutes carrying mail and two passengers.
+
+### Targets
+
+The player's half. You name an on-time percentage and an average NPS you
+intend to hit; the promise runs 30 days and is judged on what you
+actually delivered in that window (its own scoped counters, incremented
+by step.ts alongside the today- and lifetime-scoped ones).
+
+Reward scales with ambition above a neutral standard — 80% on-time
+(deliberately the same figure `sim/reputation.ts` already treats as
+neutral) and 0 NPS. Missing costs **half** what hitting pays.
+
+That asymmetry is the whole design. Without a downside the dominant play
+would be to promise the maximum every time and pocket whatever landed;
+staking Reputation on the claim turns "pick the biggest number" into a
+judgement about what your operation can actually sustain. Keeping the
+penalty at half the reward means committing stays worth doing on
+balance — the mechanic should encourage engagement, not punish anyone who
+uses it.
+
+| promise | pays | costs if missed |
+| --- | --- | --- |
+| 85% on-time, 10 NPS | +35 | -18 |
+| 90% / 25 | +78 | -39 |
+| 95% / 40 | +120 | -60 |
+| 99% / 60 | +166 | -83 |
+
+A window with fewer than 20 departures expires **unjudged** — no reward
+and no penalty. Same reasoning as `REPUTATION_MIN_SAMPLE_FLIGHTS`: with a
+handful of flights, on-time percentage says more about luck than about
+the operation. It can't be exploited by flying less, since an unjudged
+promise pays nothing either.
+
+### Where it lives
+
+Its own sidebar tab, not the Executive ledger the original sketch
+proposed. That sketch predates the tab system existing; now that adding a
+tab is cheap, burying the game's only statement of purpose underneath
+loans and a cash chart would undercut the exact complaint it answers.
+
+### Verified
+
+In isolation: the mission fires the tick its condition holds, pays
+exactly once, and never double-pays across 100 further ticks; reward
+scaling runs 0 at baseline to 166 at the maximum promise; commitments
+resolve at window close, apply the signed Reputation delta, clear
+`activeTarget`, and stay unresolved while the window is still open.
+
+In the browser: leasing an aircraft completed *Wheels Up* immediately,
+Reputation moved 0 → 50, the card turned green, and the ticker announced
+it. A 95%/40 promise committed correctly, swapped the setup block for
+live progress, and reported "0 departures in window · 30 days left ·
+needs 20 to be judged". Zero console errors.
+
+**One thing the testing surfaced, not fixed here:** the headless test
+network runs at ~54% on-time, well under the 80% both this and
+`sim/reputation.ts` treat as neutral — so its Reputation bleeds steadily.
+A well-scheduled small network hits 91% comfortably (observed in a
+one-aircraft browser game), so the baseline looks right and the fixture
+is simply a badly-scheduled airline. Worth re-checking against a real
+playthrough before trusting either number.
+
+---
+
 ## Proposed build order (not committed)
 
 Roughly in dependency order — each item mostly needs the one before it

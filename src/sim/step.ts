@@ -6,6 +6,8 @@ import { rollTotalDelayMinutes } from './delays';
 import { rollCompetitorRouteOpenings } from './competitors';
 import { rollDailyFuelPrice } from './fuel';
 import { rollDailyMarketDemand, actualDailyDemand } from './marketDemand';
+import { checkMissions } from './missions';
+import { resolveTargetIfDue } from './targets';
 import { applyDailyLoanInterest } from './loans';
 import { flightSatisfactionScore } from './nps';
 import { applyDailyReputationChange } from './reputation';
@@ -83,6 +85,12 @@ export function step(state: SimState): void {
     // they're cleared" ordering this block already relies on for
     // todayRevenue/todayCost/todayMargin elsewhere in main.ts/step.ts.
     applyDailyReputationChange(state);
+    // Week six's targets (sim/targets.ts): a commitment whose window has
+    // elapsed is judged here, immediately after the reputation change
+    // above — both move the same currency, and settling the promise on
+    // the same rollover keeps the two from being read in a half-applied
+    // state by anything downstream.
+    resolveTargetIfDue(state);
     // Week five's runway forecast (sim/forecast.ts): same "read it before
     // today's own charges touch Cash" timing as the reputation call just
     // above — this is what makes each entry "yesterday's closing balance."
@@ -186,6 +194,14 @@ export function step(state: SimState): void {
       state.flightsOnTimeTotal += 1;
       state.todayFlightsOnTime += 1;
     }
+    // A running target commitment keeps its own window-scoped copy of the
+    // same counters — a promise is judged on what you deliver from the
+    // moment you make it, not on a lifetime record that may be months
+    // long (sim/targets.ts).
+    if (state.activeTarget) {
+      state.activeTarget.flightsDeparted += 1;
+      if (lateAtDepartureMinutes === 0) state.activeTarget.flightsOnTime += 1;
+    }
 
     // Same on-time question as the whole-airline counters just above,
     // just split out per market for the On-Time panel (ui/onTime.ts) —
@@ -229,6 +245,7 @@ export function step(state: SimState): void {
     );
     state.npsPointsTotal += satisfactionScore;
     state.todayNpsPoints += satisfactionScore;
+    if (state.activeTarget) state.activeTarget.npsPoints += satisfactionScore;
 
     const activeFlight: ActiveFlight = {
       legId: leg.legId,
@@ -364,6 +381,11 @@ export function step(state: SimState): void {
     state.completedToday.push(flight.legId);
     state.activeFlights.splice(i, 1);
   }
+
+  // Week six's missions (sim/missions.ts): cheap pure reads of `state`,
+  // checked every tick rather than once a day so "you bought your first
+  // aircraft" lands immediately instead of up to a simulated day later.
+  checkMissions(state);
 
   state.simMinute += 1;
 }

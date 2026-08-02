@@ -35,6 +35,7 @@ import { setupExecutivePanel, updateExecutivePanel } from './ui/executive';
 import { setupFuelPricePanel, updateFuelPricePanel } from './ui/fuelPrice';
 import { setupTechTreePanel, updateTechTreePanel } from './ui/techTree';
 import { setupDevPanel, updateDevPanel } from './ui/devTools';
+import { setupMissionsPanel, updateMissionsPanel } from './ui/missions';
 import { updateTicker } from './ui/ticker';
 import { setupLoans, updateLoans } from './ui/loans';
 import { isInsolvent } from './sim/loans';
@@ -71,6 +72,7 @@ setupExecutivePanel();
 setupFuelPricePanel();
 setupTechTreePanel(state);
 setupDevPanel();
+setupMissionsPanel(state);
 setupLoans(state);
 setupGameControls(state);
 
@@ -134,6 +136,7 @@ const fleetMarketPanelEl = document.querySelector<HTMLDivElement>('#fleet-market
 const onTimePanelEl = document.querySelector<HTMLDivElement>('#ontime-panel')!;
 const executivePanelEl = document.querySelector<HTMLDivElement>('#executive-panel')!;
 const techTreePanelEl = document.querySelector<HTMLDivElement>('#tech-tree-panel')!;
+const missionsPanelEl = document.querySelector<HTMLDivElement>('#missions-panel')!;
 const devPanelEl = document.querySelector<HTMLDivElement>('#dev-panel')!;
 const gameTabEl = document.querySelector<HTMLDivElement>('#game-tab')!;
 const sidebarTabButtons = document.querySelectorAll<HTMLButtonElement>('#sidebar-tabs button');
@@ -230,6 +233,7 @@ type SidebarTab =
   | 'ontime'
   | 'executive'
   | 'techtree'
+  | 'missions'
   | 'dev'
   | 'game';
 let sidebarTab: SidebarTab = 'fleet';
@@ -255,6 +259,10 @@ function render(nowMs: number = performance.now()): void {
   // be useless. Gated on it actually being visible so it costs nothing
   // the rest of the time.
   if (sidebarTab === 'dev') updateDevPanel(state);
+  // Same every-frame treatment as the Dev tab, for the same reason: a
+  // commitment's progress moves with every departure, and a mission can
+  // complete on any tick.
+  if (sidebarTab === 'missions') updateMissionsPanel(state);
 
   const cssWidth = window.innerWidth - currentPanelWidthPx;
   const cssHeight = window.innerHeight;
@@ -461,6 +469,7 @@ function switchToSidebarTab(tab: SidebarTab, highlightLegIds: string[] = []): vo
   onTimePanelEl.hidden = tab !== 'ontime';
   executivePanelEl.hidden = tab !== 'executive';
   techTreePanelEl.hidden = tab !== 'techtree';
+  missionsPanelEl.hidden = tab !== 'missions';
   devPanelEl.hidden = tab !== 'dev';
   gameTabEl.hidden = tab !== 'game';
 
