@@ -136,6 +136,33 @@ const TRAINING_COST_PER_PILOT = [3400, 7000];
 export const TRAINING_DAYS = 21;
 
 /**
+ * Recurrent cabin service training. Cheaper and much shorter than a
+ * pilot type rating, because it isn't a qualification to fly anything —
+ * it's a service-quality upgrade that feeds NPS (sim/nps.ts).
+ *
+ * The interesting part is that trainees come **off the line** for the
+ * duration, exactly like pilots do. Cabin crew are a staffing threshold,
+ * so pulling people out can drop you below the operating minimum and
+ * ground aircraft. That gives reserve depth a second job beyond absorbing
+ * sickness: slack is what lets you train without cancelling flights.
+ */
+const CABIN_TRAINING_COST_PER_HEAD = 900;
+export const CABIN_TRAINING_DAYS = 7;
+
+/**
+ * How fast recurrent training lapses. "Recurrent" means exactly that in
+ * aviation — it expires and has to be redone, typically annually — so
+ * this is an ongoing commitment rather than a one-time purchase you make
+ * and forget. Roughly a 180-day decay, chosen so it actually bites inside
+ * a typical run rather than being a technicality.
+ *
+ * Newly hired cabin crew arrive untrained, so growing the fleet also
+ * dilutes the trained share: expansion costs service quality until the
+ * new people have been through it.
+ */
+const CABIN_TRAINING_LAPSE_PER_DAY = 1 / 180;
+
+/**
  * Mechanics per aircraft at which the fleet is considered properly
  * maintained. Below it, airframes behave older than they are; at or above
  * it, better than they are (see maintenanceAgeFactor()).
@@ -150,6 +177,14 @@ export type CrewPools = {
   /** Pilots by qualification tier. A tier-N pilot can fly anything rated tier N or below. */
   pilotsByTier: [number, number, number];
   cabinCrew: number;
+  /**
+   * How many of `cabinCrew` currently hold recurrent service training —
+   * a subset, never more than the total. Deliberately not a tier: any
+   * cabin crew member can staff any aircraft, so this doesn't gate
+   * anything. It only raises NPS, and it lapses (see
+   * CABIN_TRAINING_LAPSE_PER_DAY).
+   */
+  cabinCrewTrained: number;
   mechanics: number;
 };
 
@@ -162,16 +197,25 @@ export type PendingHire = {
   availableAtMinute: number;
 };
 
-export type PendingTraining = {
-  id: string;
-  /** The tier being trained *out of* — they return at fromTier + 1. */
-  fromTier: number;
-  count: number;
-  completesAtMinute: number;
-};
+/**
+ * A discriminated union rather than one shape with optional fields: the
+ * two kinds of training genuinely return different things — a pilot comes
+ * back one tier higher, a cabin crew member comes back service-trained —
+ * and letting the type say so keeps `resolveArrivals()` honest.
+ */
+export type PendingTraining =
+  | {
+      id: string;
+      kind: 'pilot';
+      /** The tier being trained *out of* — they return at fromTier + 1. */
+      fromTier: number;
+      count: number;
+      completesAtMinute: number;
+    }
+  | { id: string; kind: 'cabin'; count: number; completesAtMinute: number };
 
 export function createCrewPools(): CrewPools {
-  return { pilotsByTier: [0, 0, 0], cabinCrew: 0, mechanics: 0 };
+  return { pilotsByTier: [0, 0, 0], cabinCrew: 0, cabinCrewTrained: 0, mechanics: 0 };
 }
 
 // --- Requirements -----------------------------------------------------
@@ -322,6 +366,20 @@ export function trainingCost(fromTier: number, count: number): number {
   return TRAINING_COST_PER_PILOT[fromTier - 1] * count;
 }
 
+export function cabinTrainingCost(count: number): number {
+  return CABIN_TRAINING_COST_PER_HEAD * count;
+}
+
+/**
+ * The share of cabin crew carrying recurrent training, 0-1 — what
+ * sim/nps.ts turns into its service component. Zero when there are no
+ * cabin crew at all rather than dividing by zero.
+ */
+export function cabinServiceShare(pools: CrewPools): number {
+  if (pools.cabinCrew <= 0) return 0;
+  return Math.min(1, pools.cabinCrewTrained / pools.cabinCrew);
+}
+
 function nextId(prefix: string, existing: { id: string }[]): string {
   const numbers = existing.map((e) => Number(e.id.split('-').pop())).filter((n) => !Number.isNaN(n));
   return `${prefix}-${(numbers.length > 0 ? Math.max(...numbers) : 0) + 1}`;
@@ -361,9 +419,36 @@ export function startTraining(state: SimState, fromTier: number, count: number):
   state.crew.pilotsByTier[fromTier - 1] -= count;
   state.pendingTraining.push({
     id: nextId('train', state.pendingTraining),
+    kind: 'pilot',
     fromTier,
     count,
     completesAtMinute: state.simMinute + TRAINING_DAYS * MINUTES_PER_DAY,
+  });
+}
+
+/**
+ * Send cabin crew for recurrent service training. Same shape as pilot
+ * training and the same real cost: they leave the pool now, which counts
+ * against the staffing threshold and can ground aircraft if you have no
+ * reserve slack to cover them.
+ *
+ * Guarded for the same reason startTraining() is — this subtracts from a
+ * pool, and a negative headcount would corrupt every requirement and
+ * salary calculation downstream.
+ */
+export function startCabinTraining(state: SimState, count: number): void {
+  if (count <= 0 || count > state.crew.cabinCrew) return;
+
+  state.cash -= cabinTrainingCost(count);
+  state.crew.cabinCrew -= count;
+  // Someone already trained who goes round again shouldn't leave a
+  // trained count stranded above the (now smaller) total.
+  state.crew.cabinCrewTrained = Math.min(state.crew.cabinCrewTrained, state.crew.cabinCrew);
+  state.pendingTraining.push({
+    id: nextId('train', state.pendingTraining),
+    kind: 'cabin',
+    count,
+    completesAtMinute: state.simMinute + CABIN_TRAINING_DAYS * MINUTES_PER_DAY,
   });
 }
 
@@ -381,7 +466,12 @@ function resolveArrivals(state: SimState): void {
   for (let i = state.pendingTraining.length - 1; i >= 0; i--) {
     const training = state.pendingTraining[i];
     if (state.simMinute < training.completesAtMinute) continue;
-    state.crew.pilotsByTier[training.fromTier] += training.count; // fromTier is 1-based, so this index is fromTier + 1
+    if (training.kind === 'pilot') {
+      state.crew.pilotsByTier[training.fromTier] += training.count; // fromTier is 1-based, so this index is fromTier + 1
+    } else {
+      state.crew.cabinCrew += training.count;
+      state.crew.cabinCrewTrained = Math.min(state.crew.cabinCrew, state.crew.cabinCrewTrained + training.count);
+    }
     state.pendingTraining.splice(i, 1);
   }
 }
@@ -399,6 +489,14 @@ function resolveArrivals(state: SimState): void {
  */
 export function rollDailyCrew(state: SimState): void {
   resolveArrivals(state);
+
+  // Recurrent training lapses — it has to be kept up rather than bought
+  // once. Clamped to the current total so hiring or losses can never
+  // leave more trained crew on the books than there are crew.
+  state.crew.cabinCrewTrained = Math.min(
+    state.crew.cabinCrew,
+    state.crew.cabinCrewTrained * (1 - CABIN_TRAINING_LAPSE_PER_DAY),
+  );
 
   const salary = dailyCrewSalary(state.crew);
   state.cash -= salary;

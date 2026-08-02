@@ -7,7 +7,7 @@ import { rollCompetitorRouteOpenings } from './competitors';
 import { rollDailyFuelPrice } from './fuel';
 import { rollDailyMarketDemand, actualDailyDemand } from './marketDemand';
 import { checkMissions } from './missions';
-import { rollDailyCrew, maintenanceAgeFactor } from './crew';
+import { rollDailyCrew, maintenanceAgeFactor, cabinServiceShare } from './crew';
 import { CANCELLATION_NPS_SCORE } from './nps';
 import { resolveTargetIfDue } from './targets';
 import { applyDailyLoanInterest } from './loans';
@@ -280,6 +280,7 @@ export function step(state: SimState): void {
       leg.origin,
       leg.dest,
       state.competitorRoutes,
+      cabinServiceShare(state.crew),
     );
     state.npsPointsTotal += satisfactionScore;
     state.todayNpsPoints += satisfactionScore;

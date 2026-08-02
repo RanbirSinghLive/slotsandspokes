@@ -1238,6 +1238,50 @@ requirement and salary calculation downstream. Now guarded, matching
 `repayLoan()`'s existing "silently does nothing if it can't" shape.
 `hireCrew()` needs no guard — it only ever adds.
 
+### Added: recurrent cabin service training
+
+Raised directly, and it turned out to be the piece that makes reserve
+depth do two jobs instead of one.
+
+Cabin crew can be sent for recurrent service training. They come **off
+the line** for 7 days, and since cabin crew are a staffing threshold,
+pulling people out counts against the operating minimum and can ground
+aircraft. So slack isn't only insurance against sickness any more — it's
+also what lets you train without cancelling flights. Thin reserves make
+you choose between service quality and completion factor.
+
+Once back, they raise NPS: a fourth component in
+`flightSatisfactionScore()`, worth up to **+15 points** at 100% trained,
+scaling linearly with the trained share of the cabin workforce. Sized
+deliberately between the age nudge (±10/-15) and the delay component
+(+30/-50) — service should matter more than a fresh airframe and less
+than getting people there on time. It's purely a bonus, never a penalty:
+untrained crew are the baseline everything else was tuned against.
+
+Notably it's **the only NPS input the player improves directly** rather
+than by buying something. Delay follows from schedule and fleet, fare
+from pricing, age from what you bought — this one is a decision on its
+own terms.
+
+Deliberately **not** modelled as a tier. Any cabin crew member can staff
+any aircraft, so unlike pilot ratings this gates nothing; it's a quality
+axis, not a qualification.
+
+**It lapses**, which is the point of "recurrent" — roughly a 180-day
+decay, so it's an ongoing commitment rather than a one-time purchase you
+make and forget. Newly hired cabin crew arrive untrained too, so growing
+the fleet dilutes the trained share: expansion costs service quality
+until the new people have been through it.
+
+Verified: sending 6 of 10 drops the pool to 4 immediately and returns it
+to 10 at day 7 with 60% trained; the NPS score runs 35 → 50 across 0-100%
+trained on an otherwise identical flight; the share decays 60% → 36% →
+22% over 90 and 180 days; over-requesting leaves the pool untouched and
+the trained count can never exceed the total. `PendingTraining` became a
+discriminated union so the two kinds of training can't be confused — a
+pilot comes back a tier higher, a cabin crew member comes back trained,
+and the type says so.
+
 ---
 
 ## Proposed build order (not committed)

@@ -39,6 +39,20 @@ const AGE_BASELINE_POINTS = 10;
 const AGE_PENALTY_PER_YEAR = 1;
 const AGE_FLOOR_POINTS = -15;
 
+/**
+ * Week six's fourth component: cabin service. Worth up to this many
+ * points when every cabin crew member on the books has been through
+ * recurrent service training, and nothing at all when none have (see
+ * sim/crew.ts's `cabinServiceBonus()`).
+ *
+ * Sized deliberately between the age nudge and the delay component:
+ * service is worth more than a fresh airframe and less than getting
+ * people there on time, which is the right ordering. It's also the only
+ * NPS input the player can improve directly rather than by buying
+ * something — the others all follow from fleet, fare and schedule.
+ */
+const CABIN_SERVICE_MAX_POINTS = 15;
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -83,6 +97,8 @@ export function flightSatisfactionScore(
   origin: string,
   dest: string,
   competitorRoutes: CompetitorOffering[],
+  /** 0-1: the share of cabin crew currently carrying recurrent service training. */
+  cabinServiceShare = 0,
 ): number {
   const delayComponent = clamp(
     DELAY_BASELINE_POINTS - delayMinutes * DELAY_PENALTY_PER_MINUTE,
@@ -100,8 +116,12 @@ export function flightSatisfactionScore(
 
   const ageComponent = clamp(AGE_BASELINE_POINTS - ageYears * AGE_PENALTY_PER_YEAR, AGE_FLOOR_POINTS, AGE_BASELINE_POINTS);
 
+  // Purely a bonus, never a penalty: untrained cabin crew are the
+  // baseline the other components were tuned against, not a failing.
+  const serviceComponent = clamp(cabinServiceShare, 0, 1) * CABIN_SERVICE_MAX_POINTS;
+
   // Real NPS is bounded to [-100, 100] by definition (100% detractors to
-  // 100% promoters) — the three components above rarely sum past that on
-  // their own, but this keeps the invariant true regardless.
-  return clamp(delayComponent + fareComponent + ageComponent, -100, 100);
+  // 100% promoters) — the components above rarely sum past that on their
+  // own, but this keeps the invariant true regardless.
+  return clamp(delayComponent + fareComponent + ageComponent + serviceComponent, -100, 100);
 }

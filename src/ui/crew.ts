@@ -5,6 +5,10 @@ import {
   hireCrew,
   trainingCost,
   startTraining,
+  cabinTrainingCost,
+  startCabinTraining,
+  cabinServiceShare,
+  CABIN_TRAINING_DAYS,
   maintenanceAgeFactor,
   RESERVE_DEPTH_MIN,
   RESERVE_DEPTH_MAX,
@@ -47,6 +51,10 @@ const trainCountInput = el<HTMLInputElement>('#crew-train-count');
 const trainCostEl = el<HTMLDivElement>('#crew-train-cost');
 const trainButton = el<HTMLButtonElement>('#crew-train-button');
 
+const cabinTrainCountInput = el<HTMLInputElement>('#crew-cabin-train-count');
+const cabinTrainCostEl = el<HTMLDivElement>('#crew-cabin-train-cost');
+const cabinTrainButton = el<HTMLButtonElement>('#crew-cabin-train-button');
+
 const pendingEl = el<HTMLDivElement>('#crew-pending');
 
 const maintenanceEl = el<HTMLDivElement>('#crew-maintenance');
@@ -86,6 +94,14 @@ function renderPools(state: SimState): void {
   if (rows.length === 0) rows.push(poolRow('Pilots', 0, 0, 0));
 
   rows.push(poolRow('Cabin crew', state.crew.cabinCrew, req.cabinCrew, req.targetCabinCrew));
+  rows.push(
+    poolRow(
+      `— service-trained (${Math.round(cabinServiceShare(state.crew) * 100)}%)`,
+      Math.round(state.crew.cabinCrewTrained),
+      0,
+      state.crew.cabinCrew,
+    ),
+  );
   // Mechanics have no operating minimum — they're a continuum, not a
   // threshold — so "need" is shown as 0 and only the target matters.
   rows.push(poolRow('Mechanics', state.crew.mechanics, 0, req.targetMechanics));
@@ -151,6 +167,17 @@ function renderTrainCost(state: SimState): void {
   trainButton.disabled = cost > state.cash || count > available;
 }
 
+function renderCabinTrainCost(state: SimState): void {
+  const count = Math.max(1, Number(cabinTrainCountInput.value) || 1);
+  const cost = cabinTrainingCost(count);
+  const share = cabinServiceShare(state.crew);
+  const npsNow = Math.round(share * 15);
+  cabinTrainCostEl.textContent =
+    `${money(cost)} · ${CABIN_TRAINING_DAYS} days off the line · ` +
+    `currently worth +${npsNow} NPS per flight at ${Math.round(share * 100)}% trained`;
+  cabinTrainButton.disabled = cost > state.cash || count > state.crew.cabinCrew;
+}
+
 function renderPending(state: SimState): void {
   const items: string[] = [];
   for (const hire of state.pendingHires) {
@@ -160,9 +187,11 @@ function renderPending(state: SimState): void {
   }
   for (const training of state.pendingTraining) {
     const days = Math.max(0, Math.ceil((training.completesAtMinute - state.simMinute) / MINUTES_PER_DAY));
-    items.push(
-      `<div class="crew-pending-row">${training.count} pilots upgrading to tier ${training.fromTier + 1} in ${days} day${days === 1 ? '' : 's'}</div>`,
-    );
+    const what =
+      training.kind === 'pilot'
+        ? `${training.count} pilots upgrading to tier ${training.fromTier + 1}`
+        : `${training.count} cabin crew in recurrent service training`;
+    items.push(`<div class="crew-pending-row">${what} back in ${days} day${days === 1 ? '' : 's'}</div>`);
   }
   pendingEl.innerHTML = items.length > 0 ? items.join('') : '<div class="crew-pending-row">Nothing in the pipeline.</div>';
 }
@@ -184,6 +213,14 @@ export function setupCrewPanel(state: SimState): void {
     const count = Math.max(1, Number(hireCountInput.value) || 1);
     if (hireCost(role, tier, count) > state.cash) return; // button is disabled; stale-click guard
     hireCrew(state, role, tier, count);
+    updateCrewPanel(state);
+  });
+
+  cabinTrainCountInput.addEventListener('input', () => renderCabinTrainCost(state));
+  cabinTrainButton.addEventListener('click', () => {
+    const count = Math.max(1, Number(cabinTrainCountInput.value) || 1);
+    if (count > state.crew.cabinCrew || cabinTrainingCost(count) > state.cash) return;
+    startCabinTraining(state, count);
     updateCrewPanel(state);
   });
 
@@ -210,5 +247,6 @@ export function updateCrewPanel(state: SimState): void {
   renderReserve(state);
   renderHireCost(state);
   renderTrainCost(state);
+  renderCabinTrainCost(state);
   renderPending(state);
 }
