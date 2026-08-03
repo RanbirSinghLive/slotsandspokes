@@ -7,17 +7,15 @@ short update whenever a milestone changes how something works; if it drifts
 out of sync with the code, the code is right and this needs fixing, not the
 other way around.
 
-Status: through **week seven, phase C** (the utilisation pivot — see
-WEEK-SEVEN.md) for the sections on `step()`, the route builder, the
-rotations list and persistence, which were rewritten with it.
+Status: current through **week seven, phase C** (the utilisation pivot —
+see WEEK-SEVEN.md).
 
-**The rest of this file is behind.** It was last maintained around week
-four and does not yet describe crew and reserve depth, missions, the
-C-suite, the tech tree, fuel price, airport slots, market stimulation, or
-aircraft bases and utilisation. Those systems exist and work; they just
-aren't written up here. WEEK-FIVE.md through WEEK-SEVEN.md carry their
-design reasoning in the meantime. Treat an unmarked section as "true as of
-week four" and the code as the authority, per the note above.
+**One known gap:** `src/sim/utilisation.ts` has no section of its own.
+The route builder and rotations-list sections below use its results, but
+the model itself — the 06:00–22:00 usable day, charging each leg its own
+turn, pooling spare capacity per base and reporting it *in aircraft* —
+is only written up in WEEK-SEVEN.md's phase A. That's the one part of
+the pivot this file doesn't explain.
 
 ---
 
