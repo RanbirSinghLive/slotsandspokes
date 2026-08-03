@@ -23,30 +23,6 @@ export type ScheduleLeg = {
   blockMinutes: number;
 };
 
-/**
- * A one-time repositioning move — flown once to get a tail from wherever it
- * actually is to wherever a route it's just been assigned to needs it to
- * start, then discarded. Distinct from ScheduleLeg in the way that matters:
- * `departMinute` here is an absolute `simMinute` (this specific moment in
- * this specific game), not a recurring minute-of-day, since this leg never
- * repeats. Created automatically by ui/routeBuilder.ts whenever a route is
- * assigned to a tail that isn't already standing at its origin — the point
- * is for the player to describe the network they want and have the game
- * work out how to get a plane there, not to hand-solve a routing puzzle
- * before every new route. It still costs real money (fuel and departure
- * cost, via sim/economy.ts's legCost()) and still carries weather/delay
- * risk, same as any other flight — the only thing it skips is passengers
- * and revenue, since there's no market to sell seats on.
- */
-export type PositioningLeg = {
-  legId: string;
-  tail: string;
-  origin: string;
-  dest: string;
-  departMinute: number;
-  blockMinutes: number;
-};
-
 const TAXI_ALLOWANCE_MINUTES = 20;
 
 /**
@@ -248,20 +224,6 @@ export function nextLegId(tail: string, legs: ScheduleLeg[]): string {
 }
 
 /**
- * Same idea as nextLegId() above, one counter per tail, but its own
- * "-POS-" namespace so a positioning leg's id can never collide with a
- * regular scheduled leg's.
- */
-export function nextPositioningLegId(tail: string, positioningLegs: PositioningLeg[]): string {
-  const existingNumbers = positioningLegs
-    .filter((leg) => leg.tail === tail)
-    .map((leg) => Number(leg.legId.split('-').pop()))
-    .filter((n) => !Number.isNaN(n));
-  const nextNumber = (existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0) + 1;
-  return `${tail}-POS-${nextNumber}`;
-}
-
-/**
  * How many of `legs` serve the `origin`-`dest` market, counting both
  * directions as the same market (a leg YHZ→YQM and a leg YQM→YHZ both count)
  * — the same bidirectional definition `render/routes.ts` and
@@ -299,99 +261,39 @@ export function networkAirports(legs: ScheduleLeg[]): Set<string> {
 }
 
 /**
- * Sanity-check that every aircraft's day is one unbroken chain: the
- * destination of one leg must be the origin of that same tail's next leg,
- * with at least MIN_TURN_MINUTES on the ground in between. A schedule that
- * fails this would make an aircraft "teleport" once M4 starts flying it —
- * a confusing bug to chase after the fact, so we catch it here at load
- * time instead.
+ * What the *world* says is wrong with the schedule, as opposed to what the
+ * budget says (that half is `utilisationProblems()` in sim/utilisation.ts;
+ * ui/panels.ts's `scheduleProblems()` runs both).
  *
- * `state.schedule` is meant to be *the* daily schedule — the same rotation
- * repeating every day, not a one-off plan for a single day (see CLAUDE.md).
- * That only actually holds if each tail's day is a closed loop: the last
- * leg's destination must also be its first leg's origin, or day 2 starts
- * with the aircraft in the wrong place and that tail's first departure
- * silently never fires again — the same failure mode as a broken link
- * between two legs, just one day delayed and easy to miss because the
- * schedule looks fine for the rest of the day it was edited. Checked here
- * too, not just link-by-link.
+ * Week seven, phase C, deleted most of this. It used to check that each
+ * tail's day was one unbroken chain — every leg's destination being the
+ * next leg's origin, with MIN_TURN_MINUTES on the ground between, and the
+ * last leg landing back where the first departed. None of those can fail
+ * any more. The player no longer authors departure times or individual
+ * legs; ui/routeBuilder.ts packs a whole rotation at once, from the base
+ * back to the base, with turns built into the spacing. The
+ * "lands at BOS but the next leg departs YQM" class of error is now
+ * unreachable by construction, and a check that can never fire is worse
+ * than no check — it implies a failure mode that doesn't exist.
  *
- * Also checks something the two rules above can't: whether each tail's
- * *actual current position* (`fleet`, i.e. `state.aircraft`) is anywhere in
- * its own rotation at all. A schedule can be perfectly self-consistent —
- * every leg chains into the next, the loop closes — and still never fly a
- * single leg, if the aircraft assigned to it is physically sitting
- * somewhere that schedule never visits. That happens easily once a player
- * starts editing mid-game: delete every leg that used to bring a tail
- * through some airport, and its schedule can still "validate clean" while
- * being permanently unreachable from where the plane actually is. Distinct
- * from the loop-closure check: that one only looks at the schedule's own
- * internal shape; this one looks at the schedule against the world.
+ * Two checks survive, because both are about the schedule meeting the
+ * world rather than the schedule agreeing with itself:
  *
- * `positioningLegs` (also week three) keeps the "stranded" check above from
- * crying wolf: a tail that isn't currently standing anywhere in its own
- * rotation is only a real problem if nothing is already fixing it. The M10
- * route builder auto-creates a positioning leg the moment it assigns a
- * route to a tail that isn't at the route's origin (see
- * ui/routeBuilder.ts), so the moment right after that — aircraft still
- * physically elsewhere, positioning leg queued but not yet flown — should
- * read as "in progress," not "broken."
+ * 1. **Too large for the airport.** Airport.maxAircraftType (week four) is
+ *    a real runway/gate limit. The route builder blocks it up front, but a
+ *    tail reassigned or a save from before a data change can still hold a
+ *    violating leg, so it stays visible as a standing warning.
+ * 2. **Stranded aircraft.** A tail physically parked somewhere none of its
+ *    own legs ever departs from will simply never fly again. Reachable by
+ *    changing an aircraft's base in the Fleet tab while it already has
+ *    legs — the one way left to break a rotation from the outside.
  *
- * Logs one line per problem found, or a single OK line, and also *returns*
- * the problem list (empty when the schedule is clean) — added in week
- * three so callers can show a warning somewhere a player will actually see
- * it. Console-only errors turned out to be invisible in practice: a route
- * added onto a tail that's already busy elsewhere breaks silently from the
- * player's point of view (no revenue, aircraft just sits there) unless
- * they happen to have devtools open at the moment they add it.
+ * Logs one line per problem, or a single OK line, and returns the list
+ * (empty when clean) so callers can show it somewhere a player will
+ * actually see it. Console-only errors turned out to be invisible in
+ * practice.
  */
-/**
- * The chain/turn-time/closure checks validateSchedule() below applies to
- * every tail, scoped to a single tail's own legs — pulled out on its own so
- * the M11 rotation board's drag-to-retime preview can ask "would this
- * tail's day still chain if this one leg landed at a new time," without
- * involving every other tail or the whole-schedule stranded-aircraft check
- * (that one needs the live fleet, which isn't meaningful mid-drag, before
- * anything is actually committed).
- */
-export function tailRotationProblems(tail: string, tailLegs: ScheduleLeg[]): string[] {
-  const problems: string[] = [];
-  const sorted = [...tailLegs].sort((a, b) => a.departMinute - b.departMinute);
-
-  for (let i = 1; i < sorted.length; i++) {
-    const previous = sorted[i - 1];
-    const current = sorted[i];
-
-    if (previous.dest !== current.origin) {
-      problems.push(
-        `${tail} lands at ${previous.dest} on ${previous.legId} but ${current.legId} departs from ${current.origin}`,
-      );
-    }
-
-    const turnMinutes = current.departMinute - (previous.departMinute + previous.blockMinutes);
-    if (turnMinutes < MIN_TURN_MINUTES) {
-      problems.push(`${tail} has only ${turnMinutes} minutes on the ground between ${previous.legId} and ${current.legId}`);
-    }
-  }
-
-  if (sorted.length > 0) {
-    const first = sorted[0];
-    const last = sorted[sorted.length - 1];
-    if (last.dest !== first.origin) {
-      problems.push(
-        `${tail}'s rotation doesn't close -- ${last.legId} lands at ${last.dest}, but the day restarts at ${first.origin} (${first.legId}). Add a leg back to ${first.origin}, or that first departure will never fire again.`,
-      );
-    }
-  }
-
-  return problems;
-}
-
-export function validateSchedule(
-  legs: ScheduleLeg[],
-  fleet: Aircraft[] = [],
-  positioningLegs: PositioningLeg[] = [],
-): string[] {
+export function validateSchedule(legs: ScheduleLeg[], fleet: Aircraft[] = []): string[] {
   const byTail = new Map<string, ScheduleLeg[]>();
   for (const leg of legs) {
     const group = byTail.get(leg.tail) ?? [];
@@ -400,10 +302,6 @@ export function validateSchedule(
   }
 
   const problems: string[] = [];
-
-  for (const [tail, tailLegs] of byTail) {
-    problems.push(...tailRotationProblems(tail, tailLegs));
-  }
 
   // Week four's airport constraints (Airport.maxAircraftType): a leg
   // already assigned to a tail whose aircraft is too large for one of
@@ -429,12 +327,10 @@ export function validateSchedule(
 
     const origins = new Set(tailLegs.map((leg) => leg.origin));
     if (!origins.has(aircraft.atAirport)) {
-      const alreadyBeingFixed = positioningLegs.some((leg) => leg.tail === aircraft.tail && origins.has(leg.dest));
-      if (!alreadyBeingFixed) {
-        problems.push(
-          `${aircraft.tail} is sitting at ${aircraft.atAirport}, but none of its scheduled legs ever depart from there -- it will never fly again until a leg (or a positioning move) gets it to one of: ${[...origins].sort().join(', ')}.`,
-        );
-      }
+      problems.push(
+        `${aircraft.tail} is sitting at ${aircraft.atAirport}, but none of its rotations ever depart from there -- it will never fly again. ` +
+          `Set its base back to one of: ${[...origins].sort().join(', ')}, or remove its rotations and draw new ones from ${aircraft.atAirport}.`,
+      );
     }
   }
 

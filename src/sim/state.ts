@@ -1,5 +1,5 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
-import { loadSchedule, marketKey, recommendedFare, type PositioningLeg, type ScheduleLeg } from './schedule';
+import { loadSchedule, marketKey, recommendedFare, type ScheduleLeg } from './schedule';
 import { loadFleetMarket, type FleetListing } from './fleetMarket';
 import { loadCompetitorRoutes, type CompetitorOffering } from './competitors';
 import type { WeatherEvent } from './weather';
@@ -93,15 +93,6 @@ export type ActiveFlight = {
    */
   fare: number;
   marketingSpend: number;
-  /**
-   * Set only on a flight step.ts created from a PositioningLeg (week
-   * three) — a one-time repositioning move with no market to sell seats
-   * on. step.ts's arrival handling checks this to charge the flight's real
-   * operating cost (fuel + departure, sim/economy.ts's legCost()) without
-   * running the passenger/revenue side of flightResult() at all, rather
-   * than pretending it has a market it doesn't.
-   */
-  isPositioning?: boolean;
 };
 
 /**
@@ -157,15 +148,6 @@ export type SimState = {
    * reuses the same entry rather than creating a second one.
    */
   routeSettings: Record<string, RouteSettings>;
-  /**
-   * One-time repositioning moves, queued but not yet flown — see
-   * PositioningLeg's own comment (sim/schedule.ts) for why these live
-   * separately from `schedule` rather than as ScheduleLeg entries. step()
-   * flies them the same way it flies a scheduled leg (weather, delay, real
-   * fuel/departure cost) and removes each one the moment it departs, since
-   * a positioning move by definition never repeats.
-   */
-  positioningLegs: PositioningLeg[];
   /**
    * Week three's Fleet Market: airframes still available to buy or lease
    * (see sim/fleetMarket.ts's FleetListing). ui/fleetMarket.ts removes a
@@ -581,7 +563,6 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     activeFlights: [],
     schedule,
     routeSettings,
-    positioningLegs: [],
     fleetMarket: [], // no Fleet Market needed for a headless balance run
     // Same competitive landscape the real game starts with, growing the
     // same way over time (step()'s day-rollover doesn't know or care
@@ -688,7 +669,6 @@ export function createNewGameState(rngSeed: number = Date.now()): SimState {
     activeFlights: [],
     schedule: [],
     routeSettings: {},
-    positioningLegs: [],
     fleetMarket: loadFleetMarket(),
     competitorRoutes: loadCompetitorRoutes(),
     weatherByAirport: {},

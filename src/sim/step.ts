@@ -1,5 +1,5 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
-import { flightResult, legCostBreakdown, type EconomyAircraftType } from './economy';
+import { flightResult, type EconomyAircraftType } from './economy';
 import { MIN_TURN_MINUTES, legsServingMarket, marketKey } from './schedule';
 import { rollDailyWeather, isAirportClosed } from './weather';
 import { routeConnectivityMultiplier } from './airports';
@@ -46,18 +46,11 @@ const aircraftTypesByCode = new Map<string, EconomyAircraftType>(
  *      (MIN_TURN_MINUTES since it last landed), takes off — it becomes an
  *      ActiveFlight with a randomly rolled arrival delay (sim/rng.ts) and
  *      its aircraft flips to airborne.
- *   3. Position (week three): same gate as a scheduled departure above,
- *      but against `state.positioningLegs` instead — one-time repositioning
- *      moves the M10 route builder queues up when a route gets assigned to
- *      a tail that isn't standing at its origin (see PositioningLeg in
- *      sim/schedule.ts). Removed from the queue the moment it departs,
- *      since it never repeats.
- *   4. Arrive: any ActiveFlight whose arrival minute has been reached
+ *   3. Arrive: any ActiveFlight whose arrival minute has been reached
  *      lands — its aircraft flips back to ground at the destination and
  *      records when (`groundSinceMinute`, for the next leg's turn-time
- *      check). A positioning flight's cost (fuel + departure, no revenue —
- *      it isn't serving a market) is applied the same as a revenue flight's
- *      full economics (sim/economy.ts) would be, and the flight is removed
+ *      check). The flight's full economics (sim/economy.ts) are applied
+ *      and the flight is removed
  *      from the active list either way.
  *
  * The reset happens at the *start* of the new day rather than the end of
@@ -353,60 +346,6 @@ export function step(state: SimState): void {
     state.activeFlights.push(activeFlight);
   }
 
-  // Positioning legs (week three, see PositioningLeg's own comment in
-  // sim/schedule.ts) depart the same way scheduled legs do above — same
-  // ground/turn-time gate, same three-cause delay roll — except
-  // `departMinute` here is an absolute simMinute, not a minute-of-day,
-  // since a positioning move never repeats: "late at departure" is just
-  // `simMinute - leg.departMinute` directly, no day-start offset needed.
-  // Removed from the queue the instant it departs rather than tracked in
-  // `completedToday`: once it's airborne it's fully represented by its
-  // ActiveFlight, and it can never come due again.
-  for (let i = state.positioningLegs.length - 1; i >= 0; i--) {
-    const leg = state.positioningLegs[i];
-    if (state.simMinute < leg.departMinute) continue;
-
-    const aircraft = state.aircraft.find((a) => a.tail === leg.tail);
-    if (!aircraft) continue;
-    if (aircraft.status !== 'ground' || aircraft.atAirport !== leg.origin) continue;
-    if (state.simMinute < aircraft.groundSinceMinute + MIN_TURN_MINUTES) continue;
-
-    aircraft.status = 'airborne';
-    aircraft.atAirport = null;
-    aircraft.activeLegId = leg.legId;
-
-    // Rolled the same way a revenue leg is, but *not* added to
-    // onTimeByMarket or delayMinutesByCause (see their own doc comments
-    // on SimState): a positioning move isn't serving a market, so it has
-    // no route-quality story to tell.
-    const weatherAtOrigin = !!state.weatherByAirport[leg.origin];
-    const lateAtDepartureMinutes = state.simMinute - leg.departMinute;
-    const [delayBreakdown, nextSeed] = rollTotalDelayMinutes(
-      state.rngSeed,
-      aircraft.ageYears,
-      weatherAtOrigin,
-      lateAtDepartureMinutes,
-      maintenanceAgeFactor(state) * executiveMaintenanceMultiplier(state),
-    );
-    state.rngSeed = nextSeed;
-    const delayMinutes = delayBreakdown.age + delayBreakdown.weather + delayBreakdown.knockOn;
-
-    const activeFlight: ActiveFlight = {
-      legId: leg.legId,
-      tail: leg.tail,
-      origin: leg.origin,
-      dest: leg.dest,
-      departMinute: state.simMinute,
-      arriveMinute: state.simMinute + leg.blockMinutes + delayMinutes,
-      scheduledArriveMinute: state.simMinute + leg.blockMinutes,
-      fare: 0,
-      marketingSpend: 0,
-      isPositioning: true,
-    };
-    state.activeFlights.push(activeFlight);
-    state.positioningLegs.splice(i, 1);
-  }
-
   for (let i = state.activeFlights.length - 1; i >= 0; i--) {
     const flight = state.activeFlights[i];
     if (state.simMinute < flight.arriveMinute) continue;
@@ -422,24 +361,7 @@ export function step(state: SimState): void {
       if (type) {
         const blockMinutes = flight.arriveMinute - flight.departMinute;
 
-        if (flight.isPositioning) {
-          // No market, no passengers, no revenue — just the real fuel and
-          // departure cost of moving the aircraft (sim/economy.ts's
-          // legCost(), the same formula a revenue flight's cost half uses).
-          const breakdown = legCostBreakdown(
-            blockMinutes,
-            type,
-            state.fuelPriceIndex,
-            state.fuelEfficiencyMultiplier,
-          );
-          const cost = breakdown.fuel + breakdown.blockNonFuel + breakdown.departure;
-          state.cash -= cost;
-          state.todayCost += cost;
-          state.todayCostByCategory.fuel += breakdown.fuel;
-          state.todayCostByCategory.blockNonFuel += breakdown.blockNonFuel;
-          state.todayCostByCategory.departure += breakdown.departure;
-          state.todayMargin -= cost;
-        } else {
+        {
           const marketFrequency = legsServingMarket(flight.origin, flight.dest, state.schedule);
           const key = marketKey(flight.origin, flight.dest);
           const spilloverAvailable = state.spilloverByMarket[key] ?? 0;

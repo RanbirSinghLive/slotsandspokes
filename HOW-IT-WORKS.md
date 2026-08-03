@@ -7,12 +7,17 @@ short update whenever a milestone changes how something works; if it drifts
 out of sync with the code, the code is right and this needs fixing, not the
 other way around.
 
-Status: M1–M6 complete (scaffold through economy/panel). Phase 2 — M7
-(headless runner), M8 (schedule editor), and M9 (turn times/delays) all
-done — that's every milestone WEEK-ONE.md's "Then, in order" names. Phase 3
-(see WEEK-TWO.md) is underway: M10 (route creation map gesture) done; the
-demand/choice-model/competition/pricing layers it'll eventually plug into
-are still brainstorm-stage, not built.
+Status: through **week seven, phase C** (the utilisation pivot — see
+WEEK-SEVEN.md) for the sections on `step()`, the route builder, the
+rotations list and persistence, which were rewritten with it.
+
+**The rest of this file is behind.** It was last maintained around week
+four and does not yet describe crew and reserve depth, missions, the
+C-suite, the tech tree, fuel price, airport slots, market stimulation, or
+aircraft bases and utilisation. Those systems exist and work; they just
+aren't written up here. WEEK-FIVE.md through WEEK-SEVEN.md carry their
+design reasoning in the meantime. Treat an unmarked section as "true as of
+week four" and the code as the authority, per the note above.
 
 ---
 
@@ -158,19 +163,10 @@ order:
    origin has active weather) added to the departure minute. Reading from
    `state.schedule` rather than a fixed constant is what lets the M8
    schedule editor's edits actually change what the sim does.
-3. **Position** (week three) — the same depart gate as step 2, but against
-   `state.positioningLegs` instead: one-time repositioning moves
-   `ui/routeBuilder.ts` queues automatically when a route gets assigned to
-   a tail that isn't standing at its origin (see "Route builder," below).
-   Removed from the queue the instant it departs, since a positioning move
-   is absolute-time and never recurs.
-4. **Arrive** — any `ActiveFlight` whose `arriveMinute` has been reached
+3. **Arrive** — any `ActiveFlight` whose `arriveMinute` has been reached
    lands: the aircraft flips back to `ground` at the destination and
    records `groundSinceMinute` (for the *next* leg's turnaround check).
-   `sim/economy.ts`'s `flightResult()` is applied for a normal leg (see
-   Economy below); a positioning flight instead pays only its real
-   fuel/departure cost (`legCost()`) with zero passengers or revenue,
-   since it isn't serving any market.
+   `sim/economy.ts`'s `flightResult()` is applied (see Economy below).
 
 **Why "at or after" instead of an exact match (M9):** once delays exist, an
 aircraft can still be mid-flight or mid-turnaround at the exact minute its
@@ -257,9 +253,7 @@ out), so "on time" collapses to "departed at exactly its due minute,"
 and a leg whose aircraft is still working off an earlier delay departs
 late by construction, the same cascade traced above. Two new lifetime
 counters on `SimState`, `flightsDepartedTotal`/`flightsOnTimeTotal`,
-incremented right in this departure loop (not the positioning-leg loop
-below — repositioning moves aren't real service, same exclusion revenue
-already gets). Lifetime rather than reset-per-day like `todayRevenue`,
+incremented right in this departure loop. Lifetime rather than reset-per-day like `todayRevenue`,
 since a "running" performance stat that blanked out every midnight
 would defeat the point — it sits next to `Cash` in the HUD for exactly
 that reason, both being the sidebar's two lifetime numbers.
@@ -287,10 +281,9 @@ minutes, using real BTS delay-code names mapped onto whichever
 mechanic actually produces each one — not decorative relabeling: a
 knock-on delay from an earlier leg is literally what the BTS calls
 "Late Aircraft"; age/reliability is the classic "Carrier" delay;
-weather is weather. Both new fields are revenue-flights-only, same
-scope the existing on-time counters already have — a positioning
-move isn't serving a market, so it has nothing to say about route
-quality.
+weather is weather. Both new fields cover every flight, since every flight
+now serves a market — week seven removed positioning legs, the one
+kind of movement that didn't.
 
 The route table sorts worst-first — surfacing problems is the whole
 point of this panel, not an alphabetical ledger — and colors anything
@@ -885,114 +878,6 @@ a fleet table (tail, type, status, and either the current airport or
 The econ/fleet parts are rebuilt from `state` every render — a pure read,
 same rule as the canvas layers.
 
-## Schedule editor (M8)
-
-The schedule table is *not* rebuilt every render like the fleet table is —
-`setupScheduleEditor()` builds its rows once at startup instead. Rebuilding
-it 60 times a second the way the fleet table is would tear out and recreate
-every `<input>` continuously, which steals keyboard focus and closes the
-browser's native time-picker mid-edit. Nothing needs it rebuilt anyway:
-`state.schedule` only ever changes through these same inputs, so there's
-nothing external for a repeated render to pick up.
-
-Each row has a real `<input type="time">` bound to one leg's `departMinute`
-(converted between "HH:MM" and minutes-of-day). Its `change` handler does
-two things: mutates that leg object in `state.schedule` directly — which
-`step()` reads from, so the very next simulated minute that reaches that
-slot uses the new time — and re-runs `validateSchedule()` on the whole
-schedule, logging to the console exactly like the M3 startup check does if
-the edit leaves an aircraft departing before it could plausibly have landed
-and turned around.
-
-**Closing the loop (week three):** `validateSchedule()` also checks, per
-tail, that the chronologically *last* leg's destination equals the *first*
-leg's origin — not just that consecutive legs chain into each other.
-`state.schedule` is supposed to be the same rotation repeating every day
-(per CLAUDE.md), so a tail whose day doesn't loop back to its own start
-looks fine on the day it's edited and then silently jams on day two: the
-aircraft simply isn't where the first leg needs it to be, and `step()`'s
-departure check (physical position must match `leg.origin`) blocks it
-forever with no error, since nothing about that check is itself broken.
-Found by playtesting, not by reading the code — a hand-added one-way leg
-stranded a tail for good with revenue silently going to zero.
-
-**Validated against reality, not just itself (week three):**
-`validateSchedule()` also takes `state.aircraft` as a second argument and
-checks, per tail, whether its actual current airport (when grounded) is
-the origin of *any* of its own scheduled legs. The closed-loop check above
-only looks at the schedule's own shape — it can't see that a tail is
-stranded if every leg that used to route it through some airport gets
-deleted, leaving a perfectly self-consistent two-leg loop (say, YHZ↔YYT)
-that the aircraft, still sitting wherever its old rotation last left it,
-never actually touches. Found immediately after the closed-loop fix
-shipped, by the same player hitting exactly this case. The message names
-the tail, where it actually is, and which airports its own schedule would
-accept it at.
-
-**Warnings are visible in the UI, not just the console (week three):**
-`validateSchedule()` returns its problem list (still logs it too) instead
-of only logging it, and every call site — the startup check here, the
-remove/edit handlers below, and the M10 route builder's Add Route — routes
-that return value through `ui/panels.ts`'s `renderScheduleWarnings()`,
-which renders the list directly above the Schedule table. A
-`console.error` nobody has devtools open to see is functionally the same
-as no error at all from the player's chair; this puts it exactly where
-their attention already is right after the edit that caused it.
-
-Editing is departure time, plus removal (week three) — reassigning a
-leg's origin, destination, or tail (which would also mean recomputing
-`blockMinutes` and touching `render/routes.ts`'s route list) is out of
-scope for this pass. Fare briefly lived here as a per-leg column during
-the Pricing loop's first pass, then moved to the route (market) level —
-see "The Commercial panel," below — once it became clear fare needed to
-be a route-level decision, not one independently adjustable per
-frequency.
-
-**Removing a leg** (week three's playtest-readiness fix): a small "×"
-button per row calls `removeScheduleLeg()`, which splices the leg out of
-`state.schedule` and its row out of the DOM. If that was the last leg on
-its market, the now-orphaned `RouteSettings` entry and Commercial-panel
-row are dropped too (`ui/commercial.ts`'s `removeCommercialRow()`) — a
-market with no flights left shouldn't keep a lingering fare/marketing
-lever. No confirmation dialog: this matches M8/M10's existing
-allow-then-flag philosophy exactly — removal is immediate, and
-`validateSchedule()` logs a broken rotation to the console the same way
-a bad manual time edit already does, rather than blocking the action. An
-already-airborne flight on the removed leg is unaffected, since
-`ActiveFlight` (sim/state.ts) already carried its own copied data
-independent of `state.schedule`.
-
-**Column filters:** a second header row holds one text input per column
-(Tail/Route/Depart). `applyScheduleFilters()` re-checks all three on every
-keystroke in any of them — case-insensitive substring match, ANDed across
-fields — and just toggles each row's `display`, not a rebuild, so it can't
-interfere with the "build once" rule above. Depart matches against the
-row's live `<input type="time">` value rather than text content, since
-that cell holds an input, not a text node; editing a row's time re-applies
-the filters too, in case the new value no longer matches.
-
-The exported `filterScheduleToRoute(origin, dest)` is called from
-`showForm()` — the moment the confirmation popup opens, not the moment
-"Add Route" is clicked. It clears the Tail/Depart filters (so a stale one
-can't hide anything) and sets the Route filter to the pending route's
-exact text, so the table narrows to that market's existing frequencies
-*while the player is still choosing a tail and time* — useful context for
-the decision itself, not just tidying up afterward. Filtering only on
-confirm was tried first and didn't feel like it worked: by the time the
-filter took effect, the popup had already closed and attention had moved
-on, so the narrowing was easy to miss entirely. Since the Route filter is
-already set to the right market by the time "Add Route" runs, the newly
-added leg satisfies it automatically — no separate re-filter step needed
-after adding.
-
-The confirmation form also resets its own depart-time input to a fixed
-default (`DEFAULT_DEPART_TIME`, `showForm()`) every time it opens, rather
-than leaving whatever time a *previous* route's form was left at — without
-this, a leftover time from an unrelated earlier route could silently
-collide with an existing leg on a new market and block Add with no
-obvious reason why (this happened for real: creating a second YSJ-YQB
-frequency after leaving the input at 13:00 from an unrelated route).
-
 ## Airport constraints (`src/sim/schedule.ts`) — week four
 
 New alongside the nine new airports: some real airports have a real
@@ -1037,397 +922,99 @@ in-browser: arming a route with an A220-300 selected and confirming
 into YTZ produced the exact expected error and a disabled Add Route
 button; switching to a DH8400 for the identical route cleared both.
 
-## Route builder (`src/ui/routeBuilder.ts`) — M10
+## Route builder (`src/ui/routeBuilder.ts`) — M10, rewritten week seven
 
-Creating a *new* route is a map gesture, not a form: **pick a plane from
-the Fleet panel first** (week three — see below), click an airport to
-arm it, move the mouse (no need to hold the button — release and the arm
-state persists) to draw a live preview arc toward the cursor, and click a
-second airport to confirm. The preview is built the same way as a real
-route — a 2-point `LineString` run through the same `d3.geoPath` machinery
-`render/routes.ts` uses — so it curves exactly like the route would once
-created, snapping onto the nearest airport's exact coordinates once the
-cursor is within `HIT_RADIUS_PX`. Escape, re-clicking the armed origin, or
-clicking anywhere that isn't a valid airport all cancel back to idle.
+Building service is a map gesture, not a form: **pick a plane from the
+Fleet panel first**, click an airport to arm it, move the mouse (no need
+to hold the button) to draw a live preview arc toward the cursor, and
+click a second airport. The preview is a `LineString` run through the same
+`d3.geoPath` machinery `render/routes.ts` uses, so it curves exactly like
+the real route will, snapping onto the nearest airport once the cursor is
+within `HIT_RADIUS_PX`. Escape, re-clicking the armed origin, or clicking
+open water all cancel back to idle.
 
-This is a small state machine (`idle` / `armed` / `confirming`) living
-entirely in this module — not in `SimState`, since it's transient UI
-interaction, not simulated-world state. `main.ts`'s existing canvas
-`mousedown` handler gives this module first refusal on every click
-(`handleRouteBuilderMouseDown`); only if it says "not mine" does the
-existing M2 pan gesture start, so the two don't fight over the same event.
+A small state machine (`idle` / `armed` / `confirming`) lives entirely in
+this module, not in `SimState` — transient UI interaction, not simulated
+state. `main.ts`'s canvas `mousedown` handler gives this module first
+refusal on every click, so the pan gesture and the builder never fight
+over the same event.
 
-**Pick the plane first, not last (week three):** Add Route used to open
-a form with a Tail dropdown *after* both endpoints were already chosen —
-so you could draw a whole route before the game ever asked which plane
-it was for, and the dropdown just defaulted to `state.aircraft[0]`. Now
-`ui/panels.ts`'s Fleet rows are clickable (a second click deselects),
-tracked in a new tiny module, `ui/fleetSelection.ts`, purely to avoid a
-circular import (`panels.ts` and `routeBuilder.ts` already import from
-each other the other way). `handleRouteBuilderMouseDown()` refuses to
-arm anything at all — same silent no-op as clicking empty water — unless
-a tail is already selected, and captures it into the `armed`/`confirming`
-state so the whole gesture stays locked to that one plane. If the Fleet
-selection changes mid-gesture, `cancelIfTailChanged()` (checked on every
-mousedown and every `drawRoutePreview()` call) cancels the pending route
-rather than let it finish for a different, or no, aircraft. Buying or
-leasing (`ui/fleetMarket.ts`) auto-selects the new tail, so a purchase
-flows straight into drawing its first route. The Tail dropdown in the
-confirmation form is gone — the plane is shown read-only
-(`#new-route-tail-label`), since it was decided before the form ever
-opened.
+### What gets built is a rotation, not a leg
 
-**A real range ring, not a decorative one (week three):** the moment an
-origin is armed, `drawRoutePreview()` draws a geodesic circle —
-`d3.geoCircle()`, a true constant-great-circle-distance ring, not a flat
-pixel one — sized to the selected plane's real range
-(`data/aircraft-types.json`'s new `rangeNm` field ÷ 60, since 60nm per
-degree of arc is the literal definition of a nautical mile). A flat
-pixel circle would lie about reachability here specifically because
-Mercator distorts distance by latitude, and this map sits far enough
-north for that distortion to matter. Range is enforced, not advisory:
-`updateFormValidation()` blocks Add Route with a plain message ("YYT is
-954 nm from YOW — beyond the Beechcraft 1900D's 700 nm range with a full
-load") whenever the destination falls outside it, with a matching
-defensive re-check in the confirm handler. 700nm is the type's realistic
-full-payload range from published specs (its empty ferry range is closer
-to 1,439nm) — checked against all 45 of this map's city pairs before
-picking it: only 5 fall outside 700nm, nearly all of them reaching
-Newfoundland (YYT) from the mainland, which tracks with the real
-geography rather than fragmenting the map.
+Week seven's pivot. `BuilderState` carries a `chain: Airport[]` — base
+first, last entry being wherever the next leg departs from. **"Add stop"**
+appends the pending destination and re-arms from it instead of
+confirming, so `YUL-YFC-YQM-YFC-YQM-YUL` is one gesture. Confirm closes
+the loop back to the base, which is why there's no "add return leg"
+checkbox: a plain out-and-back is just the two-airport chain.
 
-Confirming opens a real DOM form (per CLAUDE.md's panel rule) for
-departure time (tail is already fixed — see above). "Add Route" does
-nothing clever beyond that: it appends a new `ScheduleLeg` to
-`state.schedule` (the same array `step()` reads from) and re-runs
-`validateSchedule()` — exactly the mechanism M8's time-editing already
-uses. There's no new rotation-fitting solver; a leg added somewhere the
-chosen tail isn't actually going to be gets caught by the same console
-error a bad manual edit would produce, and nothing prevents adding it
-anyway, for consistency with M8.
+A rotation **must start at the aircraft's `baseAirport`**. Arming
+elsewhere is a hard block. An unbased airframe gets based by flying its
+first rotation from there, which is the only place other than the Fleet
+tab's dropdown where a base is set.
 
-**PDEW/CAP (week four):** the form also shows the market's un-minmaxed
-demand-vs-capacity ceiling — "PDEW: 626 CAP: 19" — right under Block
-time, turning amber when demand can't fill the plane. `PDEW` (Passengers
-Daily Each Way) is `round(dailyDemand(origin, dest) / newFrequency)`:
-`sim/demand.ts`'s existing gravity-model total, divided by the market's
-frequency *after* this confirm would add its leg(s) — the same
-denominator `sim/economy.ts`'s `flightResult()` already divides by, read
-before committing instead of after, so it can never drift from what the
-flight actually carries once it's flying. `CAP` is the plane's raw seat
-count, deliberately not the load-factor-adjusted ceiling — the point is
-showing the number *before* fare, yield segmentation, marketing spend,
-or competitor response apply, all of which are what the Commercial
-panel is for. Recomputes live when the return checkbox toggles (it
-changes `newFrequency`), and stays visible even when the route itself is
-blocked (network gating, out of range) — still useful context for a
-market worth trying differently.
+### Packing
 
-**The same reading, on hover, before you even confirm (week four):**
-while a route is *armed* (one airport clicked, cursor moving toward the
-second), a real-DOM tooltip (`ui/routeBuilder.ts`'s
-`showRouteHoverTooltip()`, positioned via mousemove the same way
-`ui/competitionTooltip.ts`'s already is) shows PDEW/CAP for whichever
-airport `candidate` — the same nearest-airport snap the preview arc
-already uses — currently points to. No new hit-testing needed:
-Competition mode's arc-distance technique turned out to be unnecessary
-here, since the route builder already tracks the hover target for its
-own preview line. A candidate beyond the selected plane's range shows
-"— out of range (954 nm)" in place of the thin-market amber, catching
-the same case the confirmation form's hard block does, just one click
-earlier. Hidden on canvas `mouseleave` without cancelling the armed
-gesture itself — moving the mouse to the sidebar to glance at the Fleet
-panel shouldn't lose an in-progress route.
+`packRotation()` walks the chain giving each leg the cursor's time, then
+advancing `cursor += blockMinutes + MIN_TURN_MINUTES`. The player no
+longer authors departure times at all — there is no time input.
 
-**A suggested depart time, not just a fixed one (week three):**
-`suggestedDepartTime()` replaces what used to be an unconditional
-`12:00` default. If the selected tail already has legs and the
-chronologically *last* one lands right at this route's origin, it
-suggests landing-time-plus-turn-buffer — reusing
-`defaultReturnDepartMinute()`'s exact formula, just applied to the
-tail's actual last leg instead of the leg being drawn — so a route that
-continues a tail's day slots in behind its last flight instead of
-defaulting to an unrelated fixed hour. Otherwise (no legs yet, or an
-origin that doesn't match where the day currently ends — which needs a
-positioning leg regardless) it falls back to a new `MORNING_DEPART_TIME`
-(07:00), matching `data/schedule.json`'s own convention for how a day
-actually starts. Always just a suggestion: the field stays a plain,
-editable `<input type="time">`.
+Start time comes from `rotationStartMinute()`: `USABLE_DAY_START_MINUTE`
+(06:00) for a tail with no legs, otherwise its last arrival plus a turn.
+Packing every rotation from 06:00 would double-book a tail against itself.
+Because every rotation ends at base, appending after the previous one
+always chains cleanly.
 
-**The return leg (week three):** confirming adds *two* legs by default,
-not one — the one you drew, plus its reverse, auto-timed via
-`defaultReturnDepartMinute()` (land, then the same block time back, plus a
-45-minute turn buffer) and shown live in the form ("Return: YQM → YYZ at
-14:54") before you confirm. This came from an actual playtest bug: adding
-a single one-way leg is exactly the gesture that strands a tail with no
-way back into its rotation, since nothing else in the schedule ever
-returns it to where that leg needs it to start. A checkbox ("Add return
-leg too", checked by default) opts back out for the genuine exception — an
-extra one-way frequency on a market that already has a return, or a
-deliberate one-off repositioning move. The return leg gets its own
-exact-time-collision check, independent of the outbound leg's, since
-either one colliding should block the whole submission.
+`packRotationAvoidingCollisions()` then shifts the whole rotation later in
+five-minute steps until no leg departs at the exact minute another tail
+already flies that market. Auto-packing makes that collision likely rather
+than rare — two aircraft at one base both opening at 06:00 on the same
+market hit it every time — and there's no time field left for the player
+to change, so it's resolved quietly.
 
-**Automatic positioning flights (week three):** every fix up to this point
-(closed-loop validation, the physical-position check) made the game
-correctly *report* a stranded tail — none of them stopped it from
-happening. That was backwards: the point of positioning flights is to let
-the player describe the network they want and have the game work out how
-to get a plane there, at a real cost, not to force a routing puzzle before
-every new route. So Add Route now checks the chosen tail's current (or,
-if it's airborne, soon-to-be — see `currentOrUpcomingAirport()`) position
-against the route's origin, and if they don't match, queues a one-time
-`PositioningLeg` (`sim/schedule.ts`) automatically — no extra click. The
-form previews it before you confirm: "Positioning: C-GVIA will fly
-YOW → YHZ first (106 min, cost only, no passengers) before this route
-starts."
+### One place decides everything
 
-A `PositioningLeg` is a genuinely different kind of thing from a
-`ScheduleLeg`: it lives in its own `state.positioningLegs` array, its
-`departMinute` is an absolute `simMinute` rather than a repeating minute-
-of-day (it never recurs), and `step()` flies it through the same gates as
-a real leg (turn time, weather, delay) but charges only its real
-fuel/departure cost on arrival (`sim/economy.ts`'s `legCost()`) — no
-market, no passengers, no revenue, since there's nothing to sell seats on.
-It's removed from the queue the instant it departs. `validateSchedule()`'s
-stranded-tail check also takes `state.positioningLegs` now, so it stops
-warning about a tail that already has a positioning leg headed toward one
-of its schedule's own origins — "in progress," not "broken."
+`planRotation()` produces the popover's text *and* gates the confirm
+handler. Range, network reachability, slot capacity and
+airport-size-limit are checked across **every** leg of the chain,
+including the closing one back to base. Two failures are new:
 
-`currentOrUpcomingAirport()` returns `null` for one more case beyond "tail
-not found": a Fleet Market purchase that's never flown, sitting
-unassigned (see the Fleet Market section above). That's handled as its
-own branch, not a positioning leg — there's no real "current location" to
-fly it in from, so Add Route just sets `aircraft.atAirport` to the new
-route's origin directly, for free, right when you confirm.
+- The packed chain lands past `USABLE_DAY_END_MINUTE` (22:00). The message
+  then reports whether the *base* still has spare capacity — "put this on
+  another tail based there" versus "buy another airframe". A separate
+  pooled-capacity gate would never fire on its own, since a rotation that
+  fits one tail's day always fits its base's pool.
+- Only the closing leg being out of range sets `blocksAddStop = false`,
+  because that one *is* fixable by adding a nearer stop. Every other
+  failure only gets worse with more legs.
 
-**Growing the network one airport at a time (week three):** a new
-route's *origin* has to already be somewhere the player flies —
-`sim/schedule.ts`'s `networkAirports()` returns every airport touched by
-`state.schedule` (both origins and destinations), and Add Route blocks
-the form (disabled button, plain error: "YSJ isn't in your network
-yet...") whenever the chosen origin isn't in that set and the set isn't
-empty. The *destination* is unrestricted — reaching a brand-new airport
-as a destination is exactly how it joins the network for the next route
-to start from. An empty network (the very first route of the game) is
-exempt, since nothing could be "already in" a network that doesn't exist
-yet. This was designed and agreed on in an earlier conversation but never
-actually wired up until a player caught two disconnected routes (YFC↔YYG,
-then YSJ↔YHZ) going through with no gate at all. It's a route-creation-
-time check, not a schedule-wide invariant — it doesn't feed into
-`validateSchedule()`'s returned problems, so an already-disconnected
-route from before this fix isn't retroactively flagged, only prevented
-going forward.
+The popover's live reading is the pivot's headline: "Uses 23% of an
+aircraft — YHZ has 1.00 spare, 0.78 after this."
 
-Editing/removing an *existing* route stays table-driven (M8) rather than
-gaining a second, harder gesture — hit-testing a click against an
-arbitrary curve is a meaningfully bigger problem than hit-testing a point,
-and the table already does the job.
+## Rotations list (`src/ui/panels.ts`) — week seven, phase C
 
-**Market vs. frequency, and the one thing that's hard-blocked:** the form's
-heading reads "New Frequency" instead of "New Route" when the chosen
-origin/destination already has service — checked bidirectionally
-(`isExistingMarket()`), the same definition `render/routes.ts` uses to
-decide what counts as the same route for drawing. Separately, adding a leg
-at the exact same origin, destination, *and* departure minute as one that
-already exists is hard-blocked in the form itself (an inline error,
-disabled Add button, live as the depart time changes) rather than allowed-
-through-then-flagged the way M8/M9's rotation checks are — two departures
-at the identical minute on the identical route has no legitimate
-interpretation in this model, unlike a temporarily awkward rotation, which
-is still meaningful to leave in place while iterating. That collision
-check is same-direction only (opposite-direction departures at the same
-clock time is an ordinary synchronized schedule bank, not a conflict).
+The Gantt rotation board and the per-leg schedule table are both gone. The
+Fleet tab lists rotations instead: one row per rotation with its chain
+(`YHZ → YQM → YFC → YHZ`), its window, its utilisation share, and a
+remove button.
 
-## Rotation board (`src/ui/rotationBoard.ts`) — M11
+`rotationsForTail()` (in `sim/utilisation.ts`, so it stays testable
+without a browser) derives rotations by splitting a tail's departure-
+sorted legs wherever one lands at its base. Nothing is stored: a
+`Rotation[]` on `SimState` alongside `schedule` would be two
+representations of one fact, free to drift.
 
-A second view of the same `state`, for when the schedule table stops being
-legible — a Gantt-style diagram, one row per tail, bars from
-`departMinute` to `departMinute + blockMinutes` against a shared 24-hour
-axis. Everything that isn't a bar *is* the answer to "where's the white
-space" — no separate free-time indicator is drawn, since the gaps between
-bars already show it.
+Removing drops the **whole** rotation. Deleting one leg out of the middle
+would strand the rest of it away from base, and the rotation is the unit
+the player built. Any market left with no legs at all loses its
+`routeSettings` entry and Commercial row too. A flight already airborne is
+unaffected — `ActiveFlight` carries its own copied data.
 
-`#map`, `#rotation-board`, `#commercial-panel`, and `#fleet-market-panel`
-are CSS siblings sized identically; the HUD's panel toggle swaps which
-one is visible via the `hidden` attribute rather than absolute
-positioning. The panels are grouped into two icon-triggered dropdowns
-rather than a flat row of buttons — **Maps** (a folded-map SVG icon;
-Map, plus the Demand/Competition overlay toggles — see "Rendering,"
-above, for why those stopped being panel-switch buttons in week four)
-and **Reports** (a bar-chart SVG icon; Rotation, Commercial, Fleet) —
-each group's trigger shows only the icon, not a text label, and opens a
-small popup on click. Clicking a panel button, or clicking anywhere
-outside an open dropdown, closes it; the trigger for whichever group the
-active panel belongs to stays visually active even while its dropdown
-is closed, so it's visible at a glance which one you're on without
-opening anything. Hit the same `[hidden]`-vs-class-selector specificity
-gotcha CLAUDE.md documents for `#map`/`#rotation-board` —
-`.view-dropdown[hidden] { display: none }` has to be explicit, or the
-dropdown's own `display: flex` rule silently wins and it never actually
-hides. `main.ts`'s `render()` still updates the clock and sidebar panel
-every frame regardless of which panel is showing, but skips all canvas
-drawing while a DOM panel is up (`if (panelView !== 'map') return;`) —
-there's no point paying for it while hidden.
-
-Read-only through week three, on purpose (phase 1 of a longer plan — see
-WEEK-TWO.md's "rotation board" section): phases 2–3 (create/reschedule
-by dragging a bar) were shelved at the time as a second implementation
-of what the M10 map gesture already does — duplicating the map
-gesture's plane-selection, range, positioning, and network-gating
-intelligence for no real gain.
-
-**Week four (M12) revisited that call, and the distinction turned out
-to matter.** The M10 route builder still owns everything about
-*creating* a leg (which plane, is it in range, does the network allow
-this origin, does it need a positioning move first) — none of that got
-duplicated. What's new is *retiming* an already-created leg, which
-needs none of that machinery: just "does this tail's day still chain if
-this one leg moves." That turned out to be exactly the operation
-missing from the M10 form, whose depart-time suggestion only checks
-"does this tail's chronologically-last leg land at this route's
-origin" — a route drawn from an airport the tail's day doesn't
-currently *end* at falls through to a fixed morning default regardless
-of what else that tail is already flying, which is how two out-and-back
-routes both starting from the same base ended up scheduled to leave at
-the same time (see WEEK-FOUR.md's own account of hitting exactly this
-with C-FQAB). Rather than trying to make that suggestion heuristic
-smarter — it can always be wrong in some *new* way, and the player never
-sees why a time was picked — M12 makes the board itself the fix: drop
-the new leg wherever, jump straight here, and let the player see and
-drag it into place.
-
-Dragging a bar (`attachDragHandlers()` in rotationBoard.ts) reads a
-scratch `tentativeDepartMinute` while the mouse moves, snapping to the
-nearest whole minute, and checks it live against `tailRotationProblems()`
-(schedule.ts) — the same per-tail chain/turn-time/closure check
-`validateSchedule()` applies to every tail, pulled out on its own so
-this preview can score one tail's hypothetical placement without
-pulling in the whole-schedule stranded-aircraft check (meaningless
-mid-drag, before anything's committed) or bleeding in an unrelated
-tail's unrelated problems. The bar turns red the instant the
-hypothetical breaks the chain, green the instant it doesn't — feedback
-while the player is still deciding where to drop it, not a warning list
-to notice afterward.
-
-**M12 confined this to one row (retime only); M13 lifted that**, once
-asked directly whether a leg could move to a *different* tail. A bar
-now reparents into whichever row the cursor is over
-(`findRowTrackAt(clientY)`, checked against a `rowTracksByTail` list
-rebuilt alongside the rows every render) — since `.rotation-bar` is
-absolutely positioned relative to its containing track, moving the DOM
-node into a different track re-anchors it there for free. The live
-check widened to match: pulling a leg out of the middle of a tail's
-closed loop can break *that* tail just as easily as it can the one
-gaining a leg, so when the candidate tail differs from the original,
-`tailRotationProblems()` runs twice — once for the destination with the
-leg hypothetically added, once for the origin with it hypothetically
-removed — and a hard `rangeNm` check (the same limit the route builder
-enforces when a route is first drawn) flags a leg dropped onto a plane
-that physically can't fly that distance, red for the same reason, not
-a separate mechanism.
-
-Deliberately *not* written back to `state.schedule` until the actual
-drop (`mouseup`): `step()` reads that array every simulated minute,
-including while the rotation board is open and a drag is mid-flight, so
-committing a half-finished drag would feed the running simulation a
-value the player hasn't actually chosen yet. On drop, the leg's real
-object gets its `departMinute` — and, if it changed rows, its `tail` —
-mutated in place (iterating `state.schedule` hands back live
-references, not copies, so no lookup-and-replace is needed);
-`legId` is left exactly as it was even after a tail reassignment, on
-purpose — nothing in the sim parses a legId's prefix for meaning, and
-renaming it would mean updating every place that keys off it (the
-schedule table's row map, `activeFlights`, `completedToday`) for no
-functional gain. `validateSchedule()` re-runs so the sidebar's warning
-list agrees with what the board now shows, and — new problem this
-surfaced — `ui/panels.ts`'s schedule table needed its own
-`syncScheduleRow()` export (`syncScheduleRowTime()`'s M13 successor,
-now syncing the Tail cell too via a new `.schedule-tail-cell` class,
-and re-applying the schedule filters since a reassigned leg may no
-longer match an active Tail filter), since that table's cells are built
-once and only ever patched by their *own* `change` handler
-(deliberately, to avoid tearing out a focused input on every frame); a
-drag commits through a completely different path, so nothing else
-would ever tell that row to catch up without this call.
-
-**Does reassigning a leg to a different gauge actually change its
-gauge, everywhere?** Asked directly, and checking turned up two real
-gaps predating M13 entirely — both a "single aircraft type" assumption
-nobody had gone back to fix once the week-four ladder introduced four
-more. `sim/schedule.ts`'s `computeBlockMinutes()` always used
-`aircraftTypesData[0]`'s cruise speed (the 1900D's 280kt) for *every*
-leg regardless of which plane was actually flying it; `ui/commercial.ts`
-did the same for a whole market's pax/load/revenue/cost summary. Both
-now take the actual aircraft type into account — `computeBlockMinutes()`
-gained a `cruiseKts` parameter (defaulting to that same first-type value,
-so `data/schedule.json`'s fixed template and the headless runner's
-single-type fleet are unaffected), and `ui/commercial.ts` looks up each
-leg's *own* tail's type (`aircraftTypeForLeg()`) rather than one type for
-the whole market, summing seat ceiling and load factor per leg so a
-market split across two different gauges reports real combined capacity
-instead of pretending every flight is the same size.
-
-The rotation board's drag ties into this directly: landing a leg on a
-different-gauge tail recomputes its `blockMinutes` right there — live,
-during the drag itself (the tooltip and the bar's own width preview the
-new tentative block time before anything commits, and the turn-time
-check scores the correct hypothetical arrival against it), and again on
-drop. Nothing else needed to change — seats, cost, and revenue were
-already read fresh off the aircraft's type via the tail at flight time,
-never cached per leg, so `blockMinutes` was the one place a stale gauge
-could actually survive a reassignment.
-
-**The map-to-board handoff (also M12):** confirming a route in
-`ui/routeBuilder.ts` now calls an `onRouteConfirmed(legIds)` callback
-(wired in `main.ts` to `switchToPanel('rotation', legIds)`) instead of
-just leaving the player looking at the map. `updateRotationBoard()`
-takes an optional `highlightLegIds` array and tags matching bars with a
-CSS-only amber glow (`rotation-bar--new`, a couple of keyframe pulses,
-no JS timer to clear it — the class just never gets applied again once
-something else triggers a rebuild), and scrolls the first one into
-view. The player finishes a route and lands immediately on "here's what
-you just added, go place it," rather than an easy-to-miss warning
-somewhere else.
-
-Unlike the schedule table or the route-builder form, the board has no
-persistent live `<input>` elements to lose focus on (a bar being
-dragged is the one exception, handled entirely through its own
-mousedown/mousemove/mouseup, not a rebuild), so `updateRotationBoard()`
-still simply clears and rebuilds every row from `state` on each call,
-rather than patching in place the way M8/M10 have to. It's called
-whenever the Rotation view is selected, whenever a drag commits, and
-whenever a route confirms with legs to highlight — not on every tick,
-since nothing else mutates the schedule while the board itself is open.
-
-Switching away from the Ops view calls `cancelPendingRoute()` (M10's
-route builder, exported for this purpose) — an armed or half-confirmed
-route gesture doesn't mean anything once the canvas it was being drawn
-on is no longer on screen.
-
-**Two more M12 legibility fixes, both raised directly after using the
-board above:** a `.rotation-row-type` column now sits to the left of
-the tail label, showing `aircraft.typeCode` — the same raw code the
-Fleet panel's own Type column already shows (`ui/panels.ts`), so the two
-never need a separate lookup to stay consistent. `.rotation-axis-spacer`
-had to widen by the same amount (72px → 140px) so the hour-tick axis
-still lines up with the track's left edge instead of the row labels.
-
-Second, each bar's hover now shows a real custom tooltip
-(`#rotation-bar-tooltip`, same "real DOM, positioned via mousemove"
-shape as `#route-hover-tooltip`) instead of relying on the bar's native
-`title` — a short block time draws a narrow bar whose own inline text
-gets clipped, which is exactly the case the native tooltip couldn't
-save (slow to appear, unstyled, and the same clipped text either way).
-The tooltip's title is the route (`origin → destination`) specifically,
-not the leg ID or time — the route is the thing a tiny bar can't
-reliably show on its own, so it's the first thing the tooltip says.
-`showBarTooltip(leg, departMinute, x, y)` takes the depart time as its
-own argument rather than reading it off `leg` so the same function
-serves both a plain hover (the bar's resting `departMinute`) and a
-live drag (the drag's own `mousemove` handler calls it with the
-tentative dragged-to minute instead), which is also why the tooltip
-keeps showing the new time as a bar moves, not just when it's still.
+A rotation that never returns to base is flagged red rather than hidden.
+That's only reachable by changing a base in the Fleet tab while legs
+already exist, which regroups them around the new base — the one remaining
+way to break a rotation from outside, and the red flag plus the remove
+button are the repair path.
 
 ## The Commercial panel (`src/ui/commercial.ts`)
 
@@ -1586,11 +1173,10 @@ Week three's playtest-readiness fix (see WEEK-THREE.md): before this,
 closing the tab threw away every schedule edit, fare change, and
 marketing dollar spent, since nothing was ever written to
 `localStorage`. `loadSavedState()`/`saveState()`/`clearSavedState()` are
-a thin wrapper around it, keyed by `airgame-save-v4` at last count —
+a thin wrapper around it, keyed by `airgame-save-v23` at last count —
 bumped by hand whenever `SimState`'s shape changes in a breaking way
-(most recently week four's `flightsDepartedTotal`/`flightsOnTimeTotal`
-counters, below; before that, the Fleet Market's `fleetMarket` field and
-`Aircraft`'s new `ownership`/`leaseCostPerDay`), so an old save under a
+(most recently week seven phase C removing `positioningLegs`; before that
+phase A adding `Aircraft.baseAirport`), so an old save under a
 retired key is simply never found again rather than crashing on a field
 the current code doesn't expect (bare-bones versioning, not a migration
 system).
@@ -1661,17 +1247,14 @@ no early lease-end, matching CLAUDE.md's aircraft-trading still being
 deferred beyond just getting into a plane.
 
 **No base-airport picker at purchase.** A bought or leased aircraft joins
-the fleet with `atAirport: null` — shown as "Unassigned" in the Fleet
-panel's Where column — sitting in a pool rather than pinned to a city
-before there's a route for it. `ui/routeBuilder.ts`'s
-`currentOrUpcomingAirport()` returns `null` for exactly this case (ground,
-no airport), which the Add Route confirm handler treats differently from
-a real mismatch: instead of queuing a costed positioning leg (see the
-Route builder section below), it deploys the aircraft directly to the
-new route's origin, for free — there's nothing to fly it in *from*. The
-form previews this before confirming: "C-FQAC has no base yet — this
-route will make YHZ its new base." That first route is also, implicitly,
-how a home base gets chosen — no separate step for it.
+the fleet with `atAirport: null` and `baseAirport: null` — shown as
+"Unassigned" in the Fleet panel's Where column — sitting in a pool rather
+than pinned to a city before there's a rotation for it. Confirming its
+first rotation places it at that rotation's base and sets `baseAirport`
+to match, for free: there's nothing to fly it in *from*. The popover
+previews this before confirming: "C-FQAC has no base yet — this rotation
+will make YHZ its base." That first rotation is one of two ways a base
+gets chosen; the Fleet tab's own Base dropdown is the other.
 
 Buying/leasing also calls `ui/fleetSelection.ts`'s `setSelectedTail()` on
 the new aircraft — since week three's later "pick a plane first" change

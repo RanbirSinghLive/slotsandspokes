@@ -4,9 +4,9 @@ Handoff document. Week six's full history lives in `WEEK-SIX.md` — read
 this one first, and go there only for the reasoning behind a specific
 system.
 
-**State at handoff:** save key `airgame-save-v22`, 12 sidebar tabs.
-Phases A and B of the pivot are done and committed; **phase C is the next
-thing to build.**
+**State at handoff:** save key `airgame-save-v23`, 11 sidebar tabs.
+Phases A, B and C of the pivot are done and committed; **phase D is the
+next thing to build.**
 
 ---
 
@@ -140,24 +140,68 @@ phase A decision, not a phase B one.
 
 ---
 
-## Phases C and D — next. Build C first.
+## Phase C — done
 
-**C — deletions.** Remove the Rotation tab (`#rotation-board`,
-`ui/rotationBoard.ts`, the `'rotation'` SidebarTab case), the schedule
-table in the Fleet tab, `PositioningLeg` and its whole queue including
-`step()`'s positioning departure loop, and the half of `validateSchedule`
-that rotations make structurally impossible (continuity and turn-time
-checks — the `"lands at BOS but next leg departs YQM"` class of error
-can no longer occur). Utilisation over 100% becomes the new failure mode.
+Two commits, each independently runnable.
 
-Phase B leaves positioning legs nearly extinct already — a rotation ends
-where it began, so a tail only needs positioning for its very first one.
-The route builder's `currentOrUpcomingAirport()` call and the
-`else if (!currentPosition)` deploy-here branch are the only two places
-left to unpick.
+**Deletions.** The Rotation tab and `ui/rotationBoard.ts`, the
+`'rotation'` SidebarTab case, its 900px expand affordance
+(`PANEL_WIDTH_EXPANDED_PX` and `setPanelWidth()` with it), the per-leg
+schedule table and its filters, `PositioningLeg` and its whole queue
+including `step()`'s positioning departure loop and
+`ActiveFlight.isPositioning`. `SAVE_KEY` bumped to **v23** for the
+`positioningLegs` removal.
 
-**D — Commercial becomes Routes.** Aggregated per-market data, fare
-policy at the top. Rename the tab and its icon.
+**`validateSchedule` lost the half rotations make impossible** —
+`tailRotationProblems()` is gone entirely, so the continuity, turn-time
+and loop-closure checks with it. Two checks survive because both are
+about the schedule meeting the *world* rather than agreeing with itself:
+too-large-for-the-airport, and stranded-aircraft.
+
+**The new failure mode is `utilisationProblems()`** in
+`sim/utilisation.ts` — over 100% of a usable day, as promised. It lives
+there rather than in `schedule.ts` because the utilisation model defines
+what "too much" means, and because `schedule.ts` importing it would close
+an import cycle. `ui/panels.ts`'s **`scheduleProblems(state)`** runs both
+halves; every call site should use it rather than either half alone.
+
+### The one thing C had to add rather than delete
+
+Removing the schedule table would have left the player able to add
+rotations but never remove one — its `×` button was the only way back
+from an unwanted route. So the **rotations list** replaces it in the
+Fleet tab: one row per rotation with its chain, window, utilisation
+share, and a remove button that drops the whole rotation.
+
+This is not the Gantt returning. It has no timeline and nothing is
+draggable; it's the budget view, listed. Removing a *rotation* rather
+than a leg is also the only coherent unit now — deleting one leg out of
+the middle would strand the rest of it away from base.
+
+`rotationsForTail()` derives rotations by splitting a tail's legs wherever
+one lands at its base. Deliberately **not** stored on `SimState`: a
+stored `Rotation[]` alongside `schedule` would be two representations of
+one fact, free to drift.
+
+### Consequences worth knowing
+
+- **Changing a base in the Fleet tab regroups existing legs.** The split
+  point is the *current* base, so legs built around the old one re-form
+  into different rotations, and one may not close. Those are flagged red
+  (`.rotation-row--open`) and are removable, which is the intended repair
+  path. This is now the only way to break a rotation from outside.
+- **The stranded check got much harder to reach.** Confirming a rotation
+  places a tail at its base when it has no legs, so "remove everything and
+  redraw" relocates the aircraft rather than stranding it. The check is
+  kept for the narrow case it still covers, but do not expect to see it.
+- **Balance is provably untouched.** `headless-output.csv` and
+  `sweep-reserve.csv` are both byte-identical after C — the fixture never
+  used positioning legs, so removing that RNG draw changed no sequence.
+
+## Phase D — next. Build this.
+
+**Commercial becomes Routes.** Aggregated per-market data, fare policy at
+the top. Rename the tab and its icon.
 
 ---
 
@@ -182,8 +226,9 @@ Phases 1 and 2 landed (airport presence → map; prose → tooltips, flavour
 collapsed). **Phase 3 — tab grouping, 12 → ~6 — was never started.**
 Proposed grouping: Operate (Fleet/Rotation/Crew), Network
 (Commercial/Airports), Grow (Fleet Market/Tech Tree/Executive), Goals
-(Missions), plus Dev and Game. Do this *after* the pivot, since C removes
-a tab and D renames one.
+(Missions), plus Dev and Game. C has since removed the Rotation tab
+(11 left, so Operate is just Fleet/Crew now) and D renames Commercial —
+do the grouping after D.
 
 Also never built from that plan: route reliability colouring on the map,
 a today's-disruption layer (grounded aircraft, cancelled legs, closed
@@ -228,7 +273,7 @@ Nothing else on that list is unlocked by it.
 ## Conventions worth knowing before touching anything
 
 - **Bump `SAVE_KEY` in `src/ui/save.ts` on any breaking `SimState`
-  change.** Currently `v22`. Old saves are simply never found again
+  change.** Currently `v23`. Old saves are simply never found again
   rather than crashing.
 - **`npm run sweep -- <lever> [days]`** is the balance tool. Its
   guarantee is that rows differ only by the lever, which requires the

@@ -15,8 +15,6 @@ import {
   MIN_TURN_MINUTES,
   networkAirports,
   nextLegId,
-  nextPositioningLegId,
-  type PositioningLeg,
   type ScheduleLeg,
 } from '../sim/schedule';
 import {
@@ -213,33 +211,6 @@ function findExactTimeCollision(
   return schedule.find(
     (leg) => leg.origin === originIata && leg.dest === destIata && leg.departMinute === departMinute,
   );
-}
-
-/**
- * Where `tail` actually is (or will be) right now, for deciding whether
- * assigning it to a new route needs a positioning leg first — see
- * PositioningLeg's own comment (sim/schedule.ts) for why this exists at
- * all. Ground and airborne aircraft need different answers: a grounded
- * tail can reposition as soon as its turn time clears, while an airborne
- * one can only start repositioning after it lands wherever it's already
- * headed (its current ActiveFlight's destination) plus its own turn time —
- * there's no such thing as diverting a flight already in the air. `null`
- * only if `tail` isn't part of the active fleet at all.
- */
-function currentOrUpcomingAirport(tail: string, state: SimState): { airport: string; earliestDepartMinute: number } | null {
-  const aircraft = state.aircraft.find((a) => a.tail === tail);
-  if (!aircraft) return null;
-
-  if (aircraft.status === 'ground' && aircraft.atAirport) {
-    return { airport: aircraft.atAirport, earliestDepartMinute: Math.max(state.simMinute, aircraft.groundSinceMinute + MIN_TURN_MINUTES) };
-  }
-
-  const activeFlight = state.activeFlights.find((f) => f.tail === tail);
-  if (activeFlight) {
-    return { airport: activeFlight.dest, earliestDepartMinute: activeFlight.arriveMinute + MIN_TURN_MINUTES };
-  }
-
-  return null;
 }
 
 function setArmedCursor(armed: boolean): void {
@@ -905,22 +876,12 @@ function updateFormValidation(chain: Airport[], dest: Airport, state: SimState):
   formConfirmButton.disabled = plan.error !== null;
   formAddStopButton.disabled = plan.blocksAddStop;
 
-  // Suppressed while blocked: describing a positioning flight for a
-  // rotation that can't be added reads as a contradiction, and the error
-  // is the only thing worth reading in that state.
-  const currentPosition = plan.error ? null : currentOrUpcomingAirport(tail, state);
-  if (plan.error) {
-    formPositioningPreview.textContent = '';
-  } else if (currentPosition && currentPosition.airport !== plan.base.iata) {
-    formPositioningPreview.textContent = `Positioning: ${tail} will fly ${currentPosition.airport} → ${plan.base.iata} first (${computeBlockMinutes(currentPosition.airport, plan.base.iata, type?.cruiseKts)} min, cost only, no passengers) before this rotation starts.`;
-  } else if (!currentPosition) {
-    // A Fleet Market purchase with no base yet (see ui/fleetMarket.ts) —
-    // deploying it here is free and immediate, not a positioning flight,
-    // since it was never anywhere else to begin with.
-    formPositioningPreview.textContent = `${tail} has no base yet — this rotation will make ${plan.base.iata} its base.`;
-  } else {
-    formPositioningPreview.textContent = '';
-  }
+  // Suppressed while blocked: the error is the only thing worth reading
+  // in that state.
+  formPositioningPreview.textContent =
+    !plan.error && aircraft && !aircraft.baseAirport
+      ? `${tail} has no base yet — this rotation will make ${plan.base.iata} its base.`
+      : '';
 }
 
 /**
@@ -956,34 +917,6 @@ export function setupRouteBuilder(state: SimState, onRouteConfirmed: (legIds: st
     if (plan.error || plan.legs.length === 0) return;
 
     const aircraft = state.aircraft.find((a) => a.tail === tail);
-    const type = aircraft ? aircraftTypesByCode.get(aircraft.typeCode) : undefined;
-
-    // If the chosen tail isn't standing at its base, queue a one-time
-    // positioning leg to get it there — see currentOrUpcomingAirport() and
-    // PositioningLeg's own comment (sim/schedule.ts). Rotations make this
-    // nearly extinct: every rotation ends where it began, so a tail only
-    // needs positioning for its very first one, and phase C of the pivot
-    // removes positioning legs entirely.
-    //
-    // `currentPosition === null` is different: a Fleet Market purchase
-    // (ui/fleetMarket.ts) that's never flown before has no base at all,
-    // not merely a *different* one, so there's nothing to fly it in from.
-    // Deploying it here is free and immediate.
-    const currentPosition = currentOrUpcomingAirport(tail, state);
-    if (currentPosition && currentPosition.airport !== plan.base.iata) {
-      const positioningLeg: PositioningLeg = {
-        legId: nextPositioningLegId(tail, state.positioningLegs),
-        tail,
-        origin: currentPosition.airport,
-        dest: plan.base.iata,
-        departMinute: currentPosition.earliestDepartMinute,
-        blockMinutes: computeBlockMinutes(currentPosition.airport, plan.base.iata, type?.cruiseKts),
-      };
-      state.positioningLegs.push(positioningLeg);
-    } else if (!currentPosition && aircraft) {
-      aircraft.atAirport = plan.base.iata;
-      aircraft.groundSinceMinute = state.simMinute;
-    }
 
     // Week seven, decision 2: an aircraft's base is explicit state, not
     // something inferred from its legs. An unbased airframe gets based
@@ -991,6 +924,20 @@ export function setupRouteBuilder(state: SimState, onRouteConfirmed: (legIds: st
     // game has to a "pick a home airport" step, and the only place a base
     // is set other than the Fleet tab's own dropdown.
     if (aircraft && !aircraft.baseAirport) aircraft.baseAirport = plan.base.iata;
+
+    // Phase C removed positioning legs. A rotation ends where it began, so
+    // a tail is always already at its base by the time it could fly
+    // another one — the only tail that isn't is one taking its *first*
+    // rotation, which is either a Fleet Market airframe that has never
+    // been anywhere (atAirport null) or one left parked after its previous
+    // rotations were removed. Placing it at the base is honest for both:
+    // there's no revenue day being skipped and nothing to fly it in from.
+    // A based tail whose legs start somewhere else is a different problem
+    // and stays one — validateSchedule()'s stranded check reports it.
+    if (aircraft && aircraft.status === 'ground' && !state.schedule.some((leg) => leg.tail === tail)) {
+      aircraft.atAirport = plan.base.iata;
+      aircraft.groundSinceMinute = state.simMinute;
+    }
 
     const createdLegIds: string[] = [];
     // Keyed bidirectionally (marketKey) so out and back collapse to one

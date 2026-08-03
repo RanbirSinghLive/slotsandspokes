@@ -46,7 +46,7 @@ export const MAX_LOANS = 20;
 
 /**
  * Same "scan existing IDs, take the highest number, add one" approach
- * sim/schedule.ts's nextLegId()/nextPositioningLegId() already use for
+ * sim/schedule.ts's nextLegId() already uses for
  * every other player-triggered ID in this codebase — no separate counter
  * to keep in sync with `state`, and taking a loan isn't part of step(), so
  * it doesn't need to be seeded-RNG-deterministic the way a delay roll does.
