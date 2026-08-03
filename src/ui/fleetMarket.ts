@@ -1,6 +1,5 @@
-import type { FleetListing } from '../sim/fleetMarket';
-import type { Aircraft, SimState } from '../sim/state';
-import { setSelectedTail } from './fleetSelection';
+import { orderAircraft, type FleetListing } from '../sim/fleetMarket';
+import type { SimState } from '../sim/state';
 
 const tableBody = document.querySelector<HTMLTableSectionElement>('#fleet-market-rows')!;
 
@@ -14,53 +13,25 @@ function formatMoney(amount: number): string {
 }
 
 /**
- * Buy or lease `listing` — creates the Aircraft record, charges (or
- * doesn't) cash, removes the listing from `state.fleetMarket` and its row,
- * and selects the new tail (ui/fleetSelection.ts) so it's immediately
- * ready to draw a route for — no separate click on its Fleet row needed
- * right after buying it. Acquisition-only for this pass: no sell-back, no
- * early lease-end, so once a listing is gone it's gone for the rest of
- * this game.
+ * Order `listing` — the rules all live in sim/fleetMarket.ts's
+ * orderAircraft(); this just removes the row and reports the date.
  *
- * `atAirport: null` — no base airport picked here on purpose. The
- * aircraft joins the fleet unassigned, sitting in the pool shown on the
- * Fleet panel until the player draws a route for it (ui/routeBuilder.ts):
- * assigning a pool aircraft to a route deploys it directly to that
- * route's origin, for free, since it was never anywhere else to begin
- * with. That's also what ends up choosing a home base, implicitly,
- * without a separate step for it.
+ * Week eight: this no longer produces an aircraft. It produces a
+ * *delivery*, which becomes an aircraft after the listing's lead time.
+ * Buying used to be the one commitment in the game with no wait attached,
+ * which sat oddly next to crew taking ten days to show up — and it made
+ * age a pure discount rather than a trade.
+ *
+ * There's no setSelectedTail() any more either: there is no tail yet to
+ * select. Selecting it on arrival would also mean silently changing what
+ * the map is armed for, weeks after the click that caused it.
  */
-function acquireAircraft(listing: FleetListing, ownership: 'owned' | 'leased', state: SimState): void {
-  if (ownership === 'owned') {
-    state.cash -= listing.buyPrice;
-  }
-  // Leasing costs nothing up front — its cost is the recurring
-  // leaseCostPerDay charged daily at step.ts's day-rollover, the same
-  // shape RouteSettings.marketingSpend already has.
+function order(listing: FleetListing, ownership: 'owned' | 'leased', state: SimState): void {
+  if (ownership === 'owned' && listing.buyPrice > state.cash) return; // button is disabled; stale-click guard
 
-  const aircraft: Aircraft = {
-    tail: listing.registration,
-    typeCode: listing.typeCode,
-    status: 'ground',
-    atAirport: null,
-    activeLegId: null,
-    groundSinceMinute: state.simMinute,
-    ownership,
-    leaseCostPerDay: ownership === 'leased' ? listing.leasePricePerDay : 0,
-    ageYears: listing.ageYears,
-    // Unbased on arrival. Basing is an explicit decision now (Fleet tab)
-    // rather than something inferred from wherever the first route
-    // happened to start — see Aircraft.baseAirport.
-    baseAirport: null,
-  };
-  state.aircraft.push(aircraft);
-
-  const index = state.fleetMarket.findIndex((l) => l.registration === listing.registration);
-  if (index !== -1) state.fleetMarket.splice(index, 1);
+  orderAircraft(state, listing, ownership);
   rowsByRegistration.get(listing.registration)?.remove();
   rowsByRegistration.delete(listing.registration);
-
-  setSelectedTail(aircraft.tail);
 }
 
 function buildListingRow(listing: FleetListing, state: SimState): HTMLTableRowElement {
@@ -75,6 +46,13 @@ function buildListingRow(listing: FleetListing, state: SimState): HTMLTableRowEl
   const ageCell = document.createElement('td');
   ageCell.textContent = `${listing.ageYears} yr`;
 
+  // Lead time sits next to age and price because it is the third axis of
+  // the same decision, not a footnote: the cheap airframe is also the one
+  // you can have soonest, and the one that will break down most.
+  const leadCell = document.createElement('td');
+  leadCell.className = 'fleet-market-lead';
+  leadCell.textContent = `${listing.leadTimeDays} d`;
+
   const leaseCell = document.createElement('td');
   leaseCell.textContent = `${formatMoney(listing.leasePricePerDay)}/day`;
 
@@ -87,15 +65,15 @@ function buildListingRow(listing: FleetListing, state: SimState): HTMLTableRowEl
   const buyButton = document.createElement('button');
   buyButton.type = 'button';
   buyButton.textContent = 'Buy';
-  buyButton.addEventListener('click', () => acquireAircraft(listing, 'owned', state));
+  buyButton.addEventListener('click', () => order(listing, 'owned', state));
 
   const leaseButton = document.createElement('button');
   leaseButton.type = 'button';
   leaseButton.textContent = 'Lease';
-  leaseButton.addEventListener('click', () => acquireAircraft(listing, 'leased', state));
+  leaseButton.addEventListener('click', () => order(listing, 'leased', state));
 
   actionCell.append(buyButton, leaseButton);
-  row.append(regCell, typeCell, ageCell, leaseCell, buyCell, actionCell);
+  row.append(regCell, typeCell, ageCell, leadCell, leaseCell, buyCell, actionCell);
 
   rowsByRegistration.set(listing.registration, row);
   return row;

@@ -1,14 +1,14 @@
 [
-  { "registration": "C-FQAB", "typeCode": "BEH1900D", "ageYears": 3, "buyPrice": 890000, "leasePricePerDay": 700 },
-  { "registration": "C-FQAC", "typeCode": "BEH1900D", "ageYears": 8, "buyPrice": 650000, "leasePricePerDay": 550 },
-  { "registration": "C-FQAD", "typeCode": "BEH1900D", "ageYears": 15, "buyPrice": 420000, "leasePricePerDay": 380 },
-  { "registration": "C-FQAE", "typeCode": "BEH1900D", "ageYears": 21, "buyPrice": 300000, "leasePricePerDay": 300 },
-  { "registration": "C-GDHA", "typeCode": "DH8300", "ageYears": 6, "buyPrice": 4200000, "leasePricePerDay": 1400 },
-  { "registration": "C-GDHB", "typeCode": "DH8300", "ageYears": 18, "buyPrice": 2100000, "leasePricePerDay": 950 },
-  { "registration": "C-GQXA", "typeCode": "DH8400", "ageYears": 5, "buyPrice": 13500000, "leasePricePerDay": 2600 },
-  { "registration": "C-GQXB", "typeCode": "DH8400", "ageYears": 16, "buyPrice": 6800000, "leasePricePerDay": 1800 },
-  { "registration": "C-GBBA", "typeCode": "A220300", "ageYears": 4, "buyPrice": 42000000, "leasePricePerDay": 7200 },
-  { "registration": "C-GBBB", "typeCode": "A220300", "ageYears": 9, "buyPrice": 31000000, "leasePricePerDay": 5400 },
-  { "registration": "C-GWBA", "typeCode": "A330300", "ageYears": 12, "buyPrice": 34000000, "leasePricePerDay": 9800 },
-  { "registration": "C-GWBB", "typeCode": "A330300", "ageYears": 24, "buyPrice": 19500000, "leasePricePerDay": 6500 }
+  { "registration": "C-FQAB", "typeCode": "BEH1900D", "ageYears": 3, "buyPrice": 890000, "leasePricePerDay": 700, "leadTimeDays": 45 },
+  { "registration": "C-FQAC", "typeCode": "BEH1900D", "ageYears": 8, "buyPrice": 650000, "leasePricePerDay": 550, "leadTimeDays": 30 },
+  { "registration": "C-FQAD", "typeCode": "BEH1900D", "ageYears": 15, "buyPrice": 420000, "leasePricePerDay": 380, "leadTimeDays": 21 },
+  { "registration": "C-FQAE", "typeCode": "BEH1900D", "ageYears": 21, "buyPrice": 300000, "leasePricePerDay": 300, "leadTimeDays": 14 },
+  { "registration": "C-GDHA", "typeCode": "DH8300", "ageYears": 6, "buyPrice": 4200000, "leasePricePerDay": 1400, "leadTimeDays": 60 },
+  { "registration": "C-GDHB", "typeCode": "DH8300", "ageYears": 18, "buyPrice": 2100000, "leasePricePerDay": 950, "leadTimeDays": 30 },
+  { "registration": "C-GQXA", "typeCode": "DH8400", "ageYears": 5, "buyPrice": 13500000, "leasePricePerDay": 2600, "leadTimeDays": 75 },
+  { "registration": "C-GQXB", "typeCode": "DH8400", "ageYears": 16, "buyPrice": 6800000, "leasePricePerDay": 1800, "leadTimeDays": 40 },
+  { "registration": "C-GBBA", "typeCode": "A220300", "ageYears": 4, "buyPrice": 42000000, "leasePricePerDay": 7200, "leadTimeDays": 90 },
+  { "registration": "C-GBBB", "typeCode": "A220300", "ageYears": 9, "buyPrice": 31000000, "leasePricePerDay": 5400, "leadTimeDays": 60 },
+  { "registration": "C-GWBA", "typeCode": "A330300", "ageYears": 12, "buyPrice": 34000000, "leasePricePerDay": 9800, "leadTimeDays": 90 },
+  { "registration": "C-GWBB", "typeCode": "A330300", "ageYears": 24, "buyPrice": 19500000, "leasePricePerDay": 6500, "leadTimeDays": 45 }
 ]

@@ -21,6 +21,8 @@ const costEl = document.querySelector<HTMLSpanElement>('#panel-cost')!;
 const marginEl = document.querySelector<HTMLSpanElement>('#panel-margin')!;
 const fleetBody = document.querySelector<HTMLTableSectionElement>('#fleet-table tbody')!;
 const fleetUtilisationEl = document.querySelector<HTMLDivElement>('#fleet-utilisation')!;
+const inboundSectionEl = document.querySelector<HTMLElement>('#inbound-section')!;
+const inboundListEl = document.querySelector<HTMLDivElement>('#inbound-list')!;
 const rotationsBody = document.querySelector<HTMLTableSectionElement>('#rotations-table tbody')!;
 const rotationsEmptyEl = document.querySelector<HTMLDivElement>('#rotations-empty')!;
 const scheduleWarningsEl = document.querySelector<HTMLUListElement>('#schedule-warnings')!;
@@ -87,6 +89,7 @@ export function updatePanel(state: SimState): void {
   marginEl.textContent = formatMoney(state.todayMargin);
 
   renderFleet(state);
+  renderInbound(state);
   renderUtilisation(state);
   renderRotations(state);
 
@@ -222,6 +225,48 @@ function renderFleet(state: SimState): void {
       cells.baseSelect.value = aircraft.baseAirport ?? '';
     }
   }
+}
+
+/**
+ * Airframes paid for and on their way (week eight). Lives directly under
+ * the fleet because that is where you look for "what aircraft have I
+ * got" — an order with a 90-day lead time would otherwise be invisible
+ * between the click that bought it and the day it appears, which is
+ * exactly the mistake the crew panel made with its ten-day hires.
+ *
+ * Hidden entirely when nothing is inbound rather than showing an empty
+ * heading, since for most of a game nothing is.
+ *
+ * No cancel button: acquisition is one-way for now, matching the Fleet
+ * Market's existing no-sell-back rule. Worth revisiting if lead times
+ * turn out to make a wrong order too punishing.
+ */
+const MINUTES_PER_DAY = 1440;
+let inboundSignature: string | null = null;
+
+function renderInbound(state: SimState): void {
+  const signature = state.pendingDeliveries
+    .map((d) => `${d.registration}:${Math.ceil((d.availableAtMinute - state.simMinute) / MINUTES_PER_DAY)}`)
+    .join('|');
+  if (signature === inboundSignature) return;
+  inboundSignature = signature;
+
+  inboundSectionEl.hidden = state.pendingDeliveries.length === 0;
+  inboundListEl.innerHTML = state.pendingDeliveries
+    .slice()
+    .sort((a, b) => a.availableAtMinute - b.availableAtMinute)
+    .map((delivery) => {
+      const days = Math.max(0, Math.ceil((delivery.availableAtMinute - state.simMinute) / MINUTES_PER_DAY));
+      const how = delivery.ownership === 'leased' ? `leased, ${formatMoney(delivery.leaseCostPerDay)}/day from arrival` : 'bought';
+      return `
+        <div class="inbound-row">
+          <span class="inbound-tail">${delivery.registration}</span>
+          <span class="inbound-type">${delivery.typeCode}</span>
+          <span class="inbound-when">${days === 0 ? 'arriving today' : `in ${days} day${days === 1 ? '' : 's'}`}</span>
+          <span class="inbound-how">${how}</span>
+        </div>`;
+    })
+    .join('');
 }
 
 /**

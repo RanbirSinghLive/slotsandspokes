@@ -1228,21 +1228,53 @@ test network; the two are deliberately separate functions rather than
 one branching on its arguments.
 
 `data/fleet-market.json` is a small, hand-authored list of individual
-airframes (registration, age, buy price, daily lease price). Week three
-shipped it with one aircraft type; week four added the rest of the
-ladder (below), so it now lists two used airframes per type, 12 rows
-total, all available from day one. `ageYears` is pricing flavor only —
-older is cheaper, with no separate reliability/maintenance mechanic
-attached.
+airframes (registration, age, buy price, daily lease price, lead time).
+Week three shipped it with one aircraft type; week four added the rest of
+the ladder (below), so it now lists two used airframes per type, 12 rows
+total, all available from day one. `ageYears` does double duty: it prices
+the listing *and* feeds one of `step.ts`'s three delay causes, so an old
+airframe is cheap and unreliable rather than cheap for no reason.
 
-The Fleet Market view (a new Reports-menu entry labeled "Fleet," real DOM
-like Rotation/Commercial) lists whatever's left in `state.fleetMarket`.
-Buying deducts `buyPrice` from cash immediately; leasing costs nothing up
-front and instead adds `leasePricePerDay` to a new daily charge in
-`step.ts` (same flat-per-day shape marketing spend already has) via the
-aircraft's `leaseCostPerDay` field. **Acquisition-only** — no sell-back,
-no early lease-end, matching CLAUDE.md's aircraft-trading still being
-deferred beyond just getting into a plane.
+The Fleet Market tab lists whatever's left in `state.fleetMarket`.
+**Acquisition-only** — no sell-back, no early lease-end, matching
+CLAUDE.md's aircraft-trading still being deferred beyond just getting
+into a plane.
+
+### Deliveries take time (week eight)
+
+Buying no longer produces an aircraft. It produces a **`PendingDelivery`**
+that becomes one after the listing's `leadTimeDays`, resolved by
+`resolveDeliveries()` in the same daily rollover that delivers crew.
+
+Before this, a $42M widebody was operational the instant you clicked Buy
+while four pilots took ten days to show up — the expensive, irreversible
+commitment was the one with no wait attached. It also made `ageYears` a
+pure discount: nothing recommended the newer airframe except a delay rate
+you couldn't see.
+
+Lead times are authored **against** age on purpose. An old airframe is
+cheap *and* quick (14 days for the 21-year 1900D) because it is sitting on
+a ramp and its owner wants rid of it; a young one is dear *and* slow (90
+days for the 4-year A220) because everyone else wants it too. So the cheap
+option wins on price and speed and loses on reliability, which is a real
+three-way trade instead of a single dominant answer.
+
+Two money rules worth knowing:
+
+- The **full purchase price is charged at order**, not on arrival. There
+  is no deposit schedule, since CLAUDE.md defers financing — and paying up
+  front is what makes lead time cost something rather than being a free
+  wait.
+- A **lease costs nothing until the aircraft arrives**; `leaseCostPerDay`
+  rides along on the delivery and only starts being charged once the
+  Aircraft record exists.
+
+The listing leaves `state.fleetMarket` at **order** time, not arrival —
+it's yours the moment you pay, and that is also what stops the same
+airframe being ordered twice while in transit. Inbound aircraft show in
+their own section under the fleet (`ui/panels.ts`'s `renderInbound()`),
+and `ui/ticker.ts` announces the arrival, since a 90-day order lands long
+after the player stopped watching for it.
 
 **No base-airport picker at purchase.** A bought or leased aircraft joins
 the fleet with `atAirport: null` and `baseAirport: null` — shown as

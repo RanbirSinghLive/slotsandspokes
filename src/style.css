@@ -733,16 +733,44 @@ body {
   overflow-x: auto;
 }
 
+/* This table is wider than the 420px sidebar and always has been, so it
+   scrolls horizontally. Week eight's Lead column made that a real problem
+   rather than a cosmetic one: it pushed Buy/Lease past the right edge, and
+   having to scroll sideways to reach the only two buttons on a row is a
+   bad trade for a column you read once.
+
+   Fixed by pinning the action column to the right edge (below) rather than
+   by squeezing the data columns — age, lead time and the two prices are
+   exactly what the player is comparing across rows, so they keep their
+   width and stay scrollable, while the buttons never move. Headers are
+   abbreviated too ("Registration" is twelve characters against a
+   six-character value), and cells stay nowrap so a tight column shows the
+   scrollbar rather than silently wrapping "15 yr" onto two lines. */
 #fleet-market-table {
   width: 100%;
-  min-width: 560px;
+  min-width: 420px;
   border-collapse: collapse;
+}
+
+#fleet-market-table td {
+  white-space: nowrap;
+}
+
+/* Pinned so Buy/Lease stay reachable at any scroll offset. The opaque
+   background matches #panel's own, so scrolled columns pass underneath
+   rather than showing through. */
+#fleet-market-table th:last-child,
+#fleet-market-table td:last-child {
+  position: sticky;
+  right: 0;
+  background: #0a0c12;
+  padding-left: 8px;
 }
 
 #fleet-market-table th,
 #fleet-market-table td {
   text-align: left;
-  padding: 8px 10px 8px 0;
+  padding: 8px 6px 8px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -1724,6 +1752,46 @@ body {
 .crew-ok {
   color: #7fd88f;
   font-variant-numeric: tabular-nums;
+}
+
+/* Week eight: aircraft ordered but not yet delivered, shown under the
+   fleet. Same amber "bought, not here yet" language as .crew-incoming
+   above — the two are the same idea for two different resources. */
+#inbound-section[hidden] {
+  display: none;
+}
+
+.inbound-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 12px;
+}
+
+.inbound-tail {
+  color: #ffd166;
+  font-weight: 600;
+}
+
+.inbound-type {
+  color: #cdd3e0;
+}
+
+.inbound-when {
+  color: #ffd166;
+}
+
+.inbound-how {
+  color: #6b7694;
+}
+
+/* Lead time reads as a duration, not a quantity — tabular so a column of
+   them lines up against the age column beside it. */
+.fleet-market-lead {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* Headcount bought but not yet arrived — the ten-day lead time made a

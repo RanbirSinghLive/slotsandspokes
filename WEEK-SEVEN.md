@@ -1,8 +1,8 @@
 # airgame — Week seven (the utilisation pivot)
 
-Handoff document. Week six's full history lives in `WEEK-SIX.md` — read
-this one first, and go there only for the reasoning behind a specific
-system.
+Handoff document. Week six's full history lives in `WEEK-SIX.md`; week
+eight's work has since moved on to `WEEK-EIGHT.md`, which is the current
+handoff. Read this one for the utilisation pivot's reasoning.
 
 **State at handoff:** save key `airgame-save-v23`, 11 sidebar tabs.
 Phases A, B and C of the pivot are done and committed; **phase D is the

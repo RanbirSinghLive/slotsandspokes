@@ -1,6 +1,6 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { loadSchedule, marketKey, recommendedFare, type ScheduleLeg } from './schedule';
-import { loadFleetMarket, type FleetListing } from './fleetMarket';
+import { loadFleetMarket, type FleetListing, type PendingDelivery } from './fleetMarket';
 import { loadCompetitorRoutes, type CompetitorOffering } from './competitors';
 import type { WeatherEvent } from './weather';
 import type { Loan } from './loans';
@@ -150,11 +150,17 @@ export type SimState = {
   routeSettings: Record<string, RouteSettings>;
   /**
    * Week three's Fleet Market: airframes still available to buy or lease
-   * (see sim/fleetMarket.ts's FleetListing). ui/fleetMarket.ts removes a
-   * listing from here the moment it's acquired — acquisition-only, no
+   * (see sim/fleetMarket.ts's FleetListing). A listing leaves here the
+   * moment it's *ordered*, not when it arrives — acquisition-only, no
    * sell-back this pass, so this array only ever shrinks.
    */
   fleetMarket: FleetListing[];
+  /**
+   * Week eight: airframes paid for and on their way, but not yet
+   * operational — see sim/fleetMarket.ts's PendingDelivery. Resolved once
+   * per day in step.ts's rollover, the same pass that delivers crew.
+   */
+  pendingDeliveries: PendingDelivery[];
   /**
    * Week four's competitor AI (sim/competitors.ts): every competitor
    * route currently in service, seeded from `data/competitors.json` and
@@ -564,6 +570,7 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     schedule,
     routeSettings,
     fleetMarket: [], // no Fleet Market needed for a headless balance run
+    pendingDeliveries: [],
     // Same competitive landscape the real game starts with, growing the
     // same way over time (step()'s day-rollover doesn't know or care
     // that this is the headless runner) — the balance-tuning tool should
@@ -670,6 +677,7 @@ export function createNewGameState(rngSeed: number = Date.now()): SimState {
     schedule: [],
     routeSettings: {},
     fleetMarket: loadFleetMarket(),
+    pendingDeliveries: [],
     competitorRoutes: loadCompetitorRoutes(),
     weatherByAirport: {},
     completedToday: [],
