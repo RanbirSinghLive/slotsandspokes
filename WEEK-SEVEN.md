@@ -4,9 +4,9 @@ Handoff document. Week six's full history lives in `WEEK-SIX.md` — read
 this one first, and go there only for the reasoning behind a specific
 system.
 
-**State at handoff:** commit `817544a`, save key `airgame-save-v22`,
-12 sidebar tabs, working tree clean. Phase A of the pivot is done and
-committed; **phase B is the next thing to build.**
+**State at handoff:** save key `airgame-save-v22`, 12 sidebar tabs.
+Phases A and B of the pivot are done and committed; **phase C is the next
+thing to build.**
 
 ---
 
@@ -82,54 +82,65 @@ roughly 0.6 of an airframe idle at every base.
 
 ---
 
-## Phase B — next. Build this.
+## Phase B — done
 
-**Key finding from phase A: B is a single-file change to
-`src/ui/routeBuilder.ts`.** It needs no data model change and no `step.ts`
-change, because a rotation *already is* a sequence of legs on one tail —
-which is exactly what `ScheduleLeg[]` filtered by tail expresses. Every
-other system (economy, market stimulation, map, on-time, validation) keeps
-seeing ordinary timed legs and keeps working untouched. This makes B
-independently revertible, which matters given the size of the pivot.
+As predicted, a single-file change to `src/ui/routeBuilder.ts` (plus the
+popover's markup and CSS). No data model change, no `step.ts` change, no
+`SAVE_KEY` bump — every other system still sees ordinary timed legs.
 
-### What to build
+- `BuilderState` carries `chain: Airport[]`, base first, last entry being
+  whatever the next leg departs from. **"Add stop"** appends the pending
+  destination and re-arms from it; confirm closes the loop back to the
+  base. The chain is drawn solid on the map as it's built.
+- `packRotation()` walks the chain from a start minute, advancing
+  `cursor += blockMinutes + MIN_TURN_MINUTES`, last leg closing to base.
+- `planRotation()` is the single source of truth for both the popover's
+  text and the confirm handler — the old form re-derived its checks in a
+  defensive second pass, which was two copies of the same rules.
+- Live preview: "Uses 23% of an aircraft — YHZ has 1.00 spare, 0.78 after
+  this."
 
-1. **Chain collection.** `BuilderState` (in `routeBuilder.ts`) gains a
-   `stops: Airport[]`. An **"Add stop"** button in the New Route popover
-   appends the current candidate and re-arms the builder from it rather
-   than confirming. Confirm closes the loop back to the base.
+### Decisions taken while building, settled with the owner
 
-2. **Auto-pack on confirm.** Walk the chain from
-   `USABLE_DAY_START_MINUTE` (06:00), assigning each leg
-   `departMinute = cursor`, then advancing
-   `cursor += blockMinutes + MIN_TURN_MINUTES`. The final leg returns to
-   the base, so continuity is automatic and no positioning leg is ever
-   needed.
+1. **A rotation must start at the tail's `baseAirport`** — arming from
+   anywhere else is a hard block with a plain message. An unbased airframe
+   gets based by flying its first rotation, which is now the only place
+   other than the Fleet tab's dropdown where a base gets set.
+2. **The Depart input and the "Add return leg too" checkbox are gone.**
+   Auto-pack owns the timeline, so a depart field would be a control that
+   lies, and a return is just the two-airport chain.
 
-3. **Live utilisation preview in the popover.** `legUtilisationShare()`
-   already exists — show "this rotation uses 34% of an aircraft; YHZ has
-   0.69 spare" *before* the player commits.
+### Three things worth knowing before touching this
 
-4. **Reject rotations that don't fit** — either the packed chain runs past
-   22:00, or it exceeds the base pool's spare capacity. Use the same
-   hard-block-with-plain-message shape the range, network and slot checks
-   already use in `updateFormValidation()`.
+- **A second rotation on a tail packs after its existing day**
+  (`rotationStartMinute()`), not from 06:00. Packing everything from 06:00
+  would double-book a tail against itself and `validateSchedule()` would
+  rightly call it broken. Because every rotation ends at base, appending
+  always chains cleanly.
+- **Exact-time collisions are nudged, not blocked.** Auto-packing makes
+  two tails departing the same market at the same minute likely rather
+  than rare, and the player has no time field to change any more, so
+  `packRotationAvoidingCollisions()` shifts the whole rotation in
+  five-minute steps until it's clear. Verified: a second YHZ aircraft's
+  rotation packs at 06:05 behind the first's 06:00.
+- **The pooled-capacity check folded into the fit check.** A rotation that
+  fits one tail's day always fits its base's pool (the pool contains that
+  tail), so a separate pooled gate could never fire. Instead, when the
+  22:00 fit fails, the message reports whether the *base* still has spare —
+  "put this on another tail based there" vs "buy another airframe."
 
-### Watch out for
+### Known small wart
 
-- The route builder already enforces **range**, **network reachability**,
-  **slot capacity** and **aircraft-type-allowed-at-airport**. Each new stop
-  must be checked against all of them, not just the first leg.
-- `formReturnCheckbox` ("Add return leg too") becomes redundant once
-  chains exist — a return is just a one-stop chain. Decide whether to keep
-  it as a shortcut or drop it.
-- The popover's overflow clamp runs *after* `updateFormValidation()`
-  populates dynamic text. If you add rows to the popover, keep that
-  ordering or it will spill off-screen (this bug was already fixed once).
+Utilisation charges a turn to every leg including the last, but the fit
+check uses actual arrival — so a base can read `-0.01 spare` while its
+schedule is perfectly legal. Worth at most 30 minutes (0.03 of an
+aircraft). Left alone deliberately: `legUtilisationMinutes()` is phase A's
+model and the Fleet tab already shows it that way, so changing it is a
+phase A decision, not a phase B one.
 
 ---
 
-## Phases C and D — after B lands
+## Phases C and D — next. Build C first.
 
 **C — deletions.** Remove the Rotation tab (`#rotation-board`,
 `ui/rotationBoard.ts`, the `'rotation'` SidebarTab case), the schedule
@@ -138,6 +149,12 @@ table in the Fleet tab, `PositioningLeg` and its whole queue including
 that rotations make structurally impossible (continuity and turn-time
 checks — the `"lands at BOS but next leg departs YQM"` class of error
 can no longer occur). Utilisation over 100% becomes the new failure mode.
+
+Phase B leaves positioning legs nearly extinct already — a rotation ends
+where it began, so a tail only needs positioning for its very first one.
+The route builder's `currentOrUpcomingAirport()` call and the
+`else if (!currentPosition)` deploy-here branch are the only two places
+left to unpick.
 
 **D — Commercial becomes Routes.** Aggregated per-market data, fare
 policy at the top. Rename the tab and its icon.

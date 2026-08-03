@@ -9,7 +9,6 @@ import { suppressedMarketReason } from '../sim/demand';
 import { isSlotControlled, remainingSlotCapacity, slotsOwned, slotsTotal } from '../sim/airports';
 import {
   computeBlockMinutes,
-  defaultReturnDepartMinute,
   isAircraftTypeAllowedAt,
   legsServingMarket,
   marketKey,
@@ -21,6 +20,13 @@ import {
   type PositioningLeg,
   type ScheduleLeg,
 } from '../sim/schedule';
+import {
+  aircraftUtilisation,
+  legUtilisationMinutes,
+  USABLE_DAY_END_MINUTE,
+  USABLE_DAY_MINUTES,
+  USABLE_DAY_START_MINUTE,
+} from '../sim/utilisation';
 import { addScheduleRow, filterScheduleToRoute, minuteOfDayToTimeString, renderScheduleWarnings } from './panels';
 import { addCommercialRow } from './commercial';
 import { policyFare } from '../sim/pricing';
@@ -31,6 +37,7 @@ import type { SimState } from '../sim/state';
 const HIT_RADIUS_PX = 14;
 const RING_RADIUS = 8;
 const PREVIEW_STROKE = '#ffd166';
+const CHAIN_STROKE = '#ffd166';
 const ORIGIN_RING_STROKE = '#9aa3b8';
 const CANDIDATE_RING_STROKE = '#ffd166';
 const RANGE_RING_STROKE = '#4a90d9';
@@ -59,10 +66,10 @@ const routeHoverTooltipBody = document.querySelector<HTMLElement>('#route-hover-
 /**
  * Same PDEW/CAP formula updateFormValidation() uses (see its own
  * comment), just computed for a candidate that hasn't been clicked yet.
- * Reads the confirmation form's return checkbox for whether to assume a
- * return leg — a reasonable best guess even before the form exists for
- * this specific candidate, since it defaults to checked every time the
- * form opens anyway.
+ * Assumes this candidate adds two frequencies to the market — the leg out
+ * and the leg back — because the minimal rotation is exactly that
+ * out-and-back, and a hovered airport isn't yet part of a chain whose
+ * real leg count could be counted instead.
  */
 function showRouteHoverTooltip(origin: Airport, candidate: Airport, screenX: number, screenY: number, state: SimState): void {
   const tail = getSelectedTail();
@@ -73,7 +80,7 @@ function showRouteHoverTooltip(origin: Airport, candidate: Airport, screenX: num
 
   if (type) {
     const existingFrequency = legsServingMarket(origin.iata, candidate.iata, state.schedule);
-    const newFrequency = existingFrequency + (formReturnCheckbox.checked ? 2 : 1);
+    const newFrequency = existingFrequency + 2;
     const pdew = Math.round(actualDailyDemand(state, origin.iata, candidate.iata) / newFrequency);
     const potentialPdew = Math.round(currentPotentialDemand(state, origin.iata, candidate.iata) / newFrequency);
     const distanceNm = greatCircleDistanceNm(origin, candidate);
@@ -132,11 +139,21 @@ export function hideRouteHoverTooltip(): void {
  * `armed`/`confirming` at arm time so a gesture always finishes with the
  * plane it started with, even if the Fleet panel selection changes
  * mid-gesture — see cancelIfTailChanged() below for what happens then.
+ *
+ * Week seven (the utilisation pivot, WEEK-SEVEN.md): what gets built is
+ * no longer a single leg but a **rotation** — an ordered chain of
+ * airports starting and ending at the aircraft's base. `chain` holds the
+ * airports agreed so far, base first; the last entry is whatever the next
+ * leg departs from. "Add stop" appends the pending destination to it and
+ * re-arms from there instead of confirming, so `YUL-YFC-YQM-YFC-YQM-YUL`
+ * is buildable in one gesture. A plain out-and-back is just the
+ * two-airport case, which is why there's no "add return leg" checkbox any
+ * more — the rotation always closes back to the base.
  */
 type BuilderState =
   | { mode: 'idle' }
-  | { mode: 'armed'; origin: Airport; tail: string }
-  | { mode: 'confirming'; origin: Airport; dest: Airport; tail: string };
+  | { mode: 'armed'; chain: Airport[]; tail: string }
+  | { mode: 'confirming'; chain: Airport[]; dest: Airport; tail: string };
 
 let builderState: BuilderState = { mode: 'idle' };
 // Only meaningful while armed: where the cursor currently is (in lon/lat,
@@ -144,6 +161,11 @@ let builderState: BuilderState = { mode: 'idle' };
 // snap onto.
 let previewGeo: [number, number] | null = null;
 let candidate: Airport | null = null;
+
+/** Where the next leg of the chain departs from — the last airport agreed so far. */
+function chainOrigin(chain: Airport[]): Airport {
+  return chain[chain.length - 1];
+}
 
 function findNearestAirport(screenX: number, screenY: number): Airport | null {
   let nearest: Airport | null = null;
@@ -181,7 +203,7 @@ function isExistingMarket(originIata: string, destIata: string, schedule: Schedu
  * in *opposite* directions at the same clock time is an ordinary
  * synchronized schedule bank, not a conflict. Two leaving the same
  * direction at the identical minute has no legitimate interpretation in
- * this model, so it's hard-blocked rather than just flagged.
+ * this model.
  */
 function findExactTimeCollision(
   originIata: string,
@@ -268,19 +290,20 @@ export function handleRouteBuilderMouseDown(event: MouseEvent, state: SimState):
     // "not our gesture," same as clicking empty water always has.
     const tail = getSelectedTail();
     if (!tail || !clicked) return false;
-    builderState = { mode: 'armed', origin: clicked, tail };
+    builderState = { mode: 'armed', chain: [clicked], tail };
     setArmedCursor(true);
     return true;
   }
 
   if (builderState.mode === 'armed') {
-    if (clicked && clicked.iata === builderState.origin.iata) {
-      reset(); // re-clicking the origin cancels
+    const origin = chainOrigin(builderState.chain);
+    if (clicked && clicked.iata === origin.iata) {
+      reset(); // re-clicking the airport the next leg departs from cancels
       return true;
     }
     if (clicked) {
-      showForm(builderState.origin, clicked, state);
-      builderState = { mode: 'confirming', origin: builderState.origin, dest: clicked, tail: builderState.tail };
+      showForm(builderState.chain, clicked, state);
+      builderState = { mode: 'confirming', chain: builderState.chain, dest: clicked, tail: builderState.tail };
       return true;
     }
     reset(); // clicked open water while armed: cancel
@@ -308,8 +331,9 @@ export function handleRouteBuilderMouseMove(event: MouseEvent, state: SimState):
   previewGeo = geo;
   candidate = findNearestAirport(event.clientX, event.clientY);
 
-  if (candidate && candidate.iata !== builderState.origin.iata) {
-    showRouteHoverTooltip(builderState.origin, candidate, event.clientX, event.clientY, state);
+  const origin = chainOrigin(builderState.chain);
+  if (candidate && candidate.iata !== origin.iata) {
+    showRouteHoverTooltip(origin, candidate, event.clientX, event.clientY, state);
   } else {
     hideRouteHoverTooltip();
   }
@@ -325,29 +349,33 @@ export function handleRouteBuilderKeyDown(event: KeyboardEvent): void {
 }
 
 /**
- * Draw the live preview arc, origin/candidate highlight rings, and (week
- * three) the selected plane's range ring. Called from main.ts's render(),
- * same as every other canvas layer — reads this module's own transient
- * state plus `state.aircraft` (to look up the armed tail's aircraft type),
- * drawn above everything else so it's never hidden behind the basemap or
- * a route.
+ * Draw the chain agreed so far, the live preview arc, base/origin/candidate
+ * highlight rings, and (week three) the selected plane's range ring.
+ * Called from main.ts's render(), same as every other canvas layer — reads
+ * this module's own transient state plus `state.aircraft` (to look up the
+ * armed tail's aircraft type), drawn above everything else so it's never
+ * hidden behind the basemap or a route.
  */
 export function drawRoutePreview(ctx: CanvasRenderingContext2D, state: SimState): void {
   cancelIfTailChanged();
   if (builderState.mode === 'idle') return;
 
-  const { origin, tail } = builderState;
+  const { chain, tail } = builderState;
+  const origin = chainOrigin(chain);
 
   // The range ring is a true geodesic circle (d3.geoCircle()), not a flat
   // pixel circle — this map's Mercator projection distorts distance by
   // latitude, so a naive on-screen circle would lie about how far the
   // plane can actually reach. Radius is in degrees of arc; 60nm per
   // degree is exact (it's the definition of a nautical mile), not an
-  // approximation the way the cost/demand model's constants are.
+  // approximation the way the cost/demand model's constants are. Centred
+  // on the chain's current origin, since that's where the next leg
+  // actually departs from — not on the base, which may be several stops
+  // back by now.
   const aircraft = state.aircraft.find((a) => a.tail === tail);
   const type = aircraft ? aircraftTypesByCode.get(aircraft.typeCode) : undefined;
+  const path = geoPath(projection, ctx);
   if (type) {
-    const path = geoPath(projection, ctx);
     const circle = geoCircle().center([origin.lon, origin.lat]).radius(type.rangeNm / 60)();
     ctx.save();
     ctx.setLineDash([2, 3]);
@@ -359,11 +387,33 @@ export function drawRoutePreview(ctx: CanvasRenderingContext2D, state: SimState)
     ctx.restore();
   }
 
-  const originPoint = projection([origin.lon, origin.lat]);
-  if (originPoint) {
+  // Week seven: the legs already agreed, drawn solid so a multi-stop
+  // rotation is visible as a shape on the map while it's being built —
+  // the dashed arc below is only ever the one leg still being chosen.
+  // While confirming, the pending destination counts as agreed for
+  // drawing purposes; it's the airport the popover is anchored to, so
+  // leaving it out of the line would look like a gap.
+  const drawnChain = builderState.mode === 'confirming' ? [...chain, builderState.dest] : chain;
+  if (drawnChain.length > 1) {
+    const chainLine: LineString = {
+      type: 'LineString',
+      coordinates: drawnChain.map((airport) => [airport.lon, airport.lat]),
+    };
+    ctx.save();
+    ctx.strokeStyle = CHAIN_STROKE;
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(originPoint[0], originPoint[1], RING_RADIUS, 0, 2 * Math.PI);
-    ctx.strokeStyle = ORIGIN_RING_STROKE;
+    path(chainLine);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  for (const airport of drawnChain) {
+    const point = projection([airport.lon, airport.lat]);
+    if (!point) continue;
+    ctx.beginPath();
+    ctx.arc(point[0], point[1], RING_RADIUS, 0, 2 * Math.PI);
+    ctx.strokeStyle = airport.iata === origin.iata ? CANDIDATE_RING_STROKE : ORIGIN_RING_STROKE;
     ctx.lineWidth = 1.5;
     ctx.stroke();
   }
@@ -377,7 +427,6 @@ export function drawRoutePreview(ctx: CanvasRenderingContext2D, state: SimState)
   const destGeo: [number, number] = candidate ? [candidate.lon, candidate.lat] : previewGeo;
   const line: LineString = { type: 'LineString', coordinates: [[origin.lon, origin.lat], destGeo] };
 
-  const path = geoPath(projection, ctx);
   ctx.save();
   ctx.setLineDash([4, 4]);
   ctx.strokeStyle = PREVIEW_STROKE;
@@ -399,6 +448,280 @@ export function drawRoutePreview(ctx: CanvasRenderingContext2D, state: SimState)
   }
 }
 
+// --- Packing a rotation into the day (week seven) ---
+
+/**
+ * One leg of a packed rotation, before it becomes a real ScheduleLeg.
+ * Same fields minus the identity ones (legId, tail), which only get
+ * assigned once the player actually confirms.
+ */
+type PackedLeg = { origin: string; dest: string; departMinute: number; blockMinutes: number };
+
+/** Five-minute steps, the granularity nudgeing uses to dodge an exact-time collision. */
+const COLLISION_NUDGE_MINUTES = 5;
+/** Enough nudging to clear a couple of hours of congestion, then give up. */
+const MAX_COLLISION_NUDGES = 24;
+
+/**
+ * Walk `airports` in order, giving each leg the cursor's current time and
+ * then advancing the cursor by that leg's block time plus its turn. The
+ * last leg closes the loop back to `airports[0]` (the base), which is what
+ * makes rotation continuity automatic — an aircraft that starts and ends
+ * its day at the same place can repeat that day forever, and no
+ * positioning leg is ever needed to make it work.
+ *
+ * A zero-length hop is skipped rather than emitted, which is what lets the
+ * player click the base itself as the final stop to say "close the loop
+ * here" without producing a base→base leg.
+ */
+function packRotation(airports: Airport[], cruiseKts: number | undefined, startMinute: number): PackedLeg[] {
+  const legs: PackedLeg[] = [];
+  let cursor = startMinute;
+  for (let i = 0; i < airports.length; i++) {
+    const from = airports[i];
+    const to = airports[(i + 1) % airports.length];
+    if (from.iata === to.iata) continue;
+    const blockMinutes = computeBlockMinutes(from.iata, to.iata, cruiseKts);
+    legs.push({ origin: from.iata, dest: to.iata, departMinute: cursor, blockMinutes });
+    cursor += blockMinutes + MIN_TURN_MINUTES;
+  }
+  return legs;
+}
+
+/**
+ * When a new rotation's day starts. The usable day opens at 06:00, but a
+ * tail that already flies a rotation can only start another one after it
+ * finishes the first and turns — packing every rotation from 06:00 would
+ * double-book the aircraft against itself, and `validateSchedule()`'s
+ * continuity check would (rightly) call that broken.
+ *
+ * Because every rotation ends back at the base, appending after the
+ * previous one always chains cleanly: the tail lands at base, turns, and
+ * departs base again.
+ */
+function rotationStartMinute(tail: string, state: SimState): number {
+  const tailLegs = state.schedule.filter((leg) => leg.tail === tail);
+  if (tailLegs.length === 0) return USABLE_DAY_START_MINUTE;
+  const lastArrival = Math.max(...tailLegs.map((leg) => leg.departMinute + leg.blockMinutes));
+  return Math.max(USABLE_DAY_START_MINUTE, lastArrival + MIN_TURN_MINUTES);
+}
+
+/**
+ * The packed rotation, nudged later in five-minute steps until no leg
+ * departs at the exact minute another tail already flies that same market
+ * (findExactTimeCollision()). Auto-packing makes that collision likely
+ * rather than rare — two aircraft based at the same airport, both opening
+ * their day at 06:00 on the same market, would hit it every time — and
+ * the player no longer authors departure times, so there is no "pick a
+ * different time" for them to do. Nudging resolves it quietly instead.
+ * Gives up after MAX_COLLISION_NUDGES and returns the last attempt; the
+ * fit and collision checks in planRotation() then report whatever is
+ * actually wrong.
+ */
+function packRotationAvoidingCollisions(
+  airports: Airport[],
+  cruiseKts: number | undefined,
+  startMinute: number,
+  schedule: ScheduleLeg[],
+): PackedLeg[] {
+  let legs = packRotation(airports, cruiseKts, startMinute);
+  for (let attempt = 0; attempt < MAX_COLLISION_NUDGES; attempt++) {
+    if (!legs.some((leg) => findExactTimeCollision(leg.origin, leg.dest, leg.departMinute, schedule))) return legs;
+    legs = packRotation(airports, cruiseKts, startMinute + (attempt + 1) * COLLISION_NUDGE_MINUTES);
+  }
+  return legs;
+}
+
+/**
+ * How many usable minutes the aircraft based at `baseIata` still have
+ * between them. Pooled per base rather than per tail because that is the
+ * level the "do I need another airframe" decision lives at (WEEK-SEVEN.md,
+ * decision 1). `tail` is counted into the pool even if it is currently
+ * unbased, since confirming a rotation from this base is exactly what
+ * assigns it here.
+ */
+function baseSpareMinutes(state: SimState, baseIata: string, tail: string): number {
+  const pool = state.aircraft.filter(
+    (aircraft) => aircraft.baseAirport === baseIata || (aircraft.tail === tail && aircraft.baseAirport === null),
+  );
+  const capacityMinutes = pool.length * USABLE_DAY_MINUTES;
+  const usedMinutes = pool.reduce((total, aircraft) => total + aircraftUtilisation(state, aircraft.tail).minutes, 0);
+  return capacityMinutes - usedMinutes;
+}
+
+/**
+ * Everything the popover needs to describe — and the confirm handler needs
+ * to commit — the rotation currently being drawn. One function so the two
+ * can never disagree: the old form re-derived its checks in the confirm
+ * handler as a defensive second pass, which meant two copies of the same
+ * rules to keep in step.
+ *
+ * `error` non-null hard-blocks Add Rotation. `blocksAddStop` is separate
+ * because one failure is genuinely fixable by extending the chain: a
+ * closing leg back to base that's beyond the aircraft's range can be
+ * rescued by adding a nearer stop before it. Every other failure only gets
+ * worse with more legs.
+ */
+type RotationPlan = {
+  /** The full ordered chain including the pending destination, base first. */
+  airports: Airport[];
+  base: Airport;
+  legs: PackedLeg[];
+  /** Block plus turn for the whole rotation — what it spends of an aircraft. */
+  rotationMinutes: number;
+  rotationShare: number;
+  spareMinutesBefore: number;
+  arriveBackMinute: number;
+  error: string | null;
+  blocksAddStop: boolean;
+};
+
+function planRotation(chain: Airport[], dest: Airport, tail: string, state: SimState): RotationPlan {
+  const base = chain[0];
+  const rotationAirports = [...chain, dest];
+  const aircraft = state.aircraft.find((a) => a.tail === tail);
+  const type = aircraft ? aircraftTypesByCode.get(aircraft.typeCode) : undefined;
+
+  const legs = packRotationAvoidingCollisions(
+    rotationAirports,
+    type?.cruiseKts,
+    rotationStartMinute(tail, state),
+    state.schedule,
+  );
+  const rotationMinutes = legs.reduce((total, leg) => total + legUtilisationMinutes(leg.blockMinutes), 0);
+  const lastLeg = legs[legs.length - 1];
+  const arriveBackMinute = lastLeg ? lastLeg.departMinute + lastLeg.blockMinutes : rotationStartMinute(tail, state);
+  const spareMinutesBefore = baseSpareMinutes(state, base.iata, tail);
+
+  const plan: RotationPlan = {
+    airports: rotationAirports,
+    base,
+    legs,
+    rotationMinutes,
+    rotationShare: rotationMinutes / USABLE_DAY_MINUTES,
+    spareMinutesBefore,
+    arriveBackMinute,
+    error: null,
+    blocksAddStop: true,
+  };
+
+  const fail = (error: string, blocksAddStop = true): RotationPlan => ({ ...plan, error, blocksAddStop });
+
+  // Week seven, decision 2: bases are assigned explicitly, never inferred
+  // from wherever a route happened to start. A rotation therefore has to
+  // begin at the base of the aircraft flying it — that is what lets a
+  // multi-leg loop like YUL-YFC-YQM-YFC-YQM-YUL be based at one airport
+  // while flying legs that never touch it.
+  if (aircraft?.baseAirport && aircraft.baseAirport !== base.iata) {
+    return fail(
+      `${tail} is based at ${aircraft.baseAirport} — a rotation starts and ends at its base. ` +
+        `Start this one from ${aircraft.baseAirport}, or change ${tail}'s base in the Fleet tab.`,
+    );
+  }
+
+  // Grow the network one airport at a time: a rotation's base has to
+  // already be somewhere the player flies. Only the base is checked, not
+  // every stop — each later stop is reached by the leg immediately before
+  // it, so the chain brings its own reachability with it. An empty network
+  // (the very first rotation of the game) is exempt, since nothing could
+  // possibly be "already in" it yet.
+  const network = networkAirports(state.schedule);
+  if (network.size > 0 && !network.has(base.iata)) {
+    return fail(
+      `${base.iata} isn't in your network yet — a rotation has to start from an airport you already fly to. ` +
+        `Fly there as a destination first, then rotations can start from it.`,
+    );
+  }
+
+  // Week six: departures from a slot-controlled airport need slots to put
+  // them in. Counted across the whole chain now rather than the two ends
+  // of one leg — a rotation that passes through the same slot-controlled
+  // airport twice needs two slots.
+  const departuresByAirport = new Map<string, number>();
+  for (const leg of legs) {
+    departuresByAirport.set(leg.origin, (departuresByAirport.get(leg.origin) ?? 0) + 1);
+  }
+  for (const [iata, departures] of departuresByAirport) {
+    if (!isSlotControlled(iata)) continue;
+    if (remainingSlotCapacity(state, iata) >= departures) continue;
+    return fail(
+      `${iata} is slot-controlled and you hold ${slotsOwned(state, iata)} of ${slotsTotal(iata)} slots, ` +
+        `all in use. This rotation needs ${departures} departure${departures === 1 ? '' : 's'} there — ` +
+        `buy another slot in the Airports tab first.`,
+    );
+  }
+
+  if (type) {
+    // Week three: a route beyond the selected plane's real range (see the
+    // ring drawn in drawRoutePreview()) is flatly impossible, not just
+    // inadvisable. Every leg of the chain gets checked, including the
+    // closing one back to base — which is the leg a long final stop
+    // quietly breaks, and the only failure a further stop can fix.
+    for (const leg of legs) {
+      const distanceNm = greatCircleDistanceNm(
+        airportByIata(leg.origin, rotationAirports),
+        airportByIata(leg.dest, rotationAirports),
+      );
+      if (distanceNm <= type.rangeNm) continue;
+      const isClosingLeg = leg === lastLeg && leg.dest === base.iata;
+      return fail(
+        `${leg.dest} is ${Math.round(distanceNm)} nm from ${leg.origin} — beyond the ${type.name}'s ${type.rangeNm} nm range with a full load.` +
+          (isClosingLeg ? ` Add a stop closer to ${base.iata} before closing the rotation.` : ''),
+        !isClosingLeg,
+      );
+    }
+
+    // Week four: airport size constraints (Airport.maxAircraftType) are
+    // just as much a hard "no" as range — a real runway or gate limit,
+    // not a matter of degree — so this gets the same block-and-explain
+    // treatment. Checked at every airport the rotation touches.
+    for (const airport of rotationAirports) {
+      if (isAircraftTypeAllowedAt(airport.iata, type.code)) continue;
+      return fail(`${airport.iata} only takes aircraft up to a smaller size than the ${type.name} — too large to operate there.`);
+    }
+  }
+
+  // Week seven: the fit check that replaces the Gantt. The rotation has to
+  // land back at base inside the usable day (06:00–22:00). When it doesn't,
+  // the useful thing to say is whether the *base* has room even though this
+  // tail doesn't — the pooled figure is what decides "another aircraft, or
+  // a shorter rotation?", and a pooled check of its own would never fire
+  // separately (a rotation that fits one tail's day always fits its base's
+  // pool, since the pool contains that tail).
+  if (arriveBackMinute > USABLE_DAY_END_MINUTE) {
+    const spareAfter = (spareMinutesBefore - rotationMinutes) / USABLE_DAY_MINUTES;
+    return fail(
+      `This rotation lands back at ${base.iata} at ${minuteOfDayToTimeString(arriveBackMinute)}, past the ${minuteOfDayToTimeString(USABLE_DAY_END_MINUTE)} end of ${tail}'s usable day. ` +
+        (spareAfter >= 0
+          ? `${base.iata} still has ${spareAfter.toFixed(2)} of an aircraft spare — put this on another tail based there.`
+          : `${base.iata} has no spare aircraft left either — shorten the rotation, or buy another airframe.`),
+    );
+  }
+
+  // Anything still colliding after packRotationAvoidingCollisions() gave
+  // up. Rare, and not something the player can retime any more, so it says
+  // what it is rather than asking for a different time.
+  const collision = legs
+    .map((leg) => findExactTimeCollision(leg.origin, leg.dest, leg.departMinute, state.schedule))
+    .find((leg) => leg !== undefined);
+  if (collision) {
+    return fail(
+      `${collision.tail} already departs ${collision.origin} for ${collision.dest} at every minute this rotation could use (${collision.legId}). Thin out that market first.`,
+    );
+  }
+
+  return { ...plan, error: null, blocksAddStop: false };
+}
+
+/**
+ * Look an Airport back up from a packed leg's IATA code. Every leg is
+ * built from a consecutive pair in the chain, so the chain always
+ * contains both of its endpoints — this never misses.
+ */
+function airportByIata(iata: string, chain: Airport[]): Airport {
+  return chain.find((airport) => airport.iata === iata)!;
+}
+
 // --- The confirmation form (real DOM, per CLAUDE.md's panel rule) ---
 
 const formSection = document.querySelector<HTMLElement>('#new-route-popover')!;
@@ -408,42 +731,17 @@ const formBlock = document.querySelector<HTMLElement>('#new-route-block')!;
 const formPdew = document.querySelector<HTMLElement>('#new-route-pdew')!;
 const formError = document.querySelector<HTMLElement>('#new-route-error')!;
 const formTailLabel = document.querySelector<HTMLElement>('#new-route-tail-label')!;
-const formDepartInput = document.querySelector<HTMLInputElement>('#new-route-depart')!;
-const formReturnCheckbox = document.querySelector<HTMLInputElement>('#new-route-return')!;
-const formReturnPreview = document.querySelector<HTMLElement>('#new-route-return-preview')!;
+const formUtilisation = document.querySelector<HTMLElement>('#new-route-utilisation')!;
 const formPositioningPreview = document.querySelector<HTMLElement>('#new-route-positioning-preview')!;
+const formAddStopButton = document.querySelector<HTMLButtonElement>('#new-route-add-stop')!;
 const formConfirmButton = document.querySelector<HTMLButtonElement>('#new-route-confirm')!;
 const formCancelButton = document.querySelector<HTMLButtonElement>('#new-route-cancel')!;
 
-// A tail's first leg of the day, with nothing yet on its schedule to
-// slot in behind — matches data/schedule.json's own convention (every
-// preset tail's day starts around 06:00–07:00), not an arbitrary pick.
-const MORNING_DEPART_TIME = '07:00';
-
-/**
- * What depart time to suggest when the form opens — always overridable,
- * never the only option, but "always defaults to noon regardless of
- * context" was the whole complaint this replaces. Two cases:
- *
- * - `tail` already has legs, and the chronologically *last* one of its
- *   day lands at this route's `origin` — suggest right after that
- *   arrival (`defaultReturnDepartMinute()`, the same "land, then this
- *   much turn buffer" formula the auto-generated return leg already
- *   uses), so a route drawn to continue a tail's day slots in behind
- *   its last flight instead of defaulting to an unrelated fixed hour.
- * - Anything else (no legs yet — a fresh pool aircraft's first route —
- *   or an origin that doesn't match where the tail's day currently
- *   ends) — suggest the morning default. A mismatched origin needs a
- *   positioning leg anyway (see currentOrUpcomingAirport()), so there's
- *   no single "right after" time to suggest for it.
- */
-function suggestedDepartTime(origin: Airport, tail: string, state: SimState): string {
-  const tailLegs = state.schedule.filter((leg) => leg.tail === tail).sort((a, b) => a.departMinute - b.departMinute);
-  const lastLeg = tailLegs[tailLegs.length - 1];
-  if (lastLeg && lastLeg.dest === origin.iata) {
-    return minuteOfDayToTimeString(defaultReturnDepartMinute(lastLeg.departMinute, lastLeg.blockMinutes));
-  }
-  return MORNING_DEPART_TIME;
+/** "4h 05m" — rotation lengths read better in hours than in three-digit minutes. */
+function formatDuration(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return hours > 0 ? `${hours}h ${String(remainder).padStart(2, '0')}m` : `${remainder}m`;
 }
 
 // Week six: the form used to be a fixed section in the sidebar, always in
@@ -474,16 +772,17 @@ function positionPopover(screenX: number, screenY: number): void {
   if (overflowY > 0) formSection.style.top = `${screenY + POPOVER_OFFSET_PX - overflowY - 8}px`;
 }
 
-function showForm(origin: Airport, dest: Airport, state: SimState): void {
-  formHeading.textContent = isExistingMarket(origin.iata, dest.iata, state.schedule) ? 'New Frequency' : 'New Route';
-  formLabel.textContent = `${origin.iata} → ${dest.iata}`;
+function showForm(chain: Airport[], dest: Airport, state: SimState): void {
+  const origin = chainOrigin(chain);
+  formHeading.textContent =
+    chain.length > 1
+      ? 'Rotation'
+      : isExistingMarket(origin.iata, dest.iata, state.schedule)
+        ? 'New Frequency'
+        : 'New Rotation';
   // Week three: the tail was already chosen (Fleet panel) before this
   // route was even armed, so it's shown here read-only, not re-picked.
-  const tail = getSelectedTail() ?? '';
-  const aircraftForBlock = state.aircraft.find((a) => a.tail === tail);
-  const typeForBlock = aircraftForBlock ? aircraftTypesByCode.get(aircraftForBlock.typeCode) : undefined;
-  formBlock.textContent = `Block time: ${computeBlockMinutes(origin.iata, dest.iata, typeForBlock?.cruiseKts)} min`;
-  formTailLabel.textContent = tail;
+  formTailLabel.textContent = getSelectedTail() ?? '';
   formSection.hidden = false;
   // The armed-state hover tooltip (PDEW/CAP for the candidate) has nothing
   // left to add once the form itself is showing the same numbers, and the
@@ -495,26 +794,10 @@ function showForm(origin: Airport, dest: Airport, state: SimState): void {
   hideRouteHoverTooltip();
   hideCompetitionTooltip();
 
-  // Suggest a time rather than always resetting to a fixed default —
-  // see suggestedDepartTime() above. Still always overridable, and still
-  // reset every time the form opens rather than leaving whatever time a
-  // *previous* route's form was left at: a leftover time from an
-  // unrelated earlier route could otherwise silently collide with an
-  // existing leg on this new market and block the Add button with no
-  // obvious reason why — exactly what happened creating a second
-  // YSJ-YQB frequency after leaving the input at 13:00 from an earlier
-  // route.
-  formDepartInput.value = suggestedDepartTime(origin, tail, state);
-  // Defaults to checked every time the form opens, same reasoning as
-  // resetting the depart time below: adding a route almost always means
-  // "and back," and this is what stops a leg like this session's C-GVIA
-  // YYG->YHZ from getting created alone, with nothing to fly the aircraft
-  // back into its own rotation.
-  formReturnCheckbox.checked = true;
-  updateFormValidation(origin, dest, state);
+  updateFormValidation(chain, dest, state);
 
   // Positioned last, after updateFormValidation() above has already set
-  // the return-leg/positioning-leg preview text (and possibly an error
+  // the utilisation/positioning preview text (and possibly an error
   // message) — the popover's real height depends on which of those are
   // showing, so measuring it any earlier (e.g., right after `hidden =
   // false`) would clamp against a shorter box than what's actually about
@@ -523,7 +806,7 @@ function showForm(origin: Airport, dest: Airport, state: SimState): void {
   if (destPoint) positionPopover(destPoint[0], destPoint[1]);
 
   // Filter the schedule table to this market *now*, while the form is
-  // still open — not only after "Add Route" is clicked. Filtering only on
+  // still open — not only after the rotation is added. Filtering only on
   // confirm meant the table narrowed the instant the form closed, which
   // in practice looked like nothing happened: by the time the filter took
   // effect, attention had already moved on with the popup. Filtering here
@@ -538,53 +821,67 @@ function hideForm(): void {
 }
 
 /**
- * Live-check the depart time (and, when the return checkbox is on, the
- * auto-computed return leg's time too) against findExactTimeCollision() and
- * hard-block submission when either collides — unlike the M8/M9 rotation
- * checks, which allow a bad edit through and just log it, an exact-time
- * double-booking has no legitimate interpretation, so it's caught here in
- * the form rather than after the fact. Also keeps the return-leg preview
- * text current, so the player can see what "Add return leg too" is actually
- * about to create before they click Add Route. Also shows a positioning-
- * leg preview (week three) whenever the currently selected tail isn't
- * standing at `origin` — see currentOrUpcomingAirport() — so the player
- * knows *before* confirming that this route won't start earning revenue
- * immediately, and why: a real, costed repositioning flight is happening
- * first, not a bug.
+ * Render everything planRotation() worked out: the chain, what it spends
+ * of an aircraft, what the base has left, the PDEW/CAP read for the leg
+ * being added, and any hard block. Nothing here decides anything — the
+ * rules all live in planRotation(), so the popover and the confirm handler
+ * can't drift apart.
  */
-function updateFormValidation(origin: Airport, dest: Airport, state: SimState): void {
+function updateFormValidation(chain: Airport[], dest: Airport, state: SimState): void {
+  const origin = chainOrigin(chain);
+
   // Defensive fallback — arming now requires a tail to already be
   // selected (ui/fleetSelection.ts), so this shouldn't be reachable in
   // practice, but the message stays accurate if it somehow is.
   const tail = getSelectedTail();
   if (!tail || state.aircraft.length === 0) {
+    formLabel.textContent = `${origin.iata} → ${dest.iata}`;
+    formBlock.textContent = '';
     formError.textContent = 'Buy or lease an aircraft first — see Fleet under the Reports menu.';
     formConfirmButton.disabled = true;
+    formAddStopButton.disabled = true;
     formPdew.textContent = '';
-    formReturnPreview.textContent = '';
+    formUtilisation.textContent = '';
     formPositioningPreview.textContent = '';
     return;
   }
 
   const aircraft = state.aircraft.find((a) => a.tail === tail);
   const type = aircraft ? aircraftTypesByCode.get(aircraft.typeCode) : undefined;
+  const plan = planRotation(chain, dest, tail, state);
 
-  // Week four's PDEW/CAP readout: the un-minmaxed demand-vs-capacity
-  // ceiling for this market, shown even if the checks below end up
-  // blocking this specific attempt — still useful context for a market
-  // you might come back and draw differently. `newFrequency` is the
-  // existing schedule's frequency on this market *plus* what this
-  // confirm would add (1 leg, or 2 if the return checkbox is on) — the
-  // same denominator sim/economy.ts's flightResult() divides the
-  // market's demand by, just read before committing instead of after, so
-  // this can never drift from what the flight would actually carry once
-  // it's flying. CAP is the plane's raw seat count, not the load-factor-
-  // adjusted ceiling — the whole point is showing the number *before*
-  // any of the fare/yield/competition knobs apply, which is what
-  // "un-minmaxed" means here.
+  // The chain as the player sees it, always ending back where it started —
+  // the closing leg is implicit in the gesture, so showing it here is how
+  // they know it's coming.
+  const routeIatas = plan.airports.map((airport) => airport.iata);
+  if (routeIatas[routeIatas.length - 1] !== plan.base.iata) routeIatas.push(plan.base.iata);
+  formLabel.textContent = routeIatas.join(' → ');
+
+  const firstLeg = plan.legs[0];
+  formBlock.textContent = firstLeg
+    ? `${plan.legs.length} leg${plan.legs.length === 1 ? '' : 's'} · ${formatDuration(plan.rotationMinutes)} · ` +
+      `${minuteOfDayToTimeString(firstLeg.departMinute)}–${minuteOfDayToTimeString(plan.arriveBackMinute)}`
+    : '';
+
+  // Week four's PDEW/CAP readout, for the leg being added right now: the
+  // un-minmaxed demand-vs-capacity ceiling for that market, shown even if
+  // the checks below end up blocking this specific attempt — still useful
+  // context for a market you might come back and draw differently.
+  // `newFrequency` is the existing schedule's frequency on this market
+  // *plus* however many of this rotation's own legs serve it (a rotation
+  // that shuttles YFC↔YQM twice adds four) — the same denominator
+  // sim/economy.ts's flightResult() divides the market's demand by, just
+  // read before committing instead of after, so this can never drift from
+  // what the flight would actually carry once it's flying. CAP is the
+  // plane's raw seat count, not the load-factor-adjusted ceiling — the
+  // whole point is showing the number *before* any of the
+  // fare/yield/competition knobs apply.
   if (type) {
-    const existingFrequency = legsServingMarket(origin.iata, dest.iata, state.schedule);
-    const newFrequency = existingFrequency + (formReturnCheckbox.checked ? 2 : 1);
+    const fromThisRotation = plan.legs.filter(
+      (leg) =>
+        (leg.origin === origin.iata && leg.dest === dest.iata) || (leg.origin === dest.iata && leg.dest === origin.iata),
+    ).length;
+    const newFrequency = legsServingMarket(origin.iata, dest.iata, state.schedule) + Math.max(fromThisRotation, 1);
     const pdew = Math.round(actualDailyDemand(state, origin.iata, dest.iata) / newFrequency);
     const potentialPdew = Math.round(currentPotentialDemand(state, origin.iata, dest.iata) / newFrequency);
     // A suppressed market (sim/demand.ts) carries nobody. Deliberately
@@ -592,130 +889,48 @@ function updateFormValidation(origin: Airport, dest: Airport, state: SimState): 
     // beats letting someone discover it from an empty P&L.
     const suppressed = suppressedMarketReason(origin.iata, dest.iata);
     formPdew.textContent = suppressed
-      ? `No market: ${suppressed}`
+      ? `${origin.iata}–${dest.iata}: no market — ${suppressed}`
       : potentialPdew > pdew
-        ? `PDEW: ${pdew} now → ${potentialPdew} potential  CAP: ${type.seats}`
-        : `PDEW: ${pdew}  CAP: ${type.seats}`;
+        ? `${origin.iata}–${dest.iata} PDEW: ${pdew} now → ${potentialPdew} potential  CAP: ${type.seats}`
+        : `${origin.iata}–${dest.iata} PDEW: ${pdew}  CAP: ${type.seats}`;
     // See the hover tooltip's own note: thin is judged on potential, not
     // on what the market happens to carry before anyone has built it.
     formPdew.classList.toggle('thin-market', potentialPdew < type.seats);
   } else {
     formPdew.textContent = '';
+    formPdew.classList.remove('thin-market');
   }
 
-  // Grow the network one airport at a time: a new route's origin has to
-  // already be somewhere the player flies — reaching a brand-new airport
-  // only happens as a *destination*, which is what lets it join the
-  // network for the next route to start from. An empty network (the very
-  // first route of the game) is exempt, since nothing could possibly be
-  // "already in" it yet.
-  const network = networkAirports(state.schedule);
-  if (network.size > 0 && !network.has(origin.iata)) {
-    formError.textContent = `${origin.iata} isn't in your network yet — a new route has to start from an airport you already fly to. Fly there as a destination first, then routes can start from it.`;
-    formConfirmButton.disabled = true;
-    formReturnPreview.textContent = '';
+  // Week seven's headline: what this rotation costs in aeroplane, and what
+  // the base has left afterwards. Spare is reported in aircraft rather
+  // than minutes because that's the number that answers "is another
+  // airframe worth it" — see sim/utilisation.ts's BaseUtilisation.
+  const spareBefore = plan.spareMinutesBefore / USABLE_DAY_MINUTES;
+  const spareAfter = (plan.spareMinutesBefore - plan.rotationMinutes) / USABLE_DAY_MINUTES;
+  formUtilisation.textContent =
+    `Uses ${Math.round(plan.rotationShare * 100)}% of an aircraft — ` +
+    `${plan.base.iata} has ${spareBefore.toFixed(2)} spare, ${spareAfter.toFixed(2)} after this.`;
+
+  formError.textContent = plan.error ?? '';
+  formConfirmButton.disabled = plan.error !== null;
+  formAddStopButton.disabled = plan.blocksAddStop;
+
+  // Suppressed while blocked: describing a positioning flight for a
+  // rotation that can't be added reads as a contradiction, and the error
+  // is the only thing worth reading in that state.
+  const currentPosition = plan.error ? null : currentOrUpcomingAirport(tail, state);
+  if (plan.error) {
     formPositioningPreview.textContent = '';
-    return;
-  }
-
-  // Week six: departures from a slot-controlled airport need slots to
-  // put them in. Same "hard block, plain message" shape as the network
-  // check above — you can buy more in the Airports tab, so this is a
-  // constraint with a purchasable answer rather than a dead end. Both
-  // ends are checked, since a return leg departs from the destination.
-  const addingReturn = formReturnCheckbox.checked;
-  for (const [airport, departuresAdded] of [
-    [origin.iata, 1],
-    [dest.iata, addingReturn ? 1 : 0],
-  ] as [string, number][]) {
-    if (departuresAdded === 0 || !isSlotControlled(airport)) continue;
-    if (remainingSlotCapacity(state, airport) >= departuresAdded) continue;
-    formError.textContent =
-      `${airport} is slot-controlled and you hold ${slotsOwned(state, airport)} of ${slotsTotal(airport)} slots, ` +
-      `all in use. Buy another in the Airports tab before adding a departure here.`;
-    formConfirmButton.disabled = true;
-    formReturnPreview.textContent = '';
-    formPositioningPreview.textContent = '';
-    return;
-  }
-
-  // Week three: a route beyond the selected plane's real range (see the
-  // ring drawn in drawRoutePreview()) is flatly impossible, not just
-  // inadvisable — same "hard block, plain message" shape as the network
-  // check above.
-  if (type) {
-    const distanceNm = greatCircleDistanceNm(origin, dest);
-    if (distanceNm > type.rangeNm) {
-      formError.textContent = `${dest.iata} is ${Math.round(distanceNm)} nm from ${origin.iata} — beyond the ${type.name}'s ${type.rangeNm} nm range with a full load.`;
-      formConfirmButton.disabled = true;
-      formReturnPreview.textContent = '';
-      formPositioningPreview.textContent = '';
-      return;
-    }
-  }
-
-  // Week four: airport size constraints (Airport.maxAircraftType) are
-  // just as much a hard "no" as range — a real runway or gate limit,
-  // not a matter of degree — so this gets the exact same block-and-
-  // explain treatment rather than just a warning.
-  if (type) {
-    const blockedIata = !isAircraftTypeAllowedAt(origin.iata, type.code)
-      ? origin.iata
-      : !isAircraftTypeAllowedAt(dest.iata, type.code)
-        ? dest.iata
-        : null;
-    if (blockedIata) {
-      formError.textContent = `${blockedIata} only takes aircraft up to a smaller size than the ${type.name} — too large to operate there.`;
-      formConfirmButton.disabled = true;
-      formReturnPreview.textContent = '';
-      formPositioningPreview.textContent = '';
-      return;
-    }
-  }
-
-  const departMinute = timeStringToMinuteOfDay(formDepartInput.value);
-  const blockMinutes = computeBlockMinutes(origin.iata, dest.iata, type?.cruiseKts);
-  const outboundCollision = findExactTimeCollision(origin.iata, dest.iata, departMinute, state.schedule);
-
-  let returnDepartMinute: number | null = null;
-  let returnCollision: ScheduleLeg | undefined;
-  if (formReturnCheckbox.checked) {
-    returnDepartMinute = defaultReturnDepartMinute(departMinute, blockMinutes);
-    returnCollision = findExactTimeCollision(dest.iata, origin.iata, returnDepartMinute, state.schedule);
-  }
-
-  if (outboundCollision) {
-    formError.textContent = `${outboundCollision.tail} already departs ${origin.iata} for ${dest.iata} at this exact time (${outboundCollision.legId}). Pick a different time.`;
-    formConfirmButton.disabled = true;
-  } else if (returnCollision) {
-    formError.textContent = `${returnCollision.tail} already departs ${dest.iata} for ${origin.iata} at the auto-computed return time (${minuteOfDayToTimeString(returnDepartMinute!)}, ${returnCollision.legId}). Uncheck the return leg, or pick a different depart time.`;
-    formConfirmButton.disabled = true;
-  } else {
-    formError.textContent = '';
-    formConfirmButton.disabled = false;
-  }
-
-  formReturnPreview.textContent =
-    formReturnCheckbox.checked && returnDepartMinute !== null
-      ? `Return: ${dest.iata} → ${origin.iata} at ${minuteOfDayToTimeString(returnDepartMinute)}`
-      : '';
-
-  const currentPosition = currentOrUpcomingAirport(tail, state);
-  if (currentPosition && currentPosition.airport !== origin.iata) {
-    formPositioningPreview.textContent = `Positioning: ${tail} will fly ${currentPosition.airport} → ${origin.iata} first (${computeBlockMinutes(currentPosition.airport, origin.iata, type?.cruiseKts)} min, cost only, no passengers) before this route starts.`;
+  } else if (currentPosition && currentPosition.airport !== plan.base.iata) {
+    formPositioningPreview.textContent = `Positioning: ${tail} will fly ${currentPosition.airport} → ${plan.base.iata} first (${computeBlockMinutes(currentPosition.airport, plan.base.iata, type?.cruiseKts)} min, cost only, no passengers) before this rotation starts.`;
   } else if (!currentPosition) {
     // A Fleet Market purchase with no base yet (see ui/fleetMarket.ts) —
     // deploying it here is free and immediate, not a positioning flight,
     // since it was never anywhere else to begin with.
-    formPositioningPreview.textContent = `${tail} has no base yet — this route will make ${origin.iata} its new base.`;
+    formPositioningPreview.textContent = `${tail} has no base yet — this rotation will make ${plan.base.iata} its base.`;
   } else {
     formPositioningPreview.textContent = '';
   }
-}
-
-function timeStringToMinuteOfDay(time: string): number {
-  const [hours, minutes] = time.split(':').map(Number);
-  return hours * 60 + minutes;
 }
 
 /**
@@ -723,155 +938,113 @@ function timeStringToMinuteOfDay(time: string): number {
  * setupScheduleEditor() — same "build once, mutate only via events" rule,
  * for the same reason: an `<input>` the player is mid-interaction with
  * shouldn't get torn out by a periodic re-render. There's no Tail
- * dropdown to populate any more (week three) — the plane is chosen before
- * the form ever opens, via the Fleet panel (ui/fleetSelection.ts).
- *
- * Adding a route doesn't run any new rotation-fitting logic — it appends
- * the leg to state.schedule (the same array step() reads from) and
- * re-runs validateSchedule(), exactly the way editing an existing leg's
- * time already does in M8. If the chosen tail/time doesn't actually chain
- * with that tail's other legs, the same console error catches it; nothing
- * here prevents adding it anyway, on purpose, for consistency with M8 —
- * that's what `onRouteConfirmed` (M12) is for: main.ts uses it to jump the
- * player straight to the rotation board with the new leg(s) highlighted,
- * so retiming a guess that didn't land well is the very next thing that
- * happens, not something they have to notice a warning about later.
+ * dropdown to populate (week three — the plane is chosen before the form
+ * ever opens, via the Fleet panel), and as of week seven no depart-time
+ * input either: the rotation is packed into the day automatically, so
+ * there is no time left for the player to author.
  */
 export function setupRouteBuilder(state: SimState, onRouteConfirmed: (legIds: string[]) => void): void {
-  // Re-check for an exact-time collision (and refresh the return-leg and
-  // positioning-leg previews) every time the player changes the depart
-  // time or the return checkbox, so the form reacts live instead of only
-  // at submission.
-  formDepartInput.addEventListener('input', () => {
+  // "Add stop" (WEEK-SEVEN.md, decision 6): take the pending destination
+  // into the chain and re-arm from it, rather than confirming. The form
+  // closes and the gesture goes back to armed, so the next click picks the
+  // stop after this one — repeat as many times as the day has room for.
+  formAddStopButton.addEventListener('click', () => {
     if (builderState.mode !== 'confirming') return;
-    updateFormValidation(builderState.origin, builderState.dest, state);
-  });
-  formReturnCheckbox.addEventListener('change', () => {
-    if (builderState.mode !== 'confirming') return;
-    updateFormValidation(builderState.origin, builderState.dest, state);
+    builderState = { mode: 'armed', chain: [...builderState.chain, builderState.dest], tail: builderState.tail };
+    previewGeo = null;
+    candidate = null;
+    hideForm();
+    setArmedCursor(true);
   });
 
   formConfirmButton.addEventListener('click', () => {
     if (builderState.mode !== 'confirming') return;
-    const { origin, dest, tail } = builderState;
-    const aircraftForRange = state.aircraft.find((a) => a.tail === tail);
-    const typeForRange = aircraftForRange ? aircraftTypesByCode.get(aircraftForRange.typeCode) : undefined;
-    const departMinute = timeStringToMinuteOfDay(formDepartInput.value);
-    const blockMinutes = computeBlockMinutes(origin.iata, dest.iata, typeForRange?.cruiseKts);
+    const { chain, dest, tail } = builderState;
+    const plan = planRotation(chain, dest, tail, state);
+    // The button is already disabled in this case — this is the same
+    // rules, not a second copy of them, so it can't drift.
+    if (plan.error || plan.legs.length === 0) return;
 
-    // Defensive re-checks: the button should already be disabled in
-    // either case, but never add a duplicate timeslot or an impossible
-    // route regardless.
-    if (findExactTimeCollision(origin.iata, dest.iata, departMinute, state.schedule)) return;
-    if (typeForRange && greatCircleDistanceNm(origin, dest) > typeForRange.rangeNm) return;
-    if (
-      typeForRange &&
-      (!isAircraftTypeAllowedAt(origin.iata, typeForRange.code) || !isAircraftTypeAllowedAt(dest.iata, typeForRange.code))
-    ) {
-      return;
-    }
+    const aircraft = state.aircraft.find((a) => a.tail === tail);
+    const type = aircraft ? aircraftTypesByCode.get(aircraft.typeCode) : undefined;
 
-    // If the chosen tail isn't standing at this route's origin, queue a
-    // one-time positioning leg to get it there first — see
-    // currentOrUpcomingAirport() and PositioningLeg's own comment
-    // (sim/schedule.ts). This is the whole point of positioning legs
-    // existing at all: describe the network you want and let the game
-    // work out how to get a plane there, rather than blocking the route or
-    // requiring a separate manual leg first.
+    // If the chosen tail isn't standing at its base, queue a one-time
+    // positioning leg to get it there — see currentOrUpcomingAirport() and
+    // PositioningLeg's own comment (sim/schedule.ts). Rotations make this
+    // nearly extinct: every rotation ends where it began, so a tail only
+    // needs positioning for its very first one, and phase C of the pivot
+    // removes positioning legs entirely.
     //
     // `currentPosition === null` is different: a Fleet Market purchase
     // (ui/fleetMarket.ts) that's never flown before has no base at all,
     // not merely a *different* one, so there's nothing to fly it in from.
-    // Deploying it here is free and immediate — this route just becomes
-    // its home base, which is also the closest thing this game has to a
-    // "pick a home airport" step, arrived at implicitly rather than as a
-    // separate purchase-time decision.
+    // Deploying it here is free and immediate.
     const currentPosition = currentOrUpcomingAirport(tail, state);
-    if (currentPosition && currentPosition.airport !== origin.iata) {
+    if (currentPosition && currentPosition.airport !== plan.base.iata) {
       const positioningLeg: PositioningLeg = {
         legId: nextPositioningLegId(tail, state.positioningLegs),
         tail,
         origin: currentPosition.airport,
-        dest: origin.iata,
+        dest: plan.base.iata,
         departMinute: currentPosition.earliestDepartMinute,
-        blockMinutes: computeBlockMinutes(currentPosition.airport, origin.iata, typeForRange?.cruiseKts),
+        blockMinutes: computeBlockMinutes(currentPosition.airport, plan.base.iata, type?.cruiseKts),
       };
       state.positioningLegs.push(positioningLeg);
-    } else if (!currentPosition) {
-      const aircraft = state.aircraft.find((a) => a.tail === tail);
-      if (aircraft) {
-        aircraft.atAirport = origin.iata;
-        aircraft.groundSinceMinute = state.simMinute;
-      }
+    } else if (!currentPosition && aircraft) {
+      aircraft.atAirport = plan.base.iata;
+      aircraft.groundSinceMinute = state.simMinute;
     }
 
-    const outboundLeg: ScheduleLeg = {
-      legId: nextLegId(tail, state.schedule),
-      tail,
-      origin: origin.iata,
-      dest: dest.iata,
-      departMinute,
-      blockMinutes,
-    };
-    state.schedule.push(outboundLeg);
-    addScheduleRow(outboundLeg, state);
-    const createdLegIds = [outboundLeg.legId];
+    // Week seven, decision 2: an aircraft's base is explicit state, not
+    // something inferred from its legs. An unbased airframe gets based
+    // here by flying its first rotation from here — the closest thing the
+    // game has to a "pick a home airport" step, and the only place a base
+    // is set other than the Fleet tab's own dropdown.
+    if (aircraft && !aircraft.baseAirport) aircraft.baseAirport = plan.base.iata;
 
-    // Adding a route creates its return leg too, by default — 99% of the
-    // time a player drawing A->B wants B->A as well, and the case that
-    // doesn't is exactly the case that used to strand a tail at the far
-    // end with no way back into its own rotation (see WEEK-THREE.md). The
-    // checkbox is the deliberate escape hatch for the real exception: an
-    // extra one-way frequency on a market that already has a return, or a
-    // one-off repositioning move where a return truly isn't wanted yet.
-    if (formReturnCheckbox.checked) {
-      const returnDepartMinute = defaultReturnDepartMinute(departMinute, blockMinutes);
-      // Same defensive re-check as the outbound leg above — if the
-      // auto-computed return time happens to collide, just skip adding it
-      // rather than fail the whole submission; the outbound leg (and the
-      // form's live validation, which would have already disabled Add
-      // Route in this case) still make this an edge case, not a silent one.
-      if (!findExactTimeCollision(dest.iata, origin.iata, returnDepartMinute, state.schedule)) {
-        const returnLeg: ScheduleLeg = {
-          legId: nextLegId(tail, state.schedule),
-          tail,
-          origin: dest.iata,
-          dest: origin.iata,
-          departMinute: returnDepartMinute,
-          blockMinutes,
-        };
-        state.schedule.push(returnLeg);
-        addScheduleRow(returnLeg, state);
-        createdLegIds.push(returnLeg.legId);
-      }
+    const createdLegIds: string[] = [];
+    // Keyed bidirectionally (marketKey) so out and back collapse to one
+    // entry, but holding the leg itself so the Commercial row is created
+    // in the direction the rotation actually flies rather than in
+    // alphabetical order.
+    const marketsTouched = new Map<string, PackedLeg>();
+    for (const packed of plan.legs) {
+      const leg: ScheduleLeg = {
+        legId: nextLegId(tail, state.schedule),
+        tail,
+        origin: packed.origin,
+        dest: packed.dest,
+        departMinute: packed.departMinute,
+        blockMinutes: packed.blockMinutes,
+      };
+      state.schedule.push(leg);
+      addScheduleRow(leg, state);
+      createdLegIds.push(leg.legId);
+      const key = marketKey(packed.origin, packed.dest);
+      if (!marketsTouched.has(key)) marketsTouched.set(key, packed);
     }
 
     renderScheduleWarnings(validateSchedule(state.schedule, state.aircraft, state.positioningLegs));
 
     // Fare/marketing are set at the market level (sim/state.ts's
     // RouteSettings), not per leg — a brand-new market gets a fresh entry
-    // (policy fare, zero marketing spend); a second
-    // frequency on a market that already has one reuses it unchanged,
-    // rather than resetting whatever fare the player already set there.
-    // marketKey() is bidirectional, so this covers the return leg too —
-    // one entry for the whole market regardless of how many legs serve it.
-    const key = marketKey(origin.iata, dest.iata);
-    if (!state.routeSettings[key]) {
+    // (policy fare, zero marketing spend); a rotation touching a market
+    // that already has one reuses it unchanged, rather than resetting
+    // whatever fare the player already set there. marketKey() is
+    // bidirectional, so out and back share one entry.
+    for (const [key, leg] of marketsTouched) {
+      if (state.routeSettings[key]) continue;
       // Priced by the airline-wide policy (sim/pricing.ts), not by bare
       // recommendedFare() — a new route should open at whatever the rest
       // of the network is charging, not silently ignore the policy and
       // need a manual correction straight after being drawn.
       state.routeSettings[key] = {
-        fare: policyFare(state, origin.iata, dest.iata),
+        fare: policyFare(state, leg.origin, leg.dest),
         fareIsOverridden: false,
         marketingSpend: 0,
       };
-      addCommercialRow(origin.iata, dest.iata, state);
+      addCommercialRow(leg.origin, leg.dest, state);
     }
-
-    // The Route filter is already set to this exact market — see
-    // showForm() — so the new row satisfies it automatically and just
-    // joins whatever else is already narrowed into view.
 
     onRouteConfirmed(createdLegIds);
     reset();

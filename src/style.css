@@ -579,16 +579,6 @@ body {
   color: #9aa3b8;
 }
 
-.new-route-field input[type='time'] {
-  font-family: inherit;
-  font-size: inherit;
-  color: #cdd3e0;
-  background: #0a0c12;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  padding: 3px 6px;
-}
-
 /* Week three: the tail is chosen before the form opens (Fleet panel), so
    it's shown here read-only rather than as an editable control. */
 #new-route-tail-label {
@@ -596,15 +586,11 @@ body {
   font-weight: 600;
 }
 
-.new-route-field--checkbox {
-  justify-content: flex-start;
-}
-
-.new-route-field--checkbox input[type='checkbox'] {
-  margin: 0;
-}
-
-#new-route-return-preview {
+/* Week seven: the live utilisation read for the rotation being built —
+   what share of an aircraft it spends, and what the base pool has left
+   after it. Amber because this is now the number the decision turns on,
+   the same weight the return-leg preview used to carry here. */
+#new-route-utilisation {
   color: #ffd166;
   margin: -4px 0 8px;
   min-height: 1.2em;
@@ -618,6 +604,7 @@ body {
 
 .new-route-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 4px;
 }
@@ -634,6 +621,15 @@ body {
   background: #3a4258;
   border: 1px solid #6b7694;
   color: #fff;
+}
+
+/* Week seven: "Add stop" extends the chain instead of confirming it, so
+   it reads as a secondary action next to Add Rotation — outlined in the
+   builder's own amber rather than filled like the confirm button. */
+#new-route-add-stop {
+  background: transparent;
+  border: 1px solid rgba(255, 209, 102, 0.5);
+  color: #ffd166;
 }
 
 #new-route-cancel {
@@ -667,7 +663,8 @@ body {
   margin-top: 4px;
 }
 
-#new-route-confirm:disabled {
+#new-route-confirm:disabled,
+#new-route-add-stop:disabled {
   background: transparent;
   border-color: rgba(255, 255, 255, 0.15);
   color: #6b7694;
