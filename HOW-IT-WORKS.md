@@ -1485,6 +1485,18 @@ pay idle salaries. Training moves pilots up a tier over 21 days, and
 takes cabin crew off the line for 7, raising NPS once they're back.
 Recurrent training **lapses** over roughly 180 days.
 
+**Standing orders (week eight)** are the alternative to clicking batches:
+set a rate per role — `perMonth` — and `runStandingOrders()` hires toward
+the fleet's target every day until it's met, then stops. There is
+deliberately no target input; the stop condition is `crewRequirement()`'s
+own target (operating need times reserve depth), which bounds the order to
+the fleet you actually own and makes it self-resume when the fleet grows.
+Counting is against *projected* headcount (pool + in transit + due back
+from training), or the ten-day lead time would have it re-order the same
+people daily. It runs after payroll, skips days it can't afford a head,
+and caps its fractional carry at one month so a pause can't bank a
+backlog.
+
 **Reserve depth** is the player's lever: 1.0 is exactly enough crew with
 no slack, 1.4 is 40% more. Each day a disruption fraction is drawn and
 reserve depth absorbs it. Cost is linear in depth; protection is a

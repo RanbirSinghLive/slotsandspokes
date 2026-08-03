@@ -4,9 +4,9 @@ Handoff document. Week seven's utilisation pivot lives in
 `WEEK-SEVEN.md`; read this one first and go there for the pivot's
 reasoning.
 
-**State at handoff:** save key `airgame-save-v24`, 11 sidebar tabs.
-Aircraft delivery lead times are done and committed. **Standing-order
-crew recruitment is the next thing to build.**
+**State at handoff:** save key `airgame-save-v25`, 11 sidebar tabs.
+Aircraft delivery lead times and standing-order recruitment are both done
+and committed. **The Grow tab — one pipeline view — is next.**
 
 ---
 
@@ -73,31 +73,53 @@ double-ordering.
 
 ---
 
-## Next: standing-order recruitment
+## Done: standing-order recruitment
 
-`hireCrew()` already queues a `PendingHire` with a lead time, so the
-mechanism exists — what's missing is that the player sets a *batch*
-rather than a *rate*.
+`StandingOrder { role, tier, perMonth, accrued }` on `SimState`, advanced
+by `runStandingOrders()` inside the daily crew pass.
 
-Sketch, not a spec:
+**There is no target field, and that is the design.** The stop condition
+is `crewRequirement()`'s existing target — operating need times reserve
+depth — so the player sets only a *rate*. Three things follow:
 
-- A per-role standing order: rate (heads per some period) plus a target
-  headcount. The daily crew pass emits hires while below target.
-- **It must have a stop condition.** An open-ended order quietly bleeds
-  cash, which is the main way this mechanic could go wrong.
-- Reserve depth and hiring rate become two halves of one decision rather
-  than unrelated sliders — worth checking whether reserve depth should
-  simply *derive* the target.
-- The existing batch form should probably survive as "hire N now", since
-  a one-off catch-up hire is still a real thing to want.
+- An order can never run away: it is bounded by the fleet you own.
+- It **self-resumes**. Buy an aircraft or raise reserve depth and the
+  requirement rises, so hiring restarts without anyone remembering to.
+- Reserve depth and hiring rate stop being unrelated sliders. Reserve
+  depth sets *how much* crew you are hiring toward; the rate sets *how
+  fast*.
+
+Three guards against the obvious failure mode of a recurring spend:
+it never orders past the target, it skips any day it cannot afford a
+whole head, and `accrued` is capped at one month so a long pause can't
+bank a backlog and dump it in one tick. It also runs **after payroll**,
+so wages have first call on cash and a tight month pauses recruitment
+rather than failing salaries.
+
+Counting is against `projectedHeadcount()` — pool plus hires in transit
+plus trainees due back — not the current pool, or the ten-day lead time
+would have it re-order the same people every day until the first batch
+landed.
+
+Batch "Recruit" survives alongside it for one-off catch-up hires.
+
+Measured: with two 1900Ds on order and a 4/month order for tier-1 pilots,
+the target stepped 0 → 6 → 12 as the aircraft arrived, hiring tracked it,
+and it stopped dead at 12 with no further spend.
 
 ---
 
-## Then: the Grow tab
+## Next: the Grow tab
 
-One pipeline view listing everything inbound with dates — aircraft, crew,
-training, later spares — with small controls to add to it. **One list,
-not one panel per resource**; a panel each multiplies UI for no gain.
+One pipeline view listing everything inbound with dates — aircraft, crew
+hires, training, later spares — with small controls to add to it. **One
+list, not one panel per resource**; a panel each multiplies UI for no
+gain.
+
+The pieces already exist and are currently scattered: `pendingDeliveries`
+shows in the Fleet tab's Inbound section, `pendingHires`/`pendingTraining`
+in the Crew tab's pipeline list, and standing orders in their own Crew
+section. Gathering them is mostly a move, not new mechanics.
 
 Executive hires arriving after a notice period is a natural fit and would
 make the C-suite a commitment rather than an instant buy. Worth doing
@@ -128,7 +150,7 @@ once the rest works.
 ## Conventions worth knowing
 
 - **Bump `SAVE_KEY` in `src/ui/save.ts` on any breaking `SimState`
-  change.** Currently `v24`.
+  change.** Currently `v25`.
 - **`headless-output.csv` and `sweep-reserve.csv` must stay
   byte-identical** across changes that aren't meant to affect balance.
   Both were verified unchanged after the delivery work — `createInitialState()`

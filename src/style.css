@@ -1754,6 +1754,55 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Week eight: standing orders — a recurring recruitment commitment, one
+   row per running order with its own cancel. Same visual language as the
+   inbound aircraft list below: amber for a commitment in flight, muted
+   for one that has met its target and is sitting idle. */
+.crew-standing-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 12px;
+}
+
+.crew-standing-row span:first-child {
+  color: #cdd3e0;
+  flex: 1;
+}
+
+.crew-standing-active {
+  color: #ffd166;
+}
+
+.crew-standing-idle {
+  color: #6b7694;
+}
+
+.crew-standing-cancel {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  line-height: 1;
+  font-family: inherit;
+  font-size: 13px;
+  color: #9aa3b8;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.crew-standing-cancel:hover {
+  color: #ff8080;
+  border-color: #ff8080;
+}
+
+.crew-form-suffix {
+  color: #6b7694;
+  font-size: 12px;
+}
+
 /* Week eight: aircraft ordered but not yet delivered, shown under the
    fleet. Same amber "bought, not here yet" language as .crew-incoming
    above — the two are the same idea for two different resources. */

@@ -373,6 +373,38 @@ export function dailyCrewSalary(pools: CrewPools): number {
   return pilots + pools.cabinCrew * CABIN_DAILY_SALARY + pools.mechanics * MECHANIC_DAILY_SALARY;
 }
 
+/**
+ * A recurring recruitment commitment: hire `perMonth` heads of this
+ * role/tier every month until the fleet's target headcount is met, then
+ * stop on its own.
+ *
+ * Week eight's pipeline idea. Batch hiring made growth a shop — click,
+ * receive, repeat — while the thing that actually limits an airline is a
+ * *rate* it can recruit at. Setting a rate rather than a batch is also
+ * what makes the ten-day lead time something to plan around instead of an
+ * annoyance to absorb once.
+ *
+ * **There is deliberately no target field.** The stop condition is
+ * `crewRequirement()`'s existing target (operating need times reserve
+ * depth), which means a standing order can never run away: it is bounded
+ * by the fleet you actually own. It also self-resumes — buy an aircraft
+ * or raise reserve depth and the requirement rises, so hiring restarts
+ * without the player remembering to. That folds reserve depth and hiring
+ * rate into one decision rather than two unrelated sliders.
+ *
+ * `accrued` is the fractional-heads carry, since a rate per month has to
+ * be spent a whole person at a time on a daily tick.
+ */
+export type StandingOrder = {
+  role: CrewRole;
+  /** 1 for cabin crew and mechanics, which aren't tiered. */
+  tier: number;
+  perMonth: number;
+  accrued: number;
+};
+
+export const STANDING_ORDER_PERIOD_DAYS = 30;
+
 export function hireCost(role: CrewRole, tier: number, count: number): number {
   if (role === 'pilot') return PILOT_HIRE_COST[tier - 1] * count;
   return (role === 'cabin' ? CABIN_HIRE_COST : MECHANIC_HIRE_COST) * count;
@@ -503,6 +535,72 @@ function resolveArrivals(state: SimState): void {
  * being paid — a deliberate simplification worth noting, since real
  * airlines keep paying them.
  */
+/** The target a standing order for this role/tier runs toward. */
+function standingOrderTarget(requirement: CrewRequirement, role: CrewRole, tier: number): number {
+  if (role === 'pilot') return requirement.targetPilotsByTier[tier - 1];
+  return role === 'cabin' ? requirement.targetCabinCrew : requirement.targetMechanics;
+}
+
+/**
+ * Headcount this role/tier will have once everything already paid for has
+ * landed — the pool now, plus hires in transit, plus anyone due back from
+ * training. Standing orders count against *this* rather than the current
+ * pool, or a ten-day lead time would have them re-order the same people
+ * every day until the first batch showed up.
+ *
+ * Pilots away upgrading are already out of their old tier's pool and
+ * return one tier higher, so they count toward the tier they're arriving
+ * at and not the one they left.
+ */
+export function projectedHeadcount(state: SimState, role: CrewRole, tier: number): number {
+  let total =
+    role === 'pilot' ? state.crew.pilotsByTier[tier - 1] : role === 'cabin' ? state.crew.cabinCrew : state.crew.mechanics;
+
+  for (const hire of state.pendingHires) {
+    if (hire.role !== role) continue;
+    if (role === 'pilot' && hire.tier !== tier) continue;
+    total += hire.count;
+  }
+  for (const training of state.pendingTraining) {
+    if (role === 'pilot' && training.kind === 'pilot' && training.fromTier + 1 === tier) total += training.count;
+    if (role === 'cabin' && training.kind === 'cabin') total += training.count;
+  }
+  return total;
+}
+
+/**
+ * Advance every standing order by one day. Runs after salary is paid, so
+ * payroll — a fixed obligation — always has first call on cash and a tight
+ * month pauses discretionary recruitment instead of failing wages.
+ *
+ * Three things stop this running away, which matters because an
+ * open-ended recurring spend is the obvious way this mechanic could go
+ * wrong: it never orders past the fleet's own target, it skips any day it
+ * can't afford a whole head, and `accrued` is capped at one month so a
+ * long pause (at target, or broke) can't bank a backlog and then dump a
+ * year of hiring in one tick.
+ *
+ * Rolls no randomness, so the balance sweep's constant-draws-per-day
+ * guarantee is untouched.
+ */
+export function runStandingOrders(state: SimState): void {
+  const requirement = crewRequirement(state);
+
+  for (const order of state.standingOrders) {
+    order.accrued = Math.min(order.accrued + order.perMonth / STANDING_ORDER_PERIOD_DAYS, order.perMonth);
+
+    const room = standingOrderTarget(requirement, order.role, order.tier) - projectedHeadcount(state, order.role, order.tier);
+    if (room <= 0) continue;
+
+    const perHead = hireCost(order.role, order.tier, 1);
+    const heads = Math.min(Math.floor(order.accrued), room, Math.floor(Math.max(0, state.cash) / perHead));
+    if (heads <= 0) continue;
+
+    hireCrew(state, order.role, order.tier, heads);
+    order.accrued -= heads;
+  }
+}
+
 export function rollDailyCrew(state: SimState): void {
   resolveArrivals(state);
 
@@ -519,6 +617,9 @@ export function rollDailyCrew(state: SimState): void {
   state.todayCost += salary;
   state.todayCostByCategory.crew += salary;
   state.todayMargin -= salary;
+
+  // After payroll on purpose — see runStandingOrders()'s own note.
+  runStandingOrders(state);
 
   const [disruptionRoll, nextSeed] = nextRandom(state.rngSeed);
   state.rngSeed = nextSeed;

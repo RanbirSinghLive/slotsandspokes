@@ -6,7 +6,7 @@ import type { WeatherEvent } from './weather';
 import type { Loan } from './loans';
 import { FUEL_PRICE_BASELINE } from './fuel';
 import type { TargetCommitment, TargetResult } from './targets';
-import { createCrewPools, crewRequirement, type CrewPools, type PendingHire, type PendingTraining } from './crew';
+import { createCrewPools, crewRequirement, type CrewPools, type PendingHire, type PendingTraining, type StandingOrder } from './crew';
 import { createExecutiveSlots, type ExecutiveSlots } from './executives';
 import { isSlotControlled } from './airports';
 
@@ -396,6 +396,11 @@ export type SimState = {
   /** Pilots currently away upgrading a tier. Already removed from `crew`, since losing their capacity is the real cost. */
   pendingTraining: PendingTraining[];
   /**
+   * Week eight: recurring recruitment commitments — see sim/crew.ts's
+   * StandingOrder. Advanced once per day inside rollDailyCrew().
+   */
+  standingOrders: StandingOrder[];
+  /**
    * How much crew the player chooses to carry above the bare operating
    * minimum, 1 meaning none at all. Cost is linear in this; protection
    * against a bad disruption day is a threshold — which is what makes it
@@ -604,6 +609,7 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     executives: createExecutiveSlots(),
     crew: createCrewPools(),
     pendingHires: [],
+    standingOrders: [],
     pendingTraining: [],
     reserveDepth: 1.15,
     groundedTails: [],
@@ -707,6 +713,7 @@ export function createNewGameState(rngSeed: number = Date.now()): SimState {
     executives: createExecutiveSlots(),
     crew: createCrewPools(),
     pendingHires: [],
+    standingOrders: [],
     pendingTraining: [],
     reserveDepth: 1.15,
     groundedTails: [],

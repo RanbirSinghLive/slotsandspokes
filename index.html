@@ -368,6 +368,26 @@
             <div id="crew-hire-cost"></div>
             <button type="button" id="crew-hire-button">Recruit</button>
           </section>
+          <section id="crew-standing-section">
+            <h2>Standing orders <button type="button" class="info-mark" aria-label="What this means" data-info="Recruits at a steady rate until the fleet's target headcount is met, then stops on its own. The target comes from your reserve depth, so raising that — or buying more aircraft — restarts hiring automatically.">i</button></h2>
+            <div class="crew-form-row">
+              <select id="crew-standing-role">
+                <option value="pilot">Pilots</option>
+                <option value="cabin">Cabin crew</option>
+                <option value="mechanic">Mechanics</option>
+              </select>
+              <select id="crew-standing-tier">
+                <option value="1">Light turboprop</option>
+                <option value="2">Regional</option>
+                <option value="3">Mainline jet</option>
+              </select>
+              <input type="number" id="crew-standing-rate" min="1" max="99" value="2" />
+              <span class="crew-form-suffix">/month</span>
+            </div>
+            <div id="crew-standing-cost"></div>
+            <button type="button" id="crew-standing-button">Start standing order</button>
+            <div id="crew-standing-list"></div>
+          </section>
           <section id="crew-train-section">
             <h2>Train up a tier</h2>
             <div class="crew-form-row">

@@ -13,6 +13,7 @@ import {
   RESERVE_DEPTH_MIN,
   RESERVE_DEPTH_MAX,
   HIRE_LEAD_TIME_DAYS,
+  projectedHeadcount,
   TRAINING_DAYS,
   MAX_PILOT_TIER,
   type CrewRole,
@@ -54,6 +55,13 @@ const trainButton = el<HTMLButtonElement>('#crew-train-button');
 const cabinTrainCountInput = el<HTMLInputElement>('#crew-cabin-train-count');
 const cabinTrainCostEl = el<HTMLDivElement>('#crew-cabin-train-cost');
 const cabinTrainButton = el<HTMLButtonElement>('#crew-cabin-train-button');
+
+const standingRoleSelect = el<HTMLSelectElement>('#crew-standing-role');
+const standingTierSelect = el<HTMLSelectElement>('#crew-standing-tier');
+const standingRateInput = el<HTMLInputElement>('#crew-standing-rate');
+const standingCostEl = el<HTMLDivElement>('#crew-standing-cost');
+const standingButton = el<HTMLButtonElement>('#crew-standing-button');
+const standingListEl = el<HTMLDivElement>('#crew-standing-list');
 
 const pendingEl = el<HTMLDivElement>('#crew-pending');
 
@@ -237,6 +245,109 @@ function renderCabinTrainCost(state: SimState): void {
   cabinTrainButton.disabled = cost > state.cash || tooFew;
 }
 
+function roleLabel(role: CrewRole, tier: number): string {
+  if (role === 'pilot') return `${TIER_NAMES[tier - 1]} pilots`;
+  return role === 'cabin' ? 'cabin crew' : 'mechanics';
+}
+
+/**
+ * What starting this order would commit to. Deliberately quotes a monthly
+ * run rate rather than a total: there is no total, since the order stops
+ * at the fleet's own target and that target moves with the fleet.
+ */
+function renderStandingCost(state: SimState): void {
+  const role = standingRoleSelect.value as CrewRole;
+  standingTierSelect.disabled = role !== 'pilot';
+  const tier = role === 'pilot' ? Number(standingTierSelect.value) : 1;
+  const rate = Math.max(1, Number(standingRateInput.value) || 1);
+
+  const req = crewRequirement(state);
+  const target = role === 'pilot' ? req.targetPilotsByTier[tier - 1] : role === 'cabin' ? req.targetCabinCrew : req.targetMechanics;
+  const projected = projectedHeadcount(state, role, tier);
+  const short = Math.max(0, target - projected);
+
+  const alreadyRunning = state.standingOrders.some((o) => o.role === role && (role !== 'pilot' || o.tier === tier));
+  standingButton.disabled = alreadyRunning;
+
+  standingCostEl.textContent = alreadyRunning
+    ? `Already running for ${roleLabel(role, tier)} — cancel it below to change the rate.`
+    : short === 0
+      ? `${money(hireCost(role, tier, rate))}/month while below target. ${roleLabel(role, tier)} are already at target (${projected} of ${target}), so this would sit idle until the fleet grows.`
+      : `${money(hireCost(role, tier, rate))}/month until target. ${short} short right now (${projected} of ${target}), about ${Math.ceil(short / rate)} month${Math.ceil(short / rate) === 1 ? '' : 's'} at this rate.`;
+}
+
+/**
+ * The running orders, each cancellable.
+ *
+ * Rebuilt **only when its own content changes**, not on every call. This
+ * whole panel is refreshed once per frame while the Crew tab is visible
+ * (see updateCrewPanel() below and main.ts's render loop), and these rows
+ * own buttons: a click only fires when mousedown and mouseup land on the
+ * same element, so tearing the list down ~60 times a second makes Cancel
+ * do nothing at all. Exactly the bug ui/panels.ts's renderFleet() documents
+ * — and it survived a scripted `.click()` here too, because that invokes
+ * the handler directly and never exercises the press.
+ *
+ * The signature covers everything rendered, including the projected and
+ * target counts, so the status text still tracks daily changes.
+ */
+let standingSignature: string | null = null;
+
+function renderStandingList(state: SimState): void {
+  const req0 = crewRequirement(state);
+  const signature = state.standingOrders
+    .map((o) => {
+      const target =
+        o.role === 'pilot' ? req0.targetPilotsByTier[o.tier - 1] : o.role === 'cabin' ? req0.targetCabinCrew : req0.targetMechanics;
+      return `${o.role}:${o.tier}:${o.perMonth}:${projectedHeadcount(state, o.role, o.tier)}/${target}`;
+    })
+    .join('|');
+  if (signature === standingSignature) return;
+  standingSignature = signature;
+
+  standingListEl.innerHTML = '';
+  if (state.standingOrders.length === 0) {
+    standingListEl.innerHTML = '<div class="crew-pending-row">No standing orders.</div>';
+    return;
+  }
+
+  const req = crewRequirement(state);
+  for (const order of state.standingOrders) {
+    const target =
+      order.role === 'pilot'
+        ? req.targetPilotsByTier[order.tier - 1]
+        : order.role === 'cabin'
+          ? req.targetCabinCrew
+          : req.targetMechanics;
+    const projected = projectedHeadcount(state, order.role, order.tier);
+    const idle = projected >= target;
+
+    const row = document.createElement('div');
+    row.className = 'crew-standing-row';
+
+    const label = document.createElement('span');
+    label.textContent = `${order.perMonth}/month ${roleLabel(order.role, order.tier)}`;
+
+    const status = document.createElement('span');
+    status.className = idle ? 'crew-standing-idle' : 'crew-standing-active';
+    status.textContent = idle ? `holding at target (${projected}/${target})` : `hiring — ${projected}/${target}`;
+
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'crew-standing-cancel';
+    cancel.textContent = '×';
+    cancel.setAttribute('aria-label', `Cancel standing order for ${roleLabel(order.role, order.tier)}`);
+    cancel.addEventListener('click', () => {
+      const index = state.standingOrders.indexOf(order);
+      if (index !== -1) state.standingOrders.splice(index, 1);
+      updateCrewPanel(state);
+    });
+
+    row.append(label, status, cancel);
+    standingListEl.appendChild(row);
+  }
+}
+
 function renderPending(state: SimState): void {
   const items: string[] = [];
   for (const hire of state.pendingHires) {
@@ -275,6 +386,22 @@ export function setupCrewPanel(state: SimState): void {
     updateCrewPanel(state);
   });
 
+  standingRoleSelect.addEventListener('change', () => renderStandingCost(state));
+  standingTierSelect.addEventListener('change', () => renderStandingCost(state));
+  standingRateInput.addEventListener('input', () => renderStandingCost(state));
+  standingButton.addEventListener('click', () => {
+    const role = standingRoleSelect.value as CrewRole;
+    const tier = role === 'pilot' ? Number(standingTierSelect.value) : 1;
+    if (state.standingOrders.some((o) => o.role === role && (role !== 'pilot' || o.tier === tier))) return;
+    state.standingOrders.push({
+      role,
+      tier,
+      perMonth: Math.max(1, Number(standingRateInput.value) || 1),
+      accrued: 0,
+    });
+    updateCrewPanel(state);
+  });
+
   cabinTrainCountInput.addEventListener('input', () => renderCabinTrainCost(state));
   cabinTrainButton.addEventListener('click', () => {
     const count = Math.max(1, Number(cabinTrainCountInput.value) || 1);
@@ -307,5 +434,7 @@ export function updateCrewPanel(state: SimState): void {
   renderHireCost(state);
   renderTrainCost(state);
   renderCabinTrainCost(state);
+  renderStandingCost(state);
+  renderStandingList(state);
   renderPending(state);
 }
