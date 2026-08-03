@@ -952,6 +952,14 @@ body {
   color: #ff8080;
 }
 
+/* Amber, not red: this stop is perfectly flyable, it just can't be the
+   last one before the base. Same caution-not-refusal weight .thin-market
+   carries, since both describe a choice with a consequence rather than a
+   choice that's blocked. */
+#route-hover-tooltip-body.needs-another-stop {
+  color: #ffd166;
+}
+
 /* The bottom-of-screen event ticker (ui/ticker.ts) — non-player events
    (new weather, a competitor opening a route) scrolling by, always
    visible regardless of which panel is showing, same "ambient

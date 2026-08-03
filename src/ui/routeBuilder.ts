@@ -68,7 +68,14 @@ const routeHoverTooltipBody = document.querySelector<HTMLElement>('#route-hover-
  * out-and-back, and a hovered airport isn't yet part of a chain whose
  * real leg count could be counted instead.
  */
-function showRouteHoverTooltip(origin: Airport, candidate: Airport, screenX: number, screenY: number, state: SimState): void {
+function showRouteHoverTooltip(
+  origin: Airport,
+  candidate: Airport,
+  base: Airport,
+  screenX: number,
+  screenY: number,
+  state: SimState,
+): void {
   const tail = getSelectedTail();
   const aircraft = tail ? state.aircraft.find((a) => a.tail === tail) : undefined;
   const type = aircraft ? aircraftTypesByCode.get(aircraft.typeCode) : undefined;
@@ -95,10 +102,25 @@ function showRouteHoverTooltip(origin: Airport, candidate: Airport, screenX: num
         ? `PDEW: ${pdew} → ${potentialPdew}`
         : `PDEW: ${pdew}`;
 
+    // A stop can be comfortably in range from here and still be a dead
+    // end, because the rotation has to get *home*: the range ring is drawn
+    // around this leg's origin, so it says nothing about whether the base
+    // is reachable from the far side. Warning here, on hover, is the only
+    // place that reading can arrive before the click that needs it —
+    // otherwise the first sign is the confirm button refusing, naming a
+    // leg the player never drew. Not fatal, and deliberately not phrased
+    // as though it were: another stop on the way back closes the loop,
+    // which is exactly what "Add stop" is for.
+    const homeNm = greatCircleDistanceNm(candidate, base);
+    const cannotGetHome = !outOfRange && candidate.iata !== base.iata && homeNm > type.rangeNm;
+
     routeHoverTooltipBody.textContent = outOfRange
       ? `${pdewText}  CAP: ${type.seats} — out of range (${Math.round(distanceNm)} nm)`
-      : `${pdewText}  CAP: ${type.seats}`;
+      : cannotGetHome
+        ? `${pdewText}  CAP: ${type.seats} — ${base.iata} is ${Math.round(homeNm)} nm back, too far to close directly; needs another stop`
+        : `${pdewText}  CAP: ${type.seats}`;
     routeHoverTooltipBody.classList.toggle('out-of-range', outOfRange);
+    routeHoverTooltipBody.classList.toggle('needs-another-stop', cannotGetHome);
     // Thin now means "can never fill this aircraft even fully grown" —
     // testing today's actual instead would fire on virtually every market
     // in the early game, since they all start at the virgin floor, and a
@@ -106,7 +128,7 @@ function showRouteHoverTooltip(origin: Airport, candidate: Airport, screenX: num
     routeHoverTooltipBody.classList.toggle('thin-market', !outOfRange && potentialPdew < type.seats);
   } else {
     routeHoverTooltipBody.textContent = '';
-    routeHoverTooltipBody.classList.remove('out-of-range', 'thin-market');
+    routeHoverTooltipBody.classList.remove('out-of-range', 'thin-market', 'needs-another-stop');
   }
 
   routeHoverTooltip.hidden = false;
@@ -303,7 +325,7 @@ export function handleRouteBuilderMouseMove(event: MouseEvent, state: SimState):
 
   const origin = chainOrigin(builderState.chain);
   if (candidate && candidate.iata !== origin.iata) {
-    showRouteHoverTooltip(origin, candidate, event.clientX, event.clientY, state);
+    showRouteHoverTooltip(origin, candidate, builderState.chain[0], event.clientX, event.clientY, state);
   } else {
     hideRouteHoverTooltip();
   }
@@ -634,9 +656,17 @@ function planRotation(chain: Airport[], dest: Airport, tail: string, state: SimS
       );
       if (distanceNm <= type.rangeNm) continue;
       const isClosingLeg = leg === lastLeg && leg.dest === base.iata;
+      // Both messages name the leg as `origin → dest`, the direction it is
+      // actually flown. The closing leg used to read "${dest} is N nm from
+      // ${origin}", which put the *base* first for a leg flying toward it
+      // — and since that distance is symmetric, it looked exactly like the
+      // range was being measured from the base against a leg that never
+      // touches it. It wasn't; every leg is checked on its own. But the
+      // message was the only evidence the player had, so it was the bug.
       return fail(
-        `${leg.dest} is ${Math.round(distanceNm)} nm from ${leg.origin} — beyond the ${type.name}'s ${type.rangeNm} nm range with a full load.` +
-          (isClosingLeg ? ` Add a stop closer to ${base.iata} before closing the rotation.` : ''),
+        isClosingLeg
+          ? `This rotation can't close: ${leg.origin} → ${base.iata} is ${Math.round(distanceNm)} nm, beyond the ${type.name}'s ${type.rangeNm} nm range. Add a stop on the way back to ${base.iata}.`
+          : `${leg.origin} → ${leg.dest} is ${Math.round(distanceNm)} nm — beyond the ${type.name}'s ${type.rangeNm} nm range with a full load.`,
         !isClosingLeg,
       );
     }
