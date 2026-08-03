@@ -63,37 +63,76 @@ function money(amount: number): string {
   return `$${Math.round(amount).toLocaleString()}`;
 }
 
-/** A "have / need" line, marked short when the pool can't cover the operating minimum. */
-function poolRow(label: string, have: number, need: number, target: number): string {
+/**
+ * A "have / need" line, marked short when the pool can't cover the
+ * operating minimum. `incoming` is headcount already bought and on its way
+ * — shown right on the pool it will land in, because hiring has a
+ * ten-day lead time and without this the Pilots row is completely
+ * unmoved by a successful recruitment. The pipeline list further down said
+ * so all along, but nobody watching the number they just paid to change
+ * is looking there.
+ */
+function poolRow(label: string, have: number, need: number, target: number, incoming = 0): string {
   const short = have < need;
   return `
     <div class="crew-pool-row">
       <span class="crew-pool-label">${label}</span>
-      <span class="${short ? 'crew-short' : 'crew-ok'}">${have}</span>
+      <span class="${short ? 'crew-short' : 'crew-ok'}">${have}${incoming > 0 ? `<span class="crew-incoming"> +${incoming}</span>` : ''}</span>
       <span class="crew-pool-need">need ${need} · target ${target}</span>
     </div>`;
 }
 
+/** Headcount already paid for and in the pipeline, by where it will land. */
+function incomingCrew(state: SimState): { pilotsByTier: number[]; cabinCrew: number; mechanics: number } {
+  const pilotsByTier = new Array(MAX_PILOT_TIER).fill(0);
+  let cabinCrew = 0;
+  let mechanics = 0;
+
+  for (const hire of state.pendingHires) {
+    if (hire.role === 'pilot') pilotsByTier[hire.tier - 1] += hire.count;
+    else if (hire.role === 'cabin') cabinCrew += hire.count;
+    else mechanics += hire.count;
+  }
+  // Pilots away upgrading come back one tier higher, and cabin crew come
+  // back to the same pool they left — both are headcount the player is
+  // waiting on just as much as a new hire.
+  for (const training of state.pendingTraining) {
+    if (training.kind === 'pilot') pilotsByTier[training.fromTier] += training.count;
+    else cabinCrew += training.count;
+  }
+  return { pilotsByTier, cabinCrew, mechanics };
+}
+
 function renderPools(state: SimState): void {
   const req = crewRequirement(state);
+  const incoming = incomingCrew(state);
   const rows: string[] = [];
 
   for (let tier = 1; tier <= MAX_PILOT_TIER; tier++) {
     // Only show a tier once it's relevant — an all-turboprop operator
-    // doesn't need a mainline-jet row cluttering the panel.
-    if (req.pilotsByTier[tier - 1] === 0 && state.crew.pilotsByTier[tier - 1] === 0) continue;
+    // doesn't need a mainline-jet row cluttering the panel. A tier with
+    // crew on the way counts as relevant, or hiring into an empty tier
+    // would appear to do nothing at all.
+    if (
+      req.pilotsByTier[tier - 1] === 0 &&
+      state.crew.pilotsByTier[tier - 1] === 0 &&
+      incoming.pilotsByTier[tier - 1] === 0
+    ) {
+      continue;
+    }
     rows.push(
       poolRow(
         `Pilots — ${TIER_NAMES[tier - 1]}`,
         state.crew.pilotsByTier[tier - 1],
         req.pilotsByTier[tier - 1],
         req.targetPilotsByTier[tier - 1],
+        incoming.pilotsByTier[tier - 1],
       ),
     );
   }
   if (rows.length === 0) rows.push(poolRow('Pilots', 0, 0, 0));
 
-  rows.push(poolRow('Cabin crew', state.crew.cabinCrew, req.cabinCrew, req.targetCabinCrew));
+  rows.push(poolRow('Cabin crew', state.crew.cabinCrew, req.cabinCrew, req.targetCabinCrew, incoming.cabinCrew));
   rows.push(
     poolRow(
       `— service-trained (${Math.round(cabinServiceShare(state.crew) * 100)}%)`,
@@ -104,7 +143,7 @@ function renderPools(state: SimState): void {
   );
   // Mechanics have no operating minimum — they're a continuum, not a
   // threshold — so "need" is shown as 0 and only the target matters.
-  rows.push(poolRow('Mechanics', state.crew.mechanics, 0, req.targetMechanics));
+  rows.push(poolRow('Mechanics', state.crew.mechanics, 0, req.targetMechanics, incoming.mechanics));
 
   poolsEl.innerHTML = rows.join('');
   salaryEl.textContent = `${money(dailyCrewSalary(state.crew))}/day in salaries, paid whether or not they fly.`;
@@ -147,13 +186,27 @@ function renderReserve(state: SimState): void {
     `Thin reserves are cheap until a bad day; deep ones are insurance you mostly don't need.`;
 }
 
+/**
+ * Every one of these three buttons goes grey when it can't be afforded (or,
+ * for the training ones, when there aren't enough people to send). A grey
+ * button with no stated reason reads as a broken button — that is exactly
+ * how "Recruit doesn't do anything" was reported — so each cost line now
+ * says what is missing, the same plain-message treatment the route
+ * builder's blocked states already get.
+ */
+function shortfallNote(cost: number, cash: number): string {
+  return cost > cash ? ` — ${money(cost - cash)} short` : '';
+}
+
 function renderHireCost(state: SimState): void {
   const role = hireRoleSelect.value as CrewRole;
   hireTierSelect.disabled = role !== 'pilot';
   const tier = role === 'pilot' ? Number(hireTierSelect.value) : 1;
   const count = Math.max(1, Number(hireCountInput.value) || 1);
   const cost = hireCost(role, tier, count);
-  hireCostEl.textContent = `${money(cost)} up front · arrives in ${HIRE_LEAD_TIME_DAYS} days`;
+  hireCostEl.textContent =
+    `${money(cost)} up front · arrives in ${HIRE_LEAD_TIME_DAYS} days${shortfallNote(cost, state.cash)}`;
+  hireCostEl.classList.toggle('crew-short', cost > state.cash);
   hireButton.disabled = cost > state.cash;
 }
 
@@ -162,9 +215,12 @@ function renderTrainCost(state: SimState): void {
   const count = Math.max(1, Number(trainCountInput.value) || 1);
   const cost = trainingCost(fromTier, count);
   const available = state.crew.pilotsByTier[fromTier - 1];
+  const tooFew = count > available;
   trainCostEl.textContent =
-    `${money(cost)} · ${TRAINING_DAYS} days · ${count} of ${available} tier-${fromTier} pilots unavailable while training`;
-  trainButton.disabled = cost > state.cash || count > available;
+    `${money(cost)} · ${TRAINING_DAYS} days · ${count} of ${available} tier-${fromTier} pilots unavailable while training` +
+    (tooFew ? ` — you only have ${available}` : shortfallNote(cost, state.cash));
+  trainCostEl.classList.toggle('crew-short', tooFew || cost > state.cash);
+  trainButton.disabled = cost > state.cash || tooFew;
 }
 
 function renderCabinTrainCost(state: SimState): void {
@@ -172,10 +228,13 @@ function renderCabinTrainCost(state: SimState): void {
   const cost = cabinTrainingCost(count);
   const share = cabinServiceShare(state.crew);
   const npsNow = Math.round(share * 15);
+  const tooFew = count > state.crew.cabinCrew;
   cabinTrainCostEl.textContent =
     `${money(cost)} · ${CABIN_TRAINING_DAYS} days off the line · ` +
-    `currently worth +${npsNow} NPS per flight at ${Math.round(share * 100)}% trained`;
-  cabinTrainButton.disabled = cost > state.cash || count > state.crew.cabinCrew;
+    `currently worth +${npsNow} NPS per flight at ${Math.round(share * 100)}% trained` +
+    (tooFew ? ` — you only have ${state.crew.cabinCrew}` : shortfallNote(cost, state.cash));
+  cabinTrainCostEl.classList.toggle('crew-short', tooFew || cost > state.cash);
+  cabinTrainButton.disabled = cost > state.cash || tooFew;
 }
 
 function renderPending(state: SimState): void {

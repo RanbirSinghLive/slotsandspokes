@@ -1726,6 +1726,14 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Headcount bought but not yet arrived — the ten-day lead time made a
+   successful hire look like nothing had happened. Amber and smaller than
+   the real figure: it's a promise, not a number you can crew with today. */
+.crew-incoming {
+  color: #ffd166;
+  font-size: 11px;
+}
+
 #crew-salary,
 #crew-reserve-note,
 #crew-hire-cost,
