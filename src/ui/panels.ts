@@ -86,16 +86,55 @@ export function updatePanel(state: SimState): void {
   costEl.textContent = formatMoney(state.todayCost);
   marginEl.textContent = formatMoney(state.todayMargin);
 
+  renderFleet(state);
+  renderUtilisation(state);
+  renderRotations(state);
+
+  fleetSelectionHintEl.hidden = getSelectedTail() !== null || state.aircraft.length === 0;
+}
+
+/**
+ * The fleet table, rebuilt **only when the fleet itself changes** and
+ * otherwise patched in place.
+ *
+ * It used to be torn down and rebuilt on every frame, which looked
+ * harmless because the cells are plain text — but the row also owns a
+ * `<select>` and, in the rotations table below, a `<button>`. Both need to
+ * outlive the interaction that uses them: a native dropdown closes the
+ * instant its `<select>` leaves the document, and a click only fires if
+ * mousedown and mouseup land on the *same* element. At ~60 rebuilds a
+ * second neither could ever survive long enough, so the Base dropdown
+ * appeared to shut immediately and the remove buttons appeared dead.
+ *
+ * Scripted testing hides this completely — `.click()` invokes the handler
+ * directly and setting `.value` skips the dropdown — so it has to be
+ * checked with real events.
+ *
+ * `structure` is what actually requires new DOM: which tails exist, in
+ * what order. Everything that changes minute to minute (status, position,
+ * selection highlight) is written into the existing cells instead.
+ */
+type FleetRowCells = {
+  row: HTMLTableRowElement;
+  statusCell: HTMLTableCellElement;
+  whereCell: HTMLTableCellElement;
+  baseSelect: HTMLSelectElement;
+};
+
+// Same sentinel reasoning as rotationsSignature below.
+let fleetStructure: string | null = null;
+const fleetRowsByTail = new Map<string, FleetRowCells>();
+
+function buildFleetRows(state: SimState): void {
   fleetBody.innerHTML = '';
+  fleetRowsByTail.clear();
+
   for (const aircraft of state.aircraft) {
     const row = document.createElement('tr');
     row.className = 'fleet-row';
     // Week three's route-builder redesign: a plane has to be picked here,
     // by clicking its row, *before* the map will let you arm a route for
-    // it — see ui/routeBuilder.ts. Rebuilt every frame same as the rest of
-    // this table, so the highlight is just read fresh from
-    // fleetSelection.ts each time rather than tracked separately.
-    row.classList.toggle('selected', aircraft.tail === getSelectedTail());
+    // it — see ui/routeBuilder.ts.
     row.addEventListener('click', () => {
       setSelectedTail(getSelectedTail() === aircraft.tail ? null : aircraft.tail);
     });
@@ -107,35 +146,11 @@ export function updatePanel(state: SimState): void {
     typeCell.textContent = aircraft.typeCode;
 
     const statusCell = document.createElement('td');
-    statusCell.textContent = aircraft.status;
-
     const whereCell = document.createElement('td');
-    if (aircraft.status === 'ground') {
-      // null means a Fleet Market purchase that's never flown yet
-      // (ui/fleetMarket.ts) — sitting in the pool, not based anywhere
-      // until the player draws a route for it.
-      whereCell.textContent = aircraft.atAirport ?? 'Unassigned';
-    } else {
-      const flight = state.activeFlights.find((f) => f.tail === aircraft.tail);
-      if (flight) {
-        const minutesRemaining = flight.arriveMinute - state.simMinute;
-        // How far behind an entirely on-time day this flight's arrival is —
-        // see ActiveFlight.scheduledArriveMinute in sim/state.ts. This is
-        // what lets the panel explain *why* a flight is running late (M9),
-        // not just that it is.
-        const lateness = flight.arriveMinute - flight.scheduledArriveMinute;
-        whereCell.textContent =
-          lateness > 0
-            ? `${flight.origin} → ${flight.dest} (${minutesRemaining} min, ${lateness} min late)`
-            : `${flight.origin} → ${flight.dest} (${minutesRemaining} min)`;
-      } else {
-        whereCell.textContent = '—';
-      }
-    }
 
-    // Base is an explicit assignment now, not something inferred from
-    // wherever the first route happened to start (see Aircraft.baseAirport).
-    // A <select> rather than a click-through so it reads as a setting.
+    // Base is an explicit assignment, not something inferred from wherever
+    // the first route happened to start (see Aircraft.baseAirport). A
+    // <select> rather than a click-through so it reads as a setting.
     const baseCell = document.createElement('td');
     const baseSelect = document.createElement('select');
     baseSelect.className = 'fleet-base-select';
@@ -149,7 +164,6 @@ export function updatePanel(state: SimState): void {
       option.textContent = airport.iata;
       baseSelect.appendChild(option);
     }
-    baseSelect.value = aircraft.baseAirport ?? '';
     // Stop the row's own select-this-tail handler firing when the dropdown
     // is used — picking a base isn't picking a plane to draw a route for.
     baseSelect.addEventListener('click', (event) => event.stopPropagation());
@@ -160,12 +174,54 @@ export function updatePanel(state: SimState): void {
 
     row.append(tailCell, typeCell, statusCell, whereCell, baseCell);
     fleetBody.appendChild(row);
+    fleetRowsByTail.set(aircraft.tail, { row, statusCell, whereCell, baseSelect });
+  }
+}
+
+function renderFleet(state: SimState): void {
+  const structure = state.aircraft.map((aircraft) => aircraft.tail).join(',');
+  if (structure !== fleetStructure) {
+    fleetStructure = structure;
+    buildFleetRows(state);
   }
 
-  renderUtilisation(state);
-  renderRotations(state);
+  for (const aircraft of state.aircraft) {
+    const cells = fleetRowsByTail.get(aircraft.tail);
+    if (!cells) continue;
 
-  fleetSelectionHintEl.hidden = getSelectedTail() !== null || state.aircraft.length === 0;
+    cells.row.classList.toggle('selected', aircraft.tail === getSelectedTail());
+    cells.statusCell.textContent = aircraft.status;
+
+    if (aircraft.status === 'ground') {
+      // null means a Fleet Market purchase that's never flown yet
+      // (ui/fleetMarket.ts) — sitting in the pool, not based anywhere
+      // until the player draws a rotation for it.
+      cells.whereCell.textContent = aircraft.atAirport ?? 'Unassigned';
+    } else {
+      const flight = state.activeFlights.find((f) => f.tail === aircraft.tail);
+      if (flight) {
+        const minutesRemaining = flight.arriveMinute - state.simMinute;
+        // How far behind an entirely on-time day this flight's arrival is —
+        // see ActiveFlight.scheduledArriveMinute in sim/state.ts. This is
+        // what lets the panel explain *why* a flight is running late (M9),
+        // not just that it is.
+        const lateness = flight.arriveMinute - flight.scheduledArriveMinute;
+        cells.whereCell.textContent =
+          lateness > 0
+            ? `${flight.origin} → ${flight.dest} (${minutesRemaining} min, ${lateness} min late)`
+            : `${flight.origin} → ${flight.dest} (${minutesRemaining} min)`;
+      } else {
+        cells.whereCell.textContent = '—';
+      }
+    }
+
+    // Never while the player is actually in the dropdown: writing `.value`
+    // on a focused <select> fights whatever they are part-way through
+    // choosing.
+    if (document.activeElement !== cells.baseSelect) {
+      cells.baseSelect.value = aircraft.baseAirport ?? '';
+    }
+  }
 }
 
 /**
@@ -228,12 +284,30 @@ export function minuteOfDayToTimeString(minuteOfDay: number): string {
  * deleting one leg out of a rotation would strand the rest of it away from
  * base. The unit the player builds is the unit they remove.
  *
- * Rebuilt every frame, same as the fleet table above and for the same
- * reason it's safe to: these are plain cells and a button, with no
- * `<input>` for a rebuild to steal focus from.
+ * Rebuilt **only when the rotations actually change** — see renderFleet()
+ * above for why a per-frame rebuild broke the remove buttons outright.
+ * Nothing here is time-varying anyway: a rotation's chain, window and
+ * share only move when a rotation is added or removed, or when a base
+ * change regroups the legs. `signature` captures exactly that.
+ *
+ * A row's remove handler closes over its `Rotation`, which holds the same
+ * leg objects that are in `state.schedule` — so even a handler built
+ * several changes ago still removes the right legs, and the rebuild that
+ * follows replaces it.
  */
+// null rather than '' so the first render always builds — an empty fleet
+// legitimately has an empty signature, and starting them equal would skip
+// the build that sets the empty-state message's visibility.
+let rotationsSignature: string | null = null;
+
 function renderRotations(state: SimState): void {
   const rotations = allRotations(state);
+  const signature = rotations
+    .map((r) => `${r.tail}:${r.airports.join('>')}:${r.departMinute}:${r.arriveMinute}:${r.closed}`)
+    .join('|');
+  if (signature === rotationsSignature) return;
+  rotationsSignature = signature;
+
   rotationsEmptyEl.hidden = rotations.length > 0;
   rotationsBody.innerHTML = '';
 
