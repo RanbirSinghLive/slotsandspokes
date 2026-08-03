@@ -1307,11 +1307,299 @@ one or two widebody ones. Buying the A330 is a real strategic mistake
 in most markets here, not just a bigger, safer version of the A220 —
 symmetrical to putting a 1900D on a market too thin to fill it.
 
+## Reputation, NPS and the quality loop (`src/sim/nps.ts`, `src/sim/reputation.ts`) — week five
+
+Three different things that are easy to confuse:
+
+- **On-Time performance** is a *rate* — on-time departures over all
+  departures. It only ever describes flights that actually operated.
+- **NPS** is a *score* per flight, derived (this game has no passengers to
+  survey) from four things step.ts already knows at the moment a flight
+  departs: how late it's going to be, how its fare compares to
+  competitors on that market, how old the airframe is, and what share of
+  cabin crew hold recurrent service training. Bounded to [-100, 100].
+- **Reputation** is a *stock*. Neither of the above accumulates, so
+  neither can be spent. Reputation is what they feed, and it's the
+  currency the tech tree, the C-suite and service targets all draw on.
+
+`applyDailyReputationChange()` runs once per day at rollover, reading
+*yesterday's* figures before they're reset. Three terms: on-time against
+an 80% baseline, completion factor against 98%, and average NPS. All
+three are scaled by a confidence factor for small samples — with two
+departures a day, "today's on-time %" can only be 0%, 50% or 100%, and
+reacting to that at full strength swung Reputation wildly for a
+one-plane operation.
+
+**Reputation is floored at zero.** Below roughly 78% on-time the daily
+delta is negative, and without a floor a struggling airline banked an
+ever-deepening deficit that even an excellent recovery took months to
+climb out of — locking it out of the very tools that would help. A
+mediocre airline still accrues nothing; it just doesn't go backwards.
+
+---
+
+## Loans and the failure state (`src/sim/loans.ts`) — week five
+
+Cash hitting zero offers a $100,000 loan, up to 20 outstanding. Interest
+compounds onto each loan's *balance* daily rather than being charged to
+Cash, so ignoring a loan costs nothing today and progressively more later.
+
+Two ways to lose. Either every loan slot is taken and Cash is still gone,
+or **Cash falls past `CASH_FLOOR`** — the total credit line negated,
+-$2,000,000. That floor exists because declining a loan used to be free:
+the offer stopped reappearing until Cash went positive (which for a
+failing airline is never), so the loan count stayed at zero, insolvency
+never fired, and Cash fell without limit. Declining was strictly better
+than accepting.
+
+---
+
+## Fuel prices (`src/sim/fuel.ts`) — week six
+
+`fuelPriceIndex` is unitless, 1.0 being baseline, moved once a day by a
+mean-reverting random walk: a ±1.5% step pulled back toward baseline by
+2% of however far it has drifted, clamped to [0.5, 2.0]. The reversion is
+the point — a pure random walk would be unguessable, but a price far from
+baseline is more likely than not heading back, so watching the 60-day
+history in the Executive tab is a real if noisy signal.
+
+`legCostBreakdown()` splits each type's flat `costPerBlockHour` into
+slices rather than touching the hand-authored data: 35% fuel-sensitive,
+30% carved out for crew (see below), the rest bundled maintenance and
+overhead. The index multiplies the fuel slice, and
+`fuelEfficiencyMultiplier` multiplies on top of that — the hook the tech
+tree turns down.
+
+---
+
+## Market stimulation (`src/sim/marketDemand.ts`) — week six
+
+Demand became **two numbers**. `potentialDailyDemand()` (the gravity
+model) is the ceiling a market could reach; `state.marketDemand` is what
+actually flies today. A market nobody serves sits at a virgin floor of
+about 10 passengers regardless of how big it could get.
+
+This exists because the old model handed every market its full gravity
+demand from day one, so the map opened as a field of large, uncontested,
+instantly-profitable routes and route choice collapsed into "pick the
+biggest number." The balance sweep found the symptom: fare had **no
+optimum at all** — the trunk markets stayed seat-capped even at 5× the
+recommended fare, so raising price cost literally no passengers.
+
+Growth is driven by `seatsOffered / potential`, which is what makes size
+matter: one daily 19-seater saturates a 9-PDEW market and is a rounding
+error against a 4,600-PDEW one. Marketing spend multiplies that rate.
+Unserved markets decay back toward the floor, more slowly than they grow.
+
+Actual demand is a property of the **market**, not of any airline —
+everyone flying it grows it, everyone serving it draws from the same
+pool. Stimulation is a public good.
+
+---
+
+## Fare policy (`src/sim/pricing.ts`) — week six
+
+One airline-wide multiplier on `recommendedFare()` prices the whole
+network. Per-market override stays available, and
+`RouteSettings.fareIsOverridden` marks those so a policy change sweeps
+everything except the routes deliberately priced differently.
+
+This replaced twenty identical slider-drags. Per-market pricing was busy
+work that got *worse* the larger your network grew, which is backwards.
+It doesn't remove the static optimum — competitors would have to react to
+price for that — but you now find it once instead of per route.
+
+---
+
+## Airports: presence, connectivity and slots (`src/sim/airports.ts`) — week six
+
+Three things keyed off how many daily departures you operate at a field:
+
+- **Level** — Unserved / Outstation / Focus city / Base / Hub.
+- **Connectivity multiplier** on revenue, growing with concentration,
+  capped at 1.25. This is a deliberate stand-in for connecting
+  itineraries, which aren't modelled: it gives the *benefit* of a hub
+  without tracking passengers through one. A flight earns the average of
+  its two ends, not the product.
+- **Slots**, but only at LGA and YYZ — the two fields on this map that
+  really are slot-coordinated. Every departure needs one, prices escalate
+  40% per slot held, and the route builder blocks departures with nowhere
+  to put them.
+
+Presence is read off the **map**, not a table: dot radius grows with
+departures, Base and Hub get a halo, controlled fields get a ring that
+turns red when departures exceed slots held.
+
+---
+
+## Crew (`src/sim/crew.ts`) — week six
+
+Pools of headcount, never named individuals — a real roster means duty
+times, rest rules and pairing, which is a second scheduling problem
+beside the one this project just deleted.
+
+Three disciplines, deliberately modelled differently:
+
+- **Pilots** are a *threshold* and tiered (light turboprop / regional /
+  mainline jet), because type ratings are the real progression gate.
+  Below complement, the aircraft doesn't fly.
+- **Cabin crew** are a threshold too but untiered, at one per fifty seats
+  — a real FAA and Transport Canada standard.
+- **Mechanics** are a *continuum*: shared capacity, no hard cliff.
+  Running thin makes airframes behave older than they are, feeding the
+  existing age-delay cause.
+
+Hiring is **bulk** with a 10-day lead time — that gap is the mechanic.
+Buy an aircraft before you have crew and it sits idle; hire ahead and you
+pay idle salaries. Training moves pilots up a tier over 21 days, and
+takes cabin crew off the line for 7, raising NPS once they're back.
+Recurrent training **lapses** over roughly 180 days.
+
+**Reserve depth** is the player's lever: 1.0 is exactly enough crew with
+no slack, 1.4 is 40% more. Each day a disruption fraction is drawn and
+reserve depth absorbs it. Cost is linear in depth; protection is a
+threshold — which is what gives it a real interior optimum rather than an
+obvious best setting.
+
+Crew salaries were **carved out of** `costPerBlockHour`, not added on
+top. That figure always bundled crew in, so adding salaries would have
+double-charged.
+
+---
+
+## Cancellations (`src/sim/step.ts`, `src/sim/weather.ts`, `src/sim/crew.ts`) — week six
+
+The second axis of reliability. On-Time only describes flights that
+operated; **Completion Factor** is `completed / scheduled`.
+
+Three causes, each with a different answer available:
+
+- **Crew shortage** — answered by reserve depth.
+- **Unscheduled maintenance** (AOG) — a daily per-aircraft roll scaling
+  with *effective* age, so answered by maintenance staffing and younger
+  metal.
+- **Severe weather** — an airport closes outright. No answer at all,
+  which is why it's kept rare.
+
+A cancellation scores a flat **-80 NPS** rather than extending the delay
+curve, which floors at -50: a cancellation isn't a very late flight, it's
+a different failure. NPS therefore divides by its own denominator
+(departures *plus* cancellations), while On-Time keeps departures.
+
+---
+
+## The tech tree (`src/sim/techTree.ts`) — week six
+
+Reputation's first spender. One branch so far — fuel efficiency — with
+five linear tiers themed on real aviation milestones, each multiplying
+`fuelEfficiencyMultiplier` down 4–6%. All five compound to roughly a 23%
+cut in fuel-sensitive cost.
+
+Data and conditions are split the same way missions are: the JSON holds
+the authored parts, the code holds the rules. A node needs its branch's
+previous tier and enough Reputation; unlocking is a one-time payment for
+a permanent effect.
+
+---
+
+## Missions and targets (`src/sim/missions.ts`, `src/sim/targets.ts`) — week six
+
+The answer to "what should I be striving for," which is the complaint
+that started weeks five and six.
+
+**Missions** are authored: `data/missions.json` holds name, objective,
+flavour and reward; `MISSION_CONDITIONS` holds the predicates, because a
+condition over `SimState` can't go in JSON without inventing a query
+language. Checked every tick so completion is immediate, and announced in
+the ticker.
+
+**Targets** are the player's half. You commit to an on-time percentage
+and average NPS; the promise runs 30 days against its own scoped
+counters. Reward scales with ambition above an 80% / 0 NPS baseline, and
+**missing costs half what hitting pays** — without a downside the
+dominant play is to promise the maximum every time, so staking Reputation
+is what makes the choice real. Windows with under 20 departures expire
+unjudged.
+
+---
+
+## The C-suite (`src/sim/executives.ts`) — week six
+
+Four slots — CEO, COO, CFO, CCO — bought with **Reputation**, which makes
+it a second real spender and puts the whole C-suite out of reach until
+the airline has been good at something. Two of the four convert
+Reputation back into cash.
+
+Each attaches to a system that already existed rather than a stat
+invented for them: the COO's three backgrounds hit the delay roll, the
+NPS scorer and the maintenance age factor respectively; the CCO
+subsidises the marketing *charge* (the spend still counts in full); the
+CEO and CFO pay escalating bonuses. Escalation resets when an incumbent
+is replaced — seniority belongs to the person, not the chair.
+
+Effects are placeholders pending real numbers.
+
+---
+
+## The balance sweep (`src/headless/sweep.ts`) — week six
+
+`npm run sweep -- <lever> [days]` runs the headless network repeatedly,
+changing one lever per run, and reports revenue, cost and margin per day
+plus where margin peaks. `run.ts` answers "how does one configuration
+do"; this answers "does moving this number help, and where does it stop
+helping," which is the question balance decisions actually turn on.
+
+**Every row uses the same RNG seed.** Different seeds would mean
+different weather, competitor openings and fuel history per row, so the
+differences would be mostly noise. This guarantee is fragile: it also
+requires the *number* of random draws per day to be constant, which was
+broken once by a roll that skipped already-grounded aircraft. See
+`rollDailyMechanicalGroundings()`.
+
+It has found real problems — fare having no optimum, marketing returning
+0.00x on nearly every market — that no amount of reading the code would
+have surfaced.
+
+---
+
+## The Dev tab (`src/ui/devTools.ts`) — week six
+
+A development tool, and deliberately *not* a hand-drawn diagram of the
+model: every leaf reads a real number out of `state`, so it can't drift
+out of date the way documentation describing the same formulas would.
+
+Three parts: a live cost tree (the categories are guaranteed to sum to
+`todayCost`), a revenue funnel showing where passengers are lost
+(potential → actual → booked → carried → recaptured → flown), and
+histograms of the delay distributions **sampled from the real functions**
+40,000 times rather than described. Seeing the squaring skew is much
+easier than reading about it.
+
+---
+
 ## What isn't built yet
 
-See WEEK-ONE.md's "Deliberately deferred" list — financing, maintenance,
-crew, competitor AI, and more — not duplicated here since it would just
-go stale. Aircraft acquisition (buying/leasing) is now built, acquisition-
-only, per WEEK-THREE.md's Fleet Market section above; selling or
-returning an aircraft is not. Everything in "Then, in order" (headless
-runner, schedule editor, turn times/delays) is done.
+Not duplicated from WEEK-ONE.md's "Deliberately deferred" list, which
+would just go stale — but the big ones as of week seven:
+
+- **Connecting itineraries.** Still the heaviest structural lift on any
+  list. The connectivity multiplier (Airports, above) is a deliberate
+  stand-in for the benefit without the machinery.
+- **Competitor price response.** Competitors open routes but never react
+  to what you charge, which is why pricing still has a findable static
+  optimum. Gated by CLAUDE.md until asked for directly.
+- **Selling or returning aircraft.** Acquisition-only.
+- **Ancillary revenue** (bag fees), designed twice and never built.
+- **More tech tree branches** — fuel efficiency is the only one.
+- **Phase D of the utilisation pivot**: Commercial becomes a Routes tab
+  carrying aggregated route data, with fare policy at the top of it. See
+  WEEK-SEVEN.md.
+- **Tab grouping**, 11 down to about 6. Proposed but never started.
+
+One open *balance* question rather than a missing feature: margin
+currently favours under-staffing. On the reference network it peaks at
+reserve depth 1.05 (77.7% completion) rather than 1.25 (99.9%), because
+cancelling marginal flights saves more variable cost than it loses in
+revenue. Completion factor and Reputation still order correctly, and
+Reputation gates the tech tree and C-suite, so reliability pays in ways
+the sweep can't see — but raw margin points the wrong way.
