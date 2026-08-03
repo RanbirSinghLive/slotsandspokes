@@ -30,8 +30,8 @@ function formatMoney(amount: number): string {
  * this entire game," just "not for this particular dip." Reset the
  * instant Cash climbs back above zero, so a *later* dip prompts again.
  * Plain module-level UI state, not part of `state` — the same category of
- * transient, render-layer-only bookkeeping as ui/rotationBoard.ts's drag
- * state or render/competition.ts's flash timestamps, never written to
+ * transient, render-layer-only bookkeeping as ui/routeBuilder.ts's
+ * builder state or render/competition.ts's flash timestamps, never written to
  * SimState because it isn't part of the simulation, just of how this one
  * browser tab is currently choosing to nag the player about it.
  */

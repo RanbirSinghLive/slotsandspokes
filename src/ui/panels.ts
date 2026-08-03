@@ -1,20 +1,15 @@
-import { legsServingMarket, marketKey, validateSchedule, type ScheduleLeg } from '../sim/schedule';
+import { legsServingMarket, marketKey, validateSchedule } from '../sim/schedule';
 import { removeCommercialRow } from './commercial';
 import { getSelectedTail, setSelectedTail } from './fleetSelection';
-import { utilisationByBase } from '../sim/utilisation';
+import { allRotations, utilisationByBase, utilisationProblems, type Rotation } from '../sim/utilisation';
 import { airports } from '../render/airports';
 import type { SimState } from '../sim/state';
 
 // Must match the --panel-width custom property's default value in
 // style.css — see the comment there. Week six: widened from 280 to fit a
-// tab bar and ledger-style content (Rotation, Commercial, etc.) that used
-// to get the full canvas-width area to themselves.
+// tab bar and ledger-style content (Commercial, etc.) that used to get
+// the full canvas-width area to themselves.
 export const PANEL_WIDTH_PX = 420;
-
-// Rotation's own expand affordance (main.ts's expandRotation()) — wider
-// still, since a 24-hour Gantt timeline needs real room to drag a bar
-// around precisely, more than the other tabs' plain tables need.
-export const PANEL_WIDTH_EXPANDED_PX = 900;
 
 const cashEl = document.querySelector<HTMLSpanElement>('#panel-cash')!;
 const otpEl = document.querySelector<HTMLSpanElement>('#panel-otp')!;
@@ -26,10 +21,8 @@ const costEl = document.querySelector<HTMLSpanElement>('#panel-cost')!;
 const marginEl = document.querySelector<HTMLSpanElement>('#panel-margin')!;
 const fleetBody = document.querySelector<HTMLTableSectionElement>('#fleet-table tbody')!;
 const fleetUtilisationEl = document.querySelector<HTMLDivElement>('#fleet-utilisation')!;
-const scheduleBody = document.querySelector<HTMLTableSectionElement>('#schedule-table tbody')!;
-const scheduleFilterTail = document.querySelector<HTMLInputElement>('#schedule-filter-tail')!;
-const scheduleFilterRoute = document.querySelector<HTMLInputElement>('#schedule-filter-route')!;
-const scheduleFilterDepart = document.querySelector<HTMLInputElement>('#schedule-filter-depart')!;
+const rotationsBody = document.querySelector<HTMLTableSectionElement>('#rotations-table tbody')!;
+const rotationsEmptyEl = document.querySelector<HTMLDivElement>('#rotations-empty')!;
 const scheduleWarningsEl = document.querySelector<HTMLUListElement>('#schedule-warnings')!;
 const fleetSelectionHintEl = document.querySelector<HTMLDivElement>('#fleet-selection-hint')!;
 
@@ -170,6 +163,7 @@ export function updatePanel(state: SimState): void {
   }
 
   renderUtilisation(state);
+  renderRotations(state);
 
   fleetSelectionHintEl.hidden = getSelectedTail() !== null || state.aircraft.length === 0;
 }
@@ -217,189 +211,106 @@ function pad(n: number): string {
   return String(n).padStart(2, '0');
 }
 
-// <input type="time"> speaks in "HH:MM" strings; the sim speaks in minutes
-// since midnight. These two just convert between them. Exported since
-// ui/rotationBoard.ts needs the same formatting for its bar tooltips.
+// The sim speaks in minutes since midnight; people read clock times.
+// Exported because the route builder's popover shows a rotation's window
+// in the same format.
 export function minuteOfDayToTimeString(minuteOfDay: number): string {
   return `${pad(Math.floor(minuteOfDay / 60))}:${pad(minuteOfDay % 60)}`;
 }
 
-function timeStringToMinuteOfDay(time: string): number {
-  const [hours, minutes] = time.split(':').map(Number);
-  return hours * 60 + minutes;
+/**
+ * Week seven, phase C: the schedule table is gone and this replaces it.
+ *
+ * The old table listed individual legs with an editable depart time and a
+ * per-leg delete — which made sense while the player authored the
+ * timeline. They no longer do: rotations are packed into the day
+ * automatically, so a per-leg time field would be a control that lies, and
+ * deleting one leg out of a rotation would strand the rest of it away from
+ * base. The unit the player builds is the unit they remove.
+ *
+ * Rebuilt every frame, same as the fleet table above and for the same
+ * reason it's safe to: these are plain cells and a button, with no
+ * `<input>` for a rebuild to steal focus from.
+ */
+function renderRotations(state: SimState): void {
+  const rotations = allRotations(state);
+  rotationsEmptyEl.hidden = rotations.length > 0;
+  rotationsBody.innerHTML = '';
+
+  for (const rotation of rotations) {
+    const row = document.createElement('tr');
+    row.className = 'rotation-row';
+    if (!rotation.closed) row.classList.add('rotation-row--open');
+
+    const tailCell = document.createElement('td');
+    tailCell.textContent = rotation.tail;
+
+    const routeCell = document.createElement('td');
+    routeCell.className = 'rotation-route-cell';
+    routeCell.textContent = rotation.airports.join(' → ');
+
+    const windowCell = document.createElement('td');
+    windowCell.textContent = `${minuteOfDayToTimeString(rotation.departMinute)}–${minuteOfDayToTimeString(rotation.arriveMinute)}`;
+
+    // The pivot's headline number, per rotation: what share of one
+    // aircraft's usable day this costs. Adding up a tail's rows tells the
+    // player how full that aeroplane is without a timeline to read.
+    const shareCell = document.createElement('td');
+    shareCell.textContent = `${Math.round(rotation.share * 100)}%`;
+
+    const removeCell = document.createElement('td');
+    const removeButton = document.createElement('button');
+    removeButton.type = 'button';
+    removeButton.className = 'rotation-remove-button';
+    removeButton.textContent = '×';
+    removeButton.setAttribute('aria-label', `Remove ${rotation.tail} ${rotation.airports.join(' ')}`);
+    removeButton.addEventListener('click', () => removeRotation(rotation, state));
+    removeCell.appendChild(removeButton);
+
+    row.append(tailCell, routeCell, windowCell, shareCell, removeCell);
+    rotationsBody.appendChild(row);
+  }
 }
 
-// Tracked by legId so the delete button (below) can find and remove its
-// own row without a DOM search — same "keep a direct reference" reasoning
-// ui/commercial.ts's RowCells uses.
-const scheduleRowsByLegId = new Map<string, HTMLTableRowElement>();
-
 /**
- * Push a leg's freshly-committed depart time — and, since M13, its tail —
- * into its own row, without touching any other row: the same "build once,
- * mutate only via events" rule setupScheduleEditor() documents below, just
- * triggered from a second place now. The rotation board writes
- * `leg.departMinute`/`leg.tail` directly (dragging a bar, not typing into
- * or picking from this table's own cells), so nothing else would ever
- * tell this row to catch up on its own; without this call the table would
- * keep showing the pre-drag time and tail until some unrelated edit
- * happened to rebuild it. Re-applies the schedule filters afterward, same
- * reasoning as the depart-time `<input>`'s own `change` handler below —
- * a leg reassigned to a different tail may no longer match an active Tail
- * filter.
+ * Remove a whole rotation — every leg of it — from `state.schedule` (the
+ * array step() reads from). For any market left with no legs at all, drops
+ * the now-orphaned RouteSettings entry and Commercial row too, since a
+ * fare/marketing lever with nothing flying it would otherwise linger.
+ *
+ * A flight already airborne on one of these legs is unaffected:
+ * ActiveFlight carries its own copied data independent of state.schedule
+ * (see sim/state.ts), so it finishes the sector it's on and simply has
+ * nothing to fly next.
  */
-export function syncScheduleRow(leg: ScheduleLeg): void {
-  const row = scheduleRowsByLegId.get(leg.legId);
-  if (!row) return;
-  const tailCell = row.querySelector<HTMLTableCellElement>('.schedule-tail-cell');
-  if (tailCell) tailCell.textContent = leg.tail;
-  const input = row.querySelector<HTMLInputElement>('input[type="time"]');
-  if (input) input.value = minuteOfDayToTimeString(leg.departMinute);
-  applyScheduleFilters();
-}
+function removeRotation(rotation: Rotation, state: SimState): void {
+  for (const leg of rotation.legs) {
+    const index = state.schedule.indexOf(leg);
+    if (index !== -1) state.schedule.splice(index, 1);
+  }
 
-/**
- * Remove `leg` entirely — week three's playtest-readiness gap: until now
- * there was no way back from an unwanted route or frequency short of
- * hand-editing data/schedule.json. Removes it from `state.schedule` (the
- * array step() reads from) and its row from the DOM; if that was the
- * *last* leg serving that market, also drops the now-orphaned
- * RouteSettings entry and Commercial-panel row, since a fare/marketing
- * lever with nothing left to fly would otherwise linger. A flight already
- * airborne on this leg is unaffected — ActiveFlight carries its own
- * copied data independent of `state.schedule`, per sim/state.ts.
- */
-function removeScheduleLeg(leg: ScheduleLeg, state: SimState): void {
-  const index = state.schedule.indexOf(leg);
-  if (index === -1) return;
-  state.schedule.splice(index, 1);
-
-  scheduleRowsByLegId.get(leg.legId)?.remove();
-  scheduleRowsByLegId.delete(leg.legId);
-
-  if (legsServingMarket(leg.origin, leg.dest, state.schedule) === 0) {
+  // Checked after every leg is gone, not as each one goes, so a rotation
+  // that flies the same market twice doesn't decide the market is orphaned
+  // while its own second leg is still in the array.
+  for (const leg of rotation.legs) {
+    if (legsServingMarket(leg.origin, leg.dest, state.schedule) > 0) continue;
     const key = marketKey(leg.origin, leg.dest);
     delete state.routeSettings[key];
     removeCommercialRow(key);
   }
 
-  renderScheduleWarnings(validateSchedule(state.schedule, state.aircraft, state.positioningLegs));
+  renderScheduleWarnings(scheduleProblems(state));
 }
 
 /**
- * Build one schedule-table row for `leg` and append it. Shared by
- * setupScheduleEditor() (the initial build) and addScheduleRow() (M10 — a
- * newly created route, appended without touching any other row).
+ * Every problem worth showing the player, from both halves of the check:
+ * `validateSchedule()` for what the *world* says (an aircraft parked
+ * somewhere its legs never depart from, an aircraft too large for an
+ * airport it's booked into) and `utilisationProblems()` for what the
+ * *budget* says (a tail asked to fly more than a day). One function so
+ * every call site gets both — the two used to be one list, and phase C
+ * splitting them made it easy to accidentally render only half.
  */
-function buildScheduleRow(leg: ScheduleLeg, state: SimState): HTMLTableRowElement {
-  const row = document.createElement('tr');
-
-  const tailCell = document.createElement('td');
-  tailCell.className = 'schedule-tail-cell';
-  tailCell.textContent = leg.tail;
-
-  const routeCell = document.createElement('td');
-  routeCell.textContent = `${leg.origin} → ${leg.dest}`;
-
-  const departCell = document.createElement('td');
-  const departInput = document.createElement('input');
-  departInput.type = 'time';
-  departInput.value = minuteOfDayToTimeString(leg.departMinute);
-  departInput.addEventListener('change', () => {
-    leg.departMinute = timeStringToMinuteOfDay(departInput.value);
-    renderScheduleWarnings(validateSchedule(state.schedule, state.aircraft, state.positioningLegs));
-    applyScheduleFilters(); // the edited time may no longer match an active Depart filter
-  });
-  departCell.appendChild(departInput);
-
-  const removeCell = document.createElement('td');
-  const removeButton = document.createElement('button');
-  removeButton.type = 'button';
-  removeButton.className = 'schedule-remove-button';
-  removeButton.textContent = '×';
-  removeButton.setAttribute('aria-label', `Remove ${leg.legId}`);
-  removeButton.addEventListener('click', () => removeScheduleLeg(leg, state));
-  removeCell.appendChild(removeButton);
-
-  row.append(tailCell, routeCell, departCell, removeCell);
-  scheduleRowsByLegId.set(leg.legId, row);
-  return row;
-}
-
-/**
- * Build the schedule table and wire up its editing — called once at
- * startup, not from the per-frame render() loop like updatePanel() above.
- *
- * That's deliberate, not an oversight: rebuilding these rows every frame
- * (as updatePanel() does for the fleet table, harmlessly, since it's plain
- * text) would tear out and recreate the <input> elements roughly 60 times
- * a second, which steals focus and resets the browser's native time-picker
- * UI out from under anyone actually trying to type into one. Nothing in
- * `state.schedule` changes except through this table's own inputs (or
- * addScheduleRow(), below), so there's nothing else for a repeated render
- * to pick up anyway.
- *
- * Editing a departure time mutates the leg object in `state.schedule`
- * directly, which is the array `step()` itself reads from — the very next
- * simulated minute that reaches that leg's slot uses the new time. Every
- * edit re-runs validateSchedule() so a change that breaks a rotation (an
- * aircraft asked to depart before it could plausibly have landed and
- * turned around) gets caught and logged to the console the same way a
- * broken schedule.json would be caught at startup.
- */
-export function setupScheduleEditor(state: SimState): void {
-  for (const leg of state.schedule) {
-    scheduleBody.appendChild(buildScheduleRow(leg, state));
-  }
-}
-
-/**
- * Append one new row for a leg just created by the M10 route builder,
- * without rebuilding the table — same reasoning as setupScheduleEditor()
- * above: a full rebuild would tear out any input another row's edit is
- * mid-focus on.
- */
-export function addScheduleRow(leg: ScheduleLeg, state: SimState): void {
-  scheduleBody.appendChild(buildScheduleRow(leg, state));
-}
-
-/**
- * Show or hide each schedule row against the three filter inputs above the
- * table — case-insensitive substring match, ANDed across fields (a row
- * must match every non-empty filter to stay visible). Depart is matched
- * against the row's current <input type="time"> value rather than text
- * content, since that cell holds a live input, not a plain text node.
- */
-function applyScheduleFilters(): void {
-  const tailQuery = scheduleFilterTail.value.trim().toLowerCase();
-  const routeQuery = scheduleFilterRoute.value.trim().toLowerCase();
-  const departQuery = scheduleFilterDepart.value.trim().toLowerCase();
-
-  for (const row of Array.from(scheduleBody.children)) {
-    const tailText = row.children[0].textContent?.toLowerCase() ?? '';
-    const routeText = row.children[1].textContent?.toLowerCase() ?? '';
-    const departValue = row.querySelector<HTMLInputElement>('input[type="time"]')?.value.toLowerCase() ?? '';
-
-    const matches =
-      tailText.includes(tailQuery) && routeText.includes(routeQuery) && departValue.includes(departQuery);
-    (row as HTMLElement).style.display = matches ? '' : 'none';
-  }
-}
-
-for (const filterInput of [scheduleFilterTail, scheduleFilterRoute, scheduleFilterDepart]) {
-  filterInput.addEventListener('input', applyScheduleFilters);
-}
-
-/**
- * Called by the M10 route builder right after adding a new leg: clears the
- * tail/depart filters — so a filter left over from before can't hide the
- * row the player just created — and sets the route filter to that leg's
- * exact "ORIGIN → DEST" text, so the table immediately narrows to just
- * that route.
- */
-export function filterScheduleToRoute(origin: string, dest: string): void {
-  scheduleFilterTail.value = '';
-  scheduleFilterDepart.value = '';
-  scheduleFilterRoute.value = `${origin} → ${dest}`;
-  applyScheduleFilters();
+export function scheduleProblems(state: SimState): string[] {
+  return [...validateSchedule(state.schedule, state.aircraft), ...utilisationProblems(state)];
 }

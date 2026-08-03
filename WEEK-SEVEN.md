@@ -189,6 +189,27 @@ Also never built from that plan: route reliability colouring on the map,
 a today's-disruption layer (grounded aircraft, cancelled legs, closed
 airports), and commercial state per route arc.
 
+### Requested, not yet designed: spares
+
+**Asked for directly by the repo owner (2026-08-02), to build after the
+pivot.** Two buyable kinds of spare, both money spent up front to protect
+something the player currently has no lever over:
+
+- **Operational spares** — line-maintainable parts held at a base, so a
+  minor defect is a delay rather than a cancellation. Protects **on-time
+  performance** and feeds the existing mechanical-groundings path.
+- **Heavy maintenance spares** — the expensive rotables that decide how
+  long an airframe sits in a heavy check. Protects **downtime**: with
+  spares held, a check returns the aircraft sooner.
+
+This needs a new per-aircraft field, **time until heavy check** (hours or
+cycles remaining), which is also the first thing on `Aircraft` that gives
+airframe age a mechanic rather than just a cost multiplier.
+
+Note this lifts CLAUDE.md's do-not-build entry for **maintenance
+planning** — it was gated "until explicitly asked," and this is that ask.
+Nothing else on that list is unlocked by it.
+
 ### Other open items
 
 - **Executive effects are placeholders** by the owner's own framing. Real

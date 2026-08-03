@@ -58,9 +58,9 @@ function onTimePctClass(pct: number): string | null {
 /**
  * Nothing to build once at startup — both tables below are fully
  * rebuilt by updateOnTimePanel() every time the panel opens, same
- * "no live inputs to lose focus on" shape ui/rotationBoard.ts's board
- * uses, not the "build once, patch in place" discipline ui/commercial.ts
- * and ui/panels.ts's schedule table need for their own live `<input>`s.
+ * "no live inputs to lose focus on" shape ui/panels.ts's fleet and
+ * rotations tables use, not the "build once, patch in place" discipline
+ * ui/commercial.ts needs for its own live `<input>`s.
  * Exported anyway, for symmetry with every other panel's setup function
  * main.ts calls once at startup.
  */
@@ -70,8 +70,8 @@ export function setupOnTimePanel(): void {}
  * Rebuild both tables from `state.onTimeByMarket` and
  * `state.delayMinutesByCause` — called whenever the On-Time panel
  * becomes visible, in case either changed while it wasn't (the same
- * "refresh on select, not every tick" pattern ui/rotationBoard.ts and
- * ui/commercial.ts already use).
+ * "refresh on select, not every tick" pattern ui/commercial.ts already
+ * uses).
  *
  * The per-route table is sorted worst-first: the point of this panel is
  * surfacing which routes are actually unreliable, not an alphabetical

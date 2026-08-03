@@ -16,7 +16,6 @@ import {
   networkAirports,
   nextLegId,
   nextPositioningLegId,
-  validateSchedule,
   type PositioningLeg,
   type ScheduleLeg,
 } from '../sim/schedule';
@@ -27,7 +26,7 @@ import {
   USABLE_DAY_MINUTES,
   USABLE_DAY_START_MINUTE,
 } from '../sim/utilisation';
-import { addScheduleRow, filterScheduleToRoute, minuteOfDayToTimeString, renderScheduleWarnings } from './panels';
+import { minuteOfDayToTimeString, renderScheduleWarnings, scheduleProblems } from './panels';
 import { addCommercialRow } from './commercial';
 import { policyFare } from '../sim/pricing';
 import { getSelectedTail } from './fleetSelection';
@@ -805,15 +804,6 @@ function showForm(chain: Airport[], dest: Airport, state: SimState): void {
   const destPoint = projection([dest.lon, dest.lat]);
   if (destPoint) positionPopover(destPoint[0], destPoint[1]);
 
-  // Filter the schedule table to this market *now*, while the form is
-  // still open — not only after the rotation is added. Filtering only on
-  // confirm meant the table narrowed the instant the form closed, which
-  // in practice looked like nothing happened: by the time the filter took
-  // effect, attention had already moved on with the popup. Filtering here
-  // instead shows the market's existing frequencies (times already taken,
-  // by which tails) while the player is still choosing theirs — which is
-  // also just more useful context to have during the decision itself.
-  filterScheduleToRoute(origin.iata, dest.iata);
 }
 
 function hideForm(): void {
@@ -1018,13 +1008,12 @@ export function setupRouteBuilder(state: SimState, onRouteConfirmed: (legIds: st
         blockMinutes: packed.blockMinutes,
       };
       state.schedule.push(leg);
-      addScheduleRow(leg, state);
       createdLegIds.push(leg.legId);
       const key = marketKey(packed.origin, packed.dest);
       if (!marketsTouched.has(key)) marketsTouched.set(key, packed);
     }
 
-    renderScheduleWarnings(validateSchedule(state.schedule, state.aircraft, state.positioningLegs));
+    renderScheduleWarnings(scheduleProblems(state));
 
     // Fare/marketing are set at the market level (sim/state.ts's
     // RouteSettings), not per leg — a brand-new market gets a fresh entry

@@ -1,4 +1,4 @@
-import { MIN_TURN_MINUTES } from './schedule';
+import { MIN_TURN_MINUTES, type ScheduleLeg } from './schedule';
 import type { SimState } from './state';
 
 /**
@@ -129,6 +129,112 @@ export function utilisationByBase(state: SimState): BaseUtilisation[] {
       };
     })
     .sort((a, b) => b.usedMinutes - a.usedMinutes);
+}
+
+/**
+ * One rotation: a run of an aircraft's legs that leaves its base and comes
+ * back to it. This is the unit the player actually builds (see
+ * ui/routeBuilder.ts) and, since week seven's phase C, the unit they
+ * remove — but it is deliberately *not* stored on SimState. A rotation is
+ * fully recoverable from the legs themselves, and inventing a stored
+ * `Rotation[]` alongside `schedule` would mean two representations of the
+ * same fact that could drift apart. Derived, not persisted.
+ */
+export type Rotation = {
+  tail: string;
+  legs: ScheduleLeg[];
+  /** Airports in order, base first and base last on a closed rotation. */
+  airports: string[];
+  departMinute: number;
+  arriveMinute: number;
+  /** Block plus turn across the whole rotation — what it spends of an aircraft. */
+  minutes: number;
+  share: number;
+  /**
+   * False when the run never makes it back to base — only reachable from a
+   * hand-edited save or a base changed out from under existing legs, since
+   * the route builder always closes the loop. Still listed, because legs
+   * the player can't see are legs they can't remove.
+   */
+  closed: boolean;
+};
+
+function buildRotation(tail: string, legs: ScheduleLeg[], base: string): Rotation {
+  const last = legs[legs.length - 1];
+  return {
+    tail,
+    legs,
+    airports: [legs[0].origin, ...legs.map((leg) => leg.dest)],
+    departMinute: legs[0].departMinute,
+    arriveMinute: last.departMinute + last.blockMinutes,
+    minutes: legs.reduce((total, leg) => total + legUtilisationMinutes(leg.blockMinutes), 0),
+    share: legs.reduce((total, leg) => total + legUtilisationMinutes(leg.blockMinutes), 0) / USABLE_DAY_MINUTES,
+    closed: last.dest === base,
+  };
+}
+
+/**
+ * An aircraft's day split into rotations, in departure order. The split
+ * point is simply "this leg lands at the base" — which works because the
+ * route builder packs each rotation to end there, so consecutive rotations
+ * never interleave.
+ */
+export function rotationsForTail(state: SimState, tail: string): Rotation[] {
+  const legs = state.schedule.filter((leg) => leg.tail === tail).sort((a, b) => a.departMinute - b.departMinute);
+  if (legs.length === 0) return [];
+
+  const aircraft = state.aircraft.find((a) => a.tail === tail);
+  // Falling back to the first leg's origin keeps an unbased tail's legs
+  // groupable rather than collapsing them all into one run.
+  const base = aircraft?.baseAirport ?? legs[0].origin;
+
+  const rotations: Rotation[] = [];
+  let current: ScheduleLeg[] = [];
+  for (const leg of legs) {
+    current.push(leg);
+    if (leg.dest === base) {
+      rotations.push(buildRotation(tail, current, base));
+      current = [];
+    }
+  }
+  if (current.length > 0) rotations.push(buildRotation(tail, current, base));
+  return rotations;
+}
+
+/** Every rotation the airline flies, grouped by tail in fleet order. */
+export function allRotations(state: SimState): Rotation[] {
+  return state.aircraft.flatMap((aircraft) => rotationsForTail(state, aircraft.tail));
+}
+
+/**
+ * The failure mode that replaces the Gantt's broken-chain errors (week
+ * seven, phase C). Continuity and turn time can no longer go wrong — a
+ * rotation starts and ends at its base and is packed with turns built in —
+ * so the only way to over-commit an aircraft now is to ask it to fly more
+ * than a day's worth, which is a number rather than a shape.
+ *
+ * Lives here rather than in validateSchedule() because the utilisation
+ * model is what defines "too much", and because schedule.ts importing this
+ * module would close an import cycle (this module already imports
+ * MIN_TURN_MINUTES from there).
+ */
+export function utilisationProblems(state: SimState): string[] {
+  const problems: string[] = [];
+  for (const aircraft of state.aircraft) {
+    const utilisation = aircraftUtilisation(state, aircraft.tail);
+    if (utilisation.legs === 0) continue;
+
+    if (utilisation.share > 1) {
+      problems.push(
+        `${aircraft.tail} is scheduled for ${Math.round(utilisation.share * 100)}% of a usable day — more than one aircraft can fly. ` +
+          `Remove a rotation, or put it on another tail.`,
+      );
+    }
+    if (!aircraft.baseAirport) {
+      problems.push(`${aircraft.tail} flies ${utilisation.legs} legs but has no base — assign one in the Fleet tab.`);
+    }
+  }
+  return problems;
 }
 
 /**

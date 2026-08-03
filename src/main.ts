@@ -9,16 +9,9 @@ import { drawAircraft } from './render/aircraft';
 import { drawDemandLayer } from './render/demand';
 import { drawCompetitionLayer, competitorAirlines, findCompetitionHover, drawNewCompetitorRouteFlashes } from './render/competition';
 import { showCompetitionTooltip, hideCompetitionTooltip } from './ui/competitionTooltip';
-import { validateSchedule } from './sim/schedule';
 import { createNewGameState, type SimState } from './sim/state';
 import { step } from './sim/step';
-import {
-  updatePanel,
-  setupScheduleEditor,
-  renderScheduleWarnings,
-  PANEL_WIDTH_PX,
-  PANEL_WIDTH_EXPANDED_PX,
-} from './ui/panels';
+import { updatePanel, renderScheduleWarnings, scheduleProblems, PANEL_WIDTH_PX } from './ui/panels';
 import {
   setupRouteBuilder,
   handleRouteBuilderMouseDown,
@@ -27,7 +20,6 @@ import {
   drawRoutePreview,
   hideRouteHoverTooltip,
 } from './ui/routeBuilder';
-import { setupRotationBoard, updateRotationBoard, hideBarTooltip } from './ui/rotationBoard';
 import { setupCommercialPanel, updateCommercialPanel } from './ui/commercial';
 import { setupFleetMarket } from './ui/fleetMarket';
 import { setupOnTimePanel, updateOnTimePanel } from './ui/onTime';
@@ -55,20 +47,17 @@ import { loadSavedState, saveState } from './ui/save';
 const state: SimState = loadSavedState() ?? createNewGameState();
 
 // Validate this game's own schedule (not just the static template) — the
-// M8 schedule editor re-runs this same check after every edit, so a change
-// that breaks a rotation gets caught the same way a broken schedule.json
-// would be caught here at startup.
-renderScheduleWarnings(validateSchedule(state.schedule, state.aircraft, state.positioningLegs));
-setupScheduleEditor(state);
-// The callback fires once a route (and its optional return leg) is
-// actually added to state.schedule — see ui/routeBuilder.ts's own comment
-// on why. switchToSidebarTab is defined further down this file as a plain
-// `function` declaration, so it's hoisted and safely callable here even
-// though this line runs before its own definition; by the time this
-// arrow function actually executes (a future route confirm), the whole
-// module has already finished evaluating.
-setupRouteBuilder(state, (legIds) => switchToSidebarTab('rotation', legIds));
-setupRotationBoard();
+// route builder re-runs this same check after every rotation added or
+// removed, so a schedule that over-commits an aircraft gets caught the
+// same way a broken schedule.json would be caught here at startup.
+renderScheduleWarnings(scheduleProblems(state));
+// The callback fires once a rotation's legs are actually in
+// state.schedule. It jumps to the Fleet tab, where the new rotation shows
+// up in the rotations list with its utilisation share — the reading the
+// pivot replaced the Gantt with. switchToSidebarTab is a plain `function`
+// declaration further down this file, so it's hoisted and safely callable
+// here even though this line runs before its own definition.
+setupRouteBuilder(state, () => switchToSidebarTab('fleet'));
 setupCommercialPanel(state);
 setupFleetMarket(state);
 setupOnTimePanel();
@@ -135,10 +124,9 @@ competitionAirlineDropdown.querySelectorAll<HTMLButtonElement>('button').forEach
 // panes inside the sidebar (#sidebar-tab-content) that replace each other,
 // while the map stays visible and interactive underneath the whole time.
 // Same element IDs as before — only their CSS treatment and DOM position
-// changed — so nothing in ui/rotationBoard.ts, ui/commercial.ts,
-// ui/fleetMarket.ts, ui/onTime.ts, or ui/executive.ts needed to change.
+// changed — so nothing in ui/commercial.ts, ui/fleetMarket.ts,
+// ui/onTime.ts, or ui/executive.ts needed to change.
 const fleetTabEl = document.querySelector<HTMLDivElement>('#fleet-tab')!;
-const rotationBoardEl = document.querySelector<HTMLDivElement>('#rotation-board')!;
 const commercialPanelEl = document.querySelector<HTMLDivElement>('#commercial-panel')!;
 const fleetMarketPanelEl = document.querySelector<HTMLDivElement>('#fleet-market-panel')!;
 const onTimePanelEl = document.querySelector<HTMLDivElement>('#ontime-panel')!;
@@ -150,36 +138,26 @@ const missionsPanelEl = document.querySelector<HTMLDivElement>('#missions-panel'
 const devPanelEl = document.querySelector<HTMLDivElement>('#dev-panel')!;
 const gameTabEl = document.querySelector<HTMLDivElement>('#game-tab')!;
 const sidebarTabButtons = document.querySelectorAll<HTMLButtonElement>('#sidebar-tabs button');
-const rotationExpandToggle = document.querySelector<HTMLButtonElement>('#rotation-expand-toggle')!;
 
-// Week six: the sidebar's width is no longer a fixed constant — it grows
-// while the Rotation tab is expanded (see rotationExpandToggle's handler,
-// further down) so that timeline gets real room to work in. Both
-// resize()'s canvas sizing and the CSS `--panel-width` custom property
-// (style.css's #map/#panel both read it) come from this one variable, so
-// they can never drift apart the way two separately-updated numbers could.
+// Both resize()'s canvas sizing and the CSS `--panel-width` custom
+// property (style.css's #map/#panel both read it) come from this one
+// variable, so they can never drift apart the way two separately-updated
+// numbers could. Still clamped against MIN_MAP_WIDTH_PX below so the map
+// never gets squeezed away to nothing on a narrow window, and recomputed
+// on every resize() rather than only when first set.
 //
-// `desiredPanelWidthPx` is what was actually asked for (PANEL_WIDTH_PX or
-// PANEL_WIDTH_EXPANDED_PX); `currentPanelWidthPx` is that same number,
-// clamped so the map never gets squeezed away to nothing on a narrower
-// window — Rotation's 900px expanded width would otherwise leave zero (or
-// negative) room for the map on a laptop-width browser window. Recomputed
-// on every resize() call too, not just when the width is first set, so
-// shrinking the actual browser window while Rotation is expanded doesn't
-// leave the two out of sync with each other.
+// Week seven, phase C: the Rotation tab's expand-to-900px affordance is
+// gone with the Gantt it existed for, so `desiredPanelWidthPx` no longer
+// varies. Kept as a variable rather than folded back into a constant
+// because the clamp still needs somewhere to read the unclamped value
+// from.
 const MIN_MAP_WIDTH_PX = 200;
-let desiredPanelWidthPx = PANEL_WIDTH_PX;
+const desiredPanelWidthPx = PANEL_WIDTH_PX;
 let currentPanelWidthPx = PANEL_WIDTH_PX;
 
 function applyPanelWidth(): void {
   currentPanelWidthPx = Math.min(desiredPanelWidthPx, window.innerWidth - MIN_MAP_WIDTH_PX);
   document.documentElement.style.setProperty('--panel-width', `${currentPanelWidthPx}px`);
-}
-
-function setPanelWidth(px: number): void {
-  desiredPanelWidthPx = px;
-  applyPanelWidth();
-  resize();
 }
 
 /**
@@ -237,7 +215,6 @@ let latestFractionalMinute = state.simMinute;
 // layer you toggle, not a destination you navigate to.
 type SidebarTab =
   | 'fleet'
-  | 'rotation'
   | 'commercial'
   | 'fleet-market'
   | 'ontime'
@@ -442,7 +419,7 @@ window.addEventListener('keydown', (event) => {
   togglePause();
 });
 
-// --- Sidebar tabs (Fleet / Rotation / Commercial / Fleet Market /
+// --- Sidebar tabs (Fleet / Commercial / Fleet Market /
 // --- On-Time / Executive) and overlay toggles (Demand / Competition) —
 // --- week six
 //
@@ -460,24 +437,17 @@ window.addEventListener('keydown', (event) => {
 /**
  * Switch which sidebar tab is showing — refreshes whichever one just
  * became visible, in case its data changed while it was hidden (the
- * rotation board has no interactive elements to lose; the commercial
- * panel only refreshes its numeric cells, never rebuilding the fare/
- * marketing sliders themselves — see ui/commercial.ts). Called by the
+ * commercial panel only refreshes its numeric cells, never rebuilding the
+ * fare/marketing sliders themselves — see ui/commercial.ts). Called by the
  * sidebar's own tab buttons *and* by ui/routeBuilder.ts's
- * onRouteConfirmed callback, which jumps straight to Rotation with the
- * new leg(s) highlighted.
+ * onRouteConfirmed callback, which jumps to Fleet so a newly added
+ * rotation is visible in the rotations list straight away.
  */
-function switchToSidebarTab(tab: SidebarTab, highlightLegIds: string[] = []): void {
+function switchToSidebarTab(tab: SidebarTab): void {
   if (tab === sidebarTab) return;
-
-  // Leaving Rotation always collapses it back to the shared tab width —
-  // "give me more room" (see expandRotation() below) only means anything
-  // while actually looking at the timeline.
-  if (sidebarTab === 'rotation' && rotationExpanded) collapseRotation();
 
   sidebarTab = tab;
   fleetTabEl.hidden = tab !== 'fleet';
-  rotationBoardEl.hidden = tab !== 'rotation';
   commercialPanelEl.hidden = tab !== 'commercial';
   fleetMarketPanelEl.hidden = tab !== 'fleet-market';
   onTimePanelEl.hidden = tab !== 'ontime';
@@ -491,8 +461,6 @@ function switchToSidebarTab(tab: SidebarTab, highlightLegIds: string[] = []): vo
 
   sidebarTabButtons.forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
 
-  if (tab !== 'rotation') hideBarTooltip(); // leaving the board mid-hover shouldn't leave its tooltip stuck on screen
-  if (tab === 'rotation') updateRotationBoard(state, highlightLegIds);
   if (tab === 'commercial') updateCommercialPanel(state);
   if (tab === 'ontime') updateOnTimePanel(state);
   if (tab === 'executive') {
@@ -508,36 +476,6 @@ function switchToSidebarTab(tab: SidebarTab, highlightLegIds: string[] = []): vo
 
 sidebarTabButtons.forEach((button) => {
   button.addEventListener('click', () => switchToSidebarTab(button.dataset.tab as SidebarTab));
-});
-
-/**
- * Rotation's own expand affordance: normally docked at the same width as
- * every other tab, but a 24-hour Gantt timeline genuinely needs more room
- * than that to drag a bar around with any precision. Widens the sidebar
- * (and shrinks the map correspondingly — it never disappears, just gets
- * narrower) rather than carving Rotation back out as a separate
- * full-screen destination, which would have undone the whole point of
- * folding it into the tab system in the first place. Every other tab
- * never needs this — "give me more room right now" is a Rotation-specific,
- * occasional ask, not the default state.
- */
-let rotationExpanded = false;
-
-function expandRotation(): void {
-  rotationExpanded = true;
-  rotationExpandToggle.textContent = '⤡ Collapse';
-  setPanelWidth(PANEL_WIDTH_EXPANDED_PX);
-}
-
-function collapseRotation(): void {
-  rotationExpanded = false;
-  rotationExpandToggle.textContent = '⤢ Expand';
-  setPanelWidth(PANEL_WIDTH_PX);
-}
-
-rotationExpandToggle.addEventListener('click', () => {
-  if (rotationExpanded) collapseRotation();
-  else expandRotation();
 });
 
 function closeAllDropdowns(): void {

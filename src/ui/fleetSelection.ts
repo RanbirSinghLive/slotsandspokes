@@ -4,8 +4,9 @@
  * (ui/routeBuilder.ts) to require picking a plane *before* arming a route,
  * not after. Lives in its own tiny module rather than either of those two,
  * since panels.ts and routeBuilder.ts already import from each other in
- * the other direction (routeBuilder.ts uses panels.ts's schedule-table
- * helpers) — putting this here avoids a circular import between them.
+ * the other direction (routeBuilder.ts uses panels.ts's warning and
+ * time-formatting helpers) — putting this here avoids a circular import
+ * between them.
  *
  * Transient UI state, not simulated-world state, same reasoning as
  * routeBuilder.ts's own `builderState`: it doesn't belong in `SimState`.

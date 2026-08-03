@@ -400,8 +400,8 @@ export function findCompetitionHover(
 // would linger far longer than intended. So this tracks "have I already
 // drawn this route's opening" using wall-clock `performance.now()`
 // timestamps kept here in the render layer, not in `state` — the same
-// category of transient, UI-owned bookkeeping as ui/rotationBoard.ts's
-// drag state or main.ts's `latestFractionalMinute`, never written back.
+// category of transient, UI-owned bookkeeping as ui/routeBuilder.ts's
+// builder state or main.ts's `latestFractionalMinute`, never written back.
 
 const FLASH_DURATION_MS = 4000;
 const NEW_ROUTE_FLASH_STROKE = '#ffd166'; // same amber "new/highlighted" language as BOTH_STROKE above
