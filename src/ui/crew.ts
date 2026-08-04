@@ -1,7 +1,6 @@
 import {
   crewRequirement,
   dailyCrewSalary,
-  hireCost,
   hireCrew,
   trainingCost,
   startTraining,
@@ -13,7 +12,11 @@ import {
   RESERVE_DEPTH_MIN,
   RESERVE_DEPTH_MAX,
   HIRE_LEAD_TIME_DAYS,
-  projectedHeadcount,
+  immediateHireCost,
+  LINE_START_EFFICIENCY,
+  LINE_MAX_EFFICIENCY,
+  retoolLine,
+  trainingCostPerHead,
   TRAINING_DAYS,
   MAX_PILOT_TIER,
   type CrewRole,
@@ -56,12 +59,12 @@ const cabinTrainCountInput = el<HTMLInputElement>('#crew-cabin-train-count');
 const cabinTrainCostEl = el<HTMLDivElement>('#crew-cabin-train-cost');
 const cabinTrainButton = el<HTMLButtonElement>('#crew-cabin-train-button');
 
-const standingRoleSelect = el<HTMLSelectElement>('#crew-standing-role');
-const standingTierSelect = el<HTMLSelectElement>('#crew-standing-tier');
-const standingRateInput = el<HTMLInputElement>('#crew-standing-rate');
-const standingCostEl = el<HTMLDivElement>('#crew-standing-cost');
-const standingButton = el<HTMLButtonElement>('#crew-standing-button');
-const standingListEl = el<HTMLDivElement>('#crew-standing-list');
+const lineRoleSelect = el<HTMLSelectElement>('#crew-line-role');
+const lineTierSelect = el<HTMLSelectElement>('#crew-line-tier');
+const lineFundingInput = el<HTMLInputElement>('#crew-line-funding');
+const lineCostEl = el<HTMLDivElement>('#crew-line-cost');
+const lineButton = el<HTMLButtonElement>('#crew-line-button');
+const linesListEl = el<HTMLDivElement>('#crew-lines-list');
 
 const pendingEl = el<HTMLDivElement>('#crew-pending');
 
@@ -211,9 +214,11 @@ function renderHireCost(state: SimState): void {
   hireTierSelect.disabled = role !== 'pilot';
   const tier = role === 'pilot' ? Number(hireTierSelect.value) : 1;
   const count = Math.max(1, Number(hireCountInput.value) || 1);
-  const cost = hireCost(role, tier, count);
+  const cost = immediateHireCost(role, tier, count);
   hireCostEl.textContent =
-    `${money(cost)} up front · arrives in ${HIRE_LEAD_TIME_DAYS} days${shortfallNote(cost, state.cash)}`;
+    `${money(cost)} up front · arrives in ${HIRE_LEAD_TIME_DAYS} days · agency rate, ` +
+    `a mature line makes the same head for ${money(trainingCostPerHead(role, tier) * count)}` +
+    shortfallNote(cost, state.cash);
   hireCostEl.classList.toggle('crew-short', cost > state.cash);
   hireButton.disabled = cost > state.cash;
 }
@@ -250,101 +255,132 @@ function roleLabel(role: CrewRole, tier: number): string {
   return role === 'cabin' ? 'cabin crew' : 'mechanics';
 }
 
-/**
- * What starting this order would commit to. Deliberately quotes a monthly
- * run rate rather than a total: there is no total, since the order stops
- * at the fleet's own target and that target moves with the fleet.
- */
-function renderStandingCost(state: SimState): void {
-  const role = standingRoleSelect.value as CrewRole;
-  standingTierSelect.disabled = role !== 'pilot';
-  const tier = role === 'pilot' ? Number(standingTierSelect.value) : 1;
-  const rate = Math.max(1, Number(standingRateInput.value) || 1);
-
-  const req = crewRequirement(state);
-  const target = role === 'pilot' ? req.targetPilotsByTier[tier - 1] : role === 'cabin' ? req.targetCabinCrew : req.targetMechanics;
-  const projected = projectedHeadcount(state, role, tier);
-  const short = Math.max(0, target - projected);
-
-  const alreadyRunning = state.standingOrders.some((o) => o.role === role && (role !== 'pilot' || o.tier === tier));
-  standingButton.disabled = alreadyRunning;
-
-  standingCostEl.textContent = alreadyRunning
-    ? `Already running for ${roleLabel(role, tier)} — cancel it below to change the rate.`
-    : short === 0
-      ? `${money(hireCost(role, tier, rate))}/month while below target. ${roleLabel(role, tier)} are already at target (${projected} of ${target}), so this would sit idle until the fleet grows.`
-      : `${money(hireCost(role, tier, rate))}/month until target. ${short} short right now (${projected} of ${target}), about ${Math.ceil(short / rate)} month${Math.ceil(short / rate) === 1 ? '' : 's'} at this rate.`;
+/** Heads per month a line at this funding and efficiency would produce. */
+function outputPerMonth(role: CrewRole, tier: number, fundingPerMonth: number, efficiency: number): number {
+  return (fundingPerMonth * efficiency) / trainingCostPerHead(role, tier);
 }
 
 /**
- * The running orders, each cancellable.
- *
- * Rebuilt **only when its own content changes**, not on every call. This
- * whole panel is refreshed once per frame while the Crew tab is visible
- * (see updateCrewPanel() below and main.ts's render loop), and these rows
- * own buttons: a click only fires when mousedown and mouseup land on the
- * same element, so tearing the list down ~60 times a second makes Cancel
- * do nothing at all. Exactly the bug ui/panels.ts's renderFleet() documents
- * — and it survived a scripted `.click()` here too, because that invokes
- * the handler directly and never exercises the press.
- *
- * The signature covers everything rendered, including the projected and
- * target counts, so the status text still tracks daily changes.
+ * What opening this line would commit to. Quotes both ends of the ramp,
+ * because the gap between them is the entire mechanic: what you get on day
+ * one versus what the same money buys once the line has matured.
  */
-let standingSignature: string | null = null;
+function renderLineCost(state: SimState): void {
+  const role = lineRoleSelect.value as CrewRole;
+  lineTierSelect.disabled = role !== 'pilot';
+  const tier = role === 'pilot' ? Number(lineTierSelect.value) : 1;
+  const funding = Math.max(0, Number(lineFundingInput.value) || 0);
 
-function renderStandingList(state: SimState): void {
-  const req0 = crewRequirement(state);
-  const signature = state.standingOrders
-    .map((o) => {
-      const target =
-        o.role === 'pilot' ? req0.targetPilotsByTier[o.tier - 1] : o.role === 'cabin' ? req0.targetCabinCrew : req0.targetMechanics;
-      return `${o.role}:${o.tier}:${o.perMonth}:${projectedHeadcount(state, o.role, o.tier)}/${target}`;
-    })
-    .join('|');
-  if (signature === standingSignature) return;
-  standingSignature = signature;
+  const existing = state.trainingLines.find((l) => l.role === role && (role !== 'pilot' || l.tier === tier));
+  lineButton.disabled = existing !== undefined || funding <= 0;
 
-  standingListEl.innerHTML = '';
-  if (state.standingOrders.length === 0) {
-    standingListEl.innerHTML = '<div class="crew-pending-row">No standing orders.</div>';
+  if (existing) {
+    lineCostEl.textContent = `Already running for ${roleLabel(role, tier)} — adjust its funding below, or retool another line onto this tier.`;
+    lineCostEl.classList.remove('crew-short');
     return;
   }
 
-  const req = crewRequirement(state);
-  for (const order of state.standingOrders) {
-    const target =
-      order.role === 'pilot'
-        ? req.targetPilotsByTier[order.tier - 1]
-        : order.role === 'cabin'
-          ? req.targetCabinCrew
-          : req.targetMechanics;
-    const projected = projectedHeadcount(state, order.role, order.tier);
-    const idle = projected >= target;
+  const atStart = outputPerMonth(role, tier, funding, LINE_START_EFFICIENCY);
+  const atFull = outputPerMonth(role, tier, funding, LINE_MAX_EFFICIENCY);
+  lineCostEl.textContent =
+    `${money(funding)}/month · ${roleLabel(role, tier)} · ` +
+    `${atStart.toFixed(1)}/month at first, ${atFull.toFixed(1)}/month once mature (about 6 months).`;
+  lineCostEl.classList.toggle('crew-short', funding > state.cash * 3);
+}
 
+/**
+ * One row per running line: what it produces, how efficient it is, its
+ * funding, and controls to retool or close it.
+ *
+ * Rebuilt only when its content changes. This panel refreshes every frame
+ * while the Crew tab is visible and these rows own an `<input>` and two
+ * buttons — a per-frame rebuild would steal focus from the funding field
+ * mid-edit and stop the buttons firing at all, since a click needs
+ * mousedown and mouseup on the same element. See ui/panels.ts's
+ * renderFleet() for what that looks like when missed.
+ */
+let linesSignature: string | null = null;
+
+function renderLines(state: SimState): void {
+  const signature = state.trainingLines
+    .map((l) => `${l.id}:${l.role}:${l.tier}:${l.fundingPerMonth}:${l.efficiency.toFixed(3)}:${l.retoolDaysLeft}`)
+    .join('|');
+  if (signature === linesSignature) return;
+  linesSignature = signature;
+
+  linesListEl.innerHTML = '';
+  if (state.trainingLines.length === 0) {
+    linesListEl.innerHTML = '<div class="crew-pending-row">No training lines. Crew only arrive through a line, or an immediate hire above.</div>';
+    return;
+  }
+
+  for (const line of state.trainingLines) {
     const row = document.createElement('div');
-    row.className = 'crew-standing-row';
+    row.className = 'crew-line-row';
 
-    const label = document.createElement('span');
-    label.textContent = `${order.perMonth}/month ${roleLabel(order.role, order.tier)}`;
+    const title = document.createElement('div');
+    title.className = 'crew-line-title';
+    title.textContent = roleLabel(line.role, line.tier);
 
-    const status = document.createElement('span');
-    status.className = idle ? 'crew-standing-idle' : 'crew-standing-active';
-    status.textContent = idle ? `holding at target (${projected}/${target})` : `hiring — ${projected}/${target}`;
+    const status = document.createElement('div');
+    status.className = 'crew-line-status';
+    status.textContent =
+      line.retoolDaysLeft > 0
+        ? `retooling — ${line.retoolDaysLeft} day${line.retoolDaysLeft === 1 ? '' : 's'} left, still funded, producing nobody`
+        : `${Math.round(line.efficiency * 100)}% efficient · ${outputPerMonth(line.role, line.tier, line.fundingPerMonth, line.efficiency).toFixed(1)}/month`;
 
-    const cancel = document.createElement('button');
-    cancel.type = 'button';
-    cancel.className = 'crew-standing-cancel';
-    cancel.textContent = '×';
-    cancel.setAttribute('aria-label', `Cancel standing order for ${roleLabel(order.role, order.tier)}`);
-    cancel.addEventListener('click', () => {
-      const index = state.standingOrders.indexOf(order);
-      if (index !== -1) state.standingOrders.splice(index, 1);
+    const controls = document.createElement('div');
+    controls.className = 'crew-line-controls';
+
+    const funding = document.createElement('input');
+    funding.type = 'number';
+    funding.min = '0';
+    funding.step = '500';
+    funding.value = String(line.fundingPerMonth);
+    funding.className = 'crew-line-funding';
+    funding.addEventListener('change', () => {
+      line.fundingPerMonth = Math.max(0, Number(funding.value) || 0);
       updateCrewPanel(state);
     });
 
-    row.append(label, status, cancel);
-    standingListEl.appendChild(row);
+    const suffix = document.createElement('span');
+    suffix.className = 'crew-form-suffix';
+    suffix.textContent = '$/month';
+
+    // Retooling is only meaningful for pilots — cabin crew and mechanics
+    // aren't type-rated, so their lines have nothing to convert between.
+    const retool = document.createElement('select');
+    retool.className = 'crew-line-retool';
+    if (line.role === 'pilot') {
+      for (let t = 1; t <= MAX_PILOT_TIER; t++) {
+        const option = document.createElement('option');
+        option.value = String(t);
+        option.textContent = TIER_NAMES[t - 1];
+        retool.appendChild(option);
+      }
+      retool.value = String(line.tier);
+      retool.addEventListener('change', () => {
+        retoolLine(line, Number(retool.value));
+        updateCrewPanel(state);
+      });
+    } else {
+      retool.hidden = true;
+    }
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'crew-line-close';
+    close.textContent = '×';
+    close.setAttribute('aria-label', `Close the ${roleLabel(line.role, line.tier)} line`);
+    close.addEventListener('click', () => {
+      const index = state.trainingLines.indexOf(line);
+      if (index !== -1) state.trainingLines.splice(index, 1);
+      updateCrewPanel(state);
+    });
+
+    controls.append(funding, suffix, retool, close);
+    row.append(title, status, controls);
+    linesListEl.appendChild(row);
   }
 }
 
@@ -381,22 +417,25 @@ export function setupCrewPanel(state: SimState): void {
     const role = hireRoleSelect.value as CrewRole;
     const tier = role === 'pilot' ? Number(hireTierSelect.value) : 1;
     const count = Math.max(1, Number(hireCountInput.value) || 1);
-    if (hireCost(role, tier, count) > state.cash) return; // button is disabled; stale-click guard
+    if (immediateHireCost(role, tier, count) > state.cash) return; // button is disabled; stale-click guard
     hireCrew(state, role, tier, count);
     updateCrewPanel(state);
   });
 
-  standingRoleSelect.addEventListener('change', () => renderStandingCost(state));
-  standingTierSelect.addEventListener('change', () => renderStandingCost(state));
-  standingRateInput.addEventListener('input', () => renderStandingCost(state));
-  standingButton.addEventListener('click', () => {
-    const role = standingRoleSelect.value as CrewRole;
-    const tier = role === 'pilot' ? Number(standingTierSelect.value) : 1;
-    if (state.standingOrders.some((o) => o.role === role && (role !== 'pilot' || o.tier === tier))) return;
-    state.standingOrders.push({
+  lineRoleSelect.addEventListener('change', () => renderLineCost(state));
+  lineTierSelect.addEventListener('change', () => renderLineCost(state));
+  lineFundingInput.addEventListener('input', () => renderLineCost(state));
+  lineButton.addEventListener('click', () => {
+    const role = lineRoleSelect.value as CrewRole;
+    const tier = role === 'pilot' ? Number(lineTierSelect.value) : 1;
+    if (state.trainingLines.some((l) => l.role === role && (role !== 'pilot' || l.tier === tier))) return;
+    state.trainingLines.push({
+      id: `line-${state.trainingLines.length + 1}-${role}-${tier}`,
       role,
       tier,
-      perMonth: Math.max(1, Number(standingRateInput.value) || 1),
+      fundingPerMonth: Math.max(0, Number(lineFundingInput.value) || 0),
+      efficiency: LINE_START_EFFICIENCY,
+      retoolDaysLeft: 0,
       accrued: 0,
     });
     updateCrewPanel(state);
@@ -434,7 +473,7 @@ export function updateCrewPanel(state: SimState): void {
   renderHireCost(state);
   renderTrainCost(state);
   renderCabinTrainCost(state);
-  renderStandingCost(state);
-  renderStandingList(state);
+  renderLineCost(state);
+  renderLines(state);
   renderPending(state);
 }

@@ -373,37 +373,73 @@ export function dailyCrewSalary(pools: CrewPools): number {
   return pilots + pools.cabinCrew * CABIN_DAILY_SALARY + pools.mechanics * MECHANIC_DAILY_SALARY;
 }
 
+/** A month, for anything quoted per month. */
+export const MONTH_DAYS = 30;
+
+// --- Training lines (week eight) ---
+
 /**
- * A recurring recruitment commitment: hire `perMonth` heads of this
- * role/tier every month until the fleet's target headcount is met, then
- * stop on its own.
+ * A funded training pipeline for one role (and, for pilots, one tier).
+ * The player commits money per month; the line converts it into people.
  *
- * Week eight's pipeline idea. Batch hiring made growth a shop — click,
- * receive, repeat — while the thing that actually limits an airline is a
- * *rate* it can recruit at. Setting a rate rather than a batch is also
- * what makes the ten-day lead time something to plan around instead of an
- * annoyance to absorb once.
+ * Modelled on Hearts of Iron's production lines rather than on a hiring
+ * form, because the interesting thing about crew is not *how many* you
+ * order but how long an institution takes to become good at producing
+ * them. A line starts inefficient and improves the longer it runs, so
+ * money spent early is largely wasted and a mature line is the cheap one.
  *
- * **There is deliberately no target field.** The stop condition is
- * `crewRequirement()`'s existing target (operating need times reserve
- * depth), which means a standing order can never run away: it is bounded
- * by the fleet you actually own. It also self-resumes — buy an aircraft
- * or raise reserve depth and the requirement rises, so hiring restarts
- * without the player remembering to. That folds reserve depth and hiring
- * rate into one decision rather than two unrelated sliders.
+ * That single property is what this exists for: it makes **fleet
+ * commonality** a real strategic axis. Adding an aircraft from a tier you
+ * don't already train for is no longer just a purchase — it's a second
+ * pipeline starting cold. Real airlines agonise over exactly this, and
+ * before now nothing in the game charged for fleet diversity at all.
  *
- * `accrued` is the fractional-heads carry, since a rate per month has to
- * be spent a whole person at a time on a daily tick.
+ * Deliberately *not* target-seeking. It produces while funded and the
+ * surplus stockpiles, paying salaries — over-funding is a real mistake
+ * the player manages, not something the sim quietly prevents. That is a
+ * reversal of the standing-order design this replaces, and the reason is
+ * that an auto-stop made the funding number costless to get wrong.
  */
-export type StandingOrder = {
+export type TrainingLine = {
+  id: string;
   role: CrewRole;
-  /** 1 for cabin crew and mechanics, which aren't tiered. */
+  /** Which pilot tier this line produces. Always 1 for cabin crew and mechanics, who aren't tiered. */
   tier: number;
-  perMonth: number;
+  /** What the player commits per month. Spent whether or not the line is efficient yet. */
+  fundingPerMonth: number;
+  /** 0..1. Scales output, not spend — an immature line wastes money rather than costing less. */
+  efficiency: number;
+  /** While positive, the line is converting to a new tier: full spend, no output. */
+  retoolDaysLeft: number;
+  /** Fractional heads carried between days, since people arrive whole. */
   accrued: number;
 };
 
-export const STANDING_ORDER_PERIOD_DAYS = 30;
+/** Where a brand-new line starts. Low enough that churning lines genuinely hurts. */
+export const LINE_START_EFFICIENCY = 0.2;
+export const LINE_MAX_EFFICIENCY = 1;
+/** Reaches the cap in roughly six months of continuous running. */
+const LINE_EFFICIENCY_GAIN_PER_DAY = (LINE_MAX_EFFICIENCY - LINE_START_EFFICIENCY) / 180;
+/** Converting a line to another tier: no output for this long. */
+export const LINE_RETOOL_DAYS = 30;
+/**
+ * How much efficiency survives a retool. The point of retooling rather
+ * than closing and opening a fresh line is that it keeps some of what the
+ * old line learned — instructors, process, a training department that has
+ * done this before. Set above LINE_START_EFFICIENCY so converting is
+ * always better than starting cold, which is what makes it a real choice
+ * when a fleet pivots.
+ */
+const LINE_RETOOL_EFFICIENCY_RETAINED = 0.5;
+
+/**
+ * What an immediate agency hire costs, as a multiple of the same head
+ * produced by a line. Batch "Recruit" survives alongside lines as the
+ * expensive, instant option — without a premium a line would be strictly
+ * worse than buying heads outright, since efficiency only ever wastes
+ * money and never discounts it.
+ */
+export const IMMEDIATE_HIRE_PREMIUM = 1.75;
 
 export function hireCost(role: CrewRole, tier: number, count: number): number {
   if (role === 'pilot') return PILOT_HIRE_COST[tier - 1] * count;
@@ -439,8 +475,23 @@ function nextId(prefix: string, existing: { id: string }[]): string {
  * responsible for checking affordability first (same "let the UI gate it"
  * shape sim/loans.ts's takeLoan() already uses).
  */
+/**
+ * Hire off the street, immediately — the expensive alternative to a
+ * training line. Costs IMMEDIATE_HIRE_PREMIUM times what a line produces
+ * the same head for, because without a premium a line would be strictly
+ * worse than buying: efficiency only ever wastes money, it never
+ * discounts it, so a mature line has to be *cheaper per head* than the
+ * instant option or there'd be no reason to run one.
+ *
+ * Still lands after HIRE_LEAD_TIME_DAYS — an agency hire is quick, not
+ * instantaneous.
+ */
+export function immediateHireCost(role: CrewRole, tier: number, count: number): number {
+  return Math.round(hireCost(role, tier, count) * IMMEDIATE_HIRE_PREMIUM);
+}
+
 export function hireCrew(state: SimState, role: CrewRole, tier: number, count: number): void {
-  state.cash -= hireCost(role, tier, count);
+  state.cash -= immediateHireCost(role, tier, count);
   state.pendingHires.push({
     id: nextId('hire', state.pendingHires),
     role,
@@ -535,12 +586,6 @@ function resolveArrivals(state: SimState): void {
  * being paid — a deliberate simplification worth noting, since real
  * airlines keep paying them.
  */
-/** The target a standing order for this role/tier runs toward. */
-function standingOrderTarget(requirement: CrewRequirement, role: CrewRole, tier: number): number {
-  if (role === 'pilot') return requirement.targetPilotsByTier[tier - 1];
-  return role === 'cabin' ? requirement.targetCabinCrew : requirement.targetMechanics;
-}
-
 /**
  * Headcount this role/tier will have once everything already paid for has
  * landed — the pool now, plus hires in transit, plus anyone due back from
@@ -569,35 +614,81 @@ export function projectedHeadcount(state: SimState, role: CrewRole, tier: number
 }
 
 /**
- * Advance every standing order by one day. Runs after salary is paid, so
- * payroll — a fixed obligation — always has first call on cash and a tight
- * month pauses discretionary recruitment instead of failing wages.
+ * What one head of this role/tier costs a training line to produce. The
+ * existing hire cost already scales steeply with tier (2,600 / 5,200 /
+ * 11,000 for pilots), which is exactly the "longer training costs more"
+ * scaling — a mainline-jet pilot is dearer per head because they take
+ * far longer to produce, so the same monthly funding buys fewer of them.
+ */
+export function trainingCostPerHead(role: CrewRole, tier: number): number {
+  return hireCost(role, tier, 1);
+}
+
+/** Add a head to the pool this line feeds. */
+function addToPool(state: SimState, role: CrewRole, tier: number, count: number): void {
+  if (role === 'pilot') state.crew.pilotsByTier[tier - 1] += count;
+  else if (role === 'cabin') state.crew.cabinCrew += count;
+  else state.crew.mechanics += count;
+}
+
+/**
+ * Point an existing line at a different tier. Keeps half its efficiency
+ * and pauses output for LINE_RETOOL_DAYS — better than closing it and
+ * opening a fresh one, which would start at LINE_START_EFFICIENCY with
+ * nothing carried over. That difference is the whole reason retooling is
+ * an action rather than something the player fakes with delete-and-create.
+ */
+export function retoolLine(line: TrainingLine, tier: number): void {
+  if (line.tier === tier) return;
+  line.tier = tier;
+  line.retoolDaysLeft = LINE_RETOOL_DAYS;
+  line.efficiency = Math.max(LINE_START_EFFICIENCY, line.efficiency * LINE_RETOOL_EFFICIENCY_RETAINED);
+  line.accrued = 0;
+}
+
+/**
+ * Run every training line for one day: spend its daily share of funding,
+ * convert it to people at the line's current efficiency, and add whole
+ * heads to the pool.
  *
- * Three things stop this running away, which matters because an
- * open-ended recurring spend is the obvious way this mechanic could go
- * wrong: it never orders past the fleet's own target, it skips any day it
- * can't afford a whole head, and `accrued` is capped at one month so a
- * long pause (at target, or broke) can't bank a backlog and then dump a
- * year of hiring in one tick.
+ * Efficiency scales **output, not spend**. An immature line costs the
+ * same and delivers less, which is what punishes churn — if efficiency
+ * discounted the money instead, starting a fresh line would be free and
+ * the mechanic would say nothing.
+ *
+ * Runs after payroll, so wages keep first call on cash. A line that can't
+ * afford its day is skipped entirely — no spend, no output, and no
+ * progress up the efficiency curve, since an idle training department
+ * isn't getting better at its job.
  *
  * Rolls no randomness, so the balance sweep's constant-draws-per-day
  * guarantee is untouched.
  */
-export function runStandingOrders(state: SimState): void {
-  const requirement = crewRequirement(state);
+export function runTrainingLines(state: SimState): void {
+  for (const line of state.trainingLines) {
+    const dailySpend = line.fundingPerMonth / MONTH_DAYS;
+    if (dailySpend <= 0 || state.cash < dailySpend) continue;
 
-  for (const order of state.standingOrders) {
-    order.accrued = Math.min(order.accrued + order.perMonth / STANDING_ORDER_PERIOD_DAYS, order.perMonth);
+    state.cash -= dailySpend;
+    state.todayCost += dailySpend;
+    state.todayCostByCategory.training += dailySpend;
+    state.todayMargin -= dailySpend;
 
-    const room = standingOrderTarget(requirement, order.role, order.tier) - projectedHeadcount(state, order.role, order.tier);
-    if (room <= 0) continue;
+    // Retooling still costs full funding — the department is being
+    // rebuilt around a new type and is paying for it — but produces
+    // nobody, and doesn't climb the curve either.
+    if (line.retoolDaysLeft > 0) {
+      line.retoolDaysLeft -= 1;
+      continue;
+    }
 
-    const perHead = hireCost(order.role, order.tier, 1);
-    const heads = Math.min(Math.floor(order.accrued), room, Math.floor(Math.max(0, state.cash) / perHead));
+    line.efficiency = Math.min(LINE_MAX_EFFICIENCY, line.efficiency + LINE_EFFICIENCY_GAIN_PER_DAY);
+    line.accrued += (dailySpend * line.efficiency) / trainingCostPerHead(line.role, line.tier);
+
+    const heads = Math.floor(line.accrued);
     if (heads <= 0) continue;
-
-    hireCrew(state, order.role, order.tier, heads);
-    order.accrued -= heads;
+    line.accrued -= heads;
+    addToPool(state, line.role, line.tier, heads);
   }
 }
 
@@ -618,8 +709,8 @@ export function rollDailyCrew(state: SimState): void {
   state.todayCostByCategory.crew += salary;
   state.todayMargin -= salary;
 
-  // After payroll on purpose — see runStandingOrders()'s own note.
-  runStandingOrders(state);
+  // After payroll on purpose — see runTrainingLines()'s own note.
+  runTrainingLines(state);
 
   const [disruptionRoll, nextSeed] = nextRandom(state.rngSeed);
   state.rngSeed = nextSeed;

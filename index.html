@@ -368,25 +368,25 @@
             <div id="crew-hire-cost"></div>
             <button type="button" id="crew-hire-button">Recruit</button>
           </section>
-          <section id="crew-standing-section">
-            <h2>Standing orders <button type="button" class="info-mark" aria-label="What this means" data-info="Recruits at a steady rate until the fleet's target headcount is met, then stops on its own. The target comes from your reserve depth, so raising that — or buying more aircraft — restarts hiring automatically.">i</button></h2>
+          <section id="crew-lines-section">
+            <h2>Training lines <button type="button" class="info-mark" aria-label="What this means" data-info="Fund a pipeline per month and it produces crew. A new line starts at 20% efficiency and takes about six months to reach full output — efficiency scales what you get, not what you pay, so a young line wastes money. Retooling a line to another tier keeps half its efficiency; closing it loses all of it. Surplus crew stockpile and keep drawing salary.">i</button></h2>
             <div class="crew-form-row">
-              <select id="crew-standing-role">
+              <select id="crew-line-role">
                 <option value="pilot">Pilots</option>
                 <option value="cabin">Cabin crew</option>
                 <option value="mechanic">Mechanics</option>
               </select>
-              <select id="crew-standing-tier">
+              <select id="crew-line-tier">
                 <option value="1">Light turboprop</option>
                 <option value="2">Regional</option>
                 <option value="3">Mainline jet</option>
               </select>
-              <input type="number" id="crew-standing-rate" min="1" max="99" value="2" />
-              <span class="crew-form-suffix">/month</span>
+              <input type="number" id="crew-line-funding" min="500" step="500" value="5000" />
+              <span class="crew-form-suffix">$/month</span>
             </div>
-            <div id="crew-standing-cost"></div>
-            <button type="button" id="crew-standing-button">Start standing order</button>
-            <div id="crew-standing-list"></div>
+            <div id="crew-line-cost"></div>
+            <button type="button" id="crew-line-button">Open line</button>
+            <div id="crew-lines-list"></div>
           </section>
           <section id="crew-train-section">
             <h2>Train up a tier</h2>

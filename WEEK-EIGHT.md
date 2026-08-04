@@ -4,9 +4,9 @@ Handoff document. Week seven's utilisation pivot lives in
 `WEEK-SEVEN.md`; read this one first and go there for the pivot's
 reasoning.
 
-**State at handoff:** save key `airgame-save-v25`, 11 sidebar tabs.
-Aircraft delivery lead times and standing-order recruitment are both done
-and committed. **The Grow tab — one pipeline view — is next.**
+**State at handoff:** save key `airgame-save-v26`, 11 sidebar tabs.
+Aircraft delivery lead times and **training lines** are done and
+committed. **The Grow tab — one pipeline view — is next.**
 
 ---
 
@@ -26,11 +26,15 @@ Settled directly with the repo owner.
 
 1. **Aircraft deliveries first**, before any Grow-tab restructuring.
    Smallest slice, biggest effect, ends in something runnable.
-2. **Crew recruitment becomes standing orders with a target** — set a
-   hiring rate per role and it runs until the target headcount is met,
-   then stops. Not one-off batches. This is the piece that makes it a
-   factory rather than a queue.
-3. **"Grow" was never a design.** It was a bucket from week six's
+2. **Crew comes from funded training lines**, modelled on Hearts of Iron
+   production. Fund a line per month; it converts money to people at an
+   efficiency that ramps as the line runs. Lines exist for **all three
+   roles**; output goes into the existing pools. Supersedes the
+   standing-order design, which was built and then replaced — see below.
+3. **Surplus stockpiles.** Overproduction is the player's to manage as
+   salary drag; the sim does not auto-stop a line. This deliberately
+   reverses the auto-stop guard the standing orders had.
+4. **"Grow" was never a design.** It was a bucket from week six's
    menu-condensing plan (Fleet Market + Tech Tree + Executive share a
    shelf, not a mechanic). The pipeline idea replaces it and gives the
    tab an actual job. The tab-grouping plan should be re-derived from
@@ -73,41 +77,72 @@ double-ordering.
 
 ---
 
-## Done: standing-order recruitment
+## Done: training lines
 
-`StandingOrder { role, tier, perMonth, accrued }` on `SimState`, advanced
-by `runStandingOrders()` inside the daily crew pass.
+`TrainingLine { id, role, tier, fundingPerMonth, efficiency, retoolDaysLeft,
+accrued }` on `SimState`, run by `runTrainingLines()` in the daily crew
+pass. Output goes straight into the pools.
 
-**There is no target field, and that is the design.** The stop condition
-is `crewRequirement()`'s existing target — operating need times reserve
-depth — so the player sets only a *rate*. Three things follow:
+**Efficiency scales output, not spend.** A line starts at 20%, reaches
+100% in about six months, and costs the same throughout. An immature line
+therefore *wastes* money rather than costing less — which is the only
+version of this that punishes churn. If efficiency discounted the spend
+instead, starting a fresh line would be free and the mechanic would say
+nothing.
 
-- An order can never run away: it is bounded by the fleet you own.
-- It **self-resumes**. Buy an aircraft or raise reserve depth and the
-  requirement rises, so hiring restarts without anyone remembering to.
-- Reserve depth and hiring rate stop being unrelated sliders. Reserve
-  depth sets *how much* crew you are hiring toward; the rate sets *how
-  fast*.
+**The point of all this is fleet commonality.** Adding an aircraft from a
+tier you don't already train for is no longer just a purchase; it's a
+second pipeline starting cold. Nothing in the game charged for fleet
+diversity before, which is odd for a genre where it's the most famous
+constraint there is.
 
-Three guards against the obvious failure mode of a recurring spend:
-it never orders past the target, it skips any day it cannot afford a
-whole head, and `accrued` is capped at one month so a long pause can't
-bank a backlog and dump it in one tick. It also runs **after payroll**,
-so wages have first call on cash and a tight month pauses recruitment
-rather than failing salaries.
+**Retooling** points a line at another tier: half its efficiency survives
+and it produces nobody for 30 days while still being funded. Retaining
+half is what makes retooling better than closing and reopening, so it's a
+real choice when a fleet pivots rather than something the player fakes
+with delete-and-create. That also means no artificial cap on lines is
+needed — starting cold *is* the cost, so concentration is self-rewarding.
 
-Counting is against `projectedHeadcount()` — pool plus hires in transit
-plus trainees due back — not the current pool, or the ten-day lead time
-would have it re-order the same people every day until the first batch
-landed.
+Measured over 300 days at $12,000/month: 20% → 33% (day 30) → 60% (day 90)
+→ 100% (day 180), producing 1 / 5 / 16 pilots by those marks. Retooling at
+day 200 dropped efficiency to 50% and produced **nobody for 30 days while
+spending ~$100k** — the fleet-diversity penalty, made concrete.
 
-Batch "Recruit" survives alongside it for one-off catch-up hires.
+Scaling by training length falls out of the existing hire costs
+(2,600 / 5,200 / 11,000 per pilot tier): the same funding buys far fewer
+mainline-jet pilots, because they take far longer to produce.
 
-Measured: with two 1900Ds on order and a 4/month order for tier-1 pilots,
-the target stepped 0 → 6 → 12 as the aircraft arrived, hiring tracked it,
-and it stopped dead at 12 with no further spend.
+**Immediate "Recruit" survives** at `IMMEDIATE_HIRE_PREMIUM` (1.75x) —
+agency hire, ten-day lead. Without a premium a line would be strictly
+worse than buying heads outright, since efficiency never discounts. The
+form now quotes both: "$18,200 up front ... a mature line makes the same
+head for $10,400."
 
----
+### Superseded: standing orders
+
+Built and then replaced within the same week. `StandingOrder`,
+`runStandingOrders()` and their UI are gone. What survived: `PendingHire`
+and the arrival queue, `projectedHeadcount()`, and `crewRequirement()`'s
+target — which is now a *readout* of what the fleet needs rather than an
+auto-stop.
+
+### Known open point
+
+`crewTier` has three values but there are five aircraft types, and
+**A220-300 and A330-300 share tier 3** — so retooling a line from
+narrowbody to widebody currently costs nothing, which is exactly the case
+the mechanic was asked for. Fixing it means promoting the A330 to a fourth
+tier, which extends `PILOT_DAILY_SALARY`, `PILOT_HIRE_COST`,
+`TRAINING_COST_PER_PILOT` and the `pilotsByTier` tuple, and needs new
+balance numbers. **Deliberately not bundled into the mechanic change** —
+it's a balance decision, not a refactor detail.
+
+### Balance risk worth watching
+
+A new game starts with no crew and no lines, so the first pilots are
+either an expensive agency hire or a six-month ramp. That may make the
+opening too slow. `LINE_START_EFFICIENCY` and the ramp length are the
+dials.
 
 ## Next: the Grow tab
 
@@ -118,7 +153,7 @@ gain.
 
 The pieces already exist and are currently scattered: `pendingDeliveries`
 shows in the Fleet tab's Inbound section, `pendingHires`/`pendingTraining`
-in the Crew tab's pipeline list, and standing orders in their own Crew
+in the Crew tab's pipeline list, and training lines in their own Crew
 section. Gathering them is mostly a move, not new mechanics.
 
 Executive hires arriving after a notice period is a natural fit and would
@@ -150,7 +185,7 @@ once the rest works.
 ## Conventions worth knowing
 
 - **Bump `SAVE_KEY` in `src/ui/save.ts` on any breaking `SimState`
-  change.** Currently `v25`.
+  change.** Currently `v26`.
 - **`headless-output.csv` and `sweep-reserve.csv` must stay
   byte-identical** across changes that aren't meant to affect balance.
   Both were verified unchanged after the delivery work — `createInitialState()`

@@ -74,7 +74,11 @@ const COST_ROWS: CostRowSpec[] = [
     label: 'Fixed',
     depth: 0,
     hint: 'Charged once at day-rollover whether or not anything flew.',
-    value: (s) => s.todayCostByCategory.marketing + s.todayCostByCategory.lease,
+    value: (s) =>
+      s.todayCostByCategory.marketing +
+      s.todayCostByCategory.lease +
+      s.todayCostByCategory.crew +
+      s.todayCostByCategory.training,
   },
   {
     label: 'Marketing',
@@ -87,6 +91,22 @@ const COST_ROWS: CostRowSpec[] = [
     depth: 1,
     hint: 'Daily cost of every leased airframe. Owned aircraft contribute nothing here.',
     value: (s) => s.todayCostByCategory.lease,
+  },
+  // Both of these were missing from the tree — crew salaries since week
+  // six, and training since week eight — so "Fixed" was quietly reporting
+  // less than it charged. The categories must sum to todayCost, and this
+  // is the panel whose whole job is showing that they do.
+  {
+    label: 'Crew salaries',
+    depth: 1,
+    hint: 'Every head on the books, whether or not they flew. Crew away in training are already out of the pools, so they stop being paid.',
+    value: (s) => s.todayCostByCategory.crew,
+  },
+  {
+    label: 'Training lines',
+    depth: 1,
+    hint: 'Funding of every training line. Charged in full even while a line is immature or retooling — efficiency scales what you get out, never what you pay in.',
+    value: (s) => s.todayCostByCategory.training,
   },
 ];
 

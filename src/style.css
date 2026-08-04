@@ -1754,32 +1754,36 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Week eight: standing orders — a recurring recruitment commitment, one
-   row per running order with its own cancel. Same visual language as the
-   inbound aircraft list below: amber for a commitment in flight, muted
-   for one that has met its target and is sitting idle. */
-.crew-standing-row {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 3px 0;
+/* Week eight: training lines. One block per running line — what it makes,
+   how efficient it is, and its controls. Efficiency is the number the
+   player is really watching, so it gets the amber. */
+.crew-line-row {
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   font-size: 12px;
 }
 
-.crew-standing-row span:first-child {
+.crew-line-title {
   color: #cdd3e0;
-  flex: 1;
 }
 
-.crew-standing-active {
+.crew-line-status {
   color: #ffd166;
+  margin: 2px 0 4px;
 }
 
-.crew-standing-idle {
-  color: #6b7694;
+.crew-line-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
 }
 
-.crew-standing-cancel {
+.crew-line-funding {
+  width: 84px;
+}
+
+.crew-line-close {
   width: 20px;
   height: 20px;
   padding: 0;
@@ -1793,7 +1797,7 @@ body {
   cursor: pointer;
 }
 
-.crew-standing-cancel:hover {
+.crew-line-close:hover {
   color: #ff8080;
   border-color: #ff8080;
 }

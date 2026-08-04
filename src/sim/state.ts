@@ -6,7 +6,7 @@ import type { WeatherEvent } from './weather';
 import type { Loan } from './loans';
 import { FUEL_PRICE_BASELINE } from './fuel';
 import type { TargetCommitment, TargetResult } from './targets';
-import { createCrewPools, crewRequirement, type CrewPools, type PendingHire, type PendingTraining, type StandingOrder } from './crew';
+import { createCrewPools, crewRequirement, type CrewPools, type PendingHire, type PendingTraining, type TrainingLine } from './crew';
 import { createExecutiveSlots, type ExecutiveSlots } from './executives';
 import { isSlotControlled } from './airports';
 
@@ -396,10 +396,10 @@ export type SimState = {
   /** Pilots currently away upgrading a tier. Already removed from `crew`, since losing their capacity is the real cost. */
   pendingTraining: PendingTraining[];
   /**
-   * Week eight: recurring recruitment commitments — see sim/crew.ts's
-   * StandingOrder. Advanced once per day inside rollDailyCrew().
+   * Week eight: funded training pipelines — see sim/crew.ts's
+   * TrainingLine. Run once per day inside rollDailyCrew().
    */
-  standingOrders: StandingOrder[];
+  trainingLines: TrainingLine[];
   /**
    * How much crew the player chooses to carry above the bare operating
    * minimum, 1 meaning none at all. Cost is linear in this; protection
@@ -489,6 +489,8 @@ export type SimState = {
     lease: number;
     /** Daily crew salaries, everyone on the books whether or not they flew. */
     crew: number;
+    /** Daily funding of every training line, spent whether or not the line is efficient yet. */
+    training: number;
   };
 };
 
@@ -609,7 +611,7 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     executives: createExecutiveSlots(),
     crew: createCrewPools(),
     pendingHires: [],
-    standingOrders: [],
+    trainingLines: [],
     pendingTraining: [],
     reserveDepth: 1.15,
     groundedTails: [],
@@ -625,7 +627,7 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     completedMissionIds: [],
     activeTarget: null,
     lastTargetResult: null,
-    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0 },
+    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0, training: 0 },
   };
 
   // Staff this fixture to its own reserve target. Unlike a real new game
@@ -713,7 +715,7 @@ export function createNewGameState(rngSeed: number = Date.now()): SimState {
     executives: createExecutiveSlots(),
     crew: createCrewPools(),
     pendingHires: [],
-    standingOrders: [],
+    trainingLines: [],
     pendingTraining: [],
     reserveDepth: 1.15,
     groundedTails: [],
@@ -729,6 +731,6 @@ export function createNewGameState(rngSeed: number = Date.now()): SimState {
     completedMissionIds: [],
     activeTarget: null,
     lastTargetResult: null,
-    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0 },
+    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0, training: 0 },
   };
 }
