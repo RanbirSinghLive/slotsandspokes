@@ -19,7 +19,10 @@ import type { SimState } from './state';
 // worse swings it down. Picked as a round, plausible "this is a
 // respectable regional carrier" benchmark, same "not fit to any real
 // study, just a reasonable anchor" spirit as every other constant here.
-const OTP_BASELINE = 0.8;
+// Exported (week eight) so render/mapmodes.ts's on-time mapmode can colour
+// routes against the same benchmark Reputation itself scores against,
+// rather than picking its own number that could silently drift from it.
+export const OTP_BASELINE = 0.8;
 const OTP_WEIGHT = 50;
 
 // NPS is already zero-centered (a bad day is negative, a good day

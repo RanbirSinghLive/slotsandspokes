@@ -60,6 +60,20 @@
             <button type="button" data-overlay="competition">Competition</button>
           </div>
         </div>
+        <div class="view-group" data-group="mapmode">
+          <button type="button" class="view-group-trigger" aria-label="Mapmode" aria-haspopup="true" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M2 12h20" />
+              <path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20Z" />
+            </svg>
+          </button>
+          <div class="view-dropdown" id="mapmode-dropdown" hidden></div>
+        </div>
+      </div>
+      <div id="mapmode-legend" hidden>
+        <div id="mapmode-legend-title"></div>
+        <div id="mapmode-legend-scale"></div>
       </div>
       <div class="view-group" id="competition-airline-group" data-group="competition-airline" hidden>
         <button

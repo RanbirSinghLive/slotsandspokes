@@ -162,6 +162,38 @@ once the rest works.
 
 ---
 
+## Mapmodes (a second thread, not part of the pipeline idea)
+
+Prompted by a separate conversation about borrowing Paradox
+(EU4/Vic3/HoI4) map-as-primary-interface principles: recolour the
+existing route network by a per-market metric instead of drawing new
+geometry, the way those games swap between political/trade/supply
+mapmodes on one map.
+
+**Done:** `render/mapmodes.ts` — `'profitability'` (margin ÷ revenue,
+via the same `summarizeMarket()` the Commercial panel uses) and
+`'ontime'` (`state.onTimeByMarket`, coloured against
+`sim/reputation.ts`'s own `OTP_BASELINE` so the map and the Reputation
+score can't silently disagree about what "acceptable" means). A
+single-select picker in the HUD, mutually exclusive with itself and
+taking priority over the Competition overlay when active — both already
+recolour the same route lines, so only one can draw at a time. A floating
+legend explains whichever mode is on and hides for `'none'`.
+
+`summarizeMarket()` moved from `ui/commercial.ts` into
+`sim/marketSummary.ts` so the mapmode could call the identical formula
+rather than a second copy of it — pure sim logic, the move was free.
+
+**Not done, and the more valuable half of the pitch:** an alert strip
+(persistent, clickable warnings that navigate to the problem — `Fleet
+tab has scheduleProblems()` today, just buried) and click-an-airport-for-
+detail (right now a click only arms a route). Both are cheap and were
+flagged as higher leverage than mapmodes alone; mapmodes was the
+recommended starting point because it's additive and touches no sim
+logic.
+
+---
+
 ## Carried forward from week seven
 
 - **Phase D of the utilisation pivot is still outstanding**: Commercial

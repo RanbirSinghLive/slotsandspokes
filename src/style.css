@@ -287,8 +287,10 @@ body {
    hover dropdowns: a small gap and its own shadow so it reads as a
    floating card that popped up, not a menu flush against its trigger
    (which only mattered for the hover-to-open groups — see main.ts's
-   isLayersPicker). */
-[data-group='maps'] .view-dropdown {
+   isLayersPicker). Week eight's mapmode picker is the same deliberate-
+   choice shape, just single-select, so it shares the treatment. */
+[data-group='maps'] .view-dropdown,
+[data-group='mapmode'] .view-dropdown {
   top: calc(100% + 6px);
   padding: 8px;
   gap: 6px;
@@ -297,8 +299,55 @@ body {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
 }
 
-[data-group='maps'] .view-dropdown button {
+[data-group='maps'] .view-dropdown button,
+[data-group='mapmode'] .view-dropdown button {
   padding: 5px 8px;
+}
+
+/* Week eight: the mapmode legend — what the current recolouring means.
+   Floats bottom-left of the map, same "real DOM over the canvas" pattern
+   the HUD clock and speed controls already use, not drawn into the
+   canvas itself (CLAUDE.md's panel rule). Hidden whenever mapMode is
+   'none', so it only ever appears alongside something it's explaining. */
+#mapmode-legend {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  padding: 8px 12px;
+  background: rgba(10, 12, 18, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  color: #cdd3e0;
+  pointer-events: none;
+}
+
+#mapmode-legend[hidden] {
+  display: none;
+}
+
+#mapmode-legend-title {
+  color: #9aa3b8;
+  margin-bottom: 6px;
+}
+
+#mapmode-legend-scale {
+  display: flex;
+  gap: 14px;
+}
+
+#mapmode-legend-scale > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mapmode-legend-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
 }
 
 #panel {

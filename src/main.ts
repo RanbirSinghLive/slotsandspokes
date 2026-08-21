@@ -8,6 +8,7 @@ import { drawWeatherEffects } from './render/weather';
 import { drawAircraft } from './render/aircraft';
 import { drawDemandLayer } from './render/demand';
 import { drawCompetitionLayer, competitorAirlines, findCompetitionHover, drawNewCompetitorRouteFlashes } from './render/competition';
+import { drawRouteMapMode, MAP_MODES, MAP_MODE_COLORS, type MapMode } from './render/mapmodes';
 import { showCompetitionTooltip, hideCompetitionTooltip } from './ui/competitionTooltip';
 import { createNewGameState, type SimState } from './sim/state';
 import { step } from './sim/step';
@@ -92,6 +93,22 @@ const viewGroups = document.querySelectorAll<HTMLDivElement>('#hud .view-group')
 const competitionAirlineGroup = document.querySelector<HTMLDivElement>('#competition-airline-group')!;
 const competitionAirlineTrigger = document.querySelector<HTMLButtonElement>('#competition-airline-trigger')!;
 const competitionAirlineDropdown = document.querySelector<HTMLDivElement>('#competition-airline-dropdown')!;
+const mapModeDropdown = document.querySelector<HTMLDivElement>('#mapmode-dropdown')!;
+const mapModeLegend = document.querySelector<HTMLDivElement>('#mapmode-legend')!;
+const mapModeLegendTitle = document.querySelector<HTMLDivElement>('#mapmode-legend-title')!;
+const mapModeLegendScale = document.querySelector<HTMLDivElement>('#mapmode-legend-scale')!;
+
+// Built from MAP_MODES (render/mapmodes.ts) rather than hand-authored in
+// index.html, so the button list can never drift out of sync with the
+// enum main.ts is actually switching on.
+for (const { mode, label } of MAP_MODES) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.dataset.mapmode = mode;
+  button.textContent = label;
+  if (mode === 'none') button.classList.add('active');
+  mapModeDropdown.appendChild(button);
+}
 
 for (const airline of competitorAirlines(state)) {
   const button = document.createElement('button');
@@ -228,6 +245,11 @@ type SidebarTab =
 let sidebarTab: SidebarTab = 'fleet';
 let demandOverlayOn = false;
 let competitionOverlayOn = false;
+// Week eight: which mapmode is recolouring the route network (render/
+// mapmodes.ts) — mutually exclusive with itself (there's only one map
+// underneath) but layered the same way Demand/Competition are: an
+// independent thing turned on over the map, not a sidebar destination.
+let mapMode: MapMode = 'none';
 
 function render(nowMs: number = performance.now()): void {
   updateClock(state);
@@ -268,11 +290,14 @@ function render(nowMs: number = performance.now()): void {
   // on top of it, not the other way around.
   if (demandOverlayOn) drawDemandLayer(ctx, state);
 
-  // The Competition overlay *replaces* the plain route drawing rather
-  // than adding to it: drawCompetitionLayer() already draws every one of
-  // your own routes too (just recolored by whether a competitor also
-  // flies it), so drawing both would double every own-route line.
-  if (competitionOverlayOn) {
+  // Mapmode, Competition and the plain grey network are three ways to draw
+  // the same route lines, never combined — each already draws every route,
+  // just coloured differently, so drawing more than one would double every
+  // line. Mapmode wins when active: it's the more deliberate "I asked to
+  // see this" choice, same precedence Competition already had over plain.
+  if (mapMode !== 'none') {
+    drawRouteMapMode(ctx, state, mapMode);
+  } else if (competitionOverlayOn) {
     drawCompetitionLayer(ctx, selectedCompetitorAirline, state);
   } else {
     drawRoutes(ctx, state);
@@ -505,8 +530,11 @@ viewGroups.forEach((group) => {
   // so it opens and closes strictly on click, never on hover. The
   // Competition airline filter keeps the original hover-opens-on-mouse
   // behavior below, since it's a plain single-select list you're just
-  // browsing, not a set of toggles worth a deliberate open/close.
-  const isLayersPicker = group.dataset.group === 'maps';
+  // browsing, not a set of toggles worth a deliberate open/close. Week
+  // eight's mapmode picker is the same deliberate-choice shape as the
+  // layers group, just single-select instead of independent toggles, so
+  // it gets the same click-only treatment.
+  const isLayersPicker = group.dataset.group === 'maps' || group.dataset.group === 'mapmode';
 
   trigger.addEventListener('click', (event) => {
     event.stopPropagation(); // don't immediately re-close via the document listener below
@@ -563,6 +591,50 @@ overlayToggleButtons.forEach((button) => {
     }
 
     competitionAirlineGroup.hidden = !competitionOverlayOn;
+    render();
+  });
+});
+
+/**
+ * Fills the legend's title and colour key for whichever mapmode is
+ * active, and hides the whole thing for `'none'` — a legend with nothing
+ * to key would just be clutter. Text and swatch colours both come from
+ * render/mapmodes.ts's own exports (MAP_MODE_COLORS), so this can never
+ * describe a scale the map isn't actually drawing.
+ */
+function updateMapModeLegend(): void {
+  mapModeLegend.hidden = mapMode === 'none';
+  if (mapMode === 'none') return;
+
+  const swatch = (color: string, label: string) =>
+    `<div><span class="mapmode-legend-swatch" style="background:${color}"></span><span>${label}</span></div>`;
+
+  if (mapMode === 'profitability') {
+    mapModeLegendTitle.textContent = 'Profitability (margin ÷ revenue)';
+    mapModeLegendScale.innerHTML =
+      swatch(MAP_MODE_COLORS.loss, 'Losing money') +
+      swatch(MAP_MODE_COLORS.breakeven, 'Breakeven') +
+      swatch(MAP_MODE_COLORS.profit, '+20% margin or better');
+  } else {
+    mapModeLegendTitle.textContent = 'On-time performance';
+    mapModeLegendScale.innerHTML =
+      swatch(MAP_MODE_COLORS.loss, '0% on-time') +
+      swatch(MAP_MODE_COLORS.breakeven, '80% (Reputation baseline)') +
+      swatch(MAP_MODE_COLORS.profit, '100% on-time');
+  }
+}
+
+/**
+ * The mapmode picker: single-select, unlike Demand/Competition's
+ * independent toggles, since there's only one map underneath to recolour.
+ * Picking a mode deselects every other button in the same dropdown.
+ */
+mapModeDropdown.querySelectorAll<HTMLButtonElement>('button[data-mapmode]').forEach((button) => {
+  button.addEventListener('click', () => {
+    closeAllDropdowns();
+    mapMode = button.dataset.mapmode as MapMode;
+    mapModeDropdown.querySelectorAll<HTMLButtonElement>('button[data-mapmode]').forEach((b) => b.classList.toggle('active', b === button));
+    updateMapModeLegend();
     render();
   });
 });
