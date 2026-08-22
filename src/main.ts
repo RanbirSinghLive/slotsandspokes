@@ -34,6 +34,7 @@ import { setupCrewPanel, updateCrewPanel } from './ui/crew';
 import { setupAirportsPanel, updateAirportsPanel } from './ui/airports';
 import { setupInfoTooltips } from './ui/infoTooltip';
 import { updateTicker } from './ui/ticker';
+import { updateAlerts } from './ui/alerts';
 import { setupLoans, updateLoans } from './ui/loans';
 import { isInsolvent } from './sim/loans';
 import { setupGameControls, updateGameControls } from './ui/gameControls';
@@ -255,6 +256,12 @@ function render(nowMs: number = performance.now()): void {
   updateClock(state);
   updatePanel(state);
   updateTicker(state);
+  // Always-visible regardless of which tab is open — see ui/alerts.ts's
+  // own comment for why that's the point. switchToSidebarTab is a plain
+  // `function` declaration further down this file, hoisted and safely
+  // callable here the same way setupRouteBuilder()'s onRouteConfirmed
+  // callback already relies on.
+  updateAlerts(state, (tab) => switchToSidebarTab(tab as SidebarTab));
 
   // The loan pop-up and the game-over screen are global overlays, not
   // part of any one sidebar tab, so they need to keep refreshing

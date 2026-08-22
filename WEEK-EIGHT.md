@@ -184,13 +184,50 @@ legend explains whichever mode is on and hides for `'none'`.
 `sim/marketSummary.ts` so the mapmode could call the identical formula
 rather than a second copy of it — pure sim logic, the move was free.
 
-**Not done, and the more valuable half of the pitch:** an alert strip
-(persistent, clickable warnings that navigate to the problem — `Fleet
-tab has scheduleProblems()` today, just buried) and click-an-airport-for-
-detail (right now a click only arms a route). Both are cheap and were
-flagged as higher leverage than mapmodes alone; mapmodes was the
-recommended starting point because it's additive and touches no sim
-logic.
+### Done: the alert strip
+
+`ui/alerts.ts` — a strip fixed under the HUD, visible regardless of which
+sidebar tab is open, listing every current problem with a click target
+that jumps to the tab that explains it. Sources: `scheduleProblems()`
+(schedule/utilisation, → Fleet tab) and `state.groundedTails`
+(crew-caused grounding, → Crew tab, previously only a bare count on that
+one tab). Both used to be invisible unless you happened to have the right
+tab open; this is the fix. Signature-gated the same way
+`ui/panels.ts`'s `renderFleet()`/`renderRotations()` are, so the row
+buttons survive their own re-render instead of being torn out from under
+a click.
+
+Verified live: an unbased-but-scheduled aircraft produces the correct
+row, the row survives across animation frames, and clicking it switches
+from the Crew tab to the Fleet tab. The crew-grounded branch is
+code-identical in shape (same push-into-array pattern reading a state
+field `ui/crew.ts` already reads successfully elsewhere) and verified
+correct headlessly with a forced multi-tail `groundedTails`, but I
+couldn't hold it long enough to see live in the browser: it's a value
+`rollDailyCrew()` recomputes from scratch at every day rollover, and the
+dev-server tab's own "idle tabs catch up in one burst on refocus" quirk
+(noted in WEEK-SEVEN.md) meant a rollover fired — correctly clearing it,
+since the fixture's actual crew numbers were sufficient — before I could
+read the DOM. Worth knowing for next time: don't try to hold a
+derived-every-rollover field steady in a live tab; force the underlying
+cause (real crew shortfall) instead of the flag, or read it back
+immediately after injection with the sim paused from the very first
+frame.
+
+**Not done:** click-an-airport-for-detail (right now a click only arms a
+route). Flagged as the other half of the original pitch; still the next
+map-engagement move after this.
+
+### Noted, not built: basemap render caching
+
+`render/basemap.ts` re-walks the full TopoJSON land geometry and calls
+`path.fill()`/`path.stroke()` on every single frame, even though the
+shape only changes on pan/zoom. Caching it to an offscreen canvas
+(re-rendered only when `projection` changes, blitted with `drawImage()`
+otherwise) would turn a 60×/second geometry walk into a single blit, and
+is what makes any further basemap richness (ocean tint, a graticule,
+country borders instead of just coastline) cost nothing per frame once
+built. Worth doing before adding any of those, not after.
 
 ---
 

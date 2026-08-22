@@ -350,6 +350,62 @@ body {
   border-radius: 2px;
 }
 
+/* Week eight: the alert strip — real problems (scheduleProblems(), crew
+   grounding) that used to only be visible inside whichever sidebar tab
+   happened to be open. Always on screen, unlike everything else here
+   that's conditional on a toggle or a mode, because a problem you didn't
+   go looking for is the whole reason this exists. Positioned below #hud
+   rather than beside it — a fixed offset, same approach every other
+   floating element here already takes (main.ts measures nothing at
+   runtime to place these), generous enough to clear the HUD's own height
+   even when it's wrapped onto two lines on a narrow window. */
+#alert-strip {
+  position: fixed;
+  top: 68px;
+  left: 12px;
+  max-width: 320px;
+  padding: 6px;
+  background: rgba(10, 12, 18, 0.85);
+  border: 1px solid rgba(255, 128, 128, 0.35);
+  border-radius: 6px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+}
+
+#alert-strip[hidden] {
+  display: none;
+}
+
+/* A real <button> per row, not a styled <div> — CLAUDE.md's panel rule
+   means clickable things are real interactive elements, same as every
+   other button in the sidebar, just made to look like a plain text row
+   here. */
+.alert-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #ff8080;
+  font: inherit;
+  cursor: pointer;
+}
+
+.alert-row:hover {
+  background: rgba(255, 128, 128, 0.12);
+}
+
+.alert-row--more {
+  color: #9aa3b8;
+  cursor: default;
+}
+
+.alert-row--more:hover {
+  background: transparent;
+}
+
 #panel {
   position: fixed;
   top: 0;
