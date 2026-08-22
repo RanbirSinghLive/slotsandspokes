@@ -21,6 +21,7 @@ import {
   drawRoutePreview,
   hideRouteHoverTooltip,
 } from './ui/routeBuilder';
+import { handleAirportDetailMouseDown, handleAirportDetailKeyDown, hideAirportDetail } from './ui/airportDetail';
 import { setupCommercialPanel, updateCommercialPanel } from './ui/commercial';
 import { setupFleetMarket } from './ui/fleetMarket';
 import { setupOnTimePanel, updateOnTimePanel } from './ui/onTime';
@@ -660,12 +661,28 @@ let dragStartY = 0;
 let translateAtDragStart: [number, number] = [0, 0];
 
 canvas.addEventListener('mousedown', (event) => {
+  // Any stale airport-detail popover (ui/airportDetail.ts) gets cleared
+  // before deciding what this click actually does — otherwise arming a
+  // route, or just starting a pan, would leave the previous click's
+  // popover visibly hanging around underneath it. Unconditional and
+  // first, so every path below starts from the same clean state.
+  hideAirportDetail();
+
   // M10's route-creation gesture (ui/routeBuilder.ts) gets first refusal
   // on any click on the map. Only once it says "not mine" does an
   // ordinary click-and-drag start panning, exactly as before. The map is
   // always live now (week six), so there's no "different panel" case to
   // exempt this from anymore — every click on the canvas reaches here.
   if (handleRouteBuilderMouseDown(event, state)) {
+    render();
+    return;
+  }
+
+  // Week eight: second refusal — a click the route builder didn't want
+  // (no plane selected) might still be "show me this airport" rather
+  // than the start of a pan. See ui/airportDetail.ts's own comment for
+  // why a selected tail always means the route builder owns the click.
+  if (handleAirportDetailMouseDown(event, state)) {
     render();
     return;
   }
@@ -724,6 +741,7 @@ window.addEventListener('mouseup', () => {
 });
 
 window.addEventListener('keydown', handleRouteBuilderKeyDown);
+window.addEventListener('keydown', handleAirportDetailKeyDown);
 
 // --- Zoom (scroll wheel) ---
 //

@@ -637,6 +637,56 @@ body {
    No dimmed backdrop the way the loan modals get — this doesn't block
    anything else, it's a contextual popover on the map itself, not an
    interruption. */
+/* Week eight: click an airport with no plane selected, get the airport —
+   see ui/airportDetail.ts. Same info-window styling as #new-route-popover
+   below (dark card, amber-tinted border, positioned near the click), but
+   its own ID rather than sharing one: the two pop up under different
+   conditions (a plane selected vs. not) and are never open at once, so
+   there's nothing to gain from merging them, and every future edit to
+   one would otherwise risk silently touching the other. Blue-tinted
+   border instead of amber — informational, not a decision being built. */
+#airport-detail-popover {
+  position: fixed;
+  z-index: 25;
+  max-width: 280px;
+  padding: 10px;
+  background: #0e1016;
+  border: 1px solid rgba(74, 144, 217, 0.35);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 13px;
+  color: #cdd3e0;
+}
+
+#airport-detail-popover[hidden] {
+  display: none;
+}
+
+#airport-detail-title {
+  font-size: 14px;
+  color: #fff;
+  margin: 0 0 8px;
+}
+
+#airport-detail-presence,
+#airport-detail-based,
+#airport-detail-markets {
+  margin-bottom: 6px;
+  color: #9aa3b8;
+}
+
+#airport-detail-markets {
+  margin-bottom: 0;
+}
+
+/* Same red as everything else "over" (the slot ring on the map, the
+   crew-short pool rows) — a slot-controlled field flying more than it
+   holds is the same class of problem those already flag. */
+#airport-detail-presence.airport-detail-over {
+  color: #ff8080;
+}
+
 #new-route-popover {
   position: fixed;
   z-index: 25;

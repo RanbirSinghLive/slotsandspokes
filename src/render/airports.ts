@@ -105,6 +105,35 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState): vo
   }
 }
 
+// How close a click/hover needs to land to an airport's projected point
+// to count as hitting it — shared by every consumer that needs to hit-test
+// a screen point against the airport list (the route builder's arm/aim
+// gesture, week eight's click-for-detail), so the two can never disagree
+// about how forgiving the target is.
+const HIT_RADIUS_PX = 14;
+
+/**
+ * Which airport (if any) is under a screen point, within HIT_RADIUS_PX.
+ * Originally lived in ui/routeBuilder.ts as a private helper; moved here
+ * (week eight) once a second consumer needed the identical hit-test —
+ * this is where "given a point, which airport" actually belongs, not in
+ * the module that happens to have used it first.
+ */
+export function findNearestAirport(screenX: number, screenY: number): Airport | null {
+  let nearest: Airport | null = null;
+  let nearestDistPx = HIT_RADIUS_PX;
+  for (const airport of airports) {
+    const point = projection([airport.lon, airport.lat]);
+    if (!point) continue;
+    const distPx = Math.hypot(point[0] - screenX, point[1] - screenY);
+    if (distPx < nearestDistPx) {
+      nearestDistPx = distPx;
+      nearest = airport;
+    }
+  }
+  return nearest;
+}
+
 /** Re-exported for the hover tooltip, which wants the same numbers the dots encode. */
 export function airportPresence(state: SimState, iata: string) {
   const departures = dailyDeparturesAt(state, iata);

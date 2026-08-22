@@ -214,9 +214,34 @@ cause (real crew shortfall) instead of the flag, or read it back
 immediately after injection with the sim paused from the very first
 frame.
 
-**Not done:** click-an-airport-for-detail (right now a click only arms a
-route). Flagged as the other half of the original pitch; still the next
-map-engagement move after this.
+### Done: click an airport, get the airport
+
+`ui/airportDetail.ts` — clicking an airport with no plane selected now
+opens a real-DOM popover: level and departures/day, slot info when
+controlled (red once departures exceed what's owned), based aircraft
+plus that base's utilisation and spare, and every market touching the
+field with frequency. Read-only on purpose — slot purchase and base
+assignment already live in the Airports and Fleet tabs, and duplicating
+those controls here would mean two places that can buy a slot. Clicking
+elsewhere or Escape closes it; clicking with a tail selected still arms a
+route exactly as before, since a selected tail always means the route
+builder owns the click (`getSelectedTail()` is the whole priority rule).
+
+`findNearestAirport()` moved out of `ui/routeBuilder.ts` (where it was a
+private helper) into `render/airports.ts`, since a second consumer needed
+the identical hit-test and "given a screen point, which airport" belongs
+to the module that owns the airport list, not the module that happened
+to use it first.
+
+Verified live against a seeded fixture with known ground truth: YHZ
+(based aircraft, 4 legs) showed the exact right departure count, the
+exact right based tail with its real utilisation %, and the exact right
+market list with frequencies; YYZ (slot-controlled, at capacity but not
+over) showed `slots 1/12` with the over-styling correctly *not* firing at
+exactly-at-capacity. Also checked: dismiss-on-click-elsewhere,
+dismiss-on-Escape, and — the one that had to not regress — a tail
+selected still arms a route on the same click, popover never appears
+while arming.
 
 ### Noted, not built: basemap render caching
 

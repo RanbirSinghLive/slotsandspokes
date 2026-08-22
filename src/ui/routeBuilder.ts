@@ -2,7 +2,7 @@ import { geoCircle, geoPath } from 'd3-geo';
 import type { LineString } from 'geojson';
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { projection } from '../render/projection';
-import { airports, type Airport } from '../render/airports';
+import { findNearestAirport, type Airport } from '../render/airports';
 import { greatCircleDistanceNm } from '../sim/geo';
 import { actualDailyDemand, currentPotentialDemand } from '../sim/marketDemand';
 import { suppressedMarketReason } from '../sim/demand';
@@ -31,7 +31,6 @@ import { getSelectedTail } from './fleetSelection';
 import { hideCompetitionTooltip } from './competitionTooltip';
 import type { SimState } from '../sim/state';
 
-const HIT_RADIUS_PX = 14;
 const RING_RADIUS = 8;
 const PREVIEW_STROKE = '#ffd166';
 const CHAIN_STROKE = '#ffd166';
@@ -184,21 +183,6 @@ let candidate: Airport | null = null;
 /** Where the next leg of the chain departs from — the last airport agreed so far. */
 function chainOrigin(chain: Airport[]): Airport {
   return chain[chain.length - 1];
-}
-
-function findNearestAirport(screenX: number, screenY: number): Airport | null {
-  let nearest: Airport | null = null;
-  let nearestDistPx = HIT_RADIUS_PX;
-  for (const airport of airports) {
-    const point = projection([airport.lon, airport.lat]);
-    if (!point) continue;
-    const distPx = Math.hypot(point[0] - screenX, point[1] - screenY);
-    if (distPx < nearestDistPx) {
-      nearestDistPx = distPx;
-      nearest = airport;
-    }
-  }
-  return nearest;
 }
 
 /**
