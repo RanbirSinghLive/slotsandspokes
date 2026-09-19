@@ -680,7 +680,7 @@ body {
   margin-bottom: 0;
 }
 
-/* Same red as everything else "over" (the slot ring on the map, the
+/* Same red as everything else "over" (the capacity ring on the map, the
    crew-short pool rows) — a slot-controlled field flying more than it
    holds is the same class of problem those already flag. */
 #airport-detail-presence.airport-detail-over {

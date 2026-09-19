@@ -31,11 +31,15 @@ function money(amount: number): string {
 
 /**
  * Presence itself moved to the map in week six's phase one — the dots
- * are sized by departures, carry a halo at Base/Hub level and a slot ring
- * where the field is controlled, and hovering one gives level,
- * connectivity and slot holdings (render/airports.ts,
- * ui/competitionTooltip.ts). A table of IATA codes describing *places*
- * was the least spatial way to show spatial data.
+ * are sized by departures and carry a halo at Base/Hub level. Week
+ * eight's deep dive added a capacity ring at every base (how full its
+ * pooled aircraft-day budget is) in place of the ring that used to mark
+ * slot-controlled fields there; slot holdings themselves are still real
+ * (they still gate route-building and still show in the airport-detail
+ * popover — render/airports.ts, ui/airportDetail.ts), they just lost
+ * their own always-on map ring once utilisation needed that visual slot
+ * more. A table of IATA codes describing *places* was the least spatial
+ * way to show spatial data to begin with.
  *
  * What's left here is a one-line summary, so the tab still answers "where
  * am I strongest" without making you scan the map for it.

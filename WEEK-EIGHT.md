@@ -254,6 +254,45 @@ is what makes any further basemap richness (ocean tint, a graticule,
 country borders instead of just coastline) cost nothing per frame once
 built. Worth doing before adding any of those, not after.
 
+### Done: the capacity ring (replaces the slot ring)
+
+A deep dive into "is utilisation actually legible on a map" found it had
+**zero presence on the canvas** — the whole point of the week-seven pivot
+lived only in a Fleet-tab bar, a route-builder popover, and a table. None
+of that is the map. `render/airports.ts` now draws a partial-arc ring
+around every *based* airport: it sweeps from empty to a closed circle as
+a base's pooled utilisation goes 0% → 100%, colouring green-to-amber over
+that same range, then turns solid red and thickens the instant share
+passes 100% — the exact threshold `sim/utilisation.ts`'s
+`utilisationProblems()` already uses to raise an alert-strip warning, so
+the ring and the alert can never disagree about what "broken" means.
+
+This **replaces** the old slot ring rather than sitting beside it — a
+deliberate call, not a compromise: slots were reclassified as supporting
+infrastructure, not core loop, in the same audit that sharpened the core
+loop down to build → watch it run → diagnose why. The slot mechanic
+itself is untouched (still gates route-building, still shown precisely in
+`ui/airportDetail.ts`'s popover — verified live, `slots 1/12` still reads
+correctly on click); it only lost its own always-on map glyph once
+utilisation needed that visual slot more.
+
+Verified live against a fixture with a genuinely overloaded base (123%,
+built by duplicating a rotation's legs): the ring rendered solid red and
+visibly thicker at that airport in a real screenshot, matching the
+alert-strip warning and the Fleet-tab figure exactly. Two lower-risk
+things — the exact green-to-amber hue at partial shares, and the ring's
+absence at non-base airports — were reasoned through and match the code,
+but weren't independently pixel-verified; a repeat of the pixel-sampling
+approach used for mapmodes hit stale-coordinate issues this time and
+wasn't worth re-fighting for a purely cosmetic gradient.
+
+Deliberately not built alongside this: a rotation-arc recolour by its own
+day-share, and a dedicated Utilisation mapmode. Both answer a real but
+more granular question ("which specific rotation is the heavy one") that
+only matters *after* this ring says a base is tight — building either now
+would be exactly the unforced complexity the same audit just cut two
+tabs for.
+
 ---
 
 ## Carried forward from week seven

@@ -1,6 +1,7 @@
 import airportsData from '../../data/airports.json';
 import { projection } from './projection';
 import { dailyDeparturesAt, airportLevel, isSlotControlled, slotsOwned, slotsTotal } from '../sim/airports';
+import { utilisationByBase, type BaseUtilisation } from '../sim/utilisation';
 import type { SimState } from '../sim/state';
 
 export type Airport = {
@@ -42,13 +43,39 @@ const LABEL_FONT = '12px system-ui, sans-serif';
 const MAX_PRESENCE_RADIUS_BONUS = 3.5;
 const PRESENCE_RADIUS_SCALE = 1.3;
 
-// Slot-controlled fields get an outer ring: amber while you hold slots to
-// spare, red the moment departures exceed them. Grey when you hold none,
-// which is the state a new game starts in and reads as "you'd have to buy
-// in here."
-const SLOT_RING_FREE = '#ffd166';
-const SLOT_RING_OVER = '#ff8080';
-const SLOT_RING_NONE = '#5b6480';
+// The capacity ring (replaces the old slot ring, week eight deep-dive):
+// utilisation was the whole point of the week-seven pivot but had zero
+// presence on the map itself — a base's spare capacity only ever showed
+// up as a bar in the Fleet tab or text in the route-builder popover, both
+// of which need a click to reach. This puts the same number on the one
+// spot on the map where the decision it drives ("does this base need
+// another aircraft") actually lives: the base itself.
+//
+// Same three-colour language as render/mapmodes.ts's route recolouring
+// (small local copy, not a shared import — ten lines isn't worth a new
+// module, and this module already keeps its own local copies of similarly
+// small things). Deliberately re-derived from real thresholds rather than
+// invented aesthetics: the arc sweeps from empty to a full circle exactly
+// as share goes 0% to 100%, colouring green-to-amber over that same
+// range, so "the ring closed" and "the base is full" are the same moment.
+// Only past that — share > 1 — does it turn solid red, because that is
+// the exact threshold sim/utilisation.ts's utilisationProblems() already
+// uses to raise a real alert-strip warning. The ring and the alert can
+// never disagree about what "broken" means, because they read the same
+// number against the same threshold.
+const CAPACITY_RING_GREEN: [number, number, number] = [127, 216, 143];
+const CAPACITY_RING_AMBER: [number, number, number] = [255, 209, 102];
+const CAPACITY_RING_RED = '#ff8080';
+const CAPACITY_RING_OVER_LINE_WIDTH = 2.5;
+const CAPACITY_RING_LINE_WIDTH = 1.5;
+
+function lerpCapacityColor(t: number): string {
+  const clamped = Math.min(Math.max(t, 0), 1);
+  const r = Math.round(CAPACITY_RING_GREEN[0] + (CAPACITY_RING_AMBER[0] - CAPACITY_RING_GREEN[0]) * clamped);
+  const g = Math.round(CAPACITY_RING_GREEN[1] + (CAPACITY_RING_AMBER[1] - CAPACITY_RING_GREEN[1]) * clamped);
+  const b = Math.round(CAPACITY_RING_GREEN[2] + (CAPACITY_RING_AMBER[2] - CAPACITY_RING_GREEN[2]) * clamped);
+  return `rgb(${r}, ${g}, ${b})`;
+}
 
 function presenceRadius(departures: number): number {
   if (departures === 0) return MARKER_RADIUS;
@@ -57,8 +84,8 @@ function presenceRadius(departures: number): number {
 
 /**
  * Draw a dot plus IATA code for every airport, sized and coloured by how
- * much of an airline you are there, with a slot ring at the two fields
- * that are slot-controlled.
+ * much of an airline you are there, with a capacity ring at every base
+ * showing how full its pooled aircraft-day budget is.
  *
  * Overlapping labels still aren't solved (WEEK-ONE.md says so
  * explicitly) — this draws every label at a fixed offset and lets them
@@ -67,6 +94,14 @@ function presenceRadius(departures: number): number {
 export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState): void {
   ctx.font = LABEL_FONT;
   ctx.textBaseline = 'middle';
+
+  // Computed once for the whole map rather than per airport — it's a
+  // single pass over the fleet either way, so there's no reason to repeat
+  // it 19 times. Keyed by IATA; the unbased pool comes back keyed under
+  // '' (sim/utilisation.ts's own convention), which no real airport code
+  // can ever collide with, so it's naturally excluded from every lookup
+  // below without needing a separate check.
+  const baseUtilisationByIata = new Map<string, BaseUtilisation>(utilisationByBase(state).map((b) => [b.base, b]));
 
   for (const airport of airports) {
     const point = projection([airport.lon, airport.lat]);
@@ -86,12 +121,23 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState): vo
       ctx.fill();
     }
 
-    if (isSlotControlled(airport.iata)) {
-      const owned = slotsOwned(state, airport.iata);
+    // Only airports with at least one based aircraft get a ring — nothing
+    // to show, and nothing to warn about, anywhere else. The arc sweeps
+    // clockwise from 12 o'clock in step with `share`: empty at 0%, a
+    // closed circle at exactly 100%. Past that, the ring can't sweep any
+    // further (a circle has no "past full"), so the *colour* takes over
+    // instead — solid red the instant share exceeds 1, the same threshold
+    // that raises a real alert-strip warning, so the two can never
+    // disagree about what "broken" means.
+    const baseUtilisation = baseUtilisationByIata.get(airport.iata);
+    if (baseUtilisation) {
+      const ringRadius = radius + 2.5;
+      const swept = Math.min(baseUtilisation.share, 1);
+      const over = baseUtilisation.share >= 1;
       ctx.beginPath();
-      ctx.arc(x, y, radius + 2.5, 0, 2 * Math.PI);
-      ctx.strokeStyle = departures > owned ? SLOT_RING_OVER : owned > 0 ? SLOT_RING_FREE : SLOT_RING_NONE;
-      ctx.lineWidth = 1.5;
+      ctx.arc(x, y, ringRadius, -Math.PI / 2, -Math.PI / 2 + swept * 2 * Math.PI);
+      ctx.strokeStyle = over ? CAPACITY_RING_RED : lerpCapacityColor(swept);
+      ctx.lineWidth = over ? CAPACITY_RING_OVER_LINE_WIDTH : CAPACITY_RING_LINE_WIDTH;
       ctx.stroke();
     }
 
