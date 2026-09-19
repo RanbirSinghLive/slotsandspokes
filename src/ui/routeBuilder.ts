@@ -27,7 +27,7 @@ import {
 import { minuteOfDayToTimeString, renderScheduleWarnings, scheduleProblems } from './panels';
 import { addCommercialRow } from './commercial';
 import { policyFare } from '../sim/pricing';
-import { getSelectedTail } from './fleetSelection';
+import { getSelectedTail, setSelectedTail } from './fleetSelection';
 import { hideCompetitionTooltip } from './competitionTooltip';
 import type { SimState } from '../sim/state';
 
@@ -246,6 +246,26 @@ function cancelIfTailChanged(): void {
   if (builderState.mode !== 'idle' && builderState.tail !== getSelectedTail()) {
     reset();
   }
+}
+
+/**
+ * Arm the route builder directly, skipping the "select a tail in the Fleet
+ * panel, then click its airport" two-step — used by the map's radial
+ * action menu (ui/airportDetail.ts) so picking "Add Route" there and a
+ * plane from its follow-up list lands in exactly the same `armed` state a
+ * Fleet-panel-first click would have reached. Selects the tail too
+ * (fleetSelection.ts), so cancelIfTailChanged() and the hover tooltip —
+ * both of which compare against getSelectedTail() — see the same plane
+ * every other arm path would, and the Fleet panel's row highlight follows
+ * along. Deliberately reuses `armed` rather than a new mode: everything
+ * downstream (preview, "add stop", capacity/range validation on confirm)
+ * already lives in that state machine, so this is a new door into it, not
+ * a second copy of it.
+ */
+export function armRouteBuilderAt(airport: Airport, tail: string): void {
+  setSelectedTail(tail);
+  builderState = { mode: 'armed', chain: [airport], tail };
+  setArmedCursor(true);
 }
 
 /**
