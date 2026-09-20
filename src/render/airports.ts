@@ -1,7 +1,7 @@
 import airportsData from '../../data/airports.json';
 import { projection } from './projection';
 import { dailyDeparturesAt, airportLevel, isSlotControlled, slotsOwned, slotsTotal } from '../sim/airports';
-import { utilisationByBase, type BaseUtilisation } from '../sim/utilisation';
+import { worstPoolShareByBase } from '../sim/utilisation';
 import type { SimState } from '../sim/state';
 
 export type Airport = {
@@ -77,6 +77,11 @@ function lerpCapacityColor(t: number): string {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
+/** Green to amber as a pool fills, solid red once it is over-booked. Shared with the pool bars. */
+export function capacityColor(share: number): string {
+  return share >= 1 ? CAPACITY_RING_RED : lerpCapacityColor(share);
+}
+
 function presenceRadius(departures: number): number {
   if (departures === 0) return MARKER_RADIUS;
   return MARKER_RADIUS + Math.min(MAX_PRESENCE_RADIUS_BONUS, Math.log2(1 + departures) * PRESENCE_RADIUS_SCALE);
@@ -101,7 +106,7 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState): vo
   // '' (sim/utilisation.ts's own convention), which no real airport code
   // can ever collide with, so it's naturally excluded from every lookup
   // below without needing a separate check.
-  const baseUtilisationByIata = new Map<string, BaseUtilisation>(utilisationByBase(state).map((b) => [b.base, b]));
+  const worstShareByIata = worstPoolShareByBase(state);
 
   for (const airport of airports) {
     const point = projection([airport.lon, airport.lat]);
@@ -129,11 +134,11 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState): vo
     // instead — solid red the instant share exceeds 1, the same threshold
     // that raises a real alert-strip warning, so the two can never
     // disagree about what "broken" means.
-    const baseUtilisation = baseUtilisationByIata.get(airport.iata);
-    if (baseUtilisation) {
+    const worstShare = worstShareByIata.get(airport.iata);
+    if (worstShare !== undefined) {
       const ringRadius = radius + 2.5;
-      const swept = Math.min(baseUtilisation.share, 1);
-      const over = baseUtilisation.share >= 1;
+      const swept = Math.min(worstShare, 1);
+      const over = worstShare >= 1;
       ctx.beginPath();
       ctx.arc(x, y, ringRadius, -Math.PI / 2, -Math.PI / 2 + swept * 2 * Math.PI);
       ctx.strokeStyle = over ? CAPACITY_RING_RED : lerpCapacityColor(swept);

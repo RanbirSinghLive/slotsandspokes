@@ -77,6 +77,13 @@ export function summariseMarket(state: SimState, a: string, b: string): MarketSu
   return { rotations, roundTrips, byClass };
 }
 
+/** The airport the planes flying this route are based at, or null when nothing flies it. */
+export function routeBase(state: SimState, a: string, b: string): string | null {
+  const { rotations, roundTrips } = summariseMarket(state, a, b);
+  const model = roundTrips.length > 0 ? latest(roundTrips) : rotations[0];
+  return model ? model.airports[0] : null;
+}
+
 /** Demand and seats for one flight on this market, the same numbers the draw-a-route tooltip shows. */
 export function marketReadout(state: SimState, a: string, b: string) {
   const legs = state.schedule.filter((leg) => marketKey(leg.origin, leg.dest) === marketKey(a, b));

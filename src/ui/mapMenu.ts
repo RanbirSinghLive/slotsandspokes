@@ -1,7 +1,8 @@
 import { findNearestAirport, airportPresence, type Airport } from '../render/airports';
 import { findNearestOwnRoute } from '../render/routes';
 import { projection } from '../render/projection';
-import { utilisationByBase } from '../sim/utilisation';
+import { utilisationPools } from '../sim/utilisation';
+import { buildPoolRows } from './poolBars';
 import type { SimState } from '../sim/state';
 import { getSelectedTail } from './fleetSelection';
 import { armRouteBuilderAt, candidateTailsAt } from './routeBuilder';
@@ -35,6 +36,7 @@ const titleEl = document.querySelector<HTMLElement>('#airport-detail-title')!;
 const presenceEl = document.querySelector<HTMLElement>('#airport-detail-presence')!;
 const basedEl = document.querySelector<HTMLElement>('#airport-detail-based')!;
 const marketsEl = document.querySelector<HTMLElement>('#airport-detail-markets')!;
+const poolsEl = document.querySelector<HTMLElement>('#airport-detail-pools')!;
 const hintEl = document.querySelector<HTMLElement>('#airport-detail-hint')!;
 
 const ICON = {
@@ -96,6 +98,13 @@ function positionCard(): void {
 
 // --- Airports -----------------------------------------------------------
 
+/** The class pools for the planes based at `base`, as bars; `emptyText` when there are none. */
+function fillPools(base: string | null, state: SimState, emptyText: string): void {
+  const pools = base ? utilisationPools(state, base).filter((pool) => pool.planes > 0) : [];
+  basedEl.textContent = pools.length === 0 ? emptyText : `Planes based at ${base}:`;
+  poolsEl.replaceChildren(...buildPoolRows(pools));
+}
+
 function fillAirportCard(airport: Airport, state: SimState): void {
   titleEl.textContent = `${airport.iata} — ${airport.name}`;
 
@@ -103,14 +112,7 @@ function fillAirportCard(airport: Airport, state: SimState): void {
   presenceEl.textContent = `${presence.level} · ${presence.departures} departure${presence.departures === 1 ? '' : 's'}/day`;
   presenceEl.classList.remove('airport-detail-over');
 
-  const basedTails = state.aircraft.filter((a) => a.baseAirport === airport.iata);
-  if (basedTails.length === 0) {
-    basedEl.textContent = 'No aircraft based here.';
-  } else {
-    const base = utilisationByBase(state).find((b) => b.base === airport.iata);
-    const utilisationText = base ? ` — ${Math.round(base.share * 100)}% utilised, ${base.spareAircraft.toFixed(2)} spare` : '';
-    basedEl.textContent = `Based: ${basedTails.map((a) => `${a.tail} (${a.typeCode})`).join(', ')}${utilisationText}`;
-  }
+  fillPools(airport.iata, state, 'No aircraft based here.');
 
   // Every market this airport touches, either direction, with how many
   // legs serve it.
@@ -190,9 +192,11 @@ function fillRouteCard(a: string, b: string, state: SimState): void {
   presenceEl.classList.remove('airport-detail-over');
 
   const short = readout.demandNow > readout.seatsPerFlight;
-  basedEl.textContent = `Per flight: ${readout.demandNow} passengers wanted${readout.demandPotential > readout.demandNow ? ` (${readout.demandPotential} potential)` : ''}, ${readout.seatsPerFlight} seats`;
   presenceEl.classList.toggle('airport-detail-over', short);
-  marketsEl.textContent = short ? 'Demand exceeds seats: add a flight or upgauge.' : '';
+  marketsEl.textContent =
+    `Per flight: ${readout.demandNow} passengers wanted${readout.demandPotential > readout.demandNow ? ` (${readout.demandPotential} potential)` : ''}, ${readout.seatsPerFlight} seats.` +
+    (short ? ' Demand exceeds seats: add a flight or upgauge.' : '');
+  fillPools(ops.routeBase(state, a, b), state, '');
 }
 
 function routeActions(a: string, b: string, state: SimState): RadialAction[] {

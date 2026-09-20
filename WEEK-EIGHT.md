@@ -450,6 +450,29 @@ the network.
   next step), a way to buy instead of lease.
 
 
+### Done: utilisation as class pools
+
+Utilisation is now read per aircraft class, since that is the level a
+player decides at ("do I need another Regional here"). `utilisationPools()`
+in `sim/utilisation.ts` returns the four pools (planes, minutes used,
+share), for the whole fleet or for one base.
+
+- **Map overlay** (`ui/poolBars.ts`, bottom-right of the map): one bar per
+  class that has planes, in the capacity ring's colours. Updates only when
+  a visible number changes.
+- **Airport and route cards** show the same bars for the planes based at
+  that airport. The old "Based: C-FSTA (PROP)..." tail list is gone from
+  the cards.
+- **The ring on each base** now shows the *fullest* class pool there
+  (`worstPoolShareByBase()`), not the average of all planes, so an idle
+  widebody can no longer hide a full propeller pool. Red still means a pool
+  at or over 100%, the same threshold as the alert strip.
+- `capacityColor()` in `render/airports.ts` is the one colour scale for the
+  ring and the bars.
+- The sidebar's per-base bar in the Fleet tab is unchanged (pooled across
+  classes) and is now the odd one out.
+
+
 ---
 
 ## Conventions worth knowing

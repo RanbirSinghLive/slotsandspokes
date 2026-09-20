@@ -36,6 +36,7 @@ import { setupAirportsPanel, updateAirportsPanel } from './ui/airports';
 import { setupInfoTooltips } from './ui/infoTooltip';
 import { updateTicker } from './ui/ticker';
 import { updateAlerts } from './ui/alerts';
+import { updatePoolBars } from './ui/poolBars';
 import { setupLoans, updateLoans } from './ui/loans';
 import { isInsolvent } from './sim/loans';
 import { setupGameControls, updateGameControls } from './ui/gameControls';
@@ -263,6 +264,7 @@ function render(nowMs: number = performance.now()): void {
   updateClock(state);
   updatePanel(state);
   updateTicker(state);
+  updatePoolBars(state);
   // Always-visible regardless of which tab is open — see ui/alerts.ts's
   // own comment for why that's the point. switchToSidebarTab is a plain
   // `function` declaration further down this file, hoisted and safely

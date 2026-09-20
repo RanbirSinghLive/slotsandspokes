@@ -1,5 +1,6 @@
 import { MIN_TURN_MINUTES, type ScheduleLeg } from './schedule';
 import type { SimState } from './state';
+import { AIRCRAFT_CLASSES } from './aircraftClasses';
 
 /**
  * Week six's pivot away from timeline scheduling: an aircraft's day is a
@@ -129,6 +130,63 @@ export function utilisationByBase(state: SimState): BaseUtilisation[] {
       };
     })
     .sort((a, b) => b.usedMinutes - a.usedMinutes);
+}
+
+/**
+ * One of the four aircraft-class pools: every plane of a class, optionally
+ * only those based at one airport. This is the level a player decides at
+ * ("do I need another Regional here"), since a rotation can only be flown
+ * by a plane of some class based at its base.
+ */
+export type ClassPool = {
+  code: string;
+  name: string;
+  planes: number;
+  capacityMinutes: number;
+  usedMinutes: number;
+  /** Used over capacity, 0 when there are no planes. Above 1 means over-booked. */
+  share: number;
+};
+
+export function utilisationPools(state: SimState, base?: string): ClassPool[] {
+  return AIRCRAFT_CLASSES.map((cls) => {
+    const planes = state.aircraft.filter((a) => a.typeCode === cls.code && (base === undefined || a.baseAirport === base));
+    const usedMinutes = planes.reduce((total, a) => total + aircraftUtilisation(state, a.tail).minutes, 0);
+    const capacityMinutes = planes.length * USABLE_DAY_MINUTES;
+    return {
+      code: cls.code,
+      name: cls.name,
+      planes: planes.length,
+      capacityMinutes,
+      usedMinutes,
+      share: capacityMinutes > 0 ? usedMinutes / capacityMinutes : 0,
+    };
+  });
+}
+
+/**
+ * The fullest class pool at each base, keyed by airport. What the ring on
+ * the map shows: one number that says "something here is running out",
+ * with the per-class detail one click away in the airport card. Planes
+ * with no base are left out, since they cannot fly a rotation yet.
+ */
+export function worstPoolShareByBase(state: SimState): Map<string, number> {
+  const pools = new Map<string, { used: number; capacity: number }>();
+  for (const aircraft of state.aircraft) {
+    if (!aircraft.baseAirport) continue;
+    const key = `${aircraft.baseAirport}|${aircraft.typeCode}`;
+    const pool = pools.get(key) ?? { used: 0, capacity: 0 };
+    pool.used += aircraftUtilisation(state, aircraft.tail).minutes;
+    pool.capacity += USABLE_DAY_MINUTES;
+    pools.set(key, pool);
+  }
+
+  const worst = new Map<string, number>();
+  for (const [key, pool] of pools) {
+    const base = key.split('|')[0];
+    worst.set(base, Math.max(worst.get(base) ?? 0, pool.used / pool.capacity));
+  }
+  return worst;
 }
 
 /**
