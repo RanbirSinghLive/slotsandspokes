@@ -1,6 +1,6 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { loadSchedule, marketKey, recommendedFare, type ScheduleLeg } from './schedule';
-import type { PendingDelivery } from './fleetMarket';
+import { leaseAircraft, leaseRateFor } from './leasing';
 import { loadCompetitorRoutes, type CompetitorOffering } from './competitors';
 import type { WeatherEvent } from './weather';
 import type { Loan } from './loans';
@@ -29,21 +29,13 @@ export type Aircraft = {
    */
   groundSinceMinute: number;
   /**
-   * Week three's Fleet Market: whether this airframe was bought outright
-   * or leased. Acquisition-only for this pass — no sell-back or early
-   * lease-end — so this never changes after ui/fleetMarket.ts creates the
-   * record.
-   */
-  ownership: 'owned' | 'leased';
-  /**
-   * 0 for an owned aircraft. For a leased one, the flat daily cost
-   * (`FleetListing.leasePricePerDay` at the moment it was leased) charged
-   * every day at rollover (see step.ts), the same "flat recurring cost"
-   * shape `RouteSettings.marketingSpend` already has.
+   * The flat daily lease on this aircraft (its class's rate from
+   * sim/leasing.ts at the moment it was leased), charged every day at
+   * rollover (see step.ts). Every aircraft is leased; there is no owning.
    */
   leaseCostPerDay: number;
   /**
-   * Zero for anything bought in the Fleet Market (ui/fleetMarket.ts)
+   * Zero for anything leased (sim/leasing.ts)
    * and never updated after — a deliberate simplification, not an
    * oversight: an aircraft doesn't get older as sim days pass, it's just
    * "however old it was when it joined the fleet," for now. Feeds one of
@@ -148,12 +140,6 @@ export type SimState = {
    * reuses the same entry rather than creating a second one.
    */
   routeSettings: Record<string, RouteSettings>;
-  /**
-   * Week eight: airframes paid for and on their way, but not yet
-   * operational — see sim/fleetMarket.ts's PendingDelivery. Resolved once
-   * per day in step.ts's rollover, the same pass that delivers crew.
-   */
-  pendingDeliveries: PendingDelivery[];
   /**
    * Week four's competitor AI (sim/competitors.ts): every competitor
    * route currently in service, seeded from `data/competitors.json` and
@@ -537,8 +523,9 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
       atAirport: firstLeg.origin,
       activeLegId: null,
       groundSinceMinute: 0,
-      ownership: 'owned',
-      leaseCostPerDay: 0,
+      // Leased like every other aircraft, so the balance tools price a
+      // fleet the way the real game does.
+      leaseCostPerDay: leaseRateFor(aircraftType.code),
       // A brand-new airframe for the headless runner's fixed fleet — age
       // 0 is also the delay model's baseline, so this reproduces its
       // pre-age-mechanic numbers rather than silently shifting them.
@@ -569,7 +556,6 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     activeFlights: [],
     schedule,
     routeSettings,
-    pendingDeliveries: [],
     // Same competitive landscape the real game starts with, growing the
     // same way over time (step()'s day-rollover doesn't know or care
     // that this is the headless runner) — the balance-tuning tool should
@@ -647,43 +633,35 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
 }
 
 /**
- * Starting capital for a genuinely new interactive game — enough to buy
- * one Fleet Market airframe outright with a little left over, or lease two
- * or three while routes ramp up. A pure game-balance number, not derived
- * from anything.
+ * Starting capital for a genuinely new interactive game — enough to carry
+ * the two starting planes' leases and a few more while routes ramp up. A
+ * pure game-balance number, not derived from anything.
  */
 export const STARTING_CASH = 500_000;
 
 /**
- * Two propeller planes already parked and based at Montréal, so the first
- * thing a new player does is draw a route on the map, not shop in a table
- * and wait weeks for a delivery. Montréal because five of the closest
- * airports sit inside a propeller's range from it.
+ * Two leased propeller planes already parked and based at Montréal, so the
+ * first thing a new player does is draw a route on the map. Montréal
+ * because five of the closest airports sit inside a propeller's range from
+ * it.
  */
 const STARTING_BASE = 'YUL';
-const STARTING_TAILS = ['C-FSTA', 'C-FSTB'];
+const STARTING_PLANES = 2;
 
 function createStartingFleet(): Aircraft[] {
-  return STARTING_TAILS.map((tail) => ({
-    tail,
-    typeCode: aircraftType.code,
-    status: 'ground',
-    atAirport: STARTING_BASE,
-    activeLegId: null,
-    groundSinceMinute: 0,
-    ownership: 'owned',
-    leaseCostPerDay: 0,
-    ageYears: 0,
-    baseAirport: STARTING_BASE,
-  }));
+  const aircraft: Aircraft[] = [];
+  for (let i = 0; i < STARTING_PLANES; i++) {
+    leaseAircraft({ simMinute: 0, aircraft }, aircraftType.code, STARTING_BASE);
+  }
+  return aircraft;
 }
 
 /**
  * The state an actual new game starts from — two starting propeller
  * planes (createStartingFleet() above), zero schedule, zero routes.
  * Nothing flies and nothing earns until the player draws a route
- * (ui/routeBuilder.ts); more aircraft come from the Fleet Market
- * (ui/fleetMarket.ts).
+ * (ui/routeBuilder.ts); more aircraft are leased from the map menu
+ * (ui/mapMenu.ts).
  *
  * Distinct from createInitialState() above on purpose — that one exists
  * only to keep the headless runner's known, fully-formed test network
@@ -697,7 +675,6 @@ export function createNewGameState(rngSeed: number = Date.now()): SimState {
     activeFlights: [],
     schedule: [],
     routeSettings: {},
-    pendingDeliveries: [],
     competitorRoutes: loadCompetitorRoutes(),
     weatherByAirport: {},
     completedToday: [],

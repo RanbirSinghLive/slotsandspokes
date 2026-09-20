@@ -9,7 +9,6 @@ import { rollDailyFuelPrice } from './fuel';
 import { rollDailyMarketDemand, actualDailyDemand } from './marketDemand';
 import { checkMissions } from './missions';
 import { rollDailyCrew, rollDailyMechanicalGroundings, maintenanceAgeFactor, cabinServiceShare } from './crew';
-import { resolveDeliveries } from './fleetMarket';
 import {
   payExecutiveBonuses,
   executiveDelayMultiplier,
@@ -142,22 +141,14 @@ export function step(state: SimState): void {
     state.todayCostByCategory.marketing += chargedMarketing;
     state.todayMargin -= chargedMarketing;
 
-    // Fleet Market lease cost (week three) — same "flat per-day charge"
-    // shape as marketing spend above, not tied to whether the aircraft
-    // actually flew that day. 0 for every owned aircraft, so this is a
-    // no-op for the headless runner's fully-owned fleet.
+    // Lease cost — same "flat per-day charge" shape as marketing spend
+    // above, not tied to whether the aircraft actually flew that day.
+    // Every aircraft is leased (sim/leasing.ts).
     const totalLeaseCost = state.aircraft.reduce((total, aircraft) => total + aircraft.leaseCostPerDay, 0);
     state.cash -= totalLeaseCost;
     state.todayCost += totalLeaseCost;
     state.todayCostByCategory.lease += totalLeaseCost;
     state.todayMargin -= totalLeaseCost;
-
-    // Week eight: any airframe whose lead time has run out joins the
-    // fleet. Before the crew pass below, so an aircraft arriving today is
-    // counted when working out how much crew the fleet needs — otherwise
-    // its first day would report a shortfall that corrects itself
-    // tomorrow for no reason the player could see.
-    resolveDeliveries(state);
 
     // Week six's crew model (sim/crew.ts): deliver recruitment and
     // training that has come due, pay every head on the books, then roll

@@ -5,7 +5,7 @@ import type { SimState } from '../sim/state';
  * The Tech Tree tab (week six): one branch built so far, Fuel Efficiency
  * — see data/tech-tree.json for the node list and sim/techTree.ts for the
  * unlock rules. Built once at startup, same "build the rows once, mutate
- * on events" shape ui/fleetMarket.ts already uses, since nothing here
+ * on events" shape ui/commercial.ts already uses, since nothing here
  * needs a periodic rebuild — only an Unlock click or switching back into
  * this tab (in case Reputation moved while looking elsewhere) changes
  * anything.

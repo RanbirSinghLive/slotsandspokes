@@ -113,33 +113,7 @@ function pollMissionEvents(state: SimState): void {
   }
 }
 
-let hasSeenInitialFleet = false;
-const seenTails = new Set<string>();
-
-/**
- * Week eight's aircraft deliveries. An airframe ordered with a 90-day lead
- * time arrives long after the player stopped watching for it, and the
- * Inbound list simply goes quiet when it lands — so the arrival itself
- * gets announced, the same "diff against what I already announced" shape
- * as weather, competitor routes and missions above, each with its own
- * local bookkeeping.
- */
-function pollFleetEvents(state: SimState): void {
-  if (!hasSeenInitialFleet) {
-    for (const aircraft of state.aircraft) seenTails.add(aircraft.tail);
-    hasSeenInitialFleet = true;
-    return;
-  }
-
-  for (const aircraft of state.aircraft) {
-    if (seenTails.has(aircraft.tail)) continue;
-    seenTails.add(aircraft.tail);
-    pushEvent(state.simMinute, `${aircraft.tail} (${aircraft.typeCode}) delivered`);
-  }
-}
-
 export function updateTicker(state: SimState): void {
   pollWeatherEvents(state);
   pollMissionEvents(state);
-  pollFleetEvents(state);
 }

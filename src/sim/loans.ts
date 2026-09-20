@@ -61,8 +61,8 @@ function nextLoanId(loans: Loan[]): string {
  * Draw one new loan. Whether this is actually allowed right now (under
  * MAX_LOANS) is the caller's job to check first — ui/loans.ts only shows
  * the "Take loan" button while under the cap, the same "let the UI gate
- * it, keep the sim function itself simple" shape ui/fleetMarket.ts's
- * purchase buttons already use.
+ * it, keep the sim function itself simple" shape the map menu's lease
+ * buttons use.
  */
 export function takeLoan(state: SimState): void {
   state.loans.push({

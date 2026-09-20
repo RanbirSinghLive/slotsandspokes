@@ -285,8 +285,8 @@ export function networkAirports(legs: ScheduleLeg[]): Set<string> {
  *    violating leg, so it stays visible as a standing warning.
  * 2. **Stranded aircraft.** A tail physically parked somewhere none of its
  *    own legs ever departs from will simply never fly again. Reachable by
- *    changing an aircraft's base in the Fleet tab while it already has
- *    legs — the one way left to break a rotation from the outside.
+ *    a hand-edited save or data file now, since nothing in the game moves an
+ *    aircraft's base.
  *
  * Logs one line per problem, or a single OK line, and returns the list
  * (empty when clean) so callers can show it somewhere a player will
@@ -329,7 +329,7 @@ export function validateSchedule(legs: ScheduleLeg[], fleet: Aircraft[] = []): s
     if (!origins.has(aircraft.atAirport)) {
       problems.push(
         `${aircraft.tail} is sitting at ${aircraft.atAirport}, but none of its rotations ever depart from there -- it will never fly again. ` +
-          `Set its base back to one of: ${[...origins].sort().join(', ')}, or remove its rotations and draw new ones from ${aircraft.atAirport}.`,
+          `Its rotations depart from ${[...origins].sort().join(', ')}. Remove them and draw new ones from ${aircraft.atAirport}.`,
       );
     }
   }

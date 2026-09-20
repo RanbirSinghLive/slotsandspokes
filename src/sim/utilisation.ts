@@ -149,11 +149,19 @@ export type ClassPool = {
 };
 
 /**
- * A hypothetical change to one pool's booked minutes: what a hover preview
- * says an action *would* do (ui/routeActions.ts). Negative frees time.
+ * A hypothetical change to one pool's bookings and size: what a hover
+ * preview says an action *would* do (ui/routeActions.ts). Negative frees
+ * time.
  * Never applied to state; only ever added on top of a read.
  */
-export type PoolEffect = { base: string; classCode: string; minutes: number };
+export type PoolEffect = {
+  base: string;
+  classCode: string;
+  /** Change in booked minutes. */
+  minutes: number;
+  /** Change in planes, so a lease can preview a pool growing. Each plane adds one usable day. */
+  planes?: number;
+};
 
 export function utilisationPools(state: SimState, base?: string): ClassPool[] {
   return AIRCRAFT_CLASSES.map((cls) => {
@@ -189,13 +197,17 @@ export function worstPoolShareByBase(state: SimState, effects: PoolEffect[] = []
   }
 
   for (const effect of effects) {
-    const pool = pools.get(`${effect.base}|${effect.classCode}`);
-    if (pool) pool.used += effect.minutes;
+    const key = `${effect.base}|${effect.classCode}`;
+    const pool = pools.get(key) ?? { used: 0, capacity: 0 };
+    pool.used += effect.minutes;
+    pool.capacity += (effect.planes ?? 0) * USABLE_DAY_MINUTES;
+    pools.set(key, pool);
   }
 
   const worst = new Map<string, number>();
   for (const [key, pool] of pools) {
     const base = key.split('|')[0];
+    if (pool.capacity <= 0) continue;
     worst.set(base, Math.max(worst.get(base) ?? 0, pool.used / pool.capacity));
   }
   return worst;
@@ -297,11 +309,8 @@ export function utilisationProblems(state: SimState): string[] {
     if (utilisation.share > 1) {
       problems.push(
         `${aircraft.tail} is scheduled for ${Math.round(utilisation.share * 100)}% of a usable day — more than one aircraft can fly. ` +
-          `Remove a rotation, or put it on another tail.`,
+          `Remove a rotation, or lease another plane.`,
       );
-    }
-    if (!aircraft.baseAirport) {
-      problems.push(`${aircraft.tail} flies ${utilisation.legs} legs but has no base — assign one in the Fleet tab.`);
     }
   }
   return problems;

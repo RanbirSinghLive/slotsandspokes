@@ -513,12 +513,37 @@ along with it and the button carries it (`RadialAction.preview`).
   only happen from an old save.
 
 
+### Done: lease-only fleet, lease preview, dead code removed
+
+- **Every aircraft is leased.** `sim/leasing.ts` replaces
+  `sim/fleetMarket.ts`: a rate card (`data/lease-rates.json`, per class per
+  day, unchanged from the old lease prices) and `leaseAircraft()`, which
+  adds the plane, based and parked at the airport, with no delivery step.
+  There is no purchase price and no `ownership` field. The two starting
+  planes are leased too, so a new game pays $1,400/day from day one. The
+  reasoning: outright prices ($13.5M regional, $42M narrowbody) can never
+  be reached inside one game, so the buy option was a button nobody could
+  press. Lease rates themselves are untuned.
+- **Deleted:** the Fleet Market tab and `ui/fleetMarket.ts`, the delivery
+  pipeline (`PendingDelivery`, `resolveDeliveries()`, the step hook, the
+  `pendingDeliveries` state field, the ticker's "delivered" line),
+  `ui/fleetSelection.ts` and every select-a-tail branch in the route
+  builder and map menu, and the unreachable "no base" and "change its base
+  in the Fleet tab" messages. `SAVE_KEY` is `v30`.
+- **Lease preview:** hovering a class in the Plane fan shows the pool
+  growing ("Propeller x2->3", share falling, a new row for a class you
+  don't own yet). `PoolEffect` gained an optional `planes` field, so a
+  preview can change a pool's size as well as its bookings.
+- Headless final cash is $4,718,451 (was $5,484,951): the fixed 3-plane
+  fleet now pays its lease, exactly 3 x $700 x 365 = $766,500 less.
+
+
 ---
 
 ## Conventions worth knowing
 
 - **Bump `SAVE_KEY` in `src/ui/save.ts` on any breaking `SimState`
-  change.** Currently `v29`.
+  change.** Currently `v30`.
 - **`headless-output.csv` and `sweep-reserve.csv` must stay
   byte-identical** across changes that aren't meant to affect balance.
   Both were verified unchanged after the delivery work — `createInitialState()`

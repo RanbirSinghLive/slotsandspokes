@@ -1,5 +1,5 @@
 import { capacityColor } from '../render/airports';
-import { utilisationPools, type ClassPool, type PoolEffect } from '../sim/utilisation';
+import { USABLE_DAY_MINUTES, utilisationPools, type ClassPool, type PoolEffect } from '../sim/utilisation';
 import { getMapPreview } from '../render/preview';
 import type { SimState } from '../sim/state';
 
@@ -30,16 +30,29 @@ function hours(minutes: number): string {
  * it, all of them (the whole-fleet overlay).
  */
 export function buildPoolRows(pools: ClassPool[], effects: PoolEffect[] = [], base?: string): HTMLElement[] {
+  const touching = (pool: ClassPool) => effects.filter((e) => e.classCode === pool.code && (base === undefined || e.base === base));
+
   return pools
-    .filter((pool) => pool.planes > 0)
+    .filter((pool) => pool.planes > 0 || touching(pool).some((e) => (e.planes ?? 0) > 0))
     .map((pool) => {
+      const mine = touching(pool);
+      const minutesDelta = mine.reduce((total, e) => total + e.minutes, 0);
+      const planesDelta = mine.reduce((total, e) => total + (e.planes ?? 0), 0);
+      const changed = minutesDelta !== 0 || planesDelta !== 0;
+
+      const nextPlanes = pool.planes + planesDelta;
+      const nextCapacity = pool.capacityMinutes + planesDelta * USABLE_DAY_MINUTES;
+      const nextUsed = Math.max(0, pool.usedMinutes + minutesDelta);
+      const nextShare = nextCapacity > 0 ? nextUsed / nextCapacity : 0;
+      const shownShare = changed ? nextShare : pool.share;
+
       const row = document.createElement('div');
       row.className = 'pool-row';
       row.title = `${pool.planes} ${pool.name} plane${pool.planes === 1 ? '' : 's'}: ${hours(pool.usedMinutes)} of ${hours(pool.capacityMinutes)} flying hours booked`;
 
       const name = document.createElement('span');
       name.className = 'pool-name';
-      name.textContent = `${pool.name} x${pool.planes}`;
+      name.textContent = planesDelta !== 0 ? `${pool.name} x${pool.planes}→${nextPlanes}` : `${pool.name} x${pool.planes}`;
 
       const bar = document.createElement('span');
       bar.className = 'pool-bar';
@@ -49,26 +62,20 @@ export function buildPoolRows(pools: ClassPool[], effects: PoolEffect[] = [], ba
       fill.style.background = capacityColor(pool.share);
       bar.appendChild(fill);
 
-      const delta = effects
-        .filter((e) => e.classCode === pool.code && (base === undefined || e.base === base))
-        .reduce((total, e) => total + e.minutes, 0);
-      const nextShare = pool.capacityMinutes > 0 ? Math.max(0, pool.usedMinutes + delta) / pool.capacityMinutes : 0;
-      const shownShare = delta !== 0 ? nextShare : pool.share;
-
-      if (delta !== 0) {
+      if (changed) {
         const from = Math.min(pool.share, 1);
         const to = Math.min(nextShare, 1);
         const ghost = document.createElement('span');
-        ghost.className = delta > 0 ? 'pool-ghost is-add' : 'pool-ghost is-free';
+        ghost.className = to > from ? 'pool-ghost is-add' : 'pool-ghost is-free';
         ghost.style.left = `${Math.min(from, to) * 100}%`;
         ghost.style.width = `${Math.abs(to - from) * 100}%`;
-        if (delta > 0) ghost.style.background = capacityColor(nextShare);
+        if (to > from) ghost.style.background = capacityColor(nextShare);
         bar.appendChild(ghost);
       }
 
       const value = document.createElement('span');
       value.className = 'pool-value';
-      value.textContent = delta !== 0 ? `${Math.round(pool.share * 100)}% → ${Math.round(nextShare * 100)}%` : `${Math.round(pool.share * 100)}%`;
+      value.textContent = changed ? `${Math.round(pool.share * 100)}% → ${Math.round(nextShare * 100)}%` : `${Math.round(pool.share * 100)}%`;
       if (shownShare >= 1) value.classList.add('is-over');
 
       row.append(name, bar, value);
@@ -83,14 +90,14 @@ let signature: string | null = null;
  * when a number a player could see has actually changed.
  */
 export function updatePoolBars(state: SimState): void {
-  const pools = utilisationPools(state).filter((pool) => pool.planes > 0);
+  const pools = utilisationPools(state);
   const effects = getMapPreview()?.effects ?? [];
   const next =
     pools.map((pool) => `${pool.code}:${pool.planes}:${Math.round(pool.share * 100)}:${Math.round(pool.usedMinutes)}`).join('|') +
-    `#${effects.map((e) => `${e.base}${e.classCode}${Math.round(e.minutes)}`).join(',')}`;
+    `#${effects.map((e) => `${e.base}${e.classCode}${Math.round(e.minutes)}:${e.planes ?? 0}`).join(',')}`;
   if (next === signature) return;
   signature = next;
 
-  overlayEl.hidden = pools.length === 0;
+  overlayEl.hidden = pools.every((pool) => pool.planes === 0);
   overlayEl.replaceChildren(...buildPoolRows(pools, effects));
 }

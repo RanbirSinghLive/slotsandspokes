@@ -5,7 +5,6 @@ import { utilisationPools } from '../sim/utilisation';
 import { buildPoolRows } from './poolBars';
 import { getMapPreview, setMapPreview, type MapPreview } from '../render/preview';
 import type { SimState } from '../sim/state';
-import { getSelectedTail } from './fleetSelection';
 import { armRouteBuilderAt, candidateTailsAt } from './routeBuilder';
 import { hideCompetitionTooltip } from './competitionTooltip';
 import { hideRadial, showRadial, updateRadial, type RadialAction } from './radial';
@@ -24,10 +23,9 @@ import * as ops from './routeActions';
  * network is ui/routeActions.ts, and through it the route builder's own
  * planning, so nothing here re-implements a rule.
  *
- * Whether a click is ours is still decided by `getSelectedTail()`: a plane
- * selected in the Fleet tab means the route builder owns every map click.
- * main.ts's mousedown handler gives the route builder first refusal for
- * exactly this reason, and only calls in here once it has said no.
+ * main.ts's mousedown handler gives the route builder first refusal on
+ * every map click (it owns the map while a route is being drawn), and only
+ * calls in here once it has said no.
  */
 
 const MAX_MARKET_ROWS = 6;
@@ -109,8 +107,8 @@ function positionCard(): void {
 function fillPools(base: string | null, state: SimState, emptyText: string): void {
   cardPoolBase = base;
   cardPoolState = state;
-  const pools = base ? utilisationPools(state, base).filter((pool) => pool.planes > 0) : [];
-  basedEl.textContent = pools.length === 0 ? emptyText : `Planes based at ${base}:`;
+  const pools = base ? utilisationPools(state, base) : [];
+  basedEl.textContent = pools.every((pool) => pool.planes === 0) ? emptyText : `Planes based at ${base}:`;
   renderCardPools();
 }
 
@@ -120,7 +118,7 @@ function renderCardPools(): void {
     poolsEl.replaceChildren();
     return;
   }
-  const pools = utilisationPools(cardPoolState, cardPoolBase).filter((pool) => pool.planes > 0);
+  const pools = utilisationPools(cardPoolState, cardPoolBase);
   poolsEl.replaceChildren(...buildPoolRows(pools, getMapPreview()?.effects, cardPoolBase));
 }
 
@@ -165,6 +163,7 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
     icon: `<g transform="translate(12 12) scale(${0.6 + rank * 0.14}) translate(-12 -12)">${ICON.plane}</g>`,
     angleDeg: 0,
     disabledReason: option.disabledReason,
+    preview: option.preview,
     onSelect: () => {
       const result = ops.leasePlane(state, airport.iata, option.code);
       notice = result.ok ? result.message : result.reason;
@@ -180,7 +179,7 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
       angleDeg: -115,
       disabledReason: hasPlane ? undefined : `No plane is based at ${airport.iata}. Use Plane to add one.`,
       onSelect: () => {
-        armRouteBuilderAt(airport, null);
+        armRouteBuilderAt(airport);
         hideMapMenu();
       },
     },
@@ -345,8 +344,6 @@ function refresh(): void {
  * (a point is a smaller, more precise target than a line).
  */
 export function handleMapMenuMouseDown(event: MouseEvent, state: SimState): boolean {
-  if (getSelectedTail()) return false; // a plane is selected: the route builder owns the map
-
   const airport = findNearestAirport(event.clientX, event.clientY);
   if (airport) {
     hideCompetitionTooltip();

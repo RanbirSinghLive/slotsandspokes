@@ -23,7 +23,6 @@ import {
 } from './ui/routeBuilder';
 import { handleMapMenuMouseDown, handleMapMenuKeyDown, hideMapMenu, isMapMenuOpen } from './ui/mapMenu';
 import { setupCommercialPanel, updateCommercialPanel } from './ui/commercial';
-import { setupFleetMarket, updateFleetMarket } from './ui/fleetMarket';
 import { setupOnTimePanel, updateOnTimePanel } from './ui/onTime';
 import { setupExecutivePanel, updateExecutivePanel } from './ui/executive';
 import { setupExecutivesPanel, updateExecutivesPanel } from './ui/executives';
@@ -63,7 +62,6 @@ renderScheduleWarnings(scheduleProblems(state));
 // here even though this line runs before its own definition.
 setupRouteBuilder(state, () => switchToSidebarTab('fleet'));
 setupCommercialPanel(state);
-setupFleetMarket(state);
 setupOnTimePanel();
 setupExecutivePanel();
 setupExecutivesPanel();
@@ -144,11 +142,10 @@ competitionAirlineDropdown.querySelectorAll<HTMLButtonElement>('button').forEach
 // panes inside the sidebar (#sidebar-tab-content) that replace each other,
 // while the map stays visible and interactive underneath the whole time.
 // Same element IDs as before — only their CSS treatment and DOM position
-// changed — so nothing in ui/commercial.ts, ui/fleetMarket.ts,
+// changed — so nothing in ui/commercial.ts,
 // ui/onTime.ts, or ui/executive.ts needed to change.
 const fleetTabEl = document.querySelector<HTMLDivElement>('#fleet-tab')!;
 const commercialPanelEl = document.querySelector<HTMLDivElement>('#commercial-panel')!;
-const fleetMarketPanelEl = document.querySelector<HTMLDivElement>('#fleet-market-panel')!;
 const onTimePanelEl = document.querySelector<HTMLDivElement>('#ontime-panel')!;
 const executivePanelEl = document.querySelector<HTMLDivElement>('#executive-panel')!;
 const techTreePanelEl = document.querySelector<HTMLDivElement>('#tech-tree-panel')!;
@@ -242,7 +239,6 @@ let latestFractionalMinute = state.simMinute;
 type SidebarTab =
   | 'fleet'
   | 'commercial'
-  | 'fleet-market'
   | 'ontime'
   | 'executive'
   | 'techtree'
@@ -291,7 +287,6 @@ function render(nowMs: number = performance.now()): void {
   // complete on any tick.
   if (sidebarTab === 'missions') updateMissionsPanel(state);
   if (sidebarTab === 'crew') updateCrewPanel(state);
-  if (sidebarTab === 'fleet-market') updateFleetMarket(state);
   if (sidebarTab === 'airports') updateAirportsPanel(state);
 
   const cssWidth = window.innerWidth - currentPanelWidthPx;
@@ -491,7 +486,6 @@ function switchToSidebarTab(tab: SidebarTab): void {
   sidebarTab = tab;
   fleetTabEl.hidden = tab !== 'fleet';
   commercialPanelEl.hidden = tab !== 'commercial';
-  fleetMarketPanelEl.hidden = tab !== 'fleet-market';
   onTimePanelEl.hidden = tab !== 'ontime';
   executivePanelEl.hidden = tab !== 'executive';
   techTreePanelEl.hidden = tab !== 'techtree';

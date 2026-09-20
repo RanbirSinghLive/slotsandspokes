@@ -1,0 +1,6 @@
+[
+  { "typeCode": "PROP", "leasePricePerDay": 700 },
+  { "typeCode": "REGIONAL", "leasePricePerDay": 2600 },
+  { "typeCode": "NARROWBODY", "leasePricePerDay": 7200 },
+  { "typeCode": "WIDEBODY", "leasePricePerDay": 14000 }
+]

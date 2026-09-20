@@ -5,7 +5,7 @@ import type { SimState } from '../sim/state';
 // retired key is simply never found again (loadSavedState() falls back
 // to a fresh game) rather than crashing on a field that no longer
 // matches what the current code expects.
-const SAVE_KEY = 'airgame-save-v29';
+const SAVE_KEY = 'airgame-save-v30';
 
 /**
  * Read back whatever createInitialState()/step() last produced, if

@@ -27,7 +27,6 @@ import {
 import { minuteOfDayToTimeString, renderScheduleWarnings, scheduleProblems } from './panels';
 import { addCommercialRow } from './commercial';
 import { policyFare } from '../sim/pricing';
-import { getSelectedTail, setSelectedTail } from './fleetSelection';
 import { classRank } from '../sim/aircraftClasses';
 import { hideCompetitionTooltip } from './competitionTooltip';
 import type { SimState } from '../sim/state';
@@ -147,20 +146,13 @@ export function hideRouteHoverTooltip(): void {
 }
 
 /**
- * The M10 route-creation gesture: pick a plane from the Fleet panel first
- * (week three — see ui/fleetSelection.ts), click an airport to arm it,
- * move the mouse (no need to hold the button) to draw a live preview
- * toward the cursor, and click a second airport to confirm — see
- * WEEK-TWO.md for the original design writeup and WEEK-THREE.md for the
- * pick-a-plane-first change. `idle`/`armed`/`confirming` is the whole
- * state machine; nothing here is part of SimState, since it's transient
- * interaction state, not simulated-world state. `tail` is captured into
- * `armed`/`confirming` at arm time so a gesture always finishes with the
- * plane it started with, even if the Fleet panel selection changes
- * mid-gesture — see cancelIfTailChanged() below for what happens then.
- * A `tail` of null means "pick for me": the radial menu (ui/mapMenu.ts)
- * arms without a plane, and autoPickTail() chooses one once the
- * destination is known, so the player never has to name a tail.
+ * The route-creation gesture: arm from an airport (the map menu's Route
+ * button, ui/mapMenu.ts), move the mouse (no need to hold the button) to
+ * draw a live preview toward the cursor, and click a second airport to
+ * confirm. `idle`/`armed`/`confirming` is the whole state machine; nothing
+ * here is part of SimState, since it's transient interaction state, not
+ * simulated-world state. Nobody names a plane: autoPickTail() chooses one
+ * once the destination is known, so the player never sees a tail.
  *
  * Week seven (the utilisation pivot, WEEK-SEVEN.md): what gets built is
  * no longer a single leg but a **rotation** — an ordered chain of
@@ -174,8 +166,8 @@ export function hideRouteHoverTooltip(): void {
  */
 type BuilderState =
   | { mode: 'idle' }
-  | { mode: 'armed'; chain: Airport[]; tail: string | null }
-  | { mode: 'confirming'; chain: Airport[]; dest: Airport; tail: string | null };
+  | { mode: 'armed'; chain: Airport[] }
+  | { mode: 'confirming'; chain: Airport[]; dest: Airport };
 
 let builderState: BuilderState = { mode: 'idle' };
 // Only meaningful while armed: where the cursor currently is (in lon/lat,
@@ -266,46 +258,19 @@ export function autoPickTail(state: SimState, chain: Airport[], dest: Airport | 
   return fitting ?? candidates[0];
 }
 
-/** The plane the gesture in progress will use: the named one, or the automatic pick. */
+/** The plane the gesture in progress will use. */
 function activeTail(state: SimState, dest: Airport | null): string | null {
   if (builderState.mode === 'idle') return null;
-  if (builderState.tail !== null) return builderState.tail;
   return autoPickTail(state, builderState.chain, dest);
 }
 
 /**
- * If the Fleet panel's selection (ui/fleetSelection.ts) has moved on to a
- * different tail — or been cleared — since the current gesture armed,
- * cancel it rather than let it finish for the wrong plane, or for none at
- * all. Cheap enough to call from every entry point that might notice a
- * change (a mousedown, or every render via drawRoutePreview()) rather
- * than needing panels.ts to reach into this module directly, which would
- * create a circular import between the two (routeBuilder.ts already
- * imports from panels.ts the other way).
+ * Arm the route builder from `airport`: used by the map menu's Route
+ * button (ui/mapMenu.ts). Everything downstream (preview, "add stop",
+ * capacity/range validation on confirm) lives in the armed state.
  */
-function cancelIfTailChanged(): void {
-  if (builderState.mode !== 'idle' && builderState.tail !== null && builderState.tail !== getSelectedTail()) {
-    reset();
-  }
-}
-
-/**
- * Arm the route builder directly, skipping the "select a tail in the Fleet
- * panel, then click its airport" two-step — used by the map's radial
- * action menu (ui/mapMenu.ts) so picking "Add Route" there and a
- * plane from its follow-up list lands in exactly the same `armed` state a
- * Fleet-panel-first click would have reached. Selects the tail too
- * (fleetSelection.ts), so cancelIfTailChanged() and the hover tooltip —
- * both of which compare against getSelectedTail() — see the same plane
- * every other arm path would, and the Fleet panel's row highlight follows
- * along. Deliberately reuses `armed` rather than a new mode: everything
- * downstream (preview, "add stop", capacity/range validation on confirm)
- * already lives in that state machine, so this is a new door into it, not
- * a second copy of it.
- */
-export function armRouteBuilderAt(airport: Airport, tail: string | null): void {
-  if (tail !== null) setSelectedTail(tail);
-  builderState = { mode: 'armed', chain: [airport], tail };
+export function armRouteBuilderAt(airport: Airport): void {
+  builderState = { mode: 'armed', chain: [airport] };
   setArmedCursor(true);
 }
 
@@ -317,20 +282,10 @@ export function armRouteBuilderAt(airport: Airport, tail: string | null): void {
  * and pan as usual."
  */
 export function handleRouteBuilderMouseDown(event: MouseEvent, state: SimState): boolean {
-  cancelIfTailChanged();
-  const clicked = findNearestAirport(event.clientX, event.clientY);
+  // Nothing armed means this click isn't ours; the map menu or a pan gets it.
+  if (builderState.mode === 'idle') return false;
 
-  if (builderState.mode === 'idle') {
-    // Week three: a plane has to be selected (Fleet panel) before the map
-    // will arm anything — drawing a route with no idea which plane it's
-    // for was the whole gap this closes. No tail selected just means
-    // "not our gesture," same as clicking empty water always has.
-    const tail = getSelectedTail();
-    if (!tail || !clicked) return false;
-    builderState = { mode: 'armed', chain: [clicked], tail };
-    setArmedCursor(true);
-    return true;
-  }
+  const clicked = findNearestAirport(event.clientX, event.clientY);
 
   if (builderState.mode === 'armed') {
     const origin = chainOrigin(builderState.chain);
@@ -340,7 +295,7 @@ export function handleRouteBuilderMouseDown(event: MouseEvent, state: SimState):
     }
     if (clicked) {
       showForm(builderState.chain, clicked, state);
-      builderState = { mode: 'confirming', chain: builderState.chain, dest: clicked, tail: builderState.tail };
+      builderState = { mode: 'confirming', chain: builderState.chain, dest: clicked };
       return true;
     }
     reset(); // clicked open water while armed: cancel
@@ -394,7 +349,6 @@ export function handleRouteBuilderKeyDown(event: KeyboardEvent): void {
  * hidden behind the basemap or a route.
  */
 export function drawRoutePreview(ctx: CanvasRenderingContext2D, state: SimState): void {
-  cancelIfTailChanged();
   if (builderState.mode === 'idle') return;
 
   const { chain } = builderState;
@@ -645,18 +599,6 @@ export function planRotation(chain: Airport[], dest: Airport, tail: string, stat
 
   const fail = (error: string, blocksAddStop = true): RotationPlan => ({ ...plan, error, blocksAddStop });
 
-  // Week seven, decision 2: bases are assigned explicitly, never inferred
-  // from wherever a route happened to start. A rotation therefore has to
-  // begin at the base of the aircraft flying it — that is what lets a
-  // multi-leg loop like YUL-YFC-YQM-YFC-YQM-YUL be based at one airport
-  // while flying legs that never touch it.
-  if (aircraft?.baseAirport && aircraft.baseAirport !== base.iata) {
-    return fail(
-      `${tail} is based at ${aircraft.baseAirport} — a rotation starts and ends at its base. ` +
-        `Start this one from ${aircraft.baseAirport}, or change ${tail}'s base in the Fleet tab.`,
-    );
-  }
-
   // Grow the network one airport at a time: a rotation's base has to
   // already be somewhere the player flies. Only the base is checked, not
   // every stop — each later stop is reached by the leg immediately before
@@ -735,12 +677,9 @@ export function planRotation(chain: Airport[], dest: Airport, tail: string, stat
   // separately (a rotation that fits one tail's day always fits its base's
   // pool, since the pool contains that tail).
   if (arriveBackMinute > USABLE_DAY_END_MINUTE) {
-    const spareAfter = (spareMinutesBefore - rotationMinutes) / USABLE_DAY_MINUTES;
     return fail(
-      `This rotation lands back at ${base.iata} at ${minuteOfDayToTimeString(arriveBackMinute)}, past the ${minuteOfDayToTimeString(USABLE_DAY_END_MINUTE)} end of ${tail}'s usable day. ` +
-        (spareAfter >= 0
-          ? `${base.iata} still has ${spareAfter.toFixed(2)} of an aircraft spare — put this on another tail based there.`
-          : `${base.iata} has no spare aircraft left either — shorten the rotation, or buy another airframe.`),
+      `This rotation lands back at ${base.iata} at ${minuteOfDayToTimeString(arriveBackMinute)}, past the ${minuteOfDayToTimeString(USABLE_DAY_END_MINUTE)} end of the usable day. ` +
+        `Every plane based at ${base.iata} is full: lease another (tap ${base.iata}, then Plane) or shorten the rotation.`,
     );
   }
 
@@ -972,15 +911,14 @@ export function commitRotation(state: SimState, tail: string, plan: RotationPlan
   // something inferred from its legs. An unbased airframe gets based
   // here by flying its first rotation from here — the closest thing the
   // game has to a "pick a home airport" step, and the only place a base
-  // is set other than the Fleet tab's own dropdown.
+  // is set other than leasing a plane at an airport.
   if (aircraft && !aircraft.baseAirport) aircraft.baseAirport = plan.base.iata;
 
   // Phase C removed positioning legs. A rotation ends where it began, so
   // a tail is always already at its base by the time it could fly
   // another one — the only tail that isn't is one taking its *first*
-  // rotation, which is either a Fleet Market airframe that has never
-  // been anywhere (atAirport null) or one left parked after its previous
-  // rotations were removed. Placing it at the base is honest for both:
+  // rotation, which is a plane left parked away from its base after its
+  // previous rotations were removed. Placing it at the base is honest:
   // there's no revenue day being skipped and nothing to fly it in from.
   // A based tail whose legs start somewhere else is a different problem
   // and stays one — validateSchedule()'s stranded check reports it.
@@ -1052,7 +990,7 @@ export function setupRouteBuilder(state: SimState, onRouteConfirmed: (legIds: st
   // stop after this one — repeat as many times as the day has room for.
   formAddStopButton.addEventListener('click', () => {
     if (builderState.mode !== 'confirming') return;
-    builderState = { mode: 'armed', chain: [...builderState.chain, builderState.dest], tail: builderState.tail };
+    builderState = { mode: 'armed', chain: [...builderState.chain, builderState.dest] };
     previewGeo = null;
     candidate = null;
     hideForm();

@@ -2,7 +2,7 @@ import { airports, type Airport } from '../render/airports';
 import { AIRCRAFT_CLASSES, classByCode, classRank } from '../sim/aircraftClasses';
 import { isAircraftTypeAllowedAt, legsServingMarket, marketKey } from '../sim/schedule';
 import { allRotations, type Rotation } from '../sim/utilisation';
-import { loadFleetCatalogue, orderAircraft, resolveDeliveries } from '../sim/fleetMarket';
+import { leaseAircraft, loadLeaseRates } from '../sim/leasing';
 import { actualDailyDemand, currentPotentialDemand } from '../sim/marketDemand';
 import { candidateTailsAt, commitRotation, planRotation, type RotationPlan } from './routeBuilder';
 import { removeRotation } from './panels';
@@ -280,26 +280,33 @@ export type PlaneOption = {
   seats: number;
   leasePerDay: number;
   disabledReason?: string;
+  /** One more plane in this class's pool at this airport, for the hover preview. */
+  preview?: MapPreview;
 };
 
 export function planeOptions(state: SimState, iata: string): PlaneOption[] {
-  return loadFleetCatalogue().map((listing) => {
-    const cls = classByCode(listing.typeCode)!;
+  return loadLeaseRates().map((rate) => {
+    const cls = classByCode(rate.typeCode)!;
     let disabledReason: string | undefined;
-    if (!isAircraftTypeAllowedAt(iata, listing.typeCode)) disabledReason = `Too large to operate at ${iata}.`;
-    else if (state.cash <= listing.leasePricePerDay) disabledReason = "Not enough cash to cover a day's lease.";
-    return { code: cls.code, name: cls.name, seats: cls.seats, leasePerDay: listing.leasePricePerDay, disabledReason };
+    if (!isAircraftTypeAllowedAt(iata, rate.typeCode)) disabledReason = `Too large to operate at ${iata}.`;
+    else if (state.cash <= rate.leasePricePerDay) disabledReason = "Not enough cash to cover a day's lease.";
+    return {
+      code: cls.code,
+      name: cls.name,
+      seats: cls.seats,
+      leasePerDay: rate.leasePricePerDay,
+      disabledReason,
+      preview: disabledReason ? undefined : { effects: [{ base: iata, classCode: cls.code, minutes: 0, planes: 1 }], routes: [] },
+    };
   });
 }
 
 /** Lease one plane of this class. It arrives immediately, based and parked at `iata`. */
 export function leasePlane(state: SimState, iata: string, typeCode: string): Outcome<{ message: string }> {
   const option = planeOptions(state, iata).find((o) => o.code === typeCode);
-  const listing = loadFleetCatalogue().find((l) => l.typeCode === typeCode);
-  if (!option || !listing) return { ok: false, reason: 'Unknown aircraft class.' };
+  if (!option) return { ok: false, reason: 'Unknown aircraft class.' };
   if (option.disabledReason) return { ok: false, reason: option.disabledReason };
 
-  const delivery = orderAircraft(state, listing, 'leased', iata);
-  resolveDeliveries(state);
-  return { ok: true, message: `${option.name} ${delivery.registration} leased, based at ${iata}.` };
+  const aircraft = leaseAircraft(state, typeCode, iata);
+  return { ok: true, message: `${option.name} leased at ${iata} for $${option.leasePerDay.toLocaleString()}/day (${aircraft.tail}).` };
 }

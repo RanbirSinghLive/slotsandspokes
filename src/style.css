@@ -28,7 +28,7 @@ body {
   box-sizing: border-box;
 }
 
-/* #fleet-tab, #commercial-panel, #fleet-market-panel,
+/* #fleet-tab, #commercial-panel,
    #ontime-panel, and #executive-panel are the sidebar's tab-content
    panes now (#sidebar-tab-content, inside <aside id="panel">) — siblings
    that take the same slot there, whichever one isn't [hidden]. Without
@@ -39,7 +39,6 @@ body {
    were full-screen panels instead. */
 #fleet-tab[hidden],
 #commercial-panel[hidden],
-#fleet-market-panel[hidden],
 #ontime-panel[hidden],
 #executive-panel[hidden] {
   display: none;
@@ -750,7 +749,7 @@ body {
 
 .pool-row {
   display: grid;
-  grid-template-columns: 104px 80px auto;
+  grid-template-columns: 132px 80px auto;
   align-items: center;
   gap: 8px;
   margin-top: 4px;
@@ -1002,75 +1001,6 @@ body {
 
 .commercial-status.demand-capped {
   color: #ffb37a;
-}
-
-/* Week three's Fleet Market — a new game starts with zero aircraft, so
-   this is where the very first purchase or lease happens. See
-   ui/fleetMarket.ts. Week six: same "sidebar tab, not a full-screen
-   panel" treatment as Commercial above — natural table width plus
-   horizontal scroll on the panel, rather than fixed percentage columns
-   sized for the old full-width layout. */
-#fleet-market-panel {
-  overflow-x: auto;
-}
-
-/* Four fixed rows now, so this fits the sidebar without scrolling; the
-   action column stays pinned in case the sidebar is narrowed. */
-#fleet-market-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-#fleet-market-table td {
-  white-space: nowrap;
-}
-
-/* Pinned so Buy/Lease stay reachable at any scroll offset. The opaque
-   background matches #panel's own, so scrolled columns pass underneath
-   rather than showing through. */
-#fleet-market-table th:last-child,
-#fleet-market-table td:last-child {
-  position: sticky;
-  right: 0;
-  background: #0a0c12;
-  padding-left: 8px;
-}
-
-#fleet-market-table th,
-#fleet-market-table td {
-  text-align: left;
-  padding: 8px 6px 8px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-#fleet-market-table th {
-  color: #6b7694;
-  font-weight: 400;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.fleet-market-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.fleet-market-actions button {
-  font-family: inherit;
-  font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-  background: #3a4258;
-  border: 1px solid #6b7694;
-  color: #fff;
-}
-
-.fleet-market-actions button:disabled {
-  opacity: 0.4;
-  cursor: default;
 }
 
 /* Stacked, not side by side — same reasoning as the schedule table's fare
