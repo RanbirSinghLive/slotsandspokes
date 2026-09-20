@@ -1,6 +1,6 @@
 [
-  { "typeCode": "PROP", "buyPrice": 890000, "leasePricePerDay": 700, "leadTimeDays": 1 },
-  { "typeCode": "REGIONAL", "buyPrice": 13500000, "leasePricePerDay": 2600, "leadTimeDays": 1 },
-  { "typeCode": "NARROWBODY", "buyPrice": 42000000, "leasePricePerDay": 7200, "leadTimeDays": 1 },
-  { "typeCode": "WIDEBODY", "buyPrice": 62000000, "leasePricePerDay": 14000, "leadTimeDays": 1 }
+  {"typeCode": "PROP", "buyPrice": 890000, "leasePricePerDay": 700, "leadTimeDays": 0},
+  {"typeCode": "REGIONAL", "buyPrice": 13500000, "leasePricePerDay": 2600, "leadTimeDays": 0},
+  {"typeCode": "NARROWBODY", "buyPrice": 42000000, "leasePricePerDay": 7200, "leadTimeDays": 0},
+  {"typeCode": "WIDEBODY", "buyPrice": 62000000, "leasePricePerDay": 14000, "leadTimeDays": 0}
 ]

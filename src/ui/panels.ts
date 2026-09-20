@@ -386,7 +386,7 @@ function renderRotations(state: SimState): void {
  * (see sim/state.ts), so it finishes the sector it's on and simply has
  * nothing to fly next.
  */
-function removeRotation(rotation: Rotation, state: SimState): void {
+export function removeRotation(rotation: Rotation, state: SimState): void {
   for (const leg of rotation.legs) {
     const index = state.schedule.indexOf(leg);
     if (index !== -1) state.schedule.splice(index, 1);

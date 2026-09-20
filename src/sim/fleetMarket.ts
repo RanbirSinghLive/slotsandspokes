@@ -8,7 +8,8 @@ import fleetMarketData from '../../data/fleet-market.json';
  *
  * `leadTimeDays` is how long the aircraft takes to become operational
  * after it's paid for. It used to be weeks and shaped the opening of the
- * game; it is a single day now, and stays a data field so it can be tuned.
+ * game; it is zero now (the aircraft arrives the moment it is ordered),
+ * and stays a data field so it can be tuned.
  */
 export type FleetListing = {
   typeCode: string;
@@ -39,6 +40,8 @@ export type PendingDelivery = {
   ownership: 'owned' | 'leased';
   /** Zero for an owned aircraft; the daily charge starts on arrival, not at order. */
   leaseCostPerDay: number;
+  /** Where the aircraft is based and parked when it arrives; null leaves it unbased. */
+  baseAirport: string | null;
   orderedAtMinute: number;
   availableAtMinute: number;
 };
@@ -74,7 +77,9 @@ function nextTail(typeCode: string, tailsInUse: string[]): string {
  * charge begins when the aircraft actually arrives, which is why
  * `leaseCostPerDay` rides along here instead of being applied yet.
  *
- * Returns the queued delivery so the caller can report the arrival date.
+ * `baseAirport` is where the aircraft will be based and parked on arrival
+ * (the map menu orders from an airport, so it starts there). Returns the
+ * queued delivery so the caller can report the arrival date.
  */
 export function orderAircraft(
   state: {
@@ -85,6 +90,7 @@ export function orderAircraft(
   },
   listing: FleetListing,
   ownership: 'owned' | 'leased',
+  baseAirport: string | null = null,
 ): PendingDelivery {
   if (ownership === 'owned') state.cash -= listing.buyPrice;
 
@@ -96,6 +102,7 @@ export function orderAircraft(
     ageYears: 0,
     ownership,
     leaseCostPerDay: ownership === 'leased' ? listing.leasePricePerDay : 0,
+    baseAirport,
     orderedAtMinute: state.simMinute,
     availableAtMinute: state.simMinute + listing.leadTimeDays * MINUTES_PER_DAY,
   };
@@ -109,11 +116,10 @@ export function orderAircraft(
  * per simulated day from step.ts's rollover, alongside the crew arrivals
  * it deliberately mirrors.
  *
- * The airframe arrives **unbased and unpositioned** (`atAirport: null`),
- * exactly as a Fleet Market purchase used to arrive instantly: it joins
- * the pool on the Fleet tab, and confirming its first rotation is what
- * places it and sets its base. Nothing about basing changed here — only
- * when the aircraft shows up.
+ * The aircraft arrives parked at the airport it was ordered from and
+ * based there. An order with no airport (`baseAirport: null`) arrives
+ * unbased and unpositioned, and confirming its first rotation is what
+ * places it and sets its base.
  *
  * Rolls no randomness, so the balance sweep's constant-draws-per-day
  * guarantee is untouched (see WEEK-SEVEN.md).
@@ -144,13 +150,13 @@ export function resolveDeliveries(state: {
       tail: delivery.registration,
       typeCode: delivery.typeCode,
       status: 'ground',
-      atAirport: null,
+      atAirport: delivery.baseAirport ?? null,
       activeLegId: null,
       groundSinceMinute: state.simMinute,
       ownership: delivery.ownership,
       leaseCostPerDay: delivery.leaseCostPerDay,
       ageYears: delivery.ageYears,
-      baseAirport: null,
+      baseAirport: delivery.baseAirport ?? null,
     });
     state.pendingDeliveries.splice(i, 1);
     arrived.push(delivery);

@@ -644,7 +644,7 @@ body {
    anything else, it's a contextual popover on the map itself, not an
    interruption. */
 /* Week eight: click an airport with no plane selected, get the airport —
-   see ui/airportDetail.ts. Same info-window styling as #new-route-popover
+   see ui/mapMenu.ts. Same info-window styling as #new-route-popover
    below (dark card, amber-tinted border, positioned near the click), but
    its own ID rather than sharing one: the two pop up under different
    conditions (a plane selected vs. not) and are never open at once, so
@@ -694,25 +694,25 @@ body {
 }
 
 /* Week eight's second deep dive: acting on an airport used to always mean
-   switching tabs (see ui/airportDetail.ts's own comment for why it stayed
+   switching tabs (see ui/mapMenu.ts's own comment for why it stayed
    read-only up to now). This ring of circular buttons is anchored to the
    airport's own screen point rather than tucked in the info card, so
    "click a place, act on that place" reads the same way a real map app's
    pin actions do. The container itself has no size — it's just an anchor
    positioned at the airport's (x, y); every button inside is placed with
    its own left/top, computed in JS from that same origin. */
-.airport-radial-menu {
+.radial-menu {
   position: fixed;
   z-index: 26;
   width: 0;
   height: 0;
 }
 
-.airport-radial-menu[hidden] {
+.radial-menu[hidden] {
   display: none;
 }
 
-.airport-radial-button {
+.radial-button {
   position: absolute;
   transform: translate(-50%, -50%);
   width: 34px;
@@ -729,70 +729,44 @@ body {
   transition: transform 0.08s ease, background 0.08s ease;
 }
 
-.airport-radial-button svg {
+.radial-button svg {
   width: 16px;
   height: 16px;
 }
 
-.airport-radial-button:hover:not(:disabled) {
+.radial-button:hover:not(.disabled) {
   background: #171b26;
   transform: translate(-50%, -50%) scale(1.15);
 }
 
-.airport-radial-button:disabled {
+.radial-button.disabled {
   opacity: 0.35;
   cursor: default;
 }
 
-/* The follow-up list for "Add Route" (pick a plane) and "Base Here" (pick
-   a plane) — same info-window styling as #airport-detail-popover, its own
-   ID because it opens under different conditions and the two are never
-   meant to be reconciled into one card. */
-.airport-radial-picker {
-  position: fixed;
-  z-index: 27;
-  min-width: 220px;
-  max-width: 280px;
-  padding: 10px;
-  background: #0e1016;
-  border: 1px solid rgba(255, 209, 102, 0.35);
-  border-radius: 6px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: 13px;
-  color: #cdd3e0;
-}
-
-.airport-radial-picker[hidden] {
-  display: none;
-}
-
-#airport-radial-picker-title {
-  margin-bottom: 8px;
-  color: #9aa3b8;
-}
-
-.airport-radial-picker-option {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 6px 8px;
-  margin-bottom: 4px;
+/* A parent whose fan is open stays lit; a destructive action waiting for
+   its second click turns red. */
+.radial-button.active {
   background: #171b26;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
-  color: #cdd3e0;
-  font-family: inherit;
-  font-size: inherit;
-  cursor: pointer;
+  border-color: rgba(255, 209, 102, 0.9);
 }
 
-.airport-radial-picker-option:last-child {
-  margin-bottom: 0;
+.radial-button.confirming {
+  border-color: #ff8080;
+  color: #ff8080;
 }
 
-.airport-radial-picker-option:hover {
-  border-color: rgba(255, 209, 102, 0.5);
+/* The hover line inside the card: what the hovered button does, or why it
+   can't. Reserves its height so the card doesn't jump as the text comes
+   and goes. */
+#airport-detail-hint {
+  margin-top: 8px;
+  min-height: 2.6em;
+  color: #ffd166;
+}
+
+#airport-detail-hint.is-problem {
+  color: #ff8080;
 }
 
 #new-route-popover {

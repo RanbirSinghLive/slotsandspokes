@@ -388,8 +388,7 @@ airframes are gone: no registrations, ages or per-airframe lead times.
   $13.5M / $2,600, narrowbody $42M / $7,200, widebody $62M / $14,000. The
   first three are the youngest old listing of each type; the widebody is a
   new number (the old one was a 12-year-old airframe). All tunable.
-- Lead time is 1 day for every class. Delivery happens at the next day
-  rollover after that, so aircraft land one to two days after ordering.
+- Lead time was 1 day for every class here; the map menu made it 0.
 - Tails are generated on order (`C-P001`, `C-R001`, `C-N001`, `C-W001`).
   Aircraft are bought at age 0, so age-driven delays and breakdowns are
   dormant.
@@ -416,12 +415,47 @@ airframes are gone: no registrations, ages or per-airframe lead times.
 - Ticker events now: weather forming and aircraft deliveries.
 
 
+### Done: the map menu (radial buttons, planes chosen for you)
+
+Clicking the map now opens one radial menu, for two kinds of thing. The
+menu is `ui/radial.ts` (a generic ring of circular DOM buttons: fixed
+angle per action, an optional fan of choices around one action, disabled
+buttons that say why on hover, a two-click confirm for destructive ones).
+`ui/mapMenu.ts` decides which actions each thing gets and replaces
+`ui/airportDetail.ts`; `ui/routeActions.ts` holds what the actions do to
+the network.
+
+- **Airport:** Route (arms the route builder), Plane (a fan of the four
+  classes; each button leases one, which arrives immediately, based and
+  parked there).
+- **Route (click the line):** upgauge and downgauge one flight, remove and
+  add one flight, remove the route (asks twice). The unit of change is one
+  flight, so a route can be mixed-class and every click has an opposite.
+- **Nobody names a tail any more.** `armRouteBuilderAt(airport, null)` arms
+  in automatic mode and `autoPickTail()` chooses the smallest class whose
+  plan fits (range, airport size, day length). Frequency and gauge reuse
+  `planRotation()`/`commitRotation()` (now exported from `routeBuilder.ts`),
+  so a rotation built by a button is identical to one drawn by hand. Gauge
+  moves a flight to a plane of the next class based at the same airport;
+  with none, the button says to add one.
+- **Only there-and-back rotations** are changed by these buttons. A route
+  flown only as part of a multi-stop rotation shows a disabled button
+  pointing at the Fleet tab.
+- The Fleet Market tab is hidden; planes are leased from the map and
+  **leasing is the only way to get one** (owned starting planes aside).
+  Lead time is 0 days, `PendingDelivery` gained `baseAirport`, and
+  `SAVE_KEY` is `v29`. The Fleet tab is still there as a read-out (rotation
+  list, utilisation) and still allows the old select-a-tail flow.
+- Not built yet: hover previews on the map, per-class pool bars (the plan's
+  next step), a way to buy instead of lease.
+
+
 ---
 
 ## Conventions worth knowing
 
 - **Bump `SAVE_KEY` in `src/ui/save.ts` on any breaking `SimState`
-  change.** Currently `v28`.
+  change.** Currently `v29`.
 - **`headless-output.csv` and `sweep-reserve.csv` must stay
   byte-identical** across changes that aren't meant to affect balance.
   Both were verified unchanged after the delivery work — `createInitialState()`

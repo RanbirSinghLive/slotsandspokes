@@ -2,6 +2,7 @@ import { geoPath } from 'd3-geo';
 import type { LineString } from 'geojson';
 import { projection } from './projection';
 import { airports } from './airports';
+import { distanceToArc } from './competition';
 import type { SimState } from '../sim/state';
 
 const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]));
@@ -62,4 +63,34 @@ export function drawRoutes(ctx: CanvasRenderingContext2D, state: SimState): void
     path(line);
     ctx.stroke();
   }
+}
+
+// How close a click has to land to a route's arc to count as hitting it.
+const ROUTE_HIT_RADIUS_PX = 8;
+
+/**
+ * The player's own route (a market, either direction) under a screen
+ * point, if any. Uses the same arc-distance test the competition hover
+ * uses, so a click and a hover agree about what "on the line" means.
+ */
+export function findNearestOwnRoute(screenX: number, screenY: number, state: SimState): { origin: string; dest: string } | null {
+  const distinct = new Map<string, { origin: string; dest: string }>();
+  for (const leg of state.schedule) {
+    const key = routeKey(leg.origin, leg.dest);
+    if (!distinct.has(key)) distinct.set(key, { origin: leg.origin, dest: leg.dest });
+  }
+
+  let nearest: { origin: string; dest: string } | null = null;
+  let nearestDist = ROUTE_HIT_RADIUS_PX;
+  for (const { origin, dest } of distinct.values()) {
+    const originAirport = airportsByIata.get(origin);
+    const destAirport = airportsByIata.get(dest);
+    if (!originAirport || !destAirport) continue;
+    const dist = distanceToArc(originAirport, destAirport, screenX, screenY);
+    if (dist < nearestDist) {
+      nearestDist = dist;
+      nearest = { origin, dest };
+    }
+  }
+  return nearest;
 }

@@ -36,7 +36,7 @@ function money(amount: number): string {
  * pooled aircraft-day budget is) in place of the ring that used to mark
  * slot-controlled fields there; slot holdings themselves are still real
  * (they still gate route-building and still show in the airport-detail
- * popover — render/airports.ts, ui/airportDetail.ts), they just lost
+ * popover — render/airports.ts, ui/mapMenu.ts), they just lost
  * their own always-on map ring once utilisation needed that visual slot
  * more. A table of IATA codes describing *places* was the least spatial
  * way to show spatial data to begin with.

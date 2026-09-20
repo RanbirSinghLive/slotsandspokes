@@ -307,7 +307,7 @@ function distanceToPointSegment(px: number, py: number, ax: number, ay: number, 
  * this path" query. Fine at this scale: a couple dozen samples per arc,
  * at most nine arcs on screen at once.
  */
-function distanceToArc(origin: Airport, dest: Airport, screenX: number, screenY: number): number {
+export function distanceToArc(origin: Airport, dest: Airport, screenX: number, screenY: number): number {
   const interpolate = geoInterpolate([origin.lon, origin.lat], [dest.lon, dest.lat]);
   let minDist = Infinity;
   let previous: [number, number] | null = null;

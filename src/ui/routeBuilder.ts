@@ -28,6 +28,7 @@ import { minuteOfDayToTimeString, renderScheduleWarnings, scheduleProblems } fro
 import { addCommercialRow } from './commercial';
 import { policyFare } from '../sim/pricing';
 import { getSelectedTail, setSelectedTail } from './fleetSelection';
+import { classRank } from '../sim/aircraftClasses';
 import { hideCompetitionTooltip } from './competitionTooltip';
 import type { SimState } from '../sim/state';
 
@@ -75,7 +76,7 @@ function showRouteHoverTooltip(
   screenY: number,
   state: SimState,
 ): void {
-  const tail = getSelectedTail();
+  const tail = activeTail(state, candidate);
   const aircraft = tail ? state.aircraft.find((a) => a.tail === tail) : undefined;
   const type = aircraft ? aircraftTypesByCode.get(aircraft.typeCode) : undefined;
 
@@ -157,6 +158,9 @@ export function hideRouteHoverTooltip(): void {
  * `armed`/`confirming` at arm time so a gesture always finishes with the
  * plane it started with, even if the Fleet panel selection changes
  * mid-gesture — see cancelIfTailChanged() below for what happens then.
+ * A `tail` of null means "pick for me": the radial menu (ui/mapMenu.ts)
+ * arms without a plane, and autoPickTail() chooses one once the
+ * destination is known, so the player never has to name a tail.
  *
  * Week seven (the utilisation pivot, WEEK-SEVEN.md): what gets built is
  * no longer a single leg but a **rotation** — an ordered chain of
@@ -170,8 +174,8 @@ export function hideRouteHoverTooltip(): void {
  */
 type BuilderState =
   | { mode: 'idle' }
-  | { mode: 'armed'; chain: Airport[]; tail: string }
-  | { mode: 'confirming'; chain: Airport[]; dest: Airport; tail: string };
+  | { mode: 'armed'; chain: Airport[]; tail: string | null }
+  | { mode: 'confirming'; chain: Airport[]; dest: Airport; tail: string | null };
 
 let builderState: BuilderState = { mode: 'idle' };
 // Only meaningful while armed: where the cursor currently is (in lon/lat,
@@ -233,6 +237,43 @@ function reset(): void {
 }
 
 /**
+ * Every aircraft that could fly a rotation based at `baseIata`: already
+ * based there, or not based anywhere yet (flying its first rotation is
+ * what bases it). Smallest class first, then fleet order, so the cheapest
+ * suitable plane is tried before a bigger one.
+ */
+export function candidateTailsAt(state: SimState, baseIata: string): string[] {
+  return state.aircraft
+    .filter((a) => a.baseAirport === baseIata || a.baseAirport === null)
+    .map((a, index) => ({ tail: a.tail, rank: classRank(a.typeCode), index }))
+    .sort((a, b) => a.rank - b.rank || a.index - b.index)
+    .map((a) => a.tail);
+}
+
+/**
+ * Choose the plane for a rotation the player hasn't named one for: the
+ * first candidate (smallest class first) whose plan has no error, so
+ * range, airport size and day-length limits quietly steer the choice.
+ * When nothing fits, returns the first candidate anyway so the form can
+ * show that plane's actual error, not a vague "no plane". Null only when
+ * there is no candidate at all.
+ */
+export function autoPickTail(state: SimState, chain: Airport[], dest: Airport | null): string | null {
+  const candidates = candidateTailsAt(state, chain[0].iata);
+  if (candidates.length === 0) return null;
+  if (!dest) return candidates[0];
+  const fitting = candidates.find((tail) => planRotation(chain, dest, tail, state).error === null);
+  return fitting ?? candidates[0];
+}
+
+/** The plane the gesture in progress will use: the named one, or the automatic pick. */
+function activeTail(state: SimState, dest: Airport | null): string | null {
+  if (builderState.mode === 'idle') return null;
+  if (builderState.tail !== null) return builderState.tail;
+  return autoPickTail(state, builderState.chain, dest);
+}
+
+/**
  * If the Fleet panel's selection (ui/fleetSelection.ts) has moved on to a
  * different tail — or been cleared — since the current gesture armed,
  * cancel it rather than let it finish for the wrong plane, or for none at
@@ -243,7 +284,7 @@ function reset(): void {
  * imports from panels.ts the other way).
  */
 function cancelIfTailChanged(): void {
-  if (builderState.mode !== 'idle' && builderState.tail !== getSelectedTail()) {
+  if (builderState.mode !== 'idle' && builderState.tail !== null && builderState.tail !== getSelectedTail()) {
     reset();
   }
 }
@@ -251,7 +292,7 @@ function cancelIfTailChanged(): void {
 /**
  * Arm the route builder directly, skipping the "select a tail in the Fleet
  * panel, then click its airport" two-step — used by the map's radial
- * action menu (ui/airportDetail.ts) so picking "Add Route" there and a
+ * action menu (ui/mapMenu.ts) so picking "Add Route" there and a
  * plane from its follow-up list lands in exactly the same `armed` state a
  * Fleet-panel-first click would have reached. Selects the tail too
  * (fleetSelection.ts), so cancelIfTailChanged() and the hover tooltip —
@@ -262,8 +303,8 @@ function cancelIfTailChanged(): void {
  * already lives in that state machine, so this is a new door into it, not
  * a second copy of it.
  */
-export function armRouteBuilderAt(airport: Airport, tail: string): void {
-  setSelectedTail(tail);
+export function armRouteBuilderAt(airport: Airport, tail: string | null): void {
+  if (tail !== null) setSelectedTail(tail);
   builderState = { mode: 'armed', chain: [airport], tail };
   setArmedCursor(true);
 }
@@ -356,7 +397,8 @@ export function drawRoutePreview(ctx: CanvasRenderingContext2D, state: SimState)
   cancelIfTailChanged();
   if (builderState.mode === 'idle') return;
 
-  const { chain, tail } = builderState;
+  const { chain } = builderState;
+  const tail = activeTail(state, null);
   const origin = chainOrigin(chain);
 
   // The range ring is a true geodesic circle (d3.geoCircle()), not a flat
@@ -558,7 +600,7 @@ function baseSpareMinutes(state: SimState, baseIata: string, tail: string): numb
  * rescued by adding a nearer stop before it. Every other failure only gets
  * worse with more legs.
  */
-type RotationPlan = {
+export type RotationPlan = {
   /** The full ordered chain including the pending destination, base first. */
   airports: Airport[];
   base: Airport;
@@ -572,7 +614,7 @@ type RotationPlan = {
   blocksAddStop: boolean;
 };
 
-function planRotation(chain: Airport[], dest: Airport, tail: string, state: SimState): RotationPlan {
+export function planRotation(chain: Airport[], dest: Airport, tail: string, state: SimState): RotationPlan {
   const base = chain[0];
   const rotationAirports = [...chain, dest];
   const aircraft = state.aircraft.find((a) => a.tail === tail);
@@ -784,9 +826,6 @@ function showForm(chain: Airport[], dest: Airport, state: SimState): void {
       : isExistingMarket(origin.iata, dest.iata, state.schedule)
         ? 'New Frequency'
         : 'New Rotation';
-  // Week three: the tail was already chosen (Fleet panel) before this
-  // route was even armed, so it's shown here read-only, not re-picked.
-  formTailLabel.textContent = getSelectedTail() ?? '';
   formSection.hidden = false;
   // The armed-state hover tooltip (PDEW/CAP for the candidate) has nothing
   // left to add once the form itself is showing the same numbers, and the
@@ -825,14 +864,14 @@ function hideForm(): void {
 function updateFormValidation(chain: Airport[], dest: Airport, state: SimState): void {
   const origin = chainOrigin(chain);
 
-  // Defensive fallback — arming now requires a tail to already be
-  // selected (ui/fleetSelection.ts), so this shouldn't be reachable in
-  // practice, but the message stays accurate if it somehow is.
-  const tail = getSelectedTail();
+  // No candidate at all means no plane is based at this airport, which is
+  // reachable now that the plane is picked automatically.
+  const tail = activeTail(state, dest);
   if (!tail || state.aircraft.length === 0) {
     formLabel.textContent = `${origin.iata} → ${dest.iata}`;
     formBlock.textContent = '';
-    formError.textContent = 'Buy or lease an aircraft first — see Fleet under the Reports menu.';
+    formTailLabel.textContent = '';
+    formError.textContent = `No plane is based at ${chainOrigin(chain).iata}. Tap the airport and use Plane to add one.`;
     formConfirmButton.disabled = true;
     formAddStopButton.disabled = true;
     formPdew.textContent = '';
@@ -844,6 +883,7 @@ function updateFormValidation(chain: Airport[], dest: Airport, state: SimState):
   const aircraft = state.aircraft.find((a) => a.tail === tail);
   const type = aircraft ? aircraftTypesByCode.get(aircraft.typeCode) : undefined;
   const plan = planRotation(chain, dest, tail, state);
+  formTailLabel.textContent = type ? `${type.name} (${tail})` : tail;
 
   // The chain as the player sees it, always ending back where it started —
   // the closing leg is implicit in the gesture, so showing it here is how
@@ -919,6 +959,83 @@ function updateFormValidation(chain: Airport[], dest: Airport, state: SimState):
 }
 
 /**
+ * Turn a plan into real schedule legs: base an unbased aircraft, place a
+ * plane that has never flown, push the legs, and give any brand-new
+ * market its fare settings. Shared by the confirm button and the map
+ * menu's frequency and gauge actions (ui/routeActions.ts), so a rotation
+ * built either way is created identically. Returns the new leg ids.
+ */
+export function commitRotation(state: SimState, tail: string, plan: RotationPlan): string[] {
+  const aircraft = state.aircraft.find((a) => a.tail === tail);
+
+  // Week seven, decision 2: an aircraft's base is explicit state, not
+  // something inferred from its legs. An unbased airframe gets based
+  // here by flying its first rotation from here — the closest thing the
+  // game has to a "pick a home airport" step, and the only place a base
+  // is set other than the Fleet tab's own dropdown.
+  if (aircraft && !aircraft.baseAirport) aircraft.baseAirport = plan.base.iata;
+
+  // Phase C removed positioning legs. A rotation ends where it began, so
+  // a tail is always already at its base by the time it could fly
+  // another one — the only tail that isn't is one taking its *first*
+  // rotation, which is either a Fleet Market airframe that has never
+  // been anywhere (atAirport null) or one left parked after its previous
+  // rotations were removed. Placing it at the base is honest for both:
+  // there's no revenue day being skipped and nothing to fly it in from.
+  // A based tail whose legs start somewhere else is a different problem
+  // and stays one — validateSchedule()'s stranded check reports it.
+  if (aircraft && aircraft.status === 'ground' && !state.schedule.some((leg) => leg.tail === tail)) {
+    aircraft.atAirport = plan.base.iata;
+    aircraft.groundSinceMinute = state.simMinute;
+  }
+
+  const createdLegIds: string[] = [];
+  // Keyed bidirectionally (marketKey) so out and back collapse to one
+  // entry, but holding the leg itself so the Commercial row is created
+  // in the direction the rotation actually flies rather than in
+  // alphabetical order.
+  const marketsTouched = new Map<string, PackedLeg>();
+  for (const packed of plan.legs) {
+    const leg: ScheduleLeg = {
+      legId: nextLegId(tail, state.schedule),
+      tail,
+      origin: packed.origin,
+      dest: packed.dest,
+      departMinute: packed.departMinute,
+      blockMinutes: packed.blockMinutes,
+    };
+    state.schedule.push(leg);
+    createdLegIds.push(leg.legId);
+    const key = marketKey(packed.origin, packed.dest);
+    if (!marketsTouched.has(key)) marketsTouched.set(key, packed);
+  }
+
+  renderScheduleWarnings(scheduleProblems(state));
+
+  // Fare/marketing are set at the market level (sim/state.ts's
+  // RouteSettings), not per leg — a brand-new market gets a fresh entry
+  // (policy fare, zero marketing spend); a rotation touching a market
+  // that already has one reuses it unchanged, rather than resetting
+  // whatever fare the player already set there. marketKey() is
+  // bidirectional, so out and back share one entry.
+  for (const [key, leg] of marketsTouched) {
+    if (state.routeSettings[key]) continue;
+    // Priced by the airline-wide policy (sim/pricing.ts), not by bare
+    // recommendedFare() — a new route should open at whatever the rest
+    // of the network is charging, not silently ignore the policy and
+    // need a manual correction straight after being drawn.
+    state.routeSettings[key] = {
+      fare: policyFare(state, leg.origin, leg.dest),
+      fareIsOverridden: false,
+      marketingSpend: 0,
+    };
+    addCommercialRow(leg.origin, leg.dest, state);
+  }
+
+  return createdLegIds;
+}
+
+/**
  * Wire up the confirmation form. Called once at startup, alongside
  * setupScheduleEditor() — same "build once, mutate only via events" rule,
  * for the same reason: an `<input>` the player is mid-interaction with
@@ -944,78 +1061,15 @@ export function setupRouteBuilder(state: SimState, onRouteConfirmed: (legIds: st
 
   formConfirmButton.addEventListener('click', () => {
     if (builderState.mode !== 'confirming') return;
-    const { chain, dest, tail } = builderState;
+    const { chain, dest } = builderState;
+    const tail = activeTail(state, dest);
+    if (!tail) return;
     const plan = planRotation(chain, dest, tail, state);
     // The button is already disabled in this case — this is the same
     // rules, not a second copy of them, so it can't drift.
     if (plan.error || plan.legs.length === 0) return;
 
-    const aircraft = state.aircraft.find((a) => a.tail === tail);
-
-    // Week seven, decision 2: an aircraft's base is explicit state, not
-    // something inferred from its legs. An unbased airframe gets based
-    // here by flying its first rotation from here — the closest thing the
-    // game has to a "pick a home airport" step, and the only place a base
-    // is set other than the Fleet tab's own dropdown.
-    if (aircraft && !aircraft.baseAirport) aircraft.baseAirport = plan.base.iata;
-
-    // Phase C removed positioning legs. A rotation ends where it began, so
-    // a tail is always already at its base by the time it could fly
-    // another one — the only tail that isn't is one taking its *first*
-    // rotation, which is either a Fleet Market airframe that has never
-    // been anywhere (atAirport null) or one left parked after its previous
-    // rotations were removed. Placing it at the base is honest for both:
-    // there's no revenue day being skipped and nothing to fly it in from.
-    // A based tail whose legs start somewhere else is a different problem
-    // and stays one — validateSchedule()'s stranded check reports it.
-    if (aircraft && aircraft.status === 'ground' && !state.schedule.some((leg) => leg.tail === tail)) {
-      aircraft.atAirport = plan.base.iata;
-      aircraft.groundSinceMinute = state.simMinute;
-    }
-
-    const createdLegIds: string[] = [];
-    // Keyed bidirectionally (marketKey) so out and back collapse to one
-    // entry, but holding the leg itself so the Commercial row is created
-    // in the direction the rotation actually flies rather than in
-    // alphabetical order.
-    const marketsTouched = new Map<string, PackedLeg>();
-    for (const packed of plan.legs) {
-      const leg: ScheduleLeg = {
-        legId: nextLegId(tail, state.schedule),
-        tail,
-        origin: packed.origin,
-        dest: packed.dest,
-        departMinute: packed.departMinute,
-        blockMinutes: packed.blockMinutes,
-      };
-      state.schedule.push(leg);
-      createdLegIds.push(leg.legId);
-      const key = marketKey(packed.origin, packed.dest);
-      if (!marketsTouched.has(key)) marketsTouched.set(key, packed);
-    }
-
-    renderScheduleWarnings(scheduleProblems(state));
-
-    // Fare/marketing are set at the market level (sim/state.ts's
-    // RouteSettings), not per leg — a brand-new market gets a fresh entry
-    // (policy fare, zero marketing spend); a rotation touching a market
-    // that already has one reuses it unchanged, rather than resetting
-    // whatever fare the player already set there. marketKey() is
-    // bidirectional, so out and back share one entry.
-    for (const [key, leg] of marketsTouched) {
-      if (state.routeSettings[key]) continue;
-      // Priced by the airline-wide policy (sim/pricing.ts), not by bare
-      // recommendedFare() — a new route should open at whatever the rest
-      // of the network is charging, not silently ignore the policy and
-      // need a manual correction straight after being drawn.
-      state.routeSettings[key] = {
-        fare: policyFare(state, leg.origin, leg.dest),
-        fareIsOverridden: false,
-        marketingSpend: 0,
-      };
-      addCommercialRow(leg.origin, leg.dest, state);
-    }
-
+    const createdLegIds = commitRotation(state, tail, plan);
     onRouteConfirmed(createdLegIds);
     reset();
   });

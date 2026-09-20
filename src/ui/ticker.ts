@@ -134,7 +134,7 @@ function pollFleetEvents(state: SimState): void {
   for (const aircraft of state.aircraft) {
     if (seenTails.has(aircraft.tail)) continue;
     seenTails.add(aircraft.tail);
-    pushEvent(state.simMinute, `${aircraft.tail} (${aircraft.typeCode}) delivered — assign it a base to put it to work`);
+    pushEvent(state.simMinute, `${aircraft.tail} (${aircraft.typeCode}) delivered`);
   }
 }
 
