@@ -473,6 +473,27 @@ share), for the whole fleet or for one base.
   classes) and is now the odd one out.
 
 
+### Done: hover previews
+
+Hovering an enabled route-ring button shows what it would do before it is
+pressed. `render/preview.ts` holds one transient `MapPreview` (never in
+`SimState`, never saved): pool-minute effects plus the routes to
+emphasise. `ui/routeActions.ts` already computed every action's plan to
+decide whether it was enabled, so each `preview*` now returns the effect
+along with it and the button carries it (`RadialAction.preview`).
+
+- **Bars** (overlay and card): a touched class shows "21% -> 28%" and a
+  ghost segment (extra booking in the new colour; freed time hatched).
+- **Base ring:** a dashed arc just outside the real one at the new
+  fullest-pool share.
+- **Route arc:** green for an added flight, amber for a gauge change or a
+  removed flight, red dashed for removing the route.
+- Cleared when the pointer leaves, when the menu closes, and when an
+  action rebuilds the ring.
+- Not previewed: the airport ring (Route has nothing to show; leasing a
+  plane would change a pool's size rather than its bookings).
+
+
 ---
 
 ## Conventions worth knowing

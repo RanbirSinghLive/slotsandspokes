@@ -1,3 +1,5 @@
+import type { MapPreview } from '../render/preview';
+
 /**
  * The one radial menu every map click uses: a ring of circular buttons
  * around a point, real DOM positioned over the canvas (CLAUDE.md: never
@@ -28,6 +30,8 @@ export type RadialAction = {
   disabledReason?: string;
   confirm?: boolean;
   children?: RadialAction[];
+  /** What the map should show while this action is hovered (never for a disabled one). */
+  preview?: MapPreview;
   /** Runs when chosen. Return true to close the menu afterwards. */
   onSelect?: () => boolean | void;
 };
@@ -39,6 +43,8 @@ export type RadialSpec = {
   actions: RadialAction[];
   /** Called with what to show while a button is hovered (null when none), and whether it is a problem. */
   onHint: (text: string | null, isProblem: boolean) => void;
+  /** Called with the hovered action's preview, or null when the pointer leaves. */
+  onPreview?: (preview: MapPreview | null) => void;
 };
 
 const RING_RADIUS_PX = 56;
@@ -57,6 +63,7 @@ export function isRadialOpen(): boolean {
 }
 
 export function hideRadial(): void {
+  current?.onPreview?.(null);
   menuEl.hidden = true;
   menuEl.innerHTML = '';
   current = null;
@@ -111,10 +118,14 @@ function buildButton(action: RadialAction, spec: RadialSpec): HTMLButtonElement 
   // A button waiting for its second click keeps saying so, since the ring
   // is rebuilt under the pointer when it arms and re-fires the hover.
   button.addEventListener('mouseenter', () => {
+    spec.onPreview?.(action.disabledReason ? null : (action.preview ?? null));
     if (action.id === armedId) spec.onHint(`Click again to confirm: ${action.label}`, true);
     else spec.onHint(action.disabledReason ?? action.label, !!action.disabledReason);
   });
-  button.addEventListener('mouseleave', () => spec.onHint(null, false));
+  button.addEventListener('mouseleave', () => {
+    spec.onPreview?.(null);
+    spec.onHint(null, false);
+  });
   button.addEventListener('click', (event) => {
     event.stopPropagation();
     choose(action, spec);

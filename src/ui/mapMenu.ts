@@ -3,6 +3,7 @@ import { findNearestOwnRoute } from '../render/routes';
 import { projection } from '../render/projection';
 import { utilisationPools } from '../sim/utilisation';
 import { buildPoolRows } from './poolBars';
+import { getMapPreview, setMapPreview, type MapPreview } from '../render/preview';
 import type { SimState } from '../sim/state';
 import { getSelectedTail } from './fleetSelection';
 import { armRouteBuilderAt, candidateTailsAt } from './routeBuilder';
@@ -60,6 +61,8 @@ let anchorY = 0;
 // elsewhere on the map still says what it did.
 let notice: string | null = null;
 let hover: { text: string; problem: boolean } | null = null;
+let cardPoolBase: string | null = null;
+let cardPoolState: SimState | null = null;
 
 function money(amount: number): string {
   return `$${Math.round(amount).toLocaleString()}`;
@@ -68,6 +71,9 @@ function money(amount: number): string {
 export function hideMapMenu(): void {
   cardEl.hidden = true;
   hideRadial();
+  setMapPreview(null);
+  cardPoolBase = null;
+  cardPoolState = null;
   open = null;
   openState = null;
   notice = null;
@@ -100,9 +106,26 @@ function positionCard(): void {
 
 /** The class pools for the planes based at `base`, as bars; `emptyText` when there are none. */
 function fillPools(base: string | null, state: SimState, emptyText: string): void {
+  cardPoolBase = base;
+  cardPoolState = state;
   const pools = base ? utilisationPools(state, base).filter((pool) => pool.planes > 0) : [];
   basedEl.textContent = pools.length === 0 ? emptyText : `Planes based at ${base}:`;
-  poolsEl.replaceChildren(...buildPoolRows(pools));
+  renderCardPools();
+}
+
+/** Redraw the card's bars, applying whatever the hovered button would change. */
+function renderCardPools(): void {
+  if (!cardPoolBase || !cardPoolState) {
+    poolsEl.replaceChildren();
+    return;
+  }
+  const pools = utilisationPools(cardPoolState, cardPoolBase).filter((pool) => pool.planes > 0);
+  poolsEl.replaceChildren(...buildPoolRows(pools, getMapPreview()?.effects, cardPoolBase));
+}
+
+function onPreview(preview: MapPreview | null): void {
+  setMapPreview(preview);
+  renderCardPools();
 }
 
 function fillAirportCard(airport: Airport, state: SimState): void {
@@ -178,7 +201,7 @@ function openAirportMenu(airport: Airport, state: SimState): void {
   cardEl.hidden = false;
   positionCard();
   renderHint();
-  showRadial({ x: anchorX, y: anchorY, actions: airportActions(airport, state), onHint });
+  showRadial({ x: anchorX, y: anchorY, actions: airportActions(airport, state), onHint, onPreview });
 }
 
 // --- Routes ---------------------------------------------------------------
@@ -204,6 +227,7 @@ function routeActions(a: string, b: string, state: SimState): RadialAction[] {
   const gaugeDown = ops.previewGauge(state, a, b, -1);
   const addFlight = ops.previewAddFlight(state, a, b);
   const removeFlight = ops.previewRemoveFlight(state, a, b);
+  const removeRoute = ops.previewRemoveRoute(state, a, b);
 
   const act = (result: ops.Outcome<{ message: string }>): boolean => {
     notice = result.ok ? result.message : result.reason;
@@ -218,6 +242,7 @@ function routeActions(a: string, b: string, state: SimState): RadialAction[] {
       icon: ICON.gaugeDown,
       angleDeg: -170,
       disabledReason: gaugeDown.ok ? undefined : gaugeDown.reason,
+      preview: gaugeDown.ok ? gaugeDown.preview : undefined,
       onSelect: () => act(ops.applyGauge(state, a, b, -1)),
     },
     {
@@ -226,6 +251,7 @@ function routeActions(a: string, b: string, state: SimState): RadialAction[] {
       icon: ICON.gaugeUp,
       angleDeg: -132,
       disabledReason: gaugeUp.ok ? undefined : gaugeUp.reason,
+      preview: gaugeUp.ok ? gaugeUp.preview : undefined,
       onSelect: () => act(ops.applyGauge(state, a, b, 1)),
     },
     {
@@ -234,6 +260,7 @@ function routeActions(a: string, b: string, state: SimState): RadialAction[] {
       icon: ICON.minus,
       angleDeg: -94,
       disabledReason: removeFlight.ok ? undefined : removeFlight.reason,
+      preview: removeFlight.ok ? removeFlight.preview : undefined,
       onSelect: () => act(ops.removeFlight(state, a, b)),
     },
     {
@@ -242,6 +269,7 @@ function routeActions(a: string, b: string, state: SimState): RadialAction[] {
       icon: ICON.plus,
       angleDeg: -56,
       disabledReason: addFlight.ok ? undefined : addFlight.reason,
+      preview: addFlight.ok ? addFlight.preview : undefined,
       onSelect: () => act(ops.addFlight(state, a, b)),
     },
     {
@@ -250,6 +278,7 @@ function routeActions(a: string, b: string, state: SimState): RadialAction[] {
       icon: ICON.remove,
       angleDeg: -18,
       confirm: true,
+      preview: removeRoute.ok ? removeRoute.preview : undefined,
       onSelect: () => {
         const result = ops.removeRoute(state, a, b);
         notice = result.ok ? result.message : result.reason;
@@ -276,7 +305,7 @@ function openRouteMenu(a: string, b: string, state: SimState, x: number, y: numb
   cardEl.hidden = false;
   positionCard();
   renderHint();
-  showRadial({ x: anchorX, y: anchorY, actions: routeActions(a, b, state), onHint });
+  showRadial({ x: anchorX, y: anchorY, actions: routeActions(a, b, state), onHint, onPreview });
 }
 
 // --- Shared ---------------------------------------------------------------
@@ -289,6 +318,7 @@ function refresh(): void {
   // report the pointer leaving; without this its hint would stay on screen
   // over the result of the click.
   hover = null;
+  setMapPreview(null);
 
   if (open.kind === 'airport') {
     fillAirportCard(open.airport, state);

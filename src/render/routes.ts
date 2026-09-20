@@ -3,11 +3,13 @@ import type { LineString } from 'geojson';
 import { projection } from './projection';
 import { airports } from './airports';
 import { distanceToArc } from './competition';
+import { getMapPreview } from './preview';
 import type { SimState } from '../sim/state';
 
 const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]));
 
 const ROUTE_STROKE = '#3a4258';
+const PREVIEW_STROKE = { add: '#7fd88f', change: '#ffd166', remove: '#ff8080' } as const;
 
 /**
  * Distinct origin-destination city pairs, ignoring direction — YUL-YYZ and
@@ -63,6 +65,31 @@ export function drawRoutes(ctx: CanvasRenderingContext2D, state: SimState): void
     path(line);
     ctx.stroke();
   }
+
+  // The route the hovered menu button would change, drawn over the top:
+  // green for an added flight, amber for a change, red and dashed for a
+  // removal (render/preview.ts).
+  const preview = getMapPreview();
+  if (!preview) return;
+  ctx.save();
+  ctx.lineWidth = 3;
+  for (const { origin, dest, kind } of preview.routes) {
+    const originAirport = airportsByIata.get(origin);
+    const destAirport = airportsByIata.get(dest);
+    if (!originAirport || !destAirport) continue;
+    ctx.strokeStyle = PREVIEW_STROKE[kind];
+    ctx.setLineDash(kind === 'remove' ? [6, 4] : []);
+    ctx.beginPath();
+    path({
+      type: 'LineString',
+      coordinates: [
+        [originAirport.lon, originAirport.lat],
+        [destAirport.lon, destAirport.lat],
+      ],
+    } as LineString);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 // How close a click has to land to a route's arc to count as hitting it.

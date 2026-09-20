@@ -2,6 +2,7 @@ import airportsData from '../../data/airports.json';
 import { projection } from './projection';
 import { dailyDeparturesAt, airportLevel, isSlotControlled, slotsOwned, slotsTotal } from '../sim/airports';
 import { worstPoolShareByBase } from '../sim/utilisation';
+import { getMapPreview } from './preview';
 import type { SimState } from '../sim/state';
 
 export type Airport = {
@@ -107,6 +108,10 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState): vo
   // can ever collide with, so it's naturally excluded from every lookup
   // below without needing a separate check.
   const worstShareByIata = worstPoolShareByBase(state);
+  // With a menu button hovered: where each ring would land if it were
+  // pressed, drawn as a dashed arc just outside the real one.
+  const previewEffects = getMapPreview()?.effects ?? [];
+  const previewShareByIata = previewEffects.length > 0 ? worstPoolShareByBase(state, previewEffects) : null;
 
   for (const airport of airports) {
     const point = projection([airport.lon, airport.lat]);
@@ -144,6 +149,18 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState): vo
       ctx.strokeStyle = over ? CAPACITY_RING_RED : lerpCapacityColor(swept);
       ctx.lineWidth = over ? CAPACITY_RING_OVER_LINE_WIDTH : CAPACITY_RING_LINE_WIDTH;
       ctx.stroke();
+
+      const previewShare = previewShareByIata?.get(airport.iata);
+      if (previewShare !== undefined && Math.abs(previewShare - worstShare) > 0.005) {
+        ctx.save();
+        ctx.setLineDash([2, 2]);
+        ctx.beginPath();
+        ctx.arc(x, y, ringRadius + 3.5, -Math.PI / 2, -Math.PI / 2 + Math.min(previewShare, 1) * 2 * Math.PI);
+        ctx.strokeStyle = capacityColor(previewShare);
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+      }
     }
 
     ctx.beginPath();

@@ -7,6 +7,7 @@ import { actualDailyDemand, currentPotentialDemand } from '../sim/marketDemand';
 import { candidateTailsAt, commitRotation, planRotation, type RotationPlan } from './routeBuilder';
 import { removeRotation } from './panels';
 import type { SimState } from '../sim/state';
+import type { MapPreview } from '../render/preview';
 
 /**
  * What the map menu (ui/mapMenu.ts) can do to the network, as plain
@@ -111,7 +112,11 @@ function explainFailure(error: string, className: string, baseIata: string): str
 
 // --- Frequency ---------------------------------------------------------
 
-export function previewAddFlight(state: SimState, a: string, b: string): Outcome<{ tail: string; plan: RotationPlan; className: string }> {
+export function previewAddFlight(
+  state: SimState,
+  a: string,
+  b: string,
+): Outcome<{ tail: string; plan: RotationPlan; className: string; preview: MapPreview }> {
   const { roundTrips } = summariseMarket(state, a, b);
   if (roundTrips.length === 0) return { ok: false, reason: MULTI_STOP_REASON };
 
@@ -129,7 +134,13 @@ export function previewAddFlight(state: SimState, a: string, b: string): Outcome
   let firstError = '';
   for (const tail of tails) {
     const plan = planRotation([base], other, tail, state);
-    if (!plan.error) return { ok: true, tail, plan, className };
+    if (!plan.error) {
+      const preview: MapPreview = {
+        effects: [{ base: base.iata, classCode: typeCode, minutes: plan.rotationMinutes }],
+        routes: [{ origin: a, dest: b, kind: 'add' }],
+      };
+      return { ok: true, tail, plan, className, preview };
+    }
     firstError ||= plan.error;
   }
   return { ok: false, reason: explainFailure(firstError, className, base.iata) };
@@ -142,11 +153,16 @@ export function addFlight(state: SimState, a: string, b: string): Outcome<{ mess
   return { ok: true, message: `Added a ${preview.className} flight on ${a}–${b} (${preview.tail}).` };
 }
 
-export function previewRemoveFlight(state: SimState, a: string, b: string): Outcome<{ rotation: Rotation }> {
+export function previewRemoveFlight(state: SimState, a: string, b: string): Outcome<{ rotation: Rotation; preview: MapPreview }> {
   const { roundTrips } = summariseMarket(state, a, b);
   if (roundTrips.length === 0) return { ok: false, reason: MULTI_STOP_REASON };
   if (roundTrips.length === 1) return { ok: false, reason: 'This is the last flight. Use Remove route to delete the route.' };
-  return { ok: true, rotation: latest(roundTrips) };
+  const rotation = latest(roundTrips);
+  const preview: MapPreview = {
+    effects: [{ base: rotation.airports[0], classCode: typeCodeOf(state, rotation.tail), minutes: -rotation.minutes }],
+    routes: [{ origin: a, dest: b, kind: 'change' }],
+  };
+  return { ok: true, rotation, preview };
 }
 
 export function removeFlight(state: SimState, a: string, b: string): Outcome<{ message: string }> {
@@ -174,7 +190,7 @@ export function previewGauge(
   a: string,
   b: string,
   direction: 1 | -1,
-): Outcome<{ rotation: Rotation; tail: string; plan: RotationPlan; fromName: string; toName: string }> {
+): Outcome<{ rotation: Rotation; tail: string; plan: RotationPlan; fromName: string; toName: string; preview: MapPreview }> {
   const { roundTrips } = summariseMarket(state, a, b);
   if (roundTrips.length === 0) return { ok: false, reason: MULTI_STOP_REASON };
 
@@ -201,7 +217,16 @@ export function previewGauge(
   let firstError = '';
   for (const tail of tails) {
     const plan = planRotation([base], other, tail, withoutIt);
-    if (!plan.error) return { ok: true, rotation, tail, plan, fromName: fromClass.name, toName: target.name };
+    if (!plan.error) {
+      const preview: MapPreview = {
+        effects: [
+          { base: base.iata, classCode: fromClass.code, minutes: -rotation.minutes },
+          { base: base.iata, classCode: target.code, minutes: plan.rotationMinutes },
+        ],
+        routes: [{ origin: a, dest: b, kind: 'change' }],
+      };
+      return { ok: true, rotation, tail, plan, fromName: fromClass.name, toName: target.name, preview };
+    }
     firstError ||= plan.error;
   }
   return { ok: false, reason: explainFailure(firstError, target.name, base.iata) };
@@ -222,6 +247,23 @@ export function applyGauge(state: SimState, a: string, b: string, direction: 1 |
 }
 
 // --- Removing a route -----------------------------------------------------
+
+/** What removing the whole route would free, for the hover preview. */
+export function previewRemoveRoute(state: SimState, a: string, b: string): Outcome<{ preview: MapPreview }> {
+  const rotations = rotationsServing(state, a, b);
+  if (rotations.length === 0) return { ok: false, reason: 'Nothing flies this route.' };
+  return {
+    ok: true,
+    preview: {
+      effects: rotations.map((rotation) => ({
+        base: rotation.airports[0],
+        classCode: typeCodeOf(state, rotation.tail),
+        minutes: -rotation.minutes,
+      })),
+      routes: [{ origin: a, dest: b, kind: 'remove' }],
+    },
+  };
+}
 
 export function removeRoute(state: SimState, a: string, b: string): Outcome<{ message: string }> {
   const rotations = rotationsServing(state, a, b);

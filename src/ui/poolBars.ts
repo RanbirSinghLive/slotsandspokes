@@ -1,5 +1,6 @@
 import { capacityColor } from '../render/airports';
-import { utilisationPools, type ClassPool } from '../sim/utilisation';
+import { utilisationPools, type ClassPool, type PoolEffect } from '../sim/utilisation';
+import { getMapPreview } from '../render/preview';
 import type { SimState } from '../sim/state';
 
 /**
@@ -21,8 +22,14 @@ function hours(minutes: number): string {
   return (minutes / 60).toFixed(1);
 }
 
-/** Rows for every class that has at least one plane. */
-export function buildPoolRows(pools: ClassPool[]): HTMLElement[] {
+/**
+ * Rows for every class that has at least one plane. `effects` are what a
+ * hovered button would change (see render/preview.ts): a row it touches
+ * shows a ghost segment for the change and "now -> then". With `base` set,
+ * only effects at that base count (the airport and route cards); without
+ * it, all of them (the whole-fleet overlay).
+ */
+export function buildPoolRows(pools: ClassPool[], effects: PoolEffect[] = [], base?: string): HTMLElement[] {
   return pools
     .filter((pool) => pool.planes > 0)
     .map((pool) => {
@@ -42,10 +49,27 @@ export function buildPoolRows(pools: ClassPool[]): HTMLElement[] {
       fill.style.background = capacityColor(pool.share);
       bar.appendChild(fill);
 
+      const delta = effects
+        .filter((e) => e.classCode === pool.code && (base === undefined || e.base === base))
+        .reduce((total, e) => total + e.minutes, 0);
+      const nextShare = pool.capacityMinutes > 0 ? Math.max(0, pool.usedMinutes + delta) / pool.capacityMinutes : 0;
+      const shownShare = delta !== 0 ? nextShare : pool.share;
+
+      if (delta !== 0) {
+        const from = Math.min(pool.share, 1);
+        const to = Math.min(nextShare, 1);
+        const ghost = document.createElement('span');
+        ghost.className = delta > 0 ? 'pool-ghost is-add' : 'pool-ghost is-free';
+        ghost.style.left = `${Math.min(from, to) * 100}%`;
+        ghost.style.width = `${Math.abs(to - from) * 100}%`;
+        if (delta > 0) ghost.style.background = capacityColor(nextShare);
+        bar.appendChild(ghost);
+      }
+
       const value = document.createElement('span');
       value.className = 'pool-value';
-      value.textContent = `${Math.round(pool.share * 100)}%`;
-      if (pool.share >= 1) value.classList.add('is-over');
+      value.textContent = delta !== 0 ? `${Math.round(pool.share * 100)}% → ${Math.round(nextShare * 100)}%` : `${Math.round(pool.share * 100)}%`;
+      if (shownShare >= 1) value.classList.add('is-over');
 
       row.append(name, bar, value);
       return row;
@@ -60,10 +84,13 @@ let signature: string | null = null;
  */
 export function updatePoolBars(state: SimState): void {
   const pools = utilisationPools(state).filter((pool) => pool.planes > 0);
-  const next = pools.map((pool) => `${pool.code}:${pool.planes}:${Math.round(pool.share * 100)}:${Math.round(pool.usedMinutes)}`).join('|');
+  const effects = getMapPreview()?.effects ?? [];
+  const next =
+    pools.map((pool) => `${pool.code}:${pool.planes}:${Math.round(pool.share * 100)}:${Math.round(pool.usedMinutes)}`).join('|') +
+    `#${effects.map((e) => `${e.base}${e.classCode}${Math.round(e.minutes)}`).join(',')}`;
   if (next === signature) return;
   signature = next;
 
   overlayEl.hidden = pools.length === 0;
-  overlayEl.replaceChildren(...buildPoolRows(pools));
+  overlayEl.replaceChildren(...buildPoolRows(pools, effects));
 }

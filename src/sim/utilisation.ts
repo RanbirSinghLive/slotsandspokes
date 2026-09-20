@@ -148,6 +148,13 @@ export type ClassPool = {
   share: number;
 };
 
+/**
+ * A hypothetical change to one pool's booked minutes: what a hover preview
+ * says an action *would* do (ui/routeActions.ts). Negative frees time.
+ * Never applied to state; only ever added on top of a read.
+ */
+export type PoolEffect = { base: string; classCode: string; minutes: number };
+
 export function utilisationPools(state: SimState, base?: string): ClassPool[] {
   return AIRCRAFT_CLASSES.map((cls) => {
     const planes = state.aircraft.filter((a) => a.typeCode === cls.code && (base === undefined || a.baseAirport === base));
@@ -170,7 +177,7 @@ export function utilisationPools(state: SimState, base?: string): ClassPool[] {
  * with the per-class detail one click away in the airport card. Planes
  * with no base are left out, since they cannot fly a rotation yet.
  */
-export function worstPoolShareByBase(state: SimState): Map<string, number> {
+export function worstPoolShareByBase(state: SimState, effects: PoolEffect[] = []): Map<string, number> {
   const pools = new Map<string, { used: number; capacity: number }>();
   for (const aircraft of state.aircraft) {
     if (!aircraft.baseAirport) continue;
@@ -179,6 +186,11 @@ export function worstPoolShareByBase(state: SimState): Map<string, number> {
     pool.used += aircraftUtilisation(state, aircraft.tail).minutes;
     pool.capacity += USABLE_DAY_MINUTES;
     pools.set(key, pool);
+  }
+
+  for (const effect of effects) {
+    const pool = pools.get(`${effect.base}|${effect.classCode}`);
+    if (pool) pool.used += effect.minutes;
   }
 
   const worst = new Map<string, number>();
