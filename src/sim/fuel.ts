@@ -1,4 +1,5 @@
 import { nextRandom } from './rng';
+import { FUEL_PRICE_MOVES } from './features';
 import type { SimState } from './state';
 
 /**
@@ -60,6 +61,8 @@ export const FUEL_PRICE_HISTORY_MAX_DAYS = 60;
  * every time (CLAUDE.md's determinism rule).
  */
 export function rollDailyFuelPrice(state: SimState): void {
+  if (!FUEL_PRICE_MOVES) return;
+
   state.fuelPriceHistory.push(state.fuelPriceIndex);
   if (state.fuelPriceHistory.length > FUEL_PRICE_HISTORY_MAX_DAYS) {
     state.fuelPriceHistory.shift();

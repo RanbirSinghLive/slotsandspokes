@@ -15,3 +15,17 @@
  * block-hour cost stays inside block-hour cost (see sim/economy.ts).
  */
 export const CREWS_ENABLED = false;
+
+/**
+ * Fuel price swings: a mean-reverting random walk on the fuel share of
+ * block-hour cost. Off pins the index at its baseline of 1, so fuel is a
+ * steady cost rather than noise the player can't act on.
+ */
+export const FUEL_PRICE_MOVES = false;
+
+/**
+ * Airport slots: the two slot-controlled fields (YYZ, LGA) gating how many
+ * departures you may add there. Off means no airport is slot-controlled,
+ * so nothing gates route building and there is nothing to buy.
+ */
+export const SLOTS_ENABLED = false;

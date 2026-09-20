@@ -663,14 +663,35 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
 export const STARTING_CASH = 500_000;
 
 /**
- * The state an actual new game starts from (week three's Fleet Market) —
- * zero aircraft, zero schedule, zero routes. Nothing flies and nothing
- * earns until the player buys or leases a first aircraft from
- * `fleetMarket` (ui/fleetMarket.ts) and draws a route for it
- * (ui/routeBuilder.ts); wherever that first aircraft gets based is
- * whatever the player picks at the moment of purchase, which is what
- * makes this also double as "choosing a home airport" without needing a
- * separate step for it.
+ * Two propeller planes already parked and based at Montréal, so the first
+ * thing a new player does is draw a route on the map, not shop in a table
+ * and wait weeks for a delivery. Montréal because five of the closest
+ * airports sit inside a propeller's range from it.
+ */
+const STARTING_BASE = 'YUL';
+const STARTING_TAILS = ['C-FSTA', 'C-FSTB'];
+
+function createStartingFleet(): Aircraft[] {
+  return STARTING_TAILS.map((tail) => ({
+    tail,
+    typeCode: aircraftType.code,
+    status: 'ground',
+    atAirport: STARTING_BASE,
+    activeLegId: null,
+    groundSinceMinute: 0,
+    ownership: 'owned',
+    leaseCostPerDay: 0,
+    ageYears: 0,
+    baseAirport: STARTING_BASE,
+  }));
+}
+
+/**
+ * The state an actual new game starts from — two starting propeller
+ * planes (createStartingFleet() above), zero schedule, zero routes.
+ * Nothing flies and nothing earns until the player draws a route
+ * (ui/routeBuilder.ts); more aircraft come from the Fleet Market
+ * (ui/fleetMarket.ts).
  *
  * Distinct from createInitialState() above on purpose — that one exists
  * only to keep the headless runner's known, fully-formed test network
@@ -680,7 +701,7 @@ export function createNewGameState(rngSeed: number = Date.now()): SimState {
   return {
     simMinute: 0,
     cash: STARTING_CASH,
-    aircraft: [],
+    aircraft: createStartingFleet(),
     activeFlights: [],
     schedule: [],
     routeSettings: {},

@@ -1,5 +1,6 @@
 import airportsData from '../../data/airports.json';
 import type { SimState } from './state';
+import { SLOTS_ENABLED } from './features';
 
 /**
  * Week six's airport layer: how much of an airline you are *at each
@@ -81,6 +82,7 @@ export function routeConnectivityMultiplier(state: SimState, origin: string, des
 
 /** Total slots that exist at this airport, or null where slots aren't controlled at all. */
 export function slotsTotal(iata: string): number | null {
+  if (!SLOTS_ENABLED) return null;
   return byIata.get(iata)?.slotsTotal ?? null;
 }
 

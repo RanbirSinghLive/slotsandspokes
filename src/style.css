@@ -461,6 +461,12 @@ body {
   cursor: pointer;
 }
 
+/* Same specificity gotcha as the panes above: the rule just above sets
+   display, which beats the browser's default [hidden] { display: none }. */
+#sidebar-tabs button[hidden] {
+  display: none;
+}
+
 #sidebar-tabs button svg {
   width: 17px;
   height: 17px;

@@ -158,6 +158,12 @@ const devPanelEl = document.querySelector<HTMLDivElement>('#dev-panel')!;
 const gameTabEl = document.querySelector<HTMLDivElement>('#game-tab')!;
 const sidebarTabButtons = document.querySelectorAll<HTMLButtonElement>('#sidebar-tabs button');
 
+// The Dev tab is a debugging tool, not part of the game: hidden unless the
+// page is opened with ?dev in the URL.
+if (new URLSearchParams(window.location.search).has('dev')) {
+  document.querySelector<HTMLButtonElement>('#sidebar-tabs [data-tab="dev"]')!.hidden = false;
+}
+
 // Both resize()'s canvas sizing and the CSS `--panel-width` custom
 // property (style.css's #map/#panel both read it) come from this one
 // variable, so they can never drift apart the way two separately-updated

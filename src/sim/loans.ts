@@ -121,14 +121,12 @@ export function applyDailyLoanInterest(state: SimState): void {
 export const CASH_FLOOR = -(LOAN_PRINCIPAL * MAX_LOANS);
 
 /**
- * The game's actual failure state, either way it can be reached: Cash
- * has fallen past the whole credit line (CASH_FLOOR above — nothing
- * could bring it back), or Cash has hit zero with every MAX_LOANS slot
- * already spoken for. ui/loans.ts checks this every frame to decide
- * whether to show the loan offer (still room to borrow, still above the
- * floor) or the game-over screen.
+ * The game's failure state: Cash has hit zero, full stop. It used to
+ * take the whole credit line running out (CASH_FLOOR above, MAX_LOANS
+ * slots); with the Executive tab parked there is no way to borrow, so the
+ * loan machinery in this file is dormant and only this line decides.
+ * ui/loans.ts checks it every frame to show the game-over screen.
  */
 export function isInsolvent(state: SimState): boolean {
-  if (state.cash <= CASH_FLOOR) return true;
-  return state.cash <= 0 && state.loans.length >= MAX_LOANS;
+  return state.cash <= 0;
 }

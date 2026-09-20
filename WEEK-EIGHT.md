@@ -355,6 +355,31 @@ $4,586,231 (no payroll, no crew cancellations). `npm run sweep -- reserve`
 is now flat and meaningless while the flag is off.
 
 
+### Done: mini-metro pass (start with planes, fewer tabs, zero cash ends the game)
+
+- **A new game starts with two owned propeller planes based at YUL**
+  (`createStartingFleet()` in `sim/state.ts`), so the first move is drawing
+  a route from the map. $500,000 is still the opening cash.
+- **Only Fleet, Fleet Market, On-Time and Game tabs are visible.** Commercial,
+  Executive, Airports, Missions and Dev are `hidden` (Dev returns with
+  `?dev` in the URL). Fares and marketing stay at their defaults, loans are
+  unreachable.
+- **`FUEL_PRICE_MOVES` and `SLOTS_ENABLED` (`sim/features.ts`) are `false`**
+  so the parked tabs don't leave invisible rules behind: fuel is pinned at
+  its baseline and no airport is slot-controlled.
+- **`isInsolvent()` is just `cash <= 0`.** The loan code is dormant.
+- **Bug fixed:** `#sidebar-tabs button { display: flex }` beat the `hidden`
+  attribute, so hidden tab buttons (Tech Tree, Crew and the rest) were never
+  actually hidden on screen. The last tuck-away was only checked via the
+  `hidden` property. Fixed with a `[hidden]` rule.
+- Known leftovers: the HUD still shows Reputation, NPS and On-time;
+  competitor route openings still fire and appear in the ticker; a mission
+  completion can still surface in the ticker.
+
+`npm run headless` final cash is now $5,484,951 (was $4,586,231 before fuel
+and slots were parked).
+
+
 ---
 
 ## Conventions worth knowing
