@@ -58,7 +58,8 @@ let hasSeenInitialWeather = false;
 let previousWeatherAirports = new Set<string>();
 
 function pollWeatherEvents(state: SimState): void {
-  const currentAirports = new Set(Object.keys(state.weatherByAirport));
+  const known = new Set(state.knownAirports);
+  const currentAirports = new Set(Object.keys(state.weatherByAirport).filter((iata) => known.has(iata)));
 
   // First call just establishes the baseline — a fresh page load or a
   // resumed save with weather already active shouldn't announce every
@@ -113,7 +114,34 @@ function pollMissionEvents(state: SimState): void {
   }
 }
 
+let previousKnownCount: number | null = null;
+let previousKnown = new Set<string>();
+
+/**
+ * Announce airports the fog has just lifted from. The first call only
+ * records what is already known, so loading a save does not announce
+ * the whole map.
+ */
+function pollReachEvents(state: SimState): void {
+  // At minute 0 nothing has happened yet, so whatever is known is the
+  // starting picture (including the reveal from choosing a home city), not news.
+  if (previousKnownCount === null || state.simMinute === 0) {
+    previousKnown = new Set(state.knownAirports);
+    previousKnownCount = previousKnown.size;
+    return;
+  }
+  if (state.knownAirports.length === previousKnownCount) return;
+
+  const added = state.knownAirports.filter((iata) => !previousKnown.has(iata));
+  previousKnown = new Set(state.knownAirports);
+  previousKnownCount = previousKnown.size;
+  if (added.length === 0) return;
+  const shown = added.slice(0, 4).join(', ');
+  pushEvent(state.simMinute, `New airports in reach: ${shown}${added.length > 4 ? ` and ${added.length - 4} more` : ''}`);
+}
+
 export function updateTicker(state: SimState): void {
+  pollReachEvents(state);
   pollWeatherEvents(state);
   pollMissionEvents(state);
 }

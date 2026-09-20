@@ -28,6 +28,7 @@ import { minuteOfDayToTimeString, renderScheduleWarnings, scheduleProblems } fro
 import { addCommercialRow } from './commercial';
 import { policyFare } from '../sim/pricing';
 import { classRank } from '../sim/aircraftClasses';
+import { revealReach } from '../sim/reach';
 import { hideCompetitionTooltip } from './competitionTooltip';
 import type { SimState } from '../sim/state';
 
@@ -970,6 +971,9 @@ export function commitRotation(state: SimState, tail: string, plan: RotationPlan
     addCommercialRow(leg.origin, leg.dest, state);
   }
 
+  // A rotation adds its airports to the network, which can open the fog
+  // around them (sim/reach.ts).
+  revealReach(state);
   return createdLegIds;
 }
 

@@ -57,7 +57,11 @@ export function unmetDemandByAirport(state: SimState): Map<string, AirportUnmet>
     byAirport.set(iata, entry);
   };
 
+  // Only markets between airports the player can see: demand to somewhere
+  // still in the fog would leak where the opportunity is.
+  const known = new Set(state.knownAirports);
   for (const [a, b] of ALL_MARKET_PAIRS) {
+    if (!known.has(a) || !known.has(b)) continue;
     const seats = seatsByMarket.get(marketKey(a, b)) ?? 0;
     const latent = Math.max(0, currentPotentialDemand(state, a, b) - seats) / 2;
     const spilled = seats > 0 ? Math.max(0, actualDailyDemand(state, a, b) - seats) / 2 : 0;

@@ -3,6 +3,7 @@ import { AIRCRAFT_CLASSES, classByCode, classRank } from '../sim/aircraftClasses
 import { isAircraftTypeAllowedAt, legsServingMarket, marketKey } from '../sim/schedule';
 import { allRotations, type Rotation } from '../sim/utilisation';
 import { cashNeededToLease, LEASE_RESERVE_DAYS, leaseAircraft, loadLeaseRates } from '../sim/leasing';
+import { revealReach } from '../sim/reach';
 import { actualDailyDemand, currentPotentialDemand } from '../sim/marketDemand';
 import { candidateTailsAt, commitRotation, planRotation, type RotationPlan } from './routeBuilder';
 import { removeRotation } from './panels';
@@ -310,5 +311,6 @@ export function leasePlane(state: SimState, iata: string, typeCode: string): Out
   if (option.disabledReason) return { ok: false, reason: option.disabledReason };
 
   const aircraft = leaseAircraft(state, typeCode, iata);
+  revealReach(state);
   return { ok: true, message: `${option.name} leased at ${iata} for $${option.leasePerDay.toLocaleString()}/day (${aircraft.tail}).` };
 }

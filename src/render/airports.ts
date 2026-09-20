@@ -26,6 +26,24 @@ export type Airport = {
 
 export const airports: Airport[] = airportsData;
 
+// Fog by reach (sim/reach.ts): only known airports are drawn or can be
+// clicked. main.ts hands the list over every frame; a renderer never
+// reads it from `state` itself so hit-testing (which has no state) agrees
+// with what is on screen. The sim replaces the array whenever the set
+// changes (sim/reach.ts), so comparing the reference is enough.
+let knownList: string[] | null = null;
+let knownSet: Set<string> | null = null;
+
+export function setKnownAirports(list: string[]): void {
+  if (list === knownList) return;
+  knownList = list;
+  knownSet = new Set(list);
+}
+
+export function isAirportKnown(iata: string): boolean {
+  return knownSet === null || knownSet.has(iata);
+}
+
 // Unmet demand, drawn like passengers waiting at a station (sim/unmetDemand.ts
 // has the definitions): a ring of small pips around each airport, hollow for
 // riders nobody is carrying yet and solid amber for riders being turned away
@@ -128,6 +146,7 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState): vo
   const previewShareByIata = previewEffects.length > 0 ? worstPoolShareByBase(state, previewEffects) : null;
 
   for (const airport of airports) {
+    if (!isAirportKnown(airport.iata)) continue;
     const point = projection([airport.lon, airport.lat]);
     if (!point) continue; // null if the point falls outside the projection's domain
     const [x, y] = point;
@@ -226,6 +245,7 @@ export function findNearestAirport(screenX: number, screenY: number): Airport | 
   let nearest: Airport | null = null;
   let nearestDistPx = HIT_RADIUS_PX;
   for (const airport of airports) {
+    if (!isAirportKnown(airport.iata)) continue;
     const point = projection([airport.lon, airport.lat]);
     if (!point) continue;
     const distPx = Math.hypot(point[0] - screenX, point[1] - screenY);

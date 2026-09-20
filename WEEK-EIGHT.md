@@ -662,12 +662,52 @@ saves immediately, refits the map around it, and starts the clock.
   fixture still starts from Montreal.
 - Spacebar is ignored while the picker is open, so the clock cannot start
   behind it.
-- Still open in the escalation plan: fog by reach (all 40 airports are
-  drawn and usable today; most are simply off screen from a given start),
-  the time-pressure knob, and long-haul balance (fares, demand and lease
-  rates were tuned on the small map).
+- Still open in the escalation plan: the time-pressure knob, and long-haul
+  balance (fares, demand and lease rates were tuned on the small map).
 - Known leftover: the loan-offer modal in `ui/loans.ts` can no longer be
   reached (cash at zero ends the game), and is dead code.
+
+
+### Done: fog by reach
+
+Only airports you could fly to are shown; the map opens up as you grow.
+Rules live in `sim/reach.ts`:
+
+- **Network** = your home city, every airport a plane is based at, and
+  every airport a rotation touches.
+- **Reach** = the range of the biggest class you have leased (380 nm to
+  start).
+- An airport becomes **known** when it is within reach of a network
+  airport, and **stays known** (`SimState.knownAirports`, only ever grows;
+  `SAVE_KEY` is `v32`). Removing a route or a plane never re-closes the
+  fog. Revealing is not transitive: a newly known airport only opens its
+  own ring once you fly there.
+- `revealReach()` runs after a lease, after a rotation is committed, when a
+  home is chosen, and once a day as a backstop. Cash decides when: leasing a
+  class needs 14 days of it on hand.
+
+What the player sees: unknown airports are not drawn, not clickable (the
+hit-test respects it), not in the pips or demand overlay or competitor
+layer, and their weather is not announced. A dark fog sheet covers the
+rest of the map (`render/fog.ts`), with clear circles around the network
+out to your reach and small discs around known airports. The ticker says
+"New airports in reach: DUB". Tested from Paris: a Propeller hop to London
+revealed Dublin; leasing a Narrowbody (2,400 nm) opened Iceland and the
+Newfoundland airports. The zoom-out limit went from 0.5x to 0.15x so a
+widebody's reach can be seen.
+
+Limits worth knowing:
+- Fog circles are capped at 40 degrees (2,400 nm): a bigger circle would
+  swallow a pole, which Mercator cannot draw. Beyond that airports are
+  still known and drawn, in their own small clear disc, but the fog sheet
+  is not lifted around them.
+- Nothing stops you flying to an airport that is known but beyond a
+  plane's own range; the route planner refuses it, as before.
+- At world zoom the labels of a dense cluster overlap; a proper level of
+  detail is not built.
+- Not built: time pressure, and long-haul balance. Fares, demand and lease
+  rates were tuned on the small map, and a widebody is only 1.3x a
+  narrowbody there.
 
 
 ---
@@ -675,7 +715,7 @@ saves immediately, refits the map around it, and starts the clock.
 ## Conventions worth knowing
 
 - **Bump `SAVE_KEY` in `src/ui/save.ts` on any breaking `SimState`
-  change.** Currently `v31`.
+  change.** Currently `v32`.
 - **`headless-output.csv` and `sweep-reserve.csv` must stay
   byte-identical** across changes that aren't meant to affect balance.
   Both were verified unchanged after the delivery work — `createInitialState()`

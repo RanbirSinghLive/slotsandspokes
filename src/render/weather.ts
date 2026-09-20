@@ -1,5 +1,5 @@
 import { projection } from './projection';
-import { airports } from './airports';
+import { airports, isAirportKnown } from './airports';
 import type { SimState } from '../sim/state';
 
 // Purely decorative — CLAUDE.md's determinism rule is about step() (the
@@ -29,7 +29,7 @@ export function drawWeatherEffects(ctx: CanvasRenderingContext2D, state: SimStat
 
   for (const airport of airports) {
     const event = state.weatherByAirport[airport.iata];
-    if (!event) continue;
+    if (!event || !isAirportKnown(airport.iata)) continue;
 
     const point = projection([airport.lon, airport.lat]);
     if (!point) continue;

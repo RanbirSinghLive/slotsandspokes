@@ -1,6 +1,7 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { loadSchedule, marketKey, recommendedFare, type ScheduleLeg } from './schedule';
 import { leaseAircraft, leaseRateFor } from './leasing';
+import { allAirportCodes, revealReach } from './reach';
 import { loadCompetitorRoutes, type CompetitorOffering } from './competitors';
 import type { WeatherEvent } from './weather';
 import type { Loan } from './loans';
@@ -120,6 +121,12 @@ export type SimState = {
   simMinute: number;
   /** The airport the player chose to start from (sim/homes.ts). The map centres on it. */
   homeAirport: string;
+  /**
+   * Airports the player can see and use (fog by reach, sim/reach.ts).
+   * Only ever grows. Everything else is hidden on the map and cannot be
+   * a route's endpoint.
+   */
+  knownAirports: string[];
   cash: number;
   aircraft: Aircraft[];
   activeFlights: ActiveFlight[];
@@ -554,6 +561,8 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
   const state: SimState = {
     simMinute: 0,
     homeAirport: DEFAULT_HOME_AIRPORT,
+    // The headless fixture predates fog and flies wherever its schedule says.
+    knownAirports: allAirportCodes(),
     cash: 0,
     aircraft,
     activeFlights: [],
@@ -672,9 +681,10 @@ export function createStartingFleet(homeIata: string): Aircraft[] {
  * exactly as it always was; this one is the real "New Game" entry point.
  */
 export function createNewGameState(rngSeed: number = Date.now(), homeIata: string = DEFAULT_HOME_AIRPORT): SimState {
-  return {
+  const state: SimState = {
     simMinute: 0,
     homeAirport: homeIata,
+    knownAirports: [],
     cash: STARTING_CASH,
     aircraft: createStartingFleet(homeIata),
     activeFlights: [],
@@ -727,4 +737,6 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     lastTargetResult: null,
     todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0, training: 0 },
   };
+  revealReach(state);
+  return state;
 }

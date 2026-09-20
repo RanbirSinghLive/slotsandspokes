@@ -7,6 +7,7 @@ import { rollTotalDelayMinutes } from './delays';
 import { rollCompetitorRouteOpenings } from './competitors';
 import { rollDailyFuelPrice } from './fuel';
 import { rollDailyMarketDemand, actualDailyDemand } from './marketDemand';
+import { revealReach } from './reach';
 import { checkMissions } from './missions';
 import { rollDailyCrew, rollDailyMechanicalGroundings, maintenanceAgeFactor, cabinServiceShare } from './crew';
 import {
@@ -218,6 +219,9 @@ export function step(state: SimState): void {
     // toward the floor where they aren't. Same daily cadence as the rolls
     // above, but unlike them entirely deterministic — no random draws.
     rollDailyMarketDemand(state);
+    // Backstop for fog by reach (sim/reach.ts): the menu actions that widen
+    // reach reveal immediately; this catches anything that slipped past.
+    revealReach(state);
 
     // Week five's loan mechanic (sim/loans.ts): compound interest on every
     // outstanding loan, once a day, same cadence as weather and the

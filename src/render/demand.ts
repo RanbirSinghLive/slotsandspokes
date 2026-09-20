@@ -1,7 +1,7 @@
 import { geoPath } from 'd3-geo';
 import type { LineString } from 'geojson';
 import { projection } from './projection';
-import { airports } from './airports';
+import { airports, isAirportKnown } from './airports';
 import { potentialDailyDemand } from '../sim/demand';
 import { actualDailyDemand, currentPotentialDemand } from '../sim/marketDemand';
 import type { SimState } from '../sim/state';
@@ -83,6 +83,7 @@ export function drawDemandLayer(ctx: CanvasRenderingContext2D, state: SimState):
   const servedPairs = servedPairsFrom(state);
 
   for (const { origin, dest } of pairs) {
+    if (!isAirportKnown(origin) || !isAirportKnown(dest)) continue;
     const originAirport = airportsByIata.get(origin);
     const destAirport = airportsByIata.get(dest);
     if (!originAirport || !destAirport) continue;

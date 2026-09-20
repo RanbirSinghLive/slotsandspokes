@@ -3,7 +3,8 @@ import { projection, fitProjection, baselineScale } from './render/projection';
 import { drawBasemap } from './render/basemap';
 import { drawTerminator } from './render/terminator';
 import { drawRoutes } from './render/routes';
-import { drawAirports, airports } from './render/airports';
+import { drawAirports, airports, setKnownAirports } from './render/airports';
+import { drawFog } from './render/fog';
 import { drawWeatherEffects } from './render/weather';
 import { drawAircraft } from './render/aircraft';
 import { drawDemandLayer } from './render/demand';
@@ -299,9 +300,11 @@ function render(nowMs: number = performance.now()): void {
   const cssWidth = window.innerWidth - currentPanelWidthPx;
   const cssHeight = window.innerHeight;
 
+  setKnownAirports(state.knownAirports);
   ctx.clearRect(0, 0, cssWidth, cssHeight);
   drawBasemap(ctx);
   drawTerminator(ctx, latestFractionalMinute);
+  drawFog(ctx, state);
 
   // Demand draws first (a background of all 45 possible markets, sized
   // by estimated demand) so your own network — either plain gray or, if
@@ -771,7 +774,9 @@ window.addEventListener('keydown', handleMapMenuKeyDown);
 // scale, apply the new scale, then see where that same geographic point
 // lands *after* the change, and nudge `translate` by the difference. That
 // nudge cancels out the drift, so the point under the cursor never moves.
-const MIN_ZOOM = 0.5;
+// Zoomed all the way out shows most of the world, which a widebody's reach
+// can now open up (fog by reach, sim/reach.ts).
+const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 20;
 
 canvas.addEventListener(

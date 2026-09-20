@@ -1,7 +1,7 @@
 import { geoPath, geoInterpolate } from 'd3-geo';
 import type { LineString } from 'geojson';
 import { projection } from './projection';
-import { airports, type Airport } from './airports';
+import { airports, isAirportKnown, type Airport } from './airports';
 import { PLAYER_AIRLINE } from '../sim/airline';
 import type { SimState } from '../sim/state';
 
@@ -223,6 +223,7 @@ export function drawCompetitionLayer(ctx: CanvasRenderingContext2D, selectedAirl
   const allCompetitorMarketKeys = allCompetitorMarketKeysFrom(competitorRoutesByAirline);
 
   for (const [key, { origin, dest }] of visibleMarkets(ownRoutes, selectedAirline, competitorRoutesByAirline, allCompetitorMarketKeys)) {
+    if (!isAirportKnown(origin) || !isAirportKnown(dest)) continue;
     drawLine(ctx, path, origin, dest, strokeFor(key, selectedAirline, ownRoutes, competitorRoutesByAirline, allCompetitorMarketKeys));
   }
 }
@@ -352,6 +353,7 @@ export function findCompetitionHover(
   let nearestIata: string | null = null;
   let nearestAirportDist = AIRPORT_HIT_RADIUS_PX;
   for (const airport of airports) {
+    if (!isAirportKnown(airport.iata)) continue;
     const point = projection([airport.lon, airport.lat]);
     if (!point) continue;
     const dist = Math.hypot(point[0] - screenX, point[1] - screenY);
@@ -377,6 +379,7 @@ export function findCompetitionHover(
   let nearestMarket: { origin: string; dest: string } | null = null;
   let nearestMarketDist = MARKET_HIT_RADIUS_PX;
   for (const { origin, dest } of marketsToTest.values()) {
+    if (!isAirportKnown(origin) || !isAirportKnown(dest)) continue;
     const originAirport = airportsByIata.get(origin);
     const destAirport = airportsByIata.get(dest);
     if (!originAirport || !destAirport) continue;
