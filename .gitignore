@@ -28,3 +28,4 @@ sweep-*.csv
 *.njsproj
 *.sln
 *.sw?
+data/.cache/

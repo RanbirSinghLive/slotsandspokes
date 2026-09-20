@@ -1,7 +1,7 @@
 [
   {
     "iata": "YUL",
-    "name": "Montr\u00e9al\u2013Trudeau",
+    "name": "Montréal–Trudeau",
     "lat": 45.4678,
     "lon": -73.7423,
     "utcOffsetMinutes": -300,
@@ -26,7 +26,7 @@
   },
   {
     "iata": "YQB",
-    "name": "Qu\u00e9bec City Lesage",
+    "name": "Québec City Lesage",
     "lat": 46.7911,
     "lon": -71.3933,
     "utcOffsetMinutes": -300,
@@ -122,7 +122,7 @@
   },
   {
     "iata": "YBG",
-    "name": "Saguenay\u2013Bagotville",
+    "name": "Saguenay–Bagotville",
     "lat": 48.3301,
     "lon": -70.992,
     "utcOffsetMinutes": -300,
@@ -154,5 +154,173 @@
     "lon": -71.0079,
     "utcOffsetMinutes": -300,
     "population": 4941632
+  },
+  {
+    "iata": "DTW",
+    "name": "Detroit",
+    "lat": 42.2138,
+    "lon": -83.3538,
+    "utcOffsetMinutes": -300,
+    "population": 1683667
+  },
+  {
+    "iata": "PHL",
+    "name": "Philadelphia",
+    "lat": 39.8719,
+    "lon": -75.2411,
+    "utcOffsetMinutes": -300,
+    "population": 3156682
+  },
+  {
+    "iata": "DCA",
+    "name": "Washington Reagan",
+    "lat": 38.8521,
+    "lon": -77.0377,
+    "utcOffsetMinutes": -300,
+    "population": 3335576
+  },
+  {
+    "iata": "ORD",
+    "name": "Chicago O'Hare",
+    "lat": 41.9786,
+    "lon": -87.9048,
+    "utcOffsetMinutes": -360,
+    "population": 6365412
+  },
+  {
+    "iata": "ATL",
+    "name": "Atlanta",
+    "lat": 33.6367,
+    "lon": -84.4281,
+    "utcOffsetMinutes": -300,
+    "population": 1094551
+  },
+  {
+    "iata": "MIA",
+    "name": "Miami",
+    "lat": 25.796,
+    "lon": -80.2898,
+    "utcOffsetMinutes": -300,
+    "population": 3082708
+  },
+  {
+    "iata": "DFW",
+    "name": "Dallas Fort Worth",
+    "lat": 32.8968,
+    "lon": -97.038,
+    "utcOffsetMinutes": -360,
+    "population": 3223877
+  },
+  {
+    "iata": "LAX",
+    "name": "Los Angeles",
+    "lat": 33.9425,
+    "lon": -118.408,
+    "utcOffsetMinutes": -480,
+    "population": 8246481
+  },
+  {
+    "iata": "YVR",
+    "name": "Vancouver",
+    "lat": 49.1939,
+    "lon": -123.184,
+    "utcOffsetMinutes": -480,
+    "population": 3811612
+  },
+  {
+    "iata": "MEX",
+    "name": "Mexico City",
+    "lat": 19.4358,
+    "lon": -99.0703,
+    "utcOffsetMinutes": -360,
+    "population": 30380474
+  },
+  {
+    "iata": "LHR",
+    "name": "London Heathrow",
+    "lat": 51.4707,
+    "lon": -0.4599,
+    "utcOffsetMinutes": 0,
+    "population": 15207067
+  },
+  {
+    "iata": "CDG",
+    "name": "Paris Charles de Gaulle",
+    "lat": 49.009,
+    "lon": 2.5541,
+    "utcOffsetMinutes": 60,
+    "population": 10276841
+  },
+  {
+    "iata": "AMS",
+    "name": "Amsterdam Schiphol",
+    "lat": 52.3086,
+    "lon": 4.7639,
+    "utcOffsetMinutes": 60,
+    "population": 3414679
+  },
+  {
+    "iata": "FRA",
+    "name": "Frankfurt",
+    "lat": 50.0267,
+    "lon": 8.5584,
+    "utcOffsetMinutes": 60,
+    "population": 2786175
+  },
+  {
+    "iata": "DUB",
+    "name": "Dublin",
+    "lat": 53.4287,
+    "lon": -6.2621,
+    "utcOffsetMinutes": 0,
+    "population": 1727518
+  },
+  {
+    "iata": "KEF",
+    "name": "Reykjavík Keflavík",
+    "lat": 63.985,
+    "lon": -22.6056,
+    "utcOffsetMinutes": 0,
+    "population": 35654
+  },
+  {
+    "iata": "DXB",
+    "name": "Dubai",
+    "lat": 25.2498,
+    "lon": 55.371,
+    "utcOffsetMinutes": 240,
+    "population": 8350601
+  },
+  {
+    "iata": "HND",
+    "name": "Tokyo Haneda",
+    "lat": 35.5497,
+    "lon": 139.787,
+    "utcOffsetMinutes": 540,
+    "population": 28226036
+  },
+  {
+    "iata": "SIN",
+    "name": "Singapore Changi",
+    "lat": 1.3502,
+    "lon": 103.994,
+    "utcOffsetMinutes": 480,
+    "population": 14986063
+  },
+  {
+    "iata": "GRU",
+    "name": "São Paulo Guarulhos",
+    "lat": -23.4313,
+    "lon": -46.47,
+    "utcOffsetMinutes": -180,
+    "population": 24394853
+  },
+  {
+    "iata": "JNB",
+    "name": "Johannesburg O.R. Tambo",
+    "lat": -26.1401,
+    "lon": 28.2468,
+    "utcOffsetMinutes": 120,
+    "population": 12970440
   }
 ]

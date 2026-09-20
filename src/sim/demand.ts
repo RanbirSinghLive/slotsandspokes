@@ -98,8 +98,16 @@ export function potentialDailyDemand(originIata: string, destIata: string): numb
   return Math.round(gravity * SCALING_CONSTANT);
 }
 
+/** Great-circle distance between two of this map's airports, in nautical miles. */
+export function marketDistanceNm(originIata: string, destIata: string): number {
+  const origin = airportsByIata.get(originIata);
+  const dest = airportsByIata.get(destIata);
+  if (!origin || !dest) throw new Error(`marketDistanceNm: unknown airport in pair ${originIata}-${destIata}`);
+  return greatCircleDistanceNm(origin, dest);
+}
+
 /**
- * Every unordered airport pair — 171 for this map's 19 airports. Static
+ * Every unordered airport pair — 780 for this map's 40 airports. Static
  * geography, computed once at module load rather than on every use.
  *
  * Lives here rather than in any one consumer because two separate places

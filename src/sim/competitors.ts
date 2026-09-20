@@ -1,5 +1,5 @@
 import competitorsData from '../../data/competitors.json';
-import { potentialDailyDemand, ALL_MARKET_PAIRS } from './demand';
+import { potentialDailyDemand, ALL_MARKET_PAIRS, marketDistanceNm } from './demand';
 import { marketKey, recommendedFare } from './schedule';
 import { nextRandom } from './rng';
 import type { SimState } from './state';
@@ -82,6 +82,9 @@ function pickWeighted<T>(items: T[], weights: number[], roll: number): T {
   return items[items.length - 1]; // floating-point safety net
 }
 
+/** Competitors are peer startups on regional equipment, so their new routes stay within this. */
+const COMPETITOR_MAX_ROUTE_NM = 850;
+
 /**
  * Once per simulated day (called from step.ts's day-rollover, alongside
  * rollDailyWeather()): each competitor airline already in the game — the
@@ -114,8 +117,20 @@ export function rollCompetitorRouteOpenings(state: SimState, dayStartMinute: num
     const servedKeys = new Set(
       state.competitorRoutes.filter((c) => c.code === code).map((c) => marketKey(c.origin, c.dest)),
     );
-    const candidates = ALL_MARKET_PAIRS.filter(([a, b]) => !servedKeys.has(marketKey(a, b)));
-    if (candidates.length === 0) continue; // this airline already serves every possible market
+    // A competitor grows outward from where it already flies, and only in
+    // regional hops. Without both limits the AI would open Toronto to
+    // Singapore now that the map is global, and would spend all its
+    // openings on the biggest markets in Europe.
+    const airlineAirports = new Set(
+      state.competitorRoutes.filter((c) => c.code === code).flatMap((c) => [c.origin, c.dest]),
+    );
+    const candidates = ALL_MARKET_PAIRS.filter(
+      ([a, b]) =>
+        !servedKeys.has(marketKey(a, b)) &&
+        (airlineAirports.has(a) || airlineAirports.has(b)) &&
+        marketDistanceNm(a, b) <= COMPETITOR_MAX_ROUTE_NM,
+    );
+    if (candidates.length === 0) continue; // nothing left within reach of its network
 
     const weights = candidates.map(([a, b]) => potentialDailyDemand(a, b));
     const [pickRoll, seedAfterPick] = nextRandom(state.rngSeed);

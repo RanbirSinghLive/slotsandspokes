@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "headless": "tsx src/headless/run.ts",
     "sweep": "tsx src/headless/sweep.ts",
-    "lease": "tsx src/headless/lease.ts"
+    "lease": "tsx src/headless/lease.ts",
+    "airports": "tsx src/headless/buildAirports.ts"
   },
   "devDependencies": {
     "@types/d3-geo": "^3.1.0",

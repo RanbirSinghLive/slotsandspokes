@@ -613,6 +613,38 @@ is. The two-flights target and the 14-day reserve are the two numbers to
 move first if it plays too hard or too soft.
 
 
+### Done: the world hubs (data slice of the escalation plan)
+
+`data/airports.json` grew from 19 airports to 40. The 19 are untouched
+(census populations, everything tuned so far rests on them); 21 world hubs
+were added by `npm run airports` (`src/headless/buildAirports.ts`), which
+reads OurAirports (coordinates) and GeoNames (populations, time zones),
+caches the downloads in `data/.cache/` (git-ignored), and is safe to rerun.
+
+- **The 21:** DTW PHL DCA ORD ATL MIA DFW LAX YVR MEX (North America), LHR
+  CDG AMS FRA DUB KEF (Europe), DXB HND SIN GRU JNB. One airport per metro,
+  so no new same-city pairs. Dense enough to hop in a propeller from the
+  north-east (DTW, PHL, DCA, ORD) and from western Europe; the rest are
+  destinations for the bigger classes.
+- **Population** is the GeoNames city total within 30 km, chosen by
+  checking the method against the census numbers for the 11 existing
+  airports over 100,000 people: within about 16% on average. It is rougher
+  abroad: Atlanta comes out at 1.1 million (real metro about 6), Mexico City
+  at 30 million (about 22), Keflavik at 36,000. Edit a number in the JSON
+  to fix one. Time zones are standard (no DST), like the rest of the file.
+- **Competitors** now grow outward: a new route must touch an airport the
+  airline already flies and be within 850 nm (`COMPETITOR_MAX_ROUTE_NM`).
+  Without it the AI would open Toronto-Singapore, and weight all its
+  openings toward the biggest European pairs.
+- **Headless is noisy.** The same change moved seed 1 from $667k to $281k,
+  but over six seeds the mean is $169k before and $209k after, with single
+  results swinging by more than $1M either way. Do not read a headless
+  number from one seed.
+- Nothing about the game's view or start has changed yet: the map is still
+  fitted to eastern Canada and new games still start at Montreal, so most
+  of the new airports are off screen. Home-city choice is next.
+
+
 ---
 
 ## Conventions worth knowing
