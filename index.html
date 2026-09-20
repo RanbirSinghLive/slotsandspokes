@@ -105,7 +105,7 @@
     </div>
     <aside id="panel">
       <div id="sidebar-tabs">
-        <button type="button" data-tab="fleet" class="active" aria-label="Fleet" title="Fleet — your aircraft and schedule">
+        <button type="button" data-tab="fleet" class="active" aria-label="Fleet" title="Fleet — your rotations">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M22 2 11 13" />
             <path d="M22 2 15 22 11 13 2 9 22 2Z" />
@@ -191,34 +191,13 @@
       </section>
       <div id="sidebar-tab-content">
         <div id="fleet-tab">
-          <section id="fleet-section">
-            <h2>Fleet</h2>
-            <div id="fleet-selection-hint" hidden>Tap an airport or a route on the map to act on it.</div>
-            <div id="fleet-utilisation"></div>
-            <table id="fleet-table" class="panel-table">
-              <thead>
-                <tr>
-                  <th>Tail</th>
-                  <th>Type</th>
-                  <th>Status</th>
-                  <th>Where</th>
-                  <th>Base</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </section>
-          <section id="inbound-section" hidden>
-            <h2>Inbound</h2>
-            <div id="inbound-list"></div>
-          </section>
           <section id="rotations-section">
             <h2>Rotations</h2>
             <ul id="schedule-warnings" hidden></ul>
             <table id="rotations-table" class="panel-table">
               <thead>
                 <tr>
-                  <th>Tail</th>
+                  <th>Plane</th>
                   <th>Rotation</th>
                   <th>Window</th>
                   <th>Uses</th>
@@ -227,7 +206,7 @@
               </thead>
               <tbody></tbody>
             </table>
-            <div id="rotations-empty">No rotations yet — pick an aircraft above, then draw one on the map.</div>
+            <div id="rotations-empty">No rotations yet. Tap an airport on the map and choose Route.</div>
           </section>
         </div>
         <div id="commercial-panel" hidden>

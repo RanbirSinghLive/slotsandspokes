@@ -494,6 +494,25 @@ along with it and the button carries it (`RadialAction.preview`).
   plane would change a pool's size rather than its bookings).
 
 
+### Done: Fleet tab trim, one popup at a time
+
+- **The Fleet tab is one section: the rotations list.** The tail table
+  (with its base dropdowns), the per-base utilisation bars, the Inbound
+  list and the select-a-plane hint are gone, along with their code in
+  `ui/panels.ts` and their CSS. Rows show the plane's class ("Propeller");
+  the tail is on hover. Bases can now only be set by leasing at an
+  airport, so nothing in the UI assigns or changes one.
+- **The hover tooltip** (`ui/competitionTooltip.ts`: who flies this, plus a
+  presence line that duplicated the click card) now only appears while the
+  Competition overlay is on, and never while a click menu is open. Opening
+  a menu hides it. Before, both popups showed on the same airport.
+- Dead code left in place: `ui/fleetSelection.ts` and the select-a-tail
+  branch of `handleRouteBuilderMouseDown` can no longer be reached, since
+  nothing sets a selected tail. Some messages still say "assign a base in
+  the Fleet tab" (`sim/utilisation.ts`, `planRotation()`), which can now
+  only happen from an old save.
+
+
 ---
 
 ## Conventions worth knowing

@@ -547,35 +547,6 @@ body {
   box-sizing: border-box;
 }
 
-/* Week three's route-builder redesign: the Fleet table's rows are now
-   the way you pick which plane a route is for, so they need to read as
-   clickable, and the chosen one needs to stand out. */
-.fleet-row {
-  cursor: pointer;
-}
-
-.fleet-row:hover {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.fleet-row.selected {
-  background: rgba(255, 209, 102, 0.12);
-}
-
-.fleet-row.selected td:first-child {
-  color: #ffd166;
-}
-
-#fleet-selection-hint {
-  color: #9aa3b8;
-  font-size: 12px;
-  margin: -4px 0 8px;
-}
-
-#fleet-selection-hint[hidden] {
-  display: none;
-}
-
 /* Week seven, phase C: the rotations list replaces the schedule table.
    The remove button drops a whole rotation, not a single leg — a rotation
    is the unit the player builds, and deleting one leg out of the middle
@@ -2111,46 +2082,6 @@ body {
   font-size: 12px;
 }
 
-/* Week eight: aircraft ordered but not yet delivered, shown under the
-   fleet. Same amber "bought, not here yet" language as .crew-incoming
-   above — the two are the same idea for two different resources. */
-#inbound-section[hidden] {
-  display: none;
-}
-
-.inbound-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px;
-  padding: 3px 0;
-  font-size: 12px;
-}
-
-.inbound-tail {
-  color: #ffd166;
-  font-weight: 600;
-}
-
-.inbound-type {
-  color: #cdd3e0;
-}
-
-.inbound-when {
-  color: #ffd166;
-}
-
-.inbound-how {
-  color: #6b7694;
-}
-
-/* Lead time reads as a duration, not a quantity — tabular so a column of
-   them lines up against the age column beside it. */
-.fleet-market-lead {
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
 /* Headcount bought but not yet arrived — the ten-day lead time made a
    successful hire look like nothing had happened. Amber and smaller than
    the real figure: it's a promise, not a number you can crew with today. */
@@ -2663,68 +2594,3 @@ body {
   flex: none;
 }
 
-/* Week six's utilisation pivot, phase one: how full each based fleet's
-   day is (sim/utilisation.ts). Pooled per base, because the question is
-   "have I a spare aeroplane's worth of gaps", not "is this tail busy". */
-#fleet-utilisation {
-  margin-bottom: 12px;
-}
-
-.util-row {
-  display: grid;
-  grid-template-columns: 44px 40px 1fr;
-  align-items: baseline;
-  gap: 8px;
-  padding: 5px 0;
-  font-size: 12px;
-}
-
-.util-base {
-  color: #cdd3e0;
-  font-weight: 500;
-}
-
-.util-pct {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  color: #cdd3e0;
-}
-
-.util-note {
-  color: #6b7694;
-}
-
-.util-bar-track {
-  grid-column: 1 / -1;
-  height: 3px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.06);
-  overflow: hidden;
-}
-
-.util-bar {
-  height: 100%;
-  border-radius: 2px;
-  background: #4a90d9;
-}
-
-/* Over 100% means the rotation can't be flown daily by the based fleet —
-   the same red everything else genuinely broken uses. */
-.util-row--over .util-pct,
-.util-row--over .util-note {
-  color: #ff8080;
-}
-
-.util-row--over .util-bar {
-  background: #ff8080;
-}
-
-.fleet-base-select {
-  font-family: inherit;
-  font-size: 11px;
-  color: #cdd3e0;
-  background: #0a0c12;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 3px;
-  padding: 1px 3px;
-}

@@ -21,7 +21,7 @@ import {
   drawRoutePreview,
   hideRouteHoverTooltip,
 } from './ui/routeBuilder';
-import { handleMapMenuMouseDown, handleMapMenuKeyDown, hideMapMenu } from './ui/mapMenu';
+import { handleMapMenuMouseDown, handleMapMenuKeyDown, hideMapMenu, isMapMenuOpen } from './ui/mapMenu';
 import { setupCommercialPanel, updateCommercialPanel } from './ui/commercial';
 import { setupFleetMarket, updateFleetMarket } from './ui/fleetMarket';
 import { setupOnTimePanel, updateOnTimePanel } from './ui/onTime';
@@ -720,6 +720,15 @@ canvas.addEventListener('mousedown', (event) => {
 canvas.addEventListener('mousemove', (event) => {
   if (handleRouteBuilderMouseMove(event, state)) {
     render();
+    hideCompetitionTooltip();
+    return;
+  }
+
+  // The hover tooltip is the Competition overlay's readout (who else flies
+  // this). Anywhere else the click card says everything worth saying, and
+  // showing both at once put two popups on the same airport, so it appears
+  // only with the overlay on and never while a click menu is open.
+  if (!competitionOverlayOn || isMapMenuOpen()) {
     hideCompetitionTooltip();
     return;
   }

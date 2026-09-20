@@ -98,7 +98,7 @@ export function marketReadout(state: SimState, a: string, b: string) {
   };
 }
 
-const MULTI_STOP_REASON = 'Flown as part of a multi-stop rotation, so it can only be changed from the Fleet tab.';
+const MULTI_STOP_REASON = 'Flown as part of a multi-stop rotation. Remove that rotation in the Fleet tab to change this route.';
 
 /**
  * Why a plane in `code` can't take a there-and-back, in words a player can

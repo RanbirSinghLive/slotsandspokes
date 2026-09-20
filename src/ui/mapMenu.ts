@@ -7,6 +7,7 @@ import { getMapPreview, setMapPreview, type MapPreview } from '../render/preview
 import type { SimState } from '../sim/state';
 import { getSelectedTail } from './fleetSelection';
 import { armRouteBuilderAt, candidateTailsAt } from './routeBuilder';
+import { hideCompetitionTooltip } from './competitionTooltip';
 import { hideRadial, showRadial, updateRadial, type RadialAction } from './radial';
 import * as ops from './routeActions';
 
@@ -348,17 +349,24 @@ export function handleMapMenuMouseDown(event: MouseEvent, state: SimState): bool
 
   const airport = findNearestAirport(event.clientX, event.clientY);
   if (airport) {
+    hideCompetitionTooltip();
     openAirportMenu(airport, state);
     return true;
   }
 
   const route = findNearestOwnRoute(event.clientX, event.clientY, state);
   if (route) {
+    hideCompetitionTooltip();
     openRouteMenu(route.origin, route.dest, state, event.clientX, event.clientY);
     return true;
   }
 
   return false;
+}
+
+/** Whether the info card and ring are showing, so the hover tooltip can stay out of their way. */
+export function isMapMenuOpen(): boolean {
+  return open !== null;
 }
 
 export function handleMapMenuKeyDown(event: KeyboardEvent): void {

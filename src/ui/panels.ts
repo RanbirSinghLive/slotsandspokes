@@ -1,8 +1,7 @@
 import { legsServingMarket, marketKey, validateSchedule } from '../sim/schedule';
 import { removeCommercialRow } from './commercial';
-import { getSelectedTail, setSelectedTail } from './fleetSelection';
-import { allRotations, utilisationByBase, utilisationProblems, type Rotation } from '../sim/utilisation';
-import { airports } from '../render/airports';
+import { allRotations, utilisationProblems, type Rotation } from '../sim/utilisation';
+import { classByCode } from '../sim/aircraftClasses';
 import type { SimState } from '../sim/state';
 
 // Must match the --panel-width custom property's default value in
@@ -17,14 +16,9 @@ const completionEl = document.querySelector<HTMLSpanElement>('#panel-completion'
 const revenueEl = document.querySelector<HTMLSpanElement>('#panel-revenue')!;
 const costEl = document.querySelector<HTMLSpanElement>('#panel-cost')!;
 const marginEl = document.querySelector<HTMLSpanElement>('#panel-margin')!;
-const fleetBody = document.querySelector<HTMLTableSectionElement>('#fleet-table tbody')!;
-const fleetUtilisationEl = document.querySelector<HTMLDivElement>('#fleet-utilisation')!;
-const inboundSectionEl = document.querySelector<HTMLElement>('#inbound-section')!;
-const inboundListEl = document.querySelector<HTMLDivElement>('#inbound-list')!;
 const rotationsBody = document.querySelector<HTMLTableSectionElement>('#rotations-table tbody')!;
 const rotationsEmptyEl = document.querySelector<HTMLDivElement>('#rotations-empty')!;
 const scheduleWarningsEl = document.querySelector<HTMLUListElement>('#schedule-warnings')!;
-const fleetSelectionHintEl = document.querySelector<HTMLDivElement>('#fleet-selection-hint')!;
 
 /**
  * Show validateSchedule()'s problems (if any) directly in the Schedule
@@ -72,224 +66,7 @@ export function updatePanel(state: SimState): void {
   costEl.textContent = formatMoney(state.todayCost);
   marginEl.textContent = formatMoney(state.todayMargin);
 
-  renderFleet(state);
-  renderInbound(state);
-  renderUtilisation(state);
   renderRotations(state);
-
-  fleetSelectionHintEl.hidden = getSelectedTail() !== null || state.aircraft.length === 0;
-}
-
-/**
- * The fleet table, rebuilt **only when the fleet itself changes** and
- * otherwise patched in place.
- *
- * It used to be torn down and rebuilt on every frame, which looked
- * harmless because the cells are plain text — but the row also owns a
- * `<select>` and, in the rotations table below, a `<button>`. Both need to
- * outlive the interaction that uses them: a native dropdown closes the
- * instant its `<select>` leaves the document, and a click only fires if
- * mousedown and mouseup land on the *same* element. At ~60 rebuilds a
- * second neither could ever survive long enough, so the Base dropdown
- * appeared to shut immediately and the remove buttons appeared dead.
- *
- * Scripted testing hides this completely — `.click()` invokes the handler
- * directly and setting `.value` skips the dropdown — so it has to be
- * checked with real events.
- *
- * `structure` is what actually requires new DOM: which tails exist, in
- * what order. Everything that changes minute to minute (status, position,
- * selection highlight) is written into the existing cells instead.
- */
-type FleetRowCells = {
-  row: HTMLTableRowElement;
-  statusCell: HTMLTableCellElement;
-  whereCell: HTMLTableCellElement;
-  baseSelect: HTMLSelectElement;
-};
-
-// Same sentinel reasoning as rotationsSignature below.
-let fleetStructure: string | null = null;
-const fleetRowsByTail = new Map<string, FleetRowCells>();
-
-function buildFleetRows(state: SimState): void {
-  fleetBody.innerHTML = '';
-  fleetRowsByTail.clear();
-
-  for (const aircraft of state.aircraft) {
-    const row = document.createElement('tr');
-    row.className = 'fleet-row';
-    // Week three's route-builder redesign: a plane has to be picked here,
-    // by clicking its row, *before* the map will let you arm a route for
-    // it — see ui/routeBuilder.ts.
-    row.addEventListener('click', () => {
-      setSelectedTail(getSelectedTail() === aircraft.tail ? null : aircraft.tail);
-    });
-
-    const tailCell = document.createElement('td');
-    tailCell.textContent = aircraft.tail;
-
-    const typeCell = document.createElement('td');
-    typeCell.textContent = aircraft.typeCode;
-
-    const statusCell = document.createElement('td');
-    const whereCell = document.createElement('td');
-
-    // Base is an explicit assignment, not something inferred from wherever
-    // the first route happened to start (see Aircraft.baseAirport). A
-    // <select> rather than a click-through so it reads as a setting.
-    const baseCell = document.createElement('td');
-    const baseSelect = document.createElement('select');
-    baseSelect.className = 'fleet-base-select';
-    const none = document.createElement('option');
-    none.value = '';
-    none.textContent = '—';
-    baseSelect.appendChild(none);
-    for (const airport of airports) {
-      const option = document.createElement('option');
-      option.value = airport.iata;
-      option.textContent = airport.iata;
-      baseSelect.appendChild(option);
-    }
-    // Stop the row's own select-this-tail handler firing when the dropdown
-    // is used — picking a base isn't picking a plane to draw a route for.
-    baseSelect.addEventListener('click', (event) => event.stopPropagation());
-    baseSelect.addEventListener('change', () => {
-      aircraft.baseAirport = baseSelect.value || null;
-    });
-    baseCell.appendChild(baseSelect);
-
-    row.append(tailCell, typeCell, statusCell, whereCell, baseCell);
-    fleetBody.appendChild(row);
-    fleetRowsByTail.set(aircraft.tail, { row, statusCell, whereCell, baseSelect });
-  }
-}
-
-function renderFleet(state: SimState): void {
-  const structure = state.aircraft.map((aircraft) => aircraft.tail).join(',');
-  if (structure !== fleetStructure) {
-    fleetStructure = structure;
-    buildFleetRows(state);
-  }
-
-  for (const aircraft of state.aircraft) {
-    const cells = fleetRowsByTail.get(aircraft.tail);
-    if (!cells) continue;
-
-    cells.row.classList.toggle('selected', aircraft.tail === getSelectedTail());
-    cells.statusCell.textContent = aircraft.status;
-
-    if (aircraft.status === 'ground') {
-      // null means a Fleet Market purchase that's never flown yet
-      // (ui/fleetMarket.ts) — sitting in the pool, not based anywhere
-      // until the player draws a rotation for it.
-      cells.whereCell.textContent = aircraft.atAirport ?? 'Unassigned';
-    } else {
-      const flight = state.activeFlights.find((f) => f.tail === aircraft.tail);
-      if (flight) {
-        const minutesRemaining = flight.arriveMinute - state.simMinute;
-        // How far behind an entirely on-time day this flight's arrival is —
-        // see ActiveFlight.scheduledArriveMinute in sim/state.ts. This is
-        // what lets the panel explain *why* a flight is running late (M9),
-        // not just that it is.
-        const lateness = flight.arriveMinute - flight.scheduledArriveMinute;
-        cells.whereCell.textContent =
-          lateness > 0
-            ? `${flight.origin} → ${flight.dest} (${minutesRemaining} min, ${lateness} min late)`
-            : `${flight.origin} → ${flight.dest} (${minutesRemaining} min)`;
-      } else {
-        cells.whereCell.textContent = '—';
-      }
-    }
-
-    // Never while the player is actually in the dropdown: writing `.value`
-    // on a focused <select> fights whatever they are part-way through
-    // choosing.
-    if (document.activeElement !== cells.baseSelect) {
-      cells.baseSelect.value = aircraft.baseAirport ?? '';
-    }
-  }
-}
-
-/**
- * Airframes paid for and on their way (week eight). Lives directly under
- * the fleet because that is where you look for "what aircraft have I
- * got" — an order with a 90-day lead time would otherwise be invisible
- * between the click that bought it and the day it appears, which is
- * exactly the mistake the crew panel made with its ten-day hires.
- *
- * Hidden entirely when nothing is inbound rather than showing an empty
- * heading, since for most of a game nothing is.
- *
- * No cancel button: acquisition is one-way for now, matching the Fleet
- * Market's existing no-sell-back rule. Worth revisiting if lead times
- * turn out to make a wrong order too punishing.
- */
-const MINUTES_PER_DAY = 1440;
-let inboundSignature: string | null = null;
-
-function renderInbound(state: SimState): void {
-  const signature = state.pendingDeliveries
-    .map((d) => `${d.registration}:${Math.ceil((d.availableAtMinute - state.simMinute) / MINUTES_PER_DAY)}`)
-    .join('|');
-  if (signature === inboundSignature) return;
-  inboundSignature = signature;
-
-  inboundSectionEl.hidden = state.pendingDeliveries.length === 0;
-  inboundListEl.innerHTML = state.pendingDeliveries
-    .slice()
-    .sort((a, b) => a.availableAtMinute - b.availableAtMinute)
-    .map((delivery) => {
-      const days = Math.max(0, Math.ceil((delivery.availableAtMinute - state.simMinute) / MINUTES_PER_DAY));
-      const how = delivery.ownership === 'leased' ? `leased, ${formatMoney(delivery.leaseCostPerDay)}/day from arrival` : 'bought';
-      return `
-        <div class="inbound-row">
-          <span class="inbound-tail">${delivery.registration}</span>
-          <span class="inbound-type">${delivery.typeCode}</span>
-          <span class="inbound-when">${days === 0 ? 'arriving today' : `in ${days} day${days === 1 ? '' : 's'}`}</span>
-          <span class="inbound-how">${how}</span>
-        </div>`;
-    })
-    .join('');
-}
-
-/**
- * Week six's utilisation pivot, phase one: how much of each based fleet's
- * day is actually being flown, pooled per base rather than per tail.
- * Per-tail figures can't answer "have I a spare aeroplane's worth of gaps
- * scattered about", which is the question the whole pivot exists to make
- * answerable — see sim/utilisation.ts.
- */
-function renderUtilisation(state: SimState): void {
-  const bases = utilisationByBase(state);
-  if (bases.length === 0) {
-    fleetUtilisationEl.innerHTML = '';
-    return;
-  }
-
-  fleetUtilisationEl.innerHTML = bases
-    .map((b) => {
-      const pct = Math.round(b.share * 100);
-      const label = b.base === '' ? 'Unbased' : b.base;
-      const spare = b.spareAircraft;
-      // The headline reading: spare capacity expressed in aircraft, since
-      // "0.05 of a plane" is what tells you another airframe is a bad buy
-      // and "0.9" tells you it very nearly isn't.
-      const note =
-        b.base === ''
-          ? `${b.aircraft.length} aircraft with no base — assign one before they can be worked.`
-          : spare >= 0
-            ? `${spare.toFixed(2)} aircraft spare`
-            : `${Math.abs(spare).toFixed(2)} aircraft short — this rotation can't be flown daily`;
-      return `
-        <div class="util-row${b.share > 1 ? ' util-row--over' : ''}">
-          <span class="util-base">${label}</span>
-          <span class="util-pct">${pct}%</span>
-          <span class="util-note">${note}</span>
-          <div class="util-bar-track"><div class="util-bar" style="width:${Math.min(100, pct)}%"></div></div>
-        </div>`;
-    })
-    .join('');
 }
 
 function pad(n: number): string {
@@ -313,8 +90,9 @@ export function minuteOfDayToTimeString(minuteOfDay: number): string {
  * deleting one leg out of a rotation would strand the rest of it away from
  * base. The unit the player builds is the unit they remove.
  *
- * Rebuilt **only when the rotations actually change** — see renderFleet()
- * above for why a per-frame rebuild broke the remove buttons outright.
+ * Rebuilt **only when the rotations actually change** — a per-frame
+ * rebuild once broke the remove buttons outright (a click only fires if
+ * mousedown and mouseup land on the same element).
  * Nothing here is time-varying anyway: a rotation's chain, window and
  * share only move when a rotation is added or removed, or when a base
  * change regroups the legs. `signature` captures exactly that.
@@ -345,8 +123,10 @@ function renderRotations(state: SimState): void {
     row.className = 'rotation-row';
     if (!rotation.closed) row.classList.add('rotation-row--open');
 
-    const tailCell = document.createElement('td');
-    tailCell.textContent = rotation.tail;
+    const planeCell = document.createElement('td');
+    const typeCode = state.aircraft.find((a) => a.tail === rotation.tail)?.typeCode ?? '';
+    planeCell.textContent = classByCode(typeCode)?.name ?? typeCode;
+    planeCell.title = rotation.tail;
 
     const routeCell = document.createElement('td');
     routeCell.className = 'rotation-route-cell';
@@ -370,7 +150,7 @@ function renderRotations(state: SimState): void {
     removeButton.addEventListener('click', () => removeRotation(rotation, state));
     removeCell.appendChild(removeButton);
 
-    row.append(tailCell, routeCell, windowCell, shareCell, removeCell);
+    row.append(planeCell, routeCell, windowCell, shareCell, removeCell);
     rotationsBody.appendChild(row);
   }
 }
