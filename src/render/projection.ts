@@ -2,42 +2,47 @@ import { geoMercator, type GeoProjection } from 'd3-geo';
 import type { Polygon } from 'geojson';
 
 /**
- * The rectangle of the real world we want visible on screen, expressed as a
- * GeoJSON polygon. Corners are [longitude, latitude] pairs — longitude first,
- * which trips everyone up the first time because it's the opposite of the
- * "lat, lon" order most maps quote in.
+ * The rectangle of the real world visible on screen at the start,
+ * centred on the player's home city and built as a GeoJSON polygon.
+ * Corners are [longitude, latitude] pairs: longitude first, which trips
+ * everyone up the first time because it's the opposite of the "lat, lon"
+ * order most maps quote in.
  *
- * Originally just eastern Canada, roughly 42°N–50°N, 80°W–51°W, per
- * WEEK-ONE.md. Widened when the map grew a Labrador airport (YYR, at
- * 53.3°N — north of the old top edge) and two US ones (LGA at 40.8°N,
- * south of the old bottom edge) — 39°N–54°N, 81°W–51°W now, with a
- * couple of degrees of padding on every edge so nothing airport sits
- * flush against the frame.
+ * It used to be a fixed box over eastern Canada. Now the game starts from
+ * a chosen city anywhere in the world (sim/homes.ts), so the box moves
+ * with it: HOME_VIEW_HALF_WIDTH_DEG either side in longitude and
+ * HOME_VIEW_HALF_HEIGHT_DEG above and below, the same 30 by 15 degrees the
+ * old box covered.
  *
  * The ring is listed clockwise (as seen on an ordinary lon-x/lat-y plot):
  * bottom-left, top-left, top-right, bottom-right, back to start. d3-geo
  * treats geometry as living on a sphere, and it decides which side of a
- * ring is the "inside" from the direction you wind it — the opposite
+ * ring is the "inside" from the direction you wind it, the opposite
  * convention from flat GeoJSON tools, which expect counter-clockwise. Wind
  * it the wrong way and d3 measures the bounds of everywhere *except* this
- * box, which is exactly the bug this comment is here to stop you
- * reintroducing: the first version of this file had the corners in
- * counter-clockwise order, and `fitSize` below dutifully fit the projection
- * to "the whole world minus a small rectangle over eastern Canada," which
- * rendered as the entire globe.
+ * box, which renders as the entire globe.
  */
-const EASTERN_CANADA_BOUNDS: Polygon = {
-  type: 'Polygon',
-  coordinates: [
-    [
-      [-81, 39],
-      [-81, 54],
-      [-51, 54],
-      [-51, 39],
-      [-81, 39],
+const HOME_VIEW_HALF_WIDTH_DEG = 15;
+const HOME_VIEW_HALF_HEIGHT_DEG = 7.5;
+
+function homeViewBounds(lon: number, lat: number): Polygon {
+  const west = lon - HOME_VIEW_HALF_WIDTH_DEG;
+  const east = lon + HOME_VIEW_HALF_WIDTH_DEG;
+  const south = Math.max(-80, lat - HOME_VIEW_HALF_HEIGHT_DEG);
+  const north = Math.min(80, lat + HOME_VIEW_HALF_HEIGHT_DEG);
+  return {
+    type: 'Polygon',
+    coordinates: [
+      [
+        [west, south],
+        [west, north],
+        [east, north],
+        [east, south],
+        [west, south],
+      ],
     ],
-  ],
-};
+  };
+}
 
 /**
  * The single shared projection instance. Nothing else in the codebase may
@@ -49,13 +54,13 @@ export const projection: GeoProjection = geoMercator();
 /**
  * The projection's `scale` right after the most recent fit — the "100% zoom"
  * baseline. Pan/zoom code uses this to clamp how far in or out the player is
- * allowed to go, as a multiple of the zoom level that exactly frames eastern
- * Canada, rather than as some arbitrary fixed number.
+ * allowed to go, as a multiple of the zoom level that exactly frames the home
+ * region, rather than as some arbitrary fixed number.
  */
 export let baselineScale = 1;
 
 /**
- * Refit the projection so EASTERN_CANADA_BOUNDS exactly fills a
+ * Refit the projection so the view around `home` exactly fills a
  * `width` x `height` canvas, with a little breathing room.
  *
  * What "fitting" means: a projection has two knobs that control where things
@@ -82,8 +87,8 @@ export let baselineScale = 1;
  * geography, so it only needs updating on resize — panning and zooming
  * don't change the canvas's own pixel bounds.
  */
-export function fitProjection(width: number, height: number): void {
-  projection.fitSize([width, height], EASTERN_CANADA_BOUNDS);
+export function fitProjection(width: number, height: number, home: { lon: number; lat: number }): void {
+  projection.fitSize([width, height], homeViewBounds(home.lon, home.lat));
   baselineScale = projection.scale();
   projection.clipExtent([
     [0, 0],

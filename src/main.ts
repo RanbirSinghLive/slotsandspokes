@@ -3,7 +3,7 @@ import { projection, fitProjection, baselineScale } from './render/projection';
 import { drawBasemap } from './render/basemap';
 import { drawTerminator } from './render/terminator';
 import { drawRoutes } from './render/routes';
-import { drawAirports } from './render/airports';
+import { drawAirports, airports } from './render/airports';
 import { drawWeatherEffects } from './render/weather';
 import { drawAircraft } from './render/aircraft';
 import { drawDemandLayer } from './render/demand';
@@ -11,6 +11,8 @@ import { drawCompetitionLayer, competitorAirlines, findCompetitionHover, drawNew
 import { drawRouteMapMode, MAP_MODES, MAP_MODE_COLORS, type MapMode } from './render/mapmodes';
 import { showCompetitionTooltip, hideCompetitionTooltip } from './ui/competitionTooltip';
 import { createNewGameState, type SimState } from './sim/state';
+import { chooseHome, homeOptions } from './sim/homes';
+import { showHomePicker } from './ui/homePicker';
 import { step } from './sim/step';
 import { updatePanel, renderScheduleWarnings, scheduleProblems, PANEL_WIDTH_PX } from './ui/panels';
 import {
@@ -47,7 +49,11 @@ import { loadSavedState, saveState } from './ui/save';
 // Date.now() so every new playthrough gets its own weather/delay history
 // (src/headless/run.ts calls the older createInitialState() instead, with
 // its own fixed default seed, and is unaffected by any of this).
-const state: SimState = loadSavedState() ?? createNewGameState();
+const savedState = loadSavedState();
+const state: SimState = savedState ?? createNewGameState();
+// A game with no save to resume starts by choosing a home city (see the
+// picker at the bottom of this file). Until then it is paused.
+let choosingHome = savedState === null;
 
 // Validate this game's own schedule (not just the static template) — the
 // route builder re-runs this same check after every rotation added or
@@ -219,7 +225,8 @@ function resize(): void {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.scale(dpr, dpr);
 
-  fitProjection(cssWidth, cssHeight);
+  const home = airports.find((airport) => airport.iata === state.homeAirport) ?? airports[0];
+  fitProjection(cssWidth, cssHeight, home);
   render();
 }
 
@@ -448,7 +455,7 @@ function togglePause(): void {
 // filters, fare fields, the New Route form, etc.) so typing a space into
 // one of those doesn't also pause the game out from under the player.
 window.addEventListener('keydown', (event) => {
-  if (event.code !== 'Space') return;
+  if (event.code !== 'Space' || choosingHome) return;
   const target = event.target as HTMLElement | null;
   const tag = target?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return;
@@ -792,3 +799,23 @@ canvas.addEventListener(
   },
   { passive: false },
 );
+
+// --- Choosing a home city (new games only) ---
+//
+// Paused until a city is chosen, so no simulated time passes behind the
+// picker. Choosing replaces the placeholder starting fleet with two
+// propellers at the chosen city, saves straight away (so reloading does
+// not ask again), refits the map around it and starts the clock.
+if (choosingHome) {
+  speedMultiplier = 0;
+  speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === 0));
+  showHomePicker(homeOptions(), (iata) => {
+    chooseHome(state, iata);
+    saveState(state);
+    choosingHome = false;
+    resize();
+    speedMultiplier = 1;
+    speedBeforePause = 1;
+    speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === 1));
+  });
+}

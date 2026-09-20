@@ -118,6 +118,8 @@ export type RouteSettings = {
 
 export type SimState = {
   simMinute: number;
+  /** The airport the player chose to start from (sim/homes.ts). The map centres on it. */
+  homeAirport: string;
   cash: number;
   aircraft: Aircraft[];
   activeFlights: ActiveFlight[];
@@ -551,6 +553,7 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
 
   const state: SimState = {
     simMinute: 0,
+    homeAirport: DEFAULT_HOME_AIRPORT,
     cash: 0,
     aircraft,
     activeFlights: [],
@@ -640,18 +643,19 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
 export const STARTING_CASH = 500_000;
 
 /**
- * Two leased propeller planes already parked and based at Montréal, so the
- * first thing a new player does is draw a route on the map. Montréal
- * because five of the closest airports sit inside a propeller's range from
- * it.
+ * Two leased propeller planes already parked and based at the player's
+ * home city, so the first thing a new player does is draw a route on the
+ * map. The home city is chosen at the start of a game (sim/homes.ts);
+ * Montréal is the default for anything that doesn't choose.
  */
-const STARTING_BASE = 'YUL';
+export const DEFAULT_HOME_AIRPORT = 'YUL';
 const STARTING_PLANES = 2;
 
-function createStartingFleet(): Aircraft[] {
+/** The two planes a new game starts with, leased and parked at `homeIata`. */
+export function createStartingFleet(homeIata: string): Aircraft[] {
   const aircraft: Aircraft[] = [];
   for (let i = 0; i < STARTING_PLANES; i++) {
-    leaseAircraft({ simMinute: 0, aircraft }, aircraftType.code, STARTING_BASE);
+    leaseAircraft({ simMinute: 0, aircraft }, aircraftType.code, homeIata);
   }
   return aircraft;
 }
@@ -667,11 +671,12 @@ function createStartingFleet(): Aircraft[] {
  * only to keep the headless runner's known, fully-formed test network
  * exactly as it always was; this one is the real "New Game" entry point.
  */
-export function createNewGameState(rngSeed: number = Date.now()): SimState {
+export function createNewGameState(rngSeed: number = Date.now(), homeIata: string = DEFAULT_HOME_AIRPORT): SimState {
   return {
     simMinute: 0,
+    homeAirport: homeIata,
     cash: STARTING_CASH,
-    aircraft: createStartingFleet(),
+    aircraft: createStartingFleet(homeIata),
     activeFlights: [],
     schedule: [],
     routeSettings: {},

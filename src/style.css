@@ -1337,6 +1337,49 @@ body {
    starting over — a slightly harder red border marks that it's not just
    another routine pop-up, same #ff8080 the rest of the app already uses
    for "actually broken." */
+.modal-box--home {
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
+}
+
+#home-picker-list {
+  display: grid;
+  gap: 6px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+
+.home-option {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 10px;
+  text-align: left;
+  font-family: inherit;
+  font-size: 13px;
+  color: #cdd3e0;
+  background: #171b26;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.home-option:hover {
+  border-color: rgba(255, 209, 102, 0.6);
+}
+
+.home-option-code {
+  color: #ffd166;
+  font-weight: 600;
+}
+
+.home-option-reach {
+  color: #6b7694;
+  font-size: 12px;
+}
+
 .modal-box--game-over {
   border-color: #ff8080;
 }

@@ -640,9 +640,34 @@ caches the downloads in `data/.cache/` (git-ignored), and is safe to rerun.
   but over six seeds the mean is $169k before and $209k after, with single
   results swinging by more than $1M either way. Do not read a headless
   number from one seed.
-- Nothing about the game's view or start has changed yet: the map is still
-  fitted to eastern Canada and new games still start at Montreal, so most
-  of the new airports are off screen. Home-city choice is next.
+
+
+### Done: choose your home city
+
+A new game (no save to resume) opens a "Choose your home city" picker over
+the paused map. Choosing puts the two starting propellers at that city,
+saves immediately, refits the map around it, and starts the clock.
+
+- **Who can be home:** `homeOptions()` in `sim/homes.ts` offers a city if at
+  least 3 other airports are within propeller range (380 nm) *and* have a
+  market with it. Derived from the data, so a new airport can add a home
+  without touching code. 24 cities qualify today, from Boston (12 within
+  reach) and Montreal (11) down to Frankfurt and Paris (3). Chicago,
+  Atlanta and Dublin do not: too few neighbours.
+- **The map follows the home:** `fitProjection()` takes the home's
+  coordinates and frames a 30 by 15 degree box around it (the size of the
+  old fixed eastern-Canada box), so a London start shows Dublin, Amsterdam,
+  Paris and Frankfurt.
+- `SimState.homeAirport` records it; `SAVE_KEY` is `v31`. The headless
+  fixture still starts from Montreal.
+- Spacebar is ignored while the picker is open, so the clock cannot start
+  behind it.
+- Still open in the escalation plan: fog by reach (all 40 airports are
+  drawn and usable today; most are simply off screen from a given start),
+  the time-pressure knob, and long-haul balance (fares, demand and lease
+  rates were tuned on the small map).
+- Known leftover: the loan-offer modal in `ui/loans.ts` can no longer be
+  reached (cash at zero ends the game), and is dead code.
 
 
 ---
@@ -650,7 +675,7 @@ caches the downloads in `data/.cache/` (git-ignored), and is safe to rerun.
 ## Conventions worth knowing
 
 - **Bump `SAVE_KEY` in `src/ui/save.ts` on any breaking `SimState`
-  change.** Currently `v30`.
+  change.** Currently `v31`.
 - **`headless-output.csv` and `sweep-reserve.csv` must stay
   byte-identical** across changes that aren't meant to affect balance.
   Both were verified unchanged after the delivery work — `createInitialState()`
