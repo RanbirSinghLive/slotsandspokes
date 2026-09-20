@@ -567,6 +567,52 @@ different questions:
   On-Time and Competition views draw their own colours.
 
 
+### Done: lease rates tuned against what a plane earns
+
+`npm run lease` (`src/headless/lease.ts`) flies one plane of each class on
+a market it suits, round trips all day, with its own lease zeroed, and
+prints earnings per day at days 30, 90 and 180, per flight, and how many
+flights a day it takes to cover the lease. It is the tool to re-run when
+anything in the economy moves.
+
+What it found: the old rates ($700 / $2,600 / $7,200 / $14,000 a day) were
+0.3 to 1 flight of margin at day 90. A propeller earns about $28,000 a day
+before lease on YUL-YOW, a narrowbody about $220,000 on YUL-YYZ, so an idle
+plane cost almost nothing and there was no pressure to right-size the fleet.
+
+**The rule:** a plane covers its lease with about **two flights a day** on
+a market it suits, at day-90 demand. Per-flight margin at day 90 is about
+$2,200 (propeller), $8,500 (regional), $23,000 (narrowbody) and $30,000
+(widebody), so the rates are **$4,400 / $17,000 / $46,000 / $60,000** a
+day. Consequences, all from the tool:
+
+- Early on a plane needs more: 4 to 5 flights a day at day-30 demand. A
+  starting propeller flying one round trip a day is about -$9,000 at day 30
+  and +$86,000 at day 90; two round trips a day is +$81,000 at day 30.
+  Flying five round trips a day from day one burns about $89,000 by day 10
+  (demand is still near 10 a day) and wins by day 60.
+- A big plane on a thin or long market loses: a regional on YYZ-YHZ (696 nm)
+  loses $8,000 a day before lease, a narrowbody $47,000.
+- Widebody is only 1.3x narrowbody because on this small map its earnings
+  are limited by demand, not seats, so it pays off only on the very biggest
+  markets.
+- **A lease now needs 14 days of it in cash on hand**
+  (`LEASE_RESERVE_DAYS`, `sim/leasing.ts`), replacing "cash covers a day".
+  At the $500,000 opening that allows Propeller and Regional and holds
+  Narrowbody ($644,000) and Widebody ($840,000) until the airline has
+  earned its way there.
+- Starting planes now cost $8,800 a day, so 500k of cash is about 57 days
+  of doing nothing. `npm run headless` final cash is $666,951 (was
+  $4,718,451): the fixed 3-plane fleet pays $13,200 a day in lease and
+  still nets a profit at 4 flights a plane a day.
+
+Caveats: one seed, one plane, no competitors' response beyond the
+starting ones, and the economy itself is generous (a mature plane clears
+about $90 a seat on a short hop); the rates are sized to that economy as it
+is. The two-flights target and the 14-day reserve are the two numbers to
+move first if it plays too hard or too soft.
+
+
 ---
 
 ## Conventions worth knowing

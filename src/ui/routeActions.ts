@@ -2,7 +2,7 @@ import { airports, type Airport } from '../render/airports';
 import { AIRCRAFT_CLASSES, classByCode, classRank } from '../sim/aircraftClasses';
 import { isAircraftTypeAllowedAt, legsServingMarket, marketKey } from '../sim/schedule';
 import { allRotations, type Rotation } from '../sim/utilisation';
-import { leaseAircraft, loadLeaseRates } from '../sim/leasing';
+import { cashNeededToLease, LEASE_RESERVE_DAYS, leaseAircraft, loadLeaseRates } from '../sim/leasing';
 import { actualDailyDemand, currentPotentialDemand } from '../sim/marketDemand';
 import { candidateTailsAt, commitRotation, planRotation, type RotationPlan } from './routeBuilder';
 import { removeRotation } from './panels';
@@ -289,7 +289,9 @@ export function planeOptions(state: SimState, iata: string): PlaneOption[] {
     const cls = classByCode(rate.typeCode)!;
     let disabledReason: string | undefined;
     if (!isAircraftTypeAllowedAt(iata, rate.typeCode)) disabledReason = `Too large to operate at ${iata}.`;
-    else if (state.cash <= rate.leasePricePerDay) disabledReason = "Not enough cash to cover a day's lease.";
+    else if (state.cash < cashNeededToLease(rate.leasePricePerDay)) {
+      disabledReason = `Needs $${cashNeededToLease(rate.leasePricePerDay).toLocaleString()} on hand (${LEASE_RESERVE_DAYS} days of lease) to lease a ${cls.name}.`;
+    }
     return {
       code: cls.code,
       name: cls.name,

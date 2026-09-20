@@ -23,6 +23,22 @@ export function loadLeaseRates(): LeaseRate[] {
   return (leaseRatesData as LeaseRate[]).map((rate) => ({ ...rate }));
 }
 
+/**
+ * How many days of a plane's lease the player must hold in cash before
+ * leasing it. Rates are sized so a plane pays for itself with a couple of
+ * flights a day once its market has grown, which also means a plane
+ * leased with nothing behind it drains cash fast; this keeps a lease from
+ * being a way to end the game by accident. At the $500,000 opening it lets
+ * a Propeller or Regional through and holds Narrowbody and Widebody back
+ * until the airline has earned its way there.
+ */
+export const LEASE_RESERVE_DAYS = 14;
+
+/** Cash needed on hand to lease one plane at this daily rate. */
+export function cashNeededToLease(leasePricePerDay: number): number {
+  return leasePricePerDay * LEASE_RESERVE_DAYS;
+}
+
 /** What one plane of this class costs per day; 0 for an unknown class. */
 export function leaseRateFor(typeCode: string): number {
   return (leaseRatesData as LeaseRate[]).find((rate) => rate.typeCode === typeCode)?.leasePricePerDay ?? 0;
