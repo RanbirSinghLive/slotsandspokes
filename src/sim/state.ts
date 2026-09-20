@@ -1,6 +1,6 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { loadSchedule, marketKey, recommendedFare, type ScheduleLeg } from './schedule';
-import { loadFleetMarket, type FleetListing, type PendingDelivery } from './fleetMarket';
+import type { PendingDelivery } from './fleetMarket';
 import { loadCompetitorRoutes, type CompetitorOffering } from './competitors';
 import type { WeatherEvent } from './weather';
 import type { Loan } from './loans';
@@ -43,7 +43,7 @@ export type Aircraft = {
    */
   leaseCostPerDay: number;
   /**
-   * Copied from `FleetListing.ageYears` at acquisition (ui/fleetMarket.ts)
+   * Zero for anything bought in the Fleet Market (ui/fleetMarket.ts)
    * and never updated after — a deliberate simplification, not an
    * oversight: an aircraft doesn't get older as sim days pass, it's just
    * "however old it was when it joined the fleet," for now. Feeds one of
@@ -149,13 +149,6 @@ export type SimState = {
    */
   routeSettings: Record<string, RouteSettings>;
   /**
-   * Week three's Fleet Market: airframes still available to buy or lease
-   * (see sim/fleetMarket.ts's FleetListing). A listing leaves here the
-   * moment it's *ordered*, not when it arrives — acquisition-only, no
-   * sell-back this pass, so this array only ever shrinks.
-   */
-  fleetMarket: FleetListing[];
-  /**
    * Week eight: airframes paid for and on their way, but not yet
    * operational — see sim/fleetMarket.ts's PendingDelivery. Resolved once
    * per day in step.ts's rollover, the same pass that delivers crew.
@@ -166,7 +159,7 @@ export type SimState = {
    * route currently in service, seeded from `data/competitors.json` and
    * grown over time by `rollCompetitorRouteOpenings()` (called once per
    * simulated day from step.ts's day-rollover, alongside the weather
-   * roll). Unlike `fleetMarket` above, this array only ever grows —
+   * roll). This array only ever grows —
    * competitors don't retire routes in this pass. Read by
    * `sim/choiceModel.ts` (via `bookingShare()`/`trafficShare()`) for
    * live competitive pressure, and by `render/competition.ts` for the
@@ -576,7 +569,6 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     activeFlights: [],
     schedule,
     routeSettings,
-    fleetMarket: [], // no Fleet Market needed for a headless balance run
     pendingDeliveries: [],
     // Same competitive landscape the real game starts with, growing the
     // same way over time (step()'s day-rollover doesn't know or care
@@ -705,7 +697,6 @@ export function createNewGameState(rngSeed: number = Date.now()): SimState {
     activeFlights: [],
     schedule: [],
     routeSettings: {},
-    fleetMarket: loadFleetMarket(),
     pendingDeliveries: [],
     competitorRoutes: loadCompetitorRoutes(),
     weatherByAirport: {},

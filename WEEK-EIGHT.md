@@ -380,12 +380,34 @@ is now flat and meaningless while the flag is off.
 and slots were parked).
 
 
+### Done: Fleet Market is four class rows
+
+`data/fleet-market.json` is now a four-line price list, one row per
+aircraft class, with unlimited stock. The ten individually named used
+airframes are gone: no registrations, ages or per-airframe lead times.
+
+- Prices (buy / lease per day): propeller $890,000 / $700, regional
+  $13.5M / $2,600, narrowbody $42M / $7,200, widebody $62M / $14,000. The
+  first three are the youngest old listing of each type; the widebody is a
+  new number (the old one was a 12-year-old airframe). All tunable.
+- Lead time is 1 day for every class. Delivery happens at the next day
+  rollover after that, so aircraft land one to two days after ordering.
+- Tails are generated on order (`C-P001`, `C-R001`, `C-N001`, `C-W001`).
+  Aircraft are bought at age 0, so age-driven delays and breakdowns are
+  dormant.
+- `fleetMarket` is no longer in `SimState` (it was a list that shrank as
+  you bought); the catalogue is static data. `SAVE_KEY` went to `v28`.
+- Buy is greyed out unless it leaves cash above zero, since zero cash ends
+  the game. Lease has no such check: at $500,000 you can lease a $14,000/day
+  widebody straight away.
+
+
 ---
 
 ## Conventions worth knowing
 
 - **Bump `SAVE_KEY` in `src/ui/save.ts` on any breaking `SimState`
-  change.** Currently `v27`.
+  change.** Currently `v28`.
 - **`headless-output.csv` and `sweep-reserve.csv` must stay
   byte-identical** across changes that aren't meant to affect balance.
   Both were verified unchanged after the delivery work — `createInitialState()`

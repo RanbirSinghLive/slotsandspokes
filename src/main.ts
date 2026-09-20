@@ -23,7 +23,7 @@ import {
 } from './ui/routeBuilder';
 import { handleAirportDetailMouseDown, handleAirportDetailKeyDown, hideAirportDetail } from './ui/airportDetail';
 import { setupCommercialPanel, updateCommercialPanel } from './ui/commercial';
-import { setupFleetMarket } from './ui/fleetMarket';
+import { setupFleetMarket, updateFleetMarket } from './ui/fleetMarket';
 import { setupOnTimePanel, updateOnTimePanel } from './ui/onTime';
 import { setupExecutivePanel, updateExecutivePanel } from './ui/executive';
 import { setupExecutivesPanel, updateExecutivesPanel } from './ui/executives';
@@ -289,6 +289,7 @@ function render(nowMs: number = performance.now()): void {
   // complete on any tick.
   if (sidebarTab === 'missions') updateMissionsPanel(state);
   if (sidebarTab === 'crew') updateCrewPanel(state);
+  if (sidebarTab === 'fleet-market') updateFleetMarket(state);
   if (sidebarTab === 'airports') updateAirportsPanel(state);
 
   const cssWidth = window.innerWidth - currentPanelWidthPx;

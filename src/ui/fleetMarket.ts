@@ -1,93 +1,86 @@
-import { orderAircraft, type FleetListing } from '../sim/fleetMarket';
+import aircraftTypesData from '../../data/aircraft-types.json';
+import { loadFleetCatalogue, orderAircraft, type FleetListing } from '../sim/fleetMarket';
 import type { SimState } from '../sim/state';
 
 const tableBody = document.querySelector<HTMLTableSectionElement>('#fleet-market-rows')!;
 
-// Tracked by registration so acquireAircraft() can remove a listing's row
-// without a DOM search — same "keep a direct reference" reasoning
-// ui/panels.ts's schedule table and ui/commercial.ts's RowCells use.
-const rowsByRegistration = new Map<string, HTMLTableRowElement>();
+type AircraftTypeSpec = { code: string; name: string; seats: number; rangeNm: number };
+const typesByCode = new Map<string, AircraftTypeSpec>((aircraftTypesData as AircraftTypeSpec[]).map((t) => [t.code, t]));
+
+// Kept so updateFleetMarket() can grey out a button by reference, without
+// rebuilding the rows (a per-frame rebuild breaks buttons mid-click — see
+// the renderFleet() comment in ui/panels.ts).
+const buttonsByType = new Map<string, { buy: HTMLButtonElement; lease: HTMLButtonElement; listing: FleetListing }>();
 
 function formatMoney(amount: number): string {
   return `$${Math.round(amount).toLocaleString()}`;
 }
 
 /**
- * Order `listing` — the rules all live in sim/fleetMarket.ts's
- * orderAircraft(); this just removes the row and reports the date.
- *
- * Week eight: this no longer produces an aircraft. It produces a
- * *delivery*, which becomes an aircraft after the listing's lead time.
- * Buying used to be the one commitment in the game with no wait attached,
- * which sat oddly next to crew taking ten days to show up — and it made
- * age a pure discount rather than a trade.
- *
- * There's no setSelectedTail() any more either: there is no tail yet to
- * select. Selecting it on arrival would also mean silently changing what
- * the map is armed for, weeks after the click that caused it.
+ * Whether an outright purchase is allowed. It must leave cash above zero,
+ * since zero cash ends the game (sim/loans.ts's isInsolvent()) and buying
+ * yourself into a game over is never the intent.
+ */
+function canBuy(listing: FleetListing, state: SimState): boolean {
+  return state.cash - listing.buyPrice > 0;
+}
+
+/**
+ * Order one aircraft of this class — the rules all live in
+ * sim/fleetMarket.ts's orderAircraft(). It lands on the Fleet tab as an
+ * inbound delivery and becomes a usable, unbased aircraft when its lead
+ * time is up.
  */
 function order(listing: FleetListing, ownership: 'owned' | 'leased', state: SimState): void {
-  if (ownership === 'owned' && listing.buyPrice > state.cash) return; // button is disabled; stale-click guard
+  if (ownership === 'owned' && !canBuy(listing, state)) return; // button is disabled; stale-click guard
 
   orderAircraft(state, listing, ownership);
-  rowsByRegistration.get(listing.registration)?.remove();
-  rowsByRegistration.delete(listing.registration);
+  updateFleetMarket(state);
 }
 
 function buildListingRow(listing: FleetListing, state: SimState): HTMLTableRowElement {
+  const type = typesByCode.get(listing.typeCode);
   const row = document.createElement('tr');
 
-  const regCell = document.createElement('td');
-  regCell.textContent = listing.registration;
+  const classCell = document.createElement('td');
+  classCell.textContent = type?.name ?? listing.typeCode;
 
-  const typeCell = document.createElement('td');
-  typeCell.textContent = listing.typeCode;
+  const seatsCell = document.createElement('td');
+  seatsCell.textContent = type ? `${type.seats}` : '';
 
-  const ageCell = document.createElement('td');
-  ageCell.textContent = `${listing.ageYears} yr`;
-
-  // Lead time sits next to age and price because it is the third axis of
-  // the same decision, not a footnote: the cheap airframe is also the one
-  // you can have soonest, and the one that will break down most.
-  const leadCell = document.createElement('td');
-  leadCell.className = 'fleet-market-lead';
-  leadCell.textContent = `${listing.leadTimeDays} d`;
-
-  const leaseCell = document.createElement('td');
-  leaseCell.textContent = `${formatMoney(listing.leasePricePerDay)}/day`;
-
-  const buyCell = document.createElement('td');
-  buyCell.textContent = formatMoney(listing.buyPrice);
+  const rangeCell = document.createElement('td');
+  rangeCell.textContent = type ? `${type.rangeNm.toLocaleString()} nm` : '';
 
   const actionCell = document.createElement('td');
   actionCell.className = 'fleet-market-actions';
 
-  const buyButton = document.createElement('button');
-  buyButton.type = 'button';
-  buyButton.textContent = 'Buy';
-  buyButton.addEventListener('click', () => order(listing, 'owned', state));
+  const buy = document.createElement('button');
+  buy.type = 'button';
+  buy.textContent = `Buy ${formatMoney(listing.buyPrice)}`;
+  buy.addEventListener('click', () => order(listing, 'owned', state));
 
-  const leaseButton = document.createElement('button');
-  leaseButton.type = 'button';
-  leaseButton.textContent = 'Lease';
-  leaseButton.addEventListener('click', () => order(listing, 'leased', state));
+  const lease = document.createElement('button');
+  lease.type = 'button';
+  lease.textContent = `Lease ${formatMoney(listing.leasePricePerDay)}/day`;
+  lease.addEventListener('click', () => order(listing, 'leased', state));
 
-  actionCell.append(buyButton, leaseButton);
-  row.append(regCell, typeCell, ageCell, leadCell, leaseCell, buyCell, actionCell);
-
-  rowsByRegistration.set(listing.registration, row);
+  actionCell.append(buy, lease);
+  row.append(classCell, seatsCell, rangeCell, actionCell);
+  buttonsByType.set(listing.typeCode, { buy, lease, listing });
   return row;
 }
 
-/**
- * Build the Fleet Market panel once at startup — one row per listing
- * still in `state.fleetMarket`. Same "build once, mutate via events" rule
- * as ui/panels.ts's schedule table: nothing here needs a periodic
- * rebuild, since the only thing that changes it is a Buy/Lease click,
- * already handled directly.
- */
+/** Build the four class rows once at startup. Nothing here needs a periodic rebuild. */
 export function setupFleetMarket(state: SimState): void {
-  for (const listing of state.fleetMarket) {
+  for (const listing of loadFleetCatalogue()) {
     tableBody.appendChild(buildListingRow(listing, state));
+  }
+  updateFleetMarket(state);
+}
+
+/** Grey out Buy where it would take cash to zero or below. Only toggles `disabled`; never rebuilds. */
+export function updateFleetMarket(state: SimState): void {
+  for (const { buy, listing } of buttonsByType.values()) {
+    buy.disabled = !canBuy(listing, state);
   }
 }

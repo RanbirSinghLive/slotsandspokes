@@ -996,22 +996,10 @@ body {
   overflow-x: auto;
 }
 
-/* This table is wider than the 420px sidebar and always has been, so it
-   scrolls horizontally. Week eight's Lead column made that a real problem
-   rather than a cosmetic one: it pushed Buy/Lease past the right edge, and
-   having to scroll sideways to reach the only two buttons on a row is a
-   bad trade for a column you read once.
-
-   Fixed by pinning the action column to the right edge (below) rather than
-   by squeezing the data columns — age, lead time and the two prices are
-   exactly what the player is comparing across rows, so they keep their
-   width and stay scrollable, while the buttons never move. Headers are
-   abbreviated too ("Registration" is twelve characters against a
-   six-character value), and cells stay nowrap so a tight column shows the
-   scrollbar rather than silently wrapping "15 yr" onto two lines. */
+/* Four fixed rows now, so this fits the sidebar without scrolling; the
+   action column stays pinned in case the sidebar is narrowed. */
 #fleet-market-table {
   width: 100%;
-  min-width: 420px;
   border-collapse: collapse;
 }
 
@@ -1047,7 +1035,8 @@ body {
 
 .fleet-market-actions {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .fleet-market-actions button {
@@ -1059,6 +1048,11 @@ body {
   background: #3a4258;
   border: 1px solid #6b7694;
   color: #fff;
+}
+
+.fleet-market-actions button:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 /* Stacked, not side by side — same reasoning as the schedule table's fare

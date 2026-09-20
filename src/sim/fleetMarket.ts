@@ -1,72 +1,43 @@
 import fleetMarketData from '../../data/fleet-market.json';
 
 /**
- * One available airframe in the acquisition market — hand-authored, same
- * spirit as data/competitors.json: a fixed, small set of individually named
- * aircraft (not randomly generated or replenished), each either bought
- * outright or leased once, then gone from the list. Two listings per type
- * across the week-four aircraft ladder (data/aircraft-types.json) — this
- * models several distinct used airframes per type, not a type catalog of
- * its own.
+ * One row of the Fleet Market: what a new aircraft of one size class
+ * costs. There is one listing per class in data/aircraft-types.json and
+ * stock never runs out, so buying a second propeller is the same click as
+ * buying the first. This is a fixed price list, not part of `SimState`.
  *
- * `ageYears` sets pricing here (older airframes are cheaper to buy or
- * lease) and is also copied onto the resulting `Aircraft` record at
- * acquisition (ui/fleetMarket.ts) to feed one of step.ts's three delay
- * causes — the same number doing double duty as a price signal and a
- * reliability one, not two separate fields to keep in sync.
- *
- * `leadTimeDays` (week eight) is how long the airframe takes to become
- * operational after it's paid for: inspection, the delivery flight,
- * registration, getting crews on type. Before this, a $42M widebody was
- * flying the instant you clicked Buy while four pilots took ten days,
- * which had the expensive irreversible commitment be the one with no
- * wait.
- *
- * Authored *against* age on purpose. An old airframe is cheap **and**
- * quick — it's sitting on a ramp somewhere and its owner wants rid of it —
- * while a young one is dear and slow, because everyone else wants it too.
- * That's what stops "buy the oldest thing you can afford" from being the
- * flat answer it currently is: the cheap option now wins on price and
- * speed and loses on reliability, since ageYears feeds the delay roll.
+ * `leadTimeDays` is how long the aircraft takes to become operational
+ * after it's paid for. It used to be weeks and shaped the opening of the
+ * game; it is a single day now, and stays a data field so it can be tuned.
  */
 export type FleetListing = {
-  registration: string;
   typeCode: string;
-  ageYears: number;
   buyPrice: number;
   leasePricePerDay: number;
   leadTimeDays: number;
 };
 
-/**
- * A fresh, independent copy of the market listings — same reasoning as
- * sim/schedule.ts's loadSchedule(): each game gets its own mutable array
- * (state.fleetMarket), so buying an aircraft in one game can never remove
- * it from another's, and nothing mutates this module's own data directly.
- */
-export function loadFleetMarket(): FleetListing[] {
+/** The price list, one entry per aircraft class, smallest first. */
+export function loadFleetCatalogue(): FleetListing[] {
   return (fleetMarketData as FleetListing[]).map((listing) => ({ ...listing }));
 }
 
 /**
- * An airframe paid for but not yet operational. Deliberately the same
+ * An aircraft paid for but not yet operational. Deliberately the same
  * shape as sim/crew.ts's PendingHire — a commitment already charged to
- * Cash, plus the minute it lands — because "Grow" is becoming one
- * pipeline of things bought and waited for, and a second queue that
- * worked differently would just be a second thing to keep in sync.
+ * Cash, plus the minute it lands.
  *
- * Holds everything needed to build the Aircraft on arrival rather than a
- * reference back to the listing, since the listing is removed from
- * `state.fleetMarket` at order time (nobody else can buy it now) and
+ * Holds everything needed to build the Aircraft on arrival, since
  * `SimState` has to survive a JSON round trip with no shared references.
  */
 export type PendingDelivery = {
   id: string;
+  /** The tail the aircraft will carry, chosen at order time so it is unique from then on. */
   registration: string;
   typeCode: string;
   ageYears: number;
   ownership: 'owned' | 'leased';
-  /** Zero for an owned airframe; the daily charge starts on arrival, not at order. */
+  /** Zero for an owned aircraft; the daily charge starts on arrival, not at order. */
   leaseCostPerDay: number;
   orderedAtMinute: number;
   availableAtMinute: number;
@@ -81,39 +52,54 @@ function nextDeliveryId(deliveries: PendingDelivery[]): string {
 }
 
 /**
- * Order `listing`. The full purchase price is charged **now**, at order,
- * not on arrival — no deposit schedule, since CLAUDE.md defers financing,
- * and paying up front is what makes lead time cost something real rather
- * than being a free wait. A lease costs nothing up front; its daily charge
- * begins when the aircraft actually arrives, which is why
+ * The next free tail for this class: the class's first letter plus a
+ * three-digit counter (`C-P001`, `C-R002`), counting both aircraft already
+ * flying and ones still on order so two orders placed the same day can
+ * never collide.
+ */
+function nextTail(typeCode: string, tailsInUse: string[]): string {
+  const prefix = `C-${typeCode[0]}`;
+  const numbers = tailsInUse
+    .filter((tail) => tail.startsWith(prefix))
+    .map((tail) => Number(tail.slice(prefix.length)))
+    .filter((n) => !Number.isNaN(n));
+  const next = (numbers.length > 0 ? Math.max(...numbers) : 0) + 1;
+  return `${prefix}${String(next).padStart(3, '0')}`;
+}
+
+/**
+ * Order one aircraft of `listing`'s class. The full purchase price is
+ * charged **now**, at order, not on arrival — no deposit schedule, since
+ * CLAUDE.md defers financing. A lease costs nothing up front; its daily
+ * charge begins when the aircraft actually arrives, which is why
  * `leaseCostPerDay` rides along here instead of being applied yet.
  *
  * Returns the queued delivery so the caller can report the arrival date.
  */
 export function orderAircraft(
-  state: { cash: number; simMinute: number; pendingDeliveries: PendingDelivery[]; fleetMarket: FleetListing[] },
+  state: {
+    cash: number;
+    simMinute: number;
+    pendingDeliveries: PendingDelivery[];
+    aircraft: Array<{ tail: string }>;
+  },
   listing: FleetListing,
   ownership: 'owned' | 'leased',
 ): PendingDelivery {
   if (ownership === 'owned') state.cash -= listing.buyPrice;
 
+  const tailsInUse = [...state.aircraft.map((a) => a.tail), ...state.pendingDeliveries.map((d) => d.registration)];
   const delivery: PendingDelivery = {
     id: nextDeliveryId(state.pendingDeliveries),
-    registration: listing.registration,
+    registration: nextTail(listing.typeCode, tailsInUse),
     typeCode: listing.typeCode,
-    ageYears: listing.ageYears,
+    ageYears: 0,
     ownership,
     leaseCostPerDay: ownership === 'leased' ? listing.leasePricePerDay : 0,
     orderedAtMinute: state.simMinute,
     availableAtMinute: state.simMinute + listing.leadTimeDays * MINUTES_PER_DAY,
   };
   state.pendingDeliveries.push(delivery);
-
-  // Off the market at order, not at arrival: it's yours the moment you pay
-  // for it, and this is also what stops the same airframe being ordered
-  // twice while it's in transit.
-  const index = state.fleetMarket.findIndex((l) => l.registration === listing.registration);
-  if (index !== -1) state.fleetMarket.splice(index, 1);
 
   return delivery;
 }
