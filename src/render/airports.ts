@@ -13,7 +13,7 @@ export type Airport = {
   population: number;
   /**
    * Week four: the largest aircraft type (by `data/aircraft-types.json`'s
-   * own code, e.g. `"DH8400"`) allowed to operate here — a real runway/
+   * own code, e.g. `"REGIONAL"`) allowed to operate here — a real runway/
    * gate constraint some airports have (Billy Bishop's YTZ, LaGuardia's
    * perimeter/gate rules), modeled the same crude "hard limit" way range
    * already is. Absent means unconstrained. See `sim/schedule.ts`'s

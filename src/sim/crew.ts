@@ -12,8 +12,8 @@ import type { SimState } from './state';
  *      have crew and it sits earning nothing; hire ahead of the aircraft
  *      and you pay idle salaries. That timing call is the best thing
  *      crew offers as a mechanic.
- *   2. **Tier gating.** A pilot qualified on a 19-seat turboprop can't
- *      fly an A330, so climbing the fleet ladder is gated by people, not
+ *   2. **Tier gating.** A pilot qualified on a propeller can't
+ *      fly a widebody, so climbing the fleet ladder is gated by people, not
  *      only cash.
  *   3. **Train vs. hire.** Buy tier directly at a premium, or train
  *      someone up cheaply and lose their capacity while they're away.
@@ -60,9 +60,9 @@ const PILOTS_PER_AIRCRAFT = 2;
 /**
  * Seats per cabin crew member. A real regulatory standard rather than a
  * tuned constant: both the FAA and Transport Canada require one flight
- * attendant per fifty passenger seats. Gives 1 on the Beech 1900D, 2 on a
- * Q400 and 6 on an A330 straight from the seat counts already in
- * data/aircraft-types.json.
+ * attendant per fifty passenger seats. Gives 1 on a propeller, 2 on a
+ * regional, 3 on a narrowbody and 6 on a widebody straight from the seat
+ * counts already in data/aircraft-types.json.
  */
 const SEATS_PER_CABIN_CREW = 50;
 

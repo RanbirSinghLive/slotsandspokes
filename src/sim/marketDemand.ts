@@ -95,8 +95,8 @@ const DAILY_DEMAND_GROWTH = ANNUAL_DEMAND_GROWTH / 365;
  * Seats a competitor frequency is assumed to carry. Competitors have no
  * fleet in this model — `CompetitorOffering` (sim/competitors.ts) carries
  * a frequency and a fare but no aircraft type — so their contribution to
- * stimulating a market needs a stand-in gauge. A mid-size regional number,
- * matching the Dash 8-300 the player can buy, on the reasoning that
+ * stimulating a market needs a stand-in gauge. A small-regional number,
+ * between the propeller and regional classes the player can buy, on the reasoning that
  * competitors here are peer startups flying comparable equipment rather
  * than mainline carriers.
  */

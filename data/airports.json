@@ -135,7 +135,7 @@
     "lon": -79.3955,
     "utcOffsetMinutes": -300,
     "population": 6202225,
-    "maxAircraftType": "DH8400"
+    "maxAircraftType": "REGIONAL"
   },
   {
     "iata": "LGA",
@@ -144,7 +144,7 @@
     "lon": -73.8726,
     "utcOffsetMinutes": -300,
     "population": 20140470,
-    "maxAircraftType": "A220300",
+    "maxAircraftType": "NARROWBODY",
     "slotsTotal": 6
   },
   {

@@ -313,12 +313,37 @@ tabs for.
 - **Tab grouping** 11 → ~6, never started. Re-derive it from the pipeline
   idea rather than following week six's proposed buckets.
 
+### Done: aircraft types collapsed to four size classes
+
+`data/aircraft-types.json` went from five real-world types (1900D, Dash
+8-300, Q400, A220-300, A330-300) to four generic classes, in size order:
+`PROP` (25 seats), `REGIONAL` (75), `NARROWBODY` (150), `WIDEBODY` (300).
+Costs, range and cruise speed were carried over from the nearest old type
+(the Q400 became the regional, the A220 the narrowbody, the A330 the
+widebody, scaled up to the new seat counts); the propeller kept the 1900D's
+range and cruise speed so `data/schedule.json` still fits inside it. Crew
+tiers are unchanged (1, 2, 3, 3), so the widebody-retooling-is-free gap
+noted above is still open.
+
+Knock-on edits: the Fleet Market lost its two Dash 8-300 listings (10
+listings now, 4/2/2/2), the two airport size caps were renamed (YTZ
+`REGIONAL`, LGA `NARROWBODY`), and `SAVE_KEY` went to `v27` because saved
+games carry the old type codes.
+
+**This is a deliberate balance change, not a refactor.** The headless
+runner's fixed fleet is built from `aircraft-types.json[0]`, and a 25-seat
+propeller earns about a third more than a 19-seat one on the same costs:
+`npm run headless` final cash moved from $2,207,661 to $3,019,697. Fares,
+demand and the opening $500,000 were left alone, so the starter airframe
+is now the most forgiving it has been.
+
+
 ---
 
 ## Conventions worth knowing
 
 - **Bump `SAVE_KEY` in `src/ui/save.ts` on any breaking `SimState`
-  change.** Currently `v26`.
+  change.** Currently `v27`.
 - **`headless-output.csv` and `sweep-reserve.csv` must stay
   byte-identical** across changes that aren't meant to affect balance.
   Both were verified unchanged after the delivery work — `createInitialState()`

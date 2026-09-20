@@ -109,7 +109,7 @@ const DEFAULT_CRUISE_KTS = (aircraftTypesData as AircraftType[])[0].cruiseKts;
  * and `cruiseKts` — see CLAUDE.md's note on this formula. `cruiseKts`
  * defaults to the fixed template's single type (see the note above) but
  * should be passed explicitly for any leg with a real aircraft assigned,
- * so a Q400 or A220 route isn't timed as if a 1900D were flying it.
+ * so a regional or narrowbody route isn't timed as if a propeller flew it.
  * Exported so the M10 route builder can compute a real block time for a
  * leg the player is creating, not just at schedule-load time for the
  * fixed template.
