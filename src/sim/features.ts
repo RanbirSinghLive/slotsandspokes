@@ -29,3 +29,10 @@ export const FUEL_PRICE_MOVES = false;
  * so nothing gates route building and there is nothing to buy.
  */
 export const SLOTS_ENABLED = false;
+
+/**
+ * Authored missions: one-off objectives that pay Reputation. Off means none
+ * ever complete, so nothing announces one and Reputation never moves from
+ * this source.
+ */
+export const MISSIONS_ENABLED = false;

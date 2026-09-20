@@ -1,4 +1,5 @@
 import missionsData from '../../data/missions.json';
+import { MISSIONS_ENABLED } from './features';
 import type { SimState } from './state';
 
 /**
@@ -88,6 +89,8 @@ const MISSION_CONDITIONS: Record<string, (state: SimState) => boolean> = {
  * diffing, rather than this needing to reach out to the UI.
  */
 export function checkMissions(state: SimState): void {
+  if (!MISSIONS_ENABLED) return;
+
   for (const mission of loadMissions()) {
     if (state.completedMissionIds.includes(mission.id)) continue;
     const condition = MISSION_CONDITIONS[mission.id];

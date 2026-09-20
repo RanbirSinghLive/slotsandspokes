@@ -15,15 +15,6 @@ type TickerEvent = { simMinute: number; message: string };
 
 let events: TickerEvent[] = [];
 
-/**
- * Same bidirectional market-pair key every other "market" concept in
- * this codebase uses — duplicated locally rather than imported, matching
- * the existing pattern of a small local copy per file.
- */
-function marketKey(a: string, b: string): string {
-  return [a, b].sort().join('-');
-}
-
 function pushEvent(simMinute: number, message: string): void {
   events.push({ simMinute, message });
   if (events.length > MAX_EVENTS) events.shift();
@@ -86,32 +77,12 @@ function pollWeatherEvents(state: SimState): void {
   previousWeatherAirports = currentAirports;
 }
 
-let hasSeenInitialCompetitorRoutes = false;
-const seenCompetitorRouteKeys = new Set<string>();
-
-function pollCompetitorEvents(state: SimState): void {
-  if (!hasSeenInitialCompetitorRoutes) {
-    for (const route of state.competitorRoutes) {
-      seenCompetitorRouteKeys.add(`${route.code}:${marketKey(route.origin, route.dest)}`);
-    }
-    hasSeenInitialCompetitorRoutes = true;
-    return;
-  }
-
-  for (const route of state.competitorRoutes) {
-    const id = `${route.code}:${marketKey(route.origin, route.dest)}`;
-    if (seenCompetitorRouteKeys.has(id)) continue;
-    seenCompetitorRouteKeys.add(id);
-    pushEvent(state.simMinute, `${route.airline} opens ${route.origin}–${route.dest}`);
-  }
-}
-
 /**
  * The bottom-of-screen ticker for events nobody clicked to cause — new
- * weather forming, a competitor opening a route — the same two "non-
- * player" categories render/competition.ts's map flash already surfaces
- * visually, just as a persistent, always-visible scroll rather than
- * something you only catch while looking at the map. Called every frame
+ * weather forming, an aircraft arriving. Competitor route openings are
+ * deliberately not announced here any more: they still happen, and
+ * render/competition.ts's map flash shows them when the Competition
+ * overlay is on. Called every frame
  * from main.ts's render(), *before* its `panelView !== 'map'` early
  * return, so an event happening while you're deep in the Commercial
  * panel still gets announced rather than silently missed.
@@ -169,7 +140,6 @@ function pollFleetEvents(state: SimState): void {
 
 export function updateTicker(state: SimState): void {
   pollWeatherEvents(state);
-  pollCompetitorEvents(state);
   pollMissionEvents(state);
   pollFleetEvents(state);
 }

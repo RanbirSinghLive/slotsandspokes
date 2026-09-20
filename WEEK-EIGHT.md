@@ -372,9 +372,7 @@ is now flat and meaningless while the flag is off.
   attribute, so hidden tab buttons (Tech Tree, Crew and the rest) were never
   actually hidden on screen. The last tuck-away was only checked via the
   `hidden` property. Fixed with a `[hidden]` rule.
-- Known leftovers: the HUD still shows Reputation, NPS and On-time;
-  competitor route openings still fire and appear in the ticker; a mission
-  completion can still surface in the ticker.
+- Leftovers from this list are handled in the next section.
 
 `npm run headless` final cash is now $5,484,951 (was $4,586,231 before fuel
 and slots were parked).
@@ -400,6 +398,22 @@ airframes are gone: no registrations, ages or per-airframe lead times.
 - Buy is greyed out unless it leaves cash above zero, since zero cash ends
   the game. Lease has no such check: at $500,000 you can lease a $14,000/day
   widebody straight away.
+
+
+### Done: HUD and ticker leftovers
+
+- The HUD keeps Cash, On-time, Completion and Today's revenue, cost and
+  margin. NPS and Reputation rows are removed (deleted, not hidden: `.econ-row`
+  sets `display`, which would beat `hidden`). Both are still computed.
+- `MISSIONS_ENABLED` (`sim/features.ts`) is `false`: `checkMissions()` does
+  nothing, so no mission completes or announces itself.
+- The ticker no longer announces competitor route openings. The openings
+  themselves are **not** frozen: with them frozen `npm run headless` final
+  cash fell from $5,484,951 to $3,412,029, because competitor frequencies
+  also stimulate demand (`COMPETITOR_ASSUMED_SEATS` in `marketDemand.ts`).
+  They still show on the map flash when the Competition overlay is on.
+  Whether to freeze them is a balance call for the owner.
+- Ticker events now: weather forming and aircraft deliveries.
 
 
 ---

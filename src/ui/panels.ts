@@ -13,9 +13,7 @@ export const PANEL_WIDTH_PX = 420;
 
 const cashEl = document.querySelector<HTMLSpanElement>('#panel-cash')!;
 const otpEl = document.querySelector<HTMLSpanElement>('#panel-otp')!;
-const npsEl = document.querySelector<HTMLSpanElement>('#panel-nps')!;
 const completionEl = document.querySelector<HTMLSpanElement>('#panel-completion')!;
-const reputationEl = document.querySelector<HTMLSpanElement>('#panel-reputation')!;
 const revenueEl = document.querySelector<HTMLSpanElement>('#panel-revenue')!;
 const costEl = document.querySelector<HTMLSpanElement>('#panel-cost')!;
 const marginEl = document.querySelector<HTMLSpanElement>('#panel-margin')!;
@@ -63,16 +61,6 @@ export function updatePanel(state: SimState): void {
     state.flightsDepartedTotal === 0
       ? '—'
       : `${Math.round((state.flightsOnTimeTotal / state.flightsDepartedTotal) * 100)}%`;
-  // NPS divides by its own denominator, not by departures: week six
-  // scores cancellations too (a flat -80 each, sim/nps.ts), and those
-  // never departed. On-time above deliberately keeps the departures
-  // denominator, since it only ever describes flights that operated.
-  if (state.npsScoredFlightsTotal === 0) {
-    npsEl.textContent = '—';
-  } else {
-    const nps = Math.round(state.npsPointsTotal / state.npsScoredFlightsTotal);
-    npsEl.textContent = nps > 0 ? `+${nps}` : `${nps}`;
-  }
   // Completion Factor — the second reliability axis. On-time says how
   // punctual the flights that operated were; this says how many operated
   // at all, and a carrier can be excellent at one and dreadful at the other.
@@ -80,10 +68,6 @@ export function updatePanel(state: SimState): void {
     state.flightsScheduledTotal === 0
       ? '—'
       : `${Math.round(((state.flightsScheduledTotal - state.flightsCancelledTotal) / state.flightsScheduledTotal) * 100)}%`;
-  // Always a real number, unlike On-time/NPS above — 0 is a genuine
-  // starting Reputation (a new airline with no track record), not a
-  // placeholder for "no data yet" — see sim/reputation.ts.
-  reputationEl.textContent = `${Math.round(state.reputation)}`;
   revenueEl.textContent = formatMoney(state.todayRevenue);
   costEl.textContent = formatMoney(state.todayCost);
   marginEl.textContent = formatMoney(state.todayMargin);
