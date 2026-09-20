@@ -338,6 +338,23 @@ demand and the opening $500,000 were left alone, so the starter airframe
 is now the most forgiving it has been.
 
 
+### Done: crews parked behind a switch
+
+`CREWS_ENABLED` in `src/sim/features.ts` is `false`. It is a sim-level
+switch, not just a hidden tab: with it off `rollDailyCrew()` charges no
+payroll and grounds nothing, `maintenanceAgeFactor()` assumes a fully
+maintained fleet, `cabinServiceShare()` reads 1 (service is neither
+rewarded nor penalised), and `economy.ts` stops carving the 30% crew slice
+out of block-hour cost, so it stays inside block cost instead of vanishing.
+The Crew tab button is `hidden`. Nothing was deleted: set the flag to
+`true` and remove the `hidden` attribute to get the old system back.
+`SimState` didn't change, so the save key stays `v27`.
+
+Balance moved again: `npm run headless` final cash $3,019,697 to
+$4,586,231 (no payroll, no crew cancellations). `npm run sweep -- reserve`
+is now flat and meaningless while the flag is off.
+
+
 ---
 
 ## Conventions worth knowing

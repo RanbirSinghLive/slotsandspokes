@@ -1,4 +1,5 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
+import { CREWS_ENABLED } from './features';
 import { nextRandom } from './rng';
 import type { SimState } from './state';
 
@@ -360,6 +361,9 @@ export function crewableTails(state: SimState, availablePilotsByTier: number[], 
  * rather than dividing by zero.
  */
 export function maintenanceAgeFactor(state: SimState): number {
+  // Crews parked (sim/features.ts): assume the fleet is fully maintained,
+  // rather than reading an empty mechanic pool as the worst case.
+  if (!CREWS_ENABLED) return MAINTENANCE_FACTOR_BEST;
   if (state.aircraft.length === 0) return 1;
   const perAircraft = state.crew.mechanics / state.aircraft.length;
   const coverage = Math.min(1, perAircraft / TARGET_MECHANICS_PER_AIRCRAFT);
@@ -460,6 +464,9 @@ export function cabinTrainingCost(count: number): number {
  * cabin crew at all rather than dividing by zero.
  */
 export function cabinServiceShare(pools: CrewPools): number {
+  // Crews parked (sim/features.ts): service is neither rewarded nor
+  // penalised by training nobody can buy.
+  if (!CREWS_ENABLED) return 1;
   if (pools.cabinCrew <= 0) return 0;
   return Math.min(1, pools.cabinCrewTrained / pools.cabinCrew);
 }
@@ -693,6 +700,13 @@ export function runTrainingLines(state: SimState): void {
 }
 
 export function rollDailyCrew(state: SimState): void {
+  // Crews parked (sim/features.ts): no payroll, no disruption roll, and
+  // nothing is ever grounded for lack of crew.
+  if (!CREWS_ENABLED) {
+    state.groundedTails = [];
+    return;
+  }
+
   resolveArrivals(state);
 
   // Recurrent training lapses — it has to be kept up rather than bought

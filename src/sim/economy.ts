@@ -1,5 +1,6 @@
 import { bookingShare } from './choiceModel';
 import { FUEL_SHARE_OF_BLOCK_HOUR_COST } from './fuel';
+import { CREWS_ENABLED } from './features';
 import type { CompetitorOffering } from './competitors';
 import type { RouteSettings } from './state';
 
@@ -157,7 +158,7 @@ export function legCostBreakdown(
     fuel: baseFuelPortion * fuelPriceIndex * fuelEfficiencyMultiplier,
     // Whatever is left once fuel and the crew carve-out are removed:
     // maintenance, overhead, and everything else still bundled together.
-    blockNonFuel: blockHourCost * (1 - FUEL_SHARE_OF_BLOCK_HOUR_COST - CREW_SHARE_OF_BLOCK_HOUR_COST),
+    blockNonFuel: blockHourCost * (1 - FUEL_SHARE_OF_BLOCK_HOUR_COST - (CREWS_ENABLED ? CREW_SHARE_OF_BLOCK_HOUR_COST : 0)),
     departure: type.costPerDeparture,
   };
 }
