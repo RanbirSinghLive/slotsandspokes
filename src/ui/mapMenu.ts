@@ -2,6 +2,7 @@ import { findNearestAirport, airportPresence, type Airport } from '../render/air
 import { findNearestOwnRoute } from '../render/routes';
 import { projection } from '../render/projection';
 import { utilisationPools } from '../sim/utilisation';
+import { unmetDemandByAirport } from '../sim/unmetDemand';
 import { buildPoolRows } from './poolBars';
 import { getMapPreview, setMapPreview, type MapPreview } from '../render/preview';
 import type { SimState } from '../sim/state';
@@ -37,6 +38,7 @@ const presenceEl = document.querySelector<HTMLElement>('#airport-detail-presence
 const basedEl = document.querySelector<HTMLElement>('#airport-detail-based')!;
 const marketsEl = document.querySelector<HTMLElement>('#airport-detail-markets')!;
 const poolsEl = document.querySelector<HTMLElement>('#airport-detail-pools')!;
+const demandEl = document.querySelector<HTMLElement>('#airport-detail-demand')!;
 const hintEl = document.querySelector<HTMLElement>('#airport-detail-hint')!;
 
 const ICON = {
@@ -134,6 +136,13 @@ function fillAirportCard(airport: Airport, state: SimState): void {
   presenceEl.textContent = `${presence.level} · ${presence.departures} departure${presence.departures === 1 ? '' : 's'}/day`;
   presenceEl.classList.remove('airport-detail-over');
 
+  const unmet = unmetDemandByAirport(state).get(airport.iata);
+  const round = (n: number) => Math.round(n).toLocaleString();
+  demandEl.textContent = unmet
+    ? `Waiting: ${round(unmet.latent)} potential riders/day${unmet.spilled >= 1 ? `, ${round(unmet.spilled)} turned away` : ''}`
+    : '';
+  demandEl.classList.toggle('airport-detail-over', !!unmet && unmet.spilled >= 1);
+
   fillPools(airport.iata, state, 'No aircraft based here.');
 
   // Every market this airport touches, either direction, with how many
@@ -215,6 +224,7 @@ function fillRouteCard(a: string, b: string, state: SimState): void {
   presenceEl.classList.remove('airport-detail-over');
 
   const short = readout.demandNow > readout.seatsPerFlight;
+  demandEl.textContent = '';
   presenceEl.classList.toggle('airport-detail-over', short);
   marketsEl.textContent =
     `Per flight: ${readout.demandNow} passengers wanted${readout.demandPotential > readout.demandNow ? ` (${readout.demandPotential} potential)` : ''}, ${readout.seatsPerFlight} seats.` +

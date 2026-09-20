@@ -4,11 +4,13 @@ import { projection } from './projection';
 import { airports } from './airports';
 import { distanceToArc } from './competition';
 import { getMapPreview } from './preview';
+import { spillingMarkets } from '../sim/unmetDemand';
 import type { SimState } from '../sim/state';
 
 const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]));
 
 const ROUTE_STROKE = '#3a4258';
+const SPILL_STROKE = '#ffb347';
 const PREVIEW_STROKE = { add: '#7fd88f', change: '#ffd166', remove: '#ff8080' } as const;
 
 /**
@@ -64,6 +66,31 @@ export function drawRoutes(ctx: CanvasRenderingContext2D, state: SimState): void
     ctx.beginPath();
     path(line);
     ctx.stroke();
+  }
+
+  // A route with more demand than seats, in the same amber as the solid
+  // pips at its ends: the one that needs a flight or a bigger plane.
+  const spilling = spillingMarkets(state);
+  if (spilling.size > 0) {
+    ctx.save();
+    ctx.strokeStyle = SPILL_STROKE;
+    ctx.lineWidth = 2;
+    for (const { origin, dest } of distinctRoutes.values()) {
+      if (!spilling.has(routeKey(origin, dest))) continue;
+      const originAirport = airportsByIata.get(origin);
+      const destAirport = airportsByIata.get(dest);
+      if (!originAirport || !destAirport) continue;
+      ctx.beginPath();
+      path({
+        type: 'LineString',
+        coordinates: [
+          [originAirport.lon, originAirport.lat],
+          [destAirport.lon, destAirport.lat],
+        ],
+      } as LineString);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   // The route the hovered menu button would change, drawn over the top:

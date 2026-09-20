@@ -799,6 +799,15 @@ body {
   margin-bottom: 6px;
 }
 
+#airport-detail-demand {
+  margin-bottom: 6px;
+  color: #9aa3b8;
+}
+
+#airport-detail-demand.airport-detail-over {
+  color: #ffb347;
+}
+
 /* The hover line inside the card: what the hovered button does, or why it
    can't. Reserves its height so the card doesn't jump as the text comes
    and goes. */

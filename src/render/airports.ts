@@ -3,6 +3,7 @@ import { projection } from './projection';
 import { dailyDeparturesAt, airportLevel, isSlotControlled, slotsOwned, slotsTotal } from '../sim/airports';
 import { worstPoolShareByBase } from '../sim/utilisation';
 import { getMapPreview } from './preview';
+import { pipCount, unmetDemandByAirport } from '../sim/unmetDemand';
 import type { SimState } from '../sim/state';
 
 export type Airport = {
@@ -24,6 +25,18 @@ export type Airport = {
 };
 
 export const airports: Airport[] = airportsData;
+
+// Unmet demand, drawn like passengers waiting at a station (sim/unmetDemand.ts
+// has the definitions): a ring of small pips around each airport, hollow for
+// riders nobody is carrying yet and solid amber for riders being turned away
+// on a route you already fly. Solid pips fill the ring first. They skip the
+// stretch of the ring to the right of the dot, where the label sits.
+const PIP_RADIUS = 1.7;
+const PIP_ORBIT_OFFSET = 9;
+const PIP_FIRST_ANGLE_DEG = 40;
+const PIP_LAST_ANGLE_DEG = 320;
+const PIP_HOLLOW = '#9aa3b8';
+const PIP_SPILLED = '#ffb347';
 
 const MARKER_RADIUS = 3;
 const MARKER_FILL = '#e8ecf5';
@@ -110,6 +123,7 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState): vo
   const worstShareByIata = worstPoolShareByBase(state);
   // With a menu button hovered: where each ring would land if it were
   // pressed, drawn as a dashed arc just outside the real one.
+  const unmetByIata = unmetDemandByAirport(state);
   const previewEffects = getMapPreview()?.effects ?? [];
   const previewShareByIata = previewEffects.length > 0 ? worstPoolShareByBase(state, previewEffects) : null;
 
@@ -160,6 +174,27 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState): vo
         ctx.lineWidth = 2;
         ctx.stroke();
         ctx.restore();
+      }
+    }
+
+    const unmet = unmetByIata.get(airport.iata);
+    if (unmet) {
+      const total = pipCount(unmet.latent);
+      const solid = Math.min(total, pipCount(unmet.spilled));
+      const orbit = radius + PIP_ORBIT_OFFSET;
+      for (let i = 0; i < total; i++) {
+        const t = total === 1 ? 0.5 : i / (total - 1);
+        const angle = ((PIP_FIRST_ANGLE_DEG + t * (PIP_LAST_ANGLE_DEG - PIP_FIRST_ANGLE_DEG)) * Math.PI) / 180;
+        ctx.beginPath();
+        ctx.arc(x + Math.cos(angle) * orbit, y + Math.sin(angle) * orbit, PIP_RADIUS, 0, 2 * Math.PI);
+        if (i < solid) {
+          ctx.fillStyle = PIP_SPILLED;
+          ctx.fill();
+        } else {
+          ctx.strokeStyle = PIP_HOLLOW;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
       }
     }
 

@@ -538,6 +538,35 @@ along with it and the button carries it (`RadialAction.preview`).
   fleet now pays its lease, exactly 3 x $700 x 365 = $766,500 less.
 
 
+### Done: unmet demand on the map by default
+
+The map now shows demand nobody is carrying, without turning on the Demand
+overlay (which is still there, for the full web of every market). Two
+signals, defined in `sim/unmetDemand.ts` and kept apart because they answer
+different questions:
+
+- **Hollow pips** around each airport: *latent* demand, the potential of
+  every market touching it minus the seats you put in that market, half
+  attributed to each end. Mostly geography (LGA and the big Toronto,
+  Montreal and Boston pairs dominate: the median pair's potential is 13 a
+  day, the largest 29,854), so it says where the opportunity is and
+  barely moves as you play. Log scale (`pipCount()`): 1 pip for a town of
+  ten a day, a full ring of 12 for a big city.
+- **Solid amber pips**, and an **amber route line**: *spilled* demand, on a
+  market you already fly, today's stimulated demand beyond the seats
+  offered. This is the responsive one. Solid pips fill the ring first.
+- The airport card reads "Waiting: N potential riders/day, M turned away".
+- Not counted: competitors' seats (this is your view of what you are not
+  carrying) and unserved markets' 10-a-day floor (identical everywhere, so
+  it would only be noise).
+- Spill is rare early: demand starts near 10 a day against 25 seats and
+  grows at 5% of the gap per day scaled by how saturated the market is, so
+  a thinly served big market takes a long time to spill. Tested with a
+  hand-built save (120 demand against 50 seats: 3 solid pips at each end).
+- The route line only turns amber in the default map; the Profitability,
+  On-Time and Competition views draw their own colours.
+
+
 ---
 
 ## Conventions worth knowing
