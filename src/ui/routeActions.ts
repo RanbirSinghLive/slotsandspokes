@@ -92,6 +92,8 @@ export function marketReadout(state: SimState, a: string, b: string) {
   const legCount = Math.max(legs.length, 1);
   const seats = legs.reduce((total, leg) => total + (classByCode(typeCodeOf(state, leg.tail))?.seats ?? 0), 0);
   return {
+    legs: legs.length,
+    demandTotal: actualDailyDemand(state, a, b),
     demandNow: Math.round(actualDailyDemand(state, a, b) / legCount),
     demandPotential: Math.round(currentPotentialDemand(state, a, b) / legCount),
     seatsPerFlight: Math.round(seats / legCount),

@@ -838,6 +838,51 @@ Things this does *not* settle:
 - The lease tool's starting-propeller table still models one plane.
 
 
+### Done: why five Montreal-Toronto round trips lose money at first
+
+Reproduced from the rules (one starting propeller plus a second for the
+fifth round trip, home Montreal, seed 3) and measured. Day 1: ten flights a
+day carry about **one booked passenger each** (the market's stimulated
+demand starts near 10 a day, split across ten flights, then only 37% of it
+books us) while each flight costs about $2,100. That is -$28,000 a day
+including $8,800 of lease. Demand grows about 5% of the gap a day, so
+the route reaches break-even around day 21 to 40 and then pays.
+
+Cumulative profit after every cost, propellers, as many as needed:
+
+| Round trips/day | Deepest hole | Day 30 | Day 90 |
+|---|---|---|---|
+| 1 | -$124k, never recovers | -$84k | -$124k |
+| 2 | -$83k (day 15) | +$2k | +$474k |
+| 3 | -$100k (day 13) | +$18k | +$893k |
+| 4 | -$170k (day 17) | -$63k | +$748k |
+| 5 | -$198k (day 14) | -$141k | +$958k |
+
+So five is not a mistake in the long run, but it burns about $200,000 of a
+$500,000 start in the first two weeks; three round trips is the better
+opening, and one is too few to ever pay its lease.
+
+**Two real causes, both fixed here:**
+- **The incumbent's fare was stale.** The four seed competitors charged
+  $170 to $210, typed in before fares were recalibrated upward, so each
+  undercut the going rate by 23% to 51% (Trillium Air on Montreal-Toronto:
+  $210 against $313). A player charged the going rate lost most bookings on
+  those markets by construction. `sim/competitors.ts` now computes them as
+  90% of the going rate and the `fare` fields are gone from
+  `data/competitors.json`. Effect on five round trips: deepest hole
+  -$198k becomes -$134k, day 90 +$958k becomes +$1.17M.
+- **The map made a young market look big.** "Waiting: 20,000 potential
+  riders" is ceiling, not demand, and reads as "add flights". The route
+  card now says "Demand is still growing: extra flights fly emptier for
+  now" when demand per flight is under 40% of the seats, and the Add
+  button says how thin it would spread ("about 4 passengers wanted per
+  flight after, 25 seats, mostly empty for now").
+
+Not changed, by design: the rival fare cut (a small player up against a
+2-a-day incumbent takes -20% on fares until it flies more itself), and the
+slow demand ramp.
+
+
 ---
 
 ## Conventions worth knowing

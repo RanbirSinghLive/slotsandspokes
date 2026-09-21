@@ -58,10 +58,25 @@ export const PRE_EXISTING_OPENED_AT_MINUTE = -999_999;
  * "existing," not freshly opened — see `PRE_EXISTING_OPENED_AT_MINUTE`.
  */
 export function loadCompetitorRoutes(): CompetitorOffering[] {
-  return (competitorsData as Omit<CompetitorOffering, 'openedAtMinute'>[]).map((route) => ({
+  return (competitorsData as Omit<CompetitorOffering, 'openedAtMinute' | 'fare'>[]).map((route) => ({
     ...route,
+    fare: incumbentFare(route.origin, route.dest),
     openedAtMinute: PRE_EXISTING_OPENED_AT_MINUTE,
   }));
+}
+
+/**
+ * The fare an incumbent charges: a little under the going rate for the
+ * market. These used to be typed into data/competitors.json ($170 to $210)
+ * and were left behind when fares were recalibrated upward, so by the time
+ * the player arrived every incumbent undercut the going rate by 23% to 51%,
+ * and a player charged that rate lost most bookings on those four markets
+ * for no reason anyone chose. Computed now, so it cannot drift again.
+ */
+const INCUMBENT_FARE_FACTOR = 0.9;
+
+function incumbentFare(origin: string, dest: string): number {
+  return Math.round(recommendedFare(origin, dest) * INCUMBENT_FARE_FACTOR);
 }
 
 // Deliberately crude, same spirit as sim/weather.ts's daily roll: a small

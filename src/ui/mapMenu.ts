@@ -13,6 +13,7 @@ import { hideCompetitionTooltip } from './competitionTooltip';
 import { hideRadial, showRadial, updateRadial, type RadialAction } from './radial';
 import * as ops from './routeActions';
 import { planeIconInner } from './planeIcons';
+import { AIRCRAFT_CLASSES } from '../sim/aircraftClasses';
 
 /**
  * Click something on the map, get an info card and a ring of actions for
@@ -229,12 +230,18 @@ function fillRouteCard(a: string, b: string, state: SimState): void {
   presenceEl.classList.remove('airport-detail-over');
 
   const short = readout.demandNow > readout.seatsPerFlight;
+  // A route you have only just opened has almost no demand, however big
+  // the city pair is: demand is built by flying it, over weeks
+  // (sim/marketDemand.ts). Saying so is what stops "20,000 potential" from
+  // reading as "add ten flights".
+  const young = readout.demandNow < 0.4 * readout.seatsPerFlight;
   demandEl.textContent = '';
   demandEl.classList.remove('airport-detail-over');
   presenceEl.classList.toggle('airport-detail-over', short);
   marketsEl.textContent =
     `Per flight: ${readout.demandNow} passengers wanted${readout.demandPotential > readout.demandNow ? ` (${readout.demandPotential} potential)` : ''}, ${readout.seatsPerFlight} seats.` +
-    (short ? ' Demand exceeds seats: add a flight or upgauge.' : '');
+    (short ? ' Demand exceeds seats: add a flight or upgauge.' : '') +
+    (young ? ' Demand is still growing: extra flights fly emptier for now.' : '');
   const rivals = state.competitorRoutes.filter(
     (route) => (route.origin === a && route.dest === b) || (route.origin === b && route.dest === a),
   );
@@ -250,12 +257,21 @@ function fillRouteCard(a: string, b: string, state: SimState): void {
   fillPools(ops.routeBase(state, a, b), state, '');
 }
 
+/** What the add-flight button says, including how thin the demand would be spread. */
+function addFlightLabel(className: string, readout: ReturnType<typeof ops.marketReadout>): string {
+  const seats = AIRCRAFT_CLASSES.find((c) => c.name === className)?.seats ?? 0;
+  const wantedAfter = Math.round(readout.demandTotal / (readout.legs + 2));
+  const thin = wantedAfter < 0.4 * seats ? ', mostly empty for now' : '';
+  return `Add a ${className} flight (about ${wantedAfter} passengers wanted per flight after, ${seats} seats${thin})`;
+}
+
 function routeActions(a: string, b: string, state: SimState): RadialAction[] {
   const gaugeUp = ops.previewGauge(state, a, b, 1);
   const gaugeDown = ops.previewGauge(state, a, b, -1);
   const addFlight = ops.previewAddFlight(state, a, b);
   const removeFlight = ops.previewRemoveFlight(state, a, b);
   const removeRoute = ops.previewRemoveRoute(state, a, b);
+  const readout = ops.marketReadout(state, a, b);
 
   const act = (result: ops.Outcome<{ message: string }>): boolean => {
     notice = result.ok ? result.message : result.reason;
@@ -293,7 +309,7 @@ function routeActions(a: string, b: string, state: SimState): RadialAction[] {
     },
     {
       id: 'flight-up',
-      label: addFlight.ok ? `Add a ${addFlight.className} flight` : 'Add a flight',
+      label: addFlight.ok ? addFlightLabel(addFlight.className, readout) : 'Add a flight',
       icon: ICON.plus,
       angleDeg: -56,
       disabledReason: addFlight.ok ? undefined : addFlight.reason,

@@ -1,6 +1,6 @@
 [
-  { "airline": "Capital Wings", "code": "CW", "origin": "YOW", "dest": "YUL", "dailyFrequency": 1, "fare": 175 },
-  { "airline": "Trillium Air", "code": "TA", "origin": "YUL", "dest": "YYZ", "dailyFrequency": 2, "fare": 210 },
-  { "airline": "Trillium Air", "code": "TA", "origin": "YYZ", "dest": "YOW", "dailyFrequency": 3, "fare": 195 },
-  { "airline": "Bluenose Regional", "code": "BR", "origin": "YQB", "dest": "YHZ", "dailyFrequency": 1, "fare": 170 }
+  {"airline": "Capital Wings", "code": "CW", "origin": "YOW", "dest": "YUL", "dailyFrequency": 1},
+  {"airline": "Trillium Air", "code": "TA", "origin": "YUL", "dest": "YYZ", "dailyFrequency": 2},
+  {"airline": "Trillium Air", "code": "TA", "origin": "YYZ", "dest": "YOW", "dailyFrequency": 3},
+  {"airline": "Bluenose Regional", "code": "BR", "origin": "YQB", "dest": "YHZ", "dailyFrequency": 1}
 ]
