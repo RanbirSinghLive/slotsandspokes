@@ -704,6 +704,19 @@ body {
   height: 16px;
 }
 
+.radial-button.large svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* The aircraft-class icons (ui/planeIcons.ts) next to a class name. */
+.plane-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  vertical-align: -3px;
+}
+
 .radial-button:hover:not(.disabled) {
   background: #171b26;
   transform: translate(-50%, -50%) scale(1.15);
@@ -749,7 +762,7 @@ body {
 
 .pool-row {
   display: grid;
-  grid-template-columns: 132px 80px auto;
+  grid-template-columns: 158px 80px auto;
   align-items: center;
   gap: 8px;
   margin-top: 4px;

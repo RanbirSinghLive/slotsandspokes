@@ -814,6 +814,30 @@ Things this does *not* settle:
   flight to such a route needs a second plane.
 
 
+### Done: one starting propeller, and an icon for each class
+
+- **A new game starts with one propeller** (`STARTING_PLANES` = 1 in
+  `sim/state.ts`), not two: the pool reads "Propeller x1" and the lease is
+  $4,400 a day rather than $8,800.
+- **The Propeller is the only class you can lease at the start.** The cash
+  gate is what unlocks the rest, so `LEASE_RESERVE_DAYS` went from 14 to 30:
+  a class needs 30 days of its lease on hand. At the $500,000 opening the
+  Propeller needs $132,000, the Regional $510,000, the Narrowbody
+  $1,380,000 and the Widebody $1,800,000, so each bigger class opens when
+  the airline has earned it. The locked buttons stay in the fan and say
+  what they need. Note the Regional sits only $10,000 above the opening
+  cash, so it is one decent week away.
+- **Four unique icons** (`ui/planeIcons.ts`), top-down, told apart by
+  shape: Propeller (straight wings, a propeller bar across the nose),
+  Regional (swept wings, two rear engines, T-tail), Narrowbody (long swept
+  wings, an engine under each), Widebody (wider fuselage, longest wings,
+  two engines under each). They replace the one plane glyph scaled four
+  ways in the lease fan (now 22 px, `RadialAction.large`) and appear next
+  to the class name in the pool bars (map corner and both cards) and the
+  Fleet tab's rotation list.
+- The lease tool's starting-propeller table still models one plane.
+
+
 ---
 
 ## Conventions worth knowing

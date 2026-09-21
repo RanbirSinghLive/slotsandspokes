@@ -26,6 +26,8 @@ export type RadialAction = {
   icon: string;
   /** Position on the ring, degrees clockwise from 3 o'clock (-90 is straight up). Children ignore this. */
   angleDeg: number;
+  /** A bigger icon, for buttons whose picture has to carry detail. */
+  large?: boolean;
   /** Present means the action can't be used right now, and why. */
   disabledReason?: string;
   confirm?: boolean;
@@ -112,6 +114,7 @@ function buildButton(action: RadialAction, spec: RadialSpec): HTMLButtonElement 
     button.classList.add('disabled');
     button.setAttribute('aria-disabled', 'true');
   }
+  if (action.large) button.classList.add('large');
   if (action.id === openParentId) button.classList.add('active');
   if (action.id === armedId) button.classList.add('confirming');
 

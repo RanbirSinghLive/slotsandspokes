@@ -646,21 +646,21 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
 
 /**
  * Starting capital for a genuinely new interactive game — enough to carry
- * the two starting planes' leases and a few more while routes ramp up. A
+ * the starting plane's lease and a few more while routes ramp up. A
  * pure game-balance number, not derived from anything.
  */
 export const STARTING_CASH = 500_000;
 
 /**
- * Two leased propeller planes already parked and based at the player's
+ * One leased propeller already parked and based at the player's
  * home city, so the first thing a new player does is draw a route on the
  * map. The home city is chosen at the start of a game (sim/homes.ts);
  * Montréal is the default for anything that doesn't choose.
  */
 export const DEFAULT_HOME_AIRPORT = 'YUL';
-const STARTING_PLANES = 2;
+const STARTING_PLANES = 1;
 
-/** The two planes a new game starts with, leased and parked at `homeIata`. */
+/** The one plane a new game starts with (a propeller), leased and parked at `homeIata`. */
 export function createStartingFleet(homeIata: string): Aircraft[] {
   const aircraft: Aircraft[] = [];
   for (let i = 0; i < STARTING_PLANES; i++) {
@@ -670,8 +670,8 @@ export function createStartingFleet(homeIata: string): Aircraft[] {
 }
 
 /**
- * The state an actual new game starts from — two starting propeller
- * planes (createStartingFleet() above), zero schedule, zero routes.
+ * The state an actual new game starts from — one starting propeller
+ * plane (createStartingFleet() above), zero schedule, zero routes.
  * Nothing flies and nothing earns until the player draws a route
  * (ui/routeBuilder.ts); more aircraft are leased from the map menu
  * (ui/mapMenu.ts).

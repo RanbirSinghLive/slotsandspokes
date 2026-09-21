@@ -28,11 +28,12 @@ export function loadLeaseRates(): LeaseRate[] {
  * leasing it. Rates are sized so a plane pays for itself with a couple of
  * flights a day once its market has grown, which also means a plane
  * leased with nothing behind it drains cash fast; this keeps a lease from
- * being a way to end the game by accident. At the $500,000 opening it lets
- * a Propeller or Regional through and holds Narrowbody and Widebody back
- * until the airline has earned its way there.
+ * being a way to end the game by accident. It is also what unlocks the
+ * classes: at the $500,000 opening only the Propeller clears it ($132,000),
+ * the Regional needs $510,000, the Narrowbody $1.38M and the Widebody
+ * $1.8M, so each bigger class opens when the airline has earned it.
  */
-export const LEASE_RESERVE_DAYS = 14;
+export const LEASE_RESERVE_DAYS = 30;
 
 /** Cash needed on hand to lease one plane at this daily rate. */
 export function cashNeededToLease(leasePricePerDay: number): number {

@@ -2,6 +2,7 @@ import { legsServingMarket, marketKey, validateSchedule } from '../sim/schedule'
 import { removeCommercialRow } from './commercial';
 import { allRotations, utilisationProblems, type Rotation } from '../sim/utilisation';
 import { classByCode } from '../sim/aircraftClasses';
+import { planeIconElement } from './planeIcons';
 import type { SimState } from '../sim/state';
 
 // Must match the --panel-width custom property's default value in
@@ -128,7 +129,7 @@ function renderRotations(state: SimState): void {
 
     const planeCell = document.createElement('td');
     const typeCode = state.aircraft.find((a) => a.tail === rotation.tail)?.typeCode ?? '';
-    planeCell.textContent = classByCode(typeCode)?.name ?? typeCode;
+    planeCell.append(planeIconElement(typeCode), classByCode(typeCode)?.name ?? typeCode);
     planeCell.title = rotation.tail;
 
     const routeCell = document.createElement('td');

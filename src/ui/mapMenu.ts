@@ -12,6 +12,7 @@ import { armRouteBuilderAt, candidateTailsAt } from './routeBuilder';
 import { hideCompetitionTooltip } from './competitionTooltip';
 import { hideRadial, showRadial, updateRadial, type RadialAction } from './radial';
 import * as ops from './routeActions';
+import { planeIconInner } from './planeIcons';
 
 /**
  * Click something on the map, get an info card and a ring of actions for
@@ -167,11 +168,13 @@ function fillAirportCard(airport: Airport, state: SimState): void {
 function airportActions(airport: Airport, state: SimState): RadialAction[] {
   const hasPlane = candidateTailsAt(state, airport.iata).length > 0;
 
-  const planeChoices: RadialAction[] = ops.planeOptions(state, airport.iata).map((option, rank) => ({
+  const planeChoices: RadialAction[] = ops.planeOptions(state, airport.iata).map((option) => ({
     id: `plane:${option.code}`,
     label: `Lease a ${option.name} (${option.seats} seats) for ${money(option.leasePerDay)}/day`,
-    // Bigger class, bigger plane, so the four choices read as a ladder.
-    icon: `<g transform="translate(12 12) scale(${0.6 + rank * 0.14}) translate(-12 -12)">${ICON.plane}</g>`,
+    // Each class has its own silhouette (ui/planeIcons.ts), so the four
+    // choices are told apart by shape rather than by guessing at size.
+    icon: planeIconInner(option.code),
+    large: true,
     angleDeg: 0,
     disabledReason: option.disabledReason,
     preview: option.preview,

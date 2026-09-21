@@ -1,6 +1,7 @@
 import { capacityColor } from '../render/airports';
 import { USABLE_DAY_MINUTES, utilisationPools, type ClassPool, type PoolEffect } from '../sim/utilisation';
 import { getMapPreview } from '../render/preview';
+import { planeIconElement } from './planeIcons';
 import type { SimState } from '../sim/state';
 
 /**
@@ -52,7 +53,7 @@ export function buildPoolRows(pools: ClassPool[], effects: PoolEffect[] = [], ba
 
       const name = document.createElement('span');
       name.className = 'pool-name';
-      name.textContent = planesDelta !== 0 ? `${pool.name} x${pool.planes}→${nextPlanes}` : `${pool.name} x${pool.planes}`;
+      name.append(planeIconElement(pool.code), planesDelta !== 0 ? `${pool.name} x${pool.planes}→${nextPlanes}` : `${pool.name} x${pool.planes}`);
 
       const bar = document.createElement('span');
       bar.className = 'pool-bar';
