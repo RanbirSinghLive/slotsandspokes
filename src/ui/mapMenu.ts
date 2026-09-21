@@ -3,6 +3,8 @@ import { findNearestOwnRoute } from '../render/routes';
 import { projection } from '../render/projection';
 import { utilisationPools } from '../sim/utilisation';
 import { unmetDemandByAirport } from '../sim/unmetDemand';
+import { rivalYieldFactor } from '../sim/pressure';
+import { legsServingMarket } from '../sim/schedule';
 import { buildPoolRows } from './poolBars';
 import { getMapPreview, setMapPreview, type MapPreview } from '../render/preview';
 import type { SimState } from '../sim/state';
@@ -225,10 +227,23 @@ function fillRouteCard(a: string, b: string, state: SimState): void {
 
   const short = readout.demandNow > readout.seatsPerFlight;
   demandEl.textContent = '';
+  demandEl.classList.remove('airport-detail-over');
   presenceEl.classList.toggle('airport-detail-over', short);
   marketsEl.textContent =
     `Per flight: ${readout.demandNow} passengers wanted${readout.demandPotential > readout.demandNow ? ` (${readout.demandPotential} potential)` : ''}, ${readout.seatsPerFlight} seats.` +
     (short ? ' Demand exceeds seats: add a flight or upgauge.' : '');
+  const rivals = state.competitorRoutes.filter(
+    (route) => (route.origin === a && route.dest === b) || (route.origin === b && route.dest === a),
+  );
+  if (rivals.length > 0) {
+    const factor = rivalYieldFactor(a, b, legsServingMarket(a, b, state.schedule), state.competitorRoutes);
+    const cut = Math.round((1 - factor) * 100);
+    demandEl.textContent =
+      `Rivals: ${rivals.map((r) => `${r.airline} ${r.dailyFrequency}/day`).join(', ')}` +
+      (cut > 0 ? `. They cut your fares ${cut}%: more flights of your own reduce it.` : '');
+    demandEl.classList.add('airport-detail-over');
+  }
+
   fillPools(ops.routeBase(state, a, b), state, '');
 }
 

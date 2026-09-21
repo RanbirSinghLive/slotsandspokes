@@ -2,6 +2,7 @@ import { bookingShare } from './choiceModel';
 import { FUEL_SHARE_OF_BLOCK_HOUR_COST } from './fuel';
 import { CREWS_ENABLED } from './features';
 import type { CompetitorOffering } from './competitors';
+import { rivalYieldFactor } from './pressure';
 import type { RouteSettings } from './state';
 
 /**
@@ -188,7 +189,8 @@ export function legCostBreakdown(
  * competitor or not to travel at all rather than fly you. `routeSettings.fare`
  * feeds both the choice model's price term *and* revenue directly —
  * raising it trades booked passengers for margin per passenger, the core
- * yield-management tension. Marketing spend, by contrast, is a pure
+ * yield-management tension. Rivals on the market also cut the fare each
+ * passenger pays (`rivalYieldFactor()`, sim/pressure.ts). Marketing spend, by contrast, is a pure
  * cost-for-share trade (see sim/step.ts's day-rollover handling for where
  * that cost is charged — once per day per market, not per flight).
  *
@@ -257,7 +259,8 @@ export function flightResult(
     spilloverDelta = -recaptured;
   }
 
-  const revenue = pax * routeSettings.fare * connectivityMultiplier;
+  const yieldFactor = rivalYieldFactor(leg.origin, leg.dest, legsServingMarket, competitorRoutes);
+  const revenue = pax * routeSettings.fare * connectivityMultiplier * yieldFactor;
   const costBreakdown = legCostBreakdown(leg.blockMinutes, type, fuelPriceIndex, fuelEfficiencyMultiplier);
   const cost = costBreakdown.fuel + costBreakdown.blockNonFuel + costBreakdown.departure;
   return {

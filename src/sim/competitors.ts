@@ -1,7 +1,19 @@
 import competitorsData from '../../data/competitors.json';
+import rivalPoolData from '../../data/rival-airlines.json';
 import { potentialDailyDemand, ALL_MARKET_PAIRS, marketDistanceNm } from './demand';
 import { marketKey, recommendedFare } from './schedule';
 import { nextRandom } from './rng';
+import { networkAirports } from './reach';
+import {
+  FREQUENCY_GROWTH_PROBABILITY_PER_DAY,
+  MAX_RIVAL_ENTRIES,
+  PLAYER_MARKET_WEIGHT,
+  pressureFactor,
+  RIVAL_TARGETS_PLAYER,
+  RIVAL_ENTRY_INTERVAL_DAYS,
+  RIVAL_FIRST_ENTRY_DAY,
+  RIVAL_FREQUENCY_CAP,
+} from './pressure';
 import type { SimState } from './state';
 
 /**
@@ -112,7 +124,7 @@ export function rollCompetitorRouteOpenings(state: SimState, dayStartMinute: num
   for (const { airline, code } of roster) {
     const [openRoll, seedAfterOpen] = nextRandom(state.rngSeed);
     state.rngSeed = seedAfterOpen;
-    if (openRoll >= NEW_ROUTE_PROBABILITY_PER_DAY) continue;
+    if (openRoll >= NEW_ROUTE_PROBABILITY_PER_DAY * pressureFactor(state)) continue;
 
     const servedKeys = new Set(
       state.competitorRoutes.filter((c) => c.code === code).map((c) => marketKey(c.origin, c.dest)),
@@ -146,5 +158,86 @@ export function rollCompetitorRouteOpenings(state: SimState, dayStartMinute: num
       fare: recommendedFare(origin, dest),
       openedAtMinute: dayStartMinute,
     });
+  }
+}
+
+const SEED_CODES = new Set((competitorsData as { code: string }[]).map((route) => route.code));
+
+/**
+ * A new rival airline arrives, once the calendar says one is due (see
+ * sim/pressure.ts): the k-th arrives on day FIRST + k * INTERVAL. It
+ * opens a single daily flight on a market next to the player's network,
+ * weighted by potential demand and by PLAYER_MARKET_WEIGHT for markets the
+ * player already flies, so the newcomer tends to land on something the
+ * player built. Markets must be between airports the player knows and
+ * within regional range, like every competitor route.
+ *
+ * "How many have arrived" is read off the routes (airlines that are not in
+ * the seed data), so there is no counter to keep in `SimState`. If the
+ * player has no network yet, or nothing qualifies, it simply tries again
+ * tomorrow. Uses the seeded random stream; call it from the day rollover.
+ */
+export function rollRivalEntry(state: SimState, dayStartMinute: number): void {
+  const day = Math.floor(dayStartMinute / 1440);
+  const codesInUse = new Set(state.competitorRoutes.map((route) => route.code));
+  const entered = [...codesInUse].filter((code) => !SEED_CODES.has(code)).length;
+  if (entered >= MAX_RIVAL_ENTRIES) return;
+  if (day < RIVAL_FIRST_ENTRY_DAY + entered * RIVAL_ENTRY_INTERVAL_DAYS) return;
+
+  const known = new Set(state.knownAirports);
+  const network = networkAirports(state);
+  const playerMarkets = new Set(state.schedule.map((leg) => marketKey(leg.origin, leg.dest)));
+  const candidates = ALL_MARKET_PAIRS.filter(
+    ([a, b]) =>
+      known.has(a) &&
+      known.has(b) &&
+      (network.has(a) || network.has(b)) &&
+      marketDistanceNm(a, b) <= COMPETITOR_MAX_ROUTE_NM &&
+      potentialDailyDemand(a, b) > 0,
+  );
+  if (candidates.length === 0) return;
+
+  const pool = (rivalPoolData as { airline: string; code: string }[]).filter((rival) => !codesInUse.has(rival.code));
+  if (pool.length === 0) return;
+
+  const [targetRoll, seedAfterTarget] = nextRandom(state.rngSeed);
+  const [marketRoll, seedAfterMarket] = nextRandom(seedAfterTarget);
+  const [nameRoll, seedAfterName] = nextRandom(seedAfterMarket);
+  state.rngSeed = seedAfterName;
+
+  // Most of the time the newcomer goes straight for something the player
+  // built; otherwise it takes the best market next to the network.
+  const playerCandidates = candidates.filter(([a, b]) => playerMarkets.has(marketKey(a, b)));
+  const marketPool = playerCandidates.length > 0 && targetRoll < RIVAL_TARGETS_PLAYER ? playerCandidates : candidates;
+  const weights = marketPool.map(
+    ([a, b]) => potentialDailyDemand(a, b) * (playerMarkets.has(marketKey(a, b)) ? PLAYER_MARKET_WEIGHT : 1),
+  );
+
+  const [origin, dest] = pickWeighted(marketPool, weights, marketRoll);
+  const rival = pool[Math.min(pool.length - 1, Math.floor(nameRoll * pool.length))];
+  state.competitorRoutes.push({
+    airline: rival.airline,
+    code: rival.code,
+    origin,
+    dest,
+    dailyFrequency: 1,
+    fare: recommendedFare(origin, dest),
+    openedAtMinute: dayStartMinute,
+  });
+}
+
+/**
+ * Competitors add flights to routes they already fly, up to
+ * RIVAL_FREQUENCY_CAP, with a small daily chance per route that grows with
+ * pressureFactor(). This is what turns a rival on your route from a
+ * nuisance into a threat: booking share follows frequency
+ * (sim/choiceModel.ts). One random draw per route per day, in route order.
+ */
+export function rollCompetitorFrequencyGrowth(state: SimState): void {
+  const chance = FREQUENCY_GROWTH_PROBABILITY_PER_DAY * pressureFactor(state);
+  for (const route of state.competitorRoutes) {
+    const [roll, nextSeed] = nextRandom(state.rngSeed);
+    state.rngSeed = nextSeed;
+    if (roll < chance && route.dailyFrequency < RIVAL_FREQUENCY_CAP) route.dailyFrequency += 1;
   }
 }

@@ -4,7 +4,7 @@ import { MIN_TURN_MINUTES, legsServingMarket, marketKey } from './schedule';
 import { rollDailyWeather, isAirportClosed } from './weather';
 import { routeConnectivityMultiplier } from './airports';
 import { rollTotalDelayMinutes } from './delays';
-import { rollCompetitorRouteOpenings } from './competitors';
+import { rollCompetitorRouteOpenings, rollCompetitorFrequencyGrowth, rollRivalEntry } from './competitors';
 import { rollDailyFuelPrice } from './fuel';
 import { rollDailyMarketDemand, actualDailyDemand } from './marketDemand';
 import { revealReach } from './reach';
@@ -208,6 +208,8 @@ export function step(state: SimState): void {
     // route. Same daily cadence as weather, for the same reason — this
     // is a day-scale event, not something worth re-checking every minute.
     rollCompetitorRouteOpenings(state, state.simMinute);
+    rollCompetitorFrequencyGrowth(state);
+    rollRivalEntry(state, state.simMinute);
 
     // Week six's fuel price mechanic (sim/fuel.ts): same daily cadence as
     // weather and the competitor AI above — fuel prices move day to day

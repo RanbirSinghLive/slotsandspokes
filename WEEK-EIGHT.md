@@ -662,8 +662,8 @@ saves immediately, refits the map around it, and starts the clock.
   fixture still starts from Montreal.
 - Spacebar is ignored while the picker is open, so the clock cannot start
   behind it.
-- Still open in the escalation plan: the time-pressure knob, and long-haul
-  balance (fares, demand and lease rates were tuned on the small map).
+- Still open in the escalation plan: long-haul balance (fares, demand and
+  lease rates were tuned on the small map).
 - Known leftover: the loan-offer modal in `ui/loans.ts` can no longer be
   reached (cash at zero ends the game), and is dead code.
 
@@ -708,6 +708,50 @@ Limits worth knowing:
 - Not built: time pressure, and long-haul balance. Fares, demand and lease
   rates were tuned on the small map, and a widebody is only 1.3x a
   narrowbody there.
+
+
+### Done: time pressure
+
+Standing still now loses ground. Everything is in `sim/pressure.ts`, one
+place to tune:
+
+- **Rivals enter.** From day 15, and every 20 days after, up to 5, a new
+  airline (`data/rival-airlines.json`) opens one daily flight next to the
+  player's network. 70% of the time it goes straight for a market the
+  player already flies. Needed because every seed competitor is Canadian: a
+  London or Paris start had no rivals at all. `rollRivalEntry()` in
+  `sim/competitors.ts`; "how many have entered" is read off the routes, so
+  no new state and no save bump.
+- **Rivals grow.** Each competitor route adds a daily flight with
+  probability 0.8% a day times `pressureFactor()` (1 at day 0, 2 at day 90),
+  up to 4 a day. New-route openings scale by the same factor.
+- **Rivals cut your fares.** `rivalYieldFactor()`: up to 40% off your
+  average fare, in proportion to the rivals' share of the market's flights.
+  Four rival flights against four of yours is -20%; against fourteen, -9%.
+  More flights of your own is the counter.
+- **Demand grows** 0.3% a day (was 2% a year): about 1.4x in four months.
+
+**Why the fare cut.** Measured first: a rival with 4 flights a day on a
+plane's only route changed its 90-day profit by nothing, even nudging it
+up. Markets here are seat-limited (demand in the hundreds against 25
+seats), so a rival splitting demand leaves every plane full, and a rival's
+seats also stimulate the market (`dailySeatsOffered()` counts competitor
+seats). Competition only mattered once it touched the price.
+
+Effects, from `npm run lease -- 365` and six-seed headless runs:
+- A starting propeller on YUL-YOW, cumulative profit after lease at day 365:
+  1 round trip a day -$346k (was +$444k); 2 a day +$679k (was +$2.9M); 3 a
+  day +$2.2M (was +$5.2M); 5 a day +$4.7M (was +$7.9M). Growing still
+  wins; stopping loses.
+- The fixed 3-plane headless fleet averages -$172k a year over six seeds
+  (was +$397k): a static airline decays.
+- Lease break-even is now about 2.5 to 3.8 flights a day at day 90, against
+  the 2 the rates were tuned for. Re-tune leases if that feels too harsh.
+
+Legibility: the ticker announces rivals that touch your network ("Harbour
+Express opens LHR-CDG", "adds a flight on ..."); the route card reads
+"Rivals: Harbour Express 1/day. They cut your fares 8%"; the Competition
+overlay's airline list now rebuilds as rivals arrive.
 
 
 ---

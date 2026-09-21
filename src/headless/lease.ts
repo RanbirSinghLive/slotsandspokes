@@ -144,10 +144,11 @@ for (const experiment of EXPERIMENTS) {
 // How the plane a new game starts with does when it is not flown all day:
 // cumulative profit AFTER its lease, by round trips a day.
 console.log('\nStarting propeller on YUL-YOW, cumulative profit after lease:');
-console.log(['round trips/day', 'day 10', 'day 30', 'day 60', 'day 90'].join('\t'));
+const EARLY_DAYS = [10, 30, 60, 90, 180, 365].filter((d) => d <= HORIZON_DAYS);
+console.log(['round trips/day', ...EARLY_DAYS.map((d) => `day ${d}`)].join('\t'));
 for (const trips of [1, 2, 3, 5]) {
   const result = runExperiment({ typeCode: 'PROP', base: 'YUL', other: 'YOW', trips });
   const lease = rateByClass.get('PROP') ?? 0;
   const cumulative = (day: number) => result.perDay.slice(0, day).reduce((t, v) => t + v - lease, 0);
-  console.log([trips, ...[10, 30, 60, 90].filter((d) => d <= HORIZON_DAYS).map((d) => money(cumulative(d)))].join('\t'));
+  console.log([trips, ...EARLY_DAYS.map((d) => money(cumulative(d)))].join('\t'));
 }

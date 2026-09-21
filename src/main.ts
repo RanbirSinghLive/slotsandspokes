@@ -118,32 +118,51 @@ for (const { mode, label } of MAP_MODES) {
   mapModeDropdown.appendChild(button);
 }
 
-for (const airline of competitorAirlines(state)) {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.dataset.airline = airline;
-  button.textContent = airline;
-  competitionAirlineDropdown.appendChild(button);
-}
-
 // null means "All competitors" (the aggregate Competition overlay); a
 // specific airline name filters render/competition.ts's layer down to
 // just that carrier's own network. Lives outside render() the same way
 // sidebarTab does, since it's persistent UI state, not simulated state.
 let selectedCompetitorAirline: string | null = null;
 
+function selectCompetitorAirline(button: HTMLButtonElement): void {
+  selectedCompetitorAirline = button.dataset.airline || null;
+  competitionAirlineTrigger.textContent = button.textContent;
+  competitionAirlineDropdown
+    .querySelectorAll<HTMLButtonElement>('button')
+    .forEach((b) => b.classList.toggle('active', b === button));
+  closeAllDropdowns(); // function declaration, hoisted — defined further down with the other view groups
+  hideCompetitionTooltip(); // stale position/content for whatever was hovered under the old filter
+  render();
+}
+
+// The static "All competitors" button already in the HTML.
 competitionAirlineDropdown.querySelectorAll<HTMLButtonElement>('button').forEach((button) => {
-  button.addEventListener('click', () => {
-    selectedCompetitorAirline = button.dataset.airline || null;
-    competitionAirlineTrigger.textContent = button.textContent;
-    competitionAirlineDropdown
-      .querySelectorAll<HTMLButtonElement>('button')
-      .forEach((b) => b.classList.toggle('active', b === button));
-    closeAllDropdowns(); // function declaration, hoisted — defined further down with the other view groups
-    hideCompetitionTooltip(); // stale position/content for whatever was hovered under the old filter
-    render();
-  });
+  button.addEventListener('click', () => selectCompetitorAirline(button));
 });
+
+// New rivals enter as the game goes on (sim/pressure.ts), so the list of
+// airlines is rebuilt whenever it changes rather than once at startup. If
+// the airline being filtered on ever vanished it would fall back to "All".
+let competitorAirlineSignature = '';
+
+function syncCompetitorAirlineDropdown(): void {
+  const airlines = competitorAirlines(state);
+  const signature = airlines.join('|');
+  if (signature === competitorAirlineSignature) return;
+  competitorAirlineSignature = signature;
+
+  competitionAirlineDropdown.querySelectorAll<HTMLButtonElement>('button[data-airline]:not([data-airline=""])').forEach((b) => b.remove());
+  for (const airline of airlines) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.airline = airline;
+    button.textContent = airline;
+    button.classList.toggle('active', airline === selectedCompetitorAirline);
+    button.addEventListener('click', () => selectCompetitorAirline(button));
+    competitionAirlineDropdown.appendChild(button);
+  }
+}
+
 // Week six: sidebar tabs. Each of these used to be a full-screen panel
 // that replaced the map (`canvas.hidden = true`); now they're content
 // panes inside the sidebar (#sidebar-tab-content) that replace each other,
@@ -301,6 +320,7 @@ function render(nowMs: number = performance.now()): void {
   const cssHeight = window.innerHeight;
 
   setKnownAirports(state.knownAirports);
+  syncCompetitorAirlineDropdown();
   ctx.clearRect(0, 0, cssWidth, cssHeight);
   drawBasemap(ctx);
   drawTerminator(ctx, latestFractionalMinute);

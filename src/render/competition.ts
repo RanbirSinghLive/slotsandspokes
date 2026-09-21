@@ -23,7 +23,7 @@ const BOTH_STROKE = '#ffd166';
  * different concern from the three-state OWN/COMPETITOR/BOTH line colors
  * above, since a pie needs to tell *multiple* competitors apart from each
  * other, not just from the player. Hand-picked, no attempt at a generated
- * palette — four airlines is few enough to just name each one. A future
+ * palette — ten airlines is few enough to just name each one. A future
  * airline without an entry here falls back to a plain gray rather than
  * erroring.
  */
@@ -32,6 +32,14 @@ const AIRLINE_COLORS: Record<string, string> = {
   CW: '#ffb347',
   TA: '#e05a5a',
   BR: '#b388ff',
+  // Rivals that enter later (data/rival-airlines.json).
+  SK: '#4fd1c5',
+  NW: '#f6e05e',
+  MD: '#f687b3',
+  HX: '#68d391',
+  CC: '#fc8181',
+  IB: '#90cdf4',
+  LK: '#d6bcfa',
 };
 
 function colorForAirline(code: string): string {
@@ -99,12 +107,8 @@ function allCompetitorMarketKeysFrom(byAirline: Map<string, Map<string, { origin
  * Every airline with at least one competitor route, sorted — exported so
  * main.ts can populate the per-airline selector without duplicating
  * data/competitors.json's shape or re-deriving this list itself. The
- * roster itself (which airline *names* exist) never grows after game
- * start — the competitor AI only adds routes for the three airlines
- * already in `data/competitors.json`, never invents a new one — so
- * calling this once at startup, as main.ts already does, stays valid
- * for the whole game even though the routes each airline serves keep
- * changing underneath it.
+ * roster grows: rivals enter as the game goes on (sim/pressure.ts), so
+ * main.ts rebuilds the selector whenever this list changes.
  */
 export function competitorAirlines(state: SimState): string[] {
   return [...competitorRoutesByAirlineFrom(state).keys()].sort();

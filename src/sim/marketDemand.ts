@@ -81,15 +81,15 @@ const STIMULATION_RATE = 0.05;
 const DECAY_RATE = 0.015;
 
 /**
- * Latent demand itself grows slowly over time — the "potential is not a
- * fixed cap" half of the design. 2%/year, applied as a single global
- * multiplier on top of the gravity model rather than per market, since
- * nothing here varies growth by geography yet. Honest about its size: at
- * this rate it's a fraction of a percent over a typical run, so it's
- * long-game texture rather than something that moves balance.
+ * Latent demand keeps growing — the "potential is not a fixed cap" half of
+ * the design, and one of the three sources of time pressure (see
+ * sim/pressure.ts). 0.3% a day, applied as a single global multiplier on
+ * top of the gravity model rather than per market, since nothing here
+ * varies growth by geography yet. That is about 1.4x after 4 months and 3x
+ * after a year: it used to be 2% a year, too small to notice, so the
+ * market a plane filled last month is now short of seats this month.
  */
-const ANNUAL_DEMAND_GROWTH = 0.02;
-const DAILY_DEMAND_GROWTH = ANNUAL_DEMAND_GROWTH / 365;
+const DAILY_DEMAND_GROWTH = 0.003;
 
 /**
  * Seats a competitor frequency is assumed to carry. Competitors have no

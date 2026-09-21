@@ -1,4 +1,5 @@
 import { loadMissions } from '../sim/missions';
+import { networkAirports } from '../sim/reach';
 import type { SimState } from '../sim/state';
 
 const tickerTrack = document.querySelector<HTMLDivElement>('#ticker-track')!;
@@ -80,10 +81,8 @@ function pollWeatherEvents(state: SimState): void {
 
 /**
  * The bottom-of-screen ticker for events nobody clicked to cause — new
- * weather forming, an aircraft arriving. Competitor route openings are
- * deliberately not announced here any more: they still happen, and
- * render/competition.ts's map flash shows them when the Competition
- * overlay is on. Called every frame
+ * weather forming, new airports in reach, and rivals moving in on your
+ * network (see pollRivalEvents()). Called every frame
  * from main.ts's render(), *before* its `panelView !== 'map'` early
  * return, so an event happening while you're deep in the Commercial
  * panel still gets announced rather than silently missed.
@@ -110,6 +109,39 @@ function pollMissionEvents(state: SimState): void {
     const mission = loadMissions().find((m) => m.id === id);
     if (mission) {
       pushEvent(state.simMinute, `Mission complete: ${mission.name} (+${mission.reputationReward} Reputation)`);
+    }
+  }
+}
+
+let hasSeenInitialRivals = false;
+const seenRouteFrequencies = new Map<string, number>();
+
+/**
+ * Rival news, but only what touches the airline: a route at an airport in
+ * the player's network, or more flights on one. A competitor opening
+ * something on the far side of the map is not news to this player.
+ */
+function pollRivalEvents(state: SimState): void {
+  const network = networkAirports(state);
+  const identity = (route: { code: string; origin: string; dest: string }) =>
+    `${route.code}:${[route.origin, route.dest].sort().join('-')}`;
+
+  if (!hasSeenInitialRivals) {
+    for (const route of state.competitorRoutes) seenRouteFrequencies.set(identity(route), route.dailyFrequency);
+    hasSeenInitialRivals = true;
+    return;
+  }
+
+  for (const route of state.competitorRoutes) {
+    const id = identity(route);
+    const previous = seenRouteFrequencies.get(id);
+    seenRouteFrequencies.set(id, route.dailyFrequency);
+    if (!network.has(route.origin) && !network.has(route.dest)) continue;
+
+    if (previous === undefined) {
+      pushEvent(state.simMinute, `${route.airline} opens ${route.origin}–${route.dest}`);
+    } else if (route.dailyFrequency > previous) {
+      pushEvent(state.simMinute, `${route.airline} adds a flight on ${route.origin}–${route.dest} (${route.dailyFrequency}/day)`);
     }
   }
 }
@@ -142,6 +174,7 @@ function pollReachEvents(state: SimState): void {
 
 export function updateTicker(state: SimState): void {
   pollReachEvents(state);
+  pollRivalEvents(state);
   pollWeatherEvents(state);
   pollMissionEvents(state);
 }
