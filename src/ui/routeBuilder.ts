@@ -19,6 +19,7 @@ import {
 } from '../sim/schedule';
 import {
   aircraftUtilisation,
+  isLongHaulRoundTrip,
   legUtilisationMinutes,
   USABLE_DAY_END_MINUTE,
   USABLE_DAY_MINUTES,
@@ -560,8 +561,10 @@ export type RotationPlan = {
   airports: Airport[];
   base: Airport;
   legs: PackedLeg[];
-  /** Block plus turn for the whole rotation — what it spends of an aircraft. */
+  /** Block plus turn for the whole rotation — what it spends of an aircraft. A long-haul round trip counts as one full usable day here. */
   rotationMinutes: number;
+  /** The rotation's real length on the clock, block plus turns. */
+  clockMinutes: number;
   rotationShare: number;
   spareMinutesBefore: number;
   arriveBackMinute: number;
@@ -581,7 +584,13 @@ export function planRotation(chain: Airport[], dest: Airport, tail: string, stat
     rotationStartMinute(tail, state),
     state.schedule,
   );
-  const rotationMinutes = legs.reduce((total, leg) => total + legUtilisationMinutes(leg.blockMinutes), 0);
+  const clockMinutes = legs.reduce((total, leg) => total + legUtilisationMinutes(leg.blockMinutes), 0);
+  // A plane that does nothing else may fly one round trip that outruns the
+  // usable day (sim/utilisation.ts's isLongHaulRoundTrip()): it is then
+  // "one full aircraft" and the end-of-day rule below does not apply.
+  const tailIsEmpty = !state.schedule.some((leg) => leg.tail === tail);
+  const longHaul = tailIsEmpty && rotationAirports.length === 2 && isLongHaulRoundTrip(legs.length, clockMinutes);
+  const rotationMinutes = longHaul ? USABLE_DAY_MINUTES : clockMinutes;
   const lastLeg = legs[legs.length - 1];
   const arriveBackMinute = lastLeg ? lastLeg.departMinute + lastLeg.blockMinutes : rotationStartMinute(tail, state);
   const spareMinutesBefore = baseSpareMinutes(state, base.iata, tail);
@@ -591,6 +600,7 @@ export function planRotation(chain: Airport[], dest: Airport, tail: string, stat
     base,
     legs,
     rotationMinutes,
+    clockMinutes,
     rotationShare: rotationMinutes / USABLE_DAY_MINUTES,
     spareMinutesBefore,
     arriveBackMinute,
@@ -677,7 +687,7 @@ export function planRotation(chain: Airport[], dest: Airport, tail: string, stat
   // a shorter rotation?", and a pooled check of its own would never fire
   // separately (a rotation that fits one tail's day always fits its base's
   // pool, since the pool contains that tail).
-  if (arriveBackMinute > USABLE_DAY_END_MINUTE) {
+  if (!longHaul && arriveBackMinute > USABLE_DAY_END_MINUTE) {
     return fail(
       `This rotation lands back at ${base.iata} at ${minuteOfDayToTimeString(arriveBackMinute)}, past the ${minuteOfDayToTimeString(USABLE_DAY_END_MINUTE)} end of the usable day. ` +
         `Every plane based at ${base.iata} is full: lease another (tap ${base.iata}, then Plane) or shorten the rotation.`,
@@ -834,7 +844,7 @@ function updateFormValidation(chain: Airport[], dest: Airport, state: SimState):
 
   const firstLeg = plan.legs[0];
   formBlock.textContent = firstLeg
-    ? `${plan.legs.length} leg${plan.legs.length === 1 ? '' : 's'} · ${formatDuration(plan.rotationMinutes)} · ` +
+    ? `${plan.legs.length} leg${plan.legs.length === 1 ? '' : 's'} · ${formatDuration(plan.clockMinutes)} · ` +
       `${minuteOfDayToTimeString(firstLeg.departMinute)}–${minuteOfDayToTimeString(plan.arriveBackMinute)}`
     : '';
 

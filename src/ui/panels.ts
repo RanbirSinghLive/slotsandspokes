@@ -77,7 +77,10 @@ function pad(n: number): string {
 // Exported because the route builder's popover shows a rotation's window
 // in the same format.
 export function minuteOfDayToTimeString(minuteOfDay: number): string {
-  return `${pad(Math.floor(minuteOfDay / 60))}:${pad(minuteOfDay % 60)}`;
+  const hours = Math.floor(minuteOfDay / 60);
+  // A long-haul rotation lands the next morning (sim/utilisation.ts's
+  // isLongHaulRoundTrip()); "28:02" is not a time anyone reads.
+  return `${pad(hours % 24)}:${pad(minuteOfDay % 60)}${hours >= 24 ? ' +1' : ''}`;
 }
 
 /**

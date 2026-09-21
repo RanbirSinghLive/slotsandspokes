@@ -1,4 +1,5 @@
 import type { CompetitorOffering } from './competitors';
+import { recommendedFare } from './schedule';
 
 // The "connective piece" from WEEK-TWO.md's Layers — the standard technique
 // for this is a multinomial logit: score every option a traveler could pick
@@ -78,9 +79,27 @@ const SEGMENTS: Segment[] = [
  * independent scores into shares, so nothing here needs to know about the
  * other offerings to compute its own utility.
  */
-function utility(segment: Segment, fare: number, dailyFrequency: number): number {
+/**
+ * The fare, in dollars, that price sensitivity was tuned around. Fares
+ * are not judged in absolute dollars: a $1,200 ticket to London is a
+ * normal price and a $1,200 ticket to Ottawa is absurd, so what a traveler
+ * reacts to is the fare *relative to the going rate for that trip*
+ * (`recommendedFare()`, sim/schedule.ts), rescaled to this reference so
+ * the segment weights below mean what they always did. Before this, the
+ * price term used raw dollars, which was fine while every market was a
+ * short hop (fares of $200 to $350) and wiped out nearly all bookings on
+ * anything long: at $1,577 the leisure segment's utility was -21.
+ */
+const REFERENCE_FARE = 280;
+
+/** `fare` re-expressed on the reference scale: unchanged for a market priced at REFERENCE_FARE, doubled for one priced at twice the going rate. */
+function relativeFare(fare: number, goingRate: number): number {
+  return (fare * REFERENCE_FARE) / goingRate;
+}
+
+function utility(segment: Segment, fare: number, dailyFrequency: number, goingRate: number): number {
   const scheduleFit = Math.log2(1 + dailyFrequency);
-  return segment.intercept - segment.weightPrice * fare + segment.weightSchedule * scheduleFit;
+  return segment.intercept - segment.weightPrice * relativeFare(fare, goingRate) + segment.weightSchedule * scheduleFit;
 }
 
 // The "Commercial" panel's marketing-spend lever (ui/commercial.ts, week
@@ -112,10 +131,11 @@ function scores(
   legsServingMarket: number,
   competitors: CompetitorOffering[],
   marketingSpend: number,
+  goingRate: number,
 ): { yourScore: number; competitorScore: number } {
-  const yourScore = Math.exp(utility(segment, fare, legsServingMarket) + marketingBonus(marketingSpend));
+  const yourScore = Math.exp(utility(segment, fare, legsServingMarket, goingRate) + marketingBonus(marketingSpend));
   const competitorScore = competitors.reduce(
-    (total, c) => total + Math.exp(utility(segment, c.fare, c.dailyFrequency)),
+    (total, c) => total + Math.exp(utility(segment, c.fare, c.dailyFrequency, goingRate)),
     0,
   );
   return { yourScore, competitorScore };
@@ -136,8 +156,9 @@ function segmentBookingShare(
   legsServingMarket: number,
   competitors: CompetitorOffering[],
   marketingSpend: number,
+  goingRate: number,
 ): number {
-  const { yourScore, competitorScore } = scores(segment, fare, legsServingMarket, competitors, marketingSpend);
+  const { yourScore, competitorScore } = scores(segment, fare, legsServingMarket, competitors, marketingSpend, goingRate);
   const stayHomeScore = Math.exp(0);
   return yourScore / (yourScore + stayHomeScore + competitorScore);
 }
@@ -158,8 +179,9 @@ function segmentTrafficShare(
   legsServingMarket: number,
   competitors: CompetitorOffering[],
   marketingSpend: number,
+  goingRate: number,
 ): number {
-  const { yourScore, competitorScore } = scores(segment, fare, legsServingMarket, competitors, marketingSpend);
+  const { yourScore, competitorScore } = scores(segment, fare, legsServingMarket, competitors, marketingSpend, goingRate);
   return yourScore / (yourScore + competitorScore);
 }
 
@@ -184,10 +206,12 @@ export function bookingShare(
   competitorRoutes: CompetitorOffering[],
 ): number {
   const marketCompetitors = competitorsServingMarket(originIata, destIata, competitorRoutes);
+  const goingRate = recommendedFare(originIata, destIata);
   return SEGMENTS.reduce(
     (total, segment) =>
       total +
-      segment.shareOfDemand * segmentBookingShare(segment, fare, legsServingMarket, marketCompetitors, marketingSpend),
+      segment.shareOfDemand *
+        segmentBookingShare(segment, fare, legsServingMarket, marketCompetitors, marketingSpend, goingRate),
     0,
   );
 }
@@ -211,10 +235,12 @@ export function trafficShare(
   competitorRoutes: CompetitorOffering[],
 ): number {
   const marketCompetitors = competitorsServingMarket(originIata, destIata, competitorRoutes);
+  const goingRate = recommendedFare(originIata, destIata);
   return SEGMENTS.reduce(
     (total, segment) =>
       total +
-      segment.shareOfDemand * segmentTrafficShare(segment, fare, legsServingMarket, marketCompetitors, marketingSpend),
+      segment.shareOfDemand *
+        segmentTrafficShare(segment, fare, legsServingMarket, marketCompetitors, marketingSpend, goingRate),
     0,
   );
 }

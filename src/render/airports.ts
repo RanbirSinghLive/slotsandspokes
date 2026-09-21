@@ -98,6 +98,10 @@ const PRESENCE_RADIUS_SCALE = 1.3;
 const CAPACITY_RING_GREEN: [number, number, number] = [127, 216, 143];
 const CAPACITY_RING_AMBER: [number, number, number] = [255, 209, 102];
 const CAPACITY_RING_RED = '#ff8080';
+// Strictly over 100%, the same test the alert strip uses (sim/utilisation.ts):
+// a plane booked for exactly its whole day, like a long-haul round trip, is
+// full, not over-booked. The small margin absorbs floating-point noise.
+const OVER_BOOKED = 1.0001;
 const CAPACITY_RING_OVER_LINE_WIDTH = 2.5;
 const CAPACITY_RING_LINE_WIDTH = 1.5;
 
@@ -111,7 +115,7 @@ function lerpCapacityColor(t: number): string {
 
 /** Green to amber as a pool fills, solid red once it is over-booked. Shared with the pool bars. */
 export function capacityColor(share: number): string {
-  return share >= 1 ? CAPACITY_RING_RED : lerpCapacityColor(share);
+  return share > OVER_BOOKED ? CAPACITY_RING_RED : lerpCapacityColor(share);
 }
 
 function presenceRadius(departures: number): number {
@@ -176,7 +180,7 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState): vo
     if (worstShare !== undefined) {
       const ringRadius = radius + 2.5;
       const swept = Math.min(worstShare, 1);
-      const over = worstShare >= 1;
+      const over = worstShare > OVER_BOOKED;
       ctx.beginPath();
       ctx.arc(x, y, ringRadius, -Math.PI / 2, -Math.PI / 2 + swept * 2 * Math.PI);
       ctx.strokeStyle = over ? CAPACITY_RING_RED : lerpCapacityColor(swept);

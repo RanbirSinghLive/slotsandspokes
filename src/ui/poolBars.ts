@@ -76,7 +76,7 @@ export function buildPoolRows(pools: ClassPool[], effects: PoolEffect[] = [], ba
       const value = document.createElement('span');
       value.className = 'pool-value';
       value.textContent = changed ? `${Math.round(pool.share * 100)}% → ${Math.round(nextShare * 100)}%` : `${Math.round(pool.share * 100)}%`;
-      if (shownShare >= 1) value.classList.add('is-over');
+      if (shownShare > 1.0001) value.classList.add('is-over');
 
       row.append(name, bar, value);
       return row;

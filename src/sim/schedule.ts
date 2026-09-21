@@ -145,6 +145,13 @@ export function computeBlockMinutes(originIata: string, destIata: string, cruise
 // tuning fare is a real gain, not so much that ignoring it is ruinous.
 const BASE_FARE = 190;
 const PER_NM_RATE = 0.45;
+// Long-haul recalibration: real fares rise with distance more slowly than
+// linearly (a 3,000 nm ticket costs about 3x a 500 nm one, not 6x), and
+// the linear formula made a transatlantic fare $1,577. Past TAPER_NM each
+// extra mile adds PER_NM_RATE_LONG instead, which is continuous at the
+// join and leaves every fare of 500 nm or less exactly as it was.
+const TAPER_NM = 500;
+const PER_NM_RATE_LONG = 0.18;
 
 /**
  * The game's suggested fare for a *market* (an origin-dest pair, either
@@ -164,7 +171,9 @@ export function recommendedFare(originIata: string, destIata: string): number {
     throw new Error(`Schedule references an unknown airport: ${originIata} -> ${destIata}`);
   }
   const distanceNm = greatCircleDistanceNm(origin, dest);
-  return Math.round(BASE_FARE + PER_NM_RATE * distanceNm);
+  const shortHaulNm = Math.min(distanceNm, TAPER_NM);
+  const longHaulNm = Math.max(distanceNm - TAPER_NM, 0);
+  return Math.round(BASE_FARE + PER_NM_RATE * shortHaulNm + PER_NM_RATE_LONG * longHaulNm);
 }
 
 /**

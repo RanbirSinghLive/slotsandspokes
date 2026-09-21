@@ -662,8 +662,6 @@ saves immediately, refits the map around it, and starts the clock.
   fixture still starts from Montreal.
 - Spacebar is ignored while the picker is open, so the clock cannot start
   behind it.
-- Still open in the escalation plan: long-haul balance (fares, demand and
-  lease rates were tuned on the small map).
 - Known leftover: the loan-offer modal in `ui/loans.ts` can no longer be
   reached (cash at zero ends the game), and is dead code.
 
@@ -752,6 +750,68 @@ Legibility: the ticker announces rivals that touch your network ("Harbour
 Express opens LHR-CDG", "adds a flight on ..."); the route card reads
 "Rivals: Harbour Express 1/day. They cut your fares 8%"; the Competition
 overlay's airline list now rebuilds as rivals arrive.
+
+
+### Done: long-haul economics
+
+Measured first with `npm run lease` on long routes (the tool now includes
+them): a widebody on Toronto-London lost **$49,000 per flight before its
+lease** ($97,000 a day), and nothing over about 3,300 nm could be
+scheduled. Three causes, three fixes:
+
+1. **The choice model priced fares in absolute dollars** (tuned around
+   $185). A $1,577 ticket put the leisure segment's utility at -21, so a
+   plane with 347 passengers wanting each flight carried about 8.
+   `sim/choiceModel.ts` now judges a fare *relative to the going rate for
+   that trip* (`recommendedFare()`), rescaled to `REFERENCE_FARE` = $280 so
+   every existing weight means what it did. A market priced at the going
+   rate gets the same price penalty at any distance.
+2. **Fares were linear in distance** ($1,577 at 3,082 nm; real ones are
+   about 3x a 500 nm fare at 3,000 nm, not 6x). Past 500 nm a mile now adds
+   $0.18 instead of $0.45 (`sim/schedule.ts`). Every fare of 500 nm or less
+   is unchanged; Toronto-London is $880.
+3. **The 06:00-22:00 window made intercontinental routes impossible.** A
+   plane that does nothing else may now fly **one long-haul round trip a
+   day around the clock** (`isLongHaulRoundTrip()`, `sim/utilisation.ts`):
+   two legs, longer than the usable day, cycle under 24 hours. It counts as
+   exactly one full plane (100%, not the 141% the clock would say), so no
+   false over-booked alert. This opens Dallas-London (4,118 nm),
+   Los Angeles-Tokyo (4,758) and London-Johannesburg (4,900). Windows that
+   land the next morning now read "06:00-04:02 +1". Pool bars and rings go
+   red only strictly above 100%, matching the alert.
+
+Results at day 90, before lease, one plane, one route
+(`npm run lease -- 180`):
+
+| Class | Route | Per flight | Per day |
+|---|---|---|---|
+| Widebody | Toronto-London (3,082 nm) | $130,600 (was -$48,700) | $261,000 |
+| Widebody | London-Dubai (2,969) | $128,200 | $256,000 |
+| Widebody | Dallas-London (4,118) | $72,300 | $145,000 |
+| Widebody | London-Johannesburg (4,900) | $84,400 | $169,000 |
+| Narrowbody | Toronto-Los Angeles (1,887) | $50,600 (was $18,200) | $101,000 |
+| Narrowbody | Toronto-Dallas (1,041) | $43,800 | $175,000 |
+
+Short and medium markets barely moved (Propeller Montreal-Ottawa is
+identical at day 90; the starting propeller's year table is within 3%). The
+fixed 3-plane headless fleet averages +$49k a year over six seeds (was
+-$172k after time pressure, +$397k before it).
+
+**Leases are unchanged.** They already sit at about 17% (propeller) to 30%
+(narrowbody) of a full day's earnings on a market the class suits, and the
+widebody's $60,000 is about 23% of a transatlantic day.
+
+Things this does *not* settle:
+- **A widebody earns a lot on short routes too** (Toronto-Boston $253,000 a
+  day): big planes fill wherever the market is big, so the class ladder is
+  limited by the cash gate and lease rate, not by geography. Right-sizing
+  still matters on small markets (a widebody on Montreal-Ottawa loses for a
+  month), but "widebody = long-haul only" is not enforced.
+- **The whole economy is generous**: a mature plane clears $100-260k a day
+  against a $500,000 start, so past the early game cash stops mattering.
+  Time pressure (rival fare cuts) is the only thing pulling it back.
+- Long-haul rotations are a single round trip, one plane each; adding a
+  flight to such a route needs a second plane.
 
 
 ---

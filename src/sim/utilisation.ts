@@ -53,6 +53,31 @@ export function legUtilisationShare(blockMinutes: number): number {
   return legUtilisationMinutes(blockMinutes) / USABLE_DAY_MINUTES;
 }
 
+/**
+ * A plane's whole cycle can be at most a day (24 hours).
+ */
+const MINUTES_PER_DAY = 1440;
+
+/**
+ * Whether a tail's legs are one long-haul round trip: exactly two legs
+ * that take longer than the usable day but still fit in 24 hours.
+ * Intercontinental flights (Toronto to London is 6.9 hours each way, Dallas
+ * to London 9) cannot be squeezed into the 06:00 to 22:00 window, so a
+ * plane that does nothing else may run one round trip a day around the
+ * clock: leave at 06:00, be back before the next 06:00. The plane is
+ * fully used by it, so it counts as exactly one full usable day rather
+ * than the 140% its clock time would suggest (which would raise a false
+ * over-booked alarm on a plane doing precisely what it should).
+ */
+export function isLongHaulRoundTrip(legCount: number, rawMinutes: number): boolean {
+  return legCount === 2 && rawMinutes > USABLE_DAY_MINUTES && rawMinutes <= MINUTES_PER_DAY;
+}
+
+/** Minutes a tail's legs cost it, with a long-haul round trip counted as one full day. */
+export function effectiveTailMinutes(legCount: number, rawMinutes: number): number {
+  return isLongHaulRoundTrip(legCount, rawMinutes) ? USABLE_DAY_MINUTES : rawMinutes;
+}
+
 export type AircraftUtilisation = {
   tail: string;
   typeCode: string;
@@ -67,7 +92,8 @@ export type AircraftUtilisation = {
 export function aircraftUtilisation(state: SimState, tail: string): AircraftUtilisation {
   const aircraft = state.aircraft.find((a) => a.tail === tail);
   const legs = state.schedule.filter((leg) => leg.tail === tail);
-  const minutes = legs.reduce((total, leg) => total + legUtilisationMinutes(leg.blockMinutes), 0);
+  const rawMinutes = legs.reduce((total, leg) => total + legUtilisationMinutes(leg.blockMinutes), 0);
+  const minutes = effectiveTailMinutes(legs.length, rawMinutes);
   return {
     tail,
     typeCode: aircraft?.typeCode ?? '',
@@ -249,8 +275,10 @@ function buildRotation(tail: string, legs: ScheduleLeg[], base: string): Rotatio
     airports: [legs[0].origin, ...legs.map((leg) => leg.dest)],
     departMinute: legs[0].departMinute,
     arriveMinute: last.departMinute + last.blockMinutes,
-    minutes: legs.reduce((total, leg) => total + legUtilisationMinutes(leg.blockMinutes), 0),
-    share: legs.reduce((total, leg) => total + legUtilisationMinutes(leg.blockMinutes), 0) / USABLE_DAY_MINUTES,
+    minutes: effectiveTailMinutes(legs.length, legs.reduce((total, leg) => total + legUtilisationMinutes(leg.blockMinutes), 0)),
+    share:
+      effectiveTailMinutes(legs.length, legs.reduce((total, leg) => total + legUtilisationMinutes(leg.blockMinutes), 0)) /
+      USABLE_DAY_MINUTES,
     closed: last.dest === base,
   };
 }

@@ -48,6 +48,17 @@ const EXPERIMENTS: Experiment[] = [
   { typeCode: 'NARROWBODY', base: 'YYZ', other: 'YHZ' },
   { typeCode: 'WIDEBODY', base: 'YUL', other: 'YYZ' },
   { typeCode: 'WIDEBODY', base: 'YYZ', other: 'BOS' },
+  // Long haul: the routes the bigger classes exist for.
+  { typeCode: 'NARROWBODY', base: 'YYZ', other: 'LAX' },
+  { typeCode: 'NARROWBODY', base: 'YYZ', other: 'DFW' },
+  { typeCode: 'NARROWBODY', base: 'BOS', other: 'ATL' },
+  { typeCode: 'WIDEBODY', base: 'YYZ', other: 'LHR' },
+  { typeCode: 'WIDEBODY', base: 'BOS', other: 'LHR' },
+  { typeCode: 'WIDEBODY', base: 'YUL', other: 'CDG' },
+  { typeCode: 'WIDEBODY', base: 'DFW', other: 'LHR' },
+  { typeCode: 'WIDEBODY', base: 'LHR', other: 'DXB' },
+  { typeCode: 'WIDEBODY', base: 'LHR', other: 'JNB' },
+  { typeCode: 'WIDEBODY', base: 'LAX', other: 'HND' },
   // Misuse: a big plane on a thin market. These should lose money.
   { typeCode: 'REGIONAL', base: 'YUL', other: 'YOW' },
   { typeCode: 'NARROWBODY', base: 'YUL', other: 'YOW' },
@@ -81,6 +92,17 @@ function runExperiment(experiment: Experiment): { perDay: number[]; roundTrips: 
     }
     roundTrips++;
     depart += roundTripMinutes;
+  }
+  // A rotation too long for the usable day is still one round trip around
+  // the clock (see sim/utilisation.ts's isLongHaulRoundTrip()).
+  if (roundTrips === 0 && roundTripMinutes <= MINUTES_PER_DAY) {
+    for (const [origin, dest, at] of [
+      [experiment.base, experiment.other, USABLE_DAY_START_MINUTE],
+      [experiment.other, experiment.base, USABLE_DAY_START_MINUTE + block + MIN_TURN_MINUTES],
+    ] as const) {
+      state.schedule.push({ legId: `L${state.schedule.length + 1}`, tail: plane.tail, origin, dest, departMinute: at, blockMinutes: block });
+    }
+    roundTrips = 1;
   }
   state.routeSettings[marketKey(experiment.base, experiment.other)] = {
     fare: policyFare(state, experiment.base, experiment.other),
