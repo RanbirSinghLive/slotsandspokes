@@ -405,6 +405,7 @@ resize();
 // aircraft doesn't just stop advancing, it stays at the exact fractional
 // position it was at the instant of pausing.
 const MS_PER_SIM_MINUTE = 125;
+const MAX_FRAME_DELTA_MS = 250;
 let accumulator = 0;
 let speedMultiplier = 1;
 let lastFrameTimeMs: number | null = null;
@@ -425,7 +426,11 @@ function tick(nowMs: number): void {
     return;
   }
 
-  const deltaMs = nowMs - lastFrameTimeMs;
+  // At most this much real time is fed to the simulator per frame. A
+  // backgrounded tab pauses animation frames, and on return the gap could be
+  // minutes: at 100x that is hundreds of thousands of steps in one frame,
+  // a long freeze. Capped, the game simply resumes where it left off.
+  const deltaMs = Math.min(nowMs - lastFrameTimeMs, MAX_FRAME_DELTA_MS);
   lastFrameTimeMs = nowMs;
 
   accumulator += deltaMs * speedMultiplier;

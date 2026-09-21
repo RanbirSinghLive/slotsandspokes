@@ -883,6 +883,18 @@ Not changed, by design: the rival fare cut (a small player up against a
 slow demand ramp.
 
 
+### Done: speeds are 1x, 20x, 100x
+
+The speed buttons were 1x / 4x / 20x and are now 1x / 20x / 100x. Checked
+before changing: a large late-game airline (30 planes, 240 legs a day)
+costs about 48 microseconds a step, so 100x is about 13 steps a frame or
+0.64 ms of a 16 ms frame. In the browser it holds 60 fps and a simulated
+day takes about 1.8 seconds. One guard added: `MAX_FRAME_DELTA_MS` (250)
+caps how much real time a single frame feeds the simulator, so a
+backgrounded tab (which pauses animation frames) cannot come back to
+hundreds of thousands of steps in one go at 100x.
+
+
 ---
 
 ## Conventions worth knowing
