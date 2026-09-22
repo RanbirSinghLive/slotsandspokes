@@ -3,6 +3,7 @@ import { removeCommercialRow } from './commercial';
 import { allRotations, utilisationProblems, type Rotation } from '../sim/utilisation';
 import { classByCode } from '../sim/aircraftClasses';
 import { planeIconElement } from './planeIcons';
+import { updatePnlHistoryPanel } from './pnlHistory';
 import type { SimState } from '../sim/state';
 
 // Must match the --panel-width custom property's default value in
@@ -66,6 +67,7 @@ export function updatePanel(state: SimState): void {
   revenueEl.textContent = formatMoney(state.todayRevenue);
   costEl.textContent = formatMoney(state.todayCost);
   marginEl.textContent = formatMoney(state.todayMargin);
+  updatePnlHistoryPanel(state);
 
   renderRotations(state);
 }

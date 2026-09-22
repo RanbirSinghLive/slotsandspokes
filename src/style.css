@@ -517,6 +517,85 @@ body {
   color: #fff;
 }
 
+/* "Last 7 Days" bar charts (ui/pnlHistory.ts) — same bars-in-a-flex-row
+   idiom as the dev tools' delay histograms (.dev-histogram-bars below),
+   just smaller and living in the always-visible sidebar instead of a
+   hidden dev tab. */
+.pnl-chart {
+  margin-bottom: 10px;
+}
+
+.pnl-chart-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 3px;
+  color: #9aa3b8;
+}
+
+.pnl-chart-stat {
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.pnl-chart-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 32px;
+  padding-bottom: 1px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.pnl-chart-bar {
+  flex: 1;
+  min-height: 1px;
+  border-radius: 1px 1px 0 0;
+  background: #4a90d9;
+}
+
+/* Margin's chart: each day is a column split into a profit half (growing
+   up from the shared zero line) and a loss half (growing down from it) —
+   see buildMarginChart()'s comment for why every cell uses the same
+   split. The border between the two halves *is* the zero line. */
+.pnl-chart-bars--bipolar .pnl-chart-cell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.pnl-chart-cell-half {
+  display: flex;
+  min-height: 0;
+}
+
+.pnl-chart-cell-half--profit {
+  align-items: flex-end;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.pnl-chart-cell-half--loss {
+  align-items: flex-start;
+}
+
+.pnl-chart-cell-half .pnl-chart-bar {
+  width: 100%;
+}
+
+.pnl-chart-bar--positive {
+  background: #5fc98a;
+}
+
+.pnl-chart-bar--negative {
+  background: #ff8080;
+}
+
+.pnl-chart-note {
+  color: #6b7694;
+  font-size: 12px;
+}
+
 .panel-table {
   width: 100%;
   border-collapse: collapse;

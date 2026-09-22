@@ -23,6 +23,7 @@ import { applyDailyLoanInterest } from './loans';
 import { flightSatisfactionScore } from './nps';
 import { applyDailyReputationChange, REPUTATION_FLOOR } from './reputation';
 import { recordDailyCashHistory } from './forecast';
+import { recordDailyPnlHistory } from './pnlHistory';
 import type { SimState, ActiveFlight } from './state';
 
 const MINUTES_PER_DAY = 1440;
@@ -105,6 +106,9 @@ export function step(state: SimState): void {
     // today's own charges touch Cash" timing as the reputation call just
     // above — this is what makes each entry "yesterday's closing balance."
     recordDailyCashHistory(state);
+    // Same timing, same reason: state.todayRevenue/todayCost/todayMargin
+    // still hold the day that just ended, one line above where they reset.
+    recordDailyPnlHistory(state);
 
     state.completedToday = [];
     state.todayRevenue = 0;

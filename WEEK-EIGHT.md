@@ -895,12 +895,55 @@ backgrounded tab (which pauses animation frames) cannot come back to
 hundreds of thousands of steps in one go at 100x.
 
 
+### Done: hold-to-repeat on the route ring, and a reliable way into it
+
+Getting a route to several flights a day, or bumping several same-class
+flights up together, meant clicking the same ring button once per flight
+— tedious, and the exact complaint "keep clicking add route add rotation
+to get a bunch of short-haul legs added." Fix: holding Add flight, Remove
+flight, Upgauge or Downgauge now repeats it (after a short delay, then on
+an interval) instead of firing once. No new capacity-tracking logic was
+needed — every click already tears the ring down and rebuilds it with
+fresh `disabledReason`s, so the repeat loop just looks its action back up
+by id after each rebuild, and stops itself the instant that fresh lookup
+says it can't go further (fleet out of room, already the largest class,
+whatever it is). Verified live: holding Add flight on a single-propeller
+route went 1→4 flights and stopped right at 91% pool utilization; holding
+Upgauge with several propeller flights on one route moved three of them
+to Regional in one hold without thrashing on one flight.
+
+Separately, reported as "can't get to the +/- freq modal": the ring only
+opens by clicking the route's own line, which has an 8px hit zone against
+a 14px zone around each airport dot — on a short route, or the map zoomed
+out, there can be almost no pixel where the line wins. Fixed by turning
+the airport card's "Markets: YUL (8)" list into real buttons that open
+that route's ring directly, no line-clicking required.
+
+### Done: "Last 7 Days" bar charts (Revenue, Cost, Margin)
+
+The sidebar's Today figures are a single day's snapshot — no way to tell
+"is the network actually getting better" from them alone. Added three
+small bar charts under Today, one bar per finished day: `SimState` gained
+`revenueHistory`/`costHistory`/`marginHistory` (`sim/pnlHistory.ts`,
+`recordDailyPnlHistory()`), a same-shape rolling window as
+`cashHistory`/`fuelPriceHistory`, recorded at the same moment in
+step.ts's day-rollover so each entry is a genuinely finished day.
+`SAVE_KEY` went to `v33`.
+
+Revenue and Cost are plain histograms (bars up from zero, reusing the dev
+tools' bar idiom). Margin can be negative, so its chart splits each day's
+cell into a profit half and a loss half around one shared zero line,
+sized once from the whole window so an always-profitable stretch doesn't
+waste half the chart on an unused loss zone — colored green/red so a
+losing week is visible at a glance, not just readable from the axis.
+Rebuilds only on an actual day change, not every frame.
+
 ---
 
 ## Conventions worth knowing
 
 - **Bump `SAVE_KEY` in `src/ui/save.ts` on any breaking `SimState`
-  change.** Currently `v32`.
+  change.** Currently `v33`.
 - **`headless-output.csv` and `sweep-reserve.csv` must stay
   byte-identical** across changes that aren't meant to affect balance.
   Both were verified unchanged after the delivery work — `createInitialState()`

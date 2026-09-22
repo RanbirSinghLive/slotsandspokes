@@ -291,6 +291,19 @@ export type SimState = {
    */
   cashHistory: number[];
   /**
+   * The last PNL_HISTORY_MAX_DAYS days' final `todayRevenue`, `todayCost`
+   * and `todayMargin`, oldest first — recorded at the same moment as
+   * `cashHistory` above (sim/pnlHistory.ts's recordDailyPnlHistory(),
+   * called right beside recordDailyCashHistory() in step.ts's
+   * day-rollover), so each entry is a genuinely finished day, not one
+   * still being added to. This is what answers "is the network actually
+   * getting better," which a single day's numbers alone can't: one good
+   * or bad day is noise, a week of them is a trend.
+   */
+  revenueHistory: number[];
+  costHistory: number[];
+  marginHistory: number[];
+  /**
    * Week six's fuel price mechanic (sim/fuel.ts): a unitless index where
    * 1.0 is baseline — a flight's fuel-sensitive cost slice (see
    * legCost()) scales directly with this. Moved by a slow random walk,
@@ -591,6 +604,9 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     rngSeed,
     loans: [],
     cashHistory: [],
+    revenueHistory: [],
+    costHistory: [],
+    marginHistory: [],
     fuelPriceIndex: FUEL_PRICE_BASELINE,
     fuelPriceHistory: [],
     fuelEfficiencyMultiplier: 1,
@@ -709,6 +725,9 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     rngSeed,
     loans: [],
     cashHistory: [],
+    revenueHistory: [],
+    costHistory: [],
+    marginHistory: [],
     fuelPriceIndex: FUEL_PRICE_BASELINE,
     fuelPriceHistory: [],
     fuelEfficiencyMultiplier: 1,
