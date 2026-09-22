@@ -282,18 +282,24 @@ function routeActions(a: string, b: string, state: SimState): RadialAction[] {
   return [
     {
       id: 'gauge-down',
-      label: gaugeDown.ok ? `Downgauge one flight: ${gaugeDown.fromName} to ${gaugeDown.toName}` : 'Downgauge one flight',
+      label: gaugeDown.ok
+        ? `Downgauge one flight: ${gaugeDown.fromName} to ${gaugeDown.toName} (hold to downgauge several)`
+        : 'Downgauge one flight',
       icon: ICON.gaugeDown,
       angleDeg: -170,
+      repeatable: true,
       disabledReason: gaugeDown.ok ? undefined : gaugeDown.reason,
       preview: gaugeDown.ok ? gaugeDown.preview : undefined,
       onSelect: () => act(ops.applyGauge(state, a, b, -1)),
     },
     {
       id: 'gauge-up',
-      label: gaugeUp.ok ? `Upgauge one flight: ${gaugeUp.fromName} to ${gaugeUp.toName}` : 'Upgauge one flight',
+      label: gaugeUp.ok
+        ? `Upgauge one flight: ${gaugeUp.fromName} to ${gaugeUp.toName} (hold to upgauge several)`
+        : 'Upgauge one flight',
       icon: ICON.gaugeUp,
       angleDeg: -132,
+      repeatable: true,
       disabledReason: gaugeUp.ok ? undefined : gaugeUp.reason,
       preview: gaugeUp.ok ? gaugeUp.preview : undefined,
       onSelect: () => act(ops.applyGauge(state, a, b, 1)),
