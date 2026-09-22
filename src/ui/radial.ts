@@ -31,6 +31,19 @@ export type RadialAction = {
   /** Present means the action can't be used right now, and why. */
   disabledReason?: string;
   confirm?: boolean;
+  /**
+   * Holding the button fires it again and again (after a short delay, then
+   * on an interval) instead of once. For things like "add a flight" where
+   * doing it five times in a row is the normal case, so the player doesn't
+   * have to peck at the same spot repeatedly. Each repeat looks the action
+   * up again by id (see `findActionById`) rather than reusing this object,
+   * because a render happens after every fire and this object is thrown
+   * away with it — that fresh lookup is also what makes holding stop
+   * itself the instant the button would be disabled (fleet out of room,
+   * demand check failing, whatever it is), instead of needing its own
+   * capacity check.
+   */
+  repeatable?: boolean;
   children?: RadialAction[];
   /** What the map should show while this action is hovered (never for a disabled one). */
   preview?: MapPreview;
@@ -53,12 +66,17 @@ const RING_RADIUS_PX = 56;
 const FAN_RADIUS_PX = 100;
 const FAN_STEP_DEG = 26;
 const EDGE_MARGIN_PX = 20;
+const REPEAT_DELAY_MS = 450;
+const REPEAT_INTERVAL_MS = 130;
 
 const menuEl = document.querySelector<HTMLDivElement>('#radial-menu')!;
 
 let current: RadialSpec | null = null;
 let openParentId: string | null = null;
 let armedId: string | null = null;
+let repeatingId: string | null = null;
+let repeatDelayTimer: ReturnType<typeof setTimeout> | null = null;
+let repeatIntervalTimer: ReturnType<typeof setInterval> | null = null;
 
 export function isRadialOpen(): boolean {
   return current !== null;
@@ -66,11 +84,55 @@ export function isRadialOpen(): boolean {
 
 export function hideRadial(): void {
   current?.onPreview?.(null);
+  stopRepeat();
   menuEl.hidden = true;
   menuEl.innerHTML = '';
   current = null;
   openParentId = null;
   armedId = null;
+}
+
+/** Find a repeatable action back by id after a render replaced the object holding it. */
+function findActionById(id: string): RadialAction | null {
+  if (!current) return null;
+  for (const action of current.actions) {
+    if (action.id === id) return action;
+    const child = action.children?.find((c) => c.id === id);
+    if (child) return child;
+  }
+  return null;
+}
+
+function stopRepeat(): void {
+  if (repeatDelayTimer !== null) clearTimeout(repeatDelayTimer);
+  if (repeatIntervalTimer !== null) clearInterval(repeatIntervalTimer);
+  repeatDelayTimer = null;
+  repeatIntervalTimer = null;
+  repeatingId = null;
+}
+
+// One listener for the whole page rather than one per button: the button
+// under the pointer gets replaced by a render partway through a hold (see
+// the big comment on `repeatable`), so there is no single element left to
+// attach a mouseup handler to by the time the hold ends.
+document.addEventListener('mouseup', stopRepeat);
+
+function fireRepeat(spec: RadialSpec): void {
+  const action = repeatingId ? findActionById(repeatingId) : null;
+  if (!action || action.disabledReason) {
+    stopRepeat();
+    return;
+  }
+  choose(action, spec);
+}
+
+function startRepeat(action: RadialAction, spec: RadialSpec): void {
+  stopRepeat();
+  repeatingId = action.id;
+  repeatDelayTimer = setTimeout(() => {
+    repeatDelayTimer = null;
+    repeatIntervalTimer = setInterval(() => fireRepeat(spec), REPEAT_INTERVAL_MS);
+  }, REPEAT_DELAY_MS);
 }
 
 export function showRadial(spec: RadialSpec): void {
@@ -133,6 +195,17 @@ function buildButton(action: RadialAction, spec: RadialSpec): HTMLButtonElement 
     event.stopPropagation();
     choose(action, spec);
   });
+  // The click listener above already fires the first press. This only
+  // arms the *continuation*: if the button is still held REPEAT_DELAY_MS
+  // later, start firing it again on an interval. A normal tap releases
+  // well before the delay elapses, so it behaves exactly as before.
+  if (action.repeatable) {
+    button.addEventListener('mousedown', (event) => {
+      if (action.disabledReason) return;
+      event.stopPropagation();
+      startRepeat(action, spec);
+    });
+  }
   return button;
 }
 
