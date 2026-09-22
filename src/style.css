@@ -656,6 +656,23 @@ body {
   margin-bottom: 0;
 }
 
+.market-link {
+  padding: 0;
+  font-family: inherit;
+  font-size: inherit;
+  color: #cdd3e0;
+  background: transparent;
+  border: none;
+  text-decoration: underline;
+  text-decoration-color: rgba(205, 211, 224, 0.4);
+  cursor: pointer;
+}
+
+.market-link:hover {
+  color: #7ab8ff;
+  text-decoration-color: #7ab8ff;
+}
+
 /* Same red as everything else "over" (the capacity ring on the map, the
    crew-short pool rows) — a slot-controlled field flying more than it
    holds is the same class of problem those already flag. */

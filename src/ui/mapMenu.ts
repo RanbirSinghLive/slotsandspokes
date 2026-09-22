@@ -158,11 +158,31 @@ function fillAirportCard(airport: Airport, state: SimState): void {
   }
   const markets = [...frequencyByOther.entries()].sort((a, b) => b[1] - a[1]);
   if (markets.length === 0) {
-    marketsEl.textContent = 'No markets served.';
+    marketsEl.replaceChildren(document.createTextNode('No markets served.'));
   } else {
-    const shown = markets.slice(0, MAX_MARKET_ROWS).map(([iata, freq]) => `${iata} (${freq})`);
+    const shown = markets.slice(0, MAX_MARKET_ROWS);
     const rest = markets.length - shown.length;
-    marketsEl.textContent = `Markets: ${shown.join(', ')}${rest > 0 ? `, +${rest} more` : ''}`;
+    const nodes: (Node | string)[] = ['Markets: '];
+    // Each one opens that route's own ring (gauge, add/remove flight),
+    // same place clicking its line on the map goes. The line only takes a
+    // click within a few pixels of itself and loses to a nearby airport
+    // dot, so on a short route, or one zoomed far out, it can be nearly
+    // unclickable — this is a way in that doesn't depend on screen
+    // geometry at all.
+    shown.forEach(([other, freq], i) => {
+      if (i > 0) nodes.push(', ');
+      const link = document.createElement('button');
+      link.type = 'button';
+      link.className = 'market-link';
+      link.textContent = `${other} (${freq})`;
+      link.addEventListener('click', (event) => {
+        event.stopPropagation();
+        openRouteMenu(airport.iata, other, state, anchorX, anchorY);
+      });
+      nodes.push(link);
+    });
+    if (rest > 0) nodes.push(`, +${rest} more`);
+    marketsEl.replaceChildren(...nodes);
   }
 }
 
