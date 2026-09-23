@@ -297,10 +297,10 @@ export function networkAirports(legs: ScheduleLeg[]): Set<string> {
  *    a hand-edited save or data file now, since nothing in the game moves an
  *    aircraft's base.
  *
- * Logs one line per problem, or a single OK line, and returns the list
- * (empty when clean) so callers can show it somewhere a player will
- * actually see it. Console-only errors turned out to be invisible in
- * practice.
+ * A pure check: returns the list of problems (empty when clean) and writes
+ * nothing to the console. It runs every animation frame via the alert strip,
+ * so logging here flooded the console; callers show the list somewhere a
+ * player will actually see it instead (alert strip, renderScheduleWarnings()).
  */
 export function validateSchedule(legs: ScheduleLeg[], fleet: Aircraft[] = []): string[] {
   const byTail = new Map<string, ScheduleLeg[]>();
@@ -340,14 +340,6 @@ export function validateSchedule(legs: ScheduleLeg[], fleet: Aircraft[] = []): s
         `${aircraft.tail} is sitting at ${aircraft.atAirport}, but none of its rotations ever depart from there -- it will never fly again. ` +
           `Its rotations depart from ${[...origins].sort().join(', ')}. Remove them and draw new ones from ${aircraft.atAirport}.`,
       );
-    }
-  }
-
-  if (problems.length === 0) {
-    console.log(`Schedule OK: ${legs.length} legs across ${byTail.size} aircraft, no broken rotations.`);
-  } else {
-    for (const problem of problems) {
-      console.error(`Schedule error: ${problem}`);
     }
   }
 
