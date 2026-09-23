@@ -965,12 +965,42 @@ Verified live: on a single-route airline, the route's own cost tracked
 $4,400 (one propeller's daily lease) below the sidebar's network cost on
 every day, exactly the gap the scoping choice above predicts.
 
+### Done: a planned pass on the map (click-priority bug, aircraft size by class)
+
+Asked for a recommended plan to improve the map specifically, self-critiqued
+before implementing (full plan surveyed every `src/render/` file, the
+zoom/pan code, and the click-handling layer first). Two items held up;
+label-overlap-at-scale, LOD at low zoom, and a "zoom feels slow" hunch
+were all looked at and explicitly deferred — see the plan file
+(`~/.claude/plans/adaptive-bubbling-biscuit.md`) for why each one didn't
+make the cut.
+
+**Fixed:** `ui/mapMenu.ts`'s `handleMapMenuMouseDown()` and
+`render/competition.ts`'s `findCompetitionHover()` both always checked
+the airport first and returned on any hit, before ever testing the route
+line — since an airport's hit radius (14px) is bigger than a route's
+(8px), a short route (or the map zoomed out) could end up with no
+clickable pixels of its own. Both now compare candidates by
+distance-divided-by-that-target's-own-radius instead, with a sure-win
+floor (`AIRPORT_SURE_WIN_RATIO = 0.5`) so a click actually on an airport
+never loses to a route that merely starts there — found by testing the
+first version of the fix and hitting exactly that edge case for real.
+`render/airports.ts`'s `findNearestAirport()` stays untouched for the
+route builder's drag-to-draw snap, which should always prefer airports.
+
+**Also done:** aircraft on the map are now sized by class
+(`render/aircraft.ts`'s `AIRCRAFT_SIZE_BY_RANK`, keyed off the same
+`classRank()` the gauge mechanic and lease UI already use) — previously
+every flight was the same triangle regardless of Propeller through
+Widebody, the only place class had no visual identity at all. Color still
+means only late-vs-on-time.
+
 ---
 
 ## Conventions worth knowing
 
 - **Bump `SAVE_KEY` in `src/ui/save.ts` on any breaking `SimState`
-  change.** Currently `v33`.
+  change.** Currently `v34`.
 - **`headless-output.csv` and `sweep-reserve.csv` must stay
   byte-identical** across changes that aren't meant to affect balance.
   Both were verified unchanged after the delivery work — `createInitialState()`
