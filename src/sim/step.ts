@@ -117,6 +117,10 @@ export function step(state: SimState): void {
     // Week six's cost attribution — reset in lockstep with todayCost
     // above, since these five are exactly that number split up.
     state.todayCostByCategory = { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0, training: 0 };
+    // Per-market breakdown of todayRevenue/todayCost, reset in lockstep
+    // with them for the same reason as todayCostByCategory above.
+    state.todayRevenueByMarket = {};
+    state.todayCostByMarket = {};
     state.todayFlightsScheduled = 0;
     state.todayFlightsCancelled = 0;
     state.todayNpsScoredFlights = 0;
@@ -394,6 +398,10 @@ export function step(state: SimState): void {
           state.todayCostByCategory.blockNonFuel += result.costBreakdown.blockNonFuel;
           state.todayCostByCategory.departure += result.costBreakdown.departure;
           state.todayMargin += result.margin;
+          // Same numbers, split by market — sim/pnlHistory.ts rolls these
+          // into revenueHistoryByMarket/costHistoryByMarket at rollover.
+          state.todayRevenueByMarket[key] = (state.todayRevenueByMarket[key] ?? 0) + result.revenue;
+          state.todayCostByMarket[key] = (state.todayCostByMarket[key] ?? 0) + result.cost;
         }
       }
     }

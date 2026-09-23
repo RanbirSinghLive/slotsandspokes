@@ -938,6 +938,33 @@ waste half the chart on an unused loss zone — colored green/red so a
 losing week is visible at a glance, not just readable from the axis.
 Rebuilds only on an actual day change, not every frame.
 
+### Done: per-route P&L history
+
+The sidebar's chart answers "is the network trending right"; it can't say
+*which route* is the problem. Extended the same rolling window per
+market: `SimState` gained `todayRevenueByMarket`/`todayCostByMarket`
+(filled in step.ts's arrival loop, right beside the network totals) and
+`revenueHistoryByMarket`/`costHistoryByMarket` (rolled at the same
+day-rollover moment, one entry per day for every market currently in the
+schedule — even a zero one, so "yesterday" always means yesterday and not
+"the last day this route flew"). `SAVE_KEY` went to `v34`.
+
+Deliberately narrower than the network figures: only a flight's own
+fuel/block/departure economics are attributed to a market. Marketing,
+lease and crew are airline-wide overhead a plane's day is shared across —
+no honest way to give one market its "share" of a lease payment — so they
+stay out, same reasoning the dev tools' cost tree already uses. Margin
+isn't stored a third time; a market's margin is just its own revenue
+minus its own cost, computed in `ops.marketPnlHistory()`.
+
+The route card shows this as one small Margin chart (`buildBipolarBars()`
+now lives in the new `ui/pnlBars.ts`, shared with the sidebar's copy) —
+only Margin, since the popover is 280px wide at most; Revenue and Cost
+ride along in each bar's tooltip instead of getting their own row.
+Verified live: on a single-route airline, the route's own cost tracked
+$4,400 (one propeller's daily lease) below the sidebar's network cost on
+every day, exactly the gap the scoping choice above predicts.
+
 ---
 
 ## Conventions worth knowing

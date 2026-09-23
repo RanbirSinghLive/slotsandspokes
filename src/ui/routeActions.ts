@@ -101,6 +101,22 @@ export function marketReadout(state: SimState, a: string, b: string) {
   };
 }
 
+export type MarketPnlHistory = { revenue: number[]; cost: number[]; margin: number[] };
+
+/**
+ * This market's own recent daily Revenue/Cost/Margin (sim/pnlHistory.ts),
+ * the route-card equivalent of the sidebar's network-wide "Last 7 Days"
+ * charts (ui/pnlHistory.ts). Margin isn't stored on `state` separately —
+ * a market's margin is exactly its own revenue minus its own cost, so
+ * it's computed here rather than kept a third time.
+ */
+export function marketPnlHistory(state: SimState, a: string, b: string): MarketPnlHistory {
+  const key = marketKey(a, b);
+  const revenue = state.revenueHistoryByMarket[key] ?? [];
+  const cost = state.costHistoryByMarket[key] ?? [];
+  return { revenue, cost, margin: revenue.map((r, i) => r - (cost[i] ?? 0)) };
+}
+
 const MULTI_STOP_REASON = 'Flown as part of a multi-stop rotation. Remove that rotation in the Fleet tab to change this route.';
 
 /**

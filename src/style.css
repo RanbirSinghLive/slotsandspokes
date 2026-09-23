@@ -731,8 +731,25 @@ body {
   color: #9aa3b8;
 }
 
-#airport-detail-markets {
-  margin-bottom: 0;
+/* This market's own "Last 7 Days" margin chart (ui/mapMenu.ts, bars
+   shared with the sidebar's via ui/pnlBars.ts) — only populated for a
+   route card, hidden entirely on an airport card. Smaller than the
+   sidebar's own copy: the popover is 280px wide at most. */
+#airport-detail-route-history {
+  margin-bottom: 6px;
+}
+
+#airport-detail-route-history[hidden] {
+  display: none;
+}
+
+#airport-detail-route-history .pnl-chart-header {
+  color: #9aa3b8;
+  font-size: 12px;
+}
+
+#airport-detail-route-history .pnl-chart-bars {
+  height: 20px;
 }
 
 .market-link {

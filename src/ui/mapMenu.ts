@@ -14,6 +14,7 @@ import { hideRadial, showRadial, updateRadial, type RadialAction } from './radia
 import * as ops from './routeActions';
 import { planeIconInner } from './planeIcons';
 import { AIRCRAFT_CLASSES } from '../sim/aircraftClasses';
+import { WINDOW_DAYS, buildBipolarBars, dayLabel, money as pnlMoney } from './pnlBars';
 
 /**
  * Click something on the map, get an info card and a ring of actions for
@@ -41,6 +42,7 @@ const titleEl = document.querySelector<HTMLElement>('#airport-detail-title')!;
 const presenceEl = document.querySelector<HTMLElement>('#airport-detail-presence')!;
 const basedEl = document.querySelector<HTMLElement>('#airport-detail-based')!;
 const marketsEl = document.querySelector<HTMLElement>('#airport-detail-markets')!;
+const routeHistoryEl = document.querySelector<HTMLElement>('#airport-detail-route-history')!;
 const poolsEl = document.querySelector<HTMLElement>('#airport-detail-pools')!;
 const demandEl = document.querySelector<HTMLElement>('#airport-detail-demand')!;
 const hintEl = document.querySelector<HTMLElement>('#airport-detail-hint')!;
@@ -135,6 +137,9 @@ function onPreview(preview: MapPreview | null): void {
 
 function fillAirportCard(airport: Airport, state: SimState): void {
   titleEl.textContent = `${airport.iata} — ${airport.name}`;
+  // Only a route card shows a route's own history.
+  routeHistoryEl.hidden = true;
+  routeHistoryEl.replaceChildren();
 
   const presence = airportPresence(state, airport.iata);
   presenceEl.textContent = `${presence.level} · ${presence.departures} departure${presence.departures === 1 ? '' : 's'}/day`;
@@ -275,6 +280,45 @@ function fillRouteCard(a: string, b: string, state: SimState): void {
   }
 
   fillPools(ops.routeBase(state, a, b), state, '');
+  fillRouteHistory(state, a, b);
+}
+
+/**
+ * This route's own recent trend — the route-card equivalent of the
+ * sidebar's network-wide "Last 7 Days" Margin chart (ui/pnlHistory.ts),
+ * sharing the same bars (ui/pnlBars.ts) at a smaller size. Only Margin is
+ * shown, since there's room for one chart here, not three — Revenue and
+ * Cost still ride along in each bar's tooltip instead of getting their
+ * own row.
+ */
+function fillRouteHistory(state: SimState, a: string, b: string): void {
+  const history = ops.marketPnlHistory(state, a, b);
+  const shownMargin = history.margin.slice(-WINDOW_DAYS);
+  const shownRevenue = history.revenue.slice(-WINDOW_DAYS);
+  const shownCost = history.cost.slice(-WINDOW_DAYS);
+
+  if (shownMargin.length === 0) {
+    routeHistoryEl.hidden = true;
+    routeHistoryEl.replaceChildren();
+    return;
+  }
+
+  const header = document.createElement('div');
+  header.className = 'pnl-chart-header';
+  const labelEl = document.createElement('span');
+  labelEl.textContent = 'Margin, last 7 days';
+  const statEl = document.createElement('span');
+  statEl.className = 'pnl-chart-stat';
+  statEl.textContent = pnlMoney(shownMargin[shownMargin.length - 1]);
+  header.append(labelEl, statEl);
+
+  const bars = buildBipolarBars(shownMargin, (value, indexFromEnd) => {
+    const i = shownMargin.length - indexFromEnd;
+    return `${dayLabel(indexFromEnd)}: ${pnlMoney(shownRevenue[i])} revenue, ${pnlMoney(shownCost[i])} cost, ${pnlMoney(value)} margin`;
+  });
+
+  routeHistoryEl.replaceChildren(header, bars);
+  routeHistoryEl.hidden = false;
 }
 
 /** What the add-flight button says, including how thin the demand would be spread. */

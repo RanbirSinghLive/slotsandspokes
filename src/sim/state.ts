@@ -304,6 +304,32 @@ export type SimState = {
   costHistory: number[];
   marginHistory: number[];
   /**
+   * Same-day accumulation as `todayRevenue`/`todayCost` above, split by
+   * market (`marketKey(origin, dest)`, sim/schedule.ts) instead of summed
+   * across the whole airline — filled in step.ts's arrival loop, right
+   * beside the network-wide totals. Deliberately narrower than those: only
+   * a flight's own fuel/block/departure economics (sim/economy.ts's
+   * flightResult()) are attributed to a market. Marketing, lease and crew
+   * are airline-wide overhead a plane's day is shared across, with no
+   * honest way to hand one market its "share" of a lease payment, so they
+   * stay out — same reasoning the dev tools' cost tree already uses to
+   * keep a single flight's numbers free of them.
+   */
+  todayRevenueByMarket: Record<string, number>;
+  todayCostByMarket: Record<string, number>;
+  /**
+   * Rolling PNL_HISTORY_MAX_DAYS-day window of the two fields above, same
+   * recording moment as `revenueHistory`/`costHistory` — one entry per
+   * day for every market currently in the schedule, zero if it flew
+   * nothing that day, so "yesterday" always means yesterday rather than
+   * "the last day this route flew." This is what lets a route's own card
+   * show its trend instead of only the network's. A market's margin is
+   * just `revenueHistoryByMarket[key][i] - costHistoryByMarket[key][i]`;
+   * nothing else feeds it, so it isn't stored a third time.
+   */
+  revenueHistoryByMarket: Record<string, number[]>;
+  costHistoryByMarket: Record<string, number[]>;
+  /**
    * Week six's fuel price mechanic (sim/fuel.ts): a unitless index where
    * 1.0 is baseline — a flight's fuel-sensitive cost slice (see
    * legCost()) scales directly with this. Moved by a slow random walk,
@@ -607,6 +633,10 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     revenueHistory: [],
     costHistory: [],
     marginHistory: [],
+    todayRevenueByMarket: {},
+    todayCostByMarket: {},
+    revenueHistoryByMarket: {},
+    costHistoryByMarket: {},
     fuelPriceIndex: FUEL_PRICE_BASELINE,
     fuelPriceHistory: [],
     fuelEfficiencyMultiplier: 1,
@@ -728,6 +758,10 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     revenueHistory: [],
     costHistory: [],
     marginHistory: [],
+    todayRevenueByMarket: {},
+    todayCostByMarket: {},
+    revenueHistoryByMarket: {},
+    costHistoryByMarket: {},
     fuelPriceIndex: FUEL_PRICE_BASELINE,
     fuelPriceHistory: [],
     fuelEfficiencyMultiplier: 1,
