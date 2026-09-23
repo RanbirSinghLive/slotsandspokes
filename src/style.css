@@ -87,7 +87,8 @@ body {
 }
 
 #speed-controls button,
-#view-toggle button {
+#view-toggle button,
+#panel-toggle {
   font-family: inherit;
   font-size: inherit;
   color: #cdd3e0;
@@ -99,15 +100,41 @@ body {
 }
 
 #speed-controls button:hover,
-#view-toggle button:hover {
+#view-toggle button:hover,
+#panel-toggle:hover {
   border-color: rgba(255, 255, 255, 0.5);
 }
 
 #speed-controls button.active,
-#view-toggle button.active {
+#view-toggle button.active,
+#panel-toggle.active {
   background: #3a4258;
   border-color: #6b7694;
   color: #fff;
+}
+
+/* Icon-only and centered, same sizing as .view-group-trigger — but its
+   own rule rather than that shared class, since giving it a matching
+   `#panel-toggle` selector here (not `.view-group-trigger`) means these
+   two width/height/padding declarations are the only ones that apply,
+   with nothing else to conflict with them. Sits after the view-toggle
+   group rather than inside it: it isn't a map layer choice, it's "does
+   the sidebar exist right now." .active means the panel is currently
+   hidden (click to bring it back), same "on" convention the
+   Demand/Competition overlay buttons already use. */
+#panel-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  margin-left: 8px;
+}
+
+#panel-toggle svg {
+  width: 15px;
+  height: 15px;
 }
 
 #view-toggle {
@@ -423,6 +450,15 @@ body {
   /* Only #sidebar-tab-content scrolls, below — #econ-summary and
      #sidebar-tabs stay fixed in place above it regardless. */
   overflow: hidden;
+}
+
+/* #panel-toggle (main.ts) sets this attribute to collapse the sidebar.
+   Same gotcha as #fleet-tab and friends above: the `#panel` ID selector
+   (specificity 1-0-0) would otherwise beat the browser's own default
+   `[hidden] { display: none }` rule (0-1-0) and the attribute toggle
+   would silently do nothing. */
+#panel[hidden] {
+  display: none;
 }
 
 /* Week six: the tab bar that replaced the old "Reports" HUD dropdown, now

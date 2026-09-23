@@ -195,16 +195,16 @@ if (new URLSearchParams(window.location.search).has('dev')) {
 // never gets squeezed away to nothing on a narrow window, and recomputed
 // on every resize() rather than only when first set.
 //
-// Week seven, phase C: the Rotation tab's expand-to-900px affordance is
-// gone with the Gantt it existed for, so `desiredPanelWidthPx` no longer
-// varies. Kept as a variable rather than folded back into a constant
-// because the clamp still needs somewhere to read the unclamped value
-// from.
+// Week seven, phase C removed the Rotation tab's old expand-to-900px
+// affordance, and for a while nothing else made this vary. The panel-hide
+// toggle below (#panel-toggle) gives it a reason to again: hidden means 0,
+// otherwise the full width.
 const MIN_MAP_WIDTH_PX = 200;
-const desiredPanelWidthPx = PANEL_WIDTH_PX;
+let panelHidden = false;
 let currentPanelWidthPx = PANEL_WIDTH_PX;
 
 function applyPanelWidth(): void {
+  const desiredPanelWidthPx = panelHidden ? 0 : PANEL_WIDTH_PX;
   currentPanelWidthPx = Math.min(desiredPanelWidthPx, window.innerWidth - MIN_MAP_WIDTH_PX);
   document.documentElement.style.setProperty('--panel-width', `${currentPanelWidthPx}px`);
 }
@@ -386,6 +386,24 @@ function updateClock(state: SimState): void {
 
 window.addEventListener('resize', resize);
 resize();
+
+// Hide the side panel entirely and let the map fill the screen — CLAUDE.md's
+// "the map is all you need" goal taken literally. `panelHidden` (declared
+// above, next to applyPanelWidth()) is the only state; everything else here
+// just reflects it.
+const panelEl = document.querySelector<HTMLElement>('#panel')!;
+const panelToggleButton = document.querySelector<HTMLButtonElement>('#panel-toggle')!;
+panelToggleButton.addEventListener('click', () => {
+  panelHidden = !panelHidden;
+  panelEl.hidden = panelHidden;
+  panelToggleButton.classList.toggle('active', panelHidden);
+  panelToggleButton.setAttribute('aria-label', panelHidden ? 'Show side panel' : 'Hide side panel');
+  panelToggleButton.title = panelHidden
+    ? 'Show the side panel'
+    : 'Hide the side panel — the map fills the screen without it';
+  // The map's available width just changed, same as a real window resize.
+  resize();
+});
 
 // --- Simulation loop ---
 //
