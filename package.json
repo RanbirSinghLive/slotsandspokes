@@ -11,7 +11,8 @@
     "sweep": "tsx src/headless/sweep.ts",
     "lease": "tsx src/headless/lease.ts",
     "airports": "tsx src/headless/buildAirports.ts",
-    "lakes": "tsx src/headless/buildLakes.ts"
+    "lakes": "tsx src/headless/buildLakes.ts",
+    "rivers": "tsx src/headless/buildRivers.ts"
   },
   "devDependencies": {
     "@types/d3-geo": "^3.1.0",

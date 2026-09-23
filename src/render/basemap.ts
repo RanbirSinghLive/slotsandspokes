@@ -4,6 +4,7 @@ import { feature } from 'topojson-client';
 import type { Topology } from 'topojson-specification';
 import worldTopology from '../../data/world-110m.json';
 import lakesGeoJson from '../../data/lakes.json';
+import riversGeoJson from '../../data/rivers.json';
 import { projection } from './projection';
 
 // The downloaded file is TopoJSON: a compact format that stores shared
@@ -22,6 +23,13 @@ const land = feature(worldTopology as unknown as Topology, (worldTopology as unk
 // expanded-out TopoJSON above.
 const lakes = lakesGeoJson as FeatureCollection<Geometry>;
 
+// A hand-curated handful of rivers (src/headless/buildRivers.ts), the
+// world's biggest plus a few regional ones for this game's own starting
+// area — real geography the map otherwise has nothing to show for between
+// "landmass" and "airport dots." Also plain GeoJSON, same reasoning as
+// lakes above.
+const rivers = riversGeoJson as FeatureCollection<Geometry>;
+
 // Land and water were too close in brightness to read as two different
 // things at low display brightness — the whole point of a basemap that
 // isn't decoration. Land is now roughly twice as bright as the page's own
@@ -36,9 +44,9 @@ const COASTLINE_STROKE = '#4d5b7a';
 const LAKE_FILL = '#05070c';
 
 /**
- * Draw land, its coastline, and major lakes onto `ctx`. Call this once per
- * frame, after clearing the canvas and before anything else (routes,
- * aircraft) is drawn on top.
+ * Draw land, its coastline, major lakes, and a few rivers onto `ctx`. Call
+ * this once per frame, after clearing the canvas and before anything else
+ * (routes, aircraft) is drawn on top.
  */
 export function drawBasemap(ctx: CanvasRenderingContext2D): void {
   // d3.geoPath normally builds an SVG path string, but given a canvas 2D
@@ -64,6 +72,17 @@ export function drawBasemap(ctx: CanvasRenderingContext2D): void {
     ctx.fill();
     ctx.strokeStyle = COASTLINE_STROKE;
     ctx.lineWidth = 0.75;
+    ctx.stroke();
+  }
+
+  // Rivers are lines, not shapes — stroked only, no fill call — in the
+  // same void color as lake and ocean water, so a river reads as "water
+  // cutting across the land" rather than a third, unrelated color.
+  ctx.strokeStyle = LAKE_FILL;
+  ctx.lineWidth = 1;
+  for (const river of rivers.features as Feature<Geometry>[]) {
+    ctx.beginPath();
+    path(river);
     ctx.stroke();
   }
 }
