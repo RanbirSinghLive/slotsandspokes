@@ -1,4 +1,4 @@
-import { findNearestAirport, airportPresence, type Airport } from '../render/airports';
+import { nearestAirportCandidate, airportPresence, type Airport } from '../render/airports';
 import { findNearestOwnRoute } from '../render/routes';
 import { projection } from '../render/projection';
 import { utilisationPools } from '../sim/utilisation';
@@ -453,21 +453,43 @@ function refresh(): void {
   renderHint();
 }
 
+// Below this fraction of the airport's own hit radius, the airport wins
+// outright, full stop — no ratio comparison against a route. A route's
+// arc starts exactly at its airport, so right on top of the airport dot
+// itself the route's ratio is *also* near 0 (a click there really is on
+// the line, technically, at the one point where it and the dot coincide).
+// Without this floor, clicking dead-center on an airport with an outgoing
+// route could occasionally hand the click to the route instead, on
+// nothing more than sub-pixel rounding — found by testing this exact
+// scenario after the ratio comparison below was first written.
+const AIRPORT_SURE_WIN_RATIO = 0.5;
+
 /**
  * First-refusal handler, same shape as ui/routeBuilder.ts's own
  * `handleRouteBuilderMouseDown`: returns whether this module consumed the
- * click, so main.ts knows not to start a pan. An airport wins over a route
- * (a point is a smaller, more precise target than a line).
+ * click, so main.ts knows not to start a pan.
+ *
+ * Outside the sure-win zone above, airport and route are compared by
+ * `ratio` (distance divided by that target's own hit radius — see
+ * nearestAirportCandidate()'s comment in render/airports.ts), not by
+ * "airport checked first." A route's line only gets an 8px tolerance
+ * against an airport's 14px, so on a short route (or the map zoomed out)
+ * most of the line used to sit inside both endpoints' airport radii and
+ * could never win at all — checking the ratio instead means a click
+ * genuinely close to the line, but not close enough to either airport to
+ * count as "on" it, now correctly goes to the route.
  */
 export function handleMapMenuMouseDown(event: MouseEvent, state: SimState): boolean {
-  const airport = findNearestAirport(event.clientX, event.clientY);
-  if (airport) {
+  const airport = nearestAirportCandidate(event.clientX, event.clientY);
+  const route = findNearestOwnRoute(event.clientX, event.clientY, state);
+
+  const airportWins = airport && (airport.ratio <= AIRPORT_SURE_WIN_RATIO || !route || airport.ratio <= route.ratio);
+  if (airportWins) {
     hideCompetitionTooltip();
-    openAirportMenu(airport, state);
+    openAirportMenu(airport.airport, state);
     return true;
   }
 
-  const route = findNearestOwnRoute(event.clientX, event.clientY, state);
   if (route) {
     hideCompetitionTooltip();
     openRouteMenu(route.origin, route.dest, state, event.clientX, event.clientY);

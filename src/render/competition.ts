@@ -297,6 +297,14 @@ const AIRPORT_HIT_RADIUS_PX = 8;
 const MARKET_HIT_RADIUS_PX = 6;
 const ARC_SAMPLE_STEPS = 24;
 
+// Same sure-win floor as ui/mapMenu.ts's handleMapMenuMouseDown(), and the
+// same reason: a market's arc starts exactly at its airport, so right on
+// top of the airport dot the market's ratio is *also* near 0. Below this
+// fraction of the airport's own radius, the airport wins outright rather
+// than risking a coin-flip on sub-pixel rounding against a market that
+// merely happens to touch that same point.
+const AIRPORT_SURE_WIN_RATIO = 0.5;
+
 function distanceToPointSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
   const dx = bx - ax;
   const dy = by - ay;
@@ -333,9 +341,14 @@ export function distanceToArc(origin: Airport, dest: Airport, screenX: number, s
 export type CompetitionHover = { type: 'airport'; iata: string } | { type: 'market'; origin: string; dest: string };
 
 /**
- * What's under the cursor on the map, for the hover tooltip: an airport
- * takes priority (a point is a smaller, more precise target than a
- * line), then the nearest visible market arc within its hit radius.
+ * What's under the cursor on the map, for the hover tooltip: whichever of
+ * an airport or a visible market arc the point is proportionally closer
+ * to — comparing each candidate's distance divided by its own hit radius,
+ * not "airport checked first" (see ui/mapMenu.ts's handleMapMenuMouseDown
+ * for the fuller reasoning; this is the same fix for the same bug). A
+ * click genuinely on an airport still always wins, since its ratio is
+ * near 0; a click actually on a market's line no longer loses just
+ * because it also happens to be within the airport's more forgiving 8px.
  * `null` if neither is close enough.
  *
  * `includeCompetitors` (week four — was implicitly always true back when
@@ -366,7 +379,7 @@ export function findCompetitionHover(
       nearestIata = airport.iata;
     }
   }
-  if (nearestIata) return { type: 'airport', iata: nearestIata };
+  const airportRatio = nearestIata ? nearestAirportDist / AIRPORT_HIT_RADIUS_PX : null;
 
   const ownRoutes = ownRoutesFrom(state);
   let marketsToTest = ownRoutes;
@@ -392,6 +405,11 @@ export function findCompetitionHover(
       nearestMarketDist = dist;
       nearestMarket = { origin, dest };
     }
+  }
+  const marketRatio = nearestMarket ? nearestMarketDist / MARKET_HIT_RADIUS_PX : null;
+
+  if (airportRatio !== null && (airportRatio <= AIRPORT_SURE_WIN_RATIO || marketRatio === null || airportRatio <= marketRatio)) {
+    return { type: 'airport', iata: nearestIata! };
   }
   if (nearestMarket) return { type: 'market', origin: nearestMarket.origin, dest: nearestMarket.dest };
 

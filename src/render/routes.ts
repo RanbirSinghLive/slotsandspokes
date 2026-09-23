@@ -122,12 +122,23 @@ export function drawRoutes(ctx: CanvasRenderingContext2D, state: SimState): void
 // How close a click has to land to a route's arc to count as hitting it.
 const ROUTE_HIT_RADIUS_PX = 8;
 
+export type RouteHitCandidate = { origin: string; dest: string; distPx: number; ratio: number };
+
 /**
  * The player's own route (a market, either direction) under a screen
- * point, if any. Uses the same arc-distance test the competition hover
- * uses, so a click and a hover agree about what "on the line" means.
+ * point, if any, plus *how* close (`ratio`, `distPx / ROUTE_HIT_RADIUS_PX`
+ * — see render/airports.ts's nearestAirportCandidate() for the full
+ * reasoning). Uses the same arc-distance test the competition hover uses,
+ * so a click and a hover agree about what "on the line" means.
+ *
+ * ui/mapMenu.ts's handleMapMenuMouseDown() is this function's only
+ * caller, and it always needs the ratio to compare against an airport
+ * candidate — so unlike findNearestAirport() (which keeps a plain
+ * wrapper for the route builder's drag-to-draw gesture, which genuinely
+ * only ever wants "nearest airport, full stop"), there's no reason to
+ * keep a ratio-less version of this one around.
  */
-export function findNearestOwnRoute(screenX: number, screenY: number, state: SimState): { origin: string; dest: string } | null {
+export function findNearestOwnRoute(screenX: number, screenY: number, state: SimState): RouteHitCandidate | null {
   const distinct = new Map<string, { origin: string; dest: string }>();
   for (const leg of state.schedule) {
     const key = routeKey(leg.origin, leg.dest);
@@ -146,5 +157,5 @@ export function findNearestOwnRoute(screenX: number, screenY: number, state: Sim
       nearest = { origin, dest };
     }
   }
-  return nearest;
+  return nearest ? { ...nearest, distPx: nearestDist, ratio: nearestDist / ROUTE_HIT_RADIUS_PX } : null;
 }

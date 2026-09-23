@@ -238,14 +238,20 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState): vo
 // about how forgiving the target is.
 const HIT_RADIUS_PX = 14;
 
+export type AirportHitCandidate = { airport: Airport; distPx: number; ratio: number };
+
 /**
- * Which airport (if any) is under a screen point, within HIT_RADIUS_PX.
- * Originally lived in ui/routeBuilder.ts as a private helper; moved here
- * (week eight) once a second consumer needed the identical hit-test —
- * this is where "given a point, which airport" actually belongs, not in
- * the module that happens to have used it first.
+ * Which airport (if any) is under a screen point, within HIT_RADIUS_PX,
+ * plus *how* close — `ratio` is `distPx / HIT_RADIUS_PX`, so 0 means dead
+ * center and just under 1 means barely inside the tolerance. A caller
+ * choosing between an airport and something else with its own hit radius
+ * (a route's line, say) can compare each candidate's ratio rather than
+ * their raw pixel distances, which aren't comparable against radii that
+ * differ — see ui/mapMenu.ts's handleMapMenuMouseDown() and
+ * render/competition.ts's findCompetitionHover() for why that comparison
+ * matters: without it, "checked first" always beat "closer."
  */
-export function findNearestAirport(screenX: number, screenY: number): Airport | null {
+export function nearestAirportCandidate(screenX: number, screenY: number): AirportHitCandidate | null {
   let nearest: Airport | null = null;
   let nearestDistPx = HIT_RADIUS_PX;
   for (const airport of airports) {
@@ -258,7 +264,21 @@ export function findNearestAirport(screenX: number, screenY: number): Airport | 
       nearest = airport;
     }
   }
-  return nearest;
+  return nearest ? { airport: nearest, distPx: nearestDistPx, ratio: nearestDistPx / HIT_RADIUS_PX } : null;
+}
+
+/**
+ * Which airport (if any) is under a screen point, within HIT_RADIUS_PX.
+ * Originally lived in ui/routeBuilder.ts as a private helper; moved here
+ * (week eight) once a second consumer needed the identical hit-test —
+ * this is where "given a point, which airport" actually belongs, not in
+ * the module that happens to have used it first. A thin wrapper around
+ * nearestAirportCandidate() above, for the callers (the route builder's
+ * arm/aim gesture) that only ever want the nearest airport regardless of
+ * anything else on screen, never a ratio to compare it against.
+ */
+export function findNearestAirport(screenX: number, screenY: number): Airport | null {
+  return nearestAirportCandidate(screenX, screenY)?.airport ?? null;
 }
 
 /** Re-exported for the hover tooltip, which wants the same numbers the dots encode. */
