@@ -1,4 +1,4 @@
-import { MIN_TURN_MINUTES, type ScheduleLeg } from './schedule';
+import { MIN_TURN_MINUTES, marketKey, type ScheduleLeg } from './schedule';
 import type { SimState } from './state';
 import { AIRCRAFT_CLASSES } from './aircraftClasses';
 
@@ -39,18 +39,35 @@ export const USABLE_DAY_END_MINUTE = 22 * 60;
 export const USABLE_DAY_MINUTES = USABLE_DAY_END_MINUTE - USABLE_DAY_START_MINUTE;
 
 /**
- * What one leg costs an aircraft: its block time plus the turn it forces
- * at the far end. Charging the turn to the leg that causes it means a
- * rotation's cost is just the sum of its legs, with no separate
- * bookkeeping for the gaps between them.
+ * The extra scheduled ground time after a flight on this market — the
+ * player's per-route turn buffer (RouteSettings.turnBufferMinutes,
+ * sim/turnBuffer.ts). Zero for a market with no settings yet, which is
+ * every market until its first rotation is committed.
  */
-export function legUtilisationMinutes(blockMinutes: number): number {
-  return blockMinutes + MIN_TURN_MINUTES;
+export function turnBufferMinutes(state: SimState, origin: string, dest: string): number {
+  return state.routeSettings[marketKey(origin, dest)]?.turnBufferMinutes ?? 0;
 }
 
-/** That same leg as a share of one aircraft's usable day. */
-export function legUtilisationShare(blockMinutes: number): number {
-  return legUtilisationMinutes(blockMinutes) / USABLE_DAY_MINUTES;
+/** The whole scheduled turn after a flight on this market: the physical minimum plus the route's buffer. */
+export function scheduledTurnMinutes(state: SimState, origin: string, dest: string): number {
+  return MIN_TURN_MINUTES + turnBufferMinutes(state, origin, dest);
+}
+
+/**
+ * What one leg costs an aircraft: its block time plus the turn it forces
+ * at the far end, buffer included. Charging the turn to the leg that
+ * causes it means a rotation's cost is just the sum of its legs, with no
+ * separate bookkeeping for the gaps between them — and it means a turn
+ * buffer is paid for in exactly the currency it trades against: minutes
+ * of the usable day the plane can't spend flying.
+ */
+export function legUtilisationMinutes(blockMinutes: number, turnBuffer = 0): number {
+  return blockMinutes + MIN_TURN_MINUTES + turnBuffer;
+}
+
+/** `legUtilisationMinutes` for a leg already on the schedule, reading its route's buffer from `state`. */
+function scheduledLegMinutes(state: SimState, leg: ScheduleLeg): number {
+  return legUtilisationMinutes(leg.blockMinutes, turnBufferMinutes(state, leg.origin, leg.dest));
 }
 
 /**
@@ -92,7 +109,7 @@ export type AircraftUtilisation = {
 export function aircraftUtilisation(state: SimState, tail: string): AircraftUtilisation {
   const aircraft = state.aircraft.find((a) => a.tail === tail);
   const legs = state.schedule.filter((leg) => leg.tail === tail);
-  const rawMinutes = legs.reduce((total, leg) => total + legUtilisationMinutes(leg.blockMinutes), 0);
+  const rawMinutes = legs.reduce((total, leg) => total + scheduledLegMinutes(state, leg), 0);
   const minutes = effectiveTailMinutes(legs.length, rawMinutes);
   return {
     tail,
@@ -267,18 +284,17 @@ export type Rotation = {
   closed: boolean;
 };
 
-function buildRotation(tail: string, legs: ScheduleLeg[], base: string): Rotation {
+function buildRotation(state: SimState, tail: string, legs: ScheduleLeg[], base: string): Rotation {
   const last = legs[legs.length - 1];
+  const minutes = effectiveTailMinutes(legs.length, legs.reduce((total, leg) => total + scheduledLegMinutes(state, leg), 0));
   return {
     tail,
     legs,
     airports: [legs[0].origin, ...legs.map((leg) => leg.dest)],
     departMinute: legs[0].departMinute,
     arriveMinute: last.departMinute + last.blockMinutes,
-    minutes: effectiveTailMinutes(legs.length, legs.reduce((total, leg) => total + legUtilisationMinutes(leg.blockMinutes), 0)),
-    share:
-      effectiveTailMinutes(legs.length, legs.reduce((total, leg) => total + legUtilisationMinutes(leg.blockMinutes), 0)) /
-      USABLE_DAY_MINUTES,
+    minutes,
+    share: minutes / USABLE_DAY_MINUTES,
     closed: last.dest === base,
   };
 }
@@ -303,11 +319,11 @@ export function rotationsForTail(state: SimState, tail: string): Rotation[] {
   for (const leg of legs) {
     current.push(leg);
     if (leg.dest === base) {
-      rotations.push(buildRotation(tail, current, base));
+      rotations.push(buildRotation(state, tail, current, base));
       current = [];
     }
   }
-  if (current.length > 0) rotations.push(buildRotation(tail, current, base));
+  if (current.length > 0) rotations.push(buildRotation(state, tail, current, base));
   return rotations;
 }
 

@@ -31,6 +31,8 @@ export type RadialAction = {
   /** Present means the action can't be used right now, and why. */
   disabledReason?: string;
   confirm?: boolean;
+  /** Lit as the current choice, for a fan of mutually exclusive settings (a route's turn buffer). */
+  selected?: boolean;
   /**
    * Holding the button fires it again and again (after a short delay, then
    * on an interval) instead of once. For things like "add a flight" where
@@ -177,7 +179,7 @@ function buildButton(action: RadialAction, spec: RadialSpec): HTMLButtonElement 
     button.setAttribute('aria-disabled', 'true');
   }
   if (action.large) button.classList.add('large');
-  if (action.id === openParentId) button.classList.add('active');
+  if (action.id === openParentId || action.selected) button.classList.add('active');
   if (action.id === armedId) button.classList.add('confirming');
 
   // A button waiting for its second click keeps saying so, since the ring

@@ -6,7 +6,10 @@ import { drawRoutes } from './render/routes';
 import { drawAirports, airports, setKnownAirports } from './render/airports';
 import { drawFog } from './render/fog';
 import { drawWeatherEffects } from './render/weather';
-import { drawAircraft } from './render/aircraft';
+import { drawAircraft, findFlightAt, flightScreenPoint } from './render/aircraft';
+import { drawDelayCascade } from './render/cascade';
+import { projectRestOfDay } from './sim/cascade';
+import { showFlightTooltip, hideFlightTooltip } from './ui/flightTooltip';
 import { drawDemandLayer } from './render/demand';
 import { drawCompetitionLayer, competitorAirlines, findCompetitionHover, drawNewCompetitorRouteFlashes } from './render/competition';
 import { drawRouteMapMode, MAP_MODES, MAP_MODE_COLORS, type MapMode } from './render/mapmodes';
@@ -23,6 +26,7 @@ import {
   handleRouteBuilderKeyDown,
   drawRoutePreview,
   hideRouteHoverTooltip,
+  isRouteBuilderActive,
 } from './ui/routeBuilder';
 import { handleMapMenuMouseDown, handleMapMenuKeyDown, hideMapMenu, isMapMenuOpen } from './ui/mapMenu';
 import { setupCommercialPanel, updateCommercialPanel } from './ui/commercial';
@@ -282,6 +286,10 @@ let competitionOverlayOn = false;
 // underneath) but layered the same way Demand/Competition are: an
 // independent thing turned on over the map, not a sidebar destination.
 let mapMode: MapMode = 'none';
+// Where the pointer is over the map, or null when it's off it or dragging.
+// Planes move under a still pointer, so which plane is hovered is worked
+// out again every frame in render() rather than only on mousemove.
+let hoverPoint: { x: number; y: number } | null = null;
 
 function render(nowMs: number = performance.now()): void {
   updateClock(state);
@@ -345,8 +353,26 @@ function render(nowMs: number = performance.now()): void {
     drawRoutes(ctx, state);
   }
 
-  drawAircraft(ctx, state, latestFractionalMinute);
-  drawAirports(ctx, state);
+  // Hovering a plane (not the route line) shows its own story: why it's
+  // late (ui/flightTooltip.ts) and how that lateness spreads through the
+  // rest of its day (render/cascade.ts). Not while a route is being drawn
+  // or a click menu is open, which already own the pointer.
+  const hoveredFlight =
+    hoverPoint && !isRouteBuilderActive() && !isMapMenuOpen()
+      ? findFlightAt(hoverPoint.x, hoverPoint.y, state, latestFractionalMinute)
+      : null;
+  if (hoveredFlight) {
+    const restOfDay = projectRestOfDay(state, hoveredFlight.tail);
+    drawDelayCascade(ctx, hoveredFlight, restOfDay, latestFractionalMinute);
+    const point = flightScreenPoint(hoveredFlight, latestFractionalMinute);
+    if (point) showFlightTooltip(hoveredFlight, restOfDay, state, point[0], point[1]);
+  } else {
+    hideFlightTooltip();
+  }
+
+  drawAircraft(ctx, state, latestFractionalMinute, hoveredFlight?.legId ?? null);
+  // The unmet-demand pips around airports belong to the Demand layer.
+  drawAirports(ctx, state, demandOverlayOn);
   drawWeatherEffects(ctx, state);
   drawRoutePreview(ctx, state);
 
@@ -765,6 +791,7 @@ canvas.addEventListener('mousedown', (event) => {
  * for what the tooltip actually reveals).
  */
 canvas.addEventListener('mousemove', (event) => {
+  hoverPoint = isDragging ? null : { x: event.clientX, y: event.clientY };
   if (handleRouteBuilderMouseMove(event, state)) {
     render();
     hideCompetitionTooltip();
@@ -780,6 +807,12 @@ canvas.addEventListener('mousemove', (event) => {
     return;
   }
 
+  // A plane under the pointer wins over the route or airport beneath it.
+  if (findFlightAt(event.clientX, event.clientY, state, latestFractionalMinute)) {
+    hideCompetitionTooltip();
+    return;
+  }
+
   const hover = findCompetitionHover(event.clientX, event.clientY, selectedCompetitorAirline, state, competitionOverlayOn);
   if (hover) {
     showCompetitionTooltip(hover, event.clientX, event.clientY, state, competitionOverlayOn);
@@ -789,6 +822,8 @@ canvas.addEventListener('mousemove', (event) => {
 });
 
 canvas.addEventListener('mouseleave', () => {
+  hoverPoint = null;
+  hideFlightTooltip();
   hideCompetitionTooltip();
   hideRouteHoverTooltip();
 });

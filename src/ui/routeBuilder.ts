@@ -12,7 +12,6 @@ import {
   isAircraftTypeAllowedAt,
   legsServingMarket,
   marketKey,
-  MIN_TURN_MINUTES,
   networkAirports,
   nextLegId,
   type ScheduleLeg,
@@ -21,6 +20,8 @@ import {
   aircraftUtilisation,
   isLongHaulRoundTrip,
   legUtilisationMinutes,
+  scheduledTurnMinutes,
+  turnBufferMinutes,
   USABLE_DAY_END_MINUTE,
   USABLE_DAY_MINUTES,
   USABLE_DAY_START_MINUTE,
@@ -271,6 +272,11 @@ function activeTail(state: SimState, dest: Airport | null): string | null {
  * button (ui/mapMenu.ts). Everything downstream (preview, "add stop",
  * capacity/range validation on confirm) lives in the armed state.
  */
+/** Whether a route is being drawn, in which case the route builder owns the pointer. */
+export function isRouteBuilderActive(): boolean {
+  return builderState.mode !== 'idle';
+}
+
 export function armRouteBuilderAt(airport: Airport): void {
   builderState = { mode: 'armed', chain: [airport] };
   setArmedCursor(true);
@@ -468,7 +474,7 @@ const MAX_COLLISION_NUDGES = 24;
  * player click the base itself as the final stop to say "close the loop
  * here" without producing a base→base leg.
  */
-function packRotation(airports: Airport[], cruiseKts: number | undefined, startMinute: number): PackedLeg[] {
+function packRotation(airports: Airport[], cruiseKts: number | undefined, startMinute: number, state: SimState): PackedLeg[] {
   const legs: PackedLeg[] = [];
   let cursor = startMinute;
   for (let i = 0; i < airports.length; i++) {
@@ -477,7 +483,9 @@ function packRotation(airports: Airport[], cruiseKts: number | undefined, startM
     if (from.iata === to.iata) continue;
     const blockMinutes = computeBlockMinutes(from.iata, to.iata, cruiseKts);
     legs.push({ origin: from.iata, dest: to.iata, departMinute: cursor, blockMinutes });
-    cursor += blockMinutes + MIN_TURN_MINUTES;
+    // The turn includes this route's buffer (sim/turnBuffer.ts), so a
+    // flight added to a buffered route is spaced like the ones already on it.
+    cursor += blockMinutes + scheduledTurnMinutes(state, from.iata, to.iata);
   }
   return legs;
 }
@@ -496,8 +504,11 @@ function packRotation(airports: Airport[], cruiseKts: number | undefined, startM
 function rotationStartMinute(tail: string, state: SimState): number {
   const tailLegs = state.schedule.filter((leg) => leg.tail === tail);
   if (tailLegs.length === 0) return USABLE_DAY_START_MINUTE;
-  const lastArrival = Math.max(...tailLegs.map((leg) => leg.departMinute + leg.blockMinutes));
-  return Math.max(USABLE_DAY_START_MINUTE, lastArrival + MIN_TURN_MINUTES);
+  const lastLeg = tailLegs.reduce((latest, leg) =>
+    leg.departMinute + leg.blockMinutes > latest.departMinute + latest.blockMinutes ? leg : latest,
+  );
+  const lastArrival = lastLeg.departMinute + lastLeg.blockMinutes;
+  return Math.max(USABLE_DAY_START_MINUTE, lastArrival + scheduledTurnMinutes(state, lastLeg.origin, lastLeg.dest));
 }
 
 /**
@@ -516,12 +527,13 @@ function packRotationAvoidingCollisions(
   airports: Airport[],
   cruiseKts: number | undefined,
   startMinute: number,
-  schedule: ScheduleLeg[],
+  state: SimState,
 ): PackedLeg[] {
-  let legs = packRotation(airports, cruiseKts, startMinute);
+  const schedule = state.schedule;
+  let legs = packRotation(airports, cruiseKts, startMinute, state);
   for (let attempt = 0; attempt < MAX_COLLISION_NUDGES; attempt++) {
     if (!legs.some((leg) => findExactTimeCollision(leg.origin, leg.dest, leg.departMinute, schedule))) return legs;
-    legs = packRotation(airports, cruiseKts, startMinute + (attempt + 1) * COLLISION_NUDGE_MINUTES);
+    legs = packRotation(airports, cruiseKts, startMinute + (attempt + 1) * COLLISION_NUDGE_MINUTES, state);
   }
   return legs;
 }
@@ -582,9 +594,12 @@ export function planRotation(chain: Airport[], dest: Airport, tail: string, stat
     rotationAirports,
     type?.cruiseKts,
     rotationStartMinute(tail, state),
-    state.schedule,
+    state,
   );
-  const clockMinutes = legs.reduce((total, leg) => total + legUtilisationMinutes(leg.blockMinutes), 0);
+  const clockMinutes = legs.reduce(
+    (total, leg) => total + legUtilisationMinutes(leg.blockMinutes, turnBufferMinutes(state, leg.origin, leg.dest)),
+    0,
+  );
   // A plane that does nothing else may fly one round trip that outruns the
   // usable day (sim/utilisation.ts's isLongHaulRoundTrip()): it is then
   // "one full aircraft" and the end-of-day rule below does not apply.
@@ -977,6 +992,7 @@ export function commitRotation(state: SimState, tail: string, plan: RotationPlan
       fare: policyFare(state, leg.origin, leg.dest),
       fareIsOverridden: false,
       marketingSpend: 0,
+      turnBufferMinutes: 0,
     };
     addCommercialRow(leg.origin, leg.dest, state);
   }

@@ -76,7 +76,7 @@ function profitabilityColor(margin: number, revenue: number): string {
  * constant means this map and the Reputation number it feeds can never
  * silently disagree about what "acceptable" means.
  */
-function onTimeColor(pct: number): string {
+export function onTimeColor(pct: number): string {
   return pct < OTP_BASELINE ? lerpColor(RED, AMBER, pct / OTP_BASELINE) : lerpColor(AMBER, GREEN, (pct - OTP_BASELINE) / (1 - OTP_BASELINE));
 }
 

@@ -1,6 +1,7 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { potentialDailyDemand, ALL_MARKET_PAIRS } from './demand';
 import { marketKey } from './schedule';
+import { reliabilityDemandFactor, trailingMarketOtp } from './routeOtp';
 import type { SimState } from './state';
 
 /**
@@ -239,11 +240,24 @@ export function rollDailyMarketDemand(state: SimState): void {
     // exists for markets a route was drawn on anyway.)
     const marketingSpend = state.routeSettings[key]?.marketingSpend ?? 0;
 
+    // How reliably the player has flown this market lately (sim/routeOtp.ts):
+    // above the neutral line it speeds growth up, below it slows growth,
+    // and far enough below it reverses it. Neutral on a market the player
+    // doesn't fly or has barely flown yet.
+    const reliability = reliabilityDemandFactor(trailingMarketOtp(state, origin, dest).otp);
+
     let next: number;
-    if (seatsOffered > 0) {
+    if (seatsOffered > 0 && reliability >= 0) {
       const rate =
-        STIMULATION_RATE * serviceSaturation(seatsOffered, potential) * marketingRateMultiplier(marketingSpend);
+        STIMULATION_RATE *
+        serviceSaturation(seatsOffered, potential) *
+        marketingRateMultiplier(marketingSpend) *
+        reliability;
       next = current + (potential - current) * rate;
+    } else if (seatsOffered > 0) {
+      // Unreliable enough to lose passengers: the same slide toward the
+      // floor an abandoned market gets, at up to the same speed.
+      next = current + (floor - current) * DECAY_RATE * -reliability;
     } else {
       next = current + (floor - current) * DECAY_RATE;
     }

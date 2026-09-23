@@ -788,6 +788,39 @@ body {
   height: 20px;
 }
 
+/* A route's reliability, day by day (ui/mapMenu.ts's fillRouteOtp), in
+   the same small-chart shape as the margin history just above it. */
+#airport-detail-otp {
+  margin-bottom: 6px;
+}
+
+#airport-detail-otp[hidden] {
+  display: none;
+}
+
+#airport-detail-otp .pnl-chart-header {
+  color: #9aa3b8;
+  font-size: 12px;
+}
+
+#airport-detail-otp .pnl-chart-bars {
+  height: 20px;
+  margin-bottom: 4px;
+}
+
+.route-otp-line {
+  color: #9aa3b8;
+  font-size: 12px;
+}
+
+.route-otp-line.is-warning {
+  color: #ffd166;
+}
+
+.route-otp-line.is-problem {
+  color: #ff8080;
+}
+
 .market-link {
   padding: 0;
   font-family: inherit;
@@ -1265,6 +1298,66 @@ body {
 /* Competition mode's hover tooltip — real DOM (per CLAUDE.md's rule
    against hand-rolled canvas widgets), positioned next to the cursor via
    main.ts's mousemove handler rather than the mouse itself owning it. */
+/* Hovering a moving plane (ui/flightTooltip.ts): why this flight is late,
+   as delay codes, and where the delay goes next. Same look as the
+   competition tooltip beside it. */
+#flight-tooltip {
+  position: fixed;
+  z-index: 30;
+  max-width: 300px;
+  padding: 10px 12px;
+  background: rgba(10, 12, 18, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #cdd3e0;
+  pointer-events: none;
+}
+
+#flight-tooltip[hidden] {
+  display: none;
+}
+
+.flight-tooltip-title {
+  font-size: 13px;
+  color: #fff;
+}
+
+.flight-tooltip-section {
+  margin-top: 6px;
+  color: #6b7694;
+}
+
+.flight-tooltip-code {
+  display: flex;
+  gap: 8px;
+}
+
+.flight-tooltip-code-id {
+  width: 4ch;
+  color: #ffd166;
+}
+
+.flight-tooltip-code-minutes {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.flight-tooltip-hint {
+  margin-top: 6px;
+  color: #ffd166;
+}
+
+#flight-tooltip .is-good {
+  color: #7fd88f;
+}
+
+#flight-tooltip .is-late {
+  color: #ff8080;
+}
+
 #competition-tooltip {
   position: fixed;
   z-index: 30;

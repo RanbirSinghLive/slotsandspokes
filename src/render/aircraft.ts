@@ -4,7 +4,7 @@ import { airports } from './airports';
 import { bearing } from '../sim/geo';
 import { isOnTimeArrival } from '../sim/delays';
 import { classRank } from '../sim/aircraftClasses';
-import type { SimState } from '../sim/state';
+import type { ActiveFlight, SimState } from '../sim/state';
 
 const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]));
 
@@ -34,6 +34,67 @@ const AIRCRAFT_FILL_LATE = '#ff5c5c';
 // "Geography".
 const HEADING_SAMPLE_STEP = 0.001;
 
+// How close the pointer has to be to a plane to hover it. More generous
+// than the sprite itself: it's a small moving target.
+const HOVER_RADIUS_PX = 12;
+const HOVER_RING_STROKE = '#ffffff';
+
+type FlightPose = { x: number; y: number; rotation: number };
+
+/**
+ * Where a flight is on screen right now and which way it points. Shared
+ * by drawing and hover hit-testing so the thing you hover is exactly the
+ * thing drawn.
+ */
+function flightPose(flight: ActiveFlight, nowFractionalMinute: number): FlightPose | null {
+  const origin = airportsByIata.get(flight.origin);
+  const dest = airportsByIata.get(flight.dest);
+  if (!origin || !dest) return null;
+
+  const blockMinutes = flight.arriveMinute - flight.departMinute;
+  const rawT = (nowFractionalMinute - flight.departMinute) / blockMinutes;
+  const t = Math.min(Math.max(rawT, 0), 1);
+
+  const interpolate = geoInterpolate([origin.lon, origin.lat], [dest.lon, dest.lat]);
+  const here = interpolate(t);
+  const point = projection(here);
+  if (!point) return null;
+
+  const ahead = interpolate(Math.min(t + HEADING_SAMPLE_STEP, 1));
+  const compassBearing = bearing({ lon: here[0], lat: here[1] }, { lon: ahead[0], lat: ahead[1] });
+
+  // geoMercator always draws north as "up" and east as "right" (it's a
+  // conformal projection, which is precisely the property that makes this
+  // shortcut valid), so a compass bearing (0 = north, clockwise) converts
+  // to a canvas rotation with one fixed adjustment: ctx.rotate() measures
+  // its angle clockwise from due east, not due north, so we subtract 90
+  // degrees. This only holds because the map never uses any projection
+  // but Mercator — see render/projection.ts.
+  return { x: point[0], y: point[1], rotation: ((compassBearing - 90) * Math.PI) / 180 };
+}
+
+/** The airborne flight under a screen point, nearest first, or null. */
+export function findFlightAt(screenX: number, screenY: number, state: SimState, nowFractionalMinute: number): ActiveFlight | null {
+  let best: ActiveFlight | null = null;
+  let bestDistance = HOVER_RADIUS_PX;
+  for (const flight of state.activeFlights) {
+    const pose = flightPose(flight, nowFractionalMinute);
+    if (!pose) continue;
+    const distance = Math.hypot(pose.x - screenX, pose.y - screenY);
+    if (distance <= bestDistance) {
+      best = flight;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
+/** The screen point a flight is drawn at, for anchoring its hover tooltip. */
+export function flightScreenPoint(flight: ActiveFlight, nowFractionalMinute: number): [number, number] | null {
+  const pose = flightPose(flight, nowFractionalMinute);
+  return pose ? [pose.x, pose.y] : null;
+}
+
 /**
  * Draw every currently-airborne aircraft as a small triangle pointed in its
  * direction of travel, sized by its class (AIRCRAFT_SIZE_BY_RANK above) —
@@ -48,7 +109,12 @@ const HEADING_SAMPLE_STEP = 0.001;
  * for why. This keeps the motion smooth at any speed multiplier, including
  * paused, without any extra tweening state to keep in sync.
  */
-export function drawAircraft(ctx: CanvasRenderingContext2D, state: SimState, nowFractionalMinute: number): void {
+export function drawAircraft(
+  ctx: CanvasRenderingContext2D,
+  state: SimState,
+  nowFractionalMinute: number,
+  hoveredLegId: string | null = null,
+): void {
   // Rebuilt fresh each call rather than kept around between frames — the
   // fleet changes (leases, deliveries) rarely enough that this is cheap
   // insurance against ever reading a stale tail, same "recompute, don't
@@ -56,37 +122,23 @@ export function drawAircraft(ctx: CanvasRenderingContext2D, state: SimState, now
   const aircraftByTail = new Map(state.aircraft.map((aircraft) => [aircraft.tail, aircraft]));
 
   for (const flight of state.activeFlights) {
-    const origin = airportsByIata.get(flight.origin);
-    const dest = airportsByIata.get(flight.dest);
-    if (!origin || !dest) continue;
+    const pose = flightPose(flight, nowFractionalMinute);
+    if (!pose) continue;
 
     const rank = classRank(aircraftByTail.get(flight.tail)?.typeCode ?? '');
     const size = AIRCRAFT_SIZE_BY_RANK[rank] ?? DEFAULT_AIRCRAFT_SIZE;
 
-    const blockMinutes = flight.arriveMinute - flight.departMinute;
-    const rawT = (nowFractionalMinute - flight.departMinute) / blockMinutes;
-    const t = Math.min(Math.max(rawT, 0), 1);
-
-    const interpolate = geoInterpolate([origin.lon, origin.lat], [dest.lon, dest.lat]);
-    const here = interpolate(t);
-    const point = projection(here);
-    if (!point) continue;
-
-    const ahead = interpolate(Math.min(t + HEADING_SAMPLE_STEP, 1));
-    const compassBearing = bearing({ lon: here[0], lat: here[1] }, { lon: ahead[0], lat: ahead[1] });
-
-    // geoMercator always draws north as "up" and east as "right" (it's a
-    // conformal projection, which is precisely the property that makes this
-    // shortcut valid), so a compass bearing (0 = north, clockwise) converts
-    // to a canvas rotation with one fixed adjustment: ctx.rotate() measures
-    // its angle clockwise from due east, not due north, so we subtract 90
-    // degrees. This only holds because the map never uses any projection
-    // but Mercator — see render/projection.ts.
-    const canvasRotation = ((compassBearing - 90) * Math.PI) / 180;
-
     // Same rule as the On-Time stat, so a plane drawn late is one that will count as late.
     const isLate = !isOnTimeArrival(flight.arriveMinute, flight.scheduledArriveMinute);
-    drawTriangle(ctx, point[0], point[1], canvasRotation, isLate ? AIRCRAFT_FILL_LATE : AIRCRAFT_FILL, size);
+    drawTriangle(ctx, pose.x, pose.y, pose.rotation, isLate ? AIRCRAFT_FILL_LATE : AIRCRAFT_FILL, size);
+
+    if (flight.legId === hoveredLegId) {
+      ctx.beginPath();
+      ctx.arc(pose.x, pose.y, size.length + 4, 0, 2 * Math.PI);
+      ctx.strokeStyle = HOVER_RING_STROKE;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
   }
 }
 

@@ -6,7 +6,8 @@ import { cashNeededToLease, LEASE_RESERVE_DAYS, leaseAircraft, loadLeaseRates } 
 import { revealReach } from '../sim/reach';
 import { actualDailyDemand, currentPotentialDemand } from '../sim/marketDemand';
 import { candidateTailsAt, commitRotation, planRotation, type RotationPlan } from './routeBuilder';
-import { removeRotation } from './panels';
+import { removeRotation, renderScheduleWarnings, scheduleProblems } from './panels';
+import { applyTurnBufferChange, planTurnBufferChange } from '../sim/turnBuffer';
 import type { SimState } from '../sim/state';
 import type { MapPreview } from '../render/preview';
 
@@ -263,6 +264,32 @@ export function applyGauge(state: SimState, a: string, b: string, direction: 1 |
 
   const verb = direction === 1 ? 'Upgauged' : 'Downgauged';
   return { ok: true, message: `${verb} one flight on ${a}–${b}: ${preview.fromName} to ${preview.toName} (${preview.tail}).` };
+}
+
+// --- Turn buffer -----------------------------------------------------------
+
+/** The route's current turn buffer in minutes. */
+export function currentTurnBuffer(state: SimState, a: string, b: string): number {
+  return state.routeSettings[marketKey(a, b)]?.turnBufferMinutes ?? 0;
+}
+
+/**
+ * Whether this route's buffer can be set to `minutes`, and what that would
+ * do to the base's pools (sim/turnBuffer.ts does the actual planning).
+ */
+export function previewTurnBuffer(state: SimState, a: string, b: string, minutes: number): Outcome<{ preview: MapPreview; moved: number }> {
+  if (currentTurnBuffer(state, a, b) === minutes) return { ok: false, reason: `Already +${minutes} min.` };
+  const plan = planTurnBufferChange(state, a, b, minutes);
+  if (!plan.ok) return plan;
+  return { ok: true, moved: plan.moved, preview: { effects: plan.effects, routes: [{ origin: a, dest: b, kind: 'change' }] } };
+}
+
+export function setTurnBuffer(state: SimState, a: string, b: string, minutes: number): Outcome<{ message: string }> {
+  const result = applyTurnBufferChange(state, a, b, minutes);
+  if (!result.ok) return result;
+  renderScheduleWarnings(scheduleProblems(state));
+  const movedNote = result.moved > 0 ? ` ${result.moved} rotation${result.moved === 1 ? '' : 's'} moved to another plane to make room.` : '';
+  return { ok: true, message: `${a}–${b} turn buffer set to +${minutes} min after each flight.${movedNote}` };
 }
 
 // --- Removing a route -----------------------------------------------------

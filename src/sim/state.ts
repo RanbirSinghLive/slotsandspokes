@@ -4,6 +4,7 @@ import { leaseAircraft, leaseRateFor } from './leasing';
 import { allAirportCodes, revealReach } from './reach';
 import { loadCompetitorRoutes, type CompetitorOffering } from './competitors';
 import type { WeatherEvent } from './weather';
+import type { DelayBreakdown } from './delays';
 import type { Loan } from './loans';
 import { FUEL_PRICE_BASELINE } from './fuel';
 import type { TargetCommitment, TargetResult } from './targets';
@@ -75,6 +76,16 @@ export type ActiveFlight = {
    * running late, without the UI layer needing to redo any day-boundary math.
    */
   scheduledArriveMinute: number;
+  /** When this flight was scheduled to leave, as an absolute simMinute. `departMinute` minus this is how late it left. */
+  scheduledDepartMinute: number;
+  /**
+   * The delay rolled at departure, by cause (sim/delays.ts), before a
+   * flight-ops executive scales it. Kept so hovering the plane on the map
+   * can say *why* it's late, not just that it is.
+   */
+  delayByCause: DelayBreakdown;
+  /** The delay actually added to this flight's arrival: `delayByCause` summed, after the executive. */
+  delayMinutes: number;
   /**
    * This flight's fare and marketing spend, both copied from its market's
    * RouteSettings at the moment it departs (see step.ts) — not re-read at
@@ -115,6 +126,14 @@ export type RouteSettings = {
    * 0 means no spend and no effect, same as before this lever existed.
    */
   marketingSpend: number;
+  /**
+   * Extra scheduled ground time after every flight on this market, on top
+   * of MIN_TURN_MINUTES (sim/turnBuffer.ts). Slack that soaks up a late
+   * arrival before it makes the next departure late, paid for in aircraft
+   * time: each minute here is a minute of the usable day the plane can't
+   * spend flying.
+   */
+  turnBufferMinutes: number;
 };
 
 export type SimState = {
@@ -217,6 +236,19 @@ export type SimState = {
    * market.
    */
   onTimeByMarket: Record<string, { arrived: number; onTime: number }>;
+  /**
+   * Today's arrivals and on-time arrivals per market, reset at rollover
+   * after sim/routeOtp.ts copies them into `onTimeHistoryByMarket` — the
+   * same today-then-history shape `todayRevenueByMarket` uses.
+   */
+  todayOnTimeByMarket: Record<string, { arrived: number; onTime: number }>;
+  /**
+   * Each finished day's arrivals and on-time arrivals per market, oldest
+   * first, capped at PNL_HISTORY_MAX_DAYS (sim/routeOtp.ts). What the
+   * route card's on-time bars read, and what reliability's effect on
+   * demand growth (sim/marketDemand.ts) is judged on.
+   */
+  onTimeHistoryByMarket: Record<string, { arrived: number[]; onTime: number[] }>;
   /**
    * Week five's second HUD quality signal (see sim/nps.ts and
    * WEEK-FIVE.md's "Reputation" design): the running sum of every revenue
@@ -596,6 +628,7 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
         fare: recommendedFare(leg.origin, leg.dest),
         fareIsOverridden: false,
         marketingSpend: 0,
+        turnBufferMinutes: 0,
       };
     }
   }
@@ -627,6 +660,8 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     flightsArrivedTotal: 0,
     flightsOnTimeTotal: 0,
     onTimeByMarket: {},
+    todayOnTimeByMarket: {},
+    onTimeHistoryByMarket: {},
     npsPointsTotal: 0,
     reputation: 0,
     delayMinutesByCause: { age: 0, weather: 0, knockOn: 0 },
@@ -753,6 +788,8 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     flightsArrivedTotal: 0,
     flightsOnTimeTotal: 0,
     onTimeByMarket: {},
+    todayOnTimeByMarket: {},
+    onTimeHistoryByMarket: {},
     npsPointsTotal: 0,
     reputation: 0,
     delayMinutesByCause: { age: 0, weather: 0, knockOn: 0 },

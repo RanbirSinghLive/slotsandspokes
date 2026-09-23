@@ -24,6 +24,7 @@ import { flightSatisfactionScore } from './nps';
 import { applyDailyReputationChange, REPUTATION_FLOOR } from './reputation';
 import { recordDailyCashHistory } from './forecast';
 import { recordDailyPnlHistory } from './pnlHistory';
+import { recordDailyOnTimeHistory } from './routeOtp';
 import type { SimState, ActiveFlight } from './state';
 
 const MINUTES_PER_DAY = 1440;
@@ -109,6 +110,7 @@ export function step(state: SimState): void {
     // Same timing, same reason: state.todayRevenue/todayCost/todayMargin
     // still hold the day that just ended, one line above where they reset.
     recordDailyPnlHistory(state);
+    recordDailyOnTimeHistory(state);
 
     state.completedToday = [];
     state.todayRevenue = 0;
@@ -121,6 +123,7 @@ export function step(state: SimState): void {
     // with them for the same reason as todayCostByCategory above.
     state.todayRevenueByMarket = {};
     state.todayCostByMarket = {};
+    state.todayOnTimeByMarket = {};
     state.todayFlightsScheduled = 0;
     state.todayFlightsCancelled = 0;
     state.todayNpsScoredFlights = 0;
@@ -332,6 +335,9 @@ export function step(state: SimState): void {
       // zero delay — the honest "should have landed by" time, for the
       // panel to compare against.
       scheduledArriveMinute: dayStart + leg.departMinute + leg.blockMinutes,
+      scheduledDepartMinute: dayStart + leg.departMinute,
+      delayByCause: delayBreakdown,
+      delayMinutes,
       // Locked in at departure — see ActiveFlight's note on why these
       // aren't re-read from state.routeSettings at arrival.
       fare: routeSettings.fare,
@@ -395,15 +401,21 @@ export function step(state: SimState): void {
     // On-Time panel (ui/onTime.ts), created on first use the way
     // routeSettings is.
     const onTime = isOnTimeArrival(flight.arriveMinute, flight.scheduledArriveMinute);
-    const marketOnTime = (state.onTimeByMarket[marketKey(flight.origin, flight.dest)] ??= { arrived: 0, onTime: 0 });
+    const arrivedMarketKey = marketKey(flight.origin, flight.dest);
+    const marketOnTime = (state.onTimeByMarket[arrivedMarketKey] ??= { arrived: 0, onTime: 0 });
+    // Today's per-market copy feeds the route card's daily bars and
+    // reliability's effect on demand (sim/routeOtp.ts).
+    const marketOnTimeToday = (state.todayOnTimeByMarket[arrivedMarketKey] ??= { arrived: 0, onTime: 0 });
     state.flightsArrivedTotal += 1;
     state.todayFlightsArrived += 1;
     marketOnTime.arrived += 1;
+    marketOnTimeToday.arrived += 1;
     if (state.activeTarget) state.activeTarget.flightsArrived += 1;
     if (onTime) {
       state.flightsOnTimeTotal += 1;
       state.todayFlightsOnTime += 1;
       marketOnTime.onTime += 1;
+      marketOnTimeToday.onTime += 1;
       if (state.activeTarget) state.activeTarget.flightsOnTime += 1;
     }
 

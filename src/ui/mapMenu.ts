@@ -4,7 +4,10 @@ import { projection } from '../render/projection';
 import { utilisationPools } from '../sim/utilisation';
 import { unmetDemandByAirport } from '../sim/unmetDemand';
 import { rivalYieldFactor } from '../sim/pressure';
-import { legsServingMarket } from '../sim/schedule';
+import { legsServingMarket, marketKey } from '../sim/schedule';
+import { TURN_BUFFER_CHOICES } from '../sim/turnBuffer';
+import { reliabilityDemandFactor, trailingMarketOtp } from '../sim/routeOtp';
+import { onTimeColor } from '../render/mapmodes';
 import { buildPoolRows } from './poolBars';
 import { getMapPreview, setMapPreview, type MapPreview } from '../render/preview';
 import type { SimState } from '../sim/state';
@@ -43,6 +46,7 @@ const presenceEl = document.querySelector<HTMLElement>('#airport-detail-presence
 const basedEl = document.querySelector<HTMLElement>('#airport-detail-based')!;
 const marketsEl = document.querySelector<HTMLElement>('#airport-detail-markets')!;
 const routeHistoryEl = document.querySelector<HTMLElement>('#airport-detail-route-history')!;
+const routeOtpEl = document.querySelector<HTMLElement>('#airport-detail-otp')!;
 const poolsEl = document.querySelector<HTMLElement>('#airport-detail-pools')!;
 const demandEl = document.querySelector<HTMLElement>('#airport-detail-demand')!;
 const hintEl = document.querySelector<HTMLElement>('#airport-detail-hint')!;
@@ -55,7 +59,13 @@ const ICON = {
   plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
   minus: '<line x1="5" y1="12" x2="19" y2="12"/>',
   remove: '<line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>',
 };
+
+/** A short label drawn as the button's icon, for choices that are numbers rather than things. */
+function textIcon(text: string): string {
+  return `<text x="12" y="16" text-anchor="middle" font-size="10" font-weight="600" font-family="system-ui, sans-serif" fill="currentColor" stroke="none">${text}</text>`;
+}
 
 type Open = { kind: 'airport'; airport: Airport } | { kind: 'route'; a: string; b: string };
 
@@ -140,6 +150,8 @@ function fillAirportCard(airport: Airport, state: SimState): void {
   // Only a route card shows a route's own history.
   routeHistoryEl.hidden = true;
   routeHistoryEl.replaceChildren();
+  routeOtpEl.hidden = true;
+  routeOtpEl.replaceChildren();
 
   const presence = airportPresence(state, airport.iata);
   presenceEl.textContent = `${presence.level} · ${presence.departures} departure${presence.departures === 1 ? '' : 's'}/day`;
@@ -281,6 +293,71 @@ function fillRouteCard(a: string, b: string, state: SimState): void {
 
   fillPools(ops.routeBase(state, a, b), state, '');
   fillRouteHistory(state, a, b);
+  fillRouteOtp(state, a, b);
+}
+
+/**
+ * This route's reliability, day by day, and what it's doing to demand —
+ * the evidence for deciding where a turn buffer is worth its aircraft
+ * time. Bars are each finished day's on-time share, coloured on the same
+ * scale as the On-Time map mode, so a red bar here is a red route there.
+ */
+function fillRouteOtp(state: SimState, a: string, b: string): void {
+  const history = state.onTimeHistoryByMarket[marketKey(a, b)];
+  const arrived = history?.arrived.slice(-WINDOW_DAYS) ?? [];
+  const onTime = history?.onTime.slice(-WINDOW_DAYS) ?? [];
+  const trailing = trailingMarketOtp(state, a, b);
+  const buffer = ops.currentTurnBuffer(state, a, b);
+
+  const header = document.createElement('div');
+  header.className = 'pnl-chart-header';
+  const labelEl = document.createElement('span');
+  labelEl.textContent = 'On-time, last 7 days';
+  const statEl = document.createElement('span');
+  statEl.className = 'pnl-chart-stat';
+  statEl.textContent = trailing.otp === null ? '—' : `${Math.round(trailing.otp * 100)}%`;
+  if (trailing.otp !== null) statEl.style.color = onTimeColor(trailing.otp);
+  header.append(labelEl, statEl);
+
+  const bars = document.createElement('div');
+  bars.className = 'pnl-chart-bars';
+  arrived.forEach((count, i) => {
+    const bar = document.createElement('div');
+    bar.className = 'pnl-chart-bar';
+    const share = count > 0 ? onTime[i] / count : 0;
+    bar.style.height = count > 0 ? `${Math.max(share * 100, 4)}%` : '1px';
+    bar.style.background = count > 0 ? onTimeColor(share) : 'rgba(255, 255, 255, 0.15)';
+    bar.title = count > 0 ? `${dayLabel(arrived.length - i)}: ${onTime[i]} of ${count} on time` : `${dayLabel(arrived.length - i)}: no arrivals`;
+    bars.appendChild(bar);
+  });
+
+  const bufferLine = document.createElement('div');
+  bufferLine.className = 'route-otp-line';
+  bufferLine.textContent =
+    buffer === 0
+      ? 'Turn buffer: none. A late arrival here makes the next flight late.'
+      : `Turn buffer: +${buffer} min of extra ground time after each flight.`;
+
+  const demandLine = document.createElement('div');
+  demandLine.className = 'route-otp-line';
+  const factor = reliabilityDemandFactor(trailing.otp);
+  if (trailing.otp === null) {
+    demandLine.textContent = 'Reliability starts to affect demand after a few more flights.';
+  } else if (factor >= 1) {
+    demandLine.textContent = `Reliable: demand is growing ${factor.toFixed(1)}x as fast.`;
+  } else if (factor >= 0) {
+    demandLine.textContent = `Delays have slowed demand growth to ${Math.round(factor * 100)}% of normal.`;
+    demandLine.classList.add('is-warning');
+  } else {
+    demandLine.textContent = 'Delays are driving passengers away: demand is shrinking.';
+    demandLine.classList.add('is-problem');
+  }
+
+  const nodes: Node[] = [header];
+  if (arrived.length > 0) nodes.push(bars);
+  nodes.push(bufferLine, demandLine);
+  routeOtpEl.replaceChildren(...nodes);
+  routeOtpEl.hidden = false;
 }
 
 /**
@@ -336,6 +413,7 @@ function routeActions(a: string, b: string, state: SimState): RadialAction[] {
   const removeFlight = ops.previewRemoveFlight(state, a, b);
   const removeRoute = ops.previewRemoveRoute(state, a, b);
   const readout = ops.marketReadout(state, a, b);
+  const buffer = ops.currentTurnBuffer(state, a, b);
 
   const act = (result: ops.Outcome<{ message: string }>): boolean => {
     notice = result.ok ? result.message : result.reason;
@@ -343,7 +421,34 @@ function routeActions(a: string, b: string, state: SimState): RadialAction[] {
     return false;
   };
 
+  // Each buffer choice is planned up front, so a choice the base can't
+  // afford is greyed out with the reason before it's ever clicked.
+  const bufferChoices: RadialAction[] = TURN_BUFFER_CHOICES.map((minutes) => {
+    const isCurrent = minutes === buffer;
+    const plan = isCurrent ? null : ops.previewTurnBuffer(state, a, b, minutes);
+    return {
+      id: `buffer:${minutes}`,
+      label: isCurrent
+        ? `+${minutes} min after each flight (current)`
+        : `Set the turn buffer to +${minutes} min after each flight on ${a}–${b}` +
+          (plan?.ok && plan.moved > 0 ? `. Moves ${plan.moved} rotation${plan.moved === 1 ? '' : 's'} to another plane to make room` : ''),
+      icon: textIcon(minutes === 0 ? '0' : `+${minutes}`),
+      angleDeg: 0,
+      selected: isCurrent,
+      disabledReason: plan && !plan.ok ? plan.reason : undefined,
+      preview: plan?.ok ? plan.preview : undefined,
+      onSelect: () => (isCurrent ? false : act(ops.setTurnBuffer(state, a, b, minutes))),
+    };
+  });
+
   return [
+    {
+      id: 'turn-buffer',
+      label: `Turn buffer (now +${buffer} min): extra ground time after each flight soaks up delays, but uses aircraft time`,
+      icon: ICON.clock,
+      angleDeg: 150,
+      children: bufferChoices,
+    },
     {
       id: 'gauge-down',
       label: gaugeDown.ok

@@ -48,7 +48,8 @@ export function isAirportKnown(iata: string): boolean {
 // has the definitions): a ring of small pips around each airport, hollow for
 // riders nobody is carrying yet and solid amber for riders being turned away
 // on a route you already fly. Solid pips fill the ring first. They skip the
-// stretch of the ring to the right of the dot, where the label sits.
+// stretch of the ring to the right of the dot, where the label sits. Drawn
+// only while the Demand layer is on.
 const PIP_RADIUS = 1.7;
 const PIP_ORBIT_OFFSET = 9;
 const PIP_FIRST_ANGLE_DEG = 40;
@@ -132,7 +133,7 @@ function presenceRadius(departures: number): number {
  * explicitly) — this draws every label at a fixed offset and lets them
  * collide if they collide.
  */
-export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState): void {
+export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState, showUnmetDemand: boolean): void {
   ctx.font = LABEL_FONT;
   ctx.textBaseline = 'middle';
 
@@ -145,7 +146,9 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState): vo
   const worstShareByIata = worstPoolShareByBase(state);
   // With a menu button hovered: where each ring would land if it were
   // pressed, drawn as a dashed arc just outside the real one.
-  const unmetByIata = unmetDemandByAirport(state);
+  // Only with the Demand layer on: always drawn, the pips cluttered every
+  // airport all the time with something the player mostly isn't asking about.
+  const unmetByIata = showUnmetDemand ? unmetDemandByAirport(state) : new Map<string, never>();
   const previewEffects = getMapPreview()?.effects ?? [];
   const previewShareByIata = previewEffects.length > 0 ? worstPoolShareByBase(state, previewEffects) : null;
 
