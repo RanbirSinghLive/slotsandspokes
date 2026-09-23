@@ -54,9 +54,9 @@ function formatMoney(amount: number): string {
 export function updatePanel(state: SimState): void {
   cashEl.textContent = formatMoney(state.cash);
   otpEl.textContent =
-    state.flightsDepartedTotal === 0
+    state.flightsArrivedTotal === 0
       ? '—'
-      : `${Math.round((state.flightsOnTimeTotal / state.flightsDepartedTotal) * 100)}%`;
+      : `${Math.round((state.flightsOnTimeTotal / state.flightsArrivedTotal) * 100)}%`;
   // Completion Factor — the second reliability axis. On-time says how
   // punctual the flights that operated were; this says how many operated
   // at all, and a carrier can be excellent at one and dreadful at the other.

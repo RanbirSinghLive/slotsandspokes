@@ -116,7 +116,7 @@ export function drawRouteMapMode(ctx: CanvasRenderingContext2D, state: SimState,
       }
     } else {
       const stats = state.onTimeByMarket[marketKey(origin, dest)];
-      if (stats && stats.departed > 0) color = onTimeColor(stats.onTime / stats.departed);
+      if (stats && stats.arrived > 0) color = onTimeColor(stats.onTime / stats.arrived);
     }
 
     const line: LineString = {

@@ -73,7 +73,7 @@ const MISSION_CONDITIONS: Record<string, (state: SimState) => boolean> = {
   // A minimum sample for the same reason Reputation and service targets
   // both use one: 90% over ten flights is luck, not performance.
   'on-time-90': (state) =>
-    state.flightsDepartedTotal >= 100 && state.flightsOnTimeTotal / state.flightsDepartedTotal >= 0.9,
+    state.flightsArrivedTotal >= 100 && state.flightsOnTimeTotal / state.flightsArrivedTotal >= 0.9,
   'first-executive': (state) => Object.values(state.executives).some((appointment) => appointment !== null),
 };
 

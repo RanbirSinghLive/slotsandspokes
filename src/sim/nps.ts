@@ -71,12 +71,9 @@ function competitorFaresForMarket(origin: string, dest: string, competitorRoutes
 
 /**
  * One departing flight's contribution to the lifetime NPS average
- * (`state.npsPointsTotal`, divided by `state.flightsDepartedTotal` — the
- * same revenue-flights-only denominator On-Time performance already uses,
- * since it's the same population: a positioning move isn't a passenger
- * experience worth scoring, same reasoning `onTimeByMarket` already
- * applies). Called from step.ts's departure loop, the same moment
- * `flightsOnTimeTotal` and the delay-cause breakdown are updated, since
+ * (`state.npsPointsTotal`, divided by `state.npsScoredFlightsTotal`).
+ * Called from step.ts's departure loop, the same moment the delay-cause
+ * breakdown is updated, since
  * every input this needs (this flight's rolled delay, its fare, its
  * aircraft's age) is already known by then.
  */

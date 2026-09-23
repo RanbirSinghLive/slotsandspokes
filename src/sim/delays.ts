@@ -119,6 +119,25 @@ export function knockOnDelayMinutes(lateAtDepartureMinutes: number): number {
 }
 
 /**
+ * How the On-Time stat decides whether a flight counts: judged at
+ * *arrival*, and on time if it landed no more than this many minutes
+ * after its scheduled arrival. This is the industry's usual definition
+ * (arrival within 14 minutes 59 seconds; with whole-minute time here,
+ * 15 is the same line).
+ *
+ * Arrival rather than departure because arrival is what the passenger
+ * feels. Under the old departure-based rule a leg's own rolled delay
+ * could never make *that* leg late, only the next one, so the first leg
+ * of every aircraft's day was on time by construction.
+ */
+export const ON_TIME_GRACE_MINUTES = 15;
+
+/** Whether a flight that landed at `arriveMinute` counts as on time. Shared by the sim's counters and the map's late colouring so the two can't disagree. */
+export function isOnTimeArrival(arriveMinute: number, scheduledArriveMinute: number): boolean {
+  return arriveMinute - scheduledArriveMinute <= ON_TIME_GRACE_MINUTES;
+}
+
+/**
  * One flight's delay, broken out by cause rather than pre-summed — the
  * On-Time panel's "top delay codes" ranking (`ui/onTime.ts`) needs to
  * attribute minutes to age/weather/knock-on individually, not just know

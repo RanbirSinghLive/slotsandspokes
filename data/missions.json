@@ -44,7 +44,7 @@
   {
     "id": "on-time-90",
     "name": "Ninety Percent",
-    "objective": "Reach 90% lifetime on-time performance across at least 100 departures.",
+    "objective": "Reach 90% lifetime on-time performance across at least 100 flights.",
     "flavor": "American carriers only began publishing on-time figures in September 1987, after passengers made enough noise that the regulator obliged them to. Punctuality stopped being a private operational matter the moment it became a number anyone could look up.",
     "reputationReward": 180
   },

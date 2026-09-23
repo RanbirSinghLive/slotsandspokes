@@ -81,23 +81,23 @@ export function updateOnTimePanel(state: SimState): void {
   marketRowsBody.innerHTML = '';
 
   const marketRows = Object.entries(state.onTimeByMarket)
-    .map(([key, { departed, onTime }]) => ({
+    .map(([key, { arrived, onTime }]) => ({
       key,
-      departed,
+      arrived,
       onTime,
-      pct: departed > 0 ? onTime / departed : 0,
+      pct: arrived > 0 ? onTime / arrived : 0,
     }))
     .sort((a, b) => a.pct - b.pct);
 
-  for (const { key, departed, onTime, pct } of marketRows) {
+  for (const { key, arrived, onTime, pct } of marketRows) {
     const [origin, dest] = key.split('-');
     const row = document.createElement('tr');
 
     const marketCell = document.createElement('td');
     marketCell.textContent = `${origin} ↔ ${dest}`;
 
-    const departedCell = document.createElement('td');
-    departedCell.textContent = String(departed);
+    const arrivedCell = document.createElement('td');
+    arrivedCell.textContent = String(arrived);
 
     const onTimeCell = document.createElement('td');
     onTimeCell.textContent = String(onTime);
@@ -107,7 +107,7 @@ export function updateOnTimePanel(state: SimState): void {
     const cls = onTimePctClass(pct);
     if (cls) pctCell.classList.add(cls);
 
-    row.append(marketCell, departedCell, onTimeCell, pctCell);
+    row.append(marketCell, arrivedCell, onTimeCell, pctCell);
     marketRowsBody.appendChild(row);
   }
 

@@ -105,7 +105,8 @@ export const REPUTATION_FLOOR = 0;
 export function applyDailyReputationChange(state: SimState): void {
   if (state.todayFlightsDeparted === 0 && state.todayFlightsScheduled === 0) return;
 
-  const otpPct = state.todayFlightsDeparted > 0 ? state.todayFlightsOnTime / state.todayFlightsDeparted : 0;
+  // On-time is judged at arrival, so its denominator is today's arrivals.
+  const otpPct = state.todayFlightsArrived > 0 ? state.todayFlightsOnTime / state.todayFlightsArrived : 0;
   // NPS is scored over departures *and* cancellations, so it needs its own
   // denominator — see SimState.npsScoredFlightsTotal.
   const avgNps = state.todayNpsScoredFlights > 0 ? state.todayNpsPoints / state.todayNpsScoredFlights : 0;

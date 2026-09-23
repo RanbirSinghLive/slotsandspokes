@@ -72,13 +72,15 @@ export type TargetCommitment = {
   /** Absolute simMinute the window closes at — compared directly against `state.simMinute`. */
   endsAtMinute: number;
   /**
-   * Departures, on-time departures and NPS points accumulated *inside
-   * this window only* — incremented by step.ts alongside the today- and
+   * Departures, arrivals, on-time arrivals and NPS points accumulated
+   * *inside this window only* — incremented by step.ts alongside the today- and
    * lifetime-scoped counters it already keeps. Scoped counters rather
    * than a lifetime average because a promise is about what you deliver
    * from now on, not about a record that may be months long.
    */
   flightsDeparted: number;
+  /** On-time's denominator: it's judged at arrival (sim/delays.ts). Departures stay the sample size and NPS's denominator. */
+  flightsArrived: number;
   flightsOnTime: number;
   npsPoints: number;
 };
@@ -127,6 +129,7 @@ export function commitTarget(state: SimState, targetOtp: number, targetNps: numb
     targetNps,
     endsAtMinute: state.simMinute + TARGET_WINDOW_DAYS * MINUTES_PER_DAY,
     flightsDeparted: 0,
+    flightsArrived: 0,
     flightsOnTime: 0,
     npsPoints: 0,
   };
@@ -147,7 +150,7 @@ export function resolveTargetIfDue(state: SimState): void {
   const target = state.activeTarget;
   if (!target || state.simMinute < target.endsAtMinute) return;
 
-  const achievedOtp = target.flightsDeparted > 0 ? target.flightsOnTime / target.flightsDeparted : 0;
+  const achievedOtp = target.flightsArrived > 0 ? target.flightsOnTime / target.flightsArrived : 0;
   const achievedNps = target.flightsDeparted > 0 ? target.npsPoints / target.flightsDeparted : 0;
 
   let outcome: TargetOutcome;

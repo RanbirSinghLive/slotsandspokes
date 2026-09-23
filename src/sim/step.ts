@@ -3,7 +3,7 @@ import { flightResult, type EconomyAircraftType } from './economy';
 import { MIN_TURN_MINUTES, legsServingMarket, marketKey } from './schedule';
 import { rollDailyWeather, isAirportClosed } from './weather';
 import { routeConnectivityMultiplier } from './airports';
-import { rollTotalDelayMinutes } from './delays';
+import { rollTotalDelayMinutes, isOnTimeArrival } from './delays';
 import { rollCompetitorRouteOpenings, rollCompetitorFrequencyGrowth, rollRivalEntry } from './competitors';
 import { rollDailyFuelPrice } from './fuel';
 import { rollDailyMarketDemand, actualDailyDemand } from './marketDemand';
@@ -125,6 +125,7 @@ export function step(state: SimState): void {
     state.todayFlightsCancelled = 0;
     state.todayNpsScoredFlights = 0;
     state.todayFlightsDeparted = 0;
+    state.todayFlightsArrived = 0;
     state.todayFlightsOnTime = 0;
     state.todayNpsPoints = 0;
     // Spill-and-recapture's shared pool (sim/economy.ts's flightResult())
@@ -261,40 +262,20 @@ export function step(state: SimState): void {
     aircraft.atAirport = null;
     aircraft.activeLegId = leg.legId;
 
-    // On-time performance (HUD stat next to Cash) and the knock-on delay
-    // cause below share the same number: this leg was due at
+    // The knock-on delay cause below: this leg was due at
     // dayStart + leg.departMinute, and it can never depart *before* that
     // (the `minuteOfDay < leg.departMinute` check above rules it out), so
-    // how far past it this flight is actually departing is both "how
-    // late is this one" and "how much upstream pressure is still
-    // carrying forward" — a late aircraft sat waiting on an earlier leg,
-    // not a fresh event of its own.
+    // how far past it this flight is actually departing is "how much
+    // upstream pressure is still carrying forward" — a late aircraft sat
+    // waiting on an earlier leg, not a fresh event of its own.
+    // Whether the flight counts as *on time* is decided later, when it
+    // lands (see the arrival loop below).
     const lateAtDepartureMinutes = state.simMinute - (dayStart + leg.departMinute);
-    state.flightsDepartedTotal += 1;
+    // Departures still count: Reputation and service targets use them as
+    // their sample size, and targets average NPS over them.
     state.todayFlightsDeparted += 1;
-    if (lateAtDepartureMinutes === 0) {
-      state.flightsOnTimeTotal += 1;
-      state.todayFlightsOnTime += 1;
-    }
-    // A running target commitment keeps its own window-scoped copy of the
-    // same counters — a promise is judged on what you deliver from the
-    // moment you make it, not on a lifetime record that may be months
-    // long (sim/targets.ts).
-    if (state.activeTarget) {
-      state.activeTarget.flightsDeparted += 1;
-      if (lateAtDepartureMinutes === 0) state.activeTarget.flightsOnTime += 1;
-    }
-
-    // Same on-time question as the whole-airline counters just above,
-    // just split out per market for the On-Time panel (ui/onTime.ts) —
-    // lazily created the first time this market's first leg ever
-    // departs, same "create on first use" shape routeSettings uses.
+    if (state.activeTarget) state.activeTarget.flightsDeparted += 1;
     const marketOnTimeKey = marketKey(leg.origin, leg.dest);
-    const marketOnTime = (state.onTimeByMarket[marketOnTimeKey] ??= { departed: 0, onTime: 0 });
-    marketOnTime.departed += 1;
-    if (lateAtDepartureMinutes === 0) {
-      marketOnTime.onTime += 1;
-    }
 
     const weatherAtOrigin = !!state.weatherByAirport[leg.origin];
     const [delayBreakdown, nextSeed] = rollTotalDelayMinutes(
@@ -404,6 +385,26 @@ export function step(state: SimState): void {
           state.todayCostByMarket[key] = (state.todayCostByMarket[key] ?? 0) + result.cost;
         }
       }
+    }
+
+    // On-time performance (HUD stat next to Cash), judged now that the
+    // flight has actually landed: on time if it's within the grace window
+    // of its scheduled arrival (sim/delays.ts). Counted into three scopes
+    // at once — today (for Reputation), lifetime (the HUD), a running
+    // service target's window (sim/targets.ts) — plus per market for the
+    // On-Time panel (ui/onTime.ts), created on first use the way
+    // routeSettings is.
+    const onTime = isOnTimeArrival(flight.arriveMinute, flight.scheduledArriveMinute);
+    const marketOnTime = (state.onTimeByMarket[marketKey(flight.origin, flight.dest)] ??= { arrived: 0, onTime: 0 });
+    state.flightsArrivedTotal += 1;
+    state.todayFlightsArrived += 1;
+    marketOnTime.arrived += 1;
+    if (state.activeTarget) state.activeTarget.flightsArrived += 1;
+    if (onTime) {
+      state.flightsOnTimeTotal += 1;
+      state.todayFlightsOnTime += 1;
+      marketOnTime.onTime += 1;
+      if (state.activeTarget) state.activeTarget.flightsOnTime += 1;
     }
 
     state.completedToday.push(flight.legId);

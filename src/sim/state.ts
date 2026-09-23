@@ -184,24 +184,30 @@ export type SimState = {
    * actually went rather than a slow-moving lifetime average.
    */
   todayFlightsDeparted: number;
+  /**
+   * On-Time is judged at arrival (sim/delays.ts's isOnTimeArrival), so
+   * its denominator is arrivals, not departures: a flight that departs
+   * late in the evening and lands after midnight counts toward the day it
+   * lands. `todayFlightsDeparted` above stays as Reputation's sample size.
+   */
+  todayFlightsArrived: number;
   todayFlightsOnTime: number;
   todayNpsPoints: number;
   /**
    * Lifetime counters (never reset, unlike the todayX fields above) behind
-   * the "on-time performance" HUD stat next to Cash: every scheduled leg
-   * that actually departs increments `flightsDepartedTotal`, and
-   * `flightsOnTimeTotal` only when it left at or before its scheduled
-   * minute — see step.ts's departure loop for where "on time" is decided.
-   * Positioning legs don't count either way; they're not real service.
+   * the "on-time performance" HUD stat next to Cash: every flight that
+   * lands increments `flightsArrivedTotal`, and `flightsOnTimeTotal` only
+   * when it landed within ON_TIME_GRACE_MINUTES of its scheduled arrival —
+   * see step.ts's arrival loop for where "on time" is decided.
    */
-  flightsDepartedTotal: number;
+  flightsArrivedTotal: number;
   flightsOnTimeTotal: number;
   /**
-   * The same departed/on-time counters as `flightsDepartedTotal`/
+   * The same arrived/on-time counters as `flightsArrivedTotal`/
    * `flightsOnTimeTotal` above, just split out per market
    * (`marketKey(origin, dest)`) instead of one whole-airline total — the
    * On-Time panel's per-route breakdown (`ui/onTime.ts`). Lazily created
-   * the first time a market's first leg ever departs, same "create on
+   * the first time a market's first flight ever lands, same "create on
    * first use" shape `routeSettings` uses. Deliberately *not* deleted if
    * every leg on a market is later removed (unlike `routeSettings`,
    * which only tracks currently-active levers): a market's past
@@ -210,16 +216,13 @@ export type SimState = {
    * reasoning as the whole-airline totals — they're not serving a
    * market.
    */
-  onTimeByMarket: Record<string, { departed: number; onTime: number }>;
+  onTimeByMarket: Record<string, { arrived: number; onTime: number }>;
   /**
    * Week five's second HUD quality signal (see sim/nps.ts and
    * WEEK-FIVE.md's "Reputation" design): the running sum of every revenue
    * flight's `flightSatisfactionScore()` at the moment it departs.
-   * Divided by `flightsDepartedTotal` above — deliberately the *same*
-   * denominator On-Time performance uses, since it's the same population
-   * (revenue departures only; positioning moves don't count here either,
-   * same reasoning `onTimeByMarket` already documents) — to get the
-   * lifetime average NPS shown in the sidebar. A lifetime average rather
+   * Divided by `npsScoredFlightsTotal` (departures plus cancellations)
+   * to get the lifetime average NPS shown in the sidebar. A lifetime average rather
    * than a trailing window, same "simplest first pass" shape the On-Time
    * stat already has; a more reactive trailing-window version is a real
    * future refinement, not this one.
@@ -477,8 +480,8 @@ export type SimState = {
    * How many flights NPS has been scored over — departures *plus*
    * cancellations, since a cancelled flight has a very unhappy passenger
    * attached to it and would otherwise vanish from the average entirely.
-   * Deliberately a separate denominator from `flightsDepartedTotal`,
-   * which On-Time still uses.
+   * Deliberately a separate denominator from `flightsArrivedTotal`,
+   * which On-Time uses.
    */
   npsScoredFlightsTotal: number;
   todayNpsScoredFlights: number;
@@ -618,9 +621,10 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     todayCost: 0,
     todayMargin: 0,
     todayFlightsDeparted: 0,
+    todayFlightsArrived: 0,
     todayFlightsOnTime: 0,
     todayNpsPoints: 0,
-    flightsDepartedTotal: 0,
+    flightsArrivedTotal: 0,
     flightsOnTimeTotal: 0,
     onTimeByMarket: {},
     npsPointsTotal: 0,
@@ -743,9 +747,10 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     todayCost: 0,
     todayMargin: 0,
     todayFlightsDeparted: 0,
+    todayFlightsArrived: 0,
     todayFlightsOnTime: 0,
     todayNpsPoints: 0,
-    flightsDepartedTotal: 0,
+    flightsArrivedTotal: 0,
     flightsOnTimeTotal: 0,
     onTimeByMarket: {},
     npsPointsTotal: 0,

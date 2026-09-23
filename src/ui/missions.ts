@@ -124,7 +124,7 @@ function renderActiveTarget(state: SimState): void {
   targetActiveEl.hidden = target === null;
   if (!target) return;
 
-  const otp = target.flightsDeparted > 0 ? target.flightsOnTime / target.flightsDeparted : 0;
+  const otp = target.flightsArrived > 0 ? target.flightsOnTime / target.flightsArrived : 0;
   const nps = target.flightsDeparted > 0 ? target.npsPoints / target.flightsDeparted : 0;
   const daysLeft = Math.max(0, Math.ceil((target.endsAtMinute - state.simMinute) / MINUTES_PER_DAY));
 

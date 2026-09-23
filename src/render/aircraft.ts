@@ -2,6 +2,7 @@ import { geoInterpolate } from 'd3-geo';
 import { projection } from './projection';
 import { airports } from './airports';
 import { bearing } from '../sim/geo';
+import { isOnTimeArrival } from '../sim/delays';
 import { classRank } from '../sim/aircraftClasses';
 import type { SimState } from '../sim/state';
 
@@ -83,7 +84,8 @@ export function drawAircraft(ctx: CanvasRenderingContext2D, state: SimState, now
     // but Mercator — see render/projection.ts.
     const canvasRotation = ((compassBearing - 90) * Math.PI) / 180;
 
-    const isLate = flight.arriveMinute > flight.scheduledArriveMinute;
+    // Same rule as the On-Time stat, so a plane drawn late is one that will count as late.
+    const isLate = !isOnTimeArrival(flight.arriveMinute, flight.scheduledArriveMinute);
     drawTriangle(ctx, point[0], point[1], canvasRotation, isLate ? AIRCRAFT_FILL_LATE : AIRCRAFT_FILL, size);
   }
 }
