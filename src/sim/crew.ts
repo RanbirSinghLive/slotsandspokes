@@ -185,7 +185,12 @@ const MAINTENANCE_FACTOR_BEST = 0.6;
  * curve's tail, expressed as "doesn't fly today" rather than "flies very
  * late."
  */
-const AOG_PROBABILITY_PER_EFFECTIVE_YEAR = 0.0025;
+// Retuned when every lease became a 20-year-old airframe (sim/leasing.ts):
+// at the old 0.0025 a fully maintained 20-year-old (effective age 12)
+// broke down 3% of days, which cancelled about 5% of all flights — a
+// flood, not the small background drip this cause is meant to be. At this
+// rate the same airframe breaks down about 1% of days.
+const AOG_PROBABILITY_PER_EFFECTIVE_YEAR = 0.001;
 const AOG_PROBABILITY_MAX = 0.06;
 
 const MINUTES_PER_DAY = 1440;

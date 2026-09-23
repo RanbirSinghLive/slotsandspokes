@@ -92,7 +92,11 @@ export function showFlightTooltip(
   } else {
     nodes.push(line('Rest of its day, if nothing else goes wrong', 'flight-tooltip-section'));
     for (const projected of restOfDay.slice(0, MAX_REST_OF_DAY_ROWS)) {
-      const status = projected.onTime ? 'on time' : `+${projected.lateMinutes}m late`;
+      const status = projected.cancelled
+        ? 'cancelled (22:00 curfew)'
+        : projected.onTime
+          ? 'on time'
+          : `+${projected.lateMinutes}m late`;
       nodes.push(
         line(
           `${projected.leg.origin} → ${projected.leg.dest}  ${clock(projected.projectedDepartMinute)}  ${status}`,
@@ -102,7 +106,16 @@ export function showFlightTooltip(
     }
     if (restOfDay.length > MAX_REST_OF_DAY_ROWS) nodes.push(line(`+${restOfDay.length - MAX_REST_OF_DAY_ROWS} more`));
     const recovers = restOfDay.findIndex((projected) => projected.onTime);
-    if (!restOfDay[restOfDay.length - 1].onTime) {
+    const cancellations = restOfDay.filter((projected) => projected.cancelled).length;
+    if (cancellations > 0) {
+      nodes.push(
+        line(
+          `${cancellations} flight${cancellations === 1 ? '' : 's'} would miss the 22:00 curfew and be cancelled. ` +
+            `A turn buffer on ${flight.origin}–${flight.dest} would absorb the delay.`,
+          'flight-tooltip-hint',
+        ),
+      );
+    } else if (!restOfDay[restOfDay.length - 1].onTime) {
       // The buffer that helps is the one on the route being flown now: it
       // pads the turn right after this flight (sim/turnBuffer.ts).
       nodes.push(

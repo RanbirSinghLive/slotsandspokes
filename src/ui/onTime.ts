@@ -16,6 +16,7 @@ const CANCEL_CAUSE_LABELS: [keyof SimState['cancellationsByCause'], string][] = 
   ['crew', 'Crew shortage'],
   ['mechanical', 'Unscheduled maintenance'],
   ['weather', 'Airport closed'],
+  ['curfew', 'Delays ran past 22:00'],
 ];
 
 // Below BAD_THRESHOLD: red, matching the app's existing "flag a real

@@ -18,9 +18,9 @@ export type LeaseRate = {
   leasePricePerDay: number;
 };
 
-/** The rate card, one entry per aircraft class, smallest first. */
+/** What the lessor offers today, one entry per aircraft class, smallest first, priced for the starting vintage. */
 export function loadLeaseRates(): LeaseRate[] {
-  return (leaseRatesData as LeaseRate[]).map((rate) => ({ ...rate }));
+  return (leaseRatesData as LeaseRate[]).map((rate) => ({ ...rate, leasePricePerDay: leaseRateFor(rate.typeCode) }));
 }
 
 /**
@@ -29,9 +29,9 @@ export function loadLeaseRates(): LeaseRate[] {
  * flights a day once its market has grown, which also means a plane
  * leased with nothing behind it drains cash fast; this keeps a lease from
  * being a way to end the game by accident. It is also what unlocks the
- * classes: at the $500,000 opening only the Propeller clears it ($132,000),
- * the Regional needs $510,000, the Narrowbody $1.38M and the Widebody
- * $1.8M, so each bigger class opens when the airline has earned it.
+ * classes: at 20-year-old prices the Propeller needs $79,200, the Regional
+ * $306,000, the Narrowbody $828,000 and the Widebody $1.08M, so the
+ * bigger classes open as the airline earns them.
  */
 export const LEASE_RESERVE_DAYS = 30;
 
@@ -40,9 +40,36 @@ export function cashNeededToLease(leasePricePerDay: number): number {
   return leasePricePerDay * LEASE_RESERVE_DAYS;
 }
 
-/** What one plane of this class costs per day; 0 for an unknown class. */
-export function leaseRateFor(typeCode: string): number {
+/**
+ * Aircraft come from the lessor second-hand, and age is the trade the
+ * player makes: an old airframe leases cheaply but is late more often
+ * (sim/delays.ts's age cause), breaks down more often (sim/crew.ts's AOG
+ * roll) and passengers like it less (sim/nps.ts). The rate card in
+ * data/lease-rates.json is the price of a *new* airframe; age takes a
+ * straight-line discount off it.
+ *
+ * Every airline starts on 20-year-old "classic" airframes with five years
+ * of useful life left. Newer vintages are meant to be unlocked later (not
+ * built yet): pricing and reliability are already functions of age, so an
+ * unlock only has to offer a younger `ageYears`.
+ *
+ * Aircraft don't age as the game runs (see Aircraft.ageYears) — five
+ * simulated years is roughly ninety hours of play — so remaining life is
+ * shown, not enforced.
+ */
+export const STARTING_AIRCRAFT_AGE_YEARS = 20;
+export const USEFUL_LIFE_YEARS = 25;
+const LEASE_DISCOUNT_PER_YEAR = 0.02; // 20 years old leases at 60% of new
+
+/** The rate card's new-airframe price for this class; 0 for an unknown class. */
+function newLeaseRate(typeCode: string): number {
   return (leaseRatesData as LeaseRate[]).find((rate) => rate.typeCode === typeCode)?.leasePricePerDay ?? 0;
+}
+
+/** What one plane of this class and age costs per day. */
+export function leaseRateFor(typeCode: string, ageYears: number = STARTING_AIRCRAFT_AGE_YEARS): number {
+  const multiplier = Math.max(0, 1 - LEASE_DISCOUNT_PER_YEAR * ageYears);
+  return Math.round((newLeaseRate(typeCode) * multiplier) / 10) * 10;
 }
 
 /**
@@ -72,9 +99,8 @@ export function leaseAircraft(
     atAirport: baseIata,
     activeLegId: null,
     groundSinceMinute: state.simMinute,
-    leaseCostPerDay: leaseRateFor(typeCode),
-    // New from the lessor, and never aged: age-driven delays stay dormant.
-    ageYears: 0,
+    leaseCostPerDay: leaseRateFor(typeCode, STARTING_AIRCRAFT_AGE_YEARS),
+    ageYears: STARTING_AIRCRAFT_AGE_YEARS,
     baseAirport: baseIata,
   };
   state.aircraft.push(aircraft);

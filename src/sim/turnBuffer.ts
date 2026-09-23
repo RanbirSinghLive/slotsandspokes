@@ -100,7 +100,9 @@ function tailFits(work: SimState, tail: string): boolean {
  */
 function isInProgress(state: SimState, rotation: Rotation): boolean {
   const flown = (leg: ScheduleLeg) =>
-    state.completedToday.includes(leg.legId) || state.activeFlights.some((flight) => flight.legId === leg.legId);
+    state.completedToday.includes(leg.legId) ||
+    state.cancelledToday.includes(leg.legId) ||
+    state.activeFlights.some((flight) => flight.legId === leg.legId);
   const airborne = rotation.legs.some((leg) => state.activeFlights.some((flight) => flight.legId === leg.legId));
   return airborne || (rotation.legs.some(flown) && !rotation.legs.every(flown));
 }
@@ -119,7 +121,10 @@ function rehome(work: SimState, state: SimState, rotation: Rotation, fromTail: s
     .filter((a) => a.tail !== fromTail && a.typeCode === from.typeCode && a.baseAirport === from.baseAirport)
     .sort((a, b) => aircraftUtilisation(work, a.tail).minutes - aircraftUtilisation(work, b.tail).minutes);
 
-  const wasFlownToday = rotation.legs.every((leg) => state.completedToday.includes(leg.legId));
+  // Flown or cancelled already today: either way, done for today.
+  const wasHandledToday = rotation.legs.every(
+    (leg) => state.completedToday.includes(leg.legId) || state.cancelledToday.includes(leg.legId),
+  );
 
   for (const target of candidates) {
     const targetLegs = work.schedule.filter((leg) => leg.tail === target.tail);
@@ -144,9 +149,9 @@ function rehome(work: SimState, state: SimState, rotation: Rotation, fromTail: s
     repackTail(work, target.tail);
 
     if (tailFits(work, target.tail)) {
-      // A rotation already flown today under its old leg ids mustn't fly
-      // again today under its new ones.
-      if (wasFlownToday) work.completedToday.push(...moved.map((leg) => leg.legId));
+      // A rotation already flown (or cancelled) today under its old leg
+      // ids mustn't fly today under its new ones.
+      if (wasHandledToday) work.completedToday.push(...moved.map((leg) => leg.legId));
       return true;
     }
 

@@ -1,6 +1,6 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { loadSchedule, marketKey, recommendedFare, type ScheduleLeg } from './schedule';
-import { leaseAircraft, leaseRateFor } from './leasing';
+import { leaseAircraft, leaseRateFor, STARTING_AIRCRAFT_AGE_YEARS } from './leasing';
 import { allAirportCodes, revealReach } from './reach';
 import { loadCompetitorRoutes, type CompetitorOffering } from './competitors';
 import type { WeatherEvent } from './weather';
@@ -190,6 +190,13 @@ export type SimState = {
    */
   weatherByAirport: Record<string, WeatherEvent>;
   completedToday: string[];
+  /**
+   * Legs cancelled during the day by the 22:00 curfew (sim/curfew.ts), so
+   * the departure loop stops trying to fly them. Reset at rollover. The
+   * day-start causes (crew, mechanical, weather) don't need this: they
+   * ground a whole tail or airport, which the departure loop checks directly.
+   */
+  cancelledToday: string[];
   todayRevenue: number;
   todayCost: number;
   todayMargin: number;
@@ -241,14 +248,15 @@ export type SimState = {
    * after sim/routeOtp.ts copies them into `onTimeHistoryByMarket` — the
    * same today-then-history shape `todayRevenueByMarket` uses.
    */
-  todayOnTimeByMarket: Record<string, { arrived: number; onTime: number }>;
+  todayOnTimeByMarket: Record<string, { arrived: number; onTime: number; cancelled: number }>;
   /**
    * Each finished day's arrivals and on-time arrivals per market, oldest
-   * first, capped at PNL_HISTORY_MAX_DAYS (sim/routeOtp.ts). What the
-   * route card's on-time bars read, and what reliability's effect on
-   * demand growth (sim/marketDemand.ts) is judged on.
+   * first, capped at PNL_HISTORY_MAX_DAYS (sim/routeOtp.ts), plus that
+   * day's cancellations. What the route card's reliability bars read, and
+   * what reliability's effect on demand growth (sim/marketDemand.ts) is
+   * judged on.
    */
-  onTimeHistoryByMarket: Record<string, { arrived: number[]; onTime: number[] }>;
+  onTimeHistoryByMarket: Record<string, { arrived: number[]; onTime: number[]; cancelled: number[] }>;
   /**
    * Week five's second HUD quality signal (see sim/nps.ts and
    * WEEK-FIVE.md's "Reputation" design): the running sum of every revenue
@@ -497,7 +505,7 @@ export type SimState = {
    * answered by reserve depth, mechanical events by maintenance
    * staffing and younger airframes, and weather by nothing at all.
    */
-  cancellationsByCause: { crew: number; mechanical: number; weather: number };
+  cancellationsByCause: { crew: number; mechanical: number; weather: number; curfew: number };
   /**
    * Week six's cancellations: legs that should have operated today and
    * didn't. `flightsScheduled*` counts what was on the books, so
@@ -608,11 +616,10 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
       groundSinceMinute: 0,
       // Leased like every other aircraft, so the balance tools price a
       // fleet the way the real game does.
-      leaseCostPerDay: leaseRateFor(aircraftType.code),
-      // A brand-new airframe for the headless runner's fixed fleet — age
-      // 0 is also the delay model's baseline, so this reproduces its
-      // pre-age-mechanic numbers rather than silently shifting them.
-      ageYears: 0,
+      leaseCostPerDay: leaseRateFor(aircraftType.code, STARTING_AIRCRAFT_AGE_YEARS),
+      // The same second-hand vintage a real game starts on
+      // (sim/leasing.ts), so the balance tools tune the game players get.
+      ageYears: STARTING_AIRCRAFT_AGE_YEARS,
       // The fixture's rotations already start and end somewhere sensible,
       // so base it where its first leg departs — same reasoning as the
       // crew and slots it grants itself.
@@ -650,6 +657,7 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     competitorRoutes: loadCompetitorRoutes(),
     weatherByAirport: {},
     completedToday: [],
+    cancelledToday: [],
     todayRevenue: 0,
     todayCost: 0,
     todayMargin: 0,
@@ -692,7 +700,7 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     groundedTails: [],
     slotsOwned: {},
     mechanicalGroundedTails: [],
-    cancellationsByCause: { crew: 0, mechanical: 0, weather: 0 },
+    cancellationsByCause: { crew: 0, mechanical: 0, weather: 0, curfew: 0 },
     flightsScheduledTotal: 0,
     flightsCancelledTotal: 0,
     todayFlightsScheduled: 0,
@@ -778,6 +786,7 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     competitorRoutes: loadCompetitorRoutes(),
     weatherByAirport: {},
     completedToday: [],
+    cancelledToday: [],
     todayRevenue: 0,
     todayCost: 0,
     todayMargin: 0,
@@ -820,7 +829,7 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     groundedTails: [],
     slotsOwned: {},
     mechanicalGroundedTails: [],
-    cancellationsByCause: { crew: 0, mechanical: 0, weather: 0 },
+    cancellationsByCause: { crew: 0, mechanical: 0, weather: 0, curfew: 0 },
     flightsScheduledTotal: 0,
     flightsCancelledTotal: 0,
     todayFlightsScheduled: 0,

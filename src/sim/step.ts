@@ -1,6 +1,7 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { flightResult, type EconomyAircraftType } from './economy';
-import { MIN_TURN_MINUTES, legsServingMarket, marketKey } from './schedule';
+import { MIN_TURN_MINUTES, legsServingMarket, marketKey, type ScheduleLeg } from './schedule';
+import { breaksCurfew, rotationStartingWith } from './curfew';
 import { rollDailyWeather, isAirportClosed } from './weather';
 import { routeConnectivityMultiplier } from './airports';
 import { rollTotalDelayMinutes, isOnTimeArrival } from './delays';
@@ -80,6 +81,26 @@ const aircraftTypesByCode = new Map<string, EconomyAircraftType>(
  * that lets one delay push a later one back, rather than the schedule
  * quietly giving up on it.
  */
+/**
+ * Count one scheduled flight as cancelled: toward Completion, under its
+ * cause, and for NPS. A cancelled flight still has an unhappy passenger
+ * attached, so it scores for NPS — over its own denominator, since it
+ * never departed and mustn't distort On-Time. It also counts against its
+ * route's reliability (sim/routeOtp.ts), which is what lets cancellations
+ * slow that route's demand growth.
+ */
+function recordCancellation(state: SimState, leg: ScheduleLeg, cause: keyof SimState['cancellationsByCause']): void {
+  state.cancellationsByCause[cause] += 1;
+  state.todayFlightsCancelled += 1;
+  state.flightsCancelledTotal += 1;
+  state.npsPointsTotal += CANCELLATION_NPS_SCORE;
+  state.todayNpsPoints += CANCELLATION_NPS_SCORE;
+  state.npsScoredFlightsTotal += 1;
+  state.todayNpsScoredFlights += 1;
+  const market = (state.todayOnTimeByMarket[marketKey(leg.origin, leg.dest)] ??= { arrived: 0, onTime: 0, cancelled: 0 });
+  market.cancelled += 1;
+}
+
 export function step(state: SimState): void {
   const minuteOfDay = state.simMinute % MINUTES_PER_DAY;
   const dayStart = state.simMinute - minuteOfDay;
@@ -113,6 +134,7 @@ export function step(state: SimState): void {
     recordDailyOnTimeHistory(state);
 
     state.completedToday = [];
+    state.cancelledToday = [];
     state.todayRevenue = 0;
     state.todayCost = 0;
     state.todayMargin = 0;
@@ -197,17 +219,7 @@ export function step(state: SimState): void {
             ? 'weather'
             : null;
       if (cause === null) continue;
-
-      state.cancellationsByCause[cause] += 1;
-      state.todayFlightsCancelled += 1;
-      state.flightsCancelledTotal += 1;
-      // A cancelled flight still has an unhappy passenger attached, so it
-      // scores for NPS — over its own denominator, since it never
-      // departed and mustn't distort On-Time.
-      state.npsPointsTotal += CANCELLATION_NPS_SCORE;
-      state.todayNpsPoints += CANCELLATION_NPS_SCORE;
-      state.npsScoredFlightsTotal += 1;
-      state.todayNpsScoredFlights += 1;
+      recordCancellation(state, leg, cause);
     }
 
     // Weather (sim/weather.ts) is a daily-scale event, not a per-minute
@@ -248,7 +260,9 @@ export function step(state: SimState): void {
     if (minuteOfDay < leg.departMinute) continue; // not due yet today
 
     const alreadyHandledToday =
-      state.completedToday.includes(leg.legId) || state.activeFlights.some((f) => f.legId === leg.legId);
+      state.completedToday.includes(leg.legId) ||
+      state.cancelledToday.includes(leg.legId) ||
+      state.activeFlights.some((f) => f.legId === leg.legId);
     if (alreadyHandledToday) continue;
 
     const aircraft = state.aircraft.find((a) => a.tail === leg.tail);
@@ -260,6 +274,18 @@ export function step(state: SimState): void {
     if (isAirportClosed(state, leg.origin)) continue;
     if (aircraft.status !== 'ground' || aircraft.atAirport !== leg.origin) continue;
     if (state.simMinute < aircraft.groundSinceMinute + MIN_TURN_MINUTES) continue; // still turning around
+
+    // The 22:00 curfew (sim/curfew.ts): a rotation that can't be back at
+    // base by then, on the delay it's already carrying, is cancelled whole
+    // before it leaves rather than flown into the night.
+    const rotation = rotationStartingWith(state, leg);
+    if (rotation && breaksCurfew(state, rotation, state.simMinute, dayStart)) {
+      for (const cancelled of rotation.legs) {
+        state.cancelledToday.push(cancelled.legId);
+        recordCancellation(state, cancelled, 'curfew');
+      }
+      continue;
+    }
 
     aircraft.status = 'airborne';
     aircraft.atAirport = null;
@@ -405,7 +431,7 @@ export function step(state: SimState): void {
     const marketOnTime = (state.onTimeByMarket[arrivedMarketKey] ??= { arrived: 0, onTime: 0 });
     // Today's per-market copy feeds the route card's daily bars and
     // reliability's effect on demand (sim/routeOtp.ts).
-    const marketOnTimeToday = (state.todayOnTimeByMarket[arrivedMarketKey] ??= { arrived: 0, onTime: 0 });
+    const marketOnTimeToday = (state.todayOnTimeByMarket[arrivedMarketKey] ??= { arrived: 0, onTime: 0, cancelled: 0 });
     state.flightsArrivedTotal += 1;
     state.todayFlightsArrived += 1;
     marketOnTime.arrived += 1;

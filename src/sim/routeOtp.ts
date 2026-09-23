@@ -4,10 +4,18 @@ import { OTP_BASELINE } from './reputation';
 import type { SimState } from './state';
 
 /**
- * On-time performance per route, as a daily history rather than one
- * lifetime ratio. A lifetime ratio barely moves once a route has flown a
- * few hundred times, so it can't tell the player whether the buffer they
- * added last Tuesday worked. A day-by-day history can, and the same window
+ * Reliability per route, as a daily history rather than one lifetime
+ * ratio: the share of the route's scheduled flights that operated *and*
+ * arrived on time. A cancelled flight counts as a failure here — its
+ * passengers were let down at least as badly as a late one's — which is
+ * the "double impact" of a delay that runs into the 22:00 curfew
+ * (sim/curfew.ts): it costs on-time performance, then it costs the flights
+ * it cancels. The network-wide HUD On-Time stat keeps the industry
+ * definition (arrivals only); Completion covers cancellations there.
+ *
+ * Why a history rather than one lifetime ratio? A lifetime ratio barely
+ * moves once a route has flown a few hundred times, so it can't tell the
+ * player whether the buffer they added last Tuesday worked. A day-by-day history can, and the same window
  * is what reliability's pull on demand (reliabilityDemandFactor, below)
  * is judged on.
  */
@@ -39,26 +47,31 @@ function pushCapped(history: number[], value: number): void {
 export function recordDailyOnTimeHistory(state: SimState): void {
   const activeMarkets = new Set(state.schedule.map((leg) => marketKey(leg.origin, leg.dest)));
   for (const key of activeMarkets) {
-    const today = state.todayOnTimeByMarket[key] ?? { arrived: 0, onTime: 0 };
-    const history = (state.onTimeHistoryByMarket[key] ??= { arrived: [], onTime: [] });
+    const today = state.todayOnTimeByMarket[key] ?? { arrived: 0, onTime: 0, cancelled: 0 };
+    const history = (state.onTimeHistoryByMarket[key] ??= { arrived: [], onTime: [], cancelled: [] });
     pushCapped(history.arrived, today.arrived);
     pushCapped(history.onTime, today.onTime);
+    pushCapped(history.cancelled, today.cancelled);
   }
 }
 
 export type TrailingOtp = {
   arrived: number;
   onTime: number;
-  /** onTime / arrived, or null when the sample is too small to judge. */
+  cancelled: number;
+  /** onTime / (arrived + cancelled), or null when the sample is too small to judge. */
   otp: number | null;
 };
 
-/** On-time performance over the last `days` finished days on this market. */
+/** Reliability over the last `days` finished days on this market. */
 export function trailingMarketOtp(state: SimState, a: string, b: string, days = ROUTE_OTP_WINDOW_DAYS): TrailingOtp {
   const history = state.onTimeHistoryByMarket[marketKey(a, b)];
-  const arrived = history ? history.arrived.slice(-days).reduce((sum, n) => sum + n, 0) : 0;
-  const onTime = history ? history.onTime.slice(-days).reduce((sum, n) => sum + n, 0) : 0;
-  return { arrived, onTime, otp: arrived >= MIN_SAMPLE_ARRIVALS ? onTime / arrived : null };
+  const sum = (values: number[] | undefined) => (values ?? []).slice(-days).reduce((total, n) => total + n, 0);
+  const arrived = sum(history?.arrived);
+  const onTime = sum(history?.onTime);
+  const cancelled = sum(history?.cancelled);
+  const flights = arrived + cancelled;
+  return { arrived, onTime, cancelled, otp: flights >= MIN_SAMPLE_ARRIVALS ? onTime / flights : null };
 }
 
 /**

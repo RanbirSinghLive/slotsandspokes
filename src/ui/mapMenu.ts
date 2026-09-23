@@ -17,6 +17,7 @@ import { hideRadial, showRadial, updateRadial, type RadialAction } from './radia
 import * as ops from './routeActions';
 import { planeIconInner } from './planeIcons';
 import { AIRCRAFT_CLASSES } from '../sim/aircraftClasses';
+import { STARTING_AIRCRAFT_AGE_YEARS, USEFUL_LIFE_YEARS } from '../sim/leasing';
 import { WINDOW_DAYS, buildBipolarBars, dayLabel, money as pnlMoney } from './pnlBars';
 
 /**
@@ -208,7 +209,11 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
 
   const planeChoices: RadialAction[] = ops.planeOptions(state, airport.iata).map((option) => ({
     id: `plane:${option.code}`,
-    label: `Lease a ${option.name} (${option.seats} seats) for ${money(option.leasePerDay)}/day`,
+    // Every lease is a second-hand airframe (sim/leasing.ts): saying how
+    // old is what explains why it's cheap and why it runs late.
+    label:
+      `Lease a ${option.name} (${option.seats} seats, ${STARTING_AIRCRAFT_AGE_YEARS} yrs old, ` +
+      `${USEFUL_LIFE_YEARS - STARTING_AIRCRAFT_AGE_YEARS} yrs of life left) for ${money(option.leasePerDay)}/day`,
     // Each class has its own silhouette (ui/planeIcons.ts), so the four
     // choices are told apart by shape rather than by guessing at size.
     icon: planeIconInner(option.code),
@@ -306,6 +311,7 @@ function fillRouteOtp(state: SimState, a: string, b: string): void {
   const history = state.onTimeHistoryByMarket[marketKey(a, b)];
   const arrived = history?.arrived.slice(-WINDOW_DAYS) ?? [];
   const onTime = history?.onTime.slice(-WINDOW_DAYS) ?? [];
+  const cancelled = history?.cancelled.slice(-WINDOW_DAYS) ?? [];
   const trailing = trailingMarketOtp(state, a, b);
   const buffer = ops.currentTurnBuffer(state, a, b);
 
@@ -321,13 +327,20 @@ function fillRouteOtp(state: SimState, a: string, b: string): void {
 
   const bars = document.createElement('div');
   bars.className = 'pnl-chart-bars';
+  // Each day's bar is the share of its scheduled flights that flew *and*
+  // arrived on time: a cancellation counts against it (sim/routeOtp.ts).
   arrived.forEach((count, i) => {
+    const cancelledThatDay = cancelled[i] ?? 0;
+    const flights = count + cancelledThatDay;
     const bar = document.createElement('div');
     bar.className = 'pnl-chart-bar';
-    const share = count > 0 ? onTime[i] / count : 0;
-    bar.style.height = count > 0 ? `${Math.max(share * 100, 4)}%` : '1px';
-    bar.style.background = count > 0 ? onTimeColor(share) : 'rgba(255, 255, 255, 0.15)';
-    bar.title = count > 0 ? `${dayLabel(arrived.length - i)}: ${onTime[i]} of ${count} on time` : `${dayLabel(arrived.length - i)}: no arrivals`;
+    const share = flights > 0 ? onTime[i] / flights : 0;
+    bar.style.height = flights > 0 ? `${Math.max(share * 100, 4)}%` : '1px';
+    bar.style.background = flights > 0 ? onTimeColor(share) : 'rgba(255, 255, 255, 0.15)';
+    const cancelledNote = cancelledThatDay > 0 ? `, ${cancelledThatDay} cancelled` : '';
+    bar.title = flights > 0
+      ? `${dayLabel(arrived.length - i)}: ${onTime[i]} of ${flights} on time${cancelledNote}`
+      : `${dayLabel(arrived.length - i)}: no flights`;
     bars.appendChild(bar);
   });
 
@@ -341,6 +354,12 @@ function fillRouteOtp(state: SimState, a: string, b: string): void {
   const demandLine = document.createElement('div');
   demandLine.className = 'route-otp-line';
   const factor = reliabilityDemandFactor(trailing.otp);
+  let cancelledLine: HTMLElement | null = null;
+  if (trailing.cancelled > 0) {
+    cancelledLine = document.createElement('div');
+    cancelledLine.className = 'route-otp-line is-problem';
+    cancelledLine.textContent = `${trailing.cancelled} cancelled this week. Cancellations count against reliability.`;
+  }
   if (trailing.otp === null) {
     demandLine.textContent = 'Reliability starts to affect demand after a few more flights.';
   } else if (factor >= 1) {
@@ -355,7 +374,9 @@ function fillRouteOtp(state: SimState, a: string, b: string): void {
 
   const nodes: Node[] = [header];
   if (arrived.length > 0) nodes.push(bars);
-  nodes.push(bufferLine, demandLine);
+  nodes.push(bufferLine);
+  if (cancelledLine) nodes.push(cancelledLine);
+  nodes.push(demandLine);
   routeOtpEl.replaceChildren(...nodes);
   routeOtpEl.hidden = false;
 }

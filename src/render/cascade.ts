@@ -20,6 +20,9 @@ import type { ActiveFlight } from '../sim/state';
 const ON_TIME = '#7fd88f';
 const SLIGHTLY_LATE = '#ffd166';
 const LATE = '#ff8080';
+// A leg the 22:00 curfew would cancel (sim/curfew.ts): drawn in the same
+// red as a late flight but labelled, so it can't be mistaken for one.
+const CANCELLED = '#ff5c5c';
 // Beyond this many minutes late, "late" turns from amber to red.
 const VERY_LATE_MINUTES = 30;
 const LABEL_FONT = '11px ui-monospace, Consolas, monospace';
@@ -96,8 +99,8 @@ export function drawDelayCascade(
       ctx,
       [from.lon, from.lat],
       [to.lon, to.lat],
-      colourFor(projected.lateMinutes, projected.onTime),
-      `${i + 1}. ${lateLabel(projected.lateMinutes, projected.onTime)}`,
+      projected.cancelled ? CANCELLED : colourFor(projected.lateMinutes, projected.onTime),
+      `${i + 1}. ${projected.cancelled ? 'cancelled' : lateLabel(projected.lateMinutes, projected.onTime)}`,
       true,
     );
   });
