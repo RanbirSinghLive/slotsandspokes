@@ -18,13 +18,22 @@ import type { SimState } from '../sim/state';
  * this module is imported by main.ts, never the other way around, so it
  * can't depend on a type main.ts owns.
  */
-export type Alert = { message: string; tab: string };
+export type Alert = {
+  /**
+   * Which problem this is, stable while the problem lasts even as its
+   * wording changes ("about 9 days" becomes "about 8 days" tomorrow), so
+   * dismissing it sticks.
+   */
+  key: string;
+  message: string;
+  tab: string;
+};
 
 /** How many rows show before collapsing into "+N more" — a handful of aircraft shouldn't need scrolling to read. */
 const MAX_VISIBLE_ALERTS = 4;
 
 function collectAlerts(state: SimState): Alert[] {
-  const alerts: Alert[] = scheduleProblems(state).map((message) => ({ message, tab: 'fleet' }));
+  const alerts: Alert[] = scheduleProblems(state).map((message) => ({ key: `schedule:${message}`, message, tab: 'fleet' }));
 
   // Crew-grounded tails: real, and previously visible only as a bare
   // count on the Crew tab ("N aircraft with no base — assign one before
@@ -32,13 +41,13 @@ function collectAlerts(state: SimState): Alert[] {
   // this is the crew-side one). One row per tail, named, so a click
   // doesn't just say "something's wrong" — it says what.
   for (const tail of state.groundedTails) {
-    alerts.push({ message: `${tail} is grounded — not enough crew to fly it today`, tab: 'crew' });
+    alerts.push({ key: `grounded:${tail}`, message: `${tail} is grounded — not enough crew to fly it today`, tab: 'crew' });
   }
 
   // Cash running out ends the game, so it goes first: of everything in
   // this strip, it's the one problem that can't be fixed after the fact.
   const runway = runwayAlertMessage(state);
-  if (runway) alerts.unshift({ message: runway, tab: 'fleet' });
+  if (runway) alerts.unshift({ key: 'runway', message: runway, tab: 'fleet' });
 
   return alerts;
 }
@@ -47,6 +56,16 @@ const stripEl = document.querySelector<HTMLDivElement>('#alert-strip')!;
 const listEl = document.querySelector<HTMLDivElement>('#alert-strip-list')!;
 
 let signature: string | null = null;
+
+/**
+ * Keys of alerts the player has closed with ×. A dismissal lasts as long
+ * as the problem does: once an alert stops appearing its key is dropped
+ * from here, so if the same problem comes back later it shows again, as
+ * news. A Set is fine because this is screen state, like which tab is
+ * open, not part of SimState: it isn't saved, and a reload shows
+ * everything again.
+ */
+const dismissed = new Set<string>();
 
 /**
  * Refresh the strip from `state`. Called once per rendered frame from
@@ -59,7 +78,12 @@ let signature: string | null = null;
  * rebuild silently broke their own buttons.
  */
 export function updateAlerts(state: SimState, onNavigate: (tab: string) => void): void {
-  const alerts = collectAlerts(state);
+  const allAlerts = collectAlerts(state);
+  // Forget dismissals for problems that have cleared (see `dismissed`).
+  const current = new Set(allAlerts.map((a) => a.key));
+  for (const key of dismissed) if (!current.has(key)) dismissed.delete(key);
+  const alerts = allAlerts.filter((a) => !dismissed.has(a.key));
+
   const nextSignature = alerts.map((a) => a.tab + ':' + a.message).join('|');
   if (nextSignature === signature) return;
   signature = nextSignature;
@@ -69,12 +93,28 @@ export function updateAlerts(state: SimState, onNavigate: (tab: string) => void)
 
   const visible = alerts.slice(0, MAX_VISIBLE_ALERTS);
   for (const alert of visible) {
+    const item = document.createElement('div');
+    item.className = 'alert-item';
+
     const row = document.createElement('button');
     row.type = 'button';
     row.className = 'alert-row';
     row.textContent = alert.message;
     row.addEventListener('click', () => onNavigate(alert.tab));
-    listEl.appendChild(row);
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'alert-dismiss';
+    close.textContent = '×';
+    close.title = 'Dismiss. It comes back if this problem clears and happens again.';
+    close.setAttribute('aria-label', `Dismiss: ${alert.message}`);
+    close.addEventListener('click', () => {
+      dismissed.add(alert.key);
+      updateAlerts(state, onNavigate);
+    });
+
+    item.append(row, close);
+    listEl.appendChild(item);
   }
 
   if (alerts.length > MAX_VISIBLE_ALERTS) {
