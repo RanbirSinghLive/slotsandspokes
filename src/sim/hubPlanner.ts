@@ -1,10 +1,10 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
-import { legCost, LOAD_FACTOR, type EconomyAircraftType } from './economy';
+import { connectingPriceResponse, legCost, LOAD_FACTOR, type EconomyAircraftType } from './economy';
 import { connectingDemandOnMarket, connectingPassengersThrough, connectingFlowsAt, spokesOf, suggestSpokes, planHubStyleChange } from './hubs';
 import { HUB_STYLES, HUB_STYLE_ORDER, hubStyleAt, type HubStyle } from './hubStyle';
 import { airportLoad } from './airports';
 import { summarizeMarket } from './marketSummary';
-import { marketKey, recommendedFare, type ScheduleLeg } from './schedule';
+import { legsServingMarket, marketKey, recommendedFare, type ScheduleLeg } from './schedule';
 import { USABLE_DAY_END_MINUTE, USABLE_DAY_MINUTES } from './utilisation';
 import type { SimState } from './state';
 
@@ -106,7 +106,13 @@ function connectionRevenueGain(state: SimState, after: SimState, hub: string, ex
   let revenue = 0;
   let passengers = 0;
   for (const spoke of spokesOf(after, hub).keys()) {
-    const gained = connectingDemandOnMarket(after, hub, spoke) - connectingDemandOnMarket(state, hub, spoke);
+    const settings = state.routeSettings[marketKey(hub, spoke)];
+    // Priced the same way the economy prices them (sim/economy.ts): an
+    // over-priced route wins fewer of its connections.
+    const response = settings
+      ? connectingPriceResponse(settings.fare, legsServingMarket(hub, spoke, after.schedule), hub, spoke, settings.marketingSpend, state.competitorRoutes)
+      : 1;
+    const gained = (connectingDemandOnMarket(after, hub, spoke) - connectingDemandOnMarket(state, hub, spoke)) * response;
     if (gained <= 0) continue;
     const carried = Math.min(gained, (spare.get(spoke) ?? 0) + (extraSeats.get(spoke) ?? 0));
     revenue += carried * fareOn(state, hub, spoke);

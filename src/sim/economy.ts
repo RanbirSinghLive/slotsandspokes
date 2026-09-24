@@ -1,4 +1,5 @@
 import { bookingShare } from './choiceModel';
+import { recommendedFare } from './schedule';
 import { FUEL_SHARE_OF_BLOCK_HOUR_COST } from './fuel';
 import { CREWS_ENABLED } from './features';
 import type { CompetitorOffering } from './competitors';
@@ -208,6 +209,32 @@ export function legCostBreakdown(
  *     earlier flight, still flying you rather than a competitor.
  * `pax` never exceeds the seat ceiling either way.
  */
+/** Pricing under the going rate wins connecting passengers too, but at most this many times as many. */
+const MAX_CONNECTING_PRICE_GAIN = 1.5;
+
+/**
+ * How a route's fare scales the connecting passengers it gets
+ * (sim/hubs.ts): its booking share at this fare over its share at the
+ * going rate (sim/choiceModel.ts), so connecting passengers react to
+ * price exactly as local ones do. Before this they ignored fares
+ * entirely, and measured, at double the going rate they were what kept a
+ * hub's planes full after local passengers had mostly gone to rivals.
+ * Shared with the Plan hub planner (sim/hubPlanner.ts) so its estimates
+ * see the same thing.
+ */
+export function connectingPriceResponse(
+  fare: number,
+  legsServingMarket: number,
+  origin: string,
+  dest: string,
+  marketingSpend: number,
+  competitorRoutes: CompetitorOffering[],
+): number {
+  const atFare = bookingShare(fare, legsServingMarket, origin, dest, marketingSpend, competitorRoutes);
+  const atGoingRate = bookingShare(recommendedFare(origin, dest), legsServingMarket, origin, dest, marketingSpend, competitorRoutes);
+  return atGoingRate > 0 ? Math.min(MAX_CONNECTING_PRICE_GAIN, atFare / atGoingRate) : 1;
+}
+
 export function flightResult(
   leg: EconomyLeg,
   type: EconomyAircraftType,
@@ -233,17 +260,11 @@ export function flightResult(
   spilloverAvailable: number,
 ): FlightResult {
   const demandPerFlight = marketDailyDemand / legsServingMarket;
-  const bookedDemand =
-    demandPerFlight *
-      bookingShare(
-        routeSettings.fare,
-        legsServingMarket,
-        leg.origin,
-        leg.dest,
-        routeSettings.marketingSpend,
-        competitorRoutes,
-      ) +
-    connectingDailyDemand / legsServingMarket;
+  const share = bookingShare(routeSettings.fare, legsServingMarket, leg.origin, leg.dest, routeSettings.marketingSpend, competitorRoutes);
+  const connecting =
+    connectingDailyDemand *
+    connectingPriceResponse(routeSettings.fare, legsServingMarket, leg.origin, leg.dest, routeSettings.marketingSpend, competitorRoutes);
+  const bookedDemand = demandPerFlight * share + connecting / legsServingMarket;
   const seatCeiling = Math.round(type.seats * LOAD_FACTOR);
   const roundedBooked = Math.round(bookedDemand);
 
