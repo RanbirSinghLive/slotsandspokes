@@ -4,7 +4,8 @@ import { projection } from '../render/projection';
 import { utilisationPools } from '../sim/utilisation';
 import { unmetDemandByAirport } from '../sim/unmetDemand';
 import { rivalYieldFactor } from '../sim/pressure';
-import { legsServingMarket, marketKey } from '../sim/schedule';
+import { legsServingMarket, marketKey, recommendedFare } from '../sim/schedule';
+import { rivalResponseChance } from '../sim/rivalResponse';
 import { TURN_BUFFER_CHOICES } from '../sim/turnBuffer';
 import { connectingPassengersThrough, spokesOf } from '../sim/hubs';
 import { HUB_STYLES, HUB_STYLE_ORDER, hubStyleAt } from '../sim/hubStyle';
@@ -478,6 +479,16 @@ function fillRouteCard(a: string, b: string, state: SimState): void {
       `Rivals: ${rivals.map((r) => `${r.airline} ${r.dailyFrequency}/day at $${r.fare.toLocaleString()}`).join(', ')}` +
       ` (you: $${(state.routeSettings[marketKey(a, b)]?.fare ?? 0).toLocaleString()})` +
       (cut > 0 ? `. They cut your fares ${cut}%: more flights of your own reduce it.` : '');
+    demandEl.classList.add('airport-detail-over');
+  }
+
+  // Full and priced at a premium: rivals are coming for the passengers
+  // this route turns away (sim/rivalResponse.ts). Said on the card, since
+  // the fix — a flight or a bigger plane, or a lower fare — is on this ring.
+  const response = rivalResponseChance(state, a, b);
+  if (response > 0) {
+    const warning = `Full and priced ${Math.round((state.routeSettings[marketKey(a, b)].fare / recommendedFare(a, b) - 1) * 100)}% above the going rate: rivals are adding flights to take the passengers you turn away (${Math.round(response * 100)}% chance a day).`;
+    demandEl.textContent = demandEl.textContent ? `${demandEl.textContent} ${warning}` : warning;
     demandEl.classList.add('airport-detail-over');
   }
 
