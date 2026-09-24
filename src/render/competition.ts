@@ -60,13 +60,8 @@ function marketKey(a: string, b: string): string {
 // these stay module-level. The player's own routes are the opposite —
 // state.schedule is exactly what the player edits in-session (add/remove a
 // route or frequency) — so they're computed fresh per call by
-// ownRoutesFrom() below, never cached, the same fix render/routes.ts
-// already got: this file used to build `ownRoutes` once at import time
-// from the static `scheduleLegs` template, which meant the yours/theirs/
-// both coloring, the hover tooltip's frequency counts, and even a brand
-// new game's "New Game" reset never actually reflected what the player had
-// really built — every one of them kept showing the original 8-market
-// template forever, regardless of any in-game edit.
+// ownRoutesFrom() below, never cached, so the yours/theirs/both colouring
+// and the tooltip's frequency counts always match what the player has built.
 function ownRoutesFrom(state: SimState): Map<string, { origin: string; dest: string }> {
   const routes = new Map<string, { origin: string; dest: string }>();
   for (const leg of state.schedule) {

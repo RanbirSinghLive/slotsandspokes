@@ -1,4 +1,3 @@
-import scheduleData from '../../data/schedule.json';
 import aircraftTypesData from '../../data/aircraft-types.json';
 import airportsData from '../../data/airports.json';
 import { greatCircleDistanceNm } from './geo';
@@ -93,15 +92,9 @@ export function isAircraftTypeAllowedAt(iata: string, typeCode: string): boolean
   return typeRank <= maxRank;
 }
 
-// data/schedule.json's fixed template (below) predates the week-four
-// aircraft ladder and was authored against a single type — every one of
-// its legs still computes its block time against that first type's cruise
-// speed by default, which is exactly right for it: createInitialState()
-// (the headless runner's own entry point) always builds every aircraft as
-// this same first type regardless, so there's no per-tail speed to look up
-// for that fixed network anyway. A real game's legs pass their aircraft's
-// actual cruiseKts explicitly instead — see the `cruiseKts` parameter
-// below, and ui/routeBuilder.ts's call sites for where that comes from.
+// The smallest type's cruise speed, for block-time estimates that aren't
+// about a particular aircraft. A real leg passes its aircraft's own
+// cruiseKts (see sim/rotations.ts).
 const DEFAULT_CRUISE_KTS = (aircraftTypesData as AircraftType[])[0].cruiseKts;
 
 /**
@@ -189,39 +182,9 @@ export function marketKey(a: string, b: string): string {
 }
 
 /**
- * The daily schedule as authored in data/schedule.json, with each leg's
- * block time computed up front from great-circle distance — see
- * CLAUDE.md's note on why blockMinutes is computed at load time and stored
- * on the entry, rather than recomputed on every simulated minute.
- *
- * This is the unedited *template* — the set of city pairs ever flown,
- * which render/routes.ts uses to draw the route network, and which never
- * changes even once a player edits departure times (M8). Each SimState gets
- * its own independent, mutable copy via loadSchedule() below; nothing
- * mutates this array directly.
- */
-export const scheduleLegs: ScheduleLeg[] = (scheduleData as Array<Omit<ScheduleLeg, 'blockMinutes'>>).map((leg) => ({
-  ...leg,
-  blockMinutes: computeBlockMinutes(leg.origin, leg.dest),
-}));
-
-/**
- * A fresh, independent copy of the daily schedule — a new array of new leg
- * objects, so editing one game's schedule (state.schedule) can never leak
- * into another's. Called once by createInitialState(); the schedule editor
- * (ui/panels.ts) mutates the copy it gets back from there, never this
- * module's own `scheduleLegs`.
- */
-export function loadSchedule(): ScheduleLeg[] {
-  return scheduleLegs.map((leg) => ({ ...leg }));
-}
-
-/**
  * A fresh legId for a new leg on `tail` — "<tail>-<n>", one past the
- * highest existing number for that tail, matching the naming already used
- * in data/schedule.json (e.g. "C-GVIA-1".."C-GVIA-4"). Used by the M10
- * route builder when a player adds a leg; never called by anything that
- * needs to be deterministic (it's a one-off UI action, not part of step()).
+ * highest existing number for that tail (e.g. "C-P001-1", "C-P001-2").
+ * Pure: the same schedule always gives the same id.
  */
 export function nextLegId(tail: string, legs: ScheduleLeg[]): string {
   const existingNumbers = legs

@@ -53,22 +53,18 @@ import { isInsolvent } from './sim/loans';
 import { setupGameControls, updateGameControls } from './ui/gameControls';
 import { loadSavedState, saveState } from './ui/save';
 
-// Week three's persistence fix (see WEEK-THREE.md): resume a saved game
-// if one exists, rather than always starting fresh. A fresh game starts
-// from createNewGameState() — zero fleet, zero schedule, seeded from
-// Date.now() so every new playthrough gets its own weather/delay history
-// (src/headless/run.ts calls the older createInitialState() instead, with
-// its own fixed default seed, and is unaffected by any of this).
+// Resume a saved game if one exists. A fresh game starts from
+// createNewGameState(), seeded from Date.now() so every new playthrough
+// gets its own weather and delay history. (The headless runner starts
+// the same way but with a fixed seed — see src/headless/newGame.ts.)
 const savedState = loadSavedState();
 const state: SimState = savedState ?? createNewGameState();
 // A game with no save to resume starts by choosing a home city (see the
 // picker at the bottom of this file). Until then it is paused.
 let choosingHome = savedState === null;
 
-// Validate this game's own schedule (not just the static template) — the
-// route builder re-runs this same check after every rotation added or
-// removed, so a schedule that over-commits an aircraft gets caught the
-// same way a broken schedule.json would be caught here at startup.
+// Validate the loaded schedule once at startup; the route builder re-runs
+// this same check after every rotation added or removed.
 renderScheduleWarnings(scheduleProblems(state));
 // The callback fires once a rotation's legs are actually in
 // state.schedule. It jumps to the Fleet tab, where the new rotation shows

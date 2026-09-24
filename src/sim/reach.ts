@@ -49,11 +49,6 @@ export function bestRangeNm(state: SimState): number {
   return Math.max(AIRCRAFT_CLASSES[0].rangeNm, ...ranges);
 }
 
-/** Every airport code, for a state that predates fog (the headless fixture). */
-export function allAirportCodes(): string[] {
-  return [...allIatas];
-}
-
 /**
  * Add every airport now within reach of the network to `knownAirports`.
  * Returns the ones that were just added. Call it after anything that can

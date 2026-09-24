@@ -49,10 +49,8 @@ const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]
  * Which pairs currently have at least one scheduled leg, in either
  * direction — the same bidirectional definition render/routes.ts uses for
  * the route network, so "served" here means the same thing it does there.
- * Computed fresh from `state.schedule` on every call rather than cached
- * from the static `scheduleLegs` template at import time — the same fix
- * render/routes.ts already got: cached, this halo would never move even
- * as routes were added or removed in-game.
+ * Computed fresh from `state.schedule` on every call, so the halo moves
+ * as soon as a route is added or removed.
  */
 function servedPairsFrom(state: SimState): Set<string> {
   const served = new Set<string>();

@@ -55,8 +55,7 @@ export type CompetitorOffering = {
 export const PRE_EXISTING_OPENED_AT_MINUTE = -999_999;
 
 /**
- * A fresh, independent copy of the competitor roster — same reasoning as
- * `sim/schedule.ts`'s `loadSchedule()`: each game gets its own mutable
+ * A fresh, independent copy of the competitor roster: each game gets its own mutable
  * array (`state.competitorRoutes`), so one game's competitor AI adding
  * routes can never leak into another's, and nothing mutates this
  * module's own imported data directly. Every seed route starts already

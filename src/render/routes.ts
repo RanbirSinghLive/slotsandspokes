@@ -24,14 +24,9 @@ function routeKey(a: string, b: string): string {
 
 /**
  * Draw one thin arc per distinct market currently in `state.schedule` —
- * the markets the player is actually operating *right now*, not the
- * original `data/schedule.json` template. Recomputed fresh every call
- * (cheap: a dozen-ish legs, a Map) rather than cached — this used to be
- * a module-level Map built once from the static `scheduleLegs` import,
- * which meant the M10 route builder and week three's route-removal
- * button were both silently invisible here: adding or removing a route
- * never changed what this drew, since it was never reading from the
- * live, mutable schedule at all. A LineString with just its two
+ * the markets the player is operating right now. Recomputed every call
+ * (cheap: a few dozen legs) rather than cached, so adding or removing a
+ * route shows up on the very next frame. A LineString with just its two
  * endpoints is enough — d3.geoPath resamples along the great circle
  * between them as it projects, which is what produces the curved look
  * (see CLAUDE.md's note on this under "Geography").

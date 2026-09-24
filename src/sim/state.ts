@@ -1,8 +1,8 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { startingSimMinute } from './clock';
-import { loadSchedule, marketKey, recommendedFare, type ScheduleLeg } from './schedule';
-import { leaseAircraft, leaseRateFor, STARTING_AIRCRAFT_AGE_YEARS } from './leasing';
-import { allAirportCodes, revealReach } from './reach';
+import type { ScheduleLeg } from './schedule';
+import { leaseAircraft } from './leasing';
+import { revealReach } from './reach';
 import { loadCompetitorRoutes, type CompetitorOffering } from './competitors';
 import type { WeatherEvent } from './weather';
 import type { DelayBreakdown } from './delays';
@@ -12,9 +12,8 @@ import { createMarket, ensureRivalFleets, type MarketState } from './market';
 import type { Loan } from './loans';
 import { FUEL_PRICE_BASELINE } from './fuel';
 import type { TargetCommitment, TargetResult } from './targets';
-import { createCrewPools, crewRequirement, type CrewPools, type PendingHire, type PendingTraining, type TrainingLine } from './crew';
+import { createCrewPools, type CrewPools, type PendingHire, type PendingTraining, type TrainingLine } from './crew';
 import { createExecutiveSlots, type ExecutiveSlots } from './executives';
-import { acquireNeededSlots } from './slots';
 
 export type AircraftStatus = 'ground' | 'airborne';
 
@@ -154,12 +153,9 @@ export type SimState = {
   aircraft: Aircraft[];
   activeFlights: ActiveFlight[];
   /**
-   * This game's own copy of the daily schedule — a fresh array from
-   * sim/schedule.ts's loadSchedule(), independent of any other game's copy
-   * and of the unedited template. step() reads departure times from here,
-   * not from a module-level constant, specifically so the M8 schedule
-   * editor's edits actually change what the sim does: mutate
-   * `state.schedule[i].departMinute` and the very next tick sees it.
+   * The airline's daily-repeating schedule. Empty in a new game; rotations
+   * are added by sim/rotations.ts's applyRotation(). step() reads departure
+   * times from here every tick, so a change is live on the next minute.
    */
   schedule: ScheduleLeg[];
   /**
@@ -580,175 +576,6 @@ export type SimState = {
 // Only one aircraft type exists so far, so every aircraft record uses it.
 const aircraftType = (aircraftTypesData as { code: string }[])[0];
 
-function earliestLegFor(tail: string, legs: ScheduleLeg[]): ScheduleLeg {
-  const legsForTail = legs.filter((leg) => leg.tail === tail);
-  const [first] = [...legsForTail].sort((a, b) => a.departMinute - b.departMinute);
-  if (!first) {
-    throw new Error(`No scheduled legs found for tail ${tail}`);
-  }
-  return first;
-}
-
-/**
- * Build the state the world starts in at simMinute 0. Each requested tail
- * starts on the ground wherever its earliest scheduled leg departs from —
- * that's what WEEK-ONE.md means by "start it somewhere overnight."
- *
- * Only `tails` come to life as Aircraft records. step() matches schedule
- * legs against `state.aircraft` by tail, so a leg belonging to a tail that
- * isn't in `tails` simply never finds an aircraft to apply to and is
- * silently skipped. That's how M4 runs "one aircraft" out of the full
- * three-aircraft schedule without step() needing any special-case logic —
- * M5 turns the rest on by passing more tails here.
- *
- * `rngSeed` defaults to a fixed constant rather than something like
- * `Date.now()` — a default that changes every run would make two calls to
- * createInitialState produce different worlds for no reason you asked for,
- * which is exactly what determinism is supposed to rule out. Pass a
- * different seed explicitly (the M7 headless runner will want to, to
- * compare different random delay patterns run over run).
- *
- * Not used by main.ts any more — the interactive game starts from
- * createNewGameState() below, with zero fleet and zero schedule (week
- * three's Fleet Market). This one stays exactly as it was purely so
- * src/headless/run.ts (M7's balance-tuning tool) keeps simulating a full,
- * known 3-aircraft/12-leg network without needing to route through a
- * purchase flow it has no use for.
- */
-export function createInitialState(tails: string[], rngSeed: number = 1): SimState {
-  const schedule = loadSchedule();
-
-  const aircraft: Aircraft[] = tails.map((tail) => {
-    const firstLeg = earliestLegFor(tail, schedule);
-    return {
-      tail,
-      typeCode: aircraftType.code,
-      status: 'ground',
-      atAirport: firstLeg.origin,
-      activeLegId: null,
-      groundSinceMinute: 0,
-      // Leased like every other aircraft, so the balance tools price a
-      // fleet the way the real game does.
-      leaseCostPerDay: leaseRateFor(aircraftType.code, STARTING_AIRCRAFT_AGE_YEARS),
-      // The same second-hand vintage a real game starts on
-      // (sim/leasing.ts), so the balance tools tune the game players get.
-      ageYears: STARTING_AIRCRAFT_AGE_YEARS,
-      // The fixture's rotations already start and end somewhere sensible,
-      // so base it where its first leg departs — same reasoning as the
-      // crew and slots it grants itself.
-      baseAirport: firstLeg.origin,
-    };
-  });
-
-  const routeSettings: Record<string, RouteSettings> = {};
-  for (const leg of schedule) {
-    const key = marketKey(leg.origin, leg.dest);
-    if (!routeSettings[key]) {
-      routeSettings[key] = {
-        fare: recommendedFare(leg.origin, leg.dest),
-        fareIsOverridden: false,
-        marketingSpend: 0,
-        turnBufferMinutes: 0,
-      };
-    }
-  }
-
-  const state: SimState = {
-    simMinute: 0,
-    homeAirport: DEFAULT_HOME_AIRPORT,
-    // The headless fixture predates fog and flies wherever its schedule says.
-    knownAirports: allAirportCodes(),
-    cash: 0,
-    aircraft,
-    activeFlights: [],
-    schedule,
-    routeSettings,
-    // Same competitive landscape the real game starts with, growing the
-    // same way over time (step()'s day-rollover doesn't know or care
-    // that this is the headless runner) — the balance-tuning tool should
-    // face the same competitive pressure a real playthrough does.
-    competitorRoutes: loadCompetitorRoutes(),
-    weatherByAirport: {},
-    completedToday: [],
-    cancelledToday: [],
-    todayRevenue: 0,
-    todayCost: 0,
-    todayMargin: 0,
-    todayFlightsDeparted: 0,
-    todayFlightsArrived: 0,
-    todayFlightsOnTime: 0,
-    todayNpsPoints: 0,
-    flightsArrivedTotal: 0,
-    flightsOnTimeTotal: 0,
-    onTimeByMarket: {},
-    todayOnTimeByMarket: {},
-    onTimeHistoryByMarket: {},
-    npsPointsTotal: 0,
-    reputation: 0,
-    delayMinutesByCause: { age: 0, weather: 0, knockOn: 0, congestion: 0 },
-    spilloverByMarket: {},
-    rngSeed,
-    loans: [],
-    cashHistory: [],
-    revenueHistory: [],
-    costHistory: [],
-    marginHistory: [],
-    todayRevenueByMarket: {},
-    todayCostByMarket: {},
-    revenueHistoryByMarket: {},
-    costHistoryByMarket: {},
-    fuelPriceIndex: FUEL_PRICE_BASELINE,
-    fuelPriceHistory: [],
-    fuelEfficiencyMultiplier: 1,
-    unlockedTechNodeIds: [],
-    marketDemand: {},
-    demandGrowthMultiplier: 1,
-    farePolicyMultiplier: 1,
-    executives: createExecutiveSlots(),
-    crew: createCrewPools(),
-    pendingHires: [],
-    trainingLines: [],
-    pendingTraining: [],
-    reserveDepth: 1.15,
-    groundedTails: [],
-    slotsHeld: {},
-    hubStyles: {},
-    aogs: [],
-    market: { listings: [], nextArrivalDay: {}, nextListingId: 1 },
-    competitorFleets: {},
-    cancellationsByCause: { crew: 0, mechanical: 0, weather: 0, curfew: 0 },
-    flightsScheduledTotal: 0,
-    flightsCancelledTotal: 0,
-    todayFlightsScheduled: 0,
-    todayFlightsCancelled: 0,
-    npsScoredFlightsTotal: 0,
-    todayNpsScoredFlights: 0,
-    completedMissionIds: [],
-    activeTarget: null,
-    lastTargetResult: null,
-    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0, training: 0, slots: 0, maintenance: 0 },
-  };
-
-  // Staff this fixture to its own reserve target. Unlike a real new game
-  // — which starts with no crew on purpose, since hiring into a fleet is
-  // part of the mechanic (sim/crew.ts) — this one exists to be a fully
-  // formed, working airline for the balance tools. Left unstaffed, every
-  // aircraft would be grounded and the headless runner would simulate an
-  // airline that never flies.
-  const requirement = crewRequirement(state);
-  state.crew.pilotsByTier = [...requirement.targetPilotsByTier] as [number, number, number];
-  state.crew.cabinCrew = requirement.targetCabinCrew;
-  state.crew.mechanics = requirement.targetMechanics;
-
-  // Same reasoning as the crew above: this fixture's schedule already
-  // exists, so it takes the slots it flies at today's prices, as if each
-  // rotation had been drawn in the route builder (sim/slots.ts).
-  acquireNeededSlots(state);
-  openMarket(state);
-
-  return state;
-}
-
 /**
  * Starting capital for a genuinely new interactive game — enough to carry
  * the starting plane's lease and a few more while routes ramp up. A
@@ -779,11 +606,7 @@ export function createStartingFleet(homeIata: string): Aircraft[] {
  * plane (createStartingFleet() above), zero schedule, zero routes.
  * Nothing flies and nothing earns until the player draws a route
  * (ui/routeBuilder.ts); more aircraft are leased from the map menu
- * (ui/mapMenu.ts).
- *
- * Distinct from createInitialState() above on purpose — that one exists
- * only to keep the headless runner's known, fully-formed test network
- * exactly as it always was; this one is the real "New Game" entry point.
+ * (ui/mapMenu.ts). The browser and the headless runner both start here.
  */
 export function createNewGameState(rngSeed: number = Date.now(), homeIata: string = DEFAULT_HOME_AIRPORT): SimState {
   const state: SimState = {

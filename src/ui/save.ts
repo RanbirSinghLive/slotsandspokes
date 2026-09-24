@@ -8,10 +8,7 @@ import type { SimState } from '../sim/state';
 const SAVE_KEY = 'airgame-save-v44';
 
 /**
- * Read back whatever createInitialState()/step() last produced, if
- * anything was ever saved — week three's playtest-readiness fix (see
- * WEEK-THREE.md): without this, closing the tab mid-session threw away
- * every schedule edit, fare change, and marketing dollar spent. Returns
+ * Read back the last saved state, if anything was ever saved. Returns
  * `null` on missing, corrupted, or unparseable data, so main.ts's
  * fallback to a fresh game is always safe to take.
  *
