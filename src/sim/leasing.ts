@@ -86,11 +86,18 @@ function nextTail(typeCode: string, tailsInUse: string[]): string {
   return `${prefix}${String(next).padStart(3, '0')}`;
 }
 
-/** Lease one plane of this class, based and parked at `baseIata`. Returns it. */
+/**
+ * Lease one plane of this class, based and parked at `baseIata`. Returns
+ * it. `ageYears` and `leasePricePerDay` come from the market listing
+ * being taken (sim/market.ts); the defaults are the starting vintage, for
+ * the plane every airline starts with, which doesn't come off the market.
+ */
 export function leaseAircraft(
   state: { simMinute: number; aircraft: Aircraft[] },
   typeCode: string,
   baseIata: string,
+  ageYears: number = STARTING_AIRCRAFT_AGE_YEARS,
+  leasePricePerDay: number = leaseRateFor(typeCode, ageYears),
 ): Aircraft {
   const aircraft: Aircraft = {
     tail: nextTail(typeCode, state.aircraft.map((a) => a.tail)),
@@ -99,8 +106,8 @@ export function leaseAircraft(
     atAirport: baseIata,
     activeLegId: null,
     groundSinceMinute: state.simMinute,
-    leaseCostPerDay: leaseRateFor(typeCode, STARTING_AIRCRAFT_AGE_YEARS),
-    ageYears: STARTING_AIRCRAFT_AGE_YEARS,
+    leaseCostPerDay: leasePricePerDay,
+    ageYears,
     baseAirport: baseIata,
   };
   state.aircraft.push(aircraft);

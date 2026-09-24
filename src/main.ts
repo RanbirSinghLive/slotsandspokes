@@ -9,6 +9,7 @@ import { drawFog } from './render/fog';
 import { drawWeatherEffects } from './render/weather';
 import { drawAircraft, findFlightAt, flightScreenPoint } from './render/aircraft';
 import { OTP_BASELINE } from './sim/reputation';
+import { updateMarket } from './ui/market';
 import { drawDelayCascade } from './render/cascade';
 import { projectRestOfDay } from './sim/cascade';
 import { showFlightTooltip, hideFlightTooltip } from './ui/flightTooltip';
@@ -297,6 +298,7 @@ function render(nowMs: number = performance.now()): void {
   updateClock(state);
   updatePanel(state);
   updateTicker(state);
+  updateMarket(state);
   updatePoolBars(state);
   // Always-visible regardless of which tab is open — see ui/alerts.ts's
   // own comment for why that's the point. switchToSidebarTab is a plain

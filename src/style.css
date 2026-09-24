@@ -1852,6 +1852,35 @@ body {
   border-color: #ff8080;
 }
 
+/* The Lessor strip in the Fleet tab (ui/market.ts). */
+#market-section {
+  margin-bottom: 16px;
+}
+
+.market-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 0;
+  font-size: 12px;
+  color: #cdd3e0;
+}
+
+.market-row span:last-child {
+  color: #9aa3b8;
+  text-align: right;
+}
+
+.market-row.is-empty span:last-child {
+  color: #6b7694;
+}
+
+#market-debut-close {
+  color: #0a0c12;
+  background: #5ed6c8;
+  border: none;
+}
+
 .modal-actions {
   display: flex;
   gap: 8px;

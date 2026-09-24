@@ -7,6 +7,7 @@ import type { WeatherEvent } from './weather';
 import type { DelayBreakdown } from './delays';
 import type { HubStyle } from './hubStyle';
 import type { AogEvent } from './aog';
+import { createMarket, ensureRivalFleets, type MarketState } from './market';
 import type { Loan } from './loans';
 import { FUEL_PRICE_BASELINE } from './fuel';
 import type { TargetCommitment, TargetResult } from './targets';
@@ -501,6 +502,10 @@ export type SimState = {
    * cancellations are attributed to the right cause.
    */
   aogs: AogEvent[];
+  /** The shared lessor's shelf (sim/market.ts): what's listed and when the next of each class arrives. */
+  market: MarketState;
+  /** Each rival airline's fleet, one class code per plane, keyed by airline code (sim/market.ts). */
+  competitorFleets: Record<string, string[]>;
   /**
    * Lifetime cancellations by cause — the same shape (and the same
    * purpose) as `delayMinutesByCause`. Three causes, each with a
@@ -708,6 +713,8 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     slotsHeld: {},
     hubStyles: {},
     aogs: [],
+    market: { listings: [], nextArrivalDay: {}, nextListingId: 1 },
+    competitorFleets: {},
     cancellationsByCause: { crew: 0, mechanical: 0, weather: 0, curfew: 0 },
     flightsScheduledTotal: 0,
     flightsCancelledTotal: 0,
@@ -736,6 +743,7 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
   // exists, so it takes the slots it flies at today's prices, as if each
   // rotation had been drawn in the route builder (sim/slots.ts).
   acquireNeededSlots(state);
+  openMarket(state);
 
   return state;
 }
@@ -833,6 +841,8 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     slotsHeld: {},
     hubStyles: {},
     aogs: [],
+    market: { listings: [], nextArrivalDay: {}, nextListingId: 1 },
+    competitorFleets: {},
     cancellationsByCause: { crew: 0, mechanical: 0, weather: 0, curfew: 0 },
     flightsScheduledTotal: 0,
     flightsCancelledTotal: 0,
@@ -846,5 +856,12 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0, training: 0, slots: 0, maintenance: 0 },
   };
   revealReach(state);
+  openMarket(state);
   return state;
+}
+
+/** Stock the lessor's opening shelf and give the incumbent rivals the fleets they already fly (sim/market.ts). */
+function openMarket(state: SimState): void {
+  [state.market, state.rngSeed] = createMarket(state.rngSeed);
+  ensureRivalFleets(state);
 }

@@ -29,6 +29,7 @@ import { recordDailyCashHistory } from './forecast';
 import { recordDailyPnlHistory } from './pnlHistory';
 import { recordDailyOnTimeHistory } from './routeOtp';
 import { acquireNeededSlots, settleSlotsForDay } from './slots';
+import { ensureRivalFleets, rollDailyMarket } from './market';
 import type { SimState, ActiveFlight } from './state';
 
 const MINUTES_PER_DAY = 1440;
@@ -248,9 +249,16 @@ export function step(state: SimState): void {
     // competitor airline has a small independent chance to open one new
     // route. Same daily cadence as weather, for the same reason — this
     // is a day-scale event, not something worth re-checking every minute.
+    ensureRivalFleets(state);
     rollCompetitorRouteOpenings(state, state.simMinute);
     rollCompetitorFrequencyGrowth(state);
     rollRivalEntry(state, state.simMinute);
+    // The lessor's delivery (sim/market.ts) comes *after* the rivals have
+    // grown for the day. Rivals only ever act at rollover, so an airframe
+    // delivered before them would always be theirs before the player could
+    // see it; delivered after, it sits on the shelf all day and the player
+    // gets the first chance. First come, first served, fairly.
+    rollDailyMarket(state, Math.floor(state.simMinute / MINUTES_PER_DAY));
 
     // Week six's fuel price mechanic (sim/fuel.ts): same daily cadence as
     // weather and the competitor AI above — fuel prices move day to day

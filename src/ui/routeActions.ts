@@ -1,8 +1,9 @@
 import { airports, type Airport } from '../render/airports';
-import { AIRCRAFT_CLASSES, classByCode, classRank } from '../sim/aircraftClasses';
+import { AIRCRAFT_CLASSES, classByCode, classRank, pluralClassName } from '../sim/aircraftClasses';
 import { isAircraftTypeAllowedAt, legsServingMarket, marketKey } from '../sim/schedule';
 import { allRotations, type Rotation } from '../sim/utilisation';
 import { cashNeededToLease, LEASE_RESERVE_DAYS, leaseAircraft, loadLeaseRates } from '../sim/leasing';
+import { daysUntilNextListing, hasDebuted, listingsOf, returnBlockedReason, returnFee, returnLease, takeListing, type MarketListing } from '../sim/market';
 import { revealReach } from '../sim/reach';
 import { actualDailyDemand, currentPotentialDemand } from '../sim/marketDemand';
 import { candidateTailsAt, commitRotation, planRotation, type RotationPlan } from './routeBuilder';
@@ -343,38 +344,82 @@ export type PlaneOption = {
   code: string;
   name: string;
   seats: number;
-  leasePerDay: number;
+  /** The airframe a lease would take (sim/market.ts), or null when none of this class is listed. */
+  listing: MarketListing | null;
+  /** How many of this class are listed in all. */
+  listed: number;
   disabledReason?: string;
   /** One more plane in this class's pool at this airport, for the hover preview. */
   preview?: MapPreview;
 };
 
+function days(count: number): string {
+  return `${count} day${count === 1 ? '' : 's'}`;
+}
+
+/**
+ * One choice per class: the next airframe the shared lessor has listed
+ * (sim/market.ts), or why there isn't one to take.
+ */
 export function planeOptions(state: SimState, iata: string): PlaneOption[] {
   return loadLeaseRates().map((rate) => {
     const cls = classByCode(rate.typeCode)!;
+    const listings = listingsOf(state, rate.typeCode);
+    const listing = listings[0] ?? null;
     let disabledReason: string | undefined;
-    if (!isAircraftTypeAllowedAt(iata, rate.typeCode)) disabledReason = `Too large to operate at ${iata}.`;
-    else if (state.cash < cashNeededToLease(rate.leasePricePerDay)) {
-      disabledReason = `Needs $${cashNeededToLease(rate.leasePricePerDay).toLocaleString()} on hand (${LEASE_RESERVE_DAYS} days of lease) to lease a ${cls.name}.`;
+    if (!isAircraftTypeAllowedAt(iata, rate.typeCode)) {
+      disabledReason = `Too large to operate at ${iata}.`;
+    } else if (!hasDebuted(state, rate.typeCode)) {
+      disabledReason = `No ${pluralClassName(cls.name)} on the market yet: the first arrives in ${days(daysUntilNextListing(state, rate.typeCode))}.`;
+    } else if (!listing) {
+      disabledReason = `No ${cls.name} on the market. The next arrives in ${days(daysUntilNextListing(state, rate.typeCode))}, first come first served.`;
+    } else if (state.cash < cashNeededToLease(listing.leasePricePerDay)) {
+      disabledReason = `Needs $${cashNeededToLease(listing.leasePricePerDay).toLocaleString()} on hand (${LEASE_RESERVE_DAYS} days of lease) to lease this ${cls.name}.`;
     }
     return {
       code: cls.code,
       name: cls.name,
       seats: cls.seats,
-      leasePerDay: rate.leasePricePerDay,
+      listing,
+      listed: listings.length,
       disabledReason,
       preview: disabledReason ? undefined : { effects: [{ base: iata, classCode: cls.code, minutes: 0, planes: 1 }], routes: [] },
     };
   });
 }
 
-/** Lease one plane of this class. It arrives immediately, based and parked at `iata`. */
+/** Lease the next listed plane of this class. It arrives immediately, based and parked at `iata`. */
 export function leasePlane(state: SimState, iata: string, typeCode: string): Outcome<{ message: string }> {
   const option = planeOptions(state, iata).find((o) => o.code === typeCode);
   if (!option) return { ok: false, reason: 'Unknown aircraft class.' };
   if (option.disabledReason) return { ok: false, reason: option.disabledReason };
+  const listing = takeListing(state, typeCode);
+  if (!listing) return { ok: false, reason: `No ${option.name} on the market.` };
 
-  const aircraft = leaseAircraft(state, typeCode, iata);
+  const aircraft = leaseAircraft(state, typeCode, iata, listing.ageYears, listing.leasePricePerDay);
   revealReach(state);
-  return { ok: true, message: `${option.name} leased at ${iata} for $${option.leasePerDay.toLocaleString()}/day (${aircraft.tail}).` };
+  return {
+    ok: true,
+    message: `${option.name} leased at ${iata}: ${listing.ageYears} yrs old, $${listing.leasePricePerDay.toLocaleString()}/day (${aircraft.tail}).`,
+  };
+}
+
+/** Planes based here that could go back to the lessor now, and the ones that can't with why. */
+export function returnOptions(state: SimState, iata: string): { tail: string; name: string; fee: number; saves: number; ageYears: number; blocked: string | null }[] {
+  return state.aircraft
+    .filter((aircraft) => aircraft.baseAirport === iata)
+    .map((aircraft) => ({
+      tail: aircraft.tail,
+      name: classByCode(aircraft.typeCode)?.name ?? aircraft.typeCode,
+      fee: returnFee(aircraft),
+      saves: aircraft.leaseCostPerDay,
+      ageYears: aircraft.ageYears,
+      blocked: returnBlockedReason(state, aircraft) ?? (state.cash < returnFee(aircraft) ? `Needs $${returnFee(aircraft).toLocaleString()} on hand.` : null),
+    }));
+}
+
+export function returnPlane(state: SimState, tail: string): Outcome<{ message: string }> {
+  const result = returnLease(state, tail);
+  if (result.ok) renderScheduleWarnings(scheduleProblems(state));
+  return result;
 }

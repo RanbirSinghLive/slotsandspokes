@@ -22,3 +22,8 @@ export function classRank(code: string): number {
 export function classByCode(code: string): AircraftClass | undefined {
   return AIRCRAFT_CLASSES.find((c) => c.code === code);
 }
+
+/** A class name in the plural, for sentences: "Propellers", "Narrowbodies". */
+export function pluralClassName(name: string): string {
+  return name.endsWith('y') ? `${name.slice(0, -1)}ies` : `${name}s`;
+}

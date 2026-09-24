@@ -14,6 +14,7 @@ import {
   RIVAL_FIRST_ENTRY_DAY,
   RIVAL_FREQUENCY_CAP,
 } from './pressure';
+import { rivalSecuresCapacity } from './market';
 import type { SimState } from './state';
 
 /**
@@ -163,6 +164,9 @@ export function rollCompetitorRouteOpenings(state: SimState, dayStartMinute: num
     const [pickRoll, seedAfterPick] = nextRandom(state.rngSeed);
     state.rngSeed = seedAfterPick;
     const [origin, dest] = pickWeighted(candidates, weights, pickRoll);
+    // A new route needs a plane to fly it, leased from the same market the
+    // player uses (sim/market.ts). No plane, no route today.
+    if (!rivalSecuresCapacity(state, code, 1)) continue;
 
     state.competitorRoutes.push({
       airline,
@@ -230,6 +234,8 @@ export function rollRivalEntry(state: SimState, dayStartMinute: number): void {
 
   const [origin, dest] = pickWeighted(marketPool, weights, marketRoll);
   const rival = pool[Math.min(pool.length - 1, Math.floor(nameRoll * pool.length))];
+  // A new airline needs its first plane from the market, like anyone.
+  if (!rivalSecuresCapacity(state, rival.code, 1)) return;
   state.competitorRoutes.push({
     airline: rival.airline,
     code: rival.code,
@@ -253,6 +259,8 @@ export function rollCompetitorFrequencyGrowth(state: SimState): void {
   for (const route of state.competitorRoutes) {
     const [roll, nextSeed] = nextRandom(state.rngSeed);
     state.rngSeed = nextSeed;
-    if (roll < chance && route.dailyFrequency < RIVAL_FREQUENCY_CAP) route.dailyFrequency += 1;
+    if (roll < chance && route.dailyFrequency < RIVAL_FREQUENCY_CAP && rivalSecuresCapacity(state, route.code, 1)) {
+      route.dailyFrequency += 1;
+    }
   }
 }

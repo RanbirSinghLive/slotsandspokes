@@ -1,5 +1,6 @@
 import { loadMissions } from '../sim/missions';
 import { networkAirports } from '../sim/reach';
+import { AIRCRAFT_CLASSES } from '../sim/aircraftClasses';
 import type { SimState } from '../sim/state';
 
 const tickerTrack = document.querySelector<HTMLDivElement>('#ticker-track')!;
@@ -213,8 +214,46 @@ function pollAogEvents(state: SimState): void {
   }
 }
 
+/**
+ * The fleet market (sim/market.ts): airframes arriving at the lessor, and
+ * rivals leasing from it — the "Trillium Air took the last Regional"
+ * moments. Class debuts get a pop-up of their own (ui/market.ts).
+ */
+let hasSeenInitialMarket = false;
+let lastListingId = 0;
+const seenRivalFleetSizes = new Map<string, number>();
+
+function pollMarketEvents(state: SimState): void {
+  if (!hasSeenInitialMarket) {
+    lastListingId = state.market.nextListingId - 1;
+    for (const [code, fleet] of Object.entries(state.competitorFleets)) seenRivalFleetSizes.set(code, fleet.length);
+    hasSeenInitialMarket = true;
+    return;
+  }
+
+  for (const listing of state.market.listings) {
+    if (listing.id <= lastListingId) continue;
+    const name = AIRCRAFT_CLASSES.find((c) => c.code === listing.typeCode)?.name ?? listing.typeCode;
+    pushEvent(state.simMinute, `Lessor: ${name} listed (${listing.ageYears} yrs, $${listing.leasePricePerDay.toLocaleString()}/day)`);
+  }
+  lastListingId = Math.max(lastListingId, state.market.nextListingId - 1);
+
+  for (const [code, fleet] of Object.entries(state.competitorFleets)) {
+    const previous = seenRivalFleetSizes.get(code) ?? fleet.length;
+    seenRivalFleetSizes.set(code, fleet.length);
+    if (fleet.length <= previous) continue;
+    const airline = state.competitorRoutes.find((route) => route.code === code)?.airline ?? code;
+    for (const typeCode of fleet.slice(previous)) {
+      const name = AIRCRAFT_CLASSES.find((c) => c.code === typeCode)?.name ?? typeCode;
+      const left = state.market.listings.filter((l) => l.typeCode === typeCode).length;
+      pushEvent(state.simMinute, `${airline} leased a ${name} from the lessor (${left === 0 ? 'none left' : `${left} left`})`);
+    }
+  }
+}
+
 export function updateTicker(state: SimState): void {
   pollAogEvents(state);
+  pollMarketEvents(state);
   pollReachEvents(state);
   pollRivalEvents(state);
   pollWeatherEvents(state);

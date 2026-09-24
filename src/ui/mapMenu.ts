@@ -26,7 +26,7 @@ import { planeIconInner } from './planeIcons';
 import { AIRCRAFT_CLASSES } from '../sim/aircraftClasses';
 import { airportCapacityPerDay, airportLoad, dailyMovementsAt } from '../sim/airports';
 import { congestionParameters } from '../sim/delays';
-import { STARTING_AIRCRAFT_AGE_YEARS, USEFUL_LIFE_YEARS } from '../sim/leasing';
+import { USEFUL_LIFE_YEARS } from '../sim/leasing';
 import { WINDOW_DAYS, buildBipolarBars, dayLabel, money as pnlMoney } from './pnlBars';
 
 /**
@@ -75,6 +75,8 @@ const ICON = {
   plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
   minus: '<line x1="5" y1="12" x2="19" y2="12"/>',
   remove: '<line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>',
+  // An arrow curving back: handing a plane back to the lessor.
+  returnPlane: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
   // Three spokes meeting at a hub.
   hub: '<circle cx="12" cy="12" r="2.5"/><path d="M12 9.5V3"/><path d="M9.8 13.3 4.5 17"/><path d="M14.2 13.3 19.5 17"/>',
   clock: '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>',
@@ -318,13 +320,35 @@ planHubButton.addEventListener('click', (event) => {
 function airportActions(airport: Airport, state: SimState): RadialAction[] {
   const hasPlane = candidateTailsAt(state, airport.iata).length > 0;
 
+  // Returning a lease early (sim/market.ts): one choice per plane based
+  // here. Only a plane with nothing scheduled can go; the rest say why.
+  const returnChoices: RadialAction[] = ops.returnOptions(state, airport.iata).map((option) => ({
+    id: `return:${option.tail}`,
+    label:
+      `Return ${option.tail} (${option.name}, ${option.ageYears} yrs) for a $${option.fee.toLocaleString()} fee, ` +
+      `saving $${option.saves.toLocaleString()}/day. It goes back on the market for anyone to lease.`,
+    icon: planeIconInner(state.aircraft.find((a) => a.tail === option.tail)?.typeCode ?? ''),
+    large: true,
+    angleDeg: 0,
+    confirm: true,
+    disabledReason: option.blocked ?? undefined,
+    onSelect: () => {
+      const result = ops.returnPlane(state, option.tail);
+      notice = result.ok ? result.message : result.reason;
+      refresh();
+      return false;
+    },
+  }));
+
   const planeChoices: RadialAction[] = ops.planeOptions(state, airport.iata).map((option) => ({
     id: `plane:${option.code}`,
-    // Every lease is a second-hand airframe (sim/leasing.ts): saying how
-    // old is what explains why it's cheap and why it runs late.
-    label:
-      `Lease a ${option.name} (${option.seats} seats, ${STARTING_AIRCRAFT_AGE_YEARS} yrs old, ` +
-      `${USEFUL_LIFE_YEARS - STARTING_AIRCRAFT_AGE_YEARS} yrs of life left) for ${money(option.leasePerDay)}/day`,
+    // The actual airframe on offer (sim/market.ts): its age is what
+    // explains its price and how late it'll run.
+    label: option.listing
+      ? `Lease a ${option.name} (${option.seats} seats, ${option.listing.ageYears} yrs old, ` +
+        `${Math.max(0, USEFUL_LIFE_YEARS - option.listing.ageYears)} yrs of life left) for ${money(option.listing.leasePricePerDay)}/day` +
+        (option.listed > 1 ? ` · ${option.listed - 1} more listed` : ' · the last one listed')
+      : `Lease a ${option.name}`,
     // Each class has its own silhouette (ui/planeIcons.ts), so the four
     // choices are told apart by shape rather than by guessing at size.
     icon: planeIconInner(option.code),
@@ -391,6 +415,14 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
       },
     },
     { id: 'plane', label: 'Add a plane based here', icon: ICON.plane, angleDeg: -65, children: planeChoices },
+    {
+      id: 'return',
+      label: 'Return a plane to the lessor',
+      icon: ICON.returnPlane,
+      angleDeg: 150,
+      disabledReason: returnChoices.length === 0 ? `No planes are based at ${airport.iata}.` : undefined,
+      children: returnChoices,
+    },
   ];
 }
 
