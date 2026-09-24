@@ -91,7 +91,12 @@ function tailFits(work: SimState, tail: string): boolean {
   const clockMinutes = legs.reduce((total, leg) => total + leg.blockMinutes + scheduledTurnMinutes(work, leg.origin, leg.dest), 0);
   if (isLongHaulRoundTrip(legs.length, clockMinutes)) return true;
   const lastArrival = Math.max(...legs.map((leg) => leg.departMinute + leg.blockMinutes));
-  return lastArrival <= USABLE_DAY_END_MINUTE;
+  // Both the clock and the budget: the day's last flight has to land by
+  // 22:00, and the plane can't be booked past 100% of its usable day
+  // (sim/utilisation.ts, which also counts the turn after that last
+  // flight). Checking only the clock let cover load a plane the alert
+  // strip then flagged as over-booked.
+  return lastArrival <= USABLE_DAY_END_MINUTE && aircraftUtilisation(work, tail).share <= 1;
 }
 
 /**
@@ -110,15 +115,22 @@ function isInProgress(state: SimState, rotation: Rotation): boolean {
 /**
  * Move `rotation` off `fromTail` onto another plane of the same class
  * based at the same airport, appended after that plane's own day. Tries
- * the least-worked plane first. Returns false, with nothing changed, when
- * none of them has room.
+ * the least-worked plane first. Returns the moved legs (with their new
+ * ids), or null, with nothing changed, when none of them has room.
  */
-function rehome(work: SimState, state: SimState, rotation: Rotation, fromTail: string): boolean {
+function rehome(work: SimState, state: SimState, rotation: Rotation, fromTail: string): ScheduleLeg[] | null {
   const from = state.aircraft.find((a) => a.tail === fromTail);
-  if (!from || !from.baseAirport) return false;
+  if (!from || !from.baseAirport) return null;
 
   const candidates = state.aircraft
-    .filter((a) => a.tail !== fromTail && a.typeCode === from.typeCode && a.baseAirport === from.baseAirport)
+    // A plane grounded by an AOG (sim/aog.ts) can't take anyone's flying.
+    .filter(
+      (a) =>
+        a.tail !== fromTail &&
+        a.typeCode === from.typeCode &&
+        a.baseAirport === from.baseAirport &&
+        !state.aogs.some((event) => event.tail === a.tail),
+    )
     .sort((a, b) => aircraftUtilisation(work, a.tail).minutes - aircraftUtilisation(work, b.tail).minutes);
 
   // Flown or cancelled already today: either way, done for today.
@@ -152,13 +164,13 @@ function rehome(work: SimState, state: SimState, rotation: Rotation, fromTail: s
       // A rotation already flown (or cancelled) today under its old leg
       // ids mustn't fly today under its new ones.
       if (wasHandledToday) work.completedToday.push(...moved.map((leg) => leg.legId));
-      return true;
+      return moved;
     }
 
     work.schedule = work.schedule.filter((leg) => !moved.includes(leg));
     repackTail(work, target.tail);
   }
-  return false;
+  return null;
 }
 
 /** Booked minutes per base+class pool, for working out the preview's effects. */
@@ -220,6 +232,39 @@ export function planRespace(state: SimState, work: SimState, affectedTails: stri
   }
 
   return { ok: true, schedule: work.schedule, completedToday: work.completedToday, moved, effects };
+}
+
+/**
+ * Move as many of `rotations` (in the order given — put the ones that
+ * matter most first) off `fromTail` onto other planes in its pool as
+ * fit, straight into `state`. What doesn't fit stays where it was. Used by
+ * AOG cover (sim/aog.ts), where the plane they're leaving is grounded, and
+ * to hand that flying back once it's repaired. Returns how many moved and
+ * the new ids of the legs that did, so the AOG can find them again.
+ */
+export function coverRotations(state: SimState, fromTail: string, rotations: Rotation[]): { covered: number; movedLegIds: string[] } {
+  const work = workingCopy(state, {});
+  let covered = 0;
+  const movedLegIds: string[] = [];
+  for (const rotation of rotations) {
+    // The working copy has its own leg objects; find this rotation's.
+    const ids = new Set(rotation.legs.map((leg) => leg.legId));
+    const legs = work.schedule.filter((leg) => leg.tail === fromTail && ids.has(leg.legId));
+    if (legs.length === 0 || isInProgress(state, rotation)) continue;
+    work.schedule = work.schedule.filter((leg) => !legs.includes(leg));
+    const moved = rehome(work, state, { ...rotation, legs }, fromTail);
+    if (moved) {
+      covered += 1;
+      movedLegIds.push(...moved.map((leg) => leg.legId));
+    } else {
+      work.schedule.push(...legs);
+    }
+  }
+  if (covered > 0) {
+    state.schedule = work.schedule;
+    state.completedToday = work.completedToday;
+  }
+  return { covered, movedLegIds };
 }
 
 /** A copy of `state` safe for planRespace() to re-time: its own schedule and today's handled list. */

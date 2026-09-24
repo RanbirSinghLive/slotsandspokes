@@ -6,6 +6,7 @@ import { loadCompetitorRoutes, type CompetitorOffering } from './competitors';
 import type { WeatherEvent } from './weather';
 import type { DelayBreakdown } from './delays';
 import type { HubStyle } from './hubStyle';
+import type { AogEvent } from './aog';
 import type { Loan } from './loans';
 import { FUEL_PRICE_BASELINE } from './fuel';
 import type { TargetCommitment, TargetResult } from './targets';
@@ -495,12 +496,11 @@ export type SimState = {
    */
   hubStyles: Record<string, HubStyle>;
   /**
-   * Tails grounded today by an unscheduled maintenance event, kept
-   * separate from crew groundings above so cancellations can be
-   * attributed to the right cause. Rolled after the crew pass, and never
-   * for a tail already grounded for crew.
+   * Planes out of service with an AOG (sim/aog.ts) — multi-day
+   * unscheduled maintenance. Kept separate from crew groundings above so
+   * cancellations are attributed to the right cause.
    */
-  mechanicalGroundedTails: string[];
+  aogs: AogEvent[];
   /**
    * Lifetime cancellations by cause — the same shape (and the same
    * purpose) as `delayMinutesByCause`. Three causes, each with a
@@ -566,6 +566,8 @@ export type SimState = {
     training: number;
     /** Daily fees on every slot pair held (sim/slots.ts). */
     slots: number;
+    /** Paying to expedite AOG repairs (sim/aog.ts). */
+    maintenance: number;
   };
 };
 
@@ -705,7 +707,7 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     groundedTails: [],
     slotsHeld: {},
     hubStyles: {},
-    mechanicalGroundedTails: [],
+    aogs: [],
     cancellationsByCause: { crew: 0, mechanical: 0, weather: 0, curfew: 0 },
     flightsScheduledTotal: 0,
     flightsCancelledTotal: 0,
@@ -716,7 +718,7 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     completedMissionIds: [],
     activeTarget: null,
     lastTargetResult: null,
-    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0, training: 0, slots: 0 },
+    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0, training: 0, slots: 0, maintenance: 0 },
   };
 
   // Staff this fixture to its own reserve target. Unlike a real new game
@@ -830,7 +832,7 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     groundedTails: [],
     slotsHeld: {},
     hubStyles: {},
-    mechanicalGroundedTails: [],
+    aogs: [],
     cancellationsByCause: { crew: 0, mechanical: 0, weather: 0, curfew: 0 },
     flightsScheduledTotal: 0,
     flightsCancelledTotal: 0,
@@ -841,7 +843,7 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     completedMissionIds: [],
     activeTarget: null,
     lastTargetResult: null,
-    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0, training: 0, slots: 0 },
+    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0, training: 0, slots: 0, maintenance: 0 },
   };
   revealReach(state);
   return state;

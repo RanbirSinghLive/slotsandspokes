@@ -11,7 +11,8 @@ import { rollDailyFuelPrice } from './fuel';
 import { rollDailyMarketDemand, actualDailyDemand } from './marketDemand';
 import { revealReach } from './reach';
 import { checkMissions } from './missions';
-import { rollDailyCrew, rollDailyMechanicalGroundings, maintenanceAgeFactor, cabinServiceShare } from './crew';
+import { rollDailyCrew, maintenanceAgeFactor, cabinServiceShare } from './crew';
+import { isAog, rollDailyAogs } from './aog';
 import {
   payExecutiveBonuses,
   executiveDelayMultiplier,
@@ -142,7 +143,7 @@ export function step(state: SimState): void {
     state.todayMargin = 0;
     // Week six's cost attribution — reset in lockstep with todayCost
     // above, since these five are exactly that number split up.
-    state.todayCostByCategory = { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0, training: 0, slots: 0 };
+    state.todayCostByCategory = { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0, training: 0, slots: 0, maintenance: 0 };
     // Per-market breakdown of todayRevenue/todayCost, reset in lockstep
     // with them for the same reason as todayCostByCategory above.
     state.todayRevenueByMarket = {};
@@ -204,9 +205,12 @@ export function step(state: SimState): void {
     // crewed. Must run after the todayCost reset above, since it charges
     // salary into it.
     rollDailyCrew(state);
-    // Rolled after the crew pass so a tail already grounded for crew
-    // isn't grounded twice and counted under two causes.
-    rollDailyMechanicalGroundings(state);
+    // AOGs (sim/aog.ts): repairs finishing, new breakdowns, and moving a
+    // grounded plane's flying onto the rest of its pool. After the crew
+    // pass so a tail already grounded for crew isn't grounded twice and
+    // counted under two causes; before the cancellation count below, so
+    // whatever couldn't be covered is counted as cancelled today.
+    rollDailyAogs(state, state.simMinute);
 
     // Week six's C-suite: any executive bonus that has come due.
     payExecutiveBonuses(state);
@@ -226,7 +230,7 @@ export function step(state: SimState): void {
       // from. Each leg counts once, under the first that applies.
       const cause = state.groundedTails.includes(leg.tail)
         ? 'crew'
-        : state.mechanicalGroundedTails.includes(leg.tail)
+        : isAog(state, leg.tail)
           ? 'mechanical'
           : isAirportClosed(state, leg.origin)
             ? 'weather'
@@ -283,7 +287,7 @@ export function step(state: SimState): void {
     // Cancelled at rollover for one of the three causes above, so it
     // simply never departs.
     if (state.groundedTails.includes(leg.tail)) continue;
-    if (state.mechanicalGroundedTails.includes(leg.tail)) continue;
+    if (isAog(state, leg.tail)) continue;
     if (isAirportClosed(state, leg.origin)) continue;
     if (aircraft.status !== 'ground' || aircraft.atAirport !== leg.origin) continue;
     if (state.simMinute < aircraft.groundSinceMinute + MIN_TURN_MINUTES) continue; // still turning around

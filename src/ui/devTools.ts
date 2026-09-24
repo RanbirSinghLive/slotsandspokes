@@ -79,7 +79,14 @@ const COST_ROWS: CostRowSpec[] = [
       s.todayCostByCategory.lease +
       s.todayCostByCategory.crew +
       s.todayCostByCategory.training +
-      s.todayCostByCategory.slots,
+      s.todayCostByCategory.slots +
+      s.todayCostByCategory.maintenance,
+  },
+  {
+    label: 'Expedited repairs',
+    depth: 1,
+    hint: 'Paid to bring a plane back from an AOG sooner.',
+    value: (s) => s.todayCostByCategory.maintenance,
   },
   {
     label: 'Slot fees',

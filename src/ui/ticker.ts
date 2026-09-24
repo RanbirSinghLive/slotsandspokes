@@ -172,7 +172,49 @@ function pollReachEvents(state: SimState): void {
   pushEvent(state.simMinute, `New airports in reach: ${shown}${added.length > 4 ? ` and ${added.length - 4} more` : ''}`);
 }
 
+/**
+ * AOGs (sim/aog.ts) are reported here rather than on the utilisation
+ * display, which only shows the red "−1": a plane going down (and what it
+ * cancels), cover changing while it's out (the player freed time, or lost
+ * it), and the repair finishing.
+ */
+let hasSeenInitialAogs = false;
+const seenAogs = new Map<string, string>();
+
+function pollAogEvents(state: SimState): void {
+  const current = new Map(state.aogs.map((event) => [event.tail, event.uncoveredRoutes.join(', ')]));
+  if (!hasSeenInitialAogs) {
+    for (const [tail, uncovered] of current) seenAogs.set(tail, uncovered);
+    hasSeenInitialAogs = true;
+    return;
+  }
+
+  for (const event of state.aogs) {
+    const uncovered = event.uncoveredRoutes.join(', ');
+    const previous = seenAogs.get(event.tail);
+    if (previous === undefined) {
+      const days = Math.max(1, Math.ceil((event.returnsAtMinute - state.simMinute) / 1440));
+      pushEvent(
+        state.simMinute,
+        `${event.tail} AOG at ${event.base} (${event.fault}), out ~${days} day${days === 1 ? '' : 's'}. ` +
+          (uncovered ? `Cancelled until repaired: ${uncovered}` : 'Its flying moved to other planes'),
+      );
+    } else if (uncovered !== previous) {
+      pushEvent(state.simMinute, uncovered ? `While ${event.tail} is repaired, cancelled: ${uncovered}` : `All of ${event.tail}'s flying is now covered`);
+    }
+    seenAogs.set(event.tail, uncovered);
+  }
+
+  for (const tail of [...seenAogs.keys()]) {
+    if (current.has(tail)) continue;
+    seenAogs.delete(tail);
+    const aircraft = state.aircraft.find((a) => a.tail === tail);
+    pushEvent(state.simMinute, `${tail} back in service${aircraft?.baseAirport ? ` at ${aircraft.baseAirport}` : ''}`);
+  }
+}
+
 export function updateTicker(state: SimState): void {
+  pollAogEvents(state);
   pollReachEvents(state);
   pollRivalEvents(state);
   pollWeatherEvents(state);

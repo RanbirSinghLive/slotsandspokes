@@ -578,7 +578,9 @@ function baseSpareMinutes(state: SimState, baseIata: string, tail: string): numb
   const pool = state.aircraft.filter(
     (aircraft) => aircraft.baseAirport === baseIata || (aircraft.tail === tail && aircraft.baseAirport === null),
   );
-  const capacityMinutes = pool.length * USABLE_DAY_MINUTES;
+  // A plane grounded by an AOG (sim/aog.ts) offers no time until it's back.
+  const flyable = pool.filter((aircraft) => !state.aogs.some((event) => event.tail === aircraft.tail));
+  const capacityMinutes = flyable.length * USABLE_DAY_MINUTES;
   const usedMinutes = pool.reduce((total, aircraft) => total + aircraftUtilisation(state, aircraft.tail).minutes, 0);
   return capacityMinutes - usedMinutes;
 }

@@ -171,7 +171,8 @@ export function utilisationByBase(state: SimState): BaseUtilisation[] {
 
   return [...byBase.entries()]
     .map(([base, list]) => {
-      const capacityMinutes = list.length * USABLE_DAY_MINUTES;
+      // Grounded planes (AOG) add no capacity until they're back.
+      const capacityMinutes = list.filter((a) => !isGrounded(state, a.tail)).length * USABLE_DAY_MINUTES;
       const usedMinutes = list.reduce((total, a) => total + a.minutes, 0);
       return {
         base,
@@ -196,6 +197,8 @@ export type ClassPool = {
   code: string;
   name: string;
   planes: number;
+  /** Of `planes`, how many are grounded by an AOG (sim/aog.ts) and so add no capacity. */
+  grounded: number;
   capacityMinutes: number;
   usedMinutes: number;
   /** Used over capacity, 0 when there are no planes. Above 1 means over-booked. */
@@ -217,15 +220,25 @@ export type PoolEffect = {
   planes?: number;
 };
 
+/** Grounded by an AOG (sim/aog.ts). Read straight off state to keep this module free of an import cycle with it. */
+function isGrounded(state: SimState, tail: string): boolean {
+  return state.aogs.some((event) => event.tail === tail);
+}
+
 export function utilisationPools(state: SimState, base?: string): ClassPool[] {
   return AIRCRAFT_CLASSES.map((cls) => {
     const planes = state.aircraft.filter((a) => a.typeCode === cls.code && (base === undefined || a.baseAirport === base));
+    // A grounded plane's flying still counts (it's still on the schedule,
+    // waiting to be covered), but its day doesn't: that's what pushes a pool
+    // past 100% while an AOG lasts.
+    const grounded = planes.filter((a) => isGrounded(state, a.tail)).length;
     const usedMinutes = planes.reduce((total, a) => total + aircraftUtilisation(state, a.tail).minutes, 0);
-    const capacityMinutes = planes.length * USABLE_DAY_MINUTES;
+    const capacityMinutes = (planes.length - grounded) * USABLE_DAY_MINUTES;
     return {
       code: cls.code,
       name: cls.name,
       planes: planes.length,
+      grounded,
       capacityMinutes,
       usedMinutes,
       share: capacityMinutes > 0 ? usedMinutes / capacityMinutes : 0,
@@ -246,7 +259,7 @@ export function worstPoolShareByBase(state: SimState, effects: PoolEffect[] = []
     const key = `${aircraft.baseAirport}|${aircraft.typeCode}`;
     const pool = pools.get(key) ?? { used: 0, capacity: 0 };
     pool.used += aircraftUtilisation(state, aircraft.tail).minutes;
-    pool.capacity += USABLE_DAY_MINUTES;
+    if (!isGrounded(state, aircraft.tail)) pool.capacity += USABLE_DAY_MINUTES;
     pools.set(key, pool);
   }
 

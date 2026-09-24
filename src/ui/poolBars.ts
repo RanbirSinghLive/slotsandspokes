@@ -54,6 +54,15 @@ export function buildPoolRows(pools: ClassPool[], effects: PoolEffect[] = [], ba
       const name = document.createElement('span');
       name.className = 'pool-name';
       name.append(planeIconElement(pool.code), planesDelta !== 0 ? `${pool.name} x${pool.planes}→${nextPlanes}` : `${pool.name} x${pool.planes}`);
+      // A plane out with an AOG (sim/aog.ts): just a red "−1" here. What it
+      // cancels is reported in the ticker, not in this display.
+      if (pool.grounded > 0) {
+        const grounded = document.createElement('span');
+        grounded.className = 'pool-grounded';
+        grounded.textContent = ` −${pool.grounded}`;
+        grounded.title = `${pool.grounded} grounded with an AOG`;
+        name.append(grounded);
+      }
 
       const bar = document.createElement('span');
       bar.className = 'pool-bar';
@@ -94,7 +103,7 @@ export function updatePoolBars(state: SimState): void {
   const pools = utilisationPools(state);
   const effects = getMapPreview()?.effects ?? [];
   const next =
-    pools.map((pool) => `${pool.code}:${pool.planes}:${Math.round(pool.share * 100)}:${Math.round(pool.usedMinutes)}`).join('|') +
+    pools.map((pool) => `${pool.code}:${pool.planes}:${pool.grounded}:${Math.round(pool.share * 100)}:${Math.round(pool.usedMinutes)}`).join('|') +
     `#${effects.map((e) => `${e.base}${e.classCode}${Math.round(e.minutes)}:${e.planes ?? 0}`).join(',')}`;
   if (next === signature) return;
   signature = next;

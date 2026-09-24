@@ -14,7 +14,7 @@ const completionEl = document.querySelector<HTMLDivElement>('#ontime-completion'
  */
 const CANCEL_CAUSE_LABELS: [keyof SimState['cancellationsByCause'], string][] = [
   ['crew', 'Crew shortage'],
-  ['mechanical', 'Unscheduled maintenance'],
+  ['mechanical', 'Aircraft AOG'],
   ['weather', 'Airport closed'],
   ['curfew', 'Delays ran past 22:00'],
 ];

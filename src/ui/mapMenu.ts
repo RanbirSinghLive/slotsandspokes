@@ -12,6 +12,7 @@ import { reliabilityDemandFactor, trailingMarketOtp } from '../sim/routeOtp';
 import { onTimeColor } from '../render/mapmodes';
 import { hasHubView } from '../render/hubs';
 import { planHub } from '../sim/hubPlanner';
+import { daysUntilReturn, expediteCost, expediteRepair } from '../sim/aog';
 import { openHubPlanner } from './hubPlanner';
 import { buildPoolRows } from './poolBars';
 import { getMapPreview, setMapPreview, type MapPreview } from '../render/preview';
@@ -56,6 +57,7 @@ const titleEl = document.querySelector<HTMLElement>('#airport-detail-title')!;
 const presenceEl = document.querySelector<HTMLElement>('#airport-detail-presence')!;
 const loadEl = document.querySelector<HTMLElement>('#airport-detail-load')!;
 const slotsEl = document.querySelector<HTMLElement>('#airport-detail-slots')!;
+const aogEl = document.querySelector<HTMLElement>('#airport-detail-aog')!;
 const basedEl = document.querySelector<HTMLElement>('#airport-detail-based')!;
 const marketsEl = document.querySelector<HTMLElement>('#airport-detail-markets')!;
 const routeHistoryEl = document.querySelector<HTMLElement>('#airport-detail-route-history')!;
@@ -187,6 +189,7 @@ function fillAirportCard(airport: Airport, state: SimState): void {
   demandEl.classList.toggle('airport-detail-over', !!unmet && unmet.spilled >= 1);
 
   fillPools(airport.iata, state, 'No aircraft based here.');
+  fillAogs(airport.iata, state);
   fillPlanHubButton(airport.iata, state);
 
   // Every market this airport touches, either direction, with how many
@@ -252,6 +255,42 @@ function fillAirportLoad(iata: string, state: SimState): void {
     held > 0
       ? `Slots: ${held} pair${held === 1 ? '' : 's'} held, $${slotFeesPerDayAt(state, iata).toLocaleString()}/day · ${nextText}.`
       : `Slots: none held · ${nextText}.`;
+}
+
+/**
+ * Planes based here that are grounded with an AOG (sim/aog.ts): what's
+ * wrong, when they're back, and a button to pay for a day sooner. What
+ * each AOG cancels goes in the ticker, not here.
+ */
+function fillAogs(iata: string, state: SimState): void {
+  aogEl.replaceChildren(
+    ...state.aogs
+      .filter((event) => event.base === iata)
+      .map((event) => {
+        const row = document.createElement('div');
+        row.className = 'airport-aog-row';
+        const days = daysUntilReturn(state, event);
+        const text = document.createElement('span');
+        text.textContent = `${event.tail} AOG (${event.fault}), back in ${days} day${days === 1 ? '' : 's'}`;
+        row.append(text);
+        const cost = expediteCost(state, event.tail);
+        if (cost !== null) {
+          const expedite = document.createElement('button');
+          expedite.type = 'button';
+          expedite.textContent = `Expedite: $${cost.toLocaleString()} for a day sooner`;
+          expedite.disabled = state.cash < cost;
+          if (expedite.disabled) expedite.title = `Needs $${cost.toLocaleString()} on hand.`;
+          expedite.addEventListener('click', (clickEvent) => {
+            clickEvent.stopPropagation();
+            const result = expediteRepair(state, event.tail);
+            notice = result.ok ? result.message : result.reason;
+            refresh();
+          });
+          row.append(expedite);
+        }
+        return row;
+      }),
+  );
 }
 
 /**
@@ -411,6 +450,7 @@ function fillRouteCard(a: string, b: string, state: SimState): void {
   // A route card has no single airport to describe.
   loadEl.textContent = '';
   slotsEl.textContent = '';
+  aogEl.replaceChildren();
   planHubButton.hidden = true;
   fillRouteHistory(state, a, b);
   fillRouteOtp(state, a, b);
