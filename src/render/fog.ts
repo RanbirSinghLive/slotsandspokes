@@ -37,6 +37,11 @@ export function drawFog(ctx: CanvasRenderingContext2D, state: SimState): void {
   const scale = ctx.getTransform().a;
   const cssWidth = main.width / scale;
   const cssHeight = main.height / scale;
+  // A map with no area (a tab opened in the background, or a window
+  // narrower than the side panel) has nothing to fog — and drawImage()
+  // throws on a zero-sized source canvas, which used to abort main.ts
+  // before the game loop or the home picker had even started.
+  if (main.width === 0 || main.height === 0) return;
 
   if (fogCanvas.width !== main.width || fogCanvas.height !== main.height) {
     fogCanvas.width = main.width;
