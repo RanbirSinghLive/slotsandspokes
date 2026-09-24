@@ -1,7 +1,7 @@
 import { recommendedFare, marketKey } from './schedule';
 import { summarizeMarket } from './marketSummary';
 import { rivalSecuresCapacity } from './market';
-import { RIVAL_FREQUENCY_CAP, pressureFactor } from './pressure';
+import { pressureFactor } from './pressure';
 import { nextRandom } from './rng';
 import type { SimState } from './state';
 
@@ -31,6 +31,15 @@ const RESPONSE_CHANCE_BASE = 0.05;
 /** ...plus this much per unit of fare premium above it, capped. */
 const RESPONSE_CHANCE_PER_PREMIUM = 0.5;
 const RESPONSE_CHANCE_MAX = 0.3;
+/**
+ * How many daily flights a rival will build up to when it's responding to
+ * a full, expensive market — double the cap on ordinary rival growth
+ * (sim/pressure.ts's RIVAL_FREQUENCY_CAP), because a premium the player
+ * keeps charging keeps inviting more. Measured: at the ordinary cap of 4,
+ * rivals topped out on the player's routes and pricing 60% over the going
+ * rate paid again.
+ */
+const RESPONSE_FREQUENCY_CAP = 8;
 
 /** Whether this market is one rivals want to move in on, and how badly (the day's response chance; 0 when not). */
 export function rivalResponseChance(state: SimState, a: string, b: string): number {
@@ -46,9 +55,10 @@ export function rivalResponseChance(state: SimState, a: string, b: string): numb
 /**
  * Once a day, from step.ts's rollover: each of the player's full,
  * expensive markets rolls for a rival response. Where a rival already
- * flies it, the busiest one there adds a frequency; where none does, an
- * airline already flying to either end opens the route. Either needs a
- * plane from the market.
+ * flies it and has room under RESPONSE_FREQUENCY_CAP, the busiest such
+ * one adds a flight. Where none does — nobody flies it, or everyone there
+ * is at the cap — another airline already flying to either end opens the
+ * route. Either needs a plane from the market.
  */
 export function rollRivalCapacityResponse(state: SimState, dayStartMinute: number): void {
   const markets = [...new Set(state.schedule.map((leg) => marketKey(leg.origin, leg.dest)))].sort();
@@ -60,17 +70,20 @@ export function rollRivalCapacityResponse(state: SimState, dayStartMinute: numbe
     const [a, b] = key.split('-');
     if (roll >= rivalResponseChance(state, a, b)) continue;
 
-    const onMarket = state.competitorRoutes
-      .filter((route) => marketKey(route.origin, route.dest) === key && route.dailyFrequency < RIVAL_FREQUENCY_CAP)
-      .sort((x, y) => y.dailyFrequency - x.dailyFrequency);
-    if (onMarket.length > 0) {
-      const route = onMarket[0];
+    const onMarket = state.competitorRoutes.filter((route) => marketKey(route.origin, route.dest) === key);
+    const withRoom = onMarket.filter((route) => route.dailyFrequency < RESPONSE_FREQUENCY_CAP).sort((x, y) => y.dailyFrequency - x.dailyFrequency);
+    if (withRoom.length > 0) {
+      const route = withRoom[0];
       if (rivalSecuresCapacity(state, route.code, 1)) route.dailyFrequency += 1;
       continue;
     }
 
-    if (state.competitorRoutes.some((route) => marketKey(route.origin, route.dest) === key)) continue; // every rival there is at its cap
-    const neighbour = state.competitorRoutes.find((route) => [route.origin, route.dest].some((iata) => iata === a || iata === b));
+    // Nobody flies it, or everyone who does is at the cap: another airline
+    // already at either end opens the route.
+    const alreadyThere = new Set(onMarket.map((route) => route.code));
+    const neighbour = state.competitorRoutes.find(
+      (route) => !alreadyThere.has(route.code) && [route.origin, route.dest].some((iata) => iata === a || iata === b),
+    );
     if (!neighbour || !rivalSecuresCapacity(state, neighbour.code, 1)) continue;
     state.competitorRoutes.push({
       airline: neighbour.airline,
