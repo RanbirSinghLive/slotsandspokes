@@ -15,11 +15,9 @@ the week its heading names. Treat its numbers (aircraft names, seat
 counts, save-key versions) as that week's, and its "Verified …"
 paragraphs as records of checks made then, not claims about today.
 
-**Known gaps:** `src/sim/utilisation.ts` (the 06:00–22:00 usable day,
-per-base pooling reported in aircraft) is only written up in
-WEEK-SEVEN.md's phase A. Mechanics added in week eight — the runway
-warning, rival capacity response, connecting passengers — have module
-comments but no section here yet.
+Also written against the code on 2026-09-24: **Aircraft utilisation,
+Rival pressure, Airports, Connecting passengers and hub styles** and
+**Cash runway and the end of the game**.
 
 ---
 
@@ -562,7 +560,11 @@ The starter player never leases more planes, changes fares, or responds
 to rivals. What it measures is an unattended start, and that is harsh:
 from YUL, one Propeller on YUL–YYZ/YTZ/LGA ends a year at about −$219k
 from $500k, as rival airlines pile onto its markets and a day packed to
-22:00 loses flights to the curfew. Balance work that needs a better
+22:00 loses flights to the curfew. **The runner does not stop at $0,
+but the game does** (see Cash runway): from YUL a real game would end on
+day 340, after cash peaked at $819k on day 134. From Halifax it would end
+on day 38, from London on day 48, and from Boston on day 87; only
+Toronto (YYZ) survives the year. Balance work that needs a better
 player should add the behaviour to `newGame.ts`, not hand-write a
 schedule. (Until September 2026 the runner flew a hand-authored
 three-aircraft network no player could have, which is why older sections
@@ -724,6 +726,10 @@ per the pattern in CLAUDE.md's "Time" section.
 
 ## The competitor AI (`src/sim/competitors.ts`) — week four
 
+*The week-four account of how rivals first came alive. Parts are now
+superseded: new airlines do enter mid-game, and rivals respond to fares
+and to premiums. The current behaviour is in **Rival pressure**, below.*
+
 Competitor service was static from week two through week three — fixed
 routes and fares in `data/competitors.json`, loaded once, never
 touched again; `SimState` had no competitor field at all, and
@@ -819,6 +825,64 @@ errors, and the headless runner's 30-day balance check still produces
 a deterministic (same-seed, same-result) outcome at the real 3%
 probability.
 
+## Rival pressure (`src/sim/pressure.ts`, `src/sim/competitors.ts`, `src/sim/rivalResponse.ts`)
+
+The reason to keep building: nothing here hurts a player who keeps
+growing, but standing still loses ground. All of it runs once a day in
+`step.ts`'s rollover, in this order: route openings, frequency growth,
+new entrants, fare response, capacity response. The difficulty constants
+all live in `pressure.ts`.
+
+**Pressure grows without a ceiling.** `pressureFactor()` is
+`1 + day / 90`: 1 on day 0, 2 on day 90, about 5 after a year. It
+multiplies every growth chance below.
+
+**Existing rivals grow.** Each rival airline has a 3% × pressure daily
+chance to open one new route next to its own network, within 850 nm,
+weighted by potential demand (`rollCompetitorRouteOpenings()`). Each
+rival route has a 0.8% × pressure daily chance to add a flight, up to 4 a
+day (`rollCompetitorFrequencyGrowth()`).
+
+**New rivals enter.** From day 15, one new airline every 20 days, up to 5
+(`rollRivalEntry()`, names from `rival-airlines.json`). Each opens one
+daily flight on a market next to the player's network. 70% of the time
+it targets a market the player already flies, weighted 3× toward them.
+
+**Rivals take your yield** (`rivalYieldFactor()`). Markets here are
+seat-limited, so a rival splitting demand would still leave the player's
+planes full. Instead, rival frequency cuts what each passenger pays: up
+to 40% off when rivals fly every flight on the market. Four rival flights
+against four of yours is a 20% cut; against fourteen, about 9%. The
+counter is more frequency.
+
+**Rivals answer your fares** (`rollDailyRivalFares()`), on every market
+both fly, closing a quarter of the gap a day:
+- You are cheaper: they match you (never undercut), down to a floor of
+  65% of the going rate.
+- You are dearer: they follow you up but stay 8% under, to a ceiling of
+  140%.
+- You leave the market: they drift back to the fare they opened at.
+
+**Rivals chase a premium** (`rollRivalCapacityResponse()`). A market the
+player flies *full* and prices more than 10% over the going rate gets a
+daily chance of a rival response: 5% plus 50% per unit of premium, times
+pressure, capped at 30%. The response is capacity, not price, since a
+cheaper rival barely matters to a full plane: the busiest rival already
+there adds a flight (up to 8 a day), or, if none can, another airline
+flying to either end opens the route.
+
+**Every added flight needs a plane.** Rivals lease from the same shared
+market as the player (see The aircraft market), three daily flights per
+airframe. Leasing up the shelf holds them off.
+
+**Rivals never close a route.** In a three-year headless run the rival
+network grows from 4 routes to about 230. In a one-year run from YUL
+with fares at the going rate, the capacity response never fired, yet
+YUL–LGA still ended with nine rival airlines and about 26 daily rival
+flights. Ordinary growth and entrants alone did that.
+
+---
+
 ## The event ticker (`src/ui/ticker.ts`) — week four
 
 The map flash above only reads as news if you're actually looking at
@@ -888,6 +952,45 @@ Enforced in two places: `planRotation()` (`sim/rotations.ts`) refuses a
 rotation that touches a too-small airport, with an explanation, and
 `validateSchedule()` reports any existing leg that breaks the limit as a
 standing warning.
+
+## Aircraft utilisation (`src/sim/utilisation.ts`)
+
+An aircraft's day is a **budget**, and every rotation spends a share of
+it. The player never places legs on a timeline; they see "this rotation
+uses 23% of an aircraft" and decide whether the spare is worth another
+airframe. This is a planning layer only: `step()` still flies each leg at
+a real time and still cascades delays through the rest of the day.
+
+**The usable day** is 06:00–22:00 home time (`USABLE_DAY_START_MINUTE`,
+`USABLE_DAY_END_MINUTE`): 960 minutes. It stands in for slot hours,
+curfews and crew duty in one constant.
+
+**What a leg costs** (`legUtilisationMinutes()`): its block time, plus
+the turn it forces at the far end — the 30-minute minimum
+(`MIN_TURN_MINUTES`), plus the route's turn buffer, plus the
+destination's hub wait if that airport runs banked (see Connecting
+passengers). Charging the turn to the leg that causes it means a
+rotation's cost is just the sum of its legs.
+
+**Long haul.** A plane flying exactly one round trip that outruns 16
+hours but fits in 24 (Toronto–London, 6.9 hours each way) counts as
+exactly one full day rather than 140%. It may leave at 06:00 and return
+overnight (`isLongHaulRoundTrip()`).
+
+**Pools.** Utilisation is reported per aircraft, and pooled per base and
+per class (`utilisationPools()`), because "do I need another Regional at
+YUL?" is the decision the player actually makes. A plane grounded by an
+AOG adds no capacity to its pool while its flights still count, which is
+what pushes a pool past 100% during an outage. The ring round each base
+on the map shows its fullest class pool (`worstPoolShareByBase()`): it
+sweeps clockwise as the pool fills and turns solid red past 100%.
+
+**The one failure.** Rotations always start and end at base with turns
+built in, so the only way to over-commit a plane is to ask for more than
+a day. `utilisationProblems()` reports any plane over 100% as a standing
+warning.
+
+---
 
 ## Route builder (`src/ui/routeBuilder.ts`, rules in `src/sim/rotations.ts`)
 
@@ -1220,19 +1323,27 @@ mediocre airline still accrues nothing; it just doesn't go backwards.
 
 ---
 
-## Loans and the failure state (`src/sim/loans.ts`) — week five
+## Cash runway and the end of the game (`src/sim/loans.ts`, `src/sim/forecast.ts`, `src/ui/runway.ts`)
 
-Cash hitting zero offers a $100,000 loan, up to 20 outstanding. Interest
-compounds onto each loan's *balance* daily rather than being charged to
-Cash, so ignoring a loan costs nothing today and progressively more later.
+**The game ends the moment Cash reaches $0** (`isInsolvent()`). There is
+no borrowing: the loan code in `loans.ts` is dormant while the Executive
+tab is parked, so only the cash line decides. `main.ts` stops the clock
+and `ui/loans.ts` shows the game-over screen.
 
-Two ways to lose. Either every loan slot is taken and Cash is still gone,
-or **Cash falls past `CASH_FLOOR`** — the total credit line negated,
--$2,000,000. That floor exists because declining a loan used to be free:
-the offer stopped reappearing until Cash went positive (which for a
-failing airline is never), so the loan count stayed at zero, insolvency
-never fired, and Cash fell without limit. Declining was strictly better
-than accepting.
+**The runway** is the warning. `cashRunway()` draws a straight line
+through the last 7 closing balances: if cash is falling, days left =
+cash ÷ average daily fall. It shows three ways, escalating:
+- a **Runway** row under Cash, always visible — amber inside 30 days,
+  red inside 14;
+- a line in the alert strip inside 30 days;
+- a pop-up that **pauses the game** the first time the runway drops
+  inside 14 days. It re-arms only after the runway recovers past 30, so
+  hovering around two weeks doesn't nag. (That re-arm flag lives in the
+  UI module, not in `SimState`, so a reload can show it again.)
+
+At 100× a fortnight passes in under half a minute, which is why the
+pause exists.
+
 
 ---
 
@@ -1293,24 +1404,83 @@ price for that — but you now find it once instead of per route.
 
 ---
 
-## Airports: presence, connectivity and slots (`src/sim/airports.ts`) — week six
+## Airports: presence, capacity and slots (`src/sim/airports.ts`, `src/sim/slots.ts`)
 
-Three things keyed off how many daily departures you operate at a field:
+**Level** — from the player's daily departures there: Unserved (0),
+Outstation (1–2), Focus city (3–5), Base (6–9), Hub (10+). Read off the map: the dot grows
+with departures, and Base and Hub get a faint halo.
 
-- **Level** — Unserved / Outstation / Focus city / Base / Hub.
-- **Connectivity multiplier** on revenue, growing with concentration,
-  capped at 1.25. This is a deliberate stand-in for connecting
-  itineraries, which aren't modelled: it gives the *benefit* of a hub
-  without tracking passengers through one. A flight earns the average of
-  its two ends, not the product.
-- **Slots**, but only at LGA and YYZ — the two fields on this map that
-  really are slot-coordinated. Every departure needs one, prices escalate
-  40% per slot held, and the route builder blocks departures with nowhere
-  to put them.
+**Capacity and congestion.** Every airport has a daily capacity in
+takeoffs and landings, set in the data or derived from its population.
+Movements count every airline: the player's legs, plus one round trip at
+each end per rival daily frequency (rivals have no times). As an airport
+fills, congestion adds delay (`sim/delays.ts`) and the map draws a warm
+glow that grows and reddens. A hub's style raises its peak (see
+Connecting passengers).
 
-Presence is read off the **map**, not a table: dot radius grows with
-departures, Base and Hub get a halo, controlled fields get a ring that
-turns red when departures exceed slots held.
+**Slots at every airport.** Each daily departure needs a slot pair. The
+first pair at an airport nobody serves is free. Otherwise the daily fee
+scales with how busy the airport is against the average served one, so a
+field twice as busy costs nearly three times as much. The fee is locked
+when taken, like a lease. Slots are taken automatically when a rotation
+needs them (the route builder quotes the price first) and released at
+rollover once unused, most expensive first. A full airport has no slots
+at any price, and the route builder refuses the rotation.
+
+
+---
+
+## Connecting passengers and hub styles (`src/sim/hubs.ts`, `src/sim/hubStyle.ts`)
+
+People travelling between two of the player's spokes A and B, changing
+planes at a hub H the player flies to from both. Aggregate flows per
+city pair, not individual passengers. It is worked out from how often
+routes fly, never from times, because the player never authors times.
+
+For each pair of spokes at a hub, passengers a day (both directions) =
+
+| Factor | What it is |
+|---|---|
+| A–B potential demand | the gravity model (`sim/demand.ts`) |
+| × 3% | the share willing to change planes (`CONNECT_SHARE`) |
+| × establishment | the less built-up spoke route's local traffic ÷ 40 a day, capped at 1, so a new route feeds about a quarter |
+| × frequency chance | `1 − e^(−flights/2)` on the thinner route: about 40% at one daily flight, 63% at two, 86% at four |
+| × hub style | Rolling 0.5, Banked 0.75, Tight banks 1.0 |
+| × circuity | full up to 1.3× the direct distance, falling to nothing at 2× |
+| × nonstop discount | 0.2 if anyone, player or rival, flies A–B direct |
+
+**They ride both legs.** Each flow is added to the demand of both routes
+it uses (`connectingDemandOnMarket()`), where it books seats and pays
+fares like local traffic. **They react to price** like local passengers
+(`economy.ts`'s `connectingPriceResponse()`): a route's connecting demand
+is scaled by its booking share at its fare over its share at the going
+rate, capped at 1.5× for pricing under it. Before this, connecting
+passengers ignored price and kept an over-priced hub full.
+
+**Hub styles** trade connections against the airport and the planes:
+
+| Style | Connections | Peak congestion | Extra ground time per arrival |
+|---|---|---|---|
+| Rolling (default) | 0.5 | 1.5× | none |
+| Banked | 0.75 | 1.75× | 20 min |
+| Tight banks | 1.0 | 2.1× | 35 min |
+
+The extra ground time is paid in aircraft utilisation, like a turn
+buffer, and like one it absorbs delays. Changing style re-times every
+plane flying into the hub (`applyHubStyleChange()`). Where a plane's day
+overflows, rotations move to other planes in the same pool; the change is
+refused only when no plane has room.
+
+**On the map**, hovering a hub draws its connecting flows, and dashed
+lines to the best new spokes (`suggestSpokes()`: known airports in range
+of a plane based there, valued once their route is established and
+capped at what one daily round trip could carry). The map menu's **Plan
+hub** (`sim/hubPlanner.ts`) lists moves — another daily round trip to a
+spoke, a different style, a new spoke — each valued in dollars a day
+with these same formulas. Extra connections count only up to the seats
+each route has spare, because a full hub gains nothing from connecting
+more people: measured, a Tight-banks Montréal connected the most
+passengers of any style and earned the least.
 
 ---
 
@@ -1476,9 +1646,8 @@ easier than reading about it.
 The current plan is the newest `WEEK-*.md`. As of September 2026:
 
 - **The Grow tab as one pipeline view** (WEEK-EIGHT.md) — next up.
-- **Rivals closing routes.** Rivals open routes and add flights but
-  never withdraw; over three simulated years the rival network grows
-  from 4 routes to about 230.
+- **Rivals closing routes.** They open routes and add flights but
+  never withdraw (see Rival pressure).
 - **More tech tree branches** — fuel efficiency is still the only one.
 - **Ancillary revenue** (bag fees), designed twice and never built.
 - **A smarter headless player** — it doesn't lease, price or respond to
