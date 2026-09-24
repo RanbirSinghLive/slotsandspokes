@@ -60,8 +60,12 @@ let hasSeenInitialWeather = false;
 let previousWeatherAirports = new Set<string>();
 
 function pollWeatherEvents(state: SimState): void {
-  const known = new Set(state.knownAirports);
-  const currentAirports = new Set(Object.keys(state.weatherByAirport).filter((iata) => known.has(iata)));
+  // Only storms at airports the airline actually flies to. Every storm on
+  // the known map drowned the ticker — a snowy January put a dozen
+  // "Snowstorm forms at …" lines between each AOG or market arrival, which
+  // are the news a player has to act on. Storms elsewhere still show on the map.
+  const network = networkAirports(state);
+  const currentAirports = new Set(Object.keys(state.weatherByAirport).filter((iata) => network.has(iata)));
 
   // First call just establishes the baseline — a fresh page load or a
   // resumed save with weather already active shouldn't announce every

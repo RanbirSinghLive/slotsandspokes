@@ -41,7 +41,10 @@ type ClassRhythm = { debutDay: number; initial: number; intervalDays: number; ca
 
 export const MARKET_RHYTHM: Record<string, ClassRhythm> = {
   PROP: { debutDay: 0, initial: 3, intervalDays: 4, cap: 3 },
-  REGIONAL: { debutDay: 0, initial: 1, intervalDays: 10, cap: 2 },
+  // Every airline starts on Propellers: the first Regional reaches the
+  // market on day 10, not day 0, so growing past 25 seats is something the
+  // player works toward (and races rivals for) rather than a day-one buy.
+  REGIONAL: { debutDay: 10, initial: 1, intervalDays: 10, cap: 2 },
   NARROWBODY: { debutDay: 20, initial: 1, intervalDays: 20, cap: 2 },
   WIDEBODY: { debutDay: 45, initial: 1, intervalDays: 35, cap: 1 },
 };

@@ -57,11 +57,16 @@ function renderStrip(state: SimState): void {
 }
 
 // Classes already on the market when this page loaded aren't announced —
-// only a debut that happens while the player is watching.
+// only a debut that happens while the player is watching. A class counts
+// as debuted once its first airframe is actually listed, not merely once
+// its debut day has begun: the day starts a moment before that morning's
+// delivery is made, and announcing in that gap described an empty shelf.
 let announced: Set<string> | null = null;
 
 function pollDebuts(state: SimState): void {
-  const debuted = Object.keys(MARKET_RHYTHM).filter((code) => hasDebuted(state, code));
+  const debuted = Object.keys(MARKET_RHYTHM).filter(
+    (code) => hasDebuted(state, code) && (MARKET_RHYTHM[code].debutDay === 0 || listingsOf(state, code).length > 0),
+  );
   if (announced === null) {
     announced = new Set(debuted);
     return;
