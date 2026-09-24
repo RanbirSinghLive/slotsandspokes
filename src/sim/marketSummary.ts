@@ -34,6 +34,8 @@ export type MarketSummary = {
   seatCapped: boolean;
   share: number;
   totalSeats: number;
+  /** Seats a day this market can actually fill, at the load-factor ceiling — what `pax` is capped at. */
+  seatCeiling: number;
 };
 
 /**
@@ -121,5 +123,5 @@ export function summarizeMarket(origin: string, dest: string, state: SimState, r
   // pull share away here.
   const share = freq > 0 ? trafficShare(routeSettings.fare, freq, origin, dest, routeSettings.marketingSpend, state.competitorRoutes) : 1;
 
-  return { freq, pax, revenue, cost, margin, seatCapped, share, totalSeats };
+  return { freq, pax, revenue, cost, margin, seatCapped, share, totalSeats, seatCeiling: totalSeatCeiling };
 }

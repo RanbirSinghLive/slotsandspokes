@@ -1643,6 +1643,178 @@ body {
   font-size: 12px;
 }
 
+/* The Plan hub window (ui/hubPlanner.ts): wider than the other modals,
+   since it carries a grid, and scrolls if a big hub outgrows the screen. */
+.modal-box--hub {
+  max-width: 720px;
+  width: min(720px, calc(100vw - 32px));
+  max-height: 86vh;
+  overflow-y: auto;
+}
+
+.modal-box--hub h3 {
+  margin: 16px 0 8px;
+  font-size: 12px;
+  font-weight: normal;
+  color: #9aa3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.hub-planner-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+#hub-planner-close {
+  font: inherit;
+  font-size: 18px;
+  color: #9aa3b8;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.hub-planner-summary.is-warn {
+  color: #ffd166;
+}
+
+.hub-planner-summary.is-act {
+  color: #ff8080;
+}
+
+.hub-planner-styles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.hub-style-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+}
+
+.hub-style-card.is-current {
+  border-color: rgba(94, 214, 200, 0.7);
+}
+
+.hub-style-name {
+  color: #fff;
+}
+
+.hub-style-figures {
+  color: #5ed6c8;
+  font-size: 12px;
+}
+
+.hub-style-description {
+  color: #9aa3b8;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.modal-box--hub button:not(#hub-planner-close) {
+  align-self: flex-start;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: #0a0c12;
+  background: #5ed6c8;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.modal-box--hub button:disabled {
+  background: #3a4152;
+  color: #8a93a8;
+  cursor: not-allowed;
+}
+
+.hub-planner-grid {
+  overflow-x: auto;
+}
+
+.hub-grid {
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.hub-grid th,
+.hub-grid td {
+  padding: 4px 6px;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  white-space: nowrap;
+}
+
+.hub-grid th {
+  color: #9aa3b8;
+  font-weight: normal;
+}
+
+.hub-grid-self {
+  color: #3a4152;
+}
+
+.hub-move {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  line-height: 1.4;
+}
+
+.hub-move--spoke {
+  color: #9aa3b8;
+}
+
+.hub-planner-notice {
+  margin-top: 12px;
+  color: #ffd166;
+}
+
+.hub-planner-notice.is-problem {
+  color: #ff8080;
+}
+
+/* The Plan hub button on an airport card: always there, quiet when the
+   hub is fine, yellow then red as sim/hubPlanner.ts finds value missed. */
+#airport-detail-plan-hub {
+  margin-top: 8px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: #cdd3e0;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+#airport-detail-plan-hub[hidden] {
+  display: none;
+}
+
+#airport-detail-plan-hub.is-warn {
+  color: #0a0c12;
+  background: #ffd166;
+  border-color: #ffd166;
+}
+
+#airport-detail-plan-hub.is-act {
+  color: #0a0c12;
+  background: #ff8080;
+  border-color: #ff8080;
+}
+
 .modal-box--game-over {
   border-color: #ff8080;
 }

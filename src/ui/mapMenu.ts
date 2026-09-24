@@ -10,6 +10,9 @@ import { connectingPassengersThrough, spokesOf } from '../sim/hubs';
 import { HUB_STYLES, HUB_STYLE_ORDER, hubStyleAt } from '../sim/hubStyle';
 import { reliabilityDemandFactor, trailingMarketOtp } from '../sim/routeOtp';
 import { onTimeColor } from '../render/mapmodes';
+import { hasHubView } from '../render/hubs';
+import { planHub } from '../sim/hubPlanner';
+import { openHubPlanner } from './hubPlanner';
 import { buildPoolRows } from './poolBars';
 import { getMapPreview, setMapPreview, type MapPreview } from '../render/preview';
 import type { SimState } from '../sim/state';
@@ -60,6 +63,7 @@ const routeOtpEl = document.querySelector<HTMLElement>('#airport-detail-otp')!;
 const poolsEl = document.querySelector<HTMLElement>('#airport-detail-pools')!;
 const demandEl = document.querySelector<HTMLElement>('#airport-detail-demand')!;
 const hintEl = document.querySelector<HTMLElement>('#airport-detail-hint')!;
+const planHubButton = document.querySelector<HTMLButtonElement>('#airport-detail-plan-hub')!;
 
 const ICON = {
   route: '<circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M7.5 16.5 16.5 7.5"/>',
@@ -183,6 +187,7 @@ function fillAirportCard(airport: Airport, state: SimState): void {
   demandEl.classList.toggle('airport-detail-over', !!unmet && unmet.spilled >= 1);
 
   fillPools(airport.iata, state, 'No aircraft based here.');
+  fillPlanHubButton(airport.iata, state);
 
   // Every market this airport touches, either direction, with how many
   // legs serve it.
@@ -248,6 +253,28 @@ function fillAirportLoad(iata: string, state: SimState): void {
       ? `Slots: ${held} pair${held === 1 ? '' : 's'} held, $${slotFeesPerDayAt(state, iata).toLocaleString()}/day · ${nextText}.`
       : `Slots: none held · ${nextText}.`;
 }
+
+/**
+ * The Plan hub button (ui/hubPlanner.ts): on every airport you fly to, so
+ * it's always where a player looks for it, and coloured by how much value
+ * sim/hubPlanner.ts finds being missed there — plain when the hub is fine,
+ * yellow when it's worth a look, red when it's worth acting on.
+ */
+function fillPlanHubButton(iata: string, state: SimState): void {
+  planHubButton.hidden = !hasHubView(state, iata);
+  if (planHubButton.hidden) return;
+  const plan = planHub(state, iata);
+  planHubButton.classList.toggle('is-warn', plan.urgency === 'warn');
+  planHubButton.classList.toggle('is-act', plan.urgency === 'act');
+  planHubButton.textContent =
+    plan.urgency === 'none' ? 'Plan hub' : `Plan hub · about $${Math.round(plan.missedPerDay).toLocaleString()}/day missed`;
+}
+
+planHubButton.addEventListener('click', (event) => {
+  event.stopPropagation();
+  if (open?.kind !== 'airport' || !openState) return;
+  openHubPlanner(openState, open.airport.iata, refresh);
+});
 
 function airportActions(airport: Airport, state: SimState): RadialAction[] {
   const hasPlane = candidateTailsAt(state, airport.iata).length > 0;
@@ -384,6 +411,7 @@ function fillRouteCard(a: string, b: string, state: SimState): void {
   // A route card has no single airport to describe.
   loadEl.textContent = '';
   slotsEl.textContent = '';
+  planHubButton.hidden = true;
   fillRouteHistory(state, a, b);
   fillRouteOtp(state, a, b);
 }

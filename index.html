@@ -33,6 +33,7 @@
       <div id="airport-detail-markets"></div>
       <div id="airport-detail-route-history"></div>
       <div id="airport-detail-otp" hidden></div>
+      <button type="button" id="airport-detail-plan-hub" hidden>Plan hub</button>
       <div id="airport-detail-hint"></div>
     </div>
     <div id="radial-menu" class="radial-menu" hidden></div>
@@ -512,6 +513,22 @@
           <button type="button" id="loan-offer-take">Take the loan</button>
           <button type="button" id="loan-offer-dismiss">Not now</button>
         </div>
+      </div>
+    </div>
+    <div id="hub-planner-modal" class="modal-overlay" hidden>
+      <div class="modal-box modal-box--hub" role="dialog" aria-labelledby="hub-planner-title">
+        <div class="hub-planner-header">
+          <h2 id="hub-planner-title">Plan hub</h2>
+          <button type="button" id="hub-planner-close" aria-label="Close">×</button>
+        </div>
+        <p id="hub-planner-summary" class="hub-planner-summary"></p>
+        <h3>Hub style</h3>
+        <div id="hub-planner-styles" class="hub-planner-styles"></div>
+        <h3>Connecting passengers a day, by pair of routes</h3>
+        <div id="hub-planner-grid" class="hub-planner-grid"></div>
+        <h3>Suggested moves</h3>
+        <div id="hub-planner-moves"></div>
+        <p id="hub-planner-notice" class="hub-planner-notice"></p>
       </div>
     </div>
     <div id="home-picker-modal" class="modal-overlay" hidden>
