@@ -560,11 +560,12 @@ The starter player never leases more planes, changes fares, or responds
 to rivals. What it measures is an unattended start, and that is harsh:
 from YUL, one Propeller on YUL–YYZ/YTZ/LGA ends a year at about −$219k
 from $500k, as rival airlines pile onto its markets and a day packed to
-22:00 loses flights to the curfew. **The runner does not stop at $0,
-but the game does** (see Cash runway): from YUL a real game would end on
-day 340, after cash peaked at $819k on day 134. From Halifax it would end
-on day 38, from London on day 48, and from Boston on day 87; only
-Toronto (YYZ) survives the year. Balance work that needs a better
+22:00 loses flights to the curfew. **The run stops at $0**, as the game does
+(see Cash runway): it checks after every simulated minute, writes a row
+for the part of the final day that was flown, and prints `GAME OVER on
+day N`. From YUL that is day 340, after cash peaked at $819k on day 134;
+from Halifax day 38, London day 48, Boston day 87. Only Toronto (YYZ)
+survives the year. Balance work that needs a better
 player should add the behaviour to `newGame.ts`, not hand-write a
 schedule. (Until September 2026 the runner flew a hand-authored
 three-aircraft network no player could have, which is why older sections
