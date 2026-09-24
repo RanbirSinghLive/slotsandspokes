@@ -1,3 +1,4 @@
+import { minuteOfDay } from '../sim/clock';
 import { classByCode } from '../sim/aircraftClasses';
 import type { ProjectedLeg } from '../sim/cascade';
 import { ON_TIME_GRACE_MINUTES } from '../sim/delays';
@@ -20,13 +21,13 @@ import { minuteOfDayToTimeString } from './panels';
  *   COO   minutes a flight-ops executive clawed back
  */
 
-const MINUTES_PER_DAY = 1440;
 const MAX_REST_OF_DAY_ROWS = 5;
 
 const tooltipEl = document.querySelector<HTMLElement>('#flight-tooltip')!;
 
-function clock(absoluteMinute: number): string {
-  return minuteOfDayToTimeString(absoluteMinute % MINUTES_PER_DAY);
+/** An absolute simMinute as a home-local time of day, the same clock the HUD shows. */
+function clock(state: SimState, absoluteMinute: number): string {
+  return minuteOfDayToTimeString(minuteOfDay(state, absoluteMinute));
 }
 
 function row(code: string, text: string, minutes: number): HTMLElement {
@@ -68,7 +69,7 @@ export function showFlightTooltip(
 
   const nodes: HTMLElement[] = [
     line(`${flight.tail} · ${className}`, 'flight-tooltip-title'),
-    line(`${flight.origin} → ${flight.dest}, lands ${clock(flight.arriveMinute)}`),
+    line(`${flight.origin} → ${flight.dest}, lands ${clock(state, flight.arriveMinute)}`),
   ];
 
   if (lateOnArrival <= 0) {
@@ -106,7 +107,7 @@ export function showFlightTooltip(
           : `+${projected.lateMinutes}m late`;
       nodes.push(
         line(
-          `${projected.leg.origin} → ${projected.leg.dest}  ${clock(projected.projectedDepartMinute)}  ${status}`,
+          `${projected.leg.origin} → ${projected.leg.dest}  ${clock(state, projected.projectedDepartMinute)}  ${status}`,
           projected.onTime ? 'is-good' : 'is-late',
         ),
       );

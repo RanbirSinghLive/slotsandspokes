@@ -1,3 +1,4 @@
+import { dayIndex } from './clock';
 import { nextRandom } from './rng';
 import { leaseRateFor, USEFUL_LIFE_YEARS } from './leasing';
 import type { Aircraft, SimState } from './state';
@@ -62,8 +63,6 @@ const RIVAL_WIDEBODY_FLIGHTS = 14;
 /** Largest class first; a rival falls back down this list when its preferred class isn't on the market. Rivals never take Propellers. */
 const RIVAL_CLASS_LADDER = ['WIDEBODY', 'NARROWBODY', 'REGIONAL'];
 
-const MINUTES_PER_DAY = 1440;
-
 function addListing(market: MarketState, typeCode: string, day: number, seed: number): number {
   const [roll, next] = nextRandom(seed);
   const ageYears = MIN_LISTING_AGE + Math.floor(roll * LISTING_AGE_SPREAD);
@@ -109,13 +108,13 @@ export function listingsOf(state: SimState, typeCode: string): MarketListing[] {
 
 /** Days until the next airframe of this class arrives: 1 means the next rollover's delivery. */
 export function daysUntilNextListing(state: SimState, typeCode: string): number {
-  const today = Math.floor(state.simMinute / MINUTES_PER_DAY);
+  const today = dayIndex(state);
   return Math.max(1, state.market.nextArrivalDay[typeCode] - today);
 }
 
 /** Whether this class has reached the market yet. */
 export function hasDebuted(state: SimState, typeCode: string): boolean {
-  return Math.floor(state.simMinute / MINUTES_PER_DAY) >= (MARKET_RHYTHM[typeCode]?.debutDay ?? 0);
+  return dayIndex(state) >= (MARKET_RHYTHM[typeCode]?.debutDay ?? 0);
 }
 
 /** Take the first listing of this class off the market, or null when there isn't one. */
@@ -157,7 +156,7 @@ export function returnLease(state: SimState, tail: string): { ok: true; message:
     typeCode: aircraft.typeCode,
     ageYears: aircraft.ageYears,
     leasePricePerDay: aircraft.leaseCostPerDay,
-    listedDay: Math.floor(state.simMinute / MINUTES_PER_DAY),
+    listedDay: dayIndex(state),
   });
   const lifeLeft = Math.max(0, USEFUL_LIFE_YEARS - aircraft.ageYears);
   return {

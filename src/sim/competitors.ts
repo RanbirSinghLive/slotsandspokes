@@ -1,3 +1,4 @@
+import { dayIndex } from './clock';
 import competitorsData from '../../data/competitors.json';
 import rivalPoolData from '../../data/rival-airlines.json';
 import { potentialDailyDemand, ALL_MARKET_PAIRS, marketDistanceNm } from './demand';
@@ -202,7 +203,7 @@ const SEED_CODES = new Set((competitorsData as { code: string }[]).map((route) =
  * tomorrow. Uses the seeded random stream; call it from the day rollover.
  */
 export function rollRivalEntry(state: SimState, dayStartMinute: number): void {
-  const day = Math.floor(dayStartMinute / 1440);
+  const day = dayIndex(state, dayStartMinute);
   const codesInUse = new Set(state.competitorRoutes.map((route) => route.code));
   const entered = [...codesInUse].filter((code) => !SEED_CODES.has(code)).length;
   if (entered >= MAX_RIVAL_ENTRIES) return;

@@ -1,3 +1,4 @@
+import { dayIndex } from './clock';
 import airportsData from '../../data/airports.json';
 import { greatCircleDistanceNm } from './geo';
 import { nextRandom } from './rng';
@@ -23,8 +24,6 @@ export type WeatherEvent = {
   severity: WeatherSeverity;
   endsAtMinute: number;
 };
-
-const MINUTES_PER_DAY = 1440;
 
 // Two airports "adjacent" enough for weather to spread between them —
 // reuses the same great-circle distance sim/geo.ts already computes for
@@ -162,7 +161,7 @@ export function rollDailyWeather(state: SimState, dayStartMinute: number): void 
     }
   }
 
-  const dayOfYear = Math.floor(dayStartMinute / MINUTES_PER_DAY) % 365;
+  const dayOfYear = dayIndex(state, dayStartMinute) % 365;
   const kind = seasonalKind(dayOfYear);
   if (!kind) return; // outside both seasons — no new storms originate, but existing ones still expire/spread on schedule
 

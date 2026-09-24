@@ -1,3 +1,4 @@
+import { dayIndex } from './clock';
 import type { CompetitorOffering } from './competitors';
 import type { SimState } from './state';
 
@@ -44,7 +45,7 @@ export const PRESSURE_RAMP_DAYS = 90;
 
 /** 1 on day 0, 2 at PRESSURE_RAMP_DAYS, and so on without a ceiling. */
 export function pressureFactor(state: SimState): number {
-  const day = Math.floor(state.simMinute / 1440);
+  const day = dayIndex(state);
   return 1 + day / PRESSURE_RAMP_DAYS;
 }
 

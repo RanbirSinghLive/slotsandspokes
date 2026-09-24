@@ -1,4 +1,5 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
+import { startingSimMinute } from './clock';
 import { loadSchedule, marketKey, recommendedFare, type ScheduleLeg } from './schedule';
 import { leaseAircraft, leaseRateFor, STARTING_AIRCRAFT_AGE_YEARS } from './leasing';
 import { allAirportCodes, revealReach } from './reach';
@@ -786,7 +787,9 @@ export function createStartingFleet(homeIata: string): Aircraft[] {
  */
 export function createNewGameState(rngSeed: number = Date.now(), homeIata: string = DEFAULT_HOME_AIRPORT): SimState {
   const state: SimState = {
-    simMinute: 0,
+    // Home midnight, not UTC midnight: the airline's day runs on home time
+    // (sim/clock.ts). chooseHome() resets it when the player picks a city.
+    simMinute: startingSimMinute(homeIata),
     homeAirport: homeIata,
     knownAirports: [],
     cash: STARTING_CASH,

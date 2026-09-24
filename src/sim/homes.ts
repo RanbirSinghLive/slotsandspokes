@@ -1,6 +1,7 @@
 import airportsData from '../../data/airports.json';
 import { AIRCRAFT_CLASSES } from './aircraftClasses';
 import { marketDistanceNm, potentialDailyDemand } from './demand';
+import { startingSimMinute } from './clock';
 import { revealReach } from './reach';
 import { createStartingFleet, type SimState } from './state';
 
@@ -53,6 +54,9 @@ export function homeOptions(): HomeOption[] {
  */
 export function chooseHome(state: SimState, iata: string): void {
   state.homeAirport = iata;
+  // The airline's day runs on home time (sim/clock.ts), so the clock
+  // starts at home midnight rather than UTC midnight.
+  state.simMinute = startingSimMinute(iata);
   state.aircraft = createStartingFleet(iata);
   // Whatever the placeholder home revealed is forgotten: the map opens up
   // around the city actually chosen.

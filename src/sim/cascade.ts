@@ -3,9 +3,8 @@ import { executiveDelayMultiplier } from './executives';
 import { MIN_TURN_MINUTES, type ScheduleLeg } from './schedule';
 import { breaksCurfew } from './curfew';
 import { rotationsForTail } from './utilisation';
+import { dayStartMinute } from './clock';
 import type { SimState } from './state';
-
-const MINUTES_PER_DAY = 1440;
 
 /**
  * Where a late aircraft's lateness is headed: the rest of its day, leg by
@@ -47,7 +46,7 @@ export function projectRestOfDay(state: SimState, tail: string): ProjectedLeg[] 
 
   // The schedule's day this flight belongs to, from when it was due to
   // leave — not from "now", which may already be past midnight.
-  const dayStart = Math.floor(flight.scheduledDepartMinute / MINUTES_PER_DAY) * MINUTES_PER_DAY;
+  const dayStart = dayStartMinute(state, flight.scheduledDepartMinute);
   const current = state.schedule.find((leg) => leg.legId === flight.legId);
   if (!current) return [];
 

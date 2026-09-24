@@ -1,3 +1,4 @@
+import { dayIndex } from '../sim/clock';
 import type { SimState } from '../sim/state';
 import { WINDOW_DAYS, buildBipolarBars, buildUnipolarBars, dayLabel, money } from './pnlBars';
 
@@ -52,7 +53,7 @@ let lastRenderedDay = -1;
  * calls within the same day free.
  */
 export function updatePnlHistoryPanel(state: SimState): void {
-  const day = Math.floor(state.simMinute / 1440);
+  const day = dayIndex(state);
   if (day === lastRenderedDay) return;
   lastRenderedDay = day;
 

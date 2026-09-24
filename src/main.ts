@@ -1,4 +1,5 @@
 import './style.css';
+import { dayIndex, homeUtcOffsetMinutes, minuteOfDay as homeMinuteOfDay } from './sim/clock';
 import { projection, fitProjection, baselineScale } from './render/projection';
 import { drawBasemap } from './render/basemap';
 import { drawTerminator } from './render/terminator';
@@ -414,12 +415,23 @@ function formatCalendarDate(dayIndex: number): string {
   return `${MONTH_NAMES[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
 }
 
+/** −240 → "UTC−4", 330 → "UTC+5:30". */
+function formatUtcOffset(offsetMinutes: number): string {
+  const sign = offsetMinutes < 0 ? '−' : '+';
+  const hours = Math.floor(Math.abs(offsetMinutes) / 60);
+  const minutes = Math.abs(offsetMinutes) % 60;
+  return `UTC${sign}${hours}${minutes ? `:${pad(minutes)}` : ''}`;
+}
+
 function updateClock(state: SimState): void {
-  const dayIndex = Math.floor(state.simMinute / MINUTES_PER_DAY);
-  const minuteOfDay = state.simMinute % MINUTES_PER_DAY;
-  const hours = Math.floor(minuteOfDay / 60);
-  const minutes = minuteOfDay % 60;
-  clockEl.textContent = `${formatCalendarDate(dayIndex)} · ${pad(hours)}:${pad(minutes)} UTC`;
+  // Home-local time, because that is the clock the airline's day runs on
+  // (sim/clock.ts) — rotation windows, the 06:00–22:00 flying day and the
+  // 22:00 curfew all read against it.
+  const localMinute = homeMinuteOfDay(state);
+  const hours = Math.floor(localMinute / 60);
+  const minutes = localMinute % 60;
+  clockEl.textContent = `${formatCalendarDate(dayIndex(state))} · ${pad(hours)}:${pad(minutes)} ${state.homeAirport} time`;
+  clockEl.title = `Local time at your home airport, ${state.homeAirport} (${formatUtcOffset(homeUtcOffsetMinutes(state))}). Every schedule time in the game uses this clock.`;
 }
 
 window.addEventListener('resize', resize);
@@ -472,7 +484,7 @@ let lastFrameTimeMs: number | null = null;
 // tick would be. Initialized from whatever day the game actually starts
 // on (loaded or fresh) so resuming a save doesn't immediately re-save
 // before a new day has actually passed.
-let lastSavedDay = Math.floor(state.simMinute / MINUTES_PER_DAY);
+let lastSavedDay = dayIndex(state);
 
 function tick(nowMs: number): void {
   if (lastFrameTimeMs === null) {
@@ -495,7 +507,7 @@ function tick(nowMs: number): void {
     accumulator -= MS_PER_SIM_MINUTE;
   }
 
-  const currentDay = Math.floor(state.simMinute / MINUTES_PER_DAY);
+  const currentDay = dayIndex(state);
   if (currentDay !== lastSavedDay) {
     lastSavedDay = currentDay;
     saveState(state);

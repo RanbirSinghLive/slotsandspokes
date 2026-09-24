@@ -102,8 +102,10 @@ Every time value in the simulation is **an integer count of minutes since the
 start of day 0, in UTC.** Call it `simMinute`. There are no `Date` objects
 anywhere in `src/sim/`.
 
-Local time exists only for display. Each airport carries a fixed
-`utcOffsetMinutes`. Daylight saving is deliberately out of scope — do not add
+The airline's *day* runs on its home airport's local clock: the midnight
+rollover, a leg's `departMinute`, the 06:00–22:00 flying day and the curfew
+are all home-local. Ask `sim/clock.ts` for time of day — never
+`simMinute % 1440`. Each airport carries a fixed `utcOffsetMinutes`. Daylight saving is deliberately out of scope — do not add
 it without being asked.
 
 Time compression: one simulated day takes about three minutes of real time,

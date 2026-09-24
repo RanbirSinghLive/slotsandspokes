@@ -30,10 +30,9 @@ import { recordDailyPnlHistory } from './pnlHistory';
 import { recordDailyOnTimeHistory } from './routeOtp';
 import { acquireNeededSlots, settleSlotsForDay } from './slots';
 import { ensureRivalFleets, rollDailyMarket } from './market';
+import { dayIndex, minuteOfDay as homeMinuteOfDay } from './clock';
 import { rollRivalCapacityResponse } from './rivalResponse';
 import type { SimState, ActiveFlight } from './state';
-
-const MINUTES_PER_DAY = 1440;
 
 const aircraftTypesByCode = new Map<string, EconomyAircraftType>(
   (aircraftTypesData as Array<EconomyAircraftType & { code: string }>).map((type) => [type.code, type]),
@@ -70,8 +69,8 @@ const aircraftTypesByCode = new Map<string, EconomyAircraftType>(
  * numbers" cleanly between calls, instead of catching them already zeroed.
  *
  * `state.schedule` is "the daily repeating schedule" (CLAUDE.md), so
- * matching against `state.simMinute % MINUTES_PER_DAY` makes every leg fire
- * again at the same local-to-the-schedule time on day 1, day 2, and so on.
+ * matching against the home-local minute of the day (sim/clock.ts) makes
+ * every leg fire again at the same local time on day 1, day 2, and so on.
  * It's read from `state` rather than a shared module-level constant so
  * that the M8 schedule editor's edits — mutating a leg's `departMinute`
  * directly — take effect on the very next tick that reaches this loop.
@@ -107,7 +106,9 @@ function recordCancellation(state: SimState, leg: ScheduleLeg, cause: keyof SimS
 }
 
 export function step(state: SimState): void {
-  const minuteOfDay = state.simMinute % MINUTES_PER_DAY;
+  // Home-local, not UTC: the airline's day starts at its home city's
+  // midnight (sim/clock.ts).
+  const minuteOfDay = homeMinuteOfDay(state);
   const dayStart = state.simMinute - minuteOfDay;
 
   if (minuteOfDay === 0) {
@@ -263,7 +264,7 @@ export function step(state: SimState): void {
     // delivered before them would always be theirs before the player could
     // see it; delivered after, it sits on the shelf all day and the player
     // gets the first chance. First come, first served, fairly.
-    rollDailyMarket(state, Math.floor(state.simMinute / MINUTES_PER_DAY));
+    rollDailyMarket(state, dayIndex(state));
 
     // Week six's fuel price mechanic (sim/fuel.ts): same daily cadence as
     // weather and the competitor AI above — fuel prices move day to day
