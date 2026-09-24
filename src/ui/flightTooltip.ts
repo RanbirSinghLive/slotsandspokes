@@ -1,6 +1,7 @@
 import { classByCode } from '../sim/aircraftClasses';
 import type { ProjectedLeg } from '../sim/cascade';
 import { ON_TIME_GRACE_MINUTES } from '../sim/delays';
+import { airportLoad } from '../sim/airports';
 import type { ActiveFlight, SimState } from '../sim/state';
 import { minuteOfDayToTimeString } from './panels';
 
@@ -15,6 +16,7 @@ import { minuteOfDayToTimeString } from './panels';
  *   TURN  the knock-on of that rushed turnaround (sim/delays.ts)
  *   ACFT  this airframe's own unreliability, worse with age
  *   WX    weather at the departure airport
+ *   CONG  congestion at the busier of its two airports (sim/airports.ts)
  *   COO   minutes a flight-ops executive clawed back
  */
 
@@ -60,7 +62,8 @@ export function showFlightTooltip(
   const className = classByCode(aircraft?.typeCode ?? '')?.name ?? '';
   const lateOnArrival = flight.arriveMinute - flight.scheduledArriveMinute;
   const leftLate = flight.departMinute - flight.scheduledDepartMinute;
-  const rolled = flight.delayByCause.age + flight.delayByCause.weather + flight.delayByCause.knockOn;
+  const rolled =
+    flight.delayByCause.age + flight.delayByCause.weather + flight.delayByCause.knockOn + flight.delayByCause.congestion;
   const executiveSaving = flight.delayMinutes - rolled;
 
   const nodes: HTMLElement[] = [
@@ -81,6 +84,10 @@ export function showFlightTooltip(
   if (flight.delayByCause.knockOn > 0) codes.push(row('TURN', 'Rushed turnaround', flight.delayByCause.knockOn));
   if (flight.delayByCause.age > 0) codes.push(row('ACFT', `Aircraft (${aircraft?.ageYears ?? 0} yrs old)`, flight.delayByCause.age));
   if (flight.delayByCause.weather > 0) codes.push(row('WX', `Weather at ${flight.origin}`, flight.delayByCause.weather));
+  if (flight.delayByCause.congestion > 0) {
+    const busier = airportLoad(state, flight.origin) >= airportLoad(state, flight.dest) ? flight.origin : flight.dest;
+    codes.push(row('CONG', `Congestion at ${busier}`, flight.delayByCause.congestion));
+  }
   if (executiveSaving < 0) codes.push(row('COO', 'Flight-ops executive', executiveSaving));
   if (codes.length > 0) {
     nodes.push(line('Delay codes', 'flight-tooltip-section'));

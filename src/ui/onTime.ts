@@ -47,6 +47,7 @@ function delayCauseRows(state: SimState): DelayCauseRow[] {
     { label: 'Late Aircraft (knock-on)', minutes: state.delayMinutesByCause.knockOn },
     { label: 'Weather', minutes: state.delayMinutesByCause.weather },
     { label: 'Carrier (aircraft age)', minutes: state.delayMinutesByCause.age },
+    { label: 'Airport congestion', minutes: state.delayMinutesByCause.congestion },
   ];
 }
 

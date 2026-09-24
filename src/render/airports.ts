@@ -1,6 +1,6 @@
 import airportsData from '../../data/airports.json';
 import { projection } from './projection';
-import { dailyDeparturesAt, airportLevel, isSlotControlled, slotsOwned, slotsTotal } from '../sim/airports';
+import { dailyDeparturesAt, airportLevel, airportLoad, isSlotControlled, slotsOwned, slotsTotal } from '../sim/airports';
 import { worstPoolShareByBase } from '../sim/utilisation';
 import { getMapPreview } from './preview';
 import { pipCount, unmetDemandByAirport } from '../sim/unmetDemand';
@@ -58,6 +58,9 @@ const PIP_HOLLOW = '#9aa3b8';
 const PIP_SPILLED = '#ffb347';
 
 const MARKER_RADIUS = 3;
+// The load at which congestion delays start (sim/delays.ts), and so the
+// congestion glow with them.
+const CONGESTION_GLOW_ONSET = 0.5;
 const MARKER_FILL = '#e8ecf5';
 const UNSERVED_FILL = '#5b6480';
 const LABEL_FILL = '#9aa3b8';
@@ -168,6 +171,22 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState, sho
       ctx.beginPath();
       ctx.arc(x, y, radius + 4, 0, 2 * Math.PI);
       ctx.fillStyle = 'rgba(232, 236, 245, 0.08)';
+      ctx.fill();
+    }
+
+    // Congestion glow: a warm halo that appears once the airport is busy
+    // enough to start queueing flights (sim/delays.ts's congestion cause)
+    // and grows and reddens as it fills. Nothing at all at a quiet field,
+    // so it only ever draws the eye to an airport that needs it.
+    const load = airportLoad(state, airport.iata);
+    if (load > CONGESTION_GLOW_ONSET) {
+      const pressure = Math.min(1, (load - CONGESTION_GLOW_ONSET) / (1 - CONGESTION_GLOW_ONSET));
+      const glow = ctx.createRadialGradient(x, y, radius, x, y, radius + 6 + 10 * pressure);
+      glow.addColorStop(0, `rgba(255, ${Math.round(180 - 110 * pressure)}, 80, ${0.25 + 0.35 * pressure})`);
+      glow.addColorStop(1, 'rgba(255, 90, 80, 0)');
+      ctx.beginPath();
+      ctx.arc(x, y, radius + 6 + 10 * pressure, 0, 2 * Math.PI);
+      ctx.fillStyle = glow;
       ctx.fill();
     }
 

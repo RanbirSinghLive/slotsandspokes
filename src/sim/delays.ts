@@ -2,7 +2,7 @@ import { nextRandom } from './rng';
 import { WEATHER_ON_TIME_PROBABILITY, WEATHER_MAX_DELAY_MINUTES } from './weather';
 
 /**
- * The three causes a departing flight's arrival delay is built from.
+ * The four causes a departing flight's arrival delay is built from.
  * Moved out of sim/step.ts unchanged (week six) — step() was carrying
  * both the tick loop and the whole delay model, and these are two
  * separate concerns. Splitting them also lets the delay distributions be
@@ -28,10 +28,14 @@ import { WEATHER_ON_TIME_PROBABILITY, WEATHER_MAX_DELAY_MINUTES } from './weathe
  *      rather than just shifting a flight's day later by a fixed
  *      amount — a rushed turnaround loses its gate slot, its ATC slot,
  *      its crew's slack — and this is the crude version of that.
+ *   4. Congestion (rollCongestionDelay) — the busier of the flight's two
+ *      airports, judged against its capacity (sim/airports.ts's
+ *      airportLoad()). Nothing at a quiet field; a steep rise as an
+ *      airport fills up. This is the on-time price of building a hub.
  *
  * Deliberately additive and independent rather than one combined
- * distribution, so a fourth cause (maintenance events, crew, ATC) can
- * join this same list later without reshaping the first three.
+ * distribution, so another cause (crew, ATC) can join this same list
+ * later without reshaping the others.
  */
 const AGE_ON_TIME_PROBABILITY_BASE = 0.65;
 const AGE_ON_TIME_PROBABILITY_PER_YEAR = 0.01;
@@ -106,6 +110,42 @@ export function rollWeatherDelay(seed: number, hasWeatherAtOrigin: boolean): [de
 }
 
 /**
+ * Cause 4: congestion. `load` is the busier end's peak traffic over its
+ * capacity (sim/airports.ts's airportLoad()). Below CONGESTION_ONSET_LOAD
+ * an airport is simply not busy enough to queue anyone, and no random
+ * number is drawn. Above it, both the chance of a delay and the worst case
+ * climb, the chance on a squared curve: queues stay short while there's
+ * slack and grow quickly once there isn't, which is how real ones behave.
+ *
+ *   load 0.5 → never delayed
+ *   load 0.75 → about 9% delayed, up to 35 min
+ *   load 1.0 (full) → 35% delayed, up to 55 min
+ *   load 1.2 and above → 60% delayed, up to ~70 min
+ */
+const CONGESTION_ONSET_LOAD = 0.5;
+const CONGESTION_CHANCE_AT_FULL = 0.35;
+const CONGESTION_CHANCE_MAX = 0.6;
+const CONGESTION_MAX_DELAY_BASE = 15;
+const CONGESTION_MAX_DELAY_PER_UNIT = 40;
+const CONGESTION_MAX_OVERLOAD = 1.5;
+
+/** The chance and worst case a departure faces at this load — exported so the airport card can show them. */
+export function congestionParameters(load: number): { delayChance: number; maxDelayMinutes: number } {
+  if (load <= CONGESTION_ONSET_LOAD) return { delayChance: 0, maxDelayMinutes: 0 };
+  const pressure = Math.min(CONGESTION_MAX_OVERLOAD, (load - CONGESTION_ONSET_LOAD) / (1 - CONGESTION_ONSET_LOAD));
+  return {
+    delayChance: Math.min(CONGESTION_CHANCE_MAX, CONGESTION_CHANCE_AT_FULL * pressure * pressure),
+    maxDelayMinutes: Math.round(CONGESTION_MAX_DELAY_BASE + CONGESTION_MAX_DELAY_PER_UNIT * pressure),
+  };
+}
+
+export function rollCongestionDelay(seed: number, load: number): [delayMinutes: number, nextSeed: number] {
+  const { delayChance, maxDelayMinutes } = congestionParameters(load);
+  if (delayChance === 0) return [0, seed];
+  return rollCauseDelay(seed, 1 - delayChance, maxDelayMinutes);
+}
+
+/**
  * Cause 3: knock-on. `lateAtDepartureMinutes` is how far past its
  * scheduled slot this flight is *actually* departing — zero for a flight
  * that got away on time, whatever the reason; positive only when an
@@ -143,12 +183,12 @@ export function isOnTimeArrival(arriveMinute: number, scheduledArriveMinute: num
  * attribute minutes to age/weather/knock-on individually, not just know
  * the total that actually delayed the flight.
  */
-export type DelayBreakdown = { age: number; weather: number; knockOn: number };
+export type DelayBreakdown = { age: number; weather: number; knockOn: number; congestion: number };
 
 /**
- * Roll a departing flight's total arrival delay from all three causes
- * above, threading `state.rngSeed` through the two that need it (age,
- * then weather). Returns [breakdown, nextSeed] — the same second-element
+ * Roll a departing flight's total arrival delay from all four causes
+ * above, threading `state.rngSeed` through the three that need it (age,
+ * weather, then congestion). Returns [breakdown, nextSeed] — the same second-element
  * shape nextRandom() itself returns, so the caller just does
  * `state.rngSeed = nextSeed`; sum `breakdown`'s three fields for the
  * actual minutes to add to a flight's arrival time.
@@ -158,10 +198,12 @@ export function rollTotalDelayMinutes(
   ageYears: number,
   hasWeatherAtOrigin: boolean,
   lateAtDepartureMinutes: number,
+  congestionLoad: number,
   maintenanceFactor = 1,
 ): [breakdown: DelayBreakdown, nextSeed: number] {
   const [age, seedAfterAge] = rollAgeDelay(seed, ageYears, maintenanceFactor);
   const [weather, seedAfterWeather] = rollWeatherDelay(seedAfterAge, hasWeatherAtOrigin);
+  const [congestion, seedAfterCongestion] = rollCongestionDelay(seedAfterWeather, congestionLoad);
   const knockOn = knockOnDelayMinutes(lateAtDepartureMinutes);
-  return [{ age, weather, knockOn }, seedAfterWeather];
+  return [{ age, weather, knockOn, congestion }, seedAfterCongestion];
 }

@@ -761,6 +761,7 @@ body {
 }
 
 #airport-detail-presence,
+#airport-detail-load,
 #airport-detail-based,
 #airport-detail-markets {
   margin-bottom: 6px;
@@ -841,8 +842,13 @@ body {
 /* Same red as everything else "over" (the capacity ring on the map, the
    crew-short pool rows) — a slot-controlled field flying more than it
    holds is the same class of problem those already flag. */
-#airport-detail-presence.airport-detail-over {
+#airport-detail-presence.airport-detail-over,
+#airport-detail-load.airport-detail-over {
   color: #ff8080;
+}
+
+#airport-detail-load.airport-detail-warn {
+  color: #ffb347;
 }
 
 /* Week eight's second deep dive: acting on an airport used to always mean

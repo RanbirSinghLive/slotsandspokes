@@ -287,7 +287,7 @@ export type SimState = {
    * `onTimeByMarket` above — a positioning move's delay doesn't say
    * anything about route service quality.
    */
-  delayMinutesByCause: { age: number; weather: number; knockOn: number };
+  delayMinutesByCause: { age: number; weather: number; knockOn: number; congestion: number };
   /**
    * Week four's spill-and-recapture (sim/economy.ts's `flightResult()`):
    * how many recoverable passengers are currently waiting, per market,
@@ -672,7 +672,7 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     onTimeHistoryByMarket: {},
     npsPointsTotal: 0,
     reputation: 0,
-    delayMinutesByCause: { age: 0, weather: 0, knockOn: 0 },
+    delayMinutesByCause: { age: 0, weather: 0, knockOn: 0, congestion: 0 },
     spilloverByMarket: {},
     rngSeed,
     loans: [],
@@ -801,7 +801,7 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     onTimeHistoryByMarket: {},
     npsPointsTotal: 0,
     reputation: 0,
-    delayMinutesByCause: { age: 0, weather: 0, knockOn: 0 },
+    delayMinutesByCause: { age: 0, weather: 0, knockOn: 0, congestion: 0 },
     spilloverByMarket: {},
     rngSeed,
     loans: [],

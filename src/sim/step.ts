@@ -3,7 +3,7 @@ import { flightResult, type EconomyAircraftType } from './economy';
 import { MIN_TURN_MINUTES, legsServingMarket, marketKey, type ScheduleLeg } from './schedule';
 import { breaksCurfew, rotationStartingWith } from './curfew';
 import { rollDailyWeather, isAirportClosed } from './weather';
-import { routeConnectivityMultiplier } from './airports';
+import { routeConnectivityMultiplier, airportLoad } from './airports';
 import { rollTotalDelayMinutes, isOnTimeArrival } from './delays';
 import { rollCompetitorRouteOpenings, rollCompetitorFrequencyGrowth, rollRivalEntry } from './competitors';
 import { rollDailyFuelPrice } from './fuel';
@@ -312,19 +312,24 @@ export function step(state: SimState): void {
       aircraft.ageYears,
       weatherAtOrigin,
       lateAtDepartureMinutes,
+      // Congestion is judged at the busier of the two ends: a full
+      // airport queues its departures and holds its arrivals alike.
+      Math.max(airportLoad(state, leg.origin), airportLoad(state, leg.dest)),
       maintenanceAgeFactor(state) * executiveMaintenanceMultiplier(state),
     );
     state.rngSeed = nextSeed;
     state.delayMinutesByCause.age += delayBreakdown.age;
     state.delayMinutesByCause.weather += delayBreakdown.weather;
     state.delayMinutesByCause.knockOn += delayBreakdown.knockOn;
+    state.delayMinutesByCause.congestion += delayBreakdown.congestion;
     // A flight-ops COO scales the whole rolled delay down. Applied to
     // the summed total rather than to each cause, so the per-cause
     // attribution the On-Time panel reports stays the raw picture of
     // *why* flights run late, with the executive's effect visible as the
     // gap between that and what actually happened.
     const delayMinutes = Math.round(
-      (delayBreakdown.age + delayBreakdown.weather + delayBreakdown.knockOn) * executiveDelayMultiplier(state),
+      (delayBreakdown.age + delayBreakdown.weather + delayBreakdown.knockOn + delayBreakdown.congestion) *
+        executiveDelayMultiplier(state),
     );
 
     // Fare and marketing spend are market-level (RouteSettings), not

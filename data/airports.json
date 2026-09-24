@@ -135,7 +135,8 @@
     "lon": -79.3955,
     "utcOffsetMinutes": -300,
     "population": 6202225,
-    "maxAircraftType": "REGIONAL"
+    "maxAircraftType": "REGIONAL",
+    "capacityPerDay": 40
   },
   {
     "iata": "LGA",

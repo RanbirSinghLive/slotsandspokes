@@ -17,6 +17,8 @@ import { hideRadial, showRadial, updateRadial, type RadialAction } from './radia
 import * as ops from './routeActions';
 import { planeIconInner } from './planeIcons';
 import { AIRCRAFT_CLASSES } from '../sim/aircraftClasses';
+import { airportCapacityPerDay, airportLoad, dailyMovementsAt } from '../sim/airports';
+import { congestionParameters } from '../sim/delays';
 import { STARTING_AIRCRAFT_AGE_YEARS, USEFUL_LIFE_YEARS } from '../sim/leasing';
 import { WINDOW_DAYS, buildBipolarBars, dayLabel, money as pnlMoney } from './pnlBars';
 
@@ -44,6 +46,7 @@ const CARD_OFFSET_PX = 16;
 const cardEl = document.querySelector<HTMLElement>('#airport-detail-popover')!;
 const titleEl = document.querySelector<HTMLElement>('#airport-detail-title')!;
 const presenceEl = document.querySelector<HTMLElement>('#airport-detail-presence')!;
+const loadEl = document.querySelector<HTMLElement>('#airport-detail-load')!;
 const basedEl = document.querySelector<HTMLElement>('#airport-detail-based')!;
 const marketsEl = document.querySelector<HTMLElement>('#airport-detail-markets')!;
 const routeHistoryEl = document.querySelector<HTMLElement>('#airport-detail-route-history')!;
@@ -158,6 +161,8 @@ function fillAirportCard(airport: Airport, state: SimState): void {
   presenceEl.textContent = `${presence.level} · ${presence.departures} departure${presence.departures === 1 ? '' : 's'}/day`;
   presenceEl.classList.remove('airport-detail-over');
 
+  fillAirportLoad(airport.iata, state);
+
   const unmet = unmetDemandByAirport(state).get(airport.iata);
   const round = (n: number) => Math.round(n).toLocaleString();
   demandEl.textContent = unmet
@@ -202,6 +207,23 @@ function fillAirportCard(airport: Airport, state: SimState): void {
     if (rest > 0) nodes.push(`, +${rest} more`);
     marketsEl.replaceChildren(...nodes);
   }
+}
+
+/**
+ * How busy the field is against its capacity (sim/airports.ts), and what
+ * that's costing in congestion delays — the same number the glow around
+ * the airport on the map encodes, spelled out.
+ */
+function fillAirportLoad(iata: string, state: SimState): void {
+  const load = airportLoad(state, iata);
+  const { delayChance, maxDelayMinutes } = congestionParameters(load);
+  loadEl.textContent =
+    `Airport load: ${Math.round(load * 100)}% at peak (${dailyMovementsAt(state, iata)} of ${airportCapacityPerDay(iata)} movements/day)` +
+    (delayChance > 0
+      ? `. Congestion delays ${Math.round(delayChance * 100)}% of flights here, up to ${maxDelayMinutes} min.`
+      : '. No congestion.');
+  loadEl.classList.toggle('airport-detail-warn', delayChance > 0 && load < 1);
+  loadEl.classList.toggle('airport-detail-over', load >= 1);
 }
 
 function airportActions(airport: Airport, state: SimState): RadialAction[] {
@@ -297,6 +319,8 @@ function fillRouteCard(a: string, b: string, state: SimState): void {
   }
 
   fillPools(ops.routeBase(state, a, b), state, '');
+  // A route card has no single airport to describe.
+  loadEl.textContent = '';
   fillRouteHistory(state, a, b);
   fillRouteOtp(state, a, b);
 }

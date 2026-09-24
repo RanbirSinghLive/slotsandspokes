@@ -19,7 +19,7 @@ import { SLOTS_ENABLED } from './features';
  * supposed to create.
  */
 
-type AirportSpec = { iata: string; name: string; slotsTotal?: number };
+type AirportSpec = { iata: string; name: string; population: number; slotsTotal?: number; capacityPerDay?: number };
 const airports = airportsData as AirportSpec[];
 const byIata = new Map(airports.map((a) => [a.iata, a]));
 
@@ -76,6 +76,70 @@ export function connectivityFactor(state: SimState, iata: string): number {
  */
 export function routeConnectivityMultiplier(state: SimState, origin: string, dest: string): number {
   return (connectivityFactor(state, origin) + connectivityFactor(state, dest)) / 2;
+}
+
+// --- Capacity and load ---------------------------------------------------
+
+/**
+ * How many takeoffs and landings a day this airport has room for, at the
+ * game's scale: the share of the field available to the airlines in this
+ * game, not its real-world total (YYZ really handles about 1,200 a day).
+ * Grows with the catchment's population on a log curve, so a big city's
+ * airport has several times a small one's room, not a hundred times.
+ *
+ * This is the one number congestion delays (sim/delays.ts), and next,
+ * slot prices, are read against — see `airportLoad()`.
+ *
+ * An airport can override it in data/airports.json (`capacityPerDay`)
+ * where the city's size says nothing about the field: Billy Bishop shares
+ * Toronto's population but is a small island airport.
+ */
+const CAPACITY_BASE = 18;
+const CAPACITY_PER_DOUBLING = 54;
+const CAPACITY_POPULATION_SCALE = 250_000;
+
+export function airportCapacityPerDay(iata: string): number {
+  const spec = byIata.get(iata);
+  if (spec?.capacityPerDay !== undefined) return spec.capacityPerDay;
+  const population = spec?.population ?? 0;
+  return Math.round(CAPACITY_BASE + CAPACITY_PER_DOUBLING * Math.log2(1 + population / CAPACITY_POPULATION_SCALE));
+}
+
+/**
+ * Takeoffs plus landings a day at this airport, every airline counted:
+ * the player's scheduled legs from and to it, plus each competitor route
+ * touching it. Competitors have frequencies but no times, so each daily
+ * frequency counts as one round trip: a takeoff and a landing at each end.
+ */
+export function dailyMovementsAt(state: SimState, iata: string): number {
+  let movements = 0;
+  for (const leg of state.schedule) {
+    if (leg.origin === iata) movements += 1;
+    if (leg.dest === iata) movements += 1;
+  }
+  for (const route of state.competitorRoutes) {
+    if (route.origin === iata || route.dest === iata) movements += 2 * route.dailyFrequency;
+  }
+  return movements;
+}
+
+/**
+ * Traffic isn't spread evenly across the day: it bunches into morning and
+ * evening peaks. Load is judged at the peak, which runs this much busier
+ * than the daily average. One constant for every airport for now; hub
+ * styles (banked vs rolling) will vary it later.
+ */
+const PEAK_FACTOR = 1.5;
+
+/**
+ * How full the airport is at its busiest: peak movements over capacity.
+ * 0.5 is comfortably busy, 1 is full, above 1 is more traffic than the
+ * field can take without queueing. Drives congestion delays.
+ */
+export function airportLoad(state: SimState, iata: string): number {
+  const capacity = airportCapacityPerDay(iata);
+  if (capacity <= 0) return 0;
+  return (dailyMovementsAt(state, iata) * PEAK_FACTOR) / capacity;
 }
 
 // --- Slots ------------------------------------------------------------
