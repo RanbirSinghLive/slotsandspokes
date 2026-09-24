@@ -1,8 +1,9 @@
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { createInitialState, type SimState } from '../sim/state';
+import { DEFAULT_HOME_AIRPORT, type SimState } from '../sim/state';
 import { crewRequirement } from '../sim/crew';
 import { step } from '../sim/step';
+import { startHeadlessGame } from './newGame';
 
 /**
  * Balance-tuning sweep: run the same simulated network many times over,
@@ -26,7 +27,6 @@ import { step } from '../sim/step';
  */
 
 const MINUTES_PER_DAY = 1440;
-const ACTIVE_TAILS = ['C-GVIA', 'C-FATL', 'C-GMAR'];
 const SWEEP_SEED = 1;
 const DEFAULT_DAYS = 120;
 
@@ -80,6 +80,8 @@ const LEVERS: Lever[] = [
     apply: (state, multiplier) => {
       for (const settings of Object.values(state.routeSettings)) {
         settings.fare = Math.round(settings.fare * multiplier);
+        // What a player's own fare edit does, so the price policy leaves it alone.
+        settings.fareIsOverridden = true;
       }
     },
     format: (v) => `${v.toFixed(2)}x`,
@@ -129,7 +131,10 @@ type SweepRow = {
  * timing for the same reason.
  */
 function runOne(lever: Lever, value: number, days: number): SweepRow {
-  const state = createInitialState(ACTIVE_TAILS, SWEEP_SEED);
+  // A real new game (see newGame.ts), with the lever applied once its
+  // starter routes exist, so fare and marketing levers have markets to touch.
+  const state = startHeadlessGame(home, SWEEP_SEED);
+  const startingCash = state.cash;
   lever.apply(state, value);
 
   let totalRevenue = 0;
@@ -147,9 +152,8 @@ function runOne(lever: Lever, value: number, days: number): SweepRow {
 
   return {
     value,
-    // createInitialState() starts at zero cash (unlike a real new game),
-    // so this is simply cumulative profit over the whole run.
-    finalCash: state.cash,
+    // Profit over the run: a real new game starts with cash in the bank.
+    finalCash: state.cash - startingCash,
     avgDailyRevenue: totalRevenue / days,
     avgDailyCost: totalCost / days,
     avgDailyMargin: (totalRevenue - totalCost) / days,
@@ -196,7 +200,7 @@ const lever = LEVERS.find((l) => l.name === leverName);
 
 if (!lever) {
   console.log('');
-  console.log('  Usage: npm run sweep -- <lever> [days]');
+  console.log('  Usage: npm run sweep -- <lever> [days] [home IATA]');
   console.log('');
   console.log('  Levers:');
   for (const l of LEVERS) {
@@ -207,8 +211,9 @@ if (!lever) {
 }
 
 const days = Number(process.argv[3]) || DEFAULT_DAYS;
+const home = process.argv[4] || DEFAULT_HOME_AIRPORT;
 
-console.log(`Sweeping "${lever.name}" across ${lever.values.length} values, ${days} days each, seed ${SWEEP_SEED}...`);
+console.log(`Sweeping "${lever.name}" across ${lever.values.length} values, ${days} days each, from ${home}, seed ${SWEEP_SEED}...`);
 const rows = lever.values.map((value) => runOne(lever, value, days));
 
 printTable(lever, rows);

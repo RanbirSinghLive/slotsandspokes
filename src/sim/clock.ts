@@ -60,3 +60,17 @@ export function dayIndex(state: SimState, minute: number = state.simMinute): num
 export function startingSimMinute(homeIata: string): number {
   return -(offsetByIata.get(homeIata) ?? 0);
 }
+
+function pad(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
+// The sim speaks in minutes since midnight; people read clock times.
+// Lives here, not in the UI, because sim/rotations.ts writes clock times
+// into the reasons it gives for refusing a rotation.
+export function minuteOfDayToTimeString(minuteOfDay: number): string {
+  const hours = Math.floor(minuteOfDay / 60);
+  // A long-haul rotation lands the next morning (sim/utilisation.ts's
+  // isLongHaulRoundTrip()); "28:02" is not a time anyone reads.
+  return `${pad(hours % 24)}:${pad(minuteOfDay % 60)}${hours >= 24 ? ' +1' : ''}`;
+}

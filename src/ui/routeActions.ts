@@ -6,7 +6,8 @@ import { cashNeededToLease, LEASE_RESERVE_DAYS, leaseAircraft, loadLeaseRates } 
 import { daysUntilNextListing, hasDebuted, listingsOf, returnBlockedReason, returnFee, returnLease, takeListing, type MarketListing } from '../sim/market';
 import { revealReach } from '../sim/reach';
 import { actualDailyDemand, currentPotentialDemand } from '../sim/marketDemand';
-import { candidateTailsAt, commitRotation, planRotation, type RotationPlan } from './routeBuilder';
+import { candidateTailsAt, planRotation, type RotationPlan } from '../sim/rotations';
+import { commitRotation } from './routeBuilder';
 import { removeRotation, renderScheduleWarnings, scheduleProblems } from './panels';
 import { applyTurnBufferChange, planTurnBufferChange } from '../sim/turnBuffer';
 import { applyHubStyleChange, planHubStyleChange } from '../sim/hubs';
@@ -23,8 +24,8 @@ import type { MapPreview } from '../render/preview';
  * path so a button can never be enabled for something that then refuses.
  *
  * Nothing here decides what a rotation *is* or whether it fits: planning
- * and committing are ui/routeBuilder.ts's planRotation() and
- * commitRotation(), the same functions the draw-a-route gesture uses. This
+ * and committing are sim/rotations.ts's planRotation() and
+ * ui/routeBuilder.ts's commitRotation(), the same functions the draw-a-route gesture uses. This
  * module only chooses which plane and which rotation to hand them.
  *
  * The unit of change is one flight. A route with three flights a day is

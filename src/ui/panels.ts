@@ -5,6 +5,7 @@ import { classByCode } from '../sim/aircraftClasses';
 import { planeIconElement } from './planeIcons';
 import { updatePnlHistoryPanel } from './pnlHistory';
 import type { SimState } from '../sim/state';
+import { minuteOfDayToTimeString } from '../sim/clock';
 
 // Must match the --panel-width custom property's default value in
 // style.css — see the comment there. Week six: widened from 280 to fit a
@@ -72,19 +73,9 @@ export function updatePanel(state: SimState): void {
   renderRotations(state);
 }
 
-function pad(n: number): string {
-  return String(n).padStart(2, '0');
-}
-
-// The sim speaks in minutes since midnight; people read clock times.
-// Exported because the route builder's popover shows a rotation's window
-// in the same format.
-export function minuteOfDayToTimeString(minuteOfDay: number): string {
-  const hours = Math.floor(minuteOfDay / 60);
-  // A long-haul rotation lands the next morning (sim/utilisation.ts's
-  // isLongHaulRoundTrip()); "28:02" is not a time anyone reads.
-  return `${pad(hours % 24)}:${pad(minuteOfDay % 60)}${hours >= 24 ? ' +1' : ''}`;
-}
+// The formatter itself lives in sim/clock.ts (the sim writes clock times
+// into its own messages); re-exported so the panels keep importing it here.
+export { minuteOfDayToTimeString };
 
 /**
  * Week seven, phase C: the schedule table is gone and this replaces it.
