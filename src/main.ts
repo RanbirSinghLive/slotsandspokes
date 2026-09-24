@@ -48,6 +48,7 @@ import { updateTicker } from './ui/ticker';
 import { updateAlerts } from './ui/alerts';
 import { updatePoolBars } from './ui/poolBars';
 import { setupLoans, updateLoans } from './ui/loans';
+import { updateRunway } from './ui/runway';
 import { isInsolvent } from './sim/loans';
 import { setupGameControls, updateGameControls } from './ui/gameControls';
 import { loadSavedState, saveState } from './ui/save';
@@ -295,6 +296,12 @@ let mapMode: MapMode = 'none';
 // out again every frame in render() rather than only on mousemove.
 let hoverPoint: { x: number; y: number } | null = null;
 
+// Set by render() when the cash runway pop-up opens (ui/runway.ts), and
+// acted on by tick(), which owns the speed controls — the same split as the
+// insolvency pause below, for the same reason: render() can run before
+// speedMultiplier exists.
+let runwayPauseRequested = false;
+
 function render(nowMs: number = performance.now()): void {
   updateClock(state);
   updatePanel(state);
@@ -315,6 +322,7 @@ function render(nowMs: number = performance.now()): void {
   // run before speedMultiplier itself is declared (resize()'s very first
   // call, at startup).
   updateLoans(state);
+  if (updateRunway(state)) runwayPauseRequested = true;
 
   // The Dev tab is the one panel that refreshes every frame rather than
   // on tab-select — watching cost accumulate across a simulated day is
@@ -518,6 +526,14 @@ function tick(nowMs: number): void {
   // so nothing should keep flying in the background behind the game-over
   // screen ui/loans.ts is about to show.
   if (isInsolvent(state) && speedMultiplier !== 0) {
+    speedMultiplier = 0;
+    speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === 0));
+  }
+
+  // The runway pop-up pauses once so the warning can't scroll past at
+  // 100x. speedBeforePause is left alone, so Space resumes at the old speed.
+  if (runwayPauseRequested) {
+    runwayPauseRequested = false;
     speedMultiplier = 0;
     speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === 0));
   }

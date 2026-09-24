@@ -1,4 +1,5 @@
 import { scheduleProblems } from './panels';
+import { runwayAlertMessage } from './runway';
 import type { SimState } from '../sim/state';
 
 /**
@@ -33,6 +34,11 @@ function collectAlerts(state: SimState): Alert[] {
   for (const tail of state.groundedTails) {
     alerts.push({ message: `${tail} is grounded — not enough crew to fly it today`, tab: 'crew' });
   }
+
+  // Cash running out ends the game, so it goes first: of everything in
+  // this strip, it's the one problem that can't be fixed after the fact.
+  const runway = runwayAlertMessage(state);
+  if (runway) alerts.unshift({ message: runway, tab: 'fleet' });
 
   return alerts;
 }

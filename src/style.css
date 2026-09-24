@@ -553,6 +553,16 @@ body {
   color: #fff;
 }
 
+/* The Runway row (ui/runway.ts): amber inside a month, red inside two
+   weeks — the same #ffd166 / #ff8080 pair the On-Time panel uses. */
+.econ-value.runway-warn {
+  color: #ffd166;
+}
+
+.econ-value.runway-critical {
+  color: #ff8080;
+}
+
 /* "Last 7 Days" bar charts (ui/pnlHistory.ts) — same bars-in-a-flex-row
    idiom as the dev tools' delay histograms (.dev-histogram-bars below),
    just smaller and living in the always-visible sidebar instead of a
