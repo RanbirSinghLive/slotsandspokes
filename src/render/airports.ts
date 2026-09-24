@@ -133,13 +133,14 @@ function presenceRadius(departures: number): number {
  * much of an airline you are there, with a capacity ring at every base
  * showing how full its pooled aircraft-day budget is.
  *
- * Overlapping labels still aren't solved (WEEK-ONE.md says so
- * explicitly) — this draws every label at a fixed offset and lets them
- * collide if they collide.
+ * Labels are placed in a second pass, after every dot — see
+ * placeLabels() below for how close airports (YYZ/YTZ, YUL/YOW) keep
+ * their codes from printing on top of each other.
  */
 export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState, showUnmetDemand: boolean): void {
   ctx.font = LABEL_FONT;
   ctx.textBaseline = 'middle';
+  const pendingLabels: PendingLabel[] = [];
 
   // Computed once for the whole map rather than per airport — it's a
   // single pass over the fleet either way, so there's no reason to repeat
@@ -249,8 +250,74 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState, sho
     ctx.fillStyle = served ? MARKER_FILL : UNSERVED_FILL;
     ctx.fill();
 
-    ctx.fillStyle = served ? SERVED_LABEL_FILL : LABEL_FILL;
-    ctx.fillText(airport.iata, x + radius + 4, y);
+    pendingLabels.push({ iata: airport.iata, x, y, radius, served, departures, population: airport.population });
+  }
+
+  placeLabels(ctx, pendingLabels);
+}
+
+type PendingLabel = {
+  iata: string;
+  x: number;
+  y: number;
+  radius: number;
+  served: boolean;
+  departures: number;
+  population: number;
+};
+
+type Box = { left: number; top: number; right: number; bottom: number };
+
+const LABEL_HEIGHT_PX = 12;
+const LABEL_GAP_PX = 4;
+
+function boxesOverlap(a: Box, b: Box): boolean {
+  return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+}
+
+/**
+ * Draw every airport's code without letting two of them overlap.
+ *
+ * This is a "greedy" label placer: the most important airports claim
+ * their spot first (busiest for you, then biggest city), and each later
+ * label tries right, left, above and below its dot, taking the first
+ * spot that doesn't overlap a label — or a dot — already on the map. If
+ * all four are taken, that code is simply not drawn at this zoom; the dot
+ * is still there, still hoverable, and zooming in pulls the airports far
+ * enough apart for the label to come back. Greedy placement isn't
+ * optimal, but it's predictable and cheap, which is what a per-frame
+ * renderer needs.
+ */
+function placeLabels(ctx: CanvasRenderingContext2D, labels: PendingLabel[]): void {
+  labels.sort((a, b) => b.departures - a.departures || b.population - a.population);
+
+  // Every dot is an obstacle too, so a label never sits on a neighbour's marker.
+  const taken: Box[] = labels.map((l) => ({
+    left: l.x - l.radius,
+    top: l.y - l.radius,
+    right: l.x + l.radius,
+    bottom: l.y + l.radius,
+  }));
+
+  for (const label of labels) {
+    const width = ctx.measureText(label.iata).width;
+    const half = LABEL_HEIGHT_PX / 2;
+    const offset = label.radius + LABEL_GAP_PX;
+    // Each candidate is the text's left edge and vertical centre.
+    const candidates: [number, number][] = [
+      [label.x + offset, label.y], // right (the long-standing default)
+      [label.x - offset - width, label.y], // left
+      [label.x - width / 2, label.y - offset - half], // above
+      [label.x - width / 2, label.y + offset + half], // below
+    ];
+    for (const [textX, textY] of candidates) {
+      const box = { left: textX, top: textY - half, right: textX + width, bottom: textY + half };
+      if (taken.some((other) => boxesOverlap(box, other))) continue;
+      taken.push(box);
+      ctx.fillStyle = label.served ? SERVED_LABEL_FILL : LABEL_FILL;
+      ctx.fillText(label.iata, textX, textY);
+      break;
+    }
   }
 }
 
