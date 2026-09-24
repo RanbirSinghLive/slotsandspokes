@@ -1,4 +1,5 @@
 import type { SimState } from './state';
+import { OTP_BASELINE } from './reputation';
 
 /**
  * Week six's targets: the player's half of the goal system. Where a
@@ -42,11 +43,10 @@ export const TARGET_WINDOW_DAYS = 30;
 export const TARGET_MIN_SAMPLE_FLIGHTS = 20;
 
 // The neutral standards a promise is measured as ambitious *against*.
-// The on-time figure deliberately matches sim/reputation.ts's own
-// OTP_BASELINE: "a respectable regional carrier" should mean the same
-// thing to both systems. NPS is already zero-centred, so it needs no
-// baseline of its own.
-export const TARGET_OTP_BASELINE = 0.8;
+// The on-time figure *is* sim/reputation.ts's OTP_BASELINE: "a respectable
+// regional carrier" should mean the same thing to both systems. NPS is
+// already zero-centred, so it needs no baseline of its own.
+export const TARGET_OTP_BASELINE = OTP_BASELINE;
 export const TARGET_OTP_MAX = 0.99;
 export const TARGET_NPS_MAX = 60;
 

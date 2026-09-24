@@ -15,14 +15,18 @@ import type { SimState } from './state';
  * stats shows) and moves Reputation up or down accordingly.
  */
 
-// 80% on-time is this model's "neutral" day — better swings Reputation up,
-// worse swings it down. Picked as a round, plausible "this is a
-// respectable regional carrier" benchmark, same "not fit to any real
-// study, just a reasonable anchor" spirit as every other constant here.
+// 70% on-time is this model's "neutral" day — better swings Reputation up,
+// worse swings it down. Lowered from 80% when every lease became a
+// 20-year-old airframe (sim/leasing.ts): an old fleet's own age delays cap
+// it at roughly 72% even with generous turn buffers, so an 80% line meant
+// a starting airline lost Reputation every day however well it was run.
+// At 70% a well-buffered old fleet sits near neutral and a newer fleet
+// earns a real bonus. Not fit to any real study, same as every other
+// constant here.
 // Exported (week eight) so render/mapmodes.ts's on-time mapmode can colour
 // routes against the same benchmark Reputation itself scores against,
 // rather than picking its own number that could silently drift from it.
-export const OTP_BASELINE = 0.8;
+export const OTP_BASELINE = 0.7;
 const OTP_WEIGHT = 50;
 
 // NPS is already zero-centered (a bad day is negative, a good day

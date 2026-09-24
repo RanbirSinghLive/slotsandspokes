@@ -80,22 +80,22 @@ export function trailingMarketOtp(state: SimState, a: string, b: string, days = 
  * around; passengers who don't, come back and bring friends.
  *
  *   OTP 100% → 1.5   growth runs half again as fast
- *   OTP  80% → 1.0   normal growth (Reputation's own neutral line)
- *   OTP  50% → 0     growth stalls
- *   OTP  30% → -1    the market shrinks as fast as if you'd abandoned it
+ *   OTP  70% → 1.0   normal growth (Reputation's own neutral line)
+ *   OTP  40% → 0     growth stalls
+ *   OTP  20% → -1    the market shrinks as fast as if you'd abandoned it
  *
  * Straight lines between those points. The stall point sits well below
- * the neutral one on purpose: a schedule packed with zero buffer runs at
- * roughly 55–60% on-time, and that should *slow* a new player's markets
- * enough to notice, not start shrinking them before they've learned what
- * a turn buffer is. Negative values are applied as decay toward the
+ * the neutral one on purpose: the starting fleet of 20-year-old aircraft
+ * (sim/leasing.ts) runs at roughly 45% on-time with zero buffer, and that
+ * should *slow* a new player's markets enough to notice, not start
+ * shrinking them before they've learned what a turn buffer is. Negative values are applied as decay toward the
  * market's floor rather than as negative growth, so they can't overshoot.
  *
  * `null` (too few arrivals to judge) is neutral.
  */
 const FACTOR_AT_PERFECT = 1.5;
-const STALL_OTP = 0.5;
-const FULL_REVERSE_OTP = 0.3;
+const STALL_OTP = 0.4;
+const FULL_REVERSE_OTP = 0.2;
 
 export function reliabilityDemandFactor(otp: number | null): number {
   if (otp === null) return 1;

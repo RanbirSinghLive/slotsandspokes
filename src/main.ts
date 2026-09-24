@@ -7,6 +7,7 @@ import { drawAirports, airports, setKnownAirports } from './render/airports';
 import { drawFog } from './render/fog';
 import { drawWeatherEffects } from './render/weather';
 import { drawAircraft, findFlightAt, flightScreenPoint } from './render/aircraft';
+import { OTP_BASELINE } from './sim/reputation';
 import { drawDelayCascade } from './render/cascade';
 import { projectRestOfDay } from './sim/cascade';
 import { showFlightTooltip, hideFlightTooltip } from './ui/flightTooltip';
@@ -709,7 +710,7 @@ function updateMapModeLegend(): void {
     mapModeLegendTitle.textContent = 'On-time performance';
     mapModeLegendScale.innerHTML =
       swatch(MAP_MODE_COLORS.loss, '0% on-time') +
-      swatch(MAP_MODE_COLORS.breakeven, '80% (Reputation baseline)') +
+      swatch(MAP_MODE_COLORS.breakeven, `${Math.round(OTP_BASELINE * 100)}% (Reputation baseline)`) +
       swatch(MAP_MODE_COLORS.profit, '100% on-time');
   }
 }
