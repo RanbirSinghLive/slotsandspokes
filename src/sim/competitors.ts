@@ -15,6 +15,7 @@ import {
   RIVAL_FIRST_ENTRY_DAY,
   RIVAL_FREQUENCY_CAP,
   recentlyClosedByRival,
+  rivalNetworkRoom,
 } from './pressure';
 import { rivalSecuresCapacity } from './market';
 import type { SimState } from './state';
@@ -126,12 +127,12 @@ const COMPETITOR_MAX_ROUTE_NM = 850;
 
 /**
  * Once per simulated day (called from step.ts's day-rollover, alongside
- * rollDailyWeather()): each competitor airline already in the game — the
- * roster is derived from whichever airlines already have at least one
- * route, so this never invents a brand-new competitor mid-game, only
- * grows the existing three's own networks — gets an independent, small
- * chance to open exactly one new route on a market it doesn't already
- * serve.
+ * rollDailyWeather()): each competitor airline already in the game (new
+ * airlines arrive separately, via rollRivalEntry()) gets an independent,
+ * small chance to open exactly one new route on a market it doesn't
+ * already serve. The chance rises with pressureFactor() and shrinks as
+ * the airline's network fills (sim/pressure.ts's rivalNetworkRoom()), so
+ * openings slow down and stop at RIVAL_MAX_ROUTES_PER_AIRLINE.
  *
  * Candidates are weighted by potentialDailyDemand() (sim/demand.ts) —
  * *potential*, not the stimulated actual demand, on purpose: a
@@ -151,7 +152,7 @@ export function rollCompetitorRouteOpenings(state: SimState, dayStartMinute: num
   for (const { airline, code } of roster) {
     const [openRoll, seedAfterOpen] = nextRandom(state.rngSeed);
     state.rngSeed = seedAfterOpen;
-    if (openRoll >= NEW_ROUTE_PROBABILITY_PER_DAY * pressureFactor(state)) continue;
+    if (openRoll >= NEW_ROUTE_PROBABILITY_PER_DAY * pressureFactor(state) * rivalNetworkRoom(state, code)) continue;
 
     const servedKeys = new Set(
       state.competitorRoutes.filter((c) => c.code === code).map((c) => marketKey(c.origin, c.dest)),

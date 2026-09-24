@@ -58,6 +58,27 @@ export const RIVAL_CLOSE_AFTER_LOSING_DAYS = 30;
  */
 export const RIVAL_REOPEN_COOLDOWN_DAYS = 180;
 
+/**
+ * The most routes one rival airline will fly. Without a cap, pressure
+ * made openings ever more likely and networks grew without limit
+ * (measured, from London one rival reached 65 routes in three years).
+ * By the end of year one most rivals fly 8 to 15, so this starts to bite
+ * in year two.
+ */
+export const RIVAL_MAX_ROUTES_PER_AIRLINE = 20;
+
+/**
+ * How much room airline `code` has left to grow, 0 to 1: 1 with no
+ * routes, 0 at RIVAL_MAX_ROUTES_PER_AIRLINE. Multiplies its chance of
+ * opening a route, so openings slow as its network fills up rather than
+ * stopping dead at the cap. Closures (sim/rivalEconomics.ts) free room
+ * again, so a full-size airline trades losing routes for new ones.
+ */
+export function rivalNetworkRoom(state: SimState, code: string): number {
+  const routes = state.competitorRoutes.filter((route) => route.code === code).length;
+  return Math.max(0, 1 - routes / RIVAL_MAX_ROUTES_PER_AIRLINE);
+}
+
 /** Whether airline `code` closed the a–b market within RIVAL_REOPEN_COOLDOWN_DAYS. */
 export function recentlyClosedByRival(state: SimState, code: string, a: string, b: string): boolean {
   const market = [a, b].sort().join('-');
