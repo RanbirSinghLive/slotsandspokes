@@ -178,7 +178,9 @@ export function recommendedFare(originIata: string, destIata: string): number {
  * concept as an actual lookup key, not just a comparison.
  */
 export function marketKey(a: string, b: string): string {
-  return [a, b].sort().join('-');
+  // Alphabetical order, compared directly rather than by sorting an array:
+  // the map and the daily market pass call this for every airport pair.
+  return a < b ? `${a}-${b}` : `${b}-${a}`;
 }
 
 /**

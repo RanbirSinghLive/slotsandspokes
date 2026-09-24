@@ -25,7 +25,8 @@ import type { SimState } from './state';
  * demand flows both ways. Competitors' seats are ignored: this is the
  * player's view of what they are not carrying.
  *
- * Pure reads of `state`, no randomness; safe to call every frame.
+ * Pure reads of `state`, no randomness. It walks every known airport
+ * pair, so the map caches it against unmetDemandInputs().
  */
 
 const seatsByTypeCode = new Map<string, number>(
@@ -43,6 +44,18 @@ function playerSeatsByMarket(state: SimState): Map<string, number> {
     seats.set(key, (seats.get(key) ?? 0) + (seatsByTail.get(leg.tail) ?? 0));
   }
   return seats;
+}
+
+/**
+ * A string that changes whenever unmetDemandByAirport()'s answer can: the
+ * airports known, the player's seats in each market, and the demand
+ * growth multiplier (which moves only at the day rollover, the same
+ * moment actual demand does). The map redraws every frame but the answer
+ * changes rarely, so the renderer recomputes only when this changes.
+ */
+export function unmetDemandInputs(state: SimState): string {
+  const seats = [...playerSeatsByMarket(state)].map(([key, count]) => `${key}:${count}`).join(',');
+  return `${state.demandGrowthMultiplier}|${state.knownAirports.length}|${seats}`;
 }
 
 /** Per-airport latent and spilled demand, passengers a day. */

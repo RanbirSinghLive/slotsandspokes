@@ -125,29 +125,30 @@ export function actualDailyDemand(state: SimState, origin: string, dest: string)
 }
 
 /**
- * Total daily seats every airline puts into a market — the player's
- * scheduled legs at their real aircraft's gauge, plus each competitor's
- * frequency at an assumed one. This is what drives stimulation: seats,
- * not frequencies, because "is this market genuinely served" is a
- * question about capacity offered, and one daily 19-seater means
- * something very different on a 9-PDEW market than on a 4,600-PDEW one.
+ * Total daily seats every airline puts into each market, keyed by
+ * marketKey() — the player's scheduled legs at their real aircraft's
+ * gauge, plus each competitor's frequency at an assumed one. This is what
+ * drives stimulation: seats, not frequencies, because "is this market
+ * genuinely served" is a question about capacity offered, and one daily
+ * 19-seater means something very different on a 9-PDEW market than on a
+ * 4,600-PDEW one.
+ *
+ * Every market at once, because the daily pass needs every pair, and one
+ * walk of the schedule is far cheaper than one walk per pair.
  */
-function dailySeatsOffered(state: SimState, origin: string, dest: string): number {
-  const key = marketKey(origin, dest);
+function dailySeatsByMarket(state: SimState): Map<string, number> {
+  const seatsByTail = new Map(state.aircraft.map((a) => [a.tail, seatsByTypeCode.get(a.typeCode) ?? 0]));
+  const seats = new Map<string, number>();
+  const add = (key: string, count: number) => seats.set(key, (seats.get(key) ?? 0) + count);
 
-  let seats = 0;
   for (const leg of state.schedule) {
-    if (marketKey(leg.origin, leg.dest) !== key) continue;
-    const aircraft = state.aircraft.find((a) => a.tail === leg.tail);
-    if (!aircraft) continue; // a scheduled leg with no aircraft to fly it offers nothing
-    seats += seatsByTypeCode.get(aircraft.typeCode) ?? 0;
+    const tailSeats = seatsByTail.get(leg.tail);
+    if (tailSeats === undefined) continue; // a scheduled leg with no aircraft to fly it offers nothing
+    add(marketKey(leg.origin, leg.dest), tailSeats);
   }
-
   for (const competitor of state.competitorRoutes) {
-    if (marketKey(competitor.origin, competitor.dest) !== key) continue;
-    seats += competitor.dailyFrequency * COMPETITOR_ASSUMED_SEATS;
+    add(marketKey(competitor.origin, competitor.dest), competitor.dailyFrequency * COMPETITOR_ASSUMED_SEATS);
   }
-
   return seats;
 }
 
@@ -226,6 +227,7 @@ function serviceSaturation(seatsOffered: number, potential: number): number {
  */
 export function rollDailyMarketDemand(state: SimState): void {
   state.demandGrowthMultiplier *= 1 + DAILY_DEMAND_GROWTH;
+  const seatsByMarket = dailySeatsByMarket(state);
 
   for (const [origin, dest] of ALL_MARKET_PAIRS) {
     const key = marketKey(origin, dest);
@@ -233,7 +235,7 @@ export function rollDailyMarketDemand(state: SimState): void {
     const floor = Math.min(VIRGIN_MARKET_PDEW, potential);
     const current = state.marketDemand[key] ?? floor;
 
-    const seatsOffered = dailySeatsOffered(state, origin, dest);
+    const seatsOffered = seatsByMarket.get(key) ?? 0;
     // Marketing only counts where you actually fly — awareness of a
     // service that doesn't exist sells nothing, and the branch below
     // keeps that true without a separate check. (`routeSettings` only
@@ -265,6 +267,11 @@ export function rollDailyMarketDemand(state: SimState): void {
     // Never above potential, never below the floor — the growth and decay
     // terms above already approach both asymptotically, but clamping
     // keeps a future rate change from being able to overshoot either.
-    state.marketDemand[key] = Math.min(potential, Math.max(floor, next));
+    // A market sitting exactly at its floor isn't stored: actualDailyDemand()
+    // reads a missing key as the floor, so the save holds only markets
+    // someone has moved, not one entry for every pair on the map.
+    const clamped = Math.min(potential, Math.max(floor, next));
+    if (clamped === floor) delete state.marketDemand[key];
+    else state.marketDemand[key] = clamped;
   }
 }

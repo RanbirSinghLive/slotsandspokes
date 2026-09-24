@@ -4,7 +4,7 @@ import { dailyDeparturesAt, airportLevel, airportLoad } from '../sim/airports';
 import { slotFeesPerDayAt, slotsHeld } from '../sim/slots';
 import { worstPoolShareByBase } from '../sim/utilisation';
 import { getMapPreview } from './preview';
-import { pipCount, unmetDemandByAirport } from '../sim/unmetDemand';
+import { pipCount, unmetDemandByAirport, unmetDemandInputs, type AirportUnmet } from '../sim/unmetDemand';
 import type { SimState } from '../sim/state';
 
 export type Airport = {
@@ -129,6 +129,21 @@ function presenceRadius(departures: number): number {
 }
 
 /**
+ * The last unmetDemandByAirport() answer and what it was worked out from.
+ * It walks every known airport pair, too much to repeat every frame.
+ * Its inputs change only when a route or plane changes or a day ends.
+ */
+let unmetCache: { state: SimState; inputs: string; byIata: Map<string, AirportUnmet> } | null = null;
+
+function cachedUnmetDemand(state: SimState): Map<string, AirportUnmet> {
+  const inputs = unmetDemandInputs(state);
+  if (unmetCache?.state !== state || unmetCache.inputs !== inputs) {
+    unmetCache = { state, inputs, byIata: unmetDemandByAirport(state) };
+  }
+  return unmetCache.byIata;
+}
+
+/**
  * Draw a dot plus IATA code for every airport, sized and coloured by how
  * much of an airline you are there, with a capacity ring at every base
  * showing how full its pooled aircraft-day budget is.
@@ -153,7 +168,7 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState, sho
   // pressed, drawn as a dashed arc just outside the real one.
   // Only with the Demand layer on: always drawn, the pips cluttered every
   // airport all the time with something the player mostly isn't asking about.
-  const unmetByIata = showUnmetDemand ? unmetDemandByAirport(state) : new Map<string, never>();
+  const unmetByIata = showUnmetDemand ? cachedUnmetDemand(state) : new Map<string, never>();
   const previewEffects = getMapPreview()?.effects ?? [];
   const previewShareByIata = previewEffects.length > 0 ? worstPoolShareByBase(state, previewEffects) : null;
 

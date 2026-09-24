@@ -1414,6 +1414,9 @@ Growth is driven by `seatsOffered / potential`, which is what makes size
 matter: one daily 19-seater saturates a 9-PDEW market and is a rounding
 error against a 4,600-PDEW one. Marketing spend multiplies that rate.
 Unserved markets decay back toward the floor, more slowly than they grow.
+Only markets away from their floor are stored: a missing key reads as the
+floor, so the save grows with the markets anyone has flown, not with every
+pair on the map.
 
 Actual demand is a property of the **market**, not of any airline —
 everyone flying it grows it, everyone serving it draws from the same

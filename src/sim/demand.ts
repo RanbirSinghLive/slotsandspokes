@@ -82,17 +82,25 @@ export function suppressedMarketReason(originIata: string, destIata: string): st
  * market that doesn't exist yet.
  *
  * A pure function of static data (population, great-circle distance), so
- * it's cheap to call as often as needed rather than caching a matrix.
+ * every pair is worked out once at module load and this is a lookup. The
+ * map, the daily market pass and the hub model all call it for every
+ * pair, and the pair count grows with the square of the airport count.
  */
 export function potentialDailyDemand(originIata: string, destIata: string): number {
-  const origin = airportsByIata.get(originIata);
-  const dest = airportsByIata.get(destIata);
-  if (!origin || !dest) {
+  if (!airportsByIata.has(originIata) || !airportsByIata.has(destIata)) {
     throw new Error(`potentialDailyDemand: unknown airport in pair ${originIata}-${destIata}`);
   }
-  if (origin.iata === dest.iata) return 0;
-  if (suppressedByKey.has([originIata, destIata].sort().join('-'))) return 0;
+  if (originIata === destIata) return 0;
+  return potentialByPair.get(pairKey(originIata, destIata)) ?? 0;
+}
 
+/** The same key as schedule.ts's marketKey(), without sorting an array on every call. */
+function pairKey(a: string, b: string): string {
+  return a < b ? `${a}-${b}` : `${b}-${a}`;
+}
+
+function gravityDemand(origin: AirportDemandInput, dest: AirportDemandInput): number {
+  if (suppressedByKey.has(pairKey(origin.iata, dest.iata))) return 0;
   const distanceNm = greatCircleDistanceNm(origin, dest);
   const gravity = (origin.population * dest.population) / Math.pow(distanceNm, DISTANCE_EXPONENT);
   return Math.round(gravity * SCALING_CONSTANT);
@@ -127,3 +135,8 @@ export const ALL_MARKET_PAIRS: [string, string][] = (() => {
   }
   return pairs;
 })();
+
+/** potentialDailyDemand() for every pair, keyed by pairKey(). Static data, so a module-level lookup rather than state. */
+const potentialByPair = new Map<string, number>(
+  ALL_MARKET_PAIRS.map(([a, b]) => [pairKey(a, b), gravityDemand(airportsByIata.get(a)!, airportsByIata.get(b)!)]),
+);
