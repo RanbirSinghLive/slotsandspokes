@@ -173,24 +173,13 @@ function pooledMinutes(state: SimState): Map<string, number> {
 }
 
 /**
- * Work out what setting this market's buffer to `bufferMinutes` would do,
- * on a copy — nothing here touches `state`. The same plan drives the
- * button's enabled state, its hover preview and the change itself, so the
- * three can't disagree.
+ * Re-space every tail in `affectedTails` inside `work` (a copy of `state`
+ * with the new setting already applied), moving rotations to other planes
+ * in the same pool where a day overflows, and report what that does to the
+ * pools. Shared by every setting that changes scheduled ground time: a
+ * route's turn buffer (below) and a hub's style (sim/hubs.ts).
  */
-export function planTurnBufferChange(state: SimState, a: string, b: string, bufferMinutes: number): TurnBufferPlan {
-  const key = marketKey(a, b);
-  const settings = state.routeSettings[key];
-  if (!settings) return { ok: false, reason: 'Nothing flies this route.' };
-
-  const work: SimState = {
-    ...state,
-    schedule: state.schedule.map((leg) => ({ ...leg })),
-    routeSettings: { ...state.routeSettings, [key]: { ...settings, turnBufferMinutes: bufferMinutes } },
-    completedToday: [...state.completedToday],
-  };
-
-  const affectedTails = [...new Set(work.schedule.filter((leg) => marketKey(leg.origin, leg.dest) === key).map((leg) => leg.tail))];
+export function planRespace(state: SimState, work: SimState, affectedTails: string[]): TurnBufferPlan {
   let moved = 0;
 
   for (const tail of affectedTails) {
@@ -233,6 +222,53 @@ export function planTurnBufferChange(state: SimState, a: string, b: string, buff
   return { ok: true, schedule: work.schedule, completedToday: work.completedToday, moved, effects };
 }
 
+/** A copy of `state` safe for planRespace() to re-time: its own schedule and today's handled list. */
+export function workingCopy(state: SimState, overrides: Partial<SimState>): SimState {
+  return {
+    ...state,
+    schedule: state.schedule.map((leg) => ({ ...leg })),
+    completedToday: [...state.completedToday],
+    ...overrides,
+  };
+}
+
+/**
+ * Put a successful plan into effect. A plane with nothing scheduled that
+ * just took a moved rotation starts its day at its base — the same
+ * placement the route builder's commitRotation() gives a plane's first
+ * rotation, and for the same reason: otherwise a plane parked elsewhere
+ * would never reach its legs.
+ */
+export function applyRespace(state: SimState, plan: Extract<TurnBufferPlan, { ok: true }>): void {
+  for (const aircraft of state.aircraft) {
+    const hadNothing = !state.schedule.some((leg) => leg.tail === aircraft.tail);
+    const hasSomething = plan.schedule.some((leg) => leg.tail === aircraft.tail);
+    if (hadNothing && hasSomething && aircraft.status === 'ground' && aircraft.baseAirport) {
+      aircraft.atAirport = aircraft.baseAirport;
+    }
+  }
+  state.schedule = plan.schedule;
+  state.completedToday = plan.completedToday;
+}
+
+/**
+ * Work out what setting this market's buffer to `bufferMinutes` would do,
+ * on a copy — nothing here touches `state`. The same plan drives the
+ * button's enabled state, its hover preview and the change itself, so the
+ * three can't disagree.
+ */
+export function planTurnBufferChange(state: SimState, a: string, b: string, bufferMinutes: number): TurnBufferPlan {
+  const key = marketKey(a, b);
+  const settings = state.routeSettings[key];
+  if (!settings) return { ok: false, reason: 'Nothing flies this route.' };
+
+  const work = workingCopy(state, {
+    routeSettings: { ...state.routeSettings, [key]: { ...settings, turnBufferMinutes: bufferMinutes } },
+  });
+  const affectedTails = [...new Set(state.schedule.filter((leg) => marketKey(leg.origin, leg.dest) === key).map((leg) => leg.tail))];
+  return planRespace(state, work, affectedTails);
+}
+
 /** Set this market's buffer and re-time the schedule to match. */
 export function applyTurnBufferChange(
   state: SimState,
@@ -242,21 +278,7 @@ export function applyTurnBufferChange(
 ): { ok: true; moved: number } | { ok: false; reason: string } {
   const plan = planTurnBufferChange(state, a, b, bufferMinutes);
   if (!plan.ok) return plan;
-
-  // A plane with nothing scheduled that just took a moved rotation starts
-  // its day at its base — the same placement the route builder's
-  // commitRotation() gives a plane's first rotation, and for the same
-  // reason: otherwise a plane parked elsewhere would never reach its legs.
-  for (const aircraft of state.aircraft) {
-    const hadNothing = !state.schedule.some((leg) => leg.tail === aircraft.tail);
-    const hasSomething = plan.schedule.some((leg) => leg.tail === aircraft.tail);
-    if (hadNothing && hasSomething && aircraft.status === 'ground' && aircraft.baseAirport) {
-      aircraft.atAirport = aircraft.baseAirport;
-    }
-  }
-
+  applyRespace(state, plan);
   state.routeSettings[marketKey(a, b)].turnBufferMinutes = bufferMinutes;
-  state.schedule = plan.schedule;
-  state.completedToday = plan.completedToday;
   return { ok: true, moved: plan.moved };
 }

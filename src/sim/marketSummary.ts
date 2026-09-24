@@ -2,7 +2,7 @@ import aircraftTypesData from '../../data/aircraft-types.json';
 import { flightResult, LOAD_FACTOR, type EconomyAircraftType } from './economy';
 import { trafficShare } from './choiceModel';
 import { actualDailyDemand } from './marketDemand';
-import { routeConnectivityMultiplier } from './airports';
+import { connectingDemandOnMarket } from './hubs';
 import type { RouteSettings, SimState } from './state';
 import type { ScheduleLeg } from './schedule';
 
@@ -79,7 +79,7 @@ export function summarizeMarket(origin: string, dest: string, state: SimState, r
       state.fuelPriceIndex,
       state.fuelEfficiencyMultiplier,
       actualDailyDemand(state, leg.origin, leg.dest),
-      routeConnectivityMultiplier(state, leg.origin, leg.dest),
+      connectingDemandOnMarket(state, leg.origin, leg.dest),
       freq,
       routeSettings,
       state.competitorRoutes,

@@ -3,7 +3,8 @@ import { flightResult, type EconomyAircraftType } from './economy';
 import { MIN_TURN_MINUTES, legsServingMarket, marketKey, type ScheduleLeg } from './schedule';
 import { breaksCurfew, rotationStartingWith } from './curfew';
 import { rollDailyWeather, isAirportClosed } from './weather';
-import { routeConnectivityMultiplier, airportLoad } from './airports';
+import { airportLoad } from './airports';
+import { connectingDemandOnMarket } from './hubs';
 import { rollTotalDelayMinutes, isOnTimeArrival } from './delays';
 import { rollCompetitorRouteOpenings, rollCompetitorFrequencyGrowth, rollRivalEntry } from './competitors';
 import { rollDailyFuelPrice } from './fuel';
@@ -414,7 +415,7 @@ export function step(state: SimState): void {
             state.fuelPriceIndex,
             state.fuelEfficiencyMultiplier,
             actualDailyDemand(state, flight.origin, flight.dest),
-            routeConnectivityMultiplier(state, flight.origin, flight.dest),
+            connectingDemandOnMarket(state, flight.origin, flight.dest),
             marketFrequency,
             { fare: flight.fare, marketingSpend: flight.marketingSpend },
             state.competitorRoutes,

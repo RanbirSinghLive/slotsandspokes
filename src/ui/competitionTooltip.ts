@@ -3,7 +3,7 @@ import type { CompetitionHover, Operator } from '../render/competition';
 import { operatorsForAirport, operatorsForMarket } from '../render/competition';
 import { PLAYER_AIRLINE } from '../sim/airline';
 import { airportPresence } from '../render/airports';
-import { connectivityFactor } from '../sim/airports';
+import { connectingPassengersThrough } from '../sim/hubs';
 import type { SimState } from '../sim/state';
 
 const tooltip = document.querySelector<HTMLDivElement>('#competition-tooltip')!;
@@ -85,9 +85,9 @@ function renderPresence(iata: string, state: SimState): void {
   if (p.departures === 0) {
     parts.push('Not served by you');
   } else {
-    const uplift = Math.round((connectivityFactor(state, iata) - 1) * 100);
+    const connecting = Math.round(connectingPassengersThrough(state, iata));
     parts.push(`${p.level} · ${p.departures} departure${p.departures === 1 ? '' : 's'}/day`);
-    if (uplift > 0) parts.push(`+${uplift}% connectivity`);
+    if (connecting > 0) parts.push(`${connecting} connecting/day`);
   }
 
   if (p.slotsHeld > 0) parts.push(`${p.slotsHeld} slot${p.slotsHeld === 1 ? '' : 's'}, $${p.slotFeesPerDay.toLocaleString()}/day`);

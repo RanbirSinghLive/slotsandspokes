@@ -1,5 +1,6 @@
 import airportsData from '../../data/airports.json';
 import type { SimState } from './state';
+import { HUB_STYLES, hubStyleAt } from './hubStyle';
 
 /**
  * Week six's airport layer: how much of an airline you are *at each
@@ -7,34 +8,14 @@ import type { SimState } from './state';
  * airport has (capacity and load). Slots, priced from that same load,
  * live in sim/slots.ts.
  *
- * The connectivity multiplier is the interesting half. Real airlines
- * concentrate flying at hubs because a passenger arriving on one flight
- * can leave on another, and the value of that grows with how many
- * departures meet there. This sim doesn't model connecting itineraries
- * (WEEK-TWO.md decision 1, still the heaviest structural lift on any
- * list), so this is a deliberate stand-in: the *benefit* of a hub without
- * the machinery of tracking itineraries through one. It rewards
- * concentration over scattering, which is the strategic pressure a hub is
- * supposed to create.
+ * What a hub is worth — connecting passengers — lives in sim/hubs.ts; it
+ * replaced a flat revenue multiplier that used to live here and paid a
+ * hub for its size whether or not anything connected through it.
  */
 
 type AirportSpec = { iata: string; name: string; population: number; capacityPerDay?: number };
 const airports = airportsData as AirportSpec[];
 const byIata = new Map(airports.map((a) => [a.iata, a]));
-
-/**
- * How much a fully-built hub is worth on revenue, and how fast it gets
- * there. `log2` for the same diminishing returns every other bonus in
- * this sim uses — the tenth daily departure at an airport is worth much
- * less than the second.
- *
- * Capped deliberately low. This is a proxy for connecting traffic, not a
- * measurement of it, and an uncapped network effect would make a single
- * mega-hub strictly correct and every other shape of airline wrong.
- */
-const CONNECTIVITY_WEIGHT = 0.06;
-const CONNECTIVITY_SCALE = 4;
-const CONNECTIVITY_MAX = 1.25;
 
 export type AirportLevel = 'Unserved' | 'Outstation' | 'Focus city' | 'Base' | 'Hub';
 
@@ -54,23 +35,6 @@ export function airportLevel(departures: number): AirportLevel {
   if (departures <= 5) return 'Focus city';
   if (departures <= 9) return 'Base';
   return 'Hub';
-}
-
-/** Revenue multiplier earned by concentration at one airport. 1 when unserved. */
-export function connectivityFactor(state: SimState, iata: string): number {
-  const departures = dailyDeparturesAt(state, iata);
-  if (departures === 0) return 1;
-  return Math.min(CONNECTIVITY_MAX, 1 + CONNECTIVITY_WEIGHT * Math.log2(1 + departures / CONNECTIVITY_SCALE));
-}
-
-/**
- * What a single flight earns from connectivity — the average of its two
- * ends. Averaged rather than multiplied so a hub-to-outstation flight
- * gets half the benefit of a hub-to-hub one, rather than the two
- * compounding into something much larger than either.
- */
-export function routeConnectivityMultiplier(state: SimState, origin: string, dest: string): number {
-  return (connectivityFactor(state, origin) + connectivityFactor(state, dest)) / 2;
 }
 
 // --- Capacity and load ---------------------------------------------------
@@ -119,14 +83,6 @@ export function dailyMovementsAt(state: SimState, iata: string): number {
 }
 
 /**
- * Traffic isn't spread evenly across the day: it bunches into morning and
- * evening peaks. Load is judged at the peak, which runs this much busier
- * than the daily average. One constant for every airport for now; hub
- * styles (banked vs rolling) will vary it later.
- */
-const PEAK_FACTOR = 1.5;
-
-/**
  * How full the airport is at its busiest: peak movements over capacity.
  * 0.5 is comfortably busy, 1 is full, above 1 is more traffic than the
  * field can take without queueing. Drives congestion delays.
@@ -134,7 +90,10 @@ const PEAK_FACTOR = 1.5;
 export function airportLoad(state: SimState, iata: string): number {
   const capacity = airportCapacityPerDay(iata);
   if (capacity <= 0) return 0;
-  return (dailyMovementsAt(state, iata) * PEAK_FACTOR) / capacity;
+  // Traffic isn't spread evenly across the day: it bunches into peaks,
+  // and load is judged at the peak. How peaky depends on how the airport
+  // is run as a hub (sim/hubStyle.ts): waves are peaks.
+  return (dailyMovementsAt(state, iata) * HUB_STYLES[hubStyleAt(state, iata)].peakFactor) / capacity;
 }
 
 export function allAirports(): AirportSpec[] {

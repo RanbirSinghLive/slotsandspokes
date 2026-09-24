@@ -3,7 +3,8 @@ import { projection, fitProjection, baselineScale } from './render/projection';
 import { drawBasemap } from './render/basemap';
 import { drawTerminator } from './render/terminator';
 import { drawRoutes } from './render/routes';
-import { drawAirports, airports, setKnownAirports } from './render/airports';
+import { drawAirports, airports, setKnownAirports, nearestAirportCandidate } from './render/airports';
+import { drawHubView, hasHubView } from './render/hubs';
 import { drawFog } from './render/fog';
 import { drawWeatherEffects } from './render/weather';
 import { drawAircraft, findFlightAt, flightScreenPoint } from './render/aircraft';
@@ -374,6 +375,14 @@ function render(nowMs: number = performance.now()): void {
   drawAircraft(ctx, state, latestFractionalMinute, hoveredFlight?.legId ?? null);
   // The unmet-demand pips around airports belong to the Demand layer.
   drawAirports(ctx, state, demandOverlayOn);
+
+  // Hovering one of your airports (and not a plane) shows who connects
+  // through it and where to fly next (render/hubs.ts). Drawn after the
+  // airports so its labels sit on top.
+  if (hoverPoint && !hoveredFlight && !isRouteBuilderActive() && !isMapMenuOpen()) {
+    const hoveredAirport = nearestAirportCandidate(hoverPoint.x, hoverPoint.y);
+    if (hoveredAirport && hasHubView(state, hoveredAirport.airport.iata)) drawHubView(ctx, state, hoveredAirport.airport.iata);
+  }
   drawWeatherEffects(ctx, state);
   drawRoutePreview(ctx, state);
 

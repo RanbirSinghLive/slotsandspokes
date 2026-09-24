@@ -22,7 +22,7 @@ import {
   isLongHaulRoundTrip,
   legUtilisationMinutes,
   scheduledTurnMinutes,
-  turnBufferMinutes,
+  extraTurnMinutes,
   USABLE_DAY_END_MINUTE,
   USABLE_DAY_MINUTES,
   USABLE_DAY_START_MINUTE,
@@ -627,7 +627,7 @@ export function planRotation(chain: Airport[], dest: Airport, tail: string, stat
     state,
   );
   const clockMinutes = legs.reduce(
-    (total, leg) => total + legUtilisationMinutes(leg.blockMinutes, turnBufferMinutes(state, leg.origin, leg.dest)),
+    (total, leg) => total + legUtilisationMinutes(leg.blockMinutes, extraTurnMinutes(state, leg.origin, leg.dest)),
     0,
   );
   // A plane that does nothing else may fly one round trip that outruns the

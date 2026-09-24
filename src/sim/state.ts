@@ -5,6 +5,7 @@ import { allAirportCodes, revealReach } from './reach';
 import { loadCompetitorRoutes, type CompetitorOffering } from './competitors';
 import type { WeatherEvent } from './weather';
 import type { DelayBreakdown } from './delays';
+import type { HubStyle } from './hubStyle';
 import type { Loan } from './loans';
 import { FUEL_PRICE_BASELINE } from './fuel';
 import type { TargetCommitment, TargetResult } from './targets';
@@ -489,6 +490,11 @@ export type SimState = {
    */
   slotsHeld: Record<string, number[]>;
   /**
+   * How each hub is run (sim/hubStyle.ts), keyed by IATA. Only airports
+   * the player has changed appear; everything else is Rolling.
+   */
+  hubStyles: Record<string, HubStyle>;
+  /**
    * Tails grounded today by an unscheduled maintenance event, kept
    * separate from crew groundings above so cancellations can be
    * attributed to the right cause. Rolled after the crew pass, and never
@@ -698,6 +704,7 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     reserveDepth: 1.15,
     groundedTails: [],
     slotsHeld: {},
+    hubStyles: {},
     mechanicalGroundedTails: [],
     cancellationsByCause: { crew: 0, mechanical: 0, weather: 0, curfew: 0 },
     flightsScheduledTotal: 0,
@@ -822,6 +829,7 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     reserveDepth: 1.15,
     groundedTails: [],
     slotsHeld: {},
+    hubStyles: {},
     mechanicalGroundedTails: [],
     cancellationsByCause: { crew: 0, mechanical: 0, weather: 0, curfew: 0 },
     flightsScheduledTotal: 0,

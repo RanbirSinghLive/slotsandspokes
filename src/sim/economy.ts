@@ -215,11 +215,13 @@ export function flightResult(
   fuelEfficiencyMultiplier: number,
   marketDailyDemand: number,
   /**
-   * Revenue multiplier from hub concentration at this flight's two ends
-   * (sim/airports.ts). 1 means no benefit. Passed in rather than derived
-   * here so this stays a pure function of its inputs.
+   * Connecting passengers a day riding this market on their way through a
+   * hub (sim/hubs.ts). They're the airline's own customers, already booked
+   * onto its network, so they skip the booking-share split with rivals
+   * and are simply added to each flight's bookings. Passed in rather than
+   * derived here so this stays a pure function of its inputs.
    */
-  connectivityMultiplier: number,
+  connectingDailyDemand: number,
   legsServingMarket: number,
   // Narrowed to the two levers this actually prices from, rather than the
   // whole RouteSettings: `fareIsOverridden` is bookkeeping for the fare
@@ -233,14 +235,15 @@ export function flightResult(
   const demandPerFlight = marketDailyDemand / legsServingMarket;
   const bookedDemand =
     demandPerFlight *
-    bookingShare(
-      routeSettings.fare,
-      legsServingMarket,
-      leg.origin,
-      leg.dest,
-      routeSettings.marketingSpend,
-      competitorRoutes,
-    );
+      bookingShare(
+        routeSettings.fare,
+        legsServingMarket,
+        leg.origin,
+        leg.dest,
+        routeSettings.marketingSpend,
+        competitorRoutes,
+      ) +
+    connectingDailyDemand / legsServingMarket;
   const seatCeiling = Math.round(type.seats * LOAD_FACTOR);
   const roundedBooked = Math.round(bookedDemand);
 
@@ -260,7 +263,7 @@ export function flightResult(
   }
 
   const yieldFactor = rivalYieldFactor(leg.origin, leg.dest, legsServingMarket, competitorRoutes);
-  const revenue = pax * routeSettings.fare * connectivityMultiplier * yieldFactor;
+  const revenue = pax * routeSettings.fare * yieldFactor;
   const costBreakdown = legCostBreakdown(leg.blockMinutes, type, fuelPriceIndex, fuelEfficiencyMultiplier);
   const cost = costBreakdown.fuel + costBreakdown.blockNonFuel + costBreakdown.departure;
   return {

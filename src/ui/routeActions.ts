@@ -8,6 +8,8 @@ import { actualDailyDemand, currentPotentialDemand } from '../sim/marketDemand';
 import { candidateTailsAt, commitRotation, planRotation, type RotationPlan } from './routeBuilder';
 import { removeRotation, renderScheduleWarnings, scheduleProblems } from './panels';
 import { applyTurnBufferChange, planTurnBufferChange } from '../sim/turnBuffer';
+import { applyHubStyleChange, planHubStyleChange } from '../sim/hubs';
+import { HUB_STYLES, type HubStyle } from '../sim/hubStyle';
 import type { SimState } from '../sim/state';
 import type { MapPreview } from '../render/preview';
 
@@ -290,6 +292,23 @@ export function setTurnBuffer(state: SimState, a: string, b: string, minutes: nu
   renderScheduleWarnings(scheduleProblems(state));
   const movedNote = result.moved > 0 ? ` ${result.moved} rotation${result.moved === 1 ? '' : 's'} moved to another plane to make room.` : '';
   return { ok: true, message: `${a}–${b} turn buffer set to +${minutes} min after each flight.${movedNote}` };
+}
+
+// --- Hub style ------------------------------------------------------------
+
+/** Whether this airport can switch to `style`, and what that does to the pools (sim/hubs.ts plans it). */
+export function previewHubStyle(state: SimState, iata: string, style: HubStyle): Outcome<{ preview: MapPreview; moved: number }> {
+  const plan = planHubStyleChange(state, iata, style);
+  if (!plan.ok) return plan;
+  return { ok: true, moved: plan.moved, preview: { effects: plan.effects, routes: [] } };
+}
+
+export function setHubStyle(state: SimState, iata: string, style: HubStyle): Outcome<{ message: string }> {
+  const result = applyHubStyleChange(state, iata, style);
+  if (!result.ok) return result;
+  renderScheduleWarnings(scheduleProblems(state));
+  const movedNote = result.moved > 0 ? ` ${result.moved} rotation${result.moved === 1 ? '' : 's'} moved to another plane to make room.` : '';
+  return { ok: true, message: `${iata} now runs as ${HUB_STYLES[style].name}.${movedNote}` };
 }
 
 // --- Removing a route -----------------------------------------------------

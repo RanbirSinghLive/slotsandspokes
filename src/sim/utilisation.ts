@@ -1,4 +1,5 @@
 import { MIN_TURN_MINUTES, marketKey, type ScheduleLeg } from './schedule';
+import { hubWaitMinutes } from './hubStyle';
 import type { SimState } from './state';
 import { AIRCRAFT_CLASSES } from './aircraftClasses';
 
@@ -48,9 +49,19 @@ export function turnBufferMinutes(state: SimState, origin: string, dest: string)
   return state.routeSettings[marketKey(origin, dest)]?.turnBufferMinutes ?? 0;
 }
 
-/** The whole scheduled turn after a flight on this market: the physical minimum plus the route's buffer. */
+/**
+ * Scheduled ground time after a flight beyond the physical minimum: its
+ * route's turn buffer, plus the destination's hub wait when that airport
+ * runs banked (sim/hubStyle.ts). Both are slack the planner pays for in
+ * aircraft time.
+ */
+export function extraTurnMinutes(state: SimState, origin: string, dest: string): number {
+  return turnBufferMinutes(state, origin, dest) + hubWaitMinutes(state, dest);
+}
+
+/** The whole scheduled turn after a flight: the physical minimum plus any buffer and hub wait. */
 export function scheduledTurnMinutes(state: SimState, origin: string, dest: string): number {
-  return MIN_TURN_MINUTES + turnBufferMinutes(state, origin, dest);
+  return MIN_TURN_MINUTES + extraTurnMinutes(state, origin, dest);
 }
 
 /**
@@ -67,7 +78,7 @@ export function legUtilisationMinutes(blockMinutes: number, turnBuffer = 0): num
 
 /** `legUtilisationMinutes` for a leg already on the schedule, reading its route's buffer from `state`. */
 function scheduledLegMinutes(state: SimState, leg: ScheduleLeg): number {
-  return legUtilisationMinutes(leg.blockMinutes, turnBufferMinutes(state, leg.origin, leg.dest));
+  return legUtilisationMinutes(leg.blockMinutes, extraTurnMinutes(state, leg.origin, leg.dest));
 }
 
 /**

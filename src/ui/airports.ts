@@ -1,4 +1,5 @@
-import { allAirports, dailyDeparturesAt, connectivityFactor } from '../sim/airports';
+import { allAirports, dailyDeparturesAt } from '../sim/airports';
+import { connectingPassengersThrough } from '../sim/hubs';
 import { nextSlotFees, slotFeesPerDayAt, slotsHeld } from '../sim/slots';
 import type { SimState } from '../sim/state';
 
@@ -46,10 +47,10 @@ function renderPresence(state: SimState): void {
   }
 
   const best = served[0];
-  const uplift = Math.round((connectivityFactor(state, best.iata) - 1) * 100);
+  const connecting = Math.round(connectingPassengersThrough(state, best.iata));
   presenceNoteEl.textContent =
     `${served.length} airport${served.length === 1 ? '' : 's'} served. Strongest is ${best.iata} at ` +
-    `${best.departures} departures a day${uplift > 0 ? `, worth +${uplift}% on revenue there` : ''}. ` +
+    `${best.departures} departures a day${connecting > 0 ? `, with ${connecting} passengers a day connecting there` : ''}. ` +
     `Hover any airport on the map for its level, connectivity and slots.`;
 }
 

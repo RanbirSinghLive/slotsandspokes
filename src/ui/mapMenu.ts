@@ -6,6 +6,8 @@ import { unmetDemandByAirport } from '../sim/unmetDemand';
 import { rivalYieldFactor } from '../sim/pressure';
 import { legsServingMarket, marketKey } from '../sim/schedule';
 import { TURN_BUFFER_CHOICES } from '../sim/turnBuffer';
+import { connectingPassengersThrough, spokesOf } from '../sim/hubs';
+import { HUB_STYLES, HUB_STYLE_ORDER, hubStyleAt } from '../sim/hubStyle';
 import { reliabilityDemandFactor, trailingMarketOtp } from '../sim/routeOtp';
 import { onTimeColor } from '../render/mapmodes';
 import { buildPoolRows } from './poolBars';
@@ -42,6 +44,8 @@ import { WINDOW_DAYS, buildBipolarBars, dayLabel, money as pnlMoney } from './pn
  */
 
 const MAX_MARKET_ROWS = 6;
+// Short enough to fit a button: the full names are in each button's label.
+const HUB_STYLE_ICON_TEXT = { rolling: 'Roll', banked: 'Bank', tight: 'Tight' } as const;
 const CARD_OFFSET_PX = 16;
 
 const cardEl = document.querySelector<HTMLElement>('#airport-detail-popover')!;
@@ -65,12 +69,15 @@ const ICON = {
   plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
   minus: '<line x1="5" y1="12" x2="19" y2="12"/>',
   remove: '<line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>',
+  // Three spokes meeting at a hub.
+  hub: '<circle cx="12" cy="12" r="2.5"/><path d="M12 9.5V3"/><path d="M9.8 13.3 4.5 17"/><path d="M14.2 13.3 19.5 17"/>',
   clock: '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>',
 };
 
 /** A short label drawn as the button's icon, for choices that are numbers rather than things. */
-function textIcon(text: string): string {
-  return `<text x="12" y="16" text-anchor="middle" font-size="10" font-weight="600" font-family="system-ui, sans-serif" fill="currentColor" stroke="none">${text}</text>`;
+function textIcon(text: string, fontSize = 10): string {
+  const baseline = 12 + fontSize * 0.36;
+  return `<text x="12" y="${baseline}" text-anchor="middle" font-size="${fontSize}" font-weight="600" font-family="system-ui, sans-serif" fill="currentColor" stroke="none">${text}</text>`;
 }
 
 type Open = { kind: 'airport'; airport: Airport } | { kind: 'route'; a: string; b: string };
@@ -160,7 +167,10 @@ function fillAirportCard(airport: Airport, state: SimState): void {
   routeOtpEl.replaceChildren();
 
   const presence = airportPresence(state, airport.iata);
-  presenceEl.textContent = `${presence.level} · ${presence.departures} departure${presence.departures === 1 ? '' : 's'}/day`;
+  const connecting = Math.round(connectingPassengersThrough(state, airport.iata));
+  presenceEl.textContent =
+    `${presence.level} · ${presence.departures} departure${presence.departures === 1 ? '' : 's'}/day` +
+    (connecting > 0 ? ` · ${connecting} connecting/day (${HUB_STYLES[hubStyleAt(state, airport.iata)].name})` : '');
   presenceEl.classList.remove('airport-detail-over');
 
   fillAirportLoad(airport.iata, state);
@@ -263,7 +273,46 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
     },
   }));
 
+  // Hub style (sim/hubStyle.ts): each choice planned up front, like the
+  // route card's turn buffer, so one the base can't absorb is greyed out
+  // with the reason, and hovering one previews its effect on the pools.
+  const current = hubStyleAt(state, airport.iata);
+  const spokeCount = spokesOf(state, airport.iata).size;
+  const styleChoices: RadialAction[] = HUB_STYLE_ORDER.map((style) => {
+    const spec = HUB_STYLES[style];
+    const isCurrent = style === current;
+    const plan = isCurrent ? null : ops.previewHubStyle(state, airport.iata, style);
+    const connectingAfter = Math.round(
+      connectingPassengersThrough({ ...state, hubStyles: { ...state.hubStyles, [airport.iata]: style } }, airport.iata),
+    );
+    return {
+      id: `hub:${style}`,
+      label: `${spec.name}${isCurrent ? ' (current)' : ''}: ${spec.description} About ${connectingAfter} connecting/day.`,
+      icon: textIcon(HUB_STYLE_ICON_TEXT[style], 7),
+      angleDeg: 0,
+      selected: isCurrent,
+      disabledReason: plan && !plan.ok ? plan.reason : undefined,
+      preview: plan?.ok ? plan.preview : undefined,
+      onSelect: () => {
+        if (isCurrent) return false;
+        const result = ops.setHubStyle(state, airport.iata, style);
+        notice = result.ok ? result.message : result.reason;
+        refresh();
+        return false;
+      },
+    };
+  });
+
   return [
+    {
+      id: 'hub-style',
+      label: `Hub style (now ${HUB_STYLES[current].name}): how flights here are grouped, trading connections against congestion and aircraft time`,
+      icon: ICON.hub,
+      angleDeg: -165,
+      disabledReason:
+        spokeCount < 2 ? `Fly from ${airport.iata} to at least two airports first: connections need two routes to meet.` : undefined,
+      children: styleChoices,
+    },
     {
       id: 'route',
       label: 'Draw a route from here',
