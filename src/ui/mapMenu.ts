@@ -11,7 +11,8 @@ import { onTimeColor } from '../render/mapmodes';
 import { buildPoolRows } from './poolBars';
 import { getMapPreview, setMapPreview, type MapPreview } from '../render/preview';
 import type { SimState } from '../sim/state';
-import { armRouteBuilderAt, candidateTailsAt } from './routeBuilder';
+import { armRouteBuilderAt, candidateTailsAt, describeSlotQuotes } from './routeBuilder';
+import { nextSlotFees, slotFeesPerDayAt, slotsHeld } from '../sim/slots';
 import { hideCompetitionTooltip } from './competitionTooltip';
 import { hideRadial, showRadial, updateRadial, type RadialAction } from './radial';
 import * as ops from './routeActions';
@@ -47,6 +48,7 @@ const cardEl = document.querySelector<HTMLElement>('#airport-detail-popover')!;
 const titleEl = document.querySelector<HTMLElement>('#airport-detail-title')!;
 const presenceEl = document.querySelector<HTMLElement>('#airport-detail-presence')!;
 const loadEl = document.querySelector<HTMLElement>('#airport-detail-load')!;
+const slotsEl = document.querySelector<HTMLElement>('#airport-detail-slots')!;
 const basedEl = document.querySelector<HTMLElement>('#airport-detail-based')!;
 const marketsEl = document.querySelector<HTMLElement>('#airport-detail-markets')!;
 const routeHistoryEl = document.querySelector<HTMLElement>('#airport-detail-route-history')!;
@@ -224,6 +226,17 @@ function fillAirportLoad(iata: string, state: SimState): void {
       : '. No congestion.');
   loadEl.classList.toggle('airport-detail-warn', delayChance > 0 && load < 1);
   loadEl.classList.toggle('airport-detail-over', load >= 1);
+
+  // Slots (sim/slots.ts): what you hold here, and what the next pair
+  // would cost — priced from this same traffic, so a busy airport reads
+  // as both congested above and expensive here.
+  const held = slotsHeld(state, iata);
+  const [next] = nextSlotFees(state, iata, 1);
+  const nextText = next === null ? 'no slots left' : next === 0 ? 'next pair free' : `next pair $${next.toLocaleString()}/day`;
+  slotsEl.textContent =
+    held > 0
+      ? `Slots: ${held} pair${held === 1 ? '' : 's'} held, $${slotFeesPerDayAt(state, iata).toLocaleString()}/day · ${nextText}.`
+      : `Slots: none held · ${nextText}.`;
 }
 
 function airportActions(airport: Airport, state: SimState): RadialAction[] {
@@ -321,6 +334,7 @@ function fillRouteCard(a: string, b: string, state: SimState): void {
   fillPools(ops.routeBase(state, a, b), state, '');
   // A route card has no single airport to describe.
   loadEl.textContent = '';
+  slotsEl.textContent = '';
   fillRouteHistory(state, a, b);
   fillRouteOtp(state, a, b);
 }
@@ -530,7 +544,9 @@ function routeActions(a: string, b: string, state: SimState): RadialAction[] {
     },
     {
       id: 'flight-up',
-      label: addFlight.ok ? `${addFlightLabel(addFlight.className, readout)} — hold to add several` : 'Add a flight',
+      label: addFlight.ok
+        ? `${addFlightLabel(addFlight.className, readout)}. ${describeSlotQuotes(addFlight.plan.slotQuotes)} Hold to add several.`
+        : 'Add a flight',
       icon: ICON.plus,
       angleDeg: -56,
       repeatable: true,

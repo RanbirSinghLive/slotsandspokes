@@ -78,7 +78,14 @@ const COST_ROWS: CostRowSpec[] = [
       s.todayCostByCategory.marketing +
       s.todayCostByCategory.lease +
       s.todayCostByCategory.crew +
-      s.todayCostByCategory.training,
+      s.todayCostByCategory.training +
+      s.todayCostByCategory.slots,
+  },
+  {
+    label: 'Slot fees',
+    depth: 1,
+    hint: 'Daily fees on every slot pair held, each locked at the price when it was taken.',
+    value: (s) => s.todayCostByCategory.slots,
   },
   {
     label: 'Marketing',

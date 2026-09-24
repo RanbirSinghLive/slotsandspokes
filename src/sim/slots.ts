@@ -1,0 +1,169 @@
+import { allAirports, airportCapacityPerDay, dailyDeparturesAt, dailyMovementsAt } from './airports';
+import type { SimState } from './state';
+
+/**
+ * Slots at every airport. A slot pair is the right to one daily departure
+ * (and the arrival that pairs with it) at an airport, so an airline needs
+ * as many pairs at an airport as it has daily departures from it.
+ *
+ * The price is what makes it interesting, and it's set by how contested
+ * the airport is:
+ *
+ *   - Nobody serves it at all → the first pair is free. Opening up a new
+ *     airport is encouraged, not taxed.
+ *   - Otherwise the daily fee scales with the airport's traffic (every
+ *     airline's takeoffs and landings, sim/airports.ts's
+ *     dailyMovementsAt()) against the average airport that has any
+ *     service, to the power SLOT_PRICE_EXPONENT. A field twice as busy as
+ *     average costs nearly three times as much; four times as busy, eight.
+ *
+ * The player's own flights count toward that traffic. Building a hub makes
+ * the next slot there more expensive — the price side of the same trade
+ * congestion delays are the on-time side of.
+ *
+ * The fee is locked at the price when the slot is taken, like a lease, so
+ * moving into an airport early is worth something. Slots are taken
+ * automatically when a rotation needs them (the route builder shows the
+ * price first) and released at the day's rollover once nothing uses them,
+ * most expensive first: use it or lose it.
+ *
+ * An airport with no room left (movements at capacity) has no slots to
+ * give, whatever the price.
+ */
+
+/**
+ * Daily fee for a slot pair at an airport exactly as busy as the average
+ * served airport. Measured: at $75 a 32-departure Halifax hub paid about
+ * $8,900/day in slots, roughly 40% of its early revenue, before the
+ * connectivity bonus that's meant to pay for hubs even exists. At $50 the
+ * same hub pays about $5,900 and the next pair there still costs over
+ * $450/day: expensive, but not a wall.
+ */
+const SLOT_BASE_FEE_PER_DAY = 50;
+const SLOT_PRICE_EXPONENT = 1.5;
+/** A slot pair adds a takeoff and a landing. */
+const MOVEMENTS_PER_PAIR = 2;
+
+/** Average daily movements across every airport some airline serves; 0 when nobody flies anywhere. */
+function averageServedMovements(state: SimState): number {
+  const served = allAirports()
+    .map((airport) => dailyMovementsAt(state, airport.iata))
+    .filter((movements) => movements > 0);
+  return served.length > 0 ? served.reduce((total, n) => total + n, 0) / served.length : 0;
+}
+
+/** Slot pairs the airline holds at this airport. */
+export function slotsHeld(state: SimState, iata: string): number {
+  return state.slotsHeld[iata]?.length ?? 0;
+}
+
+/** Slot pairs the current schedule needs here: one per daily departure. */
+export function slotsNeeded(state: SimState, iata: string): number {
+  return dailyDeparturesAt(state, iata);
+}
+
+/** What the airline pays per day for every slot it holds here. */
+export function slotFeesPerDayAt(state: SimState, iata: string): number {
+  return (state.slotsHeld[iata] ?? []).reduce((total, fee) => total + fee, 0);
+}
+
+/**
+ * Daily fees for the next `count` slot pairs here, in the order they'd be
+ * taken — each one adds traffic, so each costs a little more than the
+ * last. `extraMovements` is traffic not on the schedule yet (a rotation
+ * being previewed), counted as if it were. Null for any pair beyond the
+ * airport's capacity.
+ */
+export function nextSlotFees(state: SimState, iata: string, count: number, extraMovements = 0): (number | null)[] {
+  const average = averageServedMovements(state);
+  const capacity = airportCapacityPerDay(iata);
+  const fees: (number | null)[] = [];
+  for (let i = 0; i < count; i++) {
+    const movements = dailyMovementsAt(state, iata) + extraMovements + i * MOVEMENTS_PER_PAIR;
+    if (movements + MOVEMENTS_PER_PAIR > capacity) {
+      fees.push(null);
+    } else if (movements === 0) {
+      fees.push(0);
+    } else {
+      const relative = movements / Math.max(average, 1);
+      fees.push(Math.round((SLOT_BASE_FEE_PER_DAY * Math.pow(relative, SLOT_PRICE_EXPONENT)) / 5) * 5);
+    }
+  }
+  return fees;
+}
+
+export type SlotQuote = { iata: string; fees: number[]; full: boolean };
+
+/**
+ * What adding these departures would cost in new slots: for each airport
+ * where the schedule would need more pairs than are held, the daily fee of
+ * each extra pair, or `full` if the airport can't give them. The route
+ * builder and the add-flight button both show this before anything is
+ * committed.
+ */
+export function quoteSlots(state: SimState, departuresByAirport: Map<string, number>, arrivalsByAirport: Map<string, number>): SlotQuote[] {
+  const quotes: SlotQuote[] = [];
+  for (const [iata, departures] of departuresByAirport) {
+    const shortfall = slotsNeeded(state, iata) + departures - slotsHeld(state, iata);
+    if (shortfall <= 0) continue;
+    // Traffic this same rotation adds before its own new pairs: every
+    // movement it makes here beyond the ones those pairs cover.
+    const ownMovements = departures + (arrivalsByAirport.get(iata) ?? 0) - shortfall * MOVEMENTS_PER_PAIR;
+    const fees = nextSlotFees(state, iata, shortfall, Math.max(0, ownMovements));
+    quotes.push({ iata, fees: fees.filter((fee): fee is number => fee !== null), full: fees.includes(null) });
+  }
+  return quotes;
+}
+
+/**
+ * Take the slot pairs a quote priced (quoteSlots(), above), at exactly
+ * those fees. This is how a committed rotation gets its slots, so the
+ * price locked in is the price the player was shown: re-pricing after the
+ * rotation is on the schedule would differ slightly, because the new
+ * traffic shifts the airport average everything is priced against.
+ */
+export function takeQuotedSlots(state: SimState, quotes: SlotQuote[]): void {
+  for (const quote of quotes) {
+    const held = (state.slotsHeld[quote.iata] ??= []);
+    held.push(...quote.fees);
+  }
+}
+
+/**
+ * Take whatever slots the schedule needs and doesn't hold, at today's
+ * prices, locking each fee. A backstop for schedules that didn't come
+ * through a quote (the headless fixture, anything missed), run at every
+ * rollover. An airport that's full simply grants what it
+ * can; the route builder refuses a rotation that would need more.
+ */
+export function acquireNeededSlots(state: SimState): void {
+  for (const airport of allAirports()) {
+    const shortfall = slotsNeeded(state, airport.iata) - slotsHeld(state, airport.iata);
+    if (shortfall <= 0) continue;
+    // Priced as the schedule stands (the new flights already on it), less
+    // the traffic of the pairs being taken, so the first pair at an
+    // airport nobody else serves really is free.
+    const fees = nextSlotFees(state, airport.iata, shortfall, -shortfall * MOVEMENTS_PER_PAIR);
+    const held = (state.slotsHeld[airport.iata] ??= []);
+    for (const fee of fees) held.push(fee ?? 0);
+  }
+}
+
+/**
+ * Daily rollover: give back slots nothing uses any more (most expensive
+ * first), then return what the rest cost today. The caller charges it.
+ */
+export function settleSlotsForDay(state: SimState): number {
+  let total = 0;
+  for (const iata of Object.keys(state.slotsHeld)) {
+    const held = state.slotsHeld[iata];
+    const unused = held.length - slotsNeeded(state, iata);
+    if (unused > 0) {
+      held.sort((a, b) => a - b);
+      held.splice(held.length - unused, unused);
+    }
+    if (held.length === 0) delete state.slotsHeld[iata];
+    else total += held.reduce((sum, fee) => sum + fee, 0);
+  }
+  return total;
+}

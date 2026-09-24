@@ -26,6 +26,7 @@ import { applyDailyReputationChange, REPUTATION_FLOOR } from './reputation';
 import { recordDailyCashHistory } from './forecast';
 import { recordDailyPnlHistory } from './pnlHistory';
 import { recordDailyOnTimeHistory } from './routeOtp';
+import { acquireNeededSlots, settleSlotsForDay } from './slots';
 import type { SimState, ActiveFlight } from './state';
 
 const MINUTES_PER_DAY = 1440;
@@ -140,7 +141,7 @@ export function step(state: SimState): void {
     state.todayMargin = 0;
     // Week six's cost attribution — reset in lockstep with todayCost
     // above, since these five are exactly that number split up.
-    state.todayCostByCategory = { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0, training: 0 };
+    state.todayCostByCategory = { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0, training: 0, slots: 0 };
     // Per-market breakdown of todayRevenue/todayCost, reset in lockstep
     // with them for the same reason as todayCostByCategory above.
     state.todayRevenueByMarket = {};
@@ -184,6 +185,17 @@ export function step(state: SimState): void {
     state.todayCost += totalLeaseCost;
     state.todayCostByCategory.lease += totalLeaseCost;
     state.todayMargin -= totalLeaseCost;
+
+    // Slot fees (sim/slots.ts): the same flat-per-day shape as the lease.
+    // Anything the schedule needs and doesn't hold is taken first (a
+    // backstop — the route builder already takes them), then slots nothing
+    // uses any more are given back before today's fees are charged.
+    acquireNeededSlots(state);
+    const slotFees = settleSlotsForDay(state);
+    state.cash -= slotFees;
+    state.todayCost += slotFees;
+    state.todayCostByCategory.slots += slotFees;
+    state.todayMargin -= slotFees;
 
     // Week six's crew model (sim/crew.ts): deliver recruitment and
     // training that has come due, pay every head on the books, then roll

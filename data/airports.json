@@ -13,8 +13,7 @@
     "lat": 43.6759,
     "lon": -79.6294,
     "utcOffsetMinutes": -300,
-    "population": 6202225,
-    "slotsTotal": 12
+    "population": 6202225
   },
   {
     "iata": "YOW",
@@ -146,7 +145,7 @@
     "utcOffsetMinutes": -300,
     "population": 20140470,
     "maxAircraftType": "NARROWBODY",
-    "slotsTotal": 6
+    "capacityPerDay": 120
   },
   {
     "iata": "BOS",

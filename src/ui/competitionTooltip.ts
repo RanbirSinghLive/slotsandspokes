@@ -90,13 +90,9 @@ function renderPresence(iata: string, state: SimState): void {
     if (uplift > 0) parts.push(`+${uplift}% connectivity`);
   }
 
-  if (p.slotControlled) {
-    const over = p.departures > p.slotsOwned;
-    parts.push(`${p.slotsOwned}/${p.slotsTotal} slots held${over ? ' — over capacity' : ''}`);
-  }
+  if (p.slotsHeld > 0) parts.push(`${p.slotsHeld} slot${p.slotsHeld === 1 ? '' : 's'}, $${p.slotFeesPerDay.toLocaleString()}/day`);
 
   presenceEl.textContent = parts.join(' · ');
-  presenceEl.classList.toggle('presence-over', p.slotControlled && p.departures > p.slotsOwned);
 }
 
 /**

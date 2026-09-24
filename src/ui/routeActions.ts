@@ -122,11 +122,11 @@ const MULTI_STOP_REASON = 'Flown as part of a multi-stop rotation. Remove that r
 
 /**
  * Why a plane in `code` can't take a there-and-back, in words a player can
- * act on. Range and airport-size failures are quoted as they are; anything
- * else is capacity, and capacity has one fix.
+ * act on. Range, airport-size and full-airport failures are quoted as they
+ * are; anything else is aircraft capacity, and that has one fix.
  */
 function explainFailure(error: string, className: string, baseIata: string): string {
-  if (/range|too large/.test(error)) return error;
+  if (/range|too large|no slots left/.test(error)) return error;
   return `Every ${className} at ${baseIata} is full. Tap ${baseIata}, then Plane, to add another.`;
 }
 

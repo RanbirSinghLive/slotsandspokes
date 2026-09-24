@@ -1,23 +1,13 @@
-import {
-  allAirports,
-  slotControlledAirports,
-  dailyDeparturesAt,
-  connectivityFactor,
-  slotsOwned,
-  slotsTotal,
-  nextSlotPrice,
-  canBuySlot,
-  buySlot,
-  isSlotControlled,
-} from '../sim/airports';
+import { allAirports, dailyDeparturesAt, connectivityFactor } from '../sim/airports';
+import { nextSlotFees, slotFeesPerDayAt, slotsHeld } from '../sim/slots';
 import type { SimState } from '../sim/state';
 
 /**
  * The Airports tab: what the airline looks like *at each field* rather
  * than route by route.
  *
- * Slots are the substance of it: buying growth at the two fields that are
- * genuinely slot-coordinated in life. Presence itself moved to the map in
+ * Slots are the substance of it: the ledger of every slot pair held and
+ * what it costs (sim/slots.ts). Presence itself moved to the map in
  * phase one of the menu-condensing pass — see renderPresence() below for
  * why a table of IATA codes was the wrong home for it.
  */
@@ -63,16 +53,33 @@ function renderPresence(state: SimState): void {
     `Hover any airport on the map for its level, connectivity and slots.`;
 }
 
+/**
+ * Every airport where the airline holds slots (sim/slots.ts): how many
+ * pairs, what they cost a day in total, and what the next pair would cost
+ * there now. Read-only — slots are taken automatically when a rotation is
+ * drawn and given back at rollover once unused; this is the ledger.
+ */
 function renderSlots(state: SimState): void {
   slotsEl.innerHTML = '';
 
-  for (const airport of slotControlledAirports()) {
-    const owned = slotsOwned(state, airport.iata);
-    const total = slotsTotal(airport.iata) ?? 0;
-    const used = dailyDeparturesAt(state, airport.iata);
-    const soldOut = owned >= total;
-    const price = nextSlotPrice(state, airport.iata);
+  const rows = allAirports()
+    .map((airport) => ({ airport, held: slotsHeld(state, airport.iata), fees: slotFeesPerDayAt(state, airport.iata) }))
+    .filter((row) => row.held > 0)
+    .sort((a, b) => b.fees - a.fees);
 
+  if (rows.length === 0) {
+    slotsEl.textContent = 'No slots held yet. The first slot pair at an airport nobody serves is free.';
+    return;
+  }
+
+  const total = rows.reduce((sum, row) => sum + row.fees, 0);
+  const summary = document.createElement('p');
+  summary.className = 'airports-note';
+  summary.textContent = `Slot fees: ${money(total)}/day across ${rows.length} airport${rows.length === 1 ? '' : 's'}.`;
+  slotsEl.appendChild(summary);
+
+  for (const { airport, held, fees } of rows) {
+    const [next] = nextSlotFees(state, airport.iata, 1);
     const block = document.createElement('div');
     block.className = 'airport-slot-block';
     block.innerHTML = `
@@ -81,33 +88,9 @@ function renderSlots(state: SimState): void {
         <span class="airport-name">${airport.name}</span>
       </div>
       <div class="airport-slot-counts">
-        Holding <strong>${owned}</strong> of ${total} slots · ${used} in use
-        ${used > owned ? '<span class="airport-slot-over">over capacity</span>' : ''}
+        <strong>${held}</strong> pair${held === 1 ? '' : 's'} · ${money(fees)}/day ·
+        next ${next === null ? 'none left' : next === 0 ? 'free' : `${money(next)}/day`}
       </div>`;
-
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'airport-slot-buy';
-    if (soldOut) {
-      button.textContent = 'All slots held';
-      button.disabled = true;
-    } else {
-      button.textContent = `Buy a slot — ${money(price)}`;
-      button.disabled = !canBuySlot(state, airport.iata);
-      button.addEventListener('click', () => {
-        buySlot(state, airport.iata);
-        updateAirportsPanel(state);
-      });
-    }
-    block.appendChild(button);
-
-    if (!soldOut && state.cash < price) {
-      const note = document.createElement('div');
-      note.className = 'airport-slot-note';
-      note.textContent = `Need ${money(price - state.cash)} more.`;
-      block.appendChild(note);
-    }
-
     slotsEl.appendChild(block);
   }
 }
@@ -118,11 +101,4 @@ export function setupAirportsPanel(): void {}
 export function updateAirportsPanel(state: SimState): void {
   renderPresence(state);
   renderSlots(state);
-}
-
-/** Exported for the schedule warnings, which want to name over-capacity fields. */
-export function slotOverages(state: SimState): string[] {
-  return slotControlledAirports()
-    .filter((a) => isSlotControlled(a.iata) && dailyDeparturesAt(state, a.iata) > slotsOwned(state, a.iata))
-    .map((a) => a.iata);
 }

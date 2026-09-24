@@ -27,6 +27,7 @@
       <div id="airport-detail-presence"></div>
       <div id="airport-detail-demand"></div>
       <div id="airport-detail-load"></div>
+      <div id="airport-detail-slots"></div>
       <div id="airport-detail-based"></div>
       <div id="airport-detail-pools"></div>
       <div id="airport-detail-markets"></div>
@@ -45,6 +46,7 @@
         <span id="new-route-tail-label"></span>
       </div>
       <div id="new-route-utilisation"></div>
+      <div id="new-route-slots"></div>
       <div id="new-route-positioning-preview"></div>
       <div id="new-route-error"></div>
       <div class="new-route-actions">
@@ -326,7 +328,7 @@
         </div>
         <div id="airports-panel" hidden>
           <section id="airports-slots-section">
-            <h2>Slot-controlled airports <button type="button" class="info-mark" aria-label="What this means" data-info="Only the fields that are genuinely slot-coordinated in real life. Every departure needs a slot; everywhere else on the map grows without asking.">i</button></h2>
+            <h2>Slots <button type="button" class="info-mark" aria-label="What this means" data-info="Every daily departure needs a slot pair at its airport. The first pair at an airport nobody serves is free; after that the daily fee rises with how busy the airport is compared with the average one, and is locked when you take it. Slots are taken automatically when you draw a route, and given back at the end of the day once nothing uses them.">i</button></h2>
             <div id="airports-slots"></div>
           </section>
           <section id="airports-presence-section">

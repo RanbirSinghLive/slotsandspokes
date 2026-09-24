@@ -10,7 +10,7 @@ import { FUEL_PRICE_BASELINE } from './fuel';
 import type { TargetCommitment, TargetResult } from './targets';
 import { createCrewPools, crewRequirement, type CrewPools, type PendingHire, type PendingTraining, type TrainingLine } from './crew';
 import { createExecutiveSlots, type ExecutiveSlots } from './executives';
-import { isSlotControlled } from './airports';
+import { acquireNeededSlots } from './slots';
 
 export type AircraftStatus = 'ground' | 'airborne';
 
@@ -484,13 +484,10 @@ export type SimState = {
    */
   groundedTails: string[];
   /**
-   * Slots purchased at each slot-controlled airport, keyed by IATA — a
-   * plain object, same JSON-round-trip reasoning as `routeSettings`. Only
-   * LGA and YYZ are controlled on this map (see data/airports.json's
-   * `slotsTotal`), matching the two fields that really are coordinated in
-   * life; everywhere else grows without asking.
+   * Slot pairs held at each airport (sim/slots.ts), keyed by IATA: one
+   * entry per pair, holding the daily fee locked in when it was taken.
    */
-  slotsOwned: Record<string, number>;
+  slotsHeld: Record<string, number[]>;
   /**
    * Tails grounded today by an unscheduled maintenance event, kept
    * separate from crew groundings above so cancellations can be
@@ -561,6 +558,8 @@ export type SimState = {
     crew: number;
     /** Daily funding of every training line, spent whether or not the line is efficient yet. */
     training: number;
+    /** Daily fees on every slot pair held (sim/slots.ts). */
+    slots: number;
   };
 };
 
@@ -698,7 +697,7 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     pendingTraining: [],
     reserveDepth: 1.15,
     groundedTails: [],
-    slotsOwned: {},
+    slotsHeld: {},
     mechanicalGroundedTails: [],
     cancellationsByCause: { crew: 0, mechanical: 0, weather: 0, curfew: 0 },
     flightsScheduledTotal: 0,
@@ -710,7 +709,7 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
     completedMissionIds: [],
     activeTarget: null,
     lastTargetResult: null,
-    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0, training: 0 },
+    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0, training: 0, slots: 0 },
   };
 
   // Staff this fixture to its own reserve target. Unlike a real new game
@@ -725,14 +724,9 @@ export function createInitialState(tails: string[], rngSeed: number = 1): SimSta
   state.crew.mechanics = requirement.targetMechanics;
 
   // Same reasoning as the crew above: this fixture's schedule already
-  // flies from slot-controlled airports, so it needs to hold the slots
-  // for them or the balance tools would model an airline permanently over
-  // capacity. A real new game owns none, because buying them is the
-  // mechanic (sim/airports.ts).
-  for (const leg of state.schedule) {
-    if (!isSlotControlled(leg.origin)) continue;
-    state.slotsOwned[leg.origin] = (state.slotsOwned[leg.origin] ?? 0) + 1;
-  }
+  // exists, so it takes the slots it flies at today's prices, as if each
+  // rotation had been drawn in the route builder (sim/slots.ts).
+  acquireNeededSlots(state);
 
   return state;
 }
@@ -827,7 +821,7 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     pendingTraining: [],
     reserveDepth: 1.15,
     groundedTails: [],
-    slotsOwned: {},
+    slotsHeld: {},
     mechanicalGroundedTails: [],
     cancellationsByCause: { crew: 0, mechanical: 0, weather: 0, curfew: 0 },
     flightsScheduledTotal: 0,
@@ -839,7 +833,7 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     completedMissionIds: [],
     activeTarget: null,
     lastTargetResult: null,
-    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0, training: 0 },
+    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0, training: 0, slots: 0 },
   };
   revealReach(state);
   return state;

@@ -1,12 +1,11 @@
 import airportsData from '../../data/airports.json';
 import type { SimState } from './state';
-import { SLOTS_ENABLED } from './features';
 
 /**
  * Week six's airport layer: how much of an airline you are *at each
- * airport*, what that concentration is worth, and — at the two fields on
- * this map that are genuinely slot-controlled in real life — how much
- * room you've actually bought to grow there.
+ * airport*, what that concentration is worth, and how much room the
+ * airport has (capacity and load). Slots, priced from that same load,
+ * live in sim/slots.ts.
  *
  * The connectivity multiplier is the interesting half. Real airlines
  * concentrate flying at hubs because a passenger arriving on one flight
@@ -19,7 +18,7 @@ import { SLOTS_ENABLED } from './features';
  * supposed to create.
  */
 
-type AirportSpec = { iata: string; name: string; population: number; slotsTotal?: number; capacityPerDay?: number };
+type AirportSpec = { iata: string; name: string; population: number; capacityPerDay?: number };
 const airports = airportsData as AirportSpec[];
 const byIata = new Map(airports.map((a) => [a.iata, a]));
 
@@ -36,10 +35,6 @@ const byIata = new Map(airports.map((a) => [a.iata, a]));
 const CONNECTIVITY_WEIGHT = 0.06;
 const CONNECTIVITY_SCALE = 4;
 const CONNECTIVITY_MAX = 1.25;
-
-/** Slot pricing escalates with how many you already hold — scarcity, and a brake on buying a whole airport at once. */
-const SLOT_BASE_PRICE = 45_000;
-const SLOT_PRICE_ESCALATION = 1.4;
 
 export type AirportLevel = 'Unserved' | 'Outstation' | 'Focus city' | 'Base' | 'Hub';
 
@@ -140,56 +135,6 @@ export function airportLoad(state: SimState, iata: string): number {
   const capacity = airportCapacityPerDay(iata);
   if (capacity <= 0) return 0;
   return (dailyMovementsAt(state, iata) * PEAK_FACTOR) / capacity;
-}
-
-// --- Slots ------------------------------------------------------------
-
-/** Total slots that exist at this airport, or null where slots aren't controlled at all. */
-export function slotsTotal(iata: string): number | null {
-  if (!SLOTS_ENABLED) return null;
-  return byIata.get(iata)?.slotsTotal ?? null;
-}
-
-export function isSlotControlled(iata: string): boolean {
-  return slotsTotal(iata) !== null;
-}
-
-export function slotsOwned(state: SimState, iata: string): number {
-  return state.slotsOwned[iata] ?? 0;
-}
-
-/** What the next slot at this airport costs — rises with each one already held. */
-export function nextSlotPrice(state: SimState, iata: string): number {
-  return Math.round(SLOT_BASE_PRICE * Math.pow(SLOT_PRICE_ESCALATION, slotsOwned(state, iata)));
-}
-
-/** Whether another slot can be bought here at all: controlled, not sold out, and affordable. */
-export function canBuySlot(state: SimState, iata: string): boolean {
-  const total = slotsTotal(iata);
-  if (total === null) return false;
-  if (slotsOwned(state, iata) >= total) return false;
-  return state.cash >= nextSlotPrice(state, iata);
-}
-
-export function buySlot(state: SimState, iata: string): void {
-  if (!canBuySlot(state, iata)) return; // UI gates this; guard against a stale click
-  state.cash -= nextSlotPrice(state, iata);
-  state.slotsOwned[iata] = slotsOwned(state, iata) + 1;
-}
-
-/**
- * How many more departures the airline may add at this airport.
- * `Infinity` where slots aren't controlled, which is most of the map —
- * callers can compare against it without special-casing.
- */
-export function remainingSlotCapacity(state: SimState, iata: string): number {
-  if (!isSlotControlled(iata)) return Number.POSITIVE_INFINITY;
-  return slotsOwned(state, iata) - dailyDeparturesAt(state, iata);
-}
-
-/** Every slot-controlled airport, for the Airports tab to list separately. */
-export function slotControlledAirports(): AirportSpec[] {
-  return airports.filter((a) => a.slotsTotal !== undefined);
 }
 
 export function allAirports(): AirportSpec[] {

@@ -1,6 +1,7 @@
 import airportsData from '../../data/airports.json';
 import { projection } from './projection';
-import { dailyDeparturesAt, airportLevel, airportLoad, isSlotControlled, slotsOwned, slotsTotal } from '../sim/airports';
+import { dailyDeparturesAt, airportLevel, airportLoad } from '../sim/airports';
+import { slotFeesPerDayAt, slotsHeld } from '../sim/slots';
 import { worstPoolShareByBase } from '../sim/utilisation';
 import { getMapPreview } from './preview';
 import { pipCount, unmetDemandByAirport } from '../sim/unmetDemand';
@@ -309,8 +310,7 @@ export function airportPresence(state: SimState, iata: string) {
   return {
     departures,
     level: airportLevel(departures),
-    slotControlled: isSlotControlled(iata),
-    slotsOwned: slotsOwned(state, iata),
-    slotsTotal: slotsTotal(iata),
+    slotsHeld: slotsHeld(state, iata),
+    slotFeesPerDay: slotFeesPerDayAt(state, iata),
   };
 }

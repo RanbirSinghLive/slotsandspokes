@@ -24,13 +24,6 @@ export const CREWS_ENABLED = false;
 export const FUEL_PRICE_MOVES = false;
 
 /**
- * Airport slots: the two slot-controlled fields (YYZ, LGA) gating how many
- * departures you may add there. Off means no airport is slot-controlled,
- * so nothing gates route building and there is nothing to buy.
- */
-export const SLOTS_ENABLED = false;
-
-/**
  * Authored missions: one-off objectives that pay Reputation. Off means none
  * ever complete, so nothing announces one and Reputation never moves from
  * this source.

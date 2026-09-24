@@ -6,7 +6,8 @@ import { findNearestAirport, type Airport } from '../render/airports';
 import { greatCircleDistanceNm } from '../sim/geo';
 import { actualDailyDemand, currentPotentialDemand } from '../sim/marketDemand';
 import { suppressedMarketReason } from '../sim/demand';
-import { isSlotControlled, remainingSlotCapacity, slotsOwned, slotsTotal } from '../sim/airports';
+import { airportCapacityPerDay, dailyMovementsAt } from '../sim/airports';
+import { acquireNeededSlots, nextSlotFees, quoteSlots, takeQuotedSlots, type SlotQuote } from '../sim/slots';
 import {
   computeBlockMinutes,
   isAircraftTypeAllowedAt,
@@ -120,7 +121,7 @@ function showRouteHoverTooltip(
       ? `${pdewText}  CAP: ${type.seats} — out of range (${Math.round(distanceNm)} nm)`
       : cannotGetHome
         ? `${pdewText}  CAP: ${type.seats} — ${base.iata} is ${Math.round(homeNm)} nm back, too far to close directly; needs another stop`
-        : `${pdewText}  CAP: ${type.seats}`;
+        : `${pdewText}  CAP: ${type.seats}  ·  ${candidate.iata} ${nextSlotText(state, candidate.iata)}`;
     routeHoverTooltipBody.classList.toggle('out-of-range', outOfRange);
     routeHoverTooltipBody.classList.toggle('needs-another-stop', cannotGetHome);
     // Thin now means "can never fill this aircraft even fully grown" —
@@ -136,6 +137,33 @@ function showRouteHoverTooltip(
   routeHoverTooltip.hidden = false;
   routeHoverTooltip.style.left = `${screenX + 16}px`;
   routeHoverTooltip.style.top = `${screenY + 16}px`;
+}
+
+function money(amount: number): string {
+  return `$${Math.round(amount).toLocaleString()}`;
+}
+
+/**
+ * The slot line for a rotation or a flight: which new slot pairs it takes
+ * and what each costs a day. Shared with the route card's add-flight
+ * button (ui/mapMenu.ts) so both say it the same way.
+ */
+export function describeSlotQuotes(quotes: SlotQuote[]): string {
+  const priced = quotes.filter((quote) => quote.fees.length > 0);
+  if (priced.length === 0) return 'Slots: already held.';
+  const parts = priced.map((quote) => {
+    const total = quote.fees.reduce((sum, fee) => sum + fee, 0);
+    const count = quote.fees.length > 1 ? `${quote.fees.length} pairs ` : '';
+    return `${quote.iata} ${count}${total === 0 ? 'free' : `${money(total)}/day`}`;
+  });
+  return `New slots: ${parts.join(', ')}.`;
+}
+
+/** What the next slot pair at an airport would cost, for the hover tooltip. */
+function nextSlotText(state: SimState, iata: string): string {
+  const [fee] = nextSlotFees(state, iata, 1);
+  if (fee === null) return 'no slots left';
+  return fee === 0 ? 'slot free' : `slot ${money(fee)}/day`;
 }
 
 /**
@@ -580,6 +608,8 @@ export type RotationPlan = {
   rotationShare: number;
   spareMinutesBefore: number;
   arriveBackMinute: number;
+  /** New slot pairs this rotation would take, and their daily fees (sim/slots.ts). */
+  slotQuotes: SlotQuote[];
   error: string | null;
   blocksAddStop: boolean;
 };
@@ -619,6 +649,7 @@ export function planRotation(chain: Airport[], dest: Airport, tail: string, stat
     rotationShare: rotationMinutes / USABLE_DAY_MINUTES,
     spareMinutesBefore,
     arriveBackMinute,
+    slotQuotes: [],
     error: null,
     blocksAddStop: true,
   };
@@ -639,21 +670,23 @@ export function planRotation(chain: Airport[], dest: Airport, tail: string, stat
     );
   }
 
-  // Week six: departures from a slot-controlled airport need slots to put
-  // them in. Counted across the whole chain now rather than the two ends
-  // of one leg — a rotation that passes through the same slot-controlled
-  // airport twice needs two slots.
+  // Slots (sim/slots.ts): every departure needs a slot pair at its
+  // airport. Counted across the whole chain — a rotation that passes
+  // through the same airport twice needs two. What's quoted here is taken
+  // automatically on confirm; the only hard stop is an airport with no
+  // room left at any price.
   const departuresByAirport = new Map<string, number>();
+  const arrivalsByAirport = new Map<string, number>();
   for (const leg of legs) {
     departuresByAirport.set(leg.origin, (departuresByAirport.get(leg.origin) ?? 0) + 1);
+    arrivalsByAirport.set(leg.dest, (arrivalsByAirport.get(leg.dest) ?? 0) + 1);
   }
-  for (const [iata, departures] of departuresByAirport) {
-    if (!isSlotControlled(iata)) continue;
-    if (remainingSlotCapacity(state, iata) >= departures) continue;
+  plan.slotQuotes = quoteSlots(state, departuresByAirport, arrivalsByAirport);
+  const full = plan.slotQuotes.find((quote) => quote.full);
+  if (full) {
     return fail(
-      `${iata} is slot-controlled and you hold ${slotsOwned(state, iata)} of ${slotsTotal(iata)} slots, ` +
-        `all in use. This rotation needs ${departures} departure${departures === 1 ? '' : 's'} there — ` +
-        `buy another slot in the Airports tab first.`,
+      `${full.iata} is full: ${dailyMovementsAt(state, full.iata)} of its ${airportCapacityPerDay(full.iata)} takeoffs and landings a day ` +
+        `are taken, so it has no slots left. Grow somewhere quieter, or carry the traffic on fewer, bigger aircraft.`,
     );
   }
 
@@ -744,6 +777,7 @@ const formError = document.querySelector<HTMLElement>('#new-route-error')!;
 const formTailLabel = document.querySelector<HTMLElement>('#new-route-tail-label')!;
 const formUtilisation = document.querySelector<HTMLElement>('#new-route-utilisation')!;
 const formPositioningPreview = document.querySelector<HTMLElement>('#new-route-positioning-preview')!;
+const formSlots = document.querySelector<HTMLElement>('#new-route-slots')!;
 const formAddStopButton = document.querySelector<HTMLButtonElement>('#new-route-add-stop')!;
 const formConfirmButton = document.querySelector<HTMLButtonElement>('#new-route-confirm')!;
 const formCancelButton = document.querySelector<HTMLButtonElement>('#new-route-cancel')!;
@@ -842,6 +876,7 @@ function updateFormValidation(chain: Airport[], dest: Airport, state: SimState):
     formPdew.textContent = '';
     formUtilisation.textContent = '';
     formPositioningPreview.textContent = '';
+    formSlots.textContent = '';
     return;
   }
 
@@ -911,6 +946,8 @@ function updateFormValidation(chain: Airport[], dest: Airport, state: SimState):
     `Uses ${Math.round(plan.rotationShare * 100)}% of an aircraft — ` +
     `${plan.base.iata} has ${spareBefore.toFixed(2)} spare, ${spareAfter.toFixed(2)} after this.`;
 
+  formSlots.textContent = describeSlotQuotes(plan.slotQuotes);
+
   formError.textContent = plan.error ?? '';
   formConfirmButton.disabled = plan.error !== null;
   formAddStopButton.disabled = plan.blocksAddStop;
@@ -974,6 +1011,10 @@ export function commitRotation(state: SimState, tail: string, plan: RotationPlan
     if (!marketsTouched.has(key)) marketsTouched.set(key, packed);
   }
 
+  // Take the slot pairs the new legs need, at the prices the popover
+  // showed; anything a quote didn't cover is taken at today's price.
+  takeQuotedSlots(state, plan.slotQuotes);
+  acquireNeededSlots(state);
   renderScheduleWarnings(scheduleProblems(state));
 
   // Fare/marketing are set at the market level (sim/state.ts's

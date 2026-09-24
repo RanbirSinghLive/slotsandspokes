@@ -762,6 +762,7 @@ body {
 
 #airport-detail-presence,
 #airport-detail-load,
+#airport-detail-slots,
 #airport-detail-based,
 #airport-detail-markets {
   margin-bottom: 6px;
@@ -840,8 +841,8 @@ body {
 }
 
 /* Same red as everything else "over" (the capacity ring on the map, the
-   crew-short pool rows) — a slot-controlled field flying more than it
-   holds is the same class of problem those already flag. */
+   crew-short pool rows) — an airport past its capacity is the same class
+   of problem those already flag. */
 #airport-detail-presence.airport-detail-over,
 #airport-detail-load.airport-detail-over {
   color: #ff8080;
@@ -1084,7 +1085,8 @@ body {
    what share of an aircraft it spends, and what the base pool has left
    after it. Amber because this is now the number the decision turns on,
    the same weight the return-leg preview used to carry here. */
-#new-route-utilisation {
+#new-route-utilisation,
+#new-route-slots {
   color: #ffd166;
   margin: -4px 0 8px;
   min-height: 1.2em;
@@ -2580,7 +2582,7 @@ body {
 }
 
 /* Week six's Airports tab (sim/airports.ts, ui/airports.ts): presence and
-   connectivity per field, plus slots at the two real slot-controlled ones. */
+   connectivity per field, plus the ledger of slots held (sim/slots.ts). */
 #airports-panel section {
   margin-bottom: 26px;
 }
