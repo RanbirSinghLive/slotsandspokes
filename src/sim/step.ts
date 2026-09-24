@@ -6,7 +6,7 @@ import { rollDailyWeather, isAirportClosed } from './weather';
 import { airportLoad } from './airports';
 import { connectingDemandOnMarket } from './hubs';
 import { rollTotalDelayMinutes, isOnTimeArrival } from './delays';
-import { rollCompetitorRouteOpenings, rollCompetitorFrequencyGrowth, rollRivalEntry } from './competitors';
+import { rollCompetitorRouteOpenings, rollCompetitorFrequencyGrowth, rollRivalEntry, rollDailyRivalFares } from './competitors';
 import { rollDailyFuelPrice } from './fuel';
 import { rollDailyMarketDemand, actualDailyDemand } from './marketDemand';
 import { revealReach } from './reach';
@@ -253,6 +253,8 @@ export function step(state: SimState): void {
     rollCompetitorRouteOpenings(state, state.simMinute);
     rollCompetitorFrequencyGrowth(state);
     rollRivalEntry(state, state.simMinute);
+    // Rivals reprice against the player's fares (sim/competitors.ts).
+    rollDailyRivalFares(state);
     // The lessor's delivery (sim/market.ts) comes *after* the rivals have
     // grown for the day. Rivals only ever act at rollover, so an airframe
     // delivered before them would always be theirs before the player could

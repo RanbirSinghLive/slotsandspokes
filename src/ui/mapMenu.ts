@@ -473,7 +473,10 @@ function fillRouteCard(a: string, b: string, state: SimState): void {
     const factor = rivalYieldFactor(a, b, legsServingMarket(a, b, state.schedule), state.competitorRoutes);
     const cut = Math.round((1 - factor) * 100);
     demandEl.textContent =
-      `Rivals: ${rivals.map((r) => `${r.airline} ${r.dailyFrequency}/day`).join(', ')}` +
+      // Their fare now moves in response to yours (sim/competitors.ts), so
+      // it's shown next to what you charge.
+      `Rivals: ${rivals.map((r) => `${r.airline} ${r.dailyFrequency}/day at $${r.fare.toLocaleString()}`).join(', ')}` +
+      ` (you: $${(state.routeSettings[marketKey(a, b)]?.fare ?? 0).toLocaleString()})` +
       (cut > 0 ? `. They cut your fares ${cut}%: more flights of your own reduce it.` : '');
     demandEl.classList.add('airport-detail-over');
   }

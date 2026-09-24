@@ -35,7 +35,10 @@ export type CompetitorOffering = {
   origin: string;
   dest: string;
   dailyFrequency: number;
+  /** What it charges today; moves in response to the player's fare (rollDailyRivalFares()). */
   fare: number;
+  /** The fare it opened at, and drifts back to when the player isn't competing with it. */
+  baseFare: number;
   openedAtMinute: number;
 };
 
@@ -62,6 +65,7 @@ export function loadCompetitorRoutes(): CompetitorOffering[] {
   return (competitorsData as Omit<CompetitorOffering, 'openedAtMinute' | 'fare'>[]).map((route) => ({
     ...route,
     fare: incumbentFare(route.origin, route.dest),
+    baseFare: incumbentFare(route.origin, route.dest),
     openedAtMinute: PRE_EXISTING_OPENED_AT_MINUTE,
   }));
 }
@@ -175,6 +179,7 @@ export function rollCompetitorRouteOpenings(state: SimState, dayStartMinute: num
       dest,
       dailyFrequency: 1,
       fare: recommendedFare(origin, dest),
+      baseFare: recommendedFare(origin, dest),
       openedAtMinute: dayStartMinute,
     });
   }
@@ -243,6 +248,7 @@ export function rollRivalEntry(state: SimState, dayStartMinute: number): void {
     dest,
     dailyFrequency: 1,
     fare: recommendedFare(origin, dest),
+    baseFare: recommendedFare(origin, dest),
     openedAtMinute: dayStartMinute,
   });
 }
@@ -262,5 +268,54 @@ export function rollCompetitorFrequencyGrowth(state: SimState): void {
     if (roll < chance && route.dailyFrequency < RIVAL_FREQUENCY_CAP && rivalSecuresCapacity(state, route.code, 1)) {
       route.dailyFrequency += 1;
     }
+  }
+}
+
+// --- Fare response ------------------------------------------------------------
+
+/**
+ * Rivals respond to the player's fares, once a day, on every market both
+ * fly. Before this, a rival's fare was fixed the day its route opened, so
+ * the player could price however they liked and the only competitive
+ * pressure was frequency.
+ *
+ * The behaviour is a simple, readable one:
+ *   - The player is cheaper: the rival cuts toward the player's fare —
+ *     matching, not undercutting, so a price war only escalates if the
+ *     player keeps cutting — down to a floor it won't go below, standing
+ *     in for its costs.
+ *   - The player is dearer: the rival raises toward the player's fare but
+ *     stays RIVAL_FOLLOW_UP_DISCOUNT under it, to keep taking share, up to
+ *     a ceiling.
+ *   - The player doesn't fly the market: the rival drifts back to the fare
+ *     it opened at.
+ * Each move covers RIVAL_FARE_ADJUST_SHARE of the gap a day, so a fare
+ * change plays out over days rather than snapping. Deterministic — no
+ * random draws.
+ */
+const RIVAL_FARE_FLOOR_SHARE = 0.65;
+const RIVAL_FARE_CEILING_SHARE = 1.4;
+const RIVAL_FOLLOW_UP_DISCOUNT = 0.08;
+const RIVAL_FARE_ADJUST_SHARE = 0.25;
+const RIVAL_FARE_DRIFT_SHARE = 0.1;
+
+/** Where this rival's fare is heading today, given the player's fare on the market (null if the player doesn't fly it). */
+export function rivalFareTarget(route: CompetitorOffering, playerFare: number | null): number {
+  const goingRate = recommendedFare(route.origin, route.dest);
+  const floor = goingRate * RIVAL_FARE_FLOOR_SHARE;
+  const ceiling = goingRate * RIVAL_FARE_CEILING_SHARE;
+  if (playerFare === null) return route.baseFare;
+  if (playerFare < route.fare) return Math.max(floor, playerFare);
+  return Math.min(ceiling, Math.max(route.fare, playerFare * (1 - RIVAL_FOLLOW_UP_DISCOUNT)));
+}
+
+export function rollDailyRivalFares(state: SimState): void {
+  const playerFlies = new Set(state.schedule.map((leg) => marketKey(leg.origin, leg.dest)));
+  for (const route of state.competitorRoutes) {
+    const key = marketKey(route.origin, route.dest);
+    const playerFare = playerFlies.has(key) ? (state.routeSettings[key]?.fare ?? null) : null;
+    const target = rivalFareTarget(route, playerFare);
+    const share = playerFare === null ? RIVAL_FARE_DRIFT_SHARE : RIVAL_FARE_ADJUST_SHARE;
+    route.fare = Math.round(route.fare + (target - route.fare) * share);
   }
 }

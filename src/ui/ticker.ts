@@ -255,8 +255,50 @@ function pollMarketEvents(state: SimState): void {
   }
 }
 
+/**
+ * Rivals repricing against the player (sim/competitors.ts): reported once
+ * a rival's fare on one of the player's markets has moved 5% or more since
+ * it was last reported, so a price war reads as a few clear lines rather
+ * than a daily trickle.
+ */
+const RIVAL_FARE_REPORT_SHARE = 0.05;
+let hasSeenInitialRivalFares = false;
+const reportedRivalFares = new Map<string, number>();
+
+function pollRivalFareEvents(state: SimState): void {
+  const identity = (route: { code: string; origin: string; dest: string }) => `${route.code}:${[route.origin, route.dest].sort().join('-')}`;
+  if (!hasSeenInitialRivalFares) {
+    for (const route of state.competitorRoutes) reportedRivalFares.set(identity(route), route.fare);
+    hasSeenInitialRivalFares = true;
+    return;
+  }
+  const playerMarkets = new Set(state.schedule.map((leg) => [leg.origin, leg.dest].sort().join('-')));
+  for (const route of state.competitorRoutes) {
+    const id = identity(route);
+    const reported = reportedRivalFares.get(id);
+    if (reported === undefined) {
+      reportedRivalFares.set(id, route.fare);
+      continue;
+    }
+    const market = [route.origin, route.dest].sort().join('-');
+    if (!playerMarkets.has(market)) {
+      reportedRivalFares.set(id, route.fare);
+      continue;
+    }
+    if (Math.abs(route.fare - reported) < reported * RIVAL_FARE_REPORT_SHARE) continue;
+    reportedRivalFares.set(id, route.fare);
+    const yours = state.routeSettings[market]?.fare;
+    pushEvent(
+      state.simMinute,
+      `${route.airline} ${route.fare < reported ? 'cuts' : 'raises'} ${route.origin}–${route.dest} to $${route.fare.toLocaleString()}` +
+        (yours !== undefined ? ` (you: $${yours.toLocaleString()})` : ''),
+    );
+  }
+}
+
 export function updateTicker(state: SimState): void {
   pollAogEvents(state);
+  pollRivalFareEvents(state);
   pollMarketEvents(state);
   pollReachEvents(state);
   pollRivalEvents(state);
