@@ -7,15 +7,19 @@ short update whenever a milestone changes how something works; if it drifts
 out of sync with the code, the code is right and this needs fixing, not the
 other way around.
 
-Status: current through **week seven, phase C** (the utilisation pivot —
-see WEEK-SEVEN.md).
+Status: sections **Time, Data files, The simulation state, Headless
+runner, Airport constraints, Route builder, Persistence, The aircraft
+market, The balance sweep** and **What isn't built yet** were rewritten
+against the code on 2026-09-24. Every other section was last checked in
+the week its heading names. Treat its numbers (aircraft names, seat
+counts, save-key versions) as that week's, and its "Verified …"
+paragraphs as records of checks made then, not claims about today.
 
-**One known gap:** `src/sim/utilisation.ts` has no section of its own.
-The route builder and rotations-list sections below use its results, but
-the model itself — the 06:00–22:00 usable day, charging each leg its own
-turn, pooling spare capacity per base and reporting it *in aircraft* —
-is only written up in WEEK-SEVEN.md's phase A. That's the one part of
-the pivot this file doesn't explain.
+**Known gaps:** `src/sim/utilisation.ts` (the 06:00–22:00 usable day,
+per-base pooling reported in aircraft) is only written up in
+WEEK-SEVEN.md's phase A. Mechanics added in week eight — the runway
+warning, rival capacity response, connecting passengers — have module
+comments but no section here yet.
 
 ---
 
@@ -23,82 +27,59 @@ the pivot this file doesn't explain.
 
 Everything in `src/sim/` measures time as `simMinute`: an integer count of
 minutes since the start of day 0, UTC. There is no `Date` object anywhere in
-the simulation. `Math.floor(simMinute / 1440)` is the day index (0-based);
-`simMinute % 1440` is the minute of that day, which is what the daily-
-repeating schedule is authored against.
+the simulation; `main.ts` uses one only to format the calendar date
+(`simMinute` 0 is January 1, 2027).
 
-The HUD showed this as "Day N" through week three. Week four fixed
-`simMinute` 0 at January 1, 2027 and displays a real calendar date
-instead (`main.ts`'s `updateClock()`/`formatCalendarDate()`) — the one
-and only place a `Date` object appears anywhere in this codebase,
-deliberately: it's display formatting, exactly the same "local time
-exists only for display" carve-out CLAUDE.md already grants each
-airport's UTC offset, not a change to what `step()` itself knows or
-needs (still nothing but a plain integer).
+**The airline's day runs on home time** (`sim/clock.ts`). Where one day
+ends and the next begins is home midnight, not UTC midnight: the
+schedule's `departMinute`, the 06:00–22:00 usable day, the 22:00 curfew
+and the daily rollover are all minutes after *home* midnight. Ask
+`clock.ts` — `minuteOfDay()`, `dayStartMinute()`, `dayIndex()` — rather
+than computing `simMinute % 1440`. A new game starts at home midnight
+(`startingSimMinute()`), which is why `chooseHome()` resets `simMinute`.
+The HUD clock shows home local time. Known limit: a plane based in
+another time zone still flies on the home clock.
 
-The browser compresses time: 125ms of real time = 1 simulated minute at 1×
-speed (`MS_PER_SIM_MINUTE` in `main.ts`). The speed buttons (Pause/1×/4×/20×)
-just multiply how fast an accumulator fills up; `step()` itself always
-advances by exactly one minute per call regardless of speed.
+Each airport has one fixed `utcOffsetMinutes` (standard time). Daylight
+saving is out of scope.
 
-The spacebar toggles pause too (week four), not just the Pause button —
-a `keydown` listener flips `speedMultiplier` between 0 and whatever it
-was before pausing (`speedBeforePause`), so resuming lands back on 4x
-or 20x rather than always resetting to 1x. Ignored while a real DOM
-input has focus, so it doesn't hijack a space typed into a fare field
-or the schedule filters.
-
-Daylight saving is out of scope — each airport has one fixed
-`utcOffsetMinutes` (see Data files below), and nothing in the sim adjusts it
-seasonally.
+The browser compresses time: 125 ms of real time = 1 simulated minute at
+1× (`MS_PER_SIM_MINUTE` in `main.ts`). The speed buttons (Pause, 1×, 20×,
+100×) multiply how fast an accumulator fills; `step()` always advances
+exactly one minute per call. At most 250 ms of real time is fed in per
+frame (`MAX_FRAME_DELTA_MS`), so returning to a backgrounded tab resumes
+rather than freezing through a huge catch-up. The spacebar toggles pause
+and resumes at the previous speed; it is ignored while a text input has
+focus.
 
 ## Data files (`data/`)
 
-- **`airports.json`** — 19 airports (10 originally, plus week four's YDF,
-  YQX, YYR, YQY, YUY, YBG, YTZ, LGA, and BOS). Each has `iata`, `name`,
-  `lat`/`lon`, `utcOffsetMinutes` (winter/standard time, fixed, not
-  DST-aware), and `population` (catchment CMA/CA population for Canadian
-  airports, StatsCan 2021 census; 2020 US Census MSA for the two
-  American ones — see `sim/demand.ts`, below). Coordinates verified
-  against OurAirports directly (fetched, not recalled). Deer Lake and
-  Sydney use their broader catchment's population (Corner Brook CA,
-  Cape Breton CA) rather than the small named town's own, since that's
-  the region the airport actually serves; Goose Bay and Rouyn-Noranda
-  use their own standalone town/city figure, having no larger CA above
-  them; Toronto's two airports (YYZ, YTZ) share one Toronto CMA number.
-  Some airports also carry a `maxAircraftType` — see "Airport
-  constraints" under `sim/schedule.ts`, below.
-- **`aircraft-types.json`** — five types now (week four's aircraft
-  ladder, at the player's request — multiple types were explicitly
-  deferred until then): Beechcraft 1900D (`BEH1900D`, 19 seats), Dash
-  8-300 (`DH8300`, 50), Dash 8-400/Q400 (`DH8400`, 78), Airbus A220-300
-  (`A220300`, 149), Airbus A330-300 (`A330300`, 280) — real public
-  spec-sheet seats/cruise per type, same sourcing rule as before; costs
-  and `rangeNm` stay "deliberately crude, not fit to any real source,"
-  same spirit as `economy.ts`'s other constants. `DH8400`'s cost figures
-  are the *original* DH4 numbers from before the very first Fleet Market
-  pass swapped the starting type down to the 1900D. `createInitialState()`
-  (the headless runner's own entry point, untouched by any of this) still
-  grabs index `[0]` of this array, which stays `BEH1900D` — array order
-  matters there, not just the code. See the Fleet Market section, below,
-  for the full ladder and its pricing.
-- **`fleet-market.json`** (week three, expanded week four) — a small,
-  hand-authored list of individual airframes available to buy or lease in
-  a new game: `registration`, `typeCode`, `ageYears`, `buyPrice`,
-  `leasePricePerDay`. Two listings per type now, 12 total, all available
-  from day one. See the Fleet Market section, below.
-- **`schedule.json`** — the daily-repeating schedule *template*: 12 legs
-  across 3 tails (`C-GVIA`, `C-FATL`, `C-GMAR`), each a hand-authored
-  rotation that returns to its own overnight base by end of day. Each entry
-  has `legId`, `tail`, `origin`, `dest`, `departMinute` (minute-of-day) —
-  `blockMinutes` is *not* stored here, it's computed at load time (see
-  below). No longer what an actual new game starts from (week three's
-  Fleet Market starts empty instead — see below); this file's only
-  remaining consumer is `src/headless/run.ts`'s `createInitialState()`
-  call, M7's balance-tuning tool, which still wants a known, fully-formed
-  network to simulate against. `sim/schedule.ts`'s `loadSchedule()` hands
-  it its own fresh, independent copy each time, never mutating this file
-  itself.
+All from public sources (CLAUDE.md). Some are **generated** by scripts in
+`src/headless/` — change the script and re-run it rather than editing the
+JSON by hand.
+
+- **`airports.json`** — 40 airports: the original eastern-Canada set plus
+  north-east US and world hubs (LHR, CDG, AMS, FRA, …). Each has `iata`,
+  `name`, `lat`/`lon`, `utcOffsetMinutes` (fixed, standard time) and
+  `population` (the catchment the airport serves). The world-hub half is
+  generated by `npm run airports` (`buildAirports.ts`) from OurAirports
+  and GeoNames. Some carry `maxAircraftType` (see Airport constraints).
+- **`aircraft-types.json`** — four classes, smallest first: Propeller
+  (`PROP`, 25 seats, 280 kt, 380 nm), Regional (`REGIONAL`, 75, 360 kt,
+  850 nm), Narrowbody (`NARROWBODY`, 150, 450 kt, 2,400 nm), Widebody
+  (`WIDEBODY`, 300, 470 kt, 5,500 nm). Array order is the size ranking
+  that airport limits use, and index 0 is the starting class.
+- **`lease-rates.json`** — the daily lease price of a *new* airframe per
+  class; age discounts it (see The aircraft market).
+- **`competitors.json`** — the seed rival routes a game starts with;
+  **`rival-airlines.json`** — the pool new rival airlines are drawn from
+  when they enter mid-game.
+- **`suppressed-markets.json`** — city pairs that carry no demand, with
+  the reason shown to the player.
+- **`tech-tree.json`**, **`missions.json`**, **`executives.json`** — the
+  content for those systems (sections below).
+- **`world-110m.json`** (Natural Earth basemap), **`lakes.json`** and
+  **`rivers.json`** (generated by `npm run lakes` / `npm run rivers`).
 
 ## The simulation state (`src/sim/state.ts`)
 
@@ -115,7 +96,7 @@ aircraft[]       — { tail, typeCode, status: 'ground'|'airborne', atAirport,
                       activeLegId, groundSinceMinute }
 activeFlights[]  — { legId, tail, origin, dest, departMinute, arriveMinute,
                       scheduledArriveMinute }
-schedule[]       — this game's own editable copy of the daily schedule (see M8, below)
+schedule[]       — the airline's daily-repeating legs; empty in a new game
 completedToday[] — legIds finished since the last day rollover
 todayRevenue/Cost/Margin — reset to 0 at day rollover; cash is not reset
 rngSeed          — seeded RNG state (see Randomness) — used by M9's delay rolls
@@ -127,11 +108,15 @@ enforce a minimum turnaround. `scheduledArriveMinute` (added M9) is what an
 zero delay — comparing it to the real `arriveMinute` is how lateness gets
 explained without redoing day-boundary math outside step.ts.
 
-`createInitialState(tails, rngSeed?)` builds this at `simMinute = 0`. Only
-the tails you pass become `Aircraft` records — a schedule leg for any other
-tail simply never matches an aircraft in `step()` and is silently ignored.
-That's how M4 ran one aircraft out of the full three-tail schedule with zero
-special-case code, and how M5 turned the rest on by passing more tails.
+A game starts from `createNewGameState(seed, home)`: `STARTING_CASH`
+($500,000), one leased Propeller at the home airport
+(`createStartingFleet()`), an empty schedule, the seed rival routes and a
+fresh aircraft market. `sim/homes.ts`'s `chooseHome()` then sets the home
+the player picked — the clock, the fleet and the fog all restart around
+it. The browser (`main.ts`) and the headless runner
+(`src/headless/newGame.ts`) both start this way. The list above is only
+the original core; `SimState` has grown a field per mechanic since, and
+`state.ts` is the reference.
 
 ## The tick (`src/sim/step.ts`)
 
@@ -140,7 +125,7 @@ place, deterministically (same state in → same state out, always — no
 `Math.random()`, no reading the clock). Each call does three things in
 order:
 
-1. **Day rollover** — if this is minute 0 of a new day,
+1. **Day rollover** — if this is minute 0 of a new home-local day,
    `completedToday`/`todayRevenue`/`todayCost`/`todayMargin` reset to zero,
    the day's total marketing spend is charged (see "The Commercial panel"),
    and `sim/weather.ts`'s `rollDailyWeather()` expires/spreads/originates
@@ -555,21 +540,33 @@ yet (see WEEK-TWO.md's "Layers").
 
 ## Headless runner (`src/headless/run.ts`)
 
-`npm run headless` (optionally `-- 30` for a shorter run than the 365-day
-default) imports `createInitialState`/`step` directly and calls `step()` in
-a plain loop — no canvas, no `requestAnimationFrame`, no waiting for real
-time to pass. It writes one CSV row per day (`headless-output.csv`, git-
-ignored — it's a report, not source) with that day's cash, revenue, cost,
-margin, and legs flown, reading `state.todayRevenue` etc. right after the
-day's last minute is processed but before the next day's first minute would
-reset them (see the note on reset timing under "The tick" above).
+`npm run headless` runs a game in Node with no browser, calling `step()`
+in a plain loop. Optional arguments: days (default 365) and home airport
+(default YUL) — `npm run headless -- 90 YHZ`. It writes one CSV row per
+day to `headless-output.csv` (git-ignored) with cash, revenue, cost,
+margin, legs flown and the fuel price index, read after the day's last
+minute but before the next rollover resets the day's totals.
 
-Before M9, margin was *exactly* $84,423 on every one of 365 days — expected
-at the time (nothing varied day to day yet), but a real limitation: there
-was no way for a bad day to happen at all. Since M9's delays feed into cost
-(see Economy, above), margin now genuinely varies day to day — a 30-day run
-ranged roughly $77,000–$84,000 depending on how much delay-driven cost each
-day happened to roll.
+**It plays the real game.** `startHeadlessGame()` in
+`src/headless/newGame.ts` makes the same two calls the browser does —
+`createNewGameState()`, then `chooseHome()` — with a fixed seed so runs
+repeat exactly. Because a new game has no routes, `openStarterRoutes()`
+then plays a deliberately plain opening: for each plane, keep adding
+out-and-back rotations from home to the known airport with the most
+potential demand per flight already on that market, until the plane's
+day is full. Every rotation goes through `planRotation()` /
+`applyRotation()` (`sim/rotations.ts`), the same rules and commit as the
+route builder, so it can't build anything a player couldn't.
+
+The starter player never leases more planes, changes fares, or responds
+to rivals. What it measures is an unattended start, and that is harsh:
+from YUL, one Propeller on YUL–YYZ/YTZ/LGA ends a year at about −$219k
+from $500k, as rival airlines pile onto its markets and a day packed to
+22:00 loses flights to the curfew. Balance work that needs a better
+player should add the behaviour to `newGame.ts`, not hand-write a
+schedule. (Until September 2026 the runner flew a hand-authored
+three-aircraft network no player could have, which is why older sections
+quote much rosier numbers.)
 
 ## Rendering (`src/render/`, plus `main.ts`'s loop)
 
@@ -735,8 +732,8 @@ directly: make competitors actually open new routes while a game is
 running.
 
 **The data moved.** `CompetitorOffering` (the type) and
-`loadCompetitorRoutes()` (a fresh per-game copy, same shape as
-`sim/schedule.ts`'s `loadSchedule()`) now live in `sim/competitors.ts`,
+`loadCompetitorRoutes()` (a fresh per-game copy) now live in
+`sim/competitors.ts`,
 not `sim/choiceModel.ts`. Every seed route gets a new
 `openedAtMinute` field, stamped with a sentinel
 (`PRE_EXISTING_OPENED_AT_MINUTE`, a large finite negative number — not
@@ -876,118 +873,82 @@ a fleet table (tail, type, status, and either the current airport or
 The econ/fleet parts are rebuilt from `state` every render — a pure read,
 same rule as the canvas layers.
 
-## Airport constraints (`src/sim/schedule.ts`) — week four
+## Airport constraints (`src/sim/schedule.ts`)
 
-New alongside the nine new airports: some real airports have a real
-runway or gate limit on what can land there, and now this map does
-too. `Airport.maxAircraftType` (`data/airports.json`) names the
-largest type allowed to operate there — YTZ (Billy Bishop Toronto
-City) is capped at `"DH8400"` (its real Dash 8/Q400 restriction), LGA
-at `"A220300"`. Every other airport has no field at all and is
-unconstrained, same as before this existed.
+Some airports limit the largest class that may operate there:
+`Airport.maxAircraftType` in `data/airports.json`. Today YTZ (Billy
+Bishop) takes up to `REGIONAL` and LGA up to `NARROWBODY`; every other
+airport is unconstrained.
 
-"Largest" needed a size ordering, and rather than invent a separate
-numeric field, `isAircraftTypeAllowedAt(iata, typeCode)` reads it
-straight off `data/aircraft-types.json`'s own array order — the
-aircraft ladder is already authored smallest-to-largest (see CLAUDE.md
-and WEEK-FOUR.md's own aircraft-ladder section), so a type's position
-in that array *is* its rank. `typeRank <= maxRank` is the whole check;
-an absent constraint or an unrecognized code both fail open (true)
-rather than block on a data gap.
+`isAircraftTypeAllowedAt(iata, typeCode)` ranks classes by their position
+in `data/aircraft-types.json` (smallest first), so the check is
+`typeRank <= maxRank`. An unknown code fails open.
 
-Enforced in three places, deliberately mirroring how this codebase
-already treats the *other* hard aircraft limit, range:
-- **`ui/routeBuilder.ts`** — a route into or out of a too-small airport
-  is a flat "no," exactly like the existing range check: `Add Route`
-  disables with a plain explanation (`updateFormValidation()`), and the
-  confirm handler re-checks defensively before ever touching
-  `state.schedule`, the same "belt and suspenders" shape the range
-  check already has there.
-- **`ui/rotationBoard.ts`** — dragging a leg onto a different-gauge
-  tail that violates either endpoint's constraint flags the bar red,
-  same "allow the drop, just flag it" treatment the existing range
-  check gets there — a drag's commit never blocks on anything, so this
-  doesn't either.
-- **`validateSchedule()`** — a leg already assigned to a tail whose
-  aircraft violates one of its two airports' constraints (however it
-  got that way) is a standing warning in the sidebar, not just a
-  one-time red flash during a drag someone might not have caught.
+Enforced in two places: `planRotation()` (`sim/rotations.ts`) refuses a
+rotation that touches a too-small airport, with an explanation, and
+`validateSchedule()` reports any existing leg that breaks the limit as a
+standing warning.
 
-Verified directly: `isAircraftTypeAllowedAt()` checked against all five
-aircraft types at YTZ and at LGA, plus an unconstrained airport (BOS)
-against the biggest type, matched expectations in every case. Live
-in-browser: arming a route with an A220-300 selected and confirming
-into YTZ produced the exact expected error and a disabled Add Route
-button; switching to a DH8400 for the identical route cleared both.
+## Route builder (`src/ui/routeBuilder.ts`, rules in `src/sim/rotations.ts`)
 
-## Route builder (`src/ui/routeBuilder.ts`) — M10, rewritten week seven
-
-Building service is a map gesture, not a form: **pick a plane from the
-Fleet panel first**, click an airport to arm it, move the mouse (no need
-to hold the button) to draw a live preview arc toward the cursor, and
-click a second airport. The preview is a `LineString` run through the same
+Building service is a map gesture: tap an airport, choose **Route** from
+the map menu, move the mouse to draw a live preview arc, and click a
+second airport. The preview is a `LineString` through the same
 `d3.geoPath` machinery `render/routes.ts` uses, so it curves exactly like
-the real route will, snapping onto the nearest airport once the cursor is
-within `HIT_RADIUS_PX`. Escape, re-clicking the armed origin, or clicking
-open water all cancel back to idle.
+the real route, snapping onto the nearest airport within
+`HIT_RADIUS_PX`. Escape, re-clicking the origin, or clicking open water
+cancels.
 
-A small state machine (`idle` / `armed` / `confirming`) lives entirely in
-this module, not in `SimState` — transient UI interaction, not simulated
-state. `main.ts`'s canvas `mousedown` handler gives this module first
-refusal on every click, so the pan gesture and the builder never fight
-over the same event.
+**The split.** Everything that decides what a rotation *is* lives in
+`sim/rotations.ts`, with no DOM: packing, `planRotation()`,
+`candidateTailsAt()`, `autoPickTail()`, and `applyRotation()`, which
+writes it into the schedule. `ui/routeBuilder.ts` keeps only the page:
+the gesture's `idle` / `armed` / `confirming` state machine (transient UI
+state, not in `SimState`), the popover, and `commitRotation()`, which
+calls `applyRotation()` and then refreshes the schedule warnings and adds
+Commercial rows for new markets. The map menu's add-frequency and
+change-gauge actions (`ui/routeActions.ts`) and the headless runner use
+the same functions, so every rotation is created the same way.
 
 ### What gets built is a rotation, not a leg
 
-Week seven's pivot. `BuilderState` carries a `chain: Airport[]` — base
-first, last entry being wherever the next leg departs from. **"Add stop"**
-appends the pending destination and re-arms from it instead of
-confirming, so `YUL-YFC-YQM-YFC-YQM-YUL` is one gesture. Confirm closes
-the loop back to the base, which is why there's no "add return leg"
-checkbox: a plain out-and-back is just the two-airport chain.
+The builder carries a `chain` of airports, base first. **Add stop**
+appends the pending destination and re-arms from it, so
+`YUL-YFC-YQM-YFC-YQM-YUL` is one gesture. Confirm closes the loop back to
+the base; a plain out-and-back is the two-airport chain.
 
-A rotation **must start at the aircraft's `baseAirport`**. Arming
-elsewhere is a hard block. An unbased airframe gets based by flying its
-first rotation from there, which is the only place other than the Fleet
-tab's dropdown where a base is set.
+The plane is chosen for you: `autoPickTail()` takes the smallest-class
+aircraft based at the origin (or not yet based) whose plan has no error.
+An unbased plane becomes based at the origin by flying its first rotation
+there. After the first rotation, a rotation must start from an airport
+already in the network.
 
 ### Packing
 
-`packRotation()` walks the chain giving each leg the cursor's time, then
-advancing `cursor += blockMinutes + MIN_TURN_MINUTES`. The player no
-longer authors departure times at all — there is no time input.
+`packRotation()` walks the chain, giving each leg the running time and
+then advancing by its block time plus its turn (`scheduledTurnMinutes()`,
+which includes any turn buffer set on the route). The player never
+authors departure times.
 
-Start time comes from `rotationStartMinute()`: `USABLE_DAY_START_MINUTE`
-(06:00) for a tail with no legs, otherwise its last arrival plus a turn.
-Packing every rotation from 06:00 would double-book a tail against itself.
-Because every rotation ends at base, appending after the previous one
-always chains cleanly.
-
-`packRotationAvoidingCollisions()` then shifts the whole rotation later in
-five-minute steps until no leg departs at the exact minute another tail
-already flies that market. Auto-packing makes that collision likely rather
-than rare — two aircraft at one base both opening at 06:00 on the same
-market hit it every time — and there's no time field left for the player
-to change, so it's resolved quietly.
+`rotationStartMinute()` is 06:00 (`USABLE_DAY_START_MINUTE`) for a plane
+with no legs, otherwise its last arrival plus a turn, so rotations chain
+without double-booking. `packRotationAvoidingCollisions()` then shifts
+the whole rotation later in five-minute steps until no leg departs at the
+exact minute another plane already flies that market.
 
 ### One place decides everything
 
 `planRotation()` produces the popover's text *and* gates the confirm
-handler. Range, network reachability, slot capacity and
-airport-size-limit are checked across **every** leg of the chain,
-including the closing one back to base. Two failures are new:
+button. It checks, across every leg including the closing one: the base
+is in the network, slots are available (and quotes their fees), range,
+airport size limits, landing back before 22:00
+(`USABLE_DAY_END_MINUTE` — except a single long-haul round trip, which
+counts as one full aircraft), and exact-time collisions. Only an
+out-of-range *closing* leg leaves Add stop enabled, because a nearer stop
+can fix it.
 
-- The packed chain lands past `USABLE_DAY_END_MINUTE` (22:00). The message
-  then reports whether the *base* still has spare capacity — "put this on
-  another tail based there" versus "buy another airframe". A separate
-  pooled-capacity gate would never fire on its own, since a rotation that
-  fits one tail's day always fits its base's pool.
-- Only the closing leg being out of range sets `blocksAddStop = false`,
-  because that one *is* fixable by adding a nearer stop. Every other
-  failure only gets worse with more legs.
-
-The popover's live reading is the pivot's headline: "Uses 23% of an
-aircraft — YHZ has 1.00 spare, 0.78 after this."
+The popover's headline reading: "Uses 14% of an aircraft — YUL has 1.00
+spare, 0.86 after this."
 
 ## Rotations list (`src/ui/panels.ts`) — week seven, phase C
 
@@ -1055,7 +1016,7 @@ currently-playing day happens to be.
 panel adds: a market is seat-capped when its passengers are pinned at
 the combined load-factor ceiling of every plane actually serving it
 (summed per leg's own aircraft type as of M13/M14, not one type times
-frequency — a market split across a 1900D and a Q400 sums 19 and 78
+frequency — a market split across a Propeller and a Regional sums 25 and 75
 seats' worth of ceiling, not double whichever type happens to be
 hardcoded) — there's more demand than the fleet can carry, so raising
 fare trades away spare demand nobody could fly anyway (free margin);
@@ -1167,175 +1128,66 @@ an active snowstorm, no console errors.
 
 ## Persistence (`src/ui/save.ts`)
 
-Week three's playtest-readiness fix (see WEEK-THREE.md): before this,
-closing the tab threw away every schedule edit, fare change, and
-marketing dollar spent, since nothing was ever written to
-`localStorage`. `loadSavedState()`/`saveState()`/`clearSavedState()` are
-a thin wrapper around it, keyed by `airgame-save-v23` at last count —
-bumped by hand whenever `SimState`'s shape changes in a breaking way
-(most recently week seven phase C removing `positioningLegs`; before that
-phase A adding `Aircraft.baseAirport`), so an old save under a
-retired key is simply never found again rather than crashing on a field
-the current code doesn't expect (bare-bones versioning, not a migration
-system).
+A save is `JSON.stringify(state)` in `localStorage` under `SAVE_KEY`
+(`airgame-save-v44` at the time of writing). The key is bumped by hand
+whenever `SimState`'s shape changes incompatibly, so an old save is
+simply never found again rather than crashing on a missing field — not a
+migration system. This works only because `SimState` survives the JSON
+round trip unchanged (CLAUDE.md).
 
-This only works because `SimState` is already required to survive
-`JSON.parse(JSON.stringify(state))` unchanged (CLAUDE.md's rule, true
-since M1) — a save *is* exactly that round trip, just persisted across
-page loads instead of happening within the same tick. `main.ts` calls
-`saveState()` once per simulated day *crossed* (tracked in the `tick()`
-loop, not every minute — 1440x fewer writes) and `loadSavedState()`
-once at startup, falling back to a fresh game if nothing was saved or
-the save didn't parse. Every `localStorage` call is wrapped in a
-try/catch that swallows the error — a save that didn't happen (private
-browsing, quota exceeded) is a minor inconvenience, not a reason to
-crash the simulation.
+`main.ts` saves once per simulated day crossed and loads once at
+startup, falling back to a new game (and the home picker) if nothing
+parses. Every `localStorage` call swallows its errors: a missed save is
+an inconvenience, not a crash. Saves stay small — about 60 KB after
+three simulated years — because every history array is capped.
 
-A fresh game now seeds from `Date.now()` (`sim/state.ts`'s
-`createNewGameState()`, `main.ts`'s entry point) rather than a fixed
-default — so every new playthrough gets its own weather/delay history.
-`src/headless/run.ts` still calls the older `createInitialState()`
-instead, which never changed and keeps its own fixed default, so it stays
-exactly as reproducible as every verification in this document already
-relies on it being.
+A new game in the browser seeds its randomness from `Date.now()`, so
+every playthrough gets its own weather and delays; the headless runner
+passes a fixed seed. New Game clears the save and reloads, after an
+inline confirmation (a real DOM control — `window.confirm()` was
+silently blocked in the preview browser).
 
-A "New Game" button in the HUD clears the save and reloads — simpler and
-more robust than resetting every piece of in-memory state by hand. It
-confirms first, since this is irreversible, via a **real inline
-confirmation** (`#new-game-confirm`, swapped in for the button itself)
-rather than `window.confirm()` — the native dialog turned out to be
-silently blocked in this project's own preview browser, always resolving
-to "cancelled" with no visible sign anything had happened, which read
-exactly like "New Game doesn't work." Plain DOM can't be suppressed that
-way, per CLAUDE.md's panel rule anyway.
+## The aircraft market (`src/sim/market.ts`, `src/sim/leasing.ts`)
 
-Verified in-browser: playing across a simulated day boundary, forcing a
-full page reload, and confirming the game resumed at the same day/cash/
-schedule rather than restarting; New Game's inline confirmation, then
-"Yes, start over," cleared the save and returned to a fresh Day 1 with
-zero fleet and a visibly different weather roll than the previous game
-had.
+**Every aircraft is leased.** There is no purchase price: a plane costs
+its daily lease from the day it is taken, charged with the day's other
+costs. It arrives immediately, parked and based where it was leased.
 
-## The Fleet Market (`src/sim/fleetMarket.ts`, `src/ui/fleetMarket.ts`)
+**One shared lessor.** The player and every rival lease from the same
+market, first come first served — it is the game's main pacing gate.
+Each class has a rhythm (`MARKET_RHYTHM`):
 
-Week three's biggest structural change: a new game now starts with
-**zero aircraft and zero schedule**, not the old fixed 3-tail/12-leg
-network. `sim/state.ts`'s `createNewGameState()` is the actual "New Game"
-entry point now — `STARTING_CASH` ($500,000) and nothing else. The old
-`createInitialState()` (full template, fixed seed) still exists
-unchanged, purely so `src/headless/run.ts` keeps simulating its known
-test network; the two are deliberately separate functions rather than
-one branching on its arguments.
+| Class | Debuts | Then one every | Max listed |
+|---|---|---|---|
+| Propeller | day 0 (3 listed) | 4 days | 3 |
+| Regional | day 10 | 10 days | 2 |
+| Narrowbody | day 20 | 20 days | 2 |
+| Widebody | day 45 | 35 days | 1 |
 
-`data/fleet-market.json` is a small, hand-authored list of individual
-airframes (registration, age, buy price, daily lease price, lead time).
-Week three shipped it with one aircraft type; week four added the rest of
-the ladder (below), so it now lists two used airframes per type, 12 rows
-total, all available from day one. `ageYears` does double duty: it prices
-the listing *and* feeds one of `step.ts`'s three delay causes, so an old
-airframe is cheap and unreliable rather than cheap for no reason.
+An arrival that finds the shelf full is lost, not queued. When a rival
+grows (`rivalSecuresCapacity()`, three daily flights per airframe) it
+takes a listing too: the class its size calls for (Regional; Narrowbody
+from 6 daily flights; Widebody from 14), falling back to smaller ones.
+So leasing the last Regional before a rival does is a real move. Rivals
+never take Propellers.
 
-The Fleet Market tab lists whatever's left in `state.fleetMarket`.
-**Acquisition-only** — no sell-back, no early lease-end, matching
-CLAUDE.md's aircraft-trading still being deferred beyond just getting
-into a plane.
+**Age is the trade.** Listings are 15–24 years old. The rate card
+(`lease-rates.json`) is a new airframe's price; each year of age takes 2%
+off (`leaseRateFor()`), so a 20-year-old plane leases at 60%. Older
+airframes are late more often (`sim/delays.ts`), break down more
+(`sim/aog.ts`) and passengers like them less (`sim/nps.ts`). Aircraft
+don't age during a game; remaining life (to 25 years) is shown, not
+enforced.
 
-### Deliveries take time (week eight)
+**Cash gate.** Leasing needs 30 days of the lease in cash
+(`LEASE_RESERVE_DAYS`), which is what unlocks the bigger classes as the
+airline earns: at 20-year prices about $79k for a Propeller, $306k for a
+Regional, $828k for a Narrowbody and $1.08M for a Widebody.
 
-Buying no longer produces an aircraft. It produces a **`PendingDelivery`**
-that becomes one after the listing's `leadTimeDays`, resolved by
-`resolveDeliveries()` in the same daily rollover that delivers crew.
-
-Before this, a $42M widebody was operational the instant you clicked Buy
-while four pilots took ten days to show up — the expensive, irreversible
-commitment was the one with no wait attached. It also made `ageYears` a
-pure discount: nothing recommended the newer airframe except a delay rate
-you couldn't see.
-
-Lead times are authored **against** age on purpose. An old airframe is
-cheap *and* quick (14 days for the 21-year 1900D) because it is sitting on
-a ramp and its owner wants rid of it; a young one is dear *and* slow (90
-days for the 4-year A220) because everyone else wants it too. So the cheap
-option wins on price and speed and loses on reliability, which is a real
-three-way trade instead of a single dominant answer.
-
-Two money rules worth knowing:
-
-- The **full purchase price is charged at order**, not on arrival. There
-  is no deposit schedule, since CLAUDE.md defers financing — and paying up
-  front is what makes lead time cost something rather than being a free
-  wait.
-- A **lease costs nothing until the aircraft arrives**; `leaseCostPerDay`
-  rides along on the delivery and only starts being charged once the
-  Aircraft record exists.
-
-The listing leaves `state.fleetMarket` at **order** time, not arrival —
-it's yours the moment you pay, and that is also what stops the same
-airframe being ordered twice while in transit. Inbound aircraft show in
-their own section under the fleet (`ui/panels.ts`'s `renderInbound()`),
-and `ui/ticker.ts` announces the arrival, since a 90-day order lands long
-after the player stopped watching for it.
-
-**No base-airport picker at purchase.** A bought or leased aircraft joins
-the fleet with `atAirport: null` and `baseAirport: null` — shown as
-"Unassigned" in the Fleet panel's Where column — sitting in a pool rather
-than pinned to a city before there's a rotation for it. Confirming its
-first rotation places it at that rotation's base and sets `baseAirport`
-to match, for free: there's nothing to fly it in *from*. The popover
-previews this before confirming: "C-FQAC has no base yet — this rotation
-will make YHZ its base." That first rotation is one of two ways a base
-gets chosen; the Fleet tab's own Base dropdown is the other.
-
-Buying/leasing also calls `ui/fleetSelection.ts`'s `setSelectedTail()` on
-the new aircraft — since week three's later "pick a plane first" change
-(see Route builder, below) means selecting it is what makes it drawable
-at all, a purchase now flows straight into drawing its first route with
-no extra click needed. Drawing a route with zero aircraft owned is still
-explicitly blocked in the form ("Buy or lease an aircraft first...")
-rather than left to silently produce a route nothing can ever fly.
-
-**The balance gap week three opened, closed in week four:** the Dash
-8-400 became a Beechcraft 1900D at the player's request, with costs
-scaled down proportionally, but the demand model wasn't re-tuned for a
-plane this much smaller — a headless run showed small net losses that
-weren't there before the swap. Week four's aircraft ladder and demand
-retune (see below, and the O-D demand section above) is that pass: five
-types now span Beechcraft-to-widebody, and `SCALING_CONSTANT` was
-tripled so more markets are actually workable starting from a single
-1900D.
-
-**The aircraft ladder (week four).** Five types in `data/aircraft-types.json`
-now, in order of size — `BEH1900D` (19 seats, 280kt, 700nm), `DH8300`
-(Dash 8-300, 50 seats, 270kt, 800nm), `DH8400` (Dash 8-400/Q400, 78
-seats, 360kt, 1,000nm — its cost figures are the original pre-swap DH4
-numbers, reused rather than re-derived), `A220300` (Airbus A220-300,
-149 seats, 450kt, 2,500nm), and `A330300` (Airbus A330-300, the
-widebody tier, 280 seats, 470kt, 6,000nm). Seats and cruise speed come
-from real public spec sheets, same sourcing rule as the original 1900D;
-costs and range stay hand-picked, same spirit as `economy.ts`'s other
-constants. Order in the array matters beyond display — `sim/state.ts`'s
-`createInitialState()` (the headless runner's entry point) grabs index
-`[0]`, so `BEH1900D` has to stay first.
-
-Buying is deliberately constrained on day one: `STARTING_CASH` is
-$500,000, the cheapest 1900D listing is $300,000 (leaving $200,000 —
-not enough for a second one at any listed price), and the cheapest
-listing of any other type (the Dash 8-300 at $2,100,000) is nowhere
-close to affordable. A new game can only ever start with exactly one
-aircraft, and it's the smallest one. Leasing isn't gated the same way —
-any type can be leased with zero upfront cost, the daily
-`leasePricePerDay` charge being the tradeoff — so a cash-strapped
-player who wants more capacity early still has a route to it, just one
-with an ongoing cost instead of a one-time one.
-
-The ladder also creates a second judgment-call trap to match the thin-
-market one: the choice model's `scheduleFit` term
-(`sim/choiceModel.ts`) rewards flight frequency on a log curve
-independent of seats, so on this map even the biggest "golden triangle"
-markets are usually better served by several A220 frequencies than by
-one or two widebody ones. Buying the A330 is a real strategic mistake
-in most markets here, not just a bigger, safer version of the A220 —
-symmetrical to putting a 1900D on a market too thin to fill it.
+**Returning a lease** (`returnLease()`) costs 14 days of it
+(`RETURN_FEE_LEASE_DAYS`) and puts the airframe back on the market for
+anyone. It is refused while the plane still has flights, is grounded by
+an AOG, or is in the air.
 
 ## Reputation, NPS and the quality loop (`src/sim/nps.ts`, `src/sim/reputation.ts`) — week five
 
@@ -1480,7 +1332,7 @@ Three disciplines, deliberately modelled differently:
   existing age-delay cause.
 
 Hiring is **bulk** with a 10-day lead time — that gap is the mechanic.
-Buy an aircraft before you have crew and it sits idle; hire ahead and you
+Lease an aircraft before you have crew and it sits idle; hire ahead and you
 pay idle salaries. Training moves pilots up a tier over 21 days, and
 takes cabin crew off the line for 7, raising NPS once they're back.
 Recurrent training **lapses** over roughly 180 days.
@@ -1583,24 +1435,24 @@ Effects are placeholders pending real numbers.
 
 ---
 
-## The balance sweep (`src/headless/sweep.ts`) — week six
+## The balance sweep (`src/headless/sweep.ts`)
 
-`npm run sweep -- <lever> [days]` runs the headless network repeatedly,
-changing one lever per run, and reports revenue, cost and margin per day
-plus where margin peaks. `run.ts` answers "how does one configuration
-do"; this answers "does moving this number help, and where does it stop
-helping," which is the question balance decisions actually turn on.
+`npm run sweep -- <lever> [days] [home]` runs the same headless game
+(see Headless runner) once per value of one lever and prints revenue,
+cost and margin per day, profit over the run, and where margin peaks.
+Levers: `reserve` (crew depth), `fare` (a multiplier on every market's
+fare, marked as a player override so the price policy leaves it alone),
+`marketing`, and `fuel-efficiency` (the tech tree's tiers).
 
-**Every row uses the same RNG seed.** Different seeds would mean
-different weather, competitor openings and fuel history per row, so the
-differences would be mostly noise. This guarantee is fragile: it also
-requires the *number* of random draws per day to be constant, which was
-broken once by a roll that skipped already-grounded aircraft. See
-`rollDailyMechanicalGroundings()`.
+**Every row uses the same seed**, so the lever is the only difference.
+That also needs the *number* of random draws per day to stay constant,
+which was broken once by a roll that skipped already-grounded aircraft;
+see `rollDailyMechanicalGroundings()`.
 
-It has found real problems — fare having no optimum, marketing returning
-0.00x on nearly every market — that no amount of reading the code would
-have surfaced.
+The lever is applied after the starter routes exist, so fare and
+marketing levers have markets to act on. On the current start (YUL,
+60 days) the fare curve peaks at about 0.8× the recommended fare.
+
 
 ---
 
@@ -1621,27 +1473,20 @@ easier than reading about it.
 
 ## What isn't built yet
 
-Not duplicated from WEEK-ONE.md's "Deliberately deferred" list, which
-would just go stale — but the big ones as of week seven:
+The current plan is the newest `WEEK-*.md`. As of September 2026:
 
-- **Connecting itineraries.** Still the heaviest structural lift on any
-  list. The connectivity multiplier (Airports, above) is a deliberate
-  stand-in for the benefit without the machinery.
-- **Competitor price response.** Competitors open routes but never react
-  to what you charge, which is why pricing still has a findable static
-  optimum. Gated by CLAUDE.md until asked for directly.
-- **Selling or returning aircraft.** Acquisition-only.
+- **The Grow tab as one pipeline view** (WEEK-EIGHT.md) — next up.
+- **Rivals closing routes.** Rivals open routes and add flights but
+  never withdraw; over three simulated years the rival network grows
+  from 4 routes to about 230.
+- **More tech tree branches** — fuel efficiency is still the only one.
 - **Ancillary revenue** (bag fees), designed twice and never built.
-- **More tech tree branches** — fuel efficiency is the only one.
-- **Phase D of the utilisation pivot**: Commercial becomes a Routes tab
-  carrying aggregated route data, with fare policy at the top of it. See
-  WEEK-SEVEN.md.
-- **Tab grouping**, 11 down to about 6. Proposed but never started.
+- **A smarter headless player** — it doesn't lease, price or respond to
+  rivals (see Headless runner).
+- **Per-base time zones** — every plane flies on the home clock.
 
-One open *balance* question rather than a missing feature: margin
-currently favours under-staffing. On the reference network it peaks at
-reserve depth 1.05 (77.7% completion) rather than 1.25 (99.9%), because
-cancelling marginal flights saves more variable cost than it loses in
-revenue. Completion factor and Reputation still order correctly, and
-Reputation gates the tech tree and C-suite, so reliability pays in ways
-the sweep can't see — but raw margin points the wrong way.
+Open balance questions rather than missing features: margin favoured
+under-staffing when last swept (peak at reserve depth 1.05, 77.7%
+completion); and an unattended start loses money from most homes, mainly
+to rival pile-on and curfew cancellations.
+

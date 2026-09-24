@@ -922,8 +922,8 @@ canvas.addEventListener(
 // --- Choosing a home city (new games only) ---
 //
 // Paused until a city is chosen, so no simulated time passes behind the
-// picker. Choosing replaces the placeholder starting fleet with two
-// propellers at the chosen city, saves straight away (so reloading does
+// picker. Choosing replaces the placeholder starting fleet with a
+// propeller at the chosen city, saves straight away (so reloading does
 // not ask again), refits the map around it and starts the clock.
 if (choosingHome) {
   speedMultiplier = 0;

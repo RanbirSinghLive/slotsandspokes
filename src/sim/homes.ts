@@ -6,9 +6,9 @@ import { revealReach } from './reach';
 import { createStartingFleet, type SimState } from './state';
 
 /**
- * Choosing where the airline starts. A new game begins with two
- * propeller planes at a home city the player picks, so the home has to
- * have somewhere to fly them: a city is offered only if at least
+ * Choosing where the airline starts. A new game begins with one
+ * propeller plane at a home city the player picks, so the home has to
+ * have somewhere to fly it: a city is offered only if at least
  * MIN_NEIGHBOURS other airports sit within a propeller's range, counting
  * only pairs that actually have a market (a second airport in the same
  * city has none). That keeps the list to places with a first route, and
