@@ -838,9 +838,17 @@ all live in `pressure.ts`.
 `1 + day / 90`: 1 on day 0, 2 on day 90, about 5 after a year. It
 multiplies every growth chance below.
 
-**Existing rivals grow.** Each rival airline has a 3% × pressure daily
+**Existing rivals grow, then level off.** Each rival airline has a daily
 chance to open one new route next to its own network, within 850 nm,
-weighted by potential demand (`rollCompetitorRouteOpenings()`). Each
+weighted by potential demand (`rollCompetitorRouteOpenings()`): 3% ×
+pressure × the room its network has left, `1 − routes ÷ 20`
+(`rivalNetworkRoom()`, `RIVAL_MAX_ROUTES_PER_AIRLINE`). Openings rise
+with pressure early on, then slow as networks fill and stop at 20 routes
+per airline. From YUL, openings per half-year run 55, 40, 26, 18, 18,
+then a floor set by closures freeing room; rival networks level off
+around 150 routes (80 from London) instead of growing past 230. When a
+rival answers a premium by opening a route (below), it must be an
+airline with room. Each
 rival route has a 0.8% × pressure daily chance to add a flight, up to 4 a
 day (`rollCompetitorFrequencyGrowth()`).
 
@@ -898,10 +906,8 @@ and reopened 193 of them within 90 days. An airline whose last route
 closes leaves the map. The ticker reports a closure that touches the
 player's network as "… pulls out of A–B".
 
-Closures thin the rival network without stopping its growth: openings
-still outpace them as pressure rises (from YUL, about 235 routes after
-three years; 96 closures from London, 10 from Halifax). A day's result
-is also sensitive to the random seed. From Toronto, the day cash runs
+With the network cap, a full-size airline trades losing routes for new
+ones rather than growing. Outcomes are sensitive to the random seed. From Toronto, the day cash runs
 out ranged from 119 to 513 across eight seeds before closures, and from
 153 to beyond 730 with them. Judge a balance change on several seeds,
 not one.
@@ -1674,9 +1680,6 @@ easier than reading about it.
 The current plan is the newest `WEEK-*.md`. As of September 2026:
 
 - **The Grow tab as one pipeline view** (WEEK-EIGHT.md) — next up.
-- **A ceiling on rival growth.** Rivals now close losing routes, but
-  openings still outpace closures as pressure rises (see Rival
-  pressure).
 - **More tech tree branches** — fuel efficiency is still the only one.
 - **Ancillary revenue** (bag fees), designed twice and never built.
 - **A smarter headless player** — it doesn't lease, price or respond to
