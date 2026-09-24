@@ -6,7 +6,9 @@ reasoning.
 
 **State at handoff:** save key `airgame-save-v26`, 11 sidebar tabs.
 Aircraft delivery lead times and **training lines** are done and
-committed. **The Grow tab — one pipeline view — is next.**
+committed. **The Grow tab — one pipeline view — is next.** A North
+American fill-out is planned as a separate thread (see "Next: filling
+out North America").
 
 ---
 
@@ -159,6 +161,151 @@ section. Gathering them is mostly a move, not new mechanics.
 Executive hires arriving after a notice period is a natural fit and would
 make the C-suite a commitment rather than an instant buy. Worth doing
 once the rest works.
+
+---
+
+## Next: filling out North America (a separate thread)
+
+**Status: planned, not started.** The owner has settled the scope (see
+"Decisions"); one small point is still open.
+
+Grow the map from 40 airports to about 150, filling in the US and
+Canada. The demand model stays the one we have: aggregate flows per
+city pair, a gravity model, and hubs connecting by frequency. The point
+is more places to fly and a denser mid-game, not a new demand model.
+Per-passenger or itinerary-level demand is a separate, later question
+(see "Out of scope").
+
+Most of the work is not the data. `npm run airports` can already pull
+any list of airports. The work is the three things that break once
+there are many more of them.
+
+### Decisions (settled with the owner)
+
+1. **About 150 airports in total.** The 40 already on the map plus
+   about 110 new ones.
+2. **US and Canada only.** No new airports in Mexico or the Caribbean.
+   MEX stays as a world hub, as do the other non-North-American hubs.
+3. **One airport per metro,** as with the world hubs. The builder
+   takes the biggest airport in each metro and skips any candidate
+   within `METRO_SEPARATION_KM` of one it has already chosen. It
+   works through large airports first, then medium, each by catchment
+   population. So Newark, JFK, Midway, Dulles, BWI, Burbank and the
+   like don't come in.
+4. **The 19 census-based airports switch to catchments.** Every
+   population in the file comes from one method, so a census Boston
+   never sits next to a catchment Providence. This moves every tuned
+   number; slice 2 exists to measure by how much. `buildAirports.ts`
+   stops keeping any airports as they are. The 19 get entries in the
+   display-name table, and the whole file is generated.
+
+**Still open:** Billy Bishop (YTZ) is a second Toronto airport and
+breaks decision 3. The recommendation is to drop it, which also retires
+the only entry in `suppressed-markets.json`. The alternative is to
+keep it as a deliberate exception, with the distance rule below
+zeroing YTZ–YYZ.
+
+### What breaks at scale, and the fix for each
+
+1. **Population is counted twice in neighbouring catchments.**
+   `buildAirports.ts` sums every GeoNames city within 30 km of an
+   airport. Airports in neighbouring cities (Providence and Boston,
+   Baltimore and Washington, Hamilton and Toronto) both claim the
+   suburbs between them. The radius is also poor for sprawling US
+   metros (Atlanta comes out at 1.1M against a real ~6M).
+   **Fix: nearest-airport catchments.** Give each GeoNames city to the
+   single airport nearest to it, up to a maximum catchment distance
+   (about 100 km to start), and sum each airport's share. This is a
+   Voronoi split, so every person counts once.
+   **Source file:** switch from `cities15000` to `cities1000`.
+   `cities15000` only lists places over 15,000 people, which would
+   leave Gander (census 13,414) and Goose Bay (8,010) with almost
+   nobody.
+
+2. **Pairs of airports very close together.** With one airport per
+   metro these should not arise. Still, add a derived rule to
+   `sim/demand.ts` as a safety net, so a close pair can't slip in
+   unnoticed: a pair closer than `MIN_MARKET_NM` has no demand.
+   Among today's airports the shortest pair that's a real market is
+   Saint John–Fredericton at 43 nm, so about 30 nm keeps every
+   current market. `suppressed-markets.json` stays for exceptions
+   that need a written reason.
+
+3. **State and per-frame work grow with the square of the airport
+   count.** About 11,000 pairs at 150 airports, against 780 today.
+   - `rollDailyMarketDemand()` writes `state.marketDemand` for every
+     one of `ALL_MARKET_PAIRS`, every day. **Fix:** store only markets
+     above the floor, and delete an entry when it decays back to it.
+     `actualDailyDemand()` already falls back to the floor for a
+     missing key, so readers don't change.
+   - Inside that loop, `dailySeatsOffered()` scans the whole schedule
+     and competitor list once per pair. **Fix:** count seats per
+     market in one pass before the loop, as `playerSeatsByMarket()` in
+     `sim/unmetDemand.ts` already does for the player.
+   - `unmetDemandByAirport()` walks every known pair **on every frame**
+     (`render/airports.ts`), and unmet demand is on by default.
+     **Fix:** compute it once per sim day and read the cached result
+     when drawing. The cache is a module-level `Map` in the renderer,
+     not in state.
+
+### Slices, in order
+
+Each slice ends runnable, with `npm run build` and `npm run headless`
+passing.
+
+1. **Sparse market demand and per-day caches (no data change).** The
+   three fixes under point 3, at 40 airports. The headless output
+   should stay byte-identical, since only storage and caching change.
+   Bump `SAVE_KEY`.
+2. **Catchment populations, `cities1000`, and the distance rule, on
+   the current 40 airports only** (minus YTZ if it's dropped).
+   Generate the whole file, the 19 included. Print a before-and-after
+   population table in the commit message, and record six-seed
+   headless means before and after, not one seed. Run the week-four
+   regional-demand check again (how many pairs fall into the thin,
+   one-flight and workable bands) since the Maritimes' numbers will
+   move. Retune `SCALING_CONSTANT` here if the bands collapse, before
+   any new airports cloud the picture.
+3. **The fill-out.** Replace the hand-typed North American list with a
+   filter over OurAirports: `large_airport` or `medium_airport`,
+   `scheduled_service` yes, country US or CA, one per metro
+   (decision 3). Take them by catchment population until the file
+   holds about 150. Keep the hand-typed list for the world hubs.
+   Display names come from a short-name table for the largest, and
+   OurAirports' name trimmed for the rest. Bump `SAVE_KEY` (the
+   airport set changes under old saves' `knownAirports`).
+4. **Map legibility.** The north-east will have far more airports on
+   the same canvas. Label thinning by zoom and importance (deferred in
+   the map pass above) becomes necessary here.
+5. **Balance pass.** More home cities qualify, fog opens more at once,
+   and hubs have more possible spokes (connecting flows grow with the
+   square of the spoke count). Sweep from a home in each region, then
+   tune `SCALING_CONSTANT`, `CONNECT_SHARE` and the competitor opening
+   rules as needed.
+
+### Out of scope for this thread
+
+- Per-passenger simulation (CLAUDE.md rules it out).
+- Itinerary-level demand, meaning passengers choosing among nonstop
+  and one-stop paths across all airlines. That would reverse WEEK-TWO
+  decision 1 and gets its own plan if the frequency-based connecting
+  model (`sim/hubs.ts`) stops holding up at the new size.
+- A worldwide demand model (income and cross-border terms in the
+  gravity model). The world hubs stay as they are.
+- Mexico, Central America and the Caribbean beyond MEX.
+- New basemap detail (the 110m world file stays).
+
+### Done when
+
+- About 150 airports on the map, all generated by `npm run airports`,
+  with no hand-edited output and no hand-kept populations.
+- No two airports serve the same metro (YTZ aside, if kept).
+- A save on a fully revealed map stays well under 1 MB.
+- No per-frame work that grows with the number of airport pairs.
+- A six-seed headless mean in a sane band, from a home city in each
+  region.
+- HOW-IT-WORKS updated (population method, the distance rule, sparse
+  market demand).
 
 ---
 
