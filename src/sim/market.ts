@@ -56,7 +56,7 @@ const LISTING_AGE_SPREAD = 10;
 /** Returning a lease early costs this many days of it. */
 export const RETURN_FEE_LEASE_DAYS = 14;
 /** How many daily flights one rival airframe carries. */
-const FLIGHTS_PER_RIVAL_PLANE = 3;
+export const FLIGHTS_PER_RIVAL_PLANE = 3;
 /** Rivals move up a class as they grow: at this many daily flights, a Narrowbody; at the next, a Widebody. */
 const RIVAL_NARROWBODY_FLIGHTS = 6;
 const RIVAL_WIDEBODY_FLIGHTS = 14;
@@ -167,12 +167,12 @@ export function returnLease(state: SimState, tail: string): { ok: true; message:
 
 // --- Rivals ------------------------------------------------------------------
 
-function rivalFlights(state: SimState, code: string): number {
+export function rivalFlights(state: SimState, code: string): number {
   return state.competitorRoutes.filter((route) => route.code === code).reduce((total, route) => total + route.dailyFrequency, 0);
 }
 
 /** The class a rival of this size wants next. */
-function preferredRivalClass(flights: number): string {
+export function preferredRivalClass(flights: number): string {
   if (flights >= RIVAL_WIDEBODY_FLIGHTS) return 'WIDEBODY';
   if (flights >= RIVAL_NARROWBODY_FLIGHTS) return 'NARROWBODY';
   return 'REGIONAL';

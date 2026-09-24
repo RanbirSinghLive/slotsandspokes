@@ -830,8 +830,8 @@ probability.
 
 The reason to keep building: nothing here hurts a player who keeps
 growing, but standing still loses ground. All of it runs once a day in
-`step.ts`'s rollover, in this order: route openings, frequency growth,
-new entrants, fare response, capacity response. The difficulty constants
+`step.ts`'s rollover, in this order: route closures, route openings,
+frequency growth, new entrants, fare response, capacity response. The difficulty constants
 all live in `pressure.ts`.
 
 **Pressure grows without a ceiling.** `pressureFactor()` is
@@ -876,11 +876,35 @@ flying to either end opens the route.
 market as the player (see The aircraft market), three daily flights per
 airframe. Leasing up the shelf holds them off.
 
-**Rivals never close a route.** In a three-year headless run the rival
-network grows from 4 routes to about 230. In a one-year run from YUL
-with fares at the going rate, the capacity response never fired, yet
-YUL–LGA still ended with nine rival airlines and about 26 daily rival
-flights. Ordinary growth and entrants alone did that.
+**Rivals close routes that lose money** (`sim/rivalEconomics.ts`).
+Rivals keep no books, so each day `rivalRouteDailyResult()` estimates a
+route's profit with the player's own formulas: passengers are market
+demand × the route's booking share (`choiceModel.ts`'s
+`rivalBookingShare()`, with the player and every rival in the softmax),
+capped by its seats at the standard load factor, paying its fare. The
+cost is its flights × `legCost()` for the class the airline's size calls
+for, plus its share of the airline's plane leases (one plane per three
+daily flights).
+
+A route isn't judged until it has run 60 days
+(`RIVAL_CLOSE_GRACE_DAYS`), because markets start small and grow as
+they're served: half of new rival routes pay within about 12 days and
+90% within 43–116. After that, **30 losing days in a row**
+(`RIVAL_CLOSE_AFTER_LOSING_DAYS`) closes it. The airline keeps the plane
+for its next opening, and won't reopen that market for 180 days
+(`RIVAL_REOPEN_COOLDOWN_DAYS`, remembered in `state.rivalClosures`).
+Without that memory, rivals from London closed 209 routes in three years
+and reopened 193 of them within 90 days. An airline whose last route
+closes leaves the map. The ticker reports a closure that touches the
+player's network as "… pulls out of A–B".
+
+Closures thin the rival network without stopping its growth: openings
+still outpace them as pressure rises (from YUL, about 235 routes after
+three years; 96 closures from London, 10 from Halifax). A day's result
+is also sensitive to the random seed. From Toronto, the day cash runs
+out ranged from 119 to 513 across eight seeds before closures, and from
+153 to beyond 730 with them. Judge a balance change on several seeds,
+not one.
 
 ---
 
@@ -1616,6 +1640,9 @@ fare, marked as a player override so the price policy leaves it alone),
 `marketing`, and `fuel-efficiency` (the tech tree's tiers).
 
 **Every row uses the same seed**, so the lever is the only difference.
+The flip side: one seed can mislead, because outcomes vary a lot between
+seeds (see Rival pressure). Confirm a result on a few seeds before
+acting on it.
 That also needs the *number* of random draws per day to stay constant,
 which was broken once by a roll that skipped already-grounded aircraft;
 see `rollDailyMechanicalGroundings()`.
@@ -1647,8 +1674,9 @@ easier than reading about it.
 The current plan is the newest `WEEK-*.md`. As of September 2026:
 
 - **The Grow tab as one pipeline view** (WEEK-EIGHT.md) — next up.
-- **Rivals closing routes.** They open routes and add flights but
-  never withdraw (see Rival pressure).
+- **A ceiling on rival growth.** Rivals now close losing routes, but
+  openings still outpace closures as pressure rises (see Rival
+  pressure).
 - **More tech tree branches** — fuel efficiency is still the only one.
 - **Ancillary revenue** (bag fees), designed twice and never built.
 - **A smarter headless player** — it doesn't lease, price or respond to

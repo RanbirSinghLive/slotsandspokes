@@ -1,0 +1,89 @@
+import aircraftTypesData from '../../data/aircraft-types.json';
+import { rivalBookingShare } from './choiceModel';
+import type { CompetitorOffering } from './competitors';
+import { LOAD_FACTOR, legCost, type EconomyAircraftType } from './economy';
+import { leaseRateFor } from './leasing';
+import { FLIGHTS_PER_RIVAL_PLANE, preferredRivalClass, rivalFlights } from './market';
+import { actualDailyDemand } from './marketDemand';
+import { RIVAL_CLOSE_AFTER_LOSING_DAYS, RIVAL_CLOSE_GRACE_DAYS, RIVAL_REOPEN_COOLDOWN_DAYS } from './pressure';
+import { computeBlockMinutes, legsServingMarket, marketKey } from './schedule';
+import type { SimState } from './state';
+
+/**
+ * Whether a rival route pays, estimated with the player's own formulas so
+ * rivals live by the same economics the player does. Rivals keep no
+ * books, so this is worked out fresh from the state each day:
+ *
+ *   passengers = market demand × this route's booking share
+ *                (sim/choiceModel.ts, with the player and every other
+ *                rival in the softmax), capped by its seats at the
+ *                standard load factor
+ *   revenue    = passengers × its fare
+ *   cost       = its flights × legCost() for the class the airline flies,
+ *                plus this route's share of that airline's plane leases
+ *
+ * A rival "daily flight" is one departure here, the same unit the choice
+ * model compares against the player's legs. The class is the one the
+ * airline's size calls for (sim/market.ts's preferredRivalClass()), since
+ * rivals don't assign planes to routes.
+ */
+
+type TypeSpec = EconomyAircraftType & { code: string; cruiseKts: number };
+const MINUTES_PER_DAY = 1440;
+
+const typesByCode = new Map((aircraftTypesData as TypeSpec[]).map((type) => [type.code, type]));
+
+export type RivalRouteResult = { passengers: number; revenue: number; cost: number; margin: number };
+
+export function rivalRouteDailyResult(state: SimState, route: CompetitorOffering): RivalRouteResult {
+  const type = typesByCode.get(preferredRivalClass(rivalFlights(state, route.code)))!;
+
+  const settings = state.routeSettings[marketKey(route.origin, route.dest)];
+  const playerLegs = legsServingMarket(route.origin, route.dest, state.schedule);
+  const share = rivalBookingShare(
+    route,
+    settings?.fare ?? 0,
+    playerLegs,
+    settings?.marketingSpend ?? 0,
+    state.competitorRoutes,
+  );
+  const seats = route.dailyFrequency * Math.round(type.seats * LOAD_FACTOR);
+  const passengers = Math.min(actualDailyDemand(state, route.origin, route.dest) * share, seats);
+  const revenue = passengers * route.fare;
+
+  const block = computeBlockMinutes(route.origin, route.dest, type.cruiseKts);
+  const flying = route.dailyFrequency * legCost(block, type, state.fuelPriceIndex, 1);
+  const leases = (route.dailyFrequency / FLIGHTS_PER_RIVAL_PLANE) * leaseRateFor(type.code);
+  const cost = flying + leases;
+
+  return { passengers, revenue, cost, margin: revenue - cost };
+}
+
+/**
+ * Once a day, from step.ts's rollover: update every rival route's losing
+ * streak, and close any route past its grace period that has lost money
+ * RIVAL_CLOSE_AFTER_LOSING_DAYS days running. The airline keeps the
+ * plane, so its next route opening doesn't need a new lease, and won't
+ * reopen the same market for RIVAL_REOPEN_COOLDOWN_DAYS. An airline whose
+ * last route closes leaves the map. Deterministic: no random draws.
+ */
+export function closeLosingRivalRoutes(state: SimState): void {
+  const graceMinutes = RIVAL_CLOSE_GRACE_DAYS * MINUTES_PER_DAY;
+  // Judge every route against the same day's market before removing any,
+  // so the order routes are listed in can't change who closes.
+  const closing = new Set<CompetitorOffering>();
+  for (const route of state.competitorRoutes) {
+    const losing = rivalRouteDailyResult(state, route).margin < 0;
+    route.losingDays = losing ? (route.losingDays ?? 0) + 1 : 0;
+    const pastGrace = state.simMinute - route.openedAtMinute >= graceMinutes;
+    if (pastGrace && route.losingDays >= RIVAL_CLOSE_AFTER_LOSING_DAYS) closing.add(route);
+  }
+  // Remember closures for the reopening cooldown, dropping ones past it.
+  const since = state.simMinute - RIVAL_REOPEN_COOLDOWN_DAYS * MINUTES_PER_DAY;
+  state.rivalClosures = (state.rivalClosures ?? []).filter((closure) => closure.closedAtMinute >= since);
+  if (closing.size === 0) return;
+  for (const route of closing) {
+    state.rivalClosures.push({ code: route.code, market: marketKey(route.origin, route.dest), closedAtMinute: state.simMinute });
+  }
+  state.competitorRoutes = state.competitorRoutes.filter((route) => !closing.has(route));
+}

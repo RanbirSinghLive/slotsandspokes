@@ -119,35 +119,48 @@ function pollMissionEvents(state: SimState): void {
 }
 
 let hasSeenInitialRivals = false;
-const seenRouteFrequencies = new Map<string, number>();
+/** Every rival route seen last poll, by identity, with what the ticker needs to describe it once it's gone. */
+const seenRoutes = new Map<string, { frequency: number; airline: string; origin: string; dest: string }>();
 
 /**
  * Rival news, but only what touches the airline: a route at an airport in
- * the player's network, or more flights on one. A competitor opening
- * something on the far side of the map is not news to this player.
+ * the player's network opening, adding a flight, or closing (a rival giving
+ * up on a market it lost money on, sim/rivalEconomics.ts). A competitor
+ * doing something on the far side of the map is not news to this player.
  */
 function pollRivalEvents(state: SimState): void {
   const network = networkAirports(state);
   const identity = (route: { code: string; origin: string; dest: string }) =>
     `${route.code}:${[route.origin, route.dest].sort().join('-')}`;
+  const touchesNetwork = (route: { origin: string; dest: string }) => network.has(route.origin) || network.has(route.dest);
 
   if (!hasSeenInitialRivals) {
-    for (const route of state.competitorRoutes) seenRouteFrequencies.set(identity(route), route.dailyFrequency);
+    for (const route of state.competitorRoutes) {
+      seenRoutes.set(identity(route), { frequency: route.dailyFrequency, airline: route.airline, origin: route.origin, dest: route.dest });
+    }
     hasSeenInitialRivals = true;
     return;
   }
 
+  const stillFlying = new Set<string>();
   for (const route of state.competitorRoutes) {
     const id = identity(route);
-    const previous = seenRouteFrequencies.get(id);
-    seenRouteFrequencies.set(id, route.dailyFrequency);
-    if (!network.has(route.origin) && !network.has(route.dest)) continue;
+    stillFlying.add(id);
+    const previous = seenRoutes.get(id)?.frequency;
+    seenRoutes.set(id, { frequency: route.dailyFrequency, airline: route.airline, origin: route.origin, dest: route.dest });
+    if (!touchesNetwork(route)) continue;
 
     if (previous === undefined) {
       pushEvent(state.simMinute, `${route.airline} opens ${route.origin}–${route.dest}`);
     } else if (route.dailyFrequency > previous) {
       pushEvent(state.simMinute, `${route.airline} adds a flight on ${route.origin}–${route.dest} (${route.dailyFrequency}/day)`);
     }
+  }
+
+  for (const [id, route] of seenRoutes) {
+    if (stillFlying.has(id)) continue;
+    seenRoutes.delete(id);
+    if (touchesNetwork(route)) pushEvent(state.simMinute, `${route.airline} pulls out of ${route.origin}–${route.dest}`);
   }
 }
 

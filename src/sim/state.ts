@@ -17,6 +17,9 @@ import { createExecutiveSlots, type ExecutiveSlots } from './executives';
 
 export type AircraftStatus = 'ground' | 'airborne';
 
+/** One rival route closure: which airline, which market (marketKey), and when. */
+export type RivalClosure = { code: string; market: string; closedAtMinute: number };
+
 export type Aircraft = {
   tail: string;
   typeCode: string;
@@ -504,6 +507,12 @@ export type SimState = {
   /** Each rival airline's fleet, one class code per plane, keyed by airline code (sim/market.ts). */
   competitorFleets: Record<string, string[]>;
   /**
+   * Routes rivals closed recently, so an airline doesn't reopen a market it
+   * just gave up on (sim/pressure.ts's recentlyClosedByRival()). Pruned
+   * once past the cooldown. Optional so older saves load: absent means none.
+   */
+  rivalClosures?: RivalClosure[];
+  /**
    * Lifetime cancellations by cause — the same shape (and the same
    * purpose) as `delayMinutesByCause`. Three causes, each with a
    * different answer available to the player: crew shortages are
@@ -669,6 +678,7 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     aogs: [],
     market: { listings: [], nextArrivalDay: {}, nextListingId: 1 },
     competitorFleets: {},
+    rivalClosures: [],
     cancellationsByCause: { crew: 0, mechanical: 0, weather: 0, curfew: 0 },
     flightsScheduledTotal: 0,
     flightsCancelledTotal: 0,

@@ -244,3 +244,32 @@ export function trafficShare(
     0,
   );
 }
+
+/**
+ * What fraction of a market's demand books this one rival route: the same
+ * softmax as `bookingShare`, seen from the rival's side. Its score over
+ * everyone's — every rival on the market (itself included), the player
+ * if the player flies it (`playerLegs` > 0), and "stay home". Used to
+ * estimate whether a rival route pays (sim/rivalEconomics.ts).
+ */
+export function rivalBookingShare(
+  route: CompetitorOffering,
+  playerFare: number,
+  playerLegs: number,
+  playerMarketingSpend: number,
+  competitorRoutes: CompetitorOffering[],
+): number {
+  const marketCompetitors = competitorsServingMarket(route.origin, route.dest, competitorRoutes);
+  const goingRate = recommendedFare(route.origin, route.dest);
+  return SEGMENTS.reduce((total, segment) => {
+    const rivalScore = Math.exp(utility(segment, route.fare, route.dailyFrequency, goingRate));
+    const allRivals = marketCompetitors.reduce(
+      (sum, c) => sum + Math.exp(utility(segment, c.fare, c.dailyFrequency, goingRate)),
+      0,
+    );
+    const playerScore =
+      playerLegs > 0 ? Math.exp(utility(segment, playerFare, playerLegs, goingRate) + marketingBonus(playerMarketingSpend)) : 0;
+    const stayHomeScore = Math.exp(0);
+    return total + segment.shareOfDemand * (rivalScore / (allRivals + playerScore + stayHomeScore));
+  }, 0);
+}

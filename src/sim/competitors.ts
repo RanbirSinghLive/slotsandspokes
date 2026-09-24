@@ -14,6 +14,7 @@ import {
   RIVAL_ENTRY_INTERVAL_DAYS,
   RIVAL_FIRST_ENTRY_DAY,
   RIVAL_FREQUENCY_CAP,
+  recentlyClosedByRival,
 } from './pressure';
 import { rivalSecuresCapacity } from './market';
 import type { SimState } from './state';
@@ -41,6 +42,12 @@ export type CompetitorOffering = {
   /** The fare it opened at, and drifts back to when the player isn't competing with it. */
   baseFare: number;
   openedAtMinute: number;
+  /**
+   * Consecutive days this route has lost money (sim/rivalEconomics.ts);
+   * reset by any profitable day. Optional so saves from before rivals
+   * could close routes still load: absent means 0.
+   */
+  losingDays?: number;
 };
 
 /**
@@ -159,6 +166,7 @@ export function rollCompetitorRouteOpenings(state: SimState, dayStartMinute: num
     const candidates = ALL_MARKET_PAIRS.filter(
       ([a, b]) =>
         !servedKeys.has(marketKey(a, b)) &&
+        !recentlyClosedByRival(state, code, a, b) &&
         (airlineAirports.has(a) || airlineAirports.has(b)) &&
         marketDistanceNm(a, b) <= COMPETITOR_MAX_ROUTE_NM,
     );

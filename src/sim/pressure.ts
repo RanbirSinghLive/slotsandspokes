@@ -36,6 +36,36 @@ export const PLAYER_MARKET_WEIGHT = 3;
 
 /** How many daily flights any competitor will run on one route. */
 export const RIVAL_FREQUENCY_CAP = 4;
+/**
+ * Rivals close routes that lose money (sim/rivalEconomics.ts). A new route
+ * isn't judged until it has run this long, because a market starts small
+ * and grows as it's served: measured, half of new rival routes pay within
+ * about 12 days and 90% within 43 to 116.
+ */
+export const RIVAL_CLOSE_GRACE_DAYS = 60;
+/**
+ * ...and then closes after losing money this many days in a row. Long
+ * enough to ride out a bad patch (fuel, or the player moving in):
+ * measured, routes that did pay had losing runs of up to about 33 days.
+ */
+export const RIVAL_CLOSE_AFTER_LOSING_DAYS = 30;
+/**
+ * An airline won't reopen a market it closed for this long. Without it,
+ * measured from London, rivals closed 209 routes in three years and
+ * reopened 193 of them within 90 days: a big market that loses money
+ * looks just as attractive the day after closing. Long enough for demand
+ * growth to have changed the answer.
+ */
+export const RIVAL_REOPEN_COOLDOWN_DAYS = 180;
+
+/** Whether airline `code` closed the a–b market within RIVAL_REOPEN_COOLDOWN_DAYS. */
+export function recentlyClosedByRival(state: SimState, code: string, a: string, b: string): boolean {
+  const market = [a, b].sort().join('-');
+  const since = state.simMinute - RIVAL_REOPEN_COOLDOWN_DAYS * 1440;
+  return (state.rivalClosures ?? []).some(
+    (closure) => closure.code === code && closure.market === market && closure.closedAtMinute >= since,
+  );
+}
 
 /** Chance per route per day, before pressure, that a competitor adds a daily flight. */
 export const FREQUENCY_GROWTH_PROBABILITY_PER_DAY = 0.008;

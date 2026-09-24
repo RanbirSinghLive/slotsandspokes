@@ -1,7 +1,7 @@
 import { recommendedFare, marketKey } from './schedule';
 import { summarizeMarket } from './marketSummary';
 import { rivalSecuresCapacity } from './market';
-import { pressureFactor } from './pressure';
+import { pressureFactor, recentlyClosedByRival } from './pressure';
 import { nextRandom } from './rng';
 import type { SimState } from './state';
 
@@ -82,7 +82,10 @@ export function rollRivalCapacityResponse(state: SimState, dayStartMinute: numbe
     // already at either end opens the route.
     const alreadyThere = new Set(onMarket.map((route) => route.code));
     const neighbour = state.competitorRoutes.find(
-      (route) => !alreadyThere.has(route.code) && [route.origin, route.dest].some((iata) => iata === a || iata === b),
+      (route) =>
+        !alreadyThere.has(route.code) &&
+        !recentlyClosedByRival(state, route.code, a, b) &&
+        [route.origin, route.dest].some((iata) => iata === a || iata === b),
     );
     if (!neighbour || !rivalSecuresCapacity(state, neighbour.code, 1)) continue;
     state.competitorRoutes.push({

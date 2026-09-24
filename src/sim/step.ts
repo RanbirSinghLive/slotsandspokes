@@ -32,6 +32,7 @@ import { acquireNeededSlots, settleSlotsForDay } from './slots';
 import { ensureRivalFleets, rollDailyMarket } from './market';
 import { dayIndex, minuteOfDay as homeMinuteOfDay } from './clock';
 import { rollRivalCapacityResponse } from './rivalResponse';
+import { closeLosingRivalRoutes } from './rivalEconomics';
 import type { SimState, ActiveFlight } from './state';
 
 const aircraftTypesByCode = new Map<string, EconomyAircraftType>(
@@ -252,6 +253,9 @@ export function step(state: SimState): void {
     // route. Same daily cadence as weather, for the same reason — this
     // is a day-scale event, not something worth re-checking every minute.
     ensureRivalFleets(state);
+    // Rivals first withdraw from routes that keep losing money
+    // (sim/rivalEconomics.ts), then grow.
+    closeLosingRivalRoutes(state);
     rollCompetitorRouteOpenings(state, state.simMinute);
     rollCompetitorFrequencyGrowth(state);
     rollRivalEntry(state, state.simMinute);
