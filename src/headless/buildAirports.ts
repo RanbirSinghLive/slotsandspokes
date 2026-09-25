@@ -3,89 +3,132 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 /**
- * Builds the world-hub half of data/airports.json from public data, so the
- * coordinates and populations are reproducible rather than typed in.
+ * Builds data/airports.json from public data, so every coordinate,
+ * population and time zone is reproducible rather than typed in.
  *
  *   npm run airports
  *
  * Sources (both public, per CLAUDE.md):
- *   - OurAirports (airports.csv): name, latitude, longitude, by IATA code.
- *   - GeoNames (cities15000): city populations and time zones.
+ *   - OurAirports (airports.csv): latitude and longitude, by IATA code.
+ *   - GeoNames (cities1000): populations and time zones of every place
+ *     over 1,000 people.
  *
- * The 19 airports that were already in the file (eastern Canada plus LGA
- * and BOS) are left exactly as they are: their populations are census
- * metropolitan-area figures (StatsCan 2021) and everything tuned so far
- * rests on them. Only the entries listed in WORLD_HUBS below are written
- * or rewritten.
+ * **Population is a catchment.** Every GeoNames place is given to the one
+ * airport nearest to it, if that airport is within CATCHMENT_MAX_KM, and
+ * an airport's population is the total of the places it was given. So
+ * every person is counted once: two airports near each other split the
+ * towns between them rather than both claiming them, which is what the
+ * gravity model (sim/demand.ts) needs to stay sane as the map fills in.
+ * That split is a Voronoi partition: each point on the map belongs to
+ * whichever airport is closest.
  *
- * **Population** is the sum of GeoNames city populations within
- * METRO_RADIUS_KM of the airport. That radius was chosen by checking the
- * method against the census figures for the 11 existing airports above
- * 100,000 people: at 30 km it lands within about 16% of them on average
- * (Toronto 1.20x, Montreal 1.31x, New York 1.25x, Boston 0.74x). It is a
- * consistent stand-in for "metro area", not a census, and the gravity
- * model (sim/demand.ts) is crude enough that this is the right level of
- * care. It is worse outside Canada, where a metro is split into many
- * small municipalities or none: Atlanta comes out at about 1.1 million
- * (a real metro of about 6), Mexico City at 30 million (about 22), Keflavik
- * at 36,000 because Reykjavik is 50 km away. Fix a bad one by editing the
- * number in data/airports.json; the script leaves the 19 hand-kept
- * airports alone but rewrites the ones it generates.
+ * GeoNames lists some cities *and* their districts (New York City and
+ * also Brooklyn, Queens, Manhattan and the Bronx), so a plain total would
+ * count those people twice. Two rules stop that. Places marked as a
+ * section of a city (feature code PPLX) are left out. And any place
+ * inside a bigger place's built-up area is left out: the area is taken as
+ * a circle holding that population at URBAN_DENSITY_PER_KM2, so New York
+ * City (8.8 million) covers about 24 km and swallows its boroughs, while
+ * Laval, 13 km from Montreal's centre, lies outside Montreal's 11 km and
+ * counts. A separate city that close in (Newark, next to New York) is
+ * lost too, which is a small error against its metro.
  *
- * **Time zones** are the *standard* offset (no daylight saving), the same
- * fixed offset every airport in this file carries (CLAUDE.md: DST is out
- * of scope). The smaller of the January and July offsets is the standard
- * one, whichever hemisphere the airport is in.
+ * **Time zones** are the *standard* offset (no daylight saving), from the
+ * biggest place in the catchment (CLAUDE.md: DST is out of scope). The
+ * smaller of the January and July offsets is the standard one, whichever
+ * hemisphere the airport is in.
  *
- * One airport per metro area on purpose: a gravity model with two
- * airports serving one city (huge population, almost no distance) gives
- * absurd demand, which is what sim/suppressed-markets.json exists to
- * paper over for the one such pair already on the map.
+ * One airport per metro on purpose. Catchments keep two airports in one
+ * city from double-counting its people, but the pair would still read as
+ * a big market over almost no distance, which nobody would fly.
+ * sim/demand.ts's MIN_MARKET_NM zeroes any such pair as a safety net.
  */
 
-/** The airports to add. The first group is dense enough to hop between in a propeller. */
-const WORLD_HUBS = [
-  // North America
-  'DTW', 'PHL', 'DCA', 'ORD', 'ATL', 'MIA', 'DFW', 'LAX', 'YVR', 'MEX',
+/**
+ * Every airport on the map, in file order, with its display name.
+ * OurAirports names run to "Detroit Metropolitan Wayne County" and
+ * "São Paulo/Guarulhos–Governor André Franco Montoro"; these keep the
+ * short style ("Toronto Pearson"). Only the label is hand-written:
+ * coordinates, population and time zone come from the data.
+ */
+const AIRPORTS: [iata: string, name: string][] = [
+  // Eastern Canada, New York and Boston: the propeller-scale core
+  ['YUL', 'Montréal–Trudeau'],
+  ['YYZ', 'Toronto Pearson'],
+  ['YOW', 'Ottawa Macdonald'],
+  ['YQB', 'Québec City Lesage'],
+  ['YHZ', 'Halifax Stanfield'],
+  ['YSJ', 'Saint John'],
+  ['YFC', 'Fredericton'],
+  ['YQM', 'Greater Moncton'],
+  ['YYG', 'Charlottetown'],
+  ['YYT', "St. John's"],
+  ['YDF', 'Deer Lake'],
+  ['YQX', 'Gander'],
+  ['YYR', 'Goose Bay'],
+  ['YQY', 'Sydney'],
+  ['YUY', 'Rouyn-Noranda'],
+  ['YBG', 'Saguenay–Bagotville'],
+  ['LGA', 'LaGuardia'],
+  ['BOS', 'Boston Logan'],
+  // The rest of North America
+  ['DTW', 'Detroit'],
+  ['PHL', 'Philadelphia'],
+  ['DCA', 'Washington Reagan'],
+  ['ORD', "Chicago O'Hare"],
+  ['ATL', 'Atlanta'],
+  ['MIA', 'Miami'],
+  ['DFW', 'Dallas Fort Worth'],
+  ['LAX', 'Los Angeles'],
+  ['YVR', 'Vancouver'],
+  ['MEX', 'Mexico City'],
   // Europe
-  'LHR', 'CDG', 'AMS', 'FRA', 'DUB', 'KEF',
+  ['LHR', 'London Heathrow'],
+  ['CDG', 'Paris Charles de Gaulle'],
+  ['AMS', 'Amsterdam Schiphol'],
+  ['FRA', 'Frankfurt'],
+  ['DUB', 'Dublin'],
+  ['KEF', 'Reykjavík Keflavík'],
   // Rest of the world
-  'DXB', 'HND', 'SIN', 'GRU', 'JNB',
+  ['DXB', 'Dubai'],
+  ['HND', 'Tokyo Haneda'],
+  ['SIN', 'Singapore Changi'],
+  ['GRU', 'São Paulo Guarulhos'],
+  ['JNB', 'Johannesburg O.R. Tambo'],
 ];
 
 /**
- * Display names, by hand. OurAirports names run to "Detroit Metropolitan
- * Wayne County" and "São Paulo/Guarulhos–Governor André Franco Montoro";
- * these match the short style the file already uses ("Toronto Pearson").
- * Only the label is hand-written: coordinates still come from the data.
+ * Game rules set by hand for particular airports, copied into the output
+ * as they are: the biggest class allowed (sim/schedule.ts's
+ * isAircraftTypeAllowedAt()) and a fixed daily capacity in place of the
+ * population-based one (sim/airports.ts's airportCapacityPerDay()).
+ * LaGuardia's perimeter and gate rules keep widebodies out, and its
+ * room is set where New York's size says little about one field.
  */
-const DISPLAY_NAMES: Record<string, string> = {
-  DTW: 'Detroit',
-  PHL: 'Philadelphia',
-  DCA: 'Washington Reagan',
-  ORD: "Chicago O'Hare",
-  ATL: 'Atlanta',
-  MIA: 'Miami',
-  DFW: 'Dallas Fort Worth',
-  LAX: 'Los Angeles',
-  YVR: 'Vancouver',
-  MEX: 'Mexico City',
-  LHR: 'London Heathrow',
-  CDG: 'Paris Charles de Gaulle',
-  AMS: 'Amsterdam Schiphol',
-  FRA: 'Frankfurt',
-  DUB: 'Dublin',
-  KEF: 'Reykjavík Keflavík',
-  DXB: 'Dubai',
-  HND: 'Tokyo Haneda',
-  SIN: 'Singapore Changi',
-  GRU: 'São Paulo Guarulhos',
-  JNB: 'Johannesburg O.R. Tambo',
+const AIRPORT_RULES: Record<string, { maxAircraftType?: string; capacityPerDay?: number }> = {
+  LGA: { maxAircraftType: 'NARROWBODY', capacityPerDay: 120 },
 };
 
-const METRO_RADIUS_KM = 30;
+/**
+ * How far a place can be from its nearest airport and still count toward
+ * it. 60 km and the density below were picked together by comparing
+ * against 2021 census metro populations (12 Canadian cities from
+ * StatsCan, plus Boston): Montreal comes out at 0.90 of its census
+ * figure, Toronto 1.22, Boston 0.96. The Maritimes read high (Moncton
+ * 2.2, Sydney 1.8, Halifax 1.5) because GeoNames lists their
+ * neighbourhoods as separate towns as well as inside the city's total. A
+ * lower density or a smaller radius trims those but shrinks every big
+ * metro more (New York to about 10 million), so the error stays about
+ * the same, only moved.
+ */
+const CATCHMENT_MAX_KM = 60;
+/** People per km² assumed inside a city's built-up area, for the "inside a bigger place" rule. */
+const URBAN_DENSITY_PER_KM2 = 5000;
+
 const CACHE_DIR = fileURLToPath(new URL('../../data/.cache/', import.meta.url));
 const AIRPORTS_FILE = fileURLToPath(new URL('../../data/airports.json', import.meta.url));
+
+type Place = { lat: number; lon: number; population: number; timeZone: string };
 
 async function download(url: string, path: string): Promise<void> {
   if (existsSync(path)) return;
@@ -140,55 +183,90 @@ function standardOffsetMinutes(timeZone: string): number {
   return Math.min(offsetAt(0), offsetAt(6));
 }
 
+/** Radius of a circle holding `population` people at URBAN_DENSITY_PER_KM2. */
+function builtUpRadiusKm(population: number): number {
+  return Math.sqrt(population / (Math.PI * URBAN_DENSITY_PER_KM2));
+}
+
+/**
+ * The places that count: sections of cities dropped, and anything inside
+ * a bigger place's built-up area dropped. Biggest first, so each place is
+ * checked only against places already kept.
+ */
+function withoutDoubleCounting(places: Place[]): Place[] {
+  const kept: Place[] = [];
+  for (const place of [...places].sort((a, b) => b.population - a.population)) {
+    const inside = kept.some((bigger) => distanceKm(place, bigger) < builtUpRadiusKm(bigger.population));
+    if (!inside) kept.push(place);
+  }
+  return kept;
+}
+
 async function main(): Promise<void> {
   mkdirSync(CACHE_DIR, { recursive: true });
   const airportsCsv = `${CACHE_DIR}airports.csv`;
-  const citiesZip = `${CACHE_DIR}cities15000.zip`;
+  const citiesZip = `${CACHE_DIR}cities1000.zip`;
   await download('https://davidmegginson.github.io/ourairports-data/airports.csv', airportsCsv);
-  await download('https://download.geonames.org/export/dump/cities15000.zip', citiesZip);
-
-  const cities = execFileSync('unzip', ['-p', citiesZip, 'cities15000.txt'], { maxBuffer: 64 * 1024 * 1024 })
-    .toString('utf8')
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => {
-      const c = line.split('\t');
-      return { lat: Number(c[4]), lon: Number(c[5]), population: Number(c[14]), timeZone: c[17] };
-    });
+  await download('https://download.geonames.org/export/dump/cities1000.zip', citiesZip);
 
   const [header, ...rows] = readFileSync(airportsCsv, 'utf8').split('\n').filter(Boolean).map(parseCsvLine);
   const column = (name: string) => header.indexOf(name);
   const byIata = new Map<string, string[]>();
   for (const row of rows) {
     const iata = row[column('iata_code')];
-    if (iata && row[column('type')] === 'large_airport') byIata.set(iata, row);
+    if (iata && ['large_airport', 'medium_airport', 'small_airport'].includes(row[column('type')])) byIata.set(iata, row);
+  }
+  const points = AIRPORTS.map(([iata]) => {
+    const row = byIata.get(iata);
+    if (!row) throw new Error(`${iata} is not an airport in OurAirports`);
+    return { iata, lat: Number(row[column('latitude_deg')]), lon: Number(row[column('longitude_deg')]) };
+  });
+
+  // Only places near some airport matter, which keeps the double-counting
+  // pass (every place against every bigger one) small.
+  const nearAnAirport = execFileSync('unzip', ['-p', citiesZip, 'cities1000.txt'], { maxBuffer: 256 * 1024 * 1024 })
+    .toString('utf8')
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => line.split('\t'))
+    .filter((c) => c[7] !== 'PPLX')
+    .map((c): Place => ({ lat: Number(c[4]), lon: Number(c[5]), population: Number(c[14]), timeZone: c[17] }))
+    .filter((place) => place.population > 0 && points.some((airport) => distanceKm(airport, place) <= CATCHMENT_MAX_KM));
+  const places = withoutDoubleCounting(nearAnAirport);
+
+  const catchments = new Map<string, Place[]>(points.map((airport) => [airport.iata, []]));
+  for (const place of places) {
+    let nearest = points[0];
+    for (const airport of points) if (distanceKm(airport, place) < distanceKm(nearest, place)) nearest = airport;
+    if (distanceKm(nearest, place) <= CATCHMENT_MAX_KM) catchments.get(nearest.iata)!.push(place);
   }
 
-  const existing = JSON.parse(readFileSync(AIRPORTS_FILE, 'utf8')) as Record<string, unknown>[];
-  const kept = existing.filter((airport) => !WORLD_HUBS.includes(airport.iata as string));
+  const previous = existsSync(AIRPORTS_FILE)
+    ? new Map((JSON.parse(readFileSync(AIRPORTS_FILE, 'utf8')) as { iata: string; population: number }[]).map((a) => [a.iata, a.population]))
+    : new Map<string, number>();
 
-  const generated = WORLD_HUBS.map((iata) => {
-    const row = byIata.get(iata);
-    if (!row) throw new Error(`${iata} is not a large airport in OurAirports`);
-    const point = { lat: Number(row[column('latitude_deg')]), lon: Number(row[column('longitude_deg')]) };
-    const nearby = cities.filter((city) => distanceKm(point, city) <= METRO_RADIUS_KM);
-    if (nearby.length === 0) throw new Error(`${iata}: no GeoNames city within ${METRO_RADIUS_KM} km`);
-    const biggest = nearby.reduce((best, city) => (city.population > best.population ? city : best));
+  const output = AIRPORTS.map(([iata, name], index) => {
+    const catchment = catchments.get(iata)!;
+    if (catchment.length === 0) throw new Error(`${iata}: no GeoNames place within ${CATCHMENT_MAX_KM} km`);
+    const biggest = catchment.reduce((best, place) => (place.population > best.population ? place : best));
     return {
       iata,
-      name: DISPLAY_NAMES[iata] ?? row[column('name')],
-      lat: Number(point.lat.toFixed(4)),
-      lon: Number(point.lon.toFixed(4)),
+      name,
+      lat: Number(points[index].lat.toFixed(4)),
+      lon: Number(points[index].lon.toFixed(4)),
       utcOffsetMinutes: standardOffsetMinutes(biggest.timeZone),
-      population: nearby.reduce((total, city) => total + city.population, 0),
+      population: catchment.reduce((total, place) => total + place.population, 0),
+      ...AIRPORT_RULES[iata],
     };
   });
 
-  const output = [...kept, ...generated];
   writeFileSync(AIRPORTS_FILE, JSON.stringify(output, null, 2) + '\n');
-  console.log(`Wrote ${output.length} airports (${kept.length} kept, ${generated.length} generated).`);
-  for (const airport of generated) {
-    console.log(`  ${airport.iata}  ${airport.name}  pop ${airport.population.toLocaleString()}  utc ${airport.utcOffsetMinutes / 60}`);
+  console.log(`Wrote ${output.length} airports.`);
+  console.log('        population before -> after');
+  for (const airport of output) {
+    const before = previous.get(airport.iata);
+    const ratio = before ? `${(airport.population / before).toFixed(2)}x` : 'new';
+    console.log(`  ${airport.iata}  ${(before ?? 0).toLocaleString().padStart(11)} -> ${airport.population.toLocaleString().padStart(11)}  ${ratio.padStart(5)}  utc ${airport.utcOffsetMinutes / 60}`);
   }
 }
 

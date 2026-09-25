@@ -5,7 +5,7 @@
     "lat": 45.4678,
     "lon": -73.7423,
     "utcOffsetMinutes": -300,
-    "population": 4291732
+    "population": 3845524
   },
   {
     "iata": "YYZ",
@@ -13,7 +13,7 @@
     "lat": 43.6759,
     "lon": -79.6294,
     "utcOffsetMinutes": -300,
-    "population": 6202225
+    "population": 7561839
   },
   {
     "iata": "YOW",
@@ -21,7 +21,7 @@
     "lat": 45.3225,
     "lon": -75.6692,
     "utcOffsetMinutes": -300,
-    "population": 1488307
+    "population": 1886913
   },
   {
     "iata": "YQB",
@@ -29,7 +29,7 @@
     "lat": 46.7911,
     "lon": -71.3933,
     "utcOffsetMinutes": -300,
-    "population": 839311
+    "population": 734492
   },
   {
     "iata": "YHZ",
@@ -37,7 +37,7 @@
     "lat": 44.8808,
     "lon": -63.5086,
     "utcOffsetMinutes": -240,
-    "population": 465703
+    "population": 685603
   },
   {
     "iata": "YSJ",
@@ -45,7 +45,7 @@
     "lat": 45.3161,
     "lon": -65.8903,
     "utcOffsetMinutes": -240,
-    "population": 130613
+    "population": 171051
   },
   {
     "iata": "YFC",
@@ -53,7 +53,7 @@
     "lat": 45.8687,
     "lon": -66.5299,
     "utcOffsetMinutes": -240,
-    "population": 108610
+    "population": 140612
   },
   {
     "iata": "YQM",
@@ -61,7 +61,7 @@
     "lat": 46.1132,
     "lon": -64.6772,
     "utcOffsetMinutes": -240,
-    "population": 157717
+    "population": 349866
   },
   {
     "iata": "YYG",
@@ -69,7 +69,7 @@
     "lat": 46.2889,
     "lon": -63.1252,
     "utcOffsetMinutes": -240,
-    "population": 78858
+    "population": 84355
   },
   {
     "iata": "YYT",
@@ -77,23 +77,23 @@
     "lat": 47.6186,
     "lon": -52.7519,
     "utcOffsetMinutes": -210,
-    "population": 212579
+    "population": 239325
   },
   {
     "iata": "YDF",
     "name": "Deer Lake",
-    "lat": 49.211,
-    "lon": -57.391,
+    "lat": 49.2082,
+    "lon": -57.3961,
     "utcOffsetMinutes": -210,
-    "population": 29762
+    "population": 32658
   },
   {
     "iata": "YQX",
     "name": "Gander",
-    "lat": 48.9367,
-    "lon": -54.5681,
+    "lat": 48.9363,
+    "lon": -54.5677,
     "utcOffsetMinutes": -210,
-    "population": 13414
+    "population": 20210
   },
   {
     "iata": "YYR",
@@ -101,7 +101,7 @@
     "lat": 53.3192,
     "lon": -60.4258,
     "utcOffsetMinutes": -240,
-    "population": 8010
+    "population": 8621
   },
   {
     "iata": "YQY",
@@ -109,7 +109,7 @@
     "lat": 46.1611,
     "lon": -60.0498,
     "utcOffsetMinutes": -240,
-    "population": 98318
+    "population": 175786
   },
   {
     "iata": "YUY",
@@ -117,7 +117,7 @@
     "lat": 48.2061,
     "lon": -78.8356,
     "utcOffsetMinutes": -300,
-    "population": 42313
+    "population": 27214
   },
   {
     "iata": "YBG",
@@ -125,17 +125,7 @@
     "lat": 48.3301,
     "lon": -70.992,
     "utcOffsetMinutes": -300,
-    "population": 161567
-  },
-  {
-    "iata": "YTZ",
-    "name": "Billy Bishop Toronto",
-    "lat": 43.6279,
-    "lon": -79.3955,
-    "utcOffsetMinutes": -300,
-    "population": 6202225,
-    "maxAircraftType": "REGIONAL",
-    "capacityPerDay": 40
+    "population": 196575
   },
   {
     "iata": "LGA",
@@ -143,7 +133,7 @@
     "lat": 40.7772,
     "lon": -73.8726,
     "utcOffsetMinutes": -300,
-    "population": 20140470,
+    "population": 14811485,
     "maxAircraftType": "NARROWBODY",
     "capacityPerDay": 120
   },
@@ -153,7 +143,7 @@
     "lat": 42.362,
     "lon": -71.0079,
     "utcOffsetMinutes": -300,
-    "population": 4941632
+    "population": 4748593
   },
   {
     "iata": "DTW",
@@ -161,7 +151,7 @@
     "lat": 42.2138,
     "lon": -83.3538,
     "utcOffsetMinutes": -300,
-    "population": 1683667
+    "population": 3486437
   },
   {
     "iata": "PHL",
@@ -169,7 +159,7 @@
     "lat": 39.8719,
     "lon": -75.2411,
     "utcOffsetMinutes": -300,
-    "population": 3156682
+    "population": 4197183
   },
   {
     "iata": "DCA",
@@ -177,7 +167,7 @@
     "lat": 38.8521,
     "lon": -77.0377,
     "utcOffsetMinutes": -300,
-    "population": 3335576
+    "population": 5482406
   },
   {
     "iata": "ORD",
@@ -185,7 +175,7 @@
     "lat": 41.9786,
     "lon": -87.9048,
     "utcOffsetMinutes": -360,
-    "population": 6365412
+    "population": 7796470
   },
   {
     "iata": "ATL",
@@ -193,7 +183,7 @@
     "lat": 33.6367,
     "lon": -84.4281,
     "utcOffsetMinutes": -300,
-    "population": 1094551
+    "population": 2394213
   },
   {
     "iata": "MIA",
@@ -201,7 +191,7 @@
     "lat": 25.796,
     "lon": -80.2898,
     "utcOffsetMinutes": -300,
-    "population": 3082708
+    "population": 4123168
   },
   {
     "iata": "DFW",
@@ -209,7 +199,7 @@
     "lat": 32.8968,
     "lon": -97.038,
     "utcOffsetMinutes": -360,
-    "population": 3223877
+    "population": 6537533
   },
   {
     "iata": "LAX",
@@ -217,7 +207,7 @@
     "lat": 33.9425,
     "lon": -118.408,
     "utcOffsetMinutes": -480,
-    "population": 8246481
+    "population": 9694103
   },
   {
     "iata": "YVR",
@@ -225,7 +215,7 @@
     "lat": 49.1939,
     "lon": -123.184,
     "utcOffsetMinutes": -480,
-    "population": 3811612
+    "population": 2838771
   },
   {
     "iata": "MEX",
@@ -233,7 +223,7 @@
     "lat": 19.4358,
     "lon": -99.0703,
     "utcOffsetMinutes": -360,
-    "population": 30380474
+    "population": 16866376
   },
   {
     "iata": "LHR",
@@ -241,7 +231,7 @@
     "lat": 51.4707,
     "lon": -0.4599,
     "utcOffsetMinutes": 0,
-    "population": 15207067
+    "population": 14181840
   },
   {
     "iata": "CDG",
@@ -249,7 +239,7 @@
     "lat": 49.009,
     "lon": 2.5541,
     "utcOffsetMinutes": 60,
-    "population": 10276841
+    "population": 8258115
   },
   {
     "iata": "AMS",
@@ -257,7 +247,7 @@
     "lat": 52.3086,
     "lon": 4.7639,
     "utcOffsetMinutes": 60,
-    "population": 3414679
+    "population": 7561610
   },
   {
     "iata": "FRA",
@@ -265,7 +255,7 @@
     "lat": 50.0267,
     "lon": 8.5584,
     "utcOffsetMinutes": 60,
-    "population": 2786175
+    "population": 4960651
   },
   {
     "iata": "DUB",
@@ -273,7 +263,7 @@
     "lat": 53.4287,
     "lon": -6.2621,
     "utcOffsetMinutes": 0,
-    "population": 1727518
+    "population": 1908037
   },
   {
     "iata": "KEF",
@@ -281,7 +271,7 @@
     "lat": 63.985,
     "lon": -22.6056,
     "utcOffsetMinutes": 0,
-    "population": 35654
+    "population": 216827
   },
   {
     "iata": "DXB",
@@ -289,7 +279,7 @@
     "lat": 25.2498,
     "lon": 55.371,
     "utcOffsetMinutes": 240,
-    "population": 8350601
+    "population": 6052834
   },
   {
     "iata": "HND",
@@ -297,7 +287,7 @@
     "lat": 35.5497,
     "lon": 139.787,
     "utcOffsetMinutes": 540,
-    "population": 28226036
+    "population": 25754043
   },
   {
     "iata": "SIN",
@@ -305,7 +295,7 @@
     "lat": 1.3502,
     "lon": 103.994,
     "utcOffsetMinutes": 480,
-    "population": 14986063
+    "population": 11112637
   },
   {
     "iata": "GRU",
@@ -313,7 +303,7 @@
     "lat": -23.4313,
     "lon": -46.47,
     "utcOffsetMinutes": -180,
-    "population": 24394853
+    "population": 16877570
   },
   {
     "iata": "JNB",
@@ -321,6 +311,6 @@
     "lat": -26.1401,
     "lon": 28.2468,
     "utcOffsetMinutes": 120,
-    "population": 12970440
+    "population": 15124375
   }
 ]

@@ -11,7 +11,7 @@ goes in HOW-IT-WORKS.md, and why it changed goes in the commit message.
 ## What this project is
 
 airgame is a browser-based airline network simulator. The player picks a home
-city from 40 airports (densest in eastern Canada and the US north-east, with
+city from 39 airports (densest in eastern Canada and the US north-east, with
 world hubs beyond), starts with one leased propeller, and grows an airline
 against rival carriers. The core loop is: draw routes on the map → watch the
 days run → read the P&L → adjust.
@@ -142,7 +142,8 @@ draw a control inside the canvas. Saves go in `localStorage`.
 ## Data
 
 Public sources only: OurAirports for coordinates, Natural Earth for the
-basemap and water, StatsCan/GeoNames for population, and published type
+basemap and water, GeoNames for population (checked against StatsCan
+census metros), and published type
 specs for aircraft. Some files are **generated** (`npm run airports`,
 `lakes`, `rivers`; scripts in `src/headless/build*.ts`). To change a generated
 file, change its script and re-run it. Never hand-edit its output. No

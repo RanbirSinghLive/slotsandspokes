@@ -71,8 +71,8 @@ const aircraftTypeCodesBySize = (aircraftTypesData as { code: string }[]).map((t
 /**
  * Whether `typeCode` is small enough to operate at `iata`, per that
  * airport's own `maxAircraftType` (`data/airports.json`, week four) —
- * a real runway/gate constraint some airports have (Billy Bishop's YTZ,
- * LaGuardia's LGA), modeled the same crude "hard limit, full stop" way
+ * a real runway/gate constraint some airports have (LaGuardia's
+ * perimeter and gate rules), modeled the same crude "hard limit, full stop" way
  * range already is, rather than degrees of inconvenience. No constraint
  * (`maxAircraftType` absent) or an unrecognized type/airport code both
  * fail open (true) rather than block on a data gap. Used by the M10

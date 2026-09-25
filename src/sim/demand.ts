@@ -16,9 +16,10 @@ const airportsByIata = new Map<string, AirportDemandInput>(
 // resulting ratio into a number of people per day. Both are deliberately
 // crude, tunable knobs in the same spirit as economy.ts's LOAD_FACTOR/
 // AVG_FARE, not calibrated against any real O-D survey — the populations
-// and distances feeding into them are real (StatsCan 2021 census CMA/CA,
-// real coordinates), but nothing converts "these two cities are this big
-// and this far apart" into an actual passenger count from any real source.
+// and distances feeding into them are real (GeoNames places summed into
+// each airport's catchment by src/headless/buildAirports.ts, real
+// coordinates), but nothing converts "these two cities are this big and
+// this far apart" into an actual passenger count from any real source.
 // See WEEK-TWO.md's "1. O-D demand" for the original rationale, and its
 // "Scaling strategy" note for why `population` lives as a plain field on
 // each airport rather than anything StatsCan-specific.
@@ -40,6 +41,16 @@ const DISTANCE_EXPONENT = 1;
 const SCALING_CONSTANT = 4.8e-8;
 
 /**
+ * Airports closer than this have no market between them. Two airports
+ * that near serve the same place, and the gravity model would read them
+ * as two big populations at almost no distance: enormous demand for a
+ * trip nobody flies. The map keeps one airport per metro, so this is a
+ * safety net rather than something the current airports hit. The
+ * shortest real market on the map is Saint John–Fredericton, 43 nm.
+ */
+export const MIN_MARKET_NM = 30;
+
+/**
  * Markets the gravity model gets badly wrong, suppressed to zero demand.
  *
  * This is a **soft** restriction on purpose: nothing stops a route being
@@ -48,12 +59,10 @@ const SCALING_CONSTANT = 4.8e-8;
  * out of the route builder's constraint logic and lets it read as a
  * property of the world rather than an arbitrary ban.
  *
- * The register exists because these will accumulate. A gravity model
- * multiplied by population and divided by distance always misbehaves
- * where two airports serve the same city — enormous populations at
- * almost no distance — and this map already has one such pair. Each entry
- * carries its own reason so the next person to read the list can tell a
- * deliberate balance decision from an accident.
+ * Same-city pairs are handled by MIN_MARKET_NM, not by this list. It is
+ * for any other pair the model gets wrong, and it is empty today. Each
+ * entry carries its own reason so the next person to read the list can
+ * tell a deliberate balance decision from an accident.
  */
 type SuppressedMarket = { origin: string; dest: string; reason: string };
 
@@ -61,9 +70,16 @@ const suppressedByKey = new Map<string, SuppressedMarket>(
   (suppressedMarketsData as SuppressedMarket[]).map((m) => [[m.origin, m.dest].sort().join('-'), m]),
 );
 
-/** The reason this market is suppressed, or undefined if it isn't — for the UI to explain itself. */
+/** The reason this market has no demand, or undefined if it has some — for the UI to explain itself. */
 export function suppressedMarketReason(originIata: string, destIata: string): string | undefined {
-  return suppressedByKey.get([originIata, destIata].sort().join('-'))?.reason;
+  const listed = suppressedByKey.get(pairKey(originIata, destIata));
+  if (listed) return listed.reason;
+  const origin = airportsByIata.get(originIata);
+  const dest = airportsByIata.get(destIata);
+  if (origin && dest && originIata !== destIata && greatCircleDistanceNm(origin, dest) < MIN_MARKET_NM) {
+    return `These airports are under ${MIN_MARKET_NM} nm apart and serve the same place, so nobody flies between them.`;
+  }
+  return undefined;
 }
 
 /**
@@ -102,6 +118,7 @@ function pairKey(a: string, b: string): string {
 function gravityDemand(origin: AirportDemandInput, dest: AirportDemandInput): number {
   if (suppressedByKey.has(pairKey(origin.iata, dest.iata))) return 0;
   const distanceNm = greatCircleDistanceNm(origin, dest);
+  if (distanceNm < MIN_MARKET_NM) return 0;
   const gravity = (origin.population * dest.population) / Math.pow(distanceNm, DISTANCE_EXPONENT);
   return Math.round(gravity * SCALING_CONSTANT);
 }

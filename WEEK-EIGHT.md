@@ -166,7 +166,7 @@ once the rest works.
 
 ## Next: filling out North America (a separate thread)
 
-**Status: slice 1 done.** The owner has settled the scope (see
+**Status: slices 1 and 2 done.** The owner has settled the scope (see
 "Decisions").
 
 Grow the map from 40 airports to about 150, filling in the US and
@@ -267,15 +267,40 @@ passing.
    `SAVE_KEY` was not bumped: the shape is unchanged, and an old save's
    full map still reads correctly. Its floor entries drop out at the
    next rollover.
-2. **Catchment populations, `cities1000`, and the distance rule, on
-   the current 40 airports only** (minus YTZ).
-   Generate the whole file, the 19 included. Print a before-and-after
-   population table in the commit message, and record six-seed
-   headless means before and after, not one seed. Run the week-four
-   regional-demand check again (how many pairs fall into the thin,
-   one-flight and workable bands) since the Maritimes' numbers will
-   move. Retune `SCALING_CONSTANT` here if the bands collapse, before
-   any new airports cloud the picture.
+2. **Done: catchment populations, `cities1000`, and the distance rule,
+   on the current airports minus YTZ (39).**
+   - `buildAirports.ts` generates the whole file. LGA's hand-set rules
+     (`maxAircraftType`, `capacityPerDay`) live in its `AIRPORT_RULES`
+     so regenerating keeps them.
+   - Catchment: 60 km, nearest airport wins. City districts are dropped
+     by a built-up-area rule at 5,000 people/km², since GeoNames lists
+     New York City *and* Brooklyn, Queens, Manhattan and the Bronx. Both
+     settings were picked together against the 13 census metros. The
+     error is about 1.4× either way wherever they're set: tightening
+     them trims the Maritimes (Moncton 2.2×, Sydney 1.8×; GeoNames
+     lists neighbourhoods there as towns) but shrinks every big metro
+     more.
+   - `MIN_MARKET_NM = 30` in `sim/demand.ts`. `suppressed-markets.json`
+     is empty. `SAVE_KEY` is `v45`.
+   - Demand bands (propeller-range pairs, each way, against 25 seats):
+     thin 27 → 23, one flight 10 → 11, more 50 → 46. Nothing collapsed,
+     so `SCALING_CONSTANT` is unchanged.
+   - Headless, six seeds, 365 days, starter player:
+
+     | Home | Before | After |
+     |---|---|---|
+     | YYZ | 3/6 survive, mean $559k | 6/6 survive, mean $1,676k |
+     | YUL | 2/6 survive, mean $563k | 3/6 survive, mean $252k, busts ~day 330 |
+     | YHZ | all bust ~day 40 | all bust ~day 45 |
+     | BOS | all bust, days 46–140 | all bust, days 79–365 |
+     | PHL | all bust, days 53–92 | all bust, days 124–212 |
+     | LHR | all bust, days 44–73 | all bust, days 70–98 |
+
+     Toronto gained population, including downtown, which YTZ used to
+     claim. Montréal's starter used to fly YUL–YTZ as well as YUL–YYZ,
+     a second copy of the Toronto market. LaGuardia shrank as New York
+     stopped being counted twice, so YUL–LGA fell from 14.7k to 9.7k
+     potential a day.
 3. **The fill-out.** Replace the hand-typed North American list with a
    filter over OurAirports: `large_airport` or `medium_airport`,
    `scheduled_service` yes, country US or CA, one per metro

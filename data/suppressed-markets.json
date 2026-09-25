@@ -1,7 +1,1 @@
-[
-  {
-    "origin": "YTZ",
-    "dest": "YYZ",
-    "reason": "Both airports serve Toronto and sit 11 nm apart. The gravity model reads a same-city pair as two full metro populations at almost zero distance, which produces enormous demand for a journey nobody would fly."
-  }
-]
+[]

@@ -50,8 +50,8 @@ export function airportLevel(departures: number): AirportLevel {
  * slot prices, are read against — see `airportLoad()`.
  *
  * An airport can override it in data/airports.json (`capacityPerDay`)
- * where the city's size says nothing about the field: Billy Bishop shares
- * Toronto's population but is a small island airport.
+ * where the city's size says little about the field: LaGuardia serves
+ * all of New York but is one crowded airport.
  */
 const CAPACITY_BASE = 18;
 const CAPACITY_PER_DOUBLING = 54;

@@ -17,8 +17,8 @@ export type Airport = {
   /**
    * Week four: the largest aircraft type (by `data/aircraft-types.json`'s
    * own code, e.g. `"REGIONAL"`) allowed to operate here — a real runway/
-   * gate constraint some airports have (Billy Bishop's YTZ, LaGuardia's
-   * perimeter/gate rules), modeled the same crude "hard limit" way range
+   * gate constraint some airports have (LaGuardia's perimeter/gate
+   * rules), modeled the same crude "hard limit" way range
    * already is. Absent means unconstrained. See `sim/schedule.ts`'s
    * `isAircraftTypeAllowedAt()` for how this gets checked.
    */
@@ -149,7 +149,7 @@ function cachedUnmetDemand(state: SimState): Map<string, AirportUnmet> {
  * showing how full its pooled aircraft-day budget is.
  *
  * Labels are placed in a second pass, after every dot — see
- * placeLabels() below for how close airports (YYZ/YTZ, YUL/YOW) keep
+ * placeLabels() below for how close airports (YUL/YOW, YSJ/YFC) keep
  * their codes from printing on top of each other.
  */
 export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState, showUnmetDemand: boolean): void {
