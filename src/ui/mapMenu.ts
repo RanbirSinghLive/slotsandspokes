@@ -17,7 +17,9 @@ import { daysUntilReturn, expediteCost, expediteRepair } from '../sim/aog';
 import { openHubPlanner } from './hubPlanner';
 import { buildPoolRows } from './poolBars';
 import { getMapPreview, setMapPreview, type MapPreview } from '../render/preview';
-import type { SimState } from '../sim/state';
+import type { FareStance, SimState } from '../sim/state';
+import { setFareStance } from '../sim/pricing';
+import { forecastStance, type StanceForecast } from '../sim/fareForecast';
 import { candidateTailsAt } from '../sim/rotations';
 import { armRouteBuilderAt, describeSlotQuotes } from './routeBuilder';
 import { nextSlotFees, slotFeesPerDayAt, slotsHeld } from '../sim/slots';
@@ -66,6 +68,7 @@ const routeHistoryEl = document.querySelector<HTMLElement>('#airport-detail-rout
 const routeOtpEl = document.querySelector<HTMLElement>('#airport-detail-otp')!;
 const poolsEl = document.querySelector<HTMLElement>('#airport-detail-pools')!;
 const demandEl = document.querySelector<HTMLElement>('#airport-detail-demand')!;
+const stanceEl = document.querySelector<HTMLElement>('#airport-detail-stance')!;
 const hintEl = document.querySelector<HTMLElement>('#airport-detail-hint')!;
 const planHubButton = document.querySelector<HTMLButtonElement>('#airport-detail-plan-hub')!;
 
@@ -170,7 +173,9 @@ function onPreview(preview: MapPreview | null): void {
 
 function fillAirportCard(airport: Airport, state: SimState): void {
   titleEl.textContent = `${airport.iata} — ${airport.name}`;
-  // Only a route card shows a route's own history.
+  // Only a route card shows a route's own history, or pricing stances.
+  stanceEl.hidden = true;
+  stanceEl.replaceChildren();
   routeHistoryEl.hidden = true;
   routeHistoryEl.replaceChildren();
   routeOtpEl.hidden = true;
@@ -493,6 +498,7 @@ function fillRouteCard(a: string, b: string, state: SimState): void {
     demandEl.classList.add('airport-detail-over');
   }
 
+  fillStances(a, b, state);
   fillPools(ops.routeBase(state, a, b), state, '');
   // A route card has no single airport to describe.
   loadEl.textContent = '';
@@ -501,6 +507,81 @@ function fillRouteCard(a: string, b: string, state: SimState): void {
   planHubButton.hidden = true;
   fillRouteHistory(state, a, b);
   fillRouteOtp(state, a, b);
+}
+
+const STANCES: { stance: FareStance; name: string }[] = [
+  { stance: 'undercut', name: 'Undercut' },
+  { stance: 'match', name: 'Match' },
+  { stance: 'premium', name: 'Premium' },
+];
+
+function signedMoney(amount: number): string {
+  return `${amount < 0 ? '−' : '+'}${money(Math.abs(amount))}`;
+}
+
+/** One stance's forecast in a line: your fare and margin, then each rival's. */
+function describeForecast(forecast: StanceForecast): string {
+  const rivals = forecast.rivals.map((rival) =>
+    rival.closesInDays !== null
+      ? `${rival.airline} $${rival.fare}, ${signedMoney(rival.margin)}/day, gone in about ${rival.closesInDays} days`
+      : `${rival.airline} $${rival.fare}, ${signedMoney(rival.margin)}/day`,
+  );
+  const response = forecast.responseChance > 0 ? ` · ${Math.round(forecast.responseChance * 100)}% a day they add a flight` : '';
+  return `You $${forecast.fare}, ${signedMoney(forecast.margin)}/day · ${rivals.join('; ')}${response}`;
+}
+
+/**
+ * On a market a rival also flies: the three fare stances (sim/pricing.ts),
+ * each with where it would settle (sim/fareForecast.ts), and buttons to
+ * pick one. Picking re-prices the market now and every day after.
+ */
+function fillStances(a: string, b: string, state: SimState): void {
+  const settings = state.routeSettings[marketKey(a, b)];
+  const contested = state.competitorRoutes.some(
+    (route) => (route.origin === a && route.dest === b) || (route.origin === b && route.dest === a),
+  );
+  stanceEl.replaceChildren();
+  stanceEl.hidden = !settings || !contested;
+  if (stanceEl.hidden) return;
+
+  const current = STANCES.find((s) => s.stance === settings.fareStance);
+  const heading = document.createElement('div');
+  heading.className = 'stance-heading';
+  heading.textContent = `Pricing against rivals: ${current ? current.name : settings.fareIsOverridden ? 'your own fare' : 'fare policy'} ($${settings.fare}). If nothing else changes:`;
+  stanceEl.append(heading);
+
+  for (const { stance, name } of STANCES) {
+    const row = document.createElement('div');
+    row.className = 'stance-row';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'stance-button';
+    button.classList.toggle('is-active', settings.fareStance === stance);
+    button.textContent = name;
+    button.addEventListener('click', (event) => {
+      event.stopPropagation();
+      setFareStance(state, a, b, stance);
+      refresh();
+    });
+    const outcome = document.createElement('span');
+    outcome.className = 'stance-outcome';
+    outcome.textContent = describeForecast(forecastStance(state, a, b, stance));
+    row.append(button, outcome);
+    stanceEl.append(row);
+  }
+
+  if (current) {
+    const off = document.createElement('button');
+    off.type = 'button';
+    off.className = 'stance-off';
+    off.textContent = 'Back to fare policy';
+    off.addEventListener('click', (event) => {
+      event.stopPropagation();
+      setFareStance(state, a, b, null);
+      refresh();
+    });
+    stanceEl.append(off);
+  }
 }
 
 /**

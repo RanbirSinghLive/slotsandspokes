@@ -32,6 +32,7 @@ import { acquireNeededSlots, settleSlotsForDay } from './slots';
 import { ensureRivalFleets, rollDailyMarket } from './market';
 import { dayIndex, minuteOfDay as homeMinuteOfDay } from './clock';
 import { rollRivalCapacityResponse } from './rivalResponse';
+import { applyFarePolicy } from './pricing';
 import { closeLosingRivalRoutes } from './rivalEconomics';
 import type { SimState, ActiveFlight } from './state';
 
@@ -259,8 +260,11 @@ export function step(state: SimState): void {
     rollCompetitorRouteOpenings(state, state.simMinute);
     rollCompetitorFrequencyGrowth(state);
     rollRivalEntry(state, state.simMinute);
-    // Rivals reprice against the player's fares (sim/competitors.ts), and
-    // move in on markets the player flies full at a premium (sim/rivalResponse.ts).
+    // The player's fare stances reprice against yesterday's rival fares
+    // (sim/pricing.ts), then rivals reprice against the player's fares
+    // (sim/competitors.ts) and move in on markets the player flies full at
+    // a premium (sim/rivalResponse.ts).
+    applyFarePolicy(state);
     rollDailyRivalFares(state);
     rollRivalCapacityResponse(state, state.simMinute);
     // The lessor's delivery (sim/market.ts) comes *after* the rivals have

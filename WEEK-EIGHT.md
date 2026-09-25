@@ -379,8 +379,39 @@ passing.
 
 ## Next: fare stances and the price war (a separate thread)
 
-**Status: draft, not started.** The open questions at the end need the
-owner's answer before any code is written.
+**Status: slices 1 and 2 done** (the owner wants to play it before
+answering the open questions, so they stay open).
+
+**What building it showed:**
+- **The forecast is accurate for the price war itself.** On O'Hare–
+  Toronto (headless Toronto start, day 120), Undercut forecast you at
+  $212 and Ironbridge at $236, closing in 51 days. The real game
+  settled on exactly those fares, and Ironbridge closed on day 52.
+- **Winning a war buys almost nothing yet.** A different airline
+  entered the same market on day 32, mid-war. The 180-day reopening
+  ban is per airline, and new entrants aim at the player's markets
+  (`RIVAL_TARGETS_PLAYER`). Slice 4 should decide whether a closure
+  protects the market from everyone for a while.
+- **Rival costs swamp the fare lever.** A rival's class comes from its
+  whole airline's size (`preferredRivalClass()`), so a big airline's
+  2-a-day route is costed as Widebodies: Ironbridge lost $33k–53k a
+  day on O'Hare–Toronto at *any* fare. Most rival routes forecast to
+  close whatever stance you pick, so the choice rarely decides
+  anything. Also slice 4.
+- **The card is tall.** The radial menu can land on its lower rows
+  when a route is clicked low on the screen.
+
+**Built:**
+- `RouteSettings.fareStance` (optional: older saves read as no
+  stance, so `SAVE_KEY` stayed at v46).
+- `stanceFare()`, `setFareStance()`, and `applyFarePolicy()` doing the
+  daily re-pricing at rollover in `sim/pricing.ts`.
+- `forecastStance()` in `sim/fareForecast.ts`, about a third of a
+  millisecond per stance.
+- The starter player on Match, and a `stance` sweep lever. Over 120
+  days from YUL, stances applied to every market give: Undercut
+  $106k, Match $460k, Premium $439k.
+- The route card's stance rows (`ui/mapMenu.ts`'s `fillStances()`).
 
 Fares today are one network-wide multiplier (`sim/pricing.ts`) plus a
 per-market number. That's a slider with a best setting that doesn't

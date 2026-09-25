@@ -2,6 +2,7 @@ import airportsData from '../../data/airports.json';
 import { potentialDailyDemand } from '../sim/demand';
 import { chooseHome } from '../sim/homes';
 import { applyRotation, planRotation, type RotationStop } from '../sim/rotations';
+import { setFareStance } from '../sim/pricing';
 import { legsServingMarket } from '../sim/schedule';
 import { createNewGameState, type SimState } from '../sim/state';
 
@@ -37,7 +38,9 @@ const airports = airportsData as RotationStop[];
  * Every rotation goes through planRotation() and applyRotation() — the same
  * rules and the same commit the route builder uses — so this can never
  * build something a player couldn't. It is an opening, not a strategy: it
- * never leases more planes, changes fares or reacts to rivals. Balance work
+ * never leases more planes or reacts to rivals. It prices every market it
+ * opens on the Match stance (sim/pricing.ts), the neutral choice, which is
+ * the policy fare until a rival arrives and the rival's fare after. Balance work
  * that needs a smarter player should add one here rather than hand-writing
  * a schedule, which is what the old runner did.
  */
@@ -62,6 +65,7 @@ export function openStarterRoutes(state: SimState): void {
       }
       if (!best) break; // this plane's day is full, or nothing is in reach
       applyRotation(state, aircraft.tail, planRotation([home], best.dest, aircraft.tail, state));
+      setFareStance(state, home.iata, best.dest.iata, 'match');
     }
   }
 }

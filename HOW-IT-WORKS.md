@@ -1459,6 +1459,40 @@ price for that — but you now find it once instead of per route.
 
 ---
 
+## Fare stances (`src/sim/pricing.ts`, `src/sim/fareForecast.ts`)
+
+On a market a rival also flies, the route card offers three **stances**
+in place of a number. A stance re-prices the market every rollover,
+before rivals set their fares, against the cheapest rival's fare that
+day:
+
+| Stance | Your fare |
+|---|---|
+| Undercut | 10% under the cheapest rival (`UNDERCUT_SHARE`) |
+| Match | the cheapest rival's fare |
+| Premium | 15% over the going rate (`PREMIUM_SHARE`) |
+
+With no rival on the market every stance charges the policy fare, so a
+stance can stay set while rivals come and go. Setting a fare by hand, or
+"Back to fare policy", clears it (`RouteSettings.fareStance`).
+
+**The forecast** (`forecastStance()`) runs the game's own daily rules
+forward on a copy of the market: rivals judged on their result, your
+stance re-priced, rivals answering your fare. Demand, schedule, fuel and
+frequencies are held where they are. The card shows, per stance:
+- where your fare and each rival's settle;
+- what each side makes a day there;
+- whether a rival would close the route, and in about how many days;
+- for a premium, the daily chance a rival adds a flight.
+
+Undercut chases a rival down to its floor (65% of the going rate), so
+it costs you margin for as long as the war lasts.
+
+The headless starter player prices every market it opens on Match, and
+`npm run sweep -- stance` compares the three across a run.
+
+---
+
 ## Airports: presence, capacity and slots (`src/sim/airports.ts`, `src/sim/slots.ts`)
 
 **Level** — from the player's daily departures there: Unserved (0),

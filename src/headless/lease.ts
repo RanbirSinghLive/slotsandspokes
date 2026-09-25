@@ -107,6 +107,7 @@ function runExperiment(experiment: Experiment): { perDay: number[]; roundTrips: 
   state.routeSettings[marketKey(experiment.base, experiment.other)] = {
     fare: policyFare(state, experiment.base, experiment.other),
     fareIsOverridden: false,
+    fareStance: null,
     marketingSpend: 0,
     turnBufferMinutes: 0,
   };

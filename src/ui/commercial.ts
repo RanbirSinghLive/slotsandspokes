@@ -157,12 +157,14 @@ function buildMarketRow(key: string, origin: string, dest: string, state: SimSta
   fareSlider.addEventListener('input', () => {
     state.routeSettings[key].fare = Number(fareSlider.value);
     state.routeSettings[key].fareIsOverridden = true;
+    state.routeSettings[key].fareStance = null;
     syncFareControls(key, state);
     refreshFarePolicyStatus(state);
     refreshRow(key, state);
   });
   fareReset.addEventListener('click', () => {
     state.routeSettings[key].fareIsOverridden = false;
+    state.routeSettings[key].fareStance = null;
     state.routeSettings[key].fare = policyFare(state, origin, dest);
     syncFareControls(key, state);
     refreshFarePolicyStatus(state);

@@ -305,7 +305,7 @@ export function rollCompetitorFrequencyGrowth(state: SimState): void {
 const RIVAL_FARE_FLOOR_SHARE = 0.65;
 const RIVAL_FARE_CEILING_SHARE = 1.4;
 const RIVAL_FOLLOW_UP_DISCOUNT = 0.08;
-const RIVAL_FARE_ADJUST_SHARE = 0.25;
+export const RIVAL_FARE_ADJUST_SHARE = 0.25;
 const RIVAL_FARE_DRIFT_SHARE = 0.1;
 
 /** Where this rival's fare is heading today, given the player's fare on the market (null if the player doesn't fly it). */

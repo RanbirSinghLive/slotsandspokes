@@ -461,6 +461,7 @@ export function applyRotation(
     state.routeSettings[key] = {
       fare: policyFare(state, leg.origin, leg.dest),
       fareIsOverridden: false,
+      fareStance: null,
       marketingSpend: 0,
       turnBufferMinutes: 0,
     };

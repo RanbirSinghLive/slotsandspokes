@@ -1,5 +1,5 @@
 import { recommendedFare, marketKey } from './schedule';
-import type { SimState } from './state';
+import type { FareStance, SimState } from './state';
 
 /**
  * Week six's fare policy. Raised directly, and the complaint was exact:
@@ -18,10 +18,11 @@ import type { SimState } from './state';
  * it is no longer *required* to play well. One decision instead of N
  * identical ones.
  *
- * Deliberately not solving the first two — a static optimum is still a
- * static optimum, just found once instead of twenty times. Making
- * competitors respond to price is what would actually remove it, and
- * that's competitor AI, gated by CLAUDE.md until asked for directly.
+ * On a market a rival also flies, the fare can instead follow a
+ * **stance** (see stanceFare()): a named way of pricing against the rival
+ * that re-prices every day as the rival's fare moves. Rivals answer your
+ * fare (sim/competitors.ts), so there the best price isn't fixed, and the
+ * stance forecast (sim/fareForecast.ts) shows where each one settles.
  */
 
 export const FARE_POLICY_MIN = 0.5;
@@ -35,9 +36,52 @@ export function policyFare(state: SimState, origin: string, dest: string): numbe
   return Math.round(recommendedFare(origin, dest) * state.farePolicyMultiplier);
 }
 
+/** How far under the cheapest rival Undercut prices. */
+export const UNDERCUT_SHARE = 0.1;
+/** How far over the going rate Premium prices. */
+export const PREMIUM_SHARE = 0.15;
+
 /**
- * Re-price every market that is still following policy, leaving
- * overridden ones alone. Called whenever the policy multiplier changes.
+ * The fare a stance asks for on `origin`-`dest`, against the rivals'
+ * fares today:
+ *   - undercut: UNDERCUT_SHARE under the cheapest rival. Rivals match a
+ *     cheaper fare down to a floor (sim/competitors.ts), so this chases
+ *     them down to it.
+ *   - match: the cheapest rival's fare.
+ *   - premium: PREMIUM_SHARE over the going rate, whatever rivals charge.
+ * With no rival on the market there is nobody to price against, so every
+ * stance charges the policy fare. That lets a stance stay set while
+ * rivals come and go.
+ */
+export function stanceFare(state: SimState, origin: string, dest: string, stance: FareStance): number {
+  const key = marketKey(origin, dest);
+  const rivalFares = state.competitorRoutes
+    .filter((route) => marketKey(route.origin, route.dest) === key)
+    .map((route) => route.fare);
+  if (rivalFares.length === 0) return policyFare(state, origin, dest);
+  const cheapestRival = Math.min(...rivalFares);
+  if (stance === 'undercut') return Math.round(cheapestRival * (1 - UNDERCUT_SHARE));
+  if (stance === 'match') return cheapestRival;
+  return Math.round(recommendedFare(origin, dest) * (1 + PREMIUM_SHARE));
+}
+
+/**
+ * Price a market by a stance from now on, or by policy again (`null`).
+ * Either way the fare is no longer one set by hand.
+ */
+export function setFareStance(state: SimState, origin: string, dest: string, stance: FareStance | null): void {
+  const settings = state.routeSettings[marketKey(origin, dest)];
+  if (!settings) return;
+  settings.fareStance = stance;
+  settings.fareIsOverridden = false;
+  settings.fare = stance ? stanceFare(state, origin, dest, stance) : policyFare(state, origin, dest);
+}
+
+/**
+ * Re-price every market that isn't priced by hand: by its stance if it
+ * has one, otherwise by policy. Called whenever the policy multiplier
+ * changes, and every rollover before rivals set their fares
+ * (sim/step.ts), so stances track rivals day by day.
  *
  * Markets are found from `state.schedule` rather than from
  * `state.routeSettings`' keys, because a key alone ("YHZ-YQM") doesn't
@@ -54,6 +98,8 @@ export function applyFarePolicy(state: SimState): void {
 
     const settings = state.routeSettings[key];
     if (!settings || settings.fareIsOverridden) continue;
-    settings.fare = policyFare(state, leg.origin, leg.dest);
+    settings.fare = settings.fareStance
+      ? stanceFare(state, leg.origin, leg.dest, settings.fareStance)
+      : policyFare(state, leg.origin, leg.dest);
   }
 }

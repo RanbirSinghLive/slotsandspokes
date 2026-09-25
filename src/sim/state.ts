@@ -114,6 +114,9 @@ export type ActiveFlight = {
  * manageable as more levers (marketing spend today, more later — see
  * ui/commercial.ts) get added to this same record.
  */
+/** A way of pricing a market against its rivals (sim/pricing.ts). */
+export type FareStance = 'undercut' | 'match' | 'premium';
+
 export type RouteSettings = {
   fare: number;
   /**
@@ -124,6 +127,13 @@ export type RouteSettings = {
    * clobbering the handful of routes deliberately priced differently.
    */
   fareIsOverridden: boolean;
+  /**
+   * How this market is priced against its rivals, re-applied every day
+   * (sim/pricing.ts's stanceFare()), or null to follow the policy.
+   * Setting a fare by hand clears it. Missing in saves from before stances
+   * existed, which reads the same as null.
+   */
+  fareStance?: FareStance | null;
   /**
    * Daily dollars spent promoting this specific market — a flat cost
    * charged once per day (see step.ts's day-rollover handling), not per

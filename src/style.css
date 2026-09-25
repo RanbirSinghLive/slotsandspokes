@@ -3106,3 +3106,52 @@ body {
   flex: none;
 }
 
+
+/* Fare stances on a contested route's card (ui/mapMenu.ts's fillStances()). */
+#airport-detail-stance {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+#airport-detail-stance[hidden] {
+  display: none;
+}
+
+.stance-heading {
+  color: #9aa3b5;
+  margin-bottom: 4px;
+}
+
+.stance-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.stance-button,
+.stance-off {
+  flex: none;
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: #cdd3e0;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.stance-button {
+  width: 76px;
+}
+
+.stance-button.is-active {
+  color: #0a0c12;
+  background: #5ed6c8;
+  border-color: #5ed6c8;
+}
+
+.stance-outcome {
+  color: #cdd3e0;
+}

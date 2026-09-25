@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { DEFAULT_HOME_AIRPORT, type SimState } from '../sim/state';
+import { DEFAULT_HOME_AIRPORT, type FareStance, type SimState } from '../sim/state';
+import { setFareStance } from '../sim/pricing';
 import { crewRequirement } from '../sim/crew';
 import { step } from '../sim/step';
 import { startHeadlessGame } from './newGame';
@@ -52,6 +53,8 @@ type Lever = {
   format: (value: number) => string;
 };
 
+const STANCES: FareStance[] = ['undercut', 'match', 'premium'];
+
 const LEVERS: Lever[] = [
   {
     // The one lever that changes headcount as well as a number: staffing
@@ -82,9 +85,23 @@ const LEVERS: Lever[] = [
         settings.fare = Math.round(settings.fare * multiplier);
         // What a player's own fare edit does, so the price policy leaves it alone.
         settings.fareIsOverridden = true;
+        settings.fareStance = null;
       }
     },
     format: (v) => `${v.toFixed(2)}x`,
+  },
+  {
+    // Every market the starter player opens, priced by one stance
+    // (sim/pricing.ts). Each stance only differs from policy once a rival
+    // shares a market, so this compares the three price-war choices over
+    // a run.
+    name: 'stance',
+    description: 'Fare stance on every market: 0 undercut, 1 match, 2 premium',
+    values: [0, 1, 2],
+    apply: (state, index) => {
+      for (const leg of state.schedule) setFareStance(state, leg.origin, leg.dest, STANCES[index]);
+    },
+    format: (v) => STANCES[v],
   },
   {
     name: 'marketing',
