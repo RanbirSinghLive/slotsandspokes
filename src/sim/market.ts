@@ -45,8 +45,7 @@ export const MARKET_RHYTHM: Record<string, ClassRhythm> = {
   // Every airline starts on Propellers: the first Regional reaches the
   // market on day 40, and the bigger classes months after, so each step
   // up in size is something the player works toward (and races rivals
-  // for) rather than an early buy. Rivals never lease Propellers, so none
-  // can add capacity before the first Regional debuts either.
+  // for) rather than an early buy.
   REGIONAL: { debutDay: 40, initial: 1, intervalDays: 10, cap: 2 },
   NARROWBODY: { debutDay: 80, initial: 1, intervalDays: 20, cap: 2 },
   WIDEBODY: { debutDay: 180, initial: 1, intervalDays: 35, cap: 1 },
@@ -62,8 +61,18 @@ export const FLIGHTS_PER_RIVAL_PLANE = 3;
 /** Rivals move up a class as they grow: at this many daily flights, a Narrowbody; at the next, a Widebody. */
 const RIVAL_NARROWBODY_FLIGHTS = 6;
 const RIVAL_WIDEBODY_FLIGHTS = 14;
-/** Largest class first; a rival falls back down this list when its preferred class isn't on the market. Rivals never take Propellers. */
-const RIVAL_CLASS_LADDER = ['WIDEBODY', 'NARROWBODY', 'REGIONAL'];
+/** Largest class first; a rival falls back down this list when its preferred class isn't on the market. */
+const RIVAL_CLASS_LADDER = ['WIDEBODY', 'NARROWBODY', 'REGIONAL', 'PROP'];
+
+/**
+ * Whether a rival may take this class's next listing. Never the last
+ * Propeller: it is the class every airline starts and first grows with,
+ * and rivals act before the player each day, so without this they could
+ * empty the only shelf the player can grow from.
+ */
+function rivalMayTake(state: SimState, typeCode: string): boolean {
+  return typeCode !== 'PROP' || listingsOf(state, typeCode).length > 1;
+}
 
 function addListing(market: MarketState, typeCode: string, day: number, seed: number): number {
   const [roll, next] = nextRandom(seed);
@@ -207,7 +216,7 @@ export function rivalSecuresCapacity(state: SimState, code: string, extraFlights
   if (fleet.length >= needed) return true;
   const preferred = preferredRivalClass(rivalFlights(state, code) + extraFlights);
   for (const typeCode of RIVAL_CLASS_LADDER.slice(RIVAL_CLASS_LADDER.indexOf(preferred))) {
-    if (takeListing(state, typeCode)) {
+    if (rivalMayTake(state, typeCode) && takeListing(state, typeCode)) {
       // Only recorded once it has a plane: a rival whose entry fails today
       // shouldn't leave an empty fleet behind.
       state.competitorFleets[code] = [...fleet, typeCode];

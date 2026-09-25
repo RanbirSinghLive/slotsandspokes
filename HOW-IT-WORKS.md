@@ -1322,7 +1322,9 @@ grows (`rivalSecuresCapacity()`, three daily flights per airframe) it
 takes a listing too: the class its size calls for (Regional; Narrowbody
 from 6 daily flights; Widebody from 14), falling back to smaller ones.
 So leasing the last Regional before a rival does is a real move. Rivals
-never take Propellers.
+fall back as far as a Propeller, but never take the last one listed: it
+is the class every airline starts and first grows with, and rivals act
+before the player each day.
 
 **Age is the trade.** Listings are 15–24 years old. The rate card
 (`lease-rates.json`) is a new airframe's price; each year of age takes 2%
