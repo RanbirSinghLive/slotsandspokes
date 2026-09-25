@@ -7,8 +7,9 @@ reasoning.
 **State at handoff:** save key `airgame-save-v26`, 11 sidebar tabs.
 Aircraft delivery lead times and **training lines** are done and
 committed. **The Grow tab — one pipeline view — is next.** A North
-American fill-out is planned as a separate thread (see "Next: filling
-out North America").
+American fill-out is under way as a separate thread (see "Next: filling
+out North America"), and fare stances are drafted as another (see
+"Next: fare stances and the price war").
 
 ---
 
@@ -373,6 +374,138 @@ passing.
   region.
 - HOW-IT-WORKS updated (population method, the distance rule, sparse
   market demand).
+
+---
+
+## Next: fare stances and the price war (a separate thread)
+
+**Status: draft, not started.** The open questions at the end need the
+owner's answer before any code is written.
+
+Fares today are one network-wide multiplier (`sim/pricing.ts`) plus a
+per-market number. That's a slider with a best setting that doesn't
+move, and a slider is never a legible choice. Meanwhile the parts of a
+real pricing game already exist in the sim, unseen:
+
+- **Rivals react to your fare** (`rollDailyRivalFares()`,
+  `sim/competitors.ts`). They match you down to 65% of the going rate,
+  never below you. They follow you up but stay 8% under, to 140%. Each
+  day they close a quarter of the gap.
+- **Rivals answer a premium with capacity** (`rollRivalCapacityResponse()`,
+  `sim/rivalResponse.ts`) on a market you fly full at more than 10% over
+  the going rate.
+- **Rival routes have a profit and a losing streak**
+  (`rivalRouteDailyResult()` and `route.losingDays`,
+  `sim/rivalEconomics.ts`). A route closes after 30 losing days in a
+  row, once its 60-day grace period is over. The airline won't reopen
+  that market for 180 days.
+
+So undercutting a rival until it leaves is already possible. It just
+can't be seen, so it can't be chosen. This thread makes pricing on a
+**contested** market (one where you and at least one rival both fly) a
+choice between three named stances. Each shows its consequence before
+you commit and while it plays out.
+
+### The stances
+
+On a contested market the fare is a stance, not a number. The sim
+re-applies the stance every day at rollover, before rivals set their
+fares, so it keeps tracking them as they move.
+
+| Stance | Your fare | What the rival does (existing rules) | The trade |
+|---|---|---|---|
+| **Undercut** | `UNDERCUT_SHARE` (10%) under the cheapest rival, never below the rival floor × (1 − that) | Matches you down, a quarter of the gap a day, to its floor (65% of going rate) | You lose margin now. If their route then loses money, they leave after the grace period plus 30 days, and stay out 180 days. |
+| **Match** | Equal to the cheapest rival | Stays put | Coexist and split the market on frequency. |
+| **Premium** | `PREMIUM_SHARE` (15%) over the going rate | Follows you up to 8% under you | High yield if your flights are full, but a daily chance they add a flight. |
+
+Uncontested markets keep following the network policy, as now. When
+the last rival leaves a market, its stance falls back to policy and
+the ticker says so.
+
+### Making it legible
+
+1. **A forecast for each stance, before you pick.** A sim function
+   `forecastStance(state, market, stance)` in `sim/pricing.ts` runs the
+   existing rival fare rule forward to where it settles. At that
+   settled point it returns:
+   - your fare and daily margin;
+   - the rival's fare and daily margin, from `rivalRouteDailyResult()`
+     with the settled fares;
+   - for Undercut: days until they'd close (grace remaining +
+     30 − `losingDays`), or "they survive at their floor" when their
+     margin stays positive;
+   - for Premium: the daily chance of a capacity response.
+
+   It is a pure read with no randomness. The route card shows three
+   rows, one per stance, e.g. "Undercut: you −$410/day · Trillium
+   −$260/day · gone in ~41 days". The player compares the three. A
+   slider can't show a trade like that.
+2. **A pain gauge on the map.** On a contested route line, a small
+   ring at the rival's end fills with `losingDays` / 30, and is red
+   while their margin is negative. It uses the Competition overlay's
+   existing colours. You can see a squeeze working, and when it isn't.
+3. **Ticker lines at the moments that matter:** a rival starts losing
+   money on your market; it reaches 20 of 30 days; it closes. The last
+   of these exists; check it and reuse it.
+
+### Why these are real choices
+
+The best stance depends on things that change and can be read on
+screen:
+- **Market size.** A big market can keep a rival profitable even at
+  its floor, and the forecast says so.
+- **Your load factor.** Premium only pays when you're full.
+- **The rival's grace timer and size.** A new route is protected for
+  60 days.
+- **What else the rival flies.** Closing one route keeps its plane, so
+  it opens somewhere else.
+
+Squeezing a rival out costs real money for a month or more. It buys
+half a year of the market to yourself. Coexisting is sometimes right.
+
+### Slices
+
+1. **Sim.**
+   - `RouteSettings.fareStance` (`'policy' | 'undercut' | 'match' |
+     'premium'`).
+   - The daily re-pricing in `sim/pricing.ts`, run at rollover before
+     `rollDailyRivalFares()`.
+   - `forecastStance()`.
+   - A headless-player policy (CLAUDE.md: a new mechanic needs one):
+     Match on every contested market, so balance numbers describe the
+     game.
+   - A `stance` lever in `sweep.ts`.
+   - Bump `SAVE_KEY`. Headless should move only through the Match
+     policy.
+2. **Route card.** The three-row forecast and the stance buttons.
+   Picking one calls the sim and refreshes the card.
+3. **Map and ticker.** The pain gauge on contested routes, and the
+   ticker lines.
+4. **Balance.** Sweep Undercut against Match against Premium, from a
+   north-east home and a thin one (Halifax). Undercut should pay on
+   some markets and not others. If it wins everywhere, the rival floor
+   or the losing-streak length is wrong.
+
+### Out of scope
+
+- Holding seats back for late, high-fare travellers (option B from the
+  same discussion). That is the mid-game puzzle for full flights, and a
+  plan of its own.
+- Rivals undercutting you back, or a rival pricing AI beyond today's
+  rules. Their rules are the thing the player learns to read, so they
+  stay fixed.
+- Per-segment fares, and fare stances for connecting passengers.
+
+### Open questions for the owner
+
+- **The per-market fare number:** does it go away on contested markets
+  (stances only), or stay as a fourth "Custom" stance for players who
+  want it?
+- **The two shares:** Undercut 10% under the rival, Premium 15% over the
+  going rate, to start. Tune in slice 4?
+- **After a rival closes:** should the stance fall back to policy
+  automatically (as drafted), or stay on Undercut in case another rival
+  enters?
 
 ---
 
