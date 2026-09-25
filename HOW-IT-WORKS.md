@@ -1313,9 +1313,9 @@ Each class has a rhythm (`MARKET_RHYTHM`):
 | Class | Debuts | Then one every | Max listed |
 |---|---|---|---|
 | Propeller | day 0 (3 listed) | 4 days | 3 |
-| Regional | day 10 | 10 days | 2 |
-| Narrowbody | day 20 | 20 days | 2 |
-| Widebody | day 45 | 35 days | 1 |
+| Regional | day 40 | 10 days | 2 |
+| Narrowbody | day 80 | 20 days | 2 |
+| Widebody | day 180 | 35 days | 1 |
 
 An arrival that finds the shelf full is lost, not queued. When a rival
 grows (`rivalSecuresCapacity()`, three daily flights per airframe) it

@@ -43,11 +43,13 @@ type ClassRhythm = { debutDay: number; initial: number; intervalDays: number; ca
 export const MARKET_RHYTHM: Record<string, ClassRhythm> = {
   PROP: { debutDay: 0, initial: 3, intervalDays: 4, cap: 3 },
   // Every airline starts on Propellers: the first Regional reaches the
-  // market on day 10, not day 0, so growing past 25 seats is something the
-  // player works toward (and races rivals for) rather than a day-one buy.
-  REGIONAL: { debutDay: 10, initial: 1, intervalDays: 10, cap: 2 },
-  NARROWBODY: { debutDay: 20, initial: 1, intervalDays: 20, cap: 2 },
-  WIDEBODY: { debutDay: 45, initial: 1, intervalDays: 35, cap: 1 },
+  // market on day 40, and the bigger classes months after, so each step
+  // up in size is something the player works toward (and races rivals
+  // for) rather than an early buy. Rivals never lease Propellers, so none
+  // can add capacity before the first Regional debuts either.
+  REGIONAL: { debutDay: 40, initial: 1, intervalDays: 10, cap: 2 },
+  NARROWBODY: { debutDay: 80, initial: 1, intervalDays: 20, cap: 2 },
+  WIDEBODY: { debutDay: 180, initial: 1, intervalDays: 35, cap: 1 },
 };
 
 /** Listed airframes are this many years old, give or take: 15 to 24. */
