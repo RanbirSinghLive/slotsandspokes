@@ -154,3 +154,30 @@ export function findNearestOwnRoute(screenX: number, screenY: number, state: Sim
   }
   return nearest ? { ...nearest, distPx: nearestDist, ratio: nearestDist / ROUTE_HIT_RADIUS_PX } : null;
 }
+
+const SELECTED_GLOW = 'rgba(94, 214, 200, 0.25)';
+const SELECTED_STROKE = '#5ed6c8';
+
+/**
+ * The route the side panel is showing (ui/selection.ts), drawn on top of
+ * whatever route layer is on: a wide soft glow under a bright line, so
+ * the map shows which route the panel describes. Drawn whatever the map
+ * mode, since the panel shows it whatever the map mode.
+ */
+export function drawSelectedRoute(ctx: CanvasRenderingContext2D, a: string, b: string): void {
+  const origin = airportsByIata.get(a);
+  const dest = airportsByIata.get(b);
+  if (!origin || !dest) return;
+  const line: LineString = { type: 'LineString', coordinates: [[origin.lon, origin.lat], [dest.lon, dest.lat]] };
+  const path = geoPath(projection, ctx);
+  ctx.save();
+  ctx.lineCap = 'round';
+  for (const [strokeStyle, lineWidth] of [[SELECTED_GLOW, 9], [SELECTED_STROKE, 2.5]] as const) {
+    ctx.strokeStyle = strokeStyle;
+    ctx.lineWidth = lineWidth;
+    ctx.beginPath();
+    path(line);
+    ctx.stroke();
+  }
+  ctx.restore();
+}

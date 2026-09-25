@@ -3,23 +3,18 @@ import { findNearestOwnRoute } from '../render/routes';
 import { projection } from '../render/projection';
 import { utilisationPools } from '../sim/utilisation';
 import { unmetDemandByAirport } from '../sim/unmetDemand';
-import { rivalYieldFactor } from '../sim/pressure';
-import { legsServingMarket, marketKey, recommendedFare } from '../sim/schedule';
-import { rivalResponseChance } from '../sim/rivalResponse';
 import { TURN_BUFFER_CHOICES } from '../sim/turnBuffer';
 import { connectingPassengersThrough, spokesOf } from '../sim/hubs';
 import { HUB_STYLES, HUB_STYLE_ORDER, hubStyleAt } from '../sim/hubStyle';
-import { reliabilityDemandFactor, trailingMarketOtp } from '../sim/routeOtp';
-import { onTimeColor } from '../render/mapmodes';
 import { hasHubView } from '../render/hubs';
 import { planHub } from '../sim/hubPlanner';
 import { daysUntilReturn, expediteCost, expediteRepair } from '../sim/aog';
 import { openHubPlanner } from './hubPlanner';
 import { buildPoolRows } from './poolBars';
 import { getMapPreview, setMapPreview, type MapPreview } from '../render/preview';
-import type { FareStance, SimState } from '../sim/state';
-import { setFareStance } from '../sim/pricing';
-import { forecastStance, type StanceForecast } from '../sim/fareForecast';
+import type { SimState } from '../sim/state';
+import { select } from './selection';
+import { redrawInspectorPreview, renderInspector } from './inspector/inspector';
 import { candidateTailsAt } from '../sim/rotations';
 import { armRouteBuilderAt, describeSlotQuotes } from './routeBuilder';
 import { nextSlotFees, slotFeesPerDayAt, slotsHeld } from '../sim/slots';
@@ -31,18 +26,20 @@ import { AIRCRAFT_CLASSES } from '../sim/aircraftClasses';
 import { airportCapacityPerDay, airportLoad, dailyMovementsAt } from '../sim/airports';
 import { congestionParameters } from '../sim/delays';
 import { USEFUL_LIFE_YEARS } from '../sim/leasing';
-import { WINDOW_DAYS, buildBipolarBars, dayLabel, money as pnlMoney } from './pnlBars';
 
 /**
- * Click something on the map, get an info card and a ring of actions for
- * it. Two kinds of thing can be clicked:
+ * Click something on the map, get a ring of actions for it, and its
+ * details. Two kinds of thing can be clicked:
  *
- * - An **airport**: draw a route from it, or add a plane based there.
+ * - An **airport**: draw a route from it, or add a plane based there. Its
+ *   details show in a card beside the ring.
  * - A **route** (the line between two airports): add or remove a flight,
- *   move a flight up or down a size class, or remove the whole route.
+ *   move a flight up or down a size class, or remove the whole route. Its
+ *   details show in the side panel (the inspector, ui/inspector/), and the
+ *   ring's hover hints in a small label under the ring.
  *
- * This module only decides which actions each ring has and what the card
- * says. Drawing the ring is ui/radial.ts; what an action does to the
+ * This module only decides which actions each ring has and what the
+ * airport card says. Drawing the ring is ui/radial.ts; what an action does to the
  * network is ui/routeActions.ts, and through it the route builder's own
  * planning, so nothing here re-implements a rule.
  *
@@ -64,12 +61,12 @@ const slotsEl = document.querySelector<HTMLElement>('#airport-detail-slots')!;
 const aogEl = document.querySelector<HTMLElement>('#airport-detail-aog')!;
 const basedEl = document.querySelector<HTMLElement>('#airport-detail-based')!;
 const marketsEl = document.querySelector<HTMLElement>('#airport-detail-markets')!;
-const routeHistoryEl = document.querySelector<HTMLElement>('#airport-detail-route-history')!;
-const routeOtpEl = document.querySelector<HTMLElement>('#airport-detail-otp')!;
 const poolsEl = document.querySelector<HTMLElement>('#airport-detail-pools')!;
 const demandEl = document.querySelector<HTMLElement>('#airport-detail-demand')!;
-const stanceEl = document.querySelector<HTMLElement>('#airport-detail-stance')!;
 const hintEl = document.querySelector<HTMLElement>('#airport-detail-hint')!;
+const ringHintEl = document.querySelector<HTMLElement>('#radial-hint')!;
+/** How far below the click point the ring's hint label sits: clear of the ring's buttons. */
+const RING_HINT_OFFSET_PX = 84;
 const planHubButton = document.querySelector<HTMLButtonElement>('#airport-detail-plan-hub')!;
 
 const ICON = {
@@ -113,6 +110,7 @@ function money(amount: number): string {
 
 export function hideMapMenu(): void {
   cardEl.hidden = true;
+  ringHintEl.hidden = true;
   hideRadial();
   setMapPreview(null);
   cardPoolBase = null;
@@ -125,8 +123,25 @@ export function hideMapMenu(): void {
 
 function renderHint(): void {
   const text = hover?.text ?? notice ?? '';
-  hintEl.textContent = text;
-  hintEl.classList.toggle('is-problem', !!hover?.problem);
+  // An airport's hint sits in its card; a route has no card, so its hint
+  // gets a label of its own under the ring.
+  const el = open?.kind === 'route' ? ringHintEl : hintEl;
+  el.textContent = text;
+  el.classList.toggle('is-problem', !!hover?.problem);
+  if (el === ringHintEl) {
+    ringHintEl.hidden = text === '';
+    positionRingHint();
+  }
+}
+
+/** Centre the ring's hint under the click point, or above it when there's no room below. */
+function positionRingHint(): void {
+  ringHintEl.style.left = `${anchorX}px`;
+  ringHintEl.style.top = `${anchorY + RING_HINT_OFFSET_PX}px`;
+  const rect = ringHintEl.getBoundingClientRect();
+  if (rect.bottom > window.innerHeight - 8) ringHintEl.style.top = `${anchorY - RING_HINT_OFFSET_PX - rect.height}px`;
+  const overflowLeft = 8 - rect.left;
+  if (overflowLeft > 0) ringHintEl.style.left = `${anchorX + overflowLeft}px`;
 }
 
 function onHint(text: string | null, problem: boolean): void {
@@ -169,17 +184,11 @@ function renderCardPools(): void {
 function onPreview(preview: MapPreview | null): void {
   setMapPreview(preview);
   renderCardPools();
+  redrawInspectorPreview();
 }
 
 function fillAirportCard(airport: Airport, state: SimState): void {
   titleEl.textContent = `${airport.iata} — ${airport.name}`;
-  // Only a route card shows a route's own history, or pricing stances.
-  stanceEl.hidden = true;
-  stanceEl.replaceChildren();
-  routeHistoryEl.hidden = true;
-  routeHistoryEl.replaceChildren();
-  routeOtpEl.hidden = true;
-  routeOtpEl.replaceChildren();
 
   const presence = airportPresence(state, airport.iata);
   const connecting = Math.round(connectingPassengersThrough(state, airport.iata));
@@ -452,256 +461,6 @@ function openAirportMenu(airport: Airport, state: SimState): void {
 
 // --- Routes ---------------------------------------------------------------
 
-function fillRouteCard(a: string, b: string, state: SimState): void {
-  const summary = ops.summariseMarket(state, a, b);
-  const readout = ops.marketReadout(state, a, b);
-
-  titleEl.textContent = `${a} – ${b}`;
-  presenceEl.textContent = `${summary.rotations.length} flight${summary.rotations.length === 1 ? '' : 's'}/day · ${summary.byClass.map((c) => `${c.name} x${c.count}`).join(', ')}`;
-  presenceEl.classList.remove('airport-detail-over');
-
-  const short = readout.demandNow > readout.seatsPerFlight;
-  // A route you have only just opened has almost no demand, however big
-  // the city pair is: demand is built by flying it, over weeks
-  // (sim/marketDemand.ts). Saying so is what stops "20,000 potential" from
-  // reading as "add ten flights".
-  const young = readout.demandNow < 0.4 * readout.seatsPerFlight;
-  demandEl.textContent = '';
-  demandEl.classList.remove('airport-detail-over');
-  presenceEl.classList.toggle('airport-detail-over', short);
-  marketsEl.textContent =
-    `Per flight: ${readout.demandNow} passengers wanted${readout.demandPotential > readout.demandNow ? ` (${readout.demandPotential} potential)` : ''}, ${readout.seatsPerFlight} seats.` +
-    (short ? ' Demand exceeds seats: add a flight or upgauge.' : '') +
-    (young ? ' Demand is still growing: extra flights fly emptier for now.' : '');
-  const rivals = state.competitorRoutes.filter(
-    (route) => (route.origin === a && route.dest === b) || (route.origin === b && route.dest === a),
-  );
-  if (rivals.length > 0) {
-    const factor = rivalYieldFactor(a, b, legsServingMarket(a, b, state.schedule), state.competitorRoutes);
-    const cut = Math.round((1 - factor) * 100);
-    demandEl.textContent =
-      // Their fare now moves in response to yours (sim/competitors.ts), so
-      // it's shown next to what you charge.
-      `Rivals: ${rivals.map((r) => `${r.airline} ${r.dailyFrequency}/day at $${r.fare.toLocaleString()}`).join(', ')}` +
-      ` (you: $${(state.routeSettings[marketKey(a, b)]?.fare ?? 0).toLocaleString()})` +
-      (cut > 0 ? `. They cut your fares ${cut}%: more flights of your own reduce it.` : '');
-    demandEl.classList.add('airport-detail-over');
-  }
-
-  // Full and priced at a premium: rivals are coming for the passengers
-  // this route turns away (sim/rivalResponse.ts). Said on the card, since
-  // the fix — a flight or a bigger plane, or a lower fare — is on this ring.
-  const response = rivalResponseChance(state, a, b);
-  if (response > 0) {
-    const warning = `Full and priced ${Math.round((state.routeSettings[marketKey(a, b)].fare / recommendedFare(a, b) - 1) * 100)}% above the going rate: rivals are adding flights to take the passengers you turn away (${Math.round(response * 100)}% chance a day).`;
-    demandEl.textContent = demandEl.textContent ? `${demandEl.textContent} ${warning}` : warning;
-    demandEl.classList.add('airport-detail-over');
-  }
-
-  fillStances(a, b, state);
-  fillPools(ops.routeBase(state, a, b), state, '');
-  // A route card has no single airport to describe.
-  loadEl.textContent = '';
-  slotsEl.textContent = '';
-  aogEl.replaceChildren();
-  planHubButton.hidden = true;
-  fillRouteHistory(state, a, b);
-  fillRouteOtp(state, a, b);
-}
-
-const STANCES: { stance: FareStance; name: string }[] = [
-  { stance: 'undercut', name: 'Undercut' },
-  { stance: 'match', name: 'Match' },
-  { stance: 'premium', name: 'Premium' },
-];
-
-function signedMoney(amount: number): string {
-  return `${amount < 0 ? '−' : '+'}${money(Math.abs(amount))}`;
-}
-
-/** One stance's forecast in a line: your fare and margin, then each rival's. */
-function describeForecast(forecast: StanceForecast): string {
-  const rivals = forecast.rivals.map((rival) =>
-    rival.closesInDays !== null
-      ? `${rival.airline} $${rival.fare}, ${signedMoney(rival.margin)}/day, gone in about ${rival.closesInDays} days`
-      : `${rival.airline} $${rival.fare}, ${signedMoney(rival.margin)}/day`,
-  );
-  const response = forecast.responseChance > 0 ? ` · ${Math.round(forecast.responseChance * 100)}% a day they add a flight` : '';
-  return `You $${forecast.fare}, ${signedMoney(forecast.margin)}/day · ${rivals.join('; ')}${response}`;
-}
-
-/**
- * On a market a rival also flies: the three fare stances (sim/pricing.ts),
- * each with where it would settle (sim/fareForecast.ts), and buttons to
- * pick one. Picking re-prices the market now and every day after.
- */
-function fillStances(a: string, b: string, state: SimState): void {
-  const settings = state.routeSettings[marketKey(a, b)];
-  const contested = state.competitorRoutes.some(
-    (route) => (route.origin === a && route.dest === b) || (route.origin === b && route.dest === a),
-  );
-  stanceEl.replaceChildren();
-  stanceEl.hidden = !settings || !contested;
-  if (stanceEl.hidden) return;
-
-  const current = STANCES.find((s) => s.stance === settings.fareStance);
-  const heading = document.createElement('div');
-  heading.className = 'stance-heading';
-  heading.textContent = `Pricing against rivals: ${current ? current.name : settings.fareIsOverridden ? 'your own fare' : 'fare policy'} ($${settings.fare}). If nothing else changes:`;
-  stanceEl.append(heading);
-
-  for (const { stance, name } of STANCES) {
-    const row = document.createElement('div');
-    row.className = 'stance-row';
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'stance-button';
-    button.classList.toggle('is-active', settings.fareStance === stance);
-    button.textContent = name;
-    button.addEventListener('click', (event) => {
-      event.stopPropagation();
-      setFareStance(state, a, b, stance);
-      refresh();
-    });
-    const outcome = document.createElement('span');
-    outcome.className = 'stance-outcome';
-    outcome.textContent = describeForecast(forecastStance(state, a, b, stance));
-    row.append(button, outcome);
-    stanceEl.append(row);
-  }
-
-  if (current) {
-    const off = document.createElement('button');
-    off.type = 'button';
-    off.className = 'stance-off';
-    off.textContent = 'Back to fare policy';
-    off.addEventListener('click', (event) => {
-      event.stopPropagation();
-      setFareStance(state, a, b, null);
-      refresh();
-    });
-    stanceEl.append(off);
-  }
-}
-
-/**
- * This route's reliability, day by day, and what it's doing to demand —
- * the evidence for deciding where a turn buffer is worth its aircraft
- * time. Bars are each finished day's on-time share, coloured on the same
- * scale as the On-Time map mode, so a red bar here is a red route there.
- */
-function fillRouteOtp(state: SimState, a: string, b: string): void {
-  const history = state.onTimeHistoryByMarket[marketKey(a, b)];
-  const arrived = history?.arrived.slice(-WINDOW_DAYS) ?? [];
-  const onTime = history?.onTime.slice(-WINDOW_DAYS) ?? [];
-  const cancelled = history?.cancelled.slice(-WINDOW_DAYS) ?? [];
-  const trailing = trailingMarketOtp(state, a, b);
-  const buffer = ops.currentTurnBuffer(state, a, b);
-
-  const header = document.createElement('div');
-  header.className = 'pnl-chart-header';
-  const labelEl = document.createElement('span');
-  labelEl.textContent = 'On-time, last 7 days';
-  const statEl = document.createElement('span');
-  statEl.className = 'pnl-chart-stat';
-  statEl.textContent = trailing.otp === null ? '—' : `${Math.round(trailing.otp * 100)}%`;
-  if (trailing.otp !== null) statEl.style.color = onTimeColor(trailing.otp);
-  header.append(labelEl, statEl);
-
-  const bars = document.createElement('div');
-  bars.className = 'pnl-chart-bars';
-  // Each day's bar is the share of its scheduled flights that flew *and*
-  // arrived on time: a cancellation counts against it (sim/routeOtp.ts).
-  arrived.forEach((count, i) => {
-    const cancelledThatDay = cancelled[i] ?? 0;
-    const flights = count + cancelledThatDay;
-    const bar = document.createElement('div');
-    bar.className = 'pnl-chart-bar';
-    const share = flights > 0 ? onTime[i] / flights : 0;
-    bar.style.height = flights > 0 ? `${Math.max(share * 100, 4)}%` : '1px';
-    bar.style.background = flights > 0 ? onTimeColor(share) : 'rgba(255, 255, 255, 0.15)';
-    const cancelledNote = cancelledThatDay > 0 ? `, ${cancelledThatDay} cancelled` : '';
-    bar.title = flights > 0
-      ? `${dayLabel(arrived.length - i)}: ${onTime[i]} of ${flights} on time${cancelledNote}`
-      : `${dayLabel(arrived.length - i)}: no flights`;
-    bars.appendChild(bar);
-  });
-
-  const bufferLine = document.createElement('div');
-  bufferLine.className = 'route-otp-line';
-  bufferLine.textContent =
-    buffer === 0
-      ? 'Turn buffer: none. A late arrival here makes the next flight late.'
-      : `Turn buffer: +${buffer} min of extra ground time after each flight.`;
-
-  const demandLine = document.createElement('div');
-  demandLine.className = 'route-otp-line';
-  const factor = reliabilityDemandFactor(trailing.otp);
-  let cancelledLine: HTMLElement | null = null;
-  if (trailing.cancelled > 0) {
-    cancelledLine = document.createElement('div');
-    cancelledLine.className = 'route-otp-line is-problem';
-    cancelledLine.textContent = `${trailing.cancelled} cancelled this week. Cancellations count against reliability.`;
-  }
-  if (trailing.otp === null) {
-    demandLine.textContent = 'Reliability starts to affect demand after a few more flights.';
-  } else if (factor >= 1) {
-    demandLine.textContent = `Reliable: demand is growing ${factor.toFixed(1)}x as fast.`;
-  } else if (factor >= 0) {
-    demandLine.textContent = `Delays have slowed demand growth to ${Math.round(factor * 100)}% of normal.`;
-    demandLine.classList.add('is-warning');
-  } else {
-    demandLine.textContent = 'Delays are driving passengers away: demand is shrinking.';
-    demandLine.classList.add('is-problem');
-  }
-
-  const nodes: Node[] = [header];
-  if (arrived.length > 0) nodes.push(bars);
-  nodes.push(bufferLine);
-  if (cancelledLine) nodes.push(cancelledLine);
-  nodes.push(demandLine);
-  routeOtpEl.replaceChildren(...nodes);
-  routeOtpEl.hidden = false;
-}
-
-/**
- * This route's own recent trend — the route-card equivalent of the
- * sidebar's network-wide "Last 7 Days" Margin chart (ui/pnlHistory.ts),
- * sharing the same bars (ui/pnlBars.ts) at a smaller size. Only Margin is
- * shown, since there's room for one chart here, not three — Revenue and
- * Cost still ride along in each bar's tooltip instead of getting their
- * own row.
- */
-function fillRouteHistory(state: SimState, a: string, b: string): void {
-  const history = ops.marketPnlHistory(state, a, b);
-  const shownMargin = history.margin.slice(-WINDOW_DAYS);
-  const shownRevenue = history.revenue.slice(-WINDOW_DAYS);
-  const shownCost = history.cost.slice(-WINDOW_DAYS);
-
-  if (shownMargin.length === 0) {
-    routeHistoryEl.hidden = true;
-    routeHistoryEl.replaceChildren();
-    return;
-  }
-
-  const header = document.createElement('div');
-  header.className = 'pnl-chart-header';
-  const labelEl = document.createElement('span');
-  labelEl.textContent = 'Margin, last 7 days';
-  const statEl = document.createElement('span');
-  statEl.className = 'pnl-chart-stat';
-  statEl.textContent = pnlMoney(shownMargin[shownMargin.length - 1]);
-  header.append(labelEl, statEl);
-
-  const bars = buildBipolarBars(shownMargin, (value, indexFromEnd) => {
-    const i = shownMargin.length - indexFromEnd;
-    return `${dayLabel(indexFromEnd)}: ${pnlMoney(shownRevenue[i])} revenue, ${pnlMoney(shownCost[i])} cost, ${pnlMoney(value)} margin`;
-  });
-
-  routeHistoryEl.replaceChildren(header, bars);
-  routeHistoryEl.hidden = false;
-}
-
 /** What the add-flight button says, including how thin the demand would be spread. */
 function addFlightLabel(className: string, readout: ReturnType<typeof ops.marketReadout>): string {
   const seats = AIRCRAFT_CLASSES.find((c) => c.name === className)?.seats ?? 0;
@@ -811,6 +570,7 @@ function routeActions(a: string, b: string, state: SimState): RadialAction[] {
         notice = result.ok ? result.message : result.reason;
         if (result.ok) {
           hideMapMenu();
+          renderInspector(state);
           return false;
         }
         refresh();
@@ -828,16 +588,14 @@ function openRouteMenu(a: string, b: string, state: SimState, x: number, y: numb
   notice = null;
   hover = null;
 
-  fillRouteCard(a, b, state);
-  cardEl.hidden = false;
-  positionCard();
+  select({ kind: 'route', a, b });
   renderHint();
   showRadial({ x: anchorX, y: anchorY, actions: routeActions(a, b, state), onHint, onPreview });
 }
 
 // --- Shared ---------------------------------------------------------------
 
-/** Rebuild the card and the ring after an action changed the network, keeping them open. */
+/** Rebuild the details and the ring after an action changed the network, keeping them open. */
 function refresh(): void {
   if (!open || !openState) return;
   const state = openState;
@@ -851,14 +609,13 @@ function refresh(): void {
     fillAirportCard(open.airport, state);
     updateRadial(airportActions(open.airport, state));
   } else {
-    // A route with nothing flying it any more has nothing left to act on.
+    // The inspector shows the route; with nothing flying it any more it
+    // falls back to Network, and the ring has nothing left to act on.
+    renderInspector(state);
     if (ops.rotationsServing(state, open.a, open.b).length === 0) {
-      const message = notice;
       hideMapMenu();
-      notice = message;
       return;
     }
-    fillRouteCard(open.a, open.b, state);
     updateRadial(routeActions(open.a, open.b, state));
   }
   renderHint();

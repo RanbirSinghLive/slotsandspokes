@@ -377,6 +377,80 @@ passing.
 
 ---
 
+## Next: the inspector (map clicks open in the side panel)
+
+**Status: slice 1 done.** Checked in the preview:
+- a route click shows the route view with the map highlight;
+- ring hints show under the ring, refusals in red;
+- the first Esc closes the ring, the second returns to Network;
+- stance buttons work from the panel;
+- removing a route falls back to Network;
+- an empty-map click closes the ring first, then returns to Network;
+- a hidden panel reopens on selection.
+
+Airport clicks still open the popover, so a click on an airport sitting
+on a route line (Flint on O'Hare–Toronto) opens that airport's card
+while the panel keeps the route. Slice 2 ends that.
+
+Clicking a route or airport opens a popover card over the map. The
+route card has outgrown that: service, demand, rivals, three stance
+forecasts, plane pools, margin and on-time charts. It covers the very
+thing you clicked, and the radial menu lands on its buttons. The
+Airports, Commercial and On-Time tabs are hidden since the fewer-tabs
+pass, so their per-route and per-airport detail has nowhere to live.
+
+The side panel becomes an **inspector**: the detail for whatever is
+selected, reached by clicking the map or by links in the panel itself.
+
+### Decisions
+
+1. **Actions stay on the map, information moves to the panel.** The
+   radial ring at the click point keeps every action (add flight, lease
+   a plane, plan hub). Only the card's contents move.
+2. **One selection, held in the UI, not in `SimState`**
+   (`ui/selection.ts`): `network | route(a, b)`, later `airports`,
+   `airport(iata)` and `rival(code)`. It keeps a history for Back. Map
+   clicks, panel links and the breadcrumb all go through `select()`.
+3. **The map marks the selection.** The selected route is drawn
+   highlighted for as long as the panel shows it, so it's clear which
+   one the panel describes. Renderers get the selection handed to them,
+   the same way `setKnownAirports()` works.
+4. **Network is the root.** The breadcrumb reads Network › YYZ – ORD
+   (later Network › Airports › YYZ › YYZ – ORD). Network is today's
+   panel: cash, the 7-day bars and the tabs. Esc steps back one level
+   once the radial ring is closed. A sidebar tab click also returns to
+   Network.
+5. **One view per kind of thing** (`ui/inspector/*.ts`), each building
+   its own DOM from the selection and `state`. A new thing to inspect is
+   a new file.
+6. **Rebuild on change, never per frame**: when the selection changes,
+   after an action, and at day rollover. A selection that stops existing
+   (its last flight removed) falls back to its parent.
+7. **A hidden panel reopens** when something is selected.
+8. **Hover stays on the map.** Tooltips, hub flows and previews are
+   unchanged. The radial button hint moves from the card's bottom line
+   to a small label under the ring.
+
+### Slices
+
+1. **Route view.** The selection model, the inspector frame with a
+   breadcrumb and Back, the map highlight and the hint label. The route
+   card's contents move to `ui/inspector/route.ts`, and route clicks no
+   longer open a popover. Airport clicks still do.
+2. **Airport view and Airports list.** A sortable list (presence,
+   departures, load, slots) replaces the hidden Airports tab. Airport
+   popovers retire. Route rows in an airport's view link to the route.
+3. **Fold in the hidden tabs.** Per-market Commercial settings and
+   per-route On-Time move into the route view. The popover code goes.
+4. **Rival airline view.** Its routes, fares, losing streaks and fleet,
+   linked from every rival name. It helps the price war.
+
+This replaces the tab regrouping the Grow tab note mentioned for
+Airports, Commercial and On-Time. The Grow tab itself (the pipeline
+list) is unaffected.
+
+---
+
 ## Next: fare stances and the price war (a separate thread)
 
 **Status: slices 1 and 2 done** (the owner wants to play it before

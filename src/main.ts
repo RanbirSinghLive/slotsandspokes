@@ -3,7 +3,7 @@ import { dayIndex, homeUtcOffsetMinutes, minuteOfDay as homeMinuteOfDay } from '
 import { projection, fitProjection, baselineScale } from './render/projection';
 import { drawBasemap } from './render/basemap';
 import { drawTerminator } from './render/terminator';
-import { drawRoutes } from './render/routes';
+import { drawRoutes, drawSelectedRoute } from './render/routes';
 import { drawAirports, airports, setKnownAirports, nearestAirportCandidate } from './render/airports';
 import { drawHubView, hasHubView } from './render/hubs';
 import { drawFog } from './render/fog';
@@ -33,6 +33,9 @@ import {
   isRouteBuilderActive,
 } from './ui/routeBuilder';
 import { handleMapMenuMouseDown, handleMapMenuKeyDown, hideMapMenu, isMapMenuOpen } from './ui/mapMenu';
+import { back, getSelection, NETWORK, onSelectionChange, select } from './ui/selection';
+import { renderInspector } from './ui/inspector/inspector';
+import { isHubPlannerOpen } from './ui/hubPlanner';
 import { setupCommercialPanel, updateCommercialPanel } from './ui/commercial';
 import { setupOnTimePanel, updateOnTimePanel } from './ui/onTime';
 import { setupExecutivePanel, updateExecutivePanel } from './ui/executive';
@@ -361,6 +364,9 @@ function render(nowMs: number = performance.now()): void {
   } else {
     drawRoutes(ctx, state);
   }
+  // The route the side panel is showing, on top of whichever layer drew routes.
+  const selection = getSelection();
+  if (selection.kind === 'route') drawSelectedRoute(ctx, selection.a, selection.b);
 
   // Hovering a plane (not the route line) shows its own story: why it's
   // late (ui/flightTooltip.ts) and how that lateness spreads through the
@@ -447,8 +453,8 @@ resize();
 // just reflects it.
 const panelEl = document.querySelector<HTMLElement>('#panel')!;
 const panelToggleButton = document.querySelector<HTMLButtonElement>('#panel-toggle')!;
-panelToggleButton.addEventListener('click', () => {
-  panelHidden = !panelHidden;
+function setPanelHidden(hidden: boolean): void {
+  panelHidden = hidden;
   panelEl.hidden = panelHidden;
   panelToggleButton.classList.toggle('active', panelHidden);
   panelToggleButton.setAttribute('aria-label', panelHidden ? 'Show side panel' : 'Hide side panel');
@@ -457,6 +463,16 @@ panelToggleButton.addEventListener('click', () => {
     : 'Hide the side panel — the map fills the screen without it';
   // The map's available width just changed, same as a real window resize.
   resize();
+}
+panelToggleButton.addEventListener('click', () => setPanelHidden(!panelHidden));
+
+// The inspector (ui/inspector/) follows the selection: a map click, a link
+// or the breadcrumb changes it, and the panel rebuilds to show it. A hidden
+// panel comes back, since otherwise the click would seem to do nothing.
+onSelectionChange(() => {
+  if (panelHidden && getSelection().kind !== 'network') setPanelHidden(false);
+  renderInspector(state);
+  render();
 });
 
 // --- Simulation loop ---
@@ -515,6 +531,9 @@ function tick(nowMs: number): void {
   if (currentDay !== lastSavedDay) {
     lastSavedDay = currentDay;
     saveState(state);
+    // The day's numbers have moved (demand, the last-7-days bars, rival
+    // fares), so whatever the inspector shows is rebuilt once per day.
+    if (getSelection().kind !== 'network') renderInspector(state);
   }
 
   // Week five's failure state: the instant every loan slot is spoken for
@@ -626,7 +645,11 @@ function switchToSidebarTab(tab: SidebarTab): void {
 }
 
 sidebarTabButtons.forEach((button) => {
-  button.addEventListener('click', () => switchToSidebarTab(button.dataset.tab as SidebarTab));
+  button.addEventListener('click', () => {
+    // The tabs belong to the Network view, so a tab click leaves the inspector.
+    select(NETWORK);
+    switchToSidebarTab(button.dataset.tab as SidebarTab);
+  });
 });
 
 function closeAllDropdowns(): void {
@@ -778,7 +801,15 @@ let dragStartX = 0;
 let dragStartY = 0;
 let translateAtDragStart: [number, number] = [0, 0];
 
+// Whether the radial ring was open when this click started: a click on
+// empty map closes the ring first, and only a click with no ring open
+// clears the selection too.
+let ringOpenAtMouseDown = false;
+/** A press that moves less than this far before release is a click, not a pan. */
+const CLICK_SLOP_PX = 4;
+
 canvas.addEventListener('mousedown', (event) => {
+  ringOpenAtMouseDown = isMapMenuOpen();
   // Any stale airport-detail popover (ui/mapMenu.ts) gets cleared
   // before deciding what this click actually does — otherwise arming a
   // route, or just starting a pan, would leave the previous click's
@@ -872,10 +903,23 @@ window.addEventListener('mousemove', (event) => {
   render();
 });
 
-window.addEventListener('mouseup', () => {
+window.addEventListener('mouseup', (event) => {
+  // A click on empty map (no route builder, no ring, no airport or route
+  // under it, so it started a pan that never moved) returns the panel to
+  // Network.
+  const moved = Math.hypot(event.clientX - dragStartX, event.clientY - dragStartY);
+  if (isDragging && moved < CLICK_SLOP_PX && !ringOpenAtMouseDown) select(NETWORK);
   isDragging = false;
 });
 
+// Esc steps the inspector back one level, but only when nothing else on
+// screen wants Esc first. Registered before those handlers, so it sees the
+// route builder and the ring still open on the press that closes them.
+window.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape' || choosingHome) return;
+  if (isRouteBuilderActive() || isMapMenuOpen() || isHubPlannerOpen()) return;
+  back();
+});
 window.addEventListener('keydown', handleRouteBuilderKeyDown);
 window.addEventListener('keydown', handleMapMenuKeyDown);
 

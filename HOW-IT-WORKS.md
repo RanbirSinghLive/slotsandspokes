@@ -988,6 +988,24 @@ a fleet table (tail, type, status, and either the current airport or
 The econ/fleet parts are rebuilt from `state` every render — a pure read,
 same rule as the canvas layers.
 
+**The inspector** (`src/ui/inspector/`, `src/ui/selection.ts`). The panel
+shows whatever is selected. At **Network** it is the summary and tabs
+above. Clicking a route on the map selects it:
+- the panel shows the route view instead, under a breadcrumb
+  (Network › YYZ – ORD);
+- the map draws that route highlighted (`drawSelectedRoute()`);
+- the radial ring still opens at the click for actions, and its hover
+  hints show in a label under the ring.
+
+Getting back: Esc (once the ring is closed), the ‹ button, a breadcrumb
+link, a sidebar tab, or a click on empty map all return toward Network.
+A route that loses its last flight falls back to Network. A hidden panel
+reopens when something is selected.
+
+The selection is UI state, not saved. A view is rebuilt when the
+selection changes, after an action, and at day rollover, never per
+frame. Airport clicks still open a card beside the ring.
+
 ## Airport constraints (`src/sim/schedule.ts`)
 
 Some airports limit the largest class that may operate there:
@@ -1461,7 +1479,7 @@ price for that — but you now find it once instead of per route.
 
 ## Fare stances (`src/sim/pricing.ts`, `src/sim/fareForecast.ts`)
 
-On a market a rival also flies, the route card offers three **stances**
+On a market a rival also flies, the route view offers three **stances**
 in place of a number. A stance re-prices the market every rollover,
 before rivals set their fares, against the cheapest rival's fare that
 day:
@@ -1479,7 +1497,7 @@ stance can stay set while rivals come and go. Setting a fare by hand, or
 **The forecast** (`forecastStance()`) runs the game's own daily rules
 forward on a copy of the market: rivals judged on their result, your
 stance re-priced, rivals answering your fare. Demand, schedule, fuel and
-frequencies are held where they are. The card shows, per stance:
+frequencies are held where they are. The route view shows, per stance:
 - where your fare and each rival's settle;
 - what each side makes a day there;
 - whether a rival would close the route, and in about how many days;

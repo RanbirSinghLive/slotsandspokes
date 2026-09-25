@@ -802,47 +802,6 @@ body {
   color: #9aa3b8;
 }
 
-/* This market's own "Last 7 Days" margin chart (ui/mapMenu.ts, bars
-   shared with the sidebar's via ui/pnlBars.ts) — only populated for a
-   route card, hidden entirely on an airport card. Smaller than the
-   sidebar's own copy: the popover is 280px wide at most. */
-#airport-detail-route-history {
-  margin-bottom: 6px;
-}
-
-#airport-detail-route-history[hidden] {
-  display: none;
-}
-
-#airport-detail-route-history .pnl-chart-header {
-  color: #9aa3b8;
-  font-size: 12px;
-}
-
-#airport-detail-route-history .pnl-chart-bars {
-  height: 20px;
-}
-
-/* A route's reliability, day by day (ui/mapMenu.ts's fillRouteOtp), in
-   the same small-chart shape as the margin history just above it. */
-#airport-detail-otp {
-  margin-bottom: 6px;
-}
-
-#airport-detail-otp[hidden] {
-  display: none;
-}
-
-#airport-detail-otp .pnl-chart-header {
-  color: #9aa3b8;
-  font-size: 12px;
-}
-
-#airport-detail-otp .pnl-chart-bars {
-  height: 20px;
-  margin-bottom: 4px;
-}
-
 .route-otp-line {
   color: #9aa3b8;
   font-size: 12px;
@@ -3107,14 +3066,11 @@ body {
 }
 
 
-/* Fare stances on a contested route's card (ui/mapMenu.ts's fillStances()). */
-#airport-detail-stance {
-  margin-top: 8px;
-  font-size: 12px;
-}
 
-#airport-detail-stance[hidden] {
-  display: none;
+/* Fare stances in the route view (ui/inspector/route.ts). */
+.stance-block {
+  margin: 10px 0;
+  font-size: 12px;
 }
 
 .stance-heading {
@@ -3154,4 +3110,125 @@ body {
 
 .stance-outcome {
   color: #cdd3e0;
+}
+
+/* The inspector (ui/inspector/inspector.ts): the detail for whatever is
+   selected, in place of the Network view's summary and tabs. Scrolls on
+   its own, like #sidebar-tab-content, with the tab bar staying above it. */
+#inspector {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+#inspector[hidden] {
+  display: none;
+}
+
+#inspector-breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-bottom: 10px;
+  color: #6b7694;
+  font-size: 12px;
+}
+
+.inspector-back {
+  width: 24px;
+  height: 24px;
+  margin-right: 6px;
+  padding: 0;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  color: #cdd3e0;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.inspector-crumb {
+  padding: 0;
+  font: inherit;
+  color: #9aa3b8;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+button.inspector-crumb:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.inspector-crumb.is-current {
+  color: #fff;
+  cursor: default;
+}
+
+.inspector-title {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.inspector-line {
+  margin-bottom: 6px;
+  color: #9aa3b8;
+}
+
+.inspector-line.is-over {
+  color: #ff8080;
+}
+
+.inspector-line.is-warn {
+  color: #ffb347;
+}
+
+.inspector-pools {
+  margin-bottom: 10px;
+}
+
+.inspector-chart {
+  margin-bottom: 10px;
+}
+
+.inspector-chart .pnl-chart-header {
+  color: #9aa3b8;
+  font-size: 12px;
+}
+
+.inspector-chart .pnl-chart-bars {
+  height: 28px;
+  margin-bottom: 4px;
+}
+
+/* The radial ring's hover hint for a route (ui/mapMenu.ts): what the
+   hovered button does, or why it can't, just under the ring. */
+#radial-hint {
+  position: fixed;
+  z-index: 26;
+  max-width: 260px;
+  padding: 6px 8px;
+  transform: translateX(-50%);
+  background: #0e1016;
+  border: 1px solid rgba(255, 209, 102, 0.35);
+  border-radius: 4px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  color: #ffd166;
+  pointer-events: none;
+}
+
+#radial-hint[hidden] {
+  display: none;
+}
+
+#radial-hint.is-problem {
+  color: #ff8080;
+  border-color: rgba(255, 128, 128, 0.35);
 }

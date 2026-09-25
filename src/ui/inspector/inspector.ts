@@ -1,0 +1,104 @@
+import type { SimState } from '../../sim/state';
+import * as ops from '../routeActions';
+import { back, getSelection, NETWORK, replaceSelection, select, type Selection } from '../selection';
+import { buildRouteView } from './route';
+
+/**
+ * The side panel as an inspector: the detail for whatever is selected
+ * (ui/selection.ts). At Network, the panel is its usual self: cash, the
+ * 7-day bars and the tabs. Anything else hides those and shows its own
+ * view here, under a breadcrumb that leads back up.
+ *
+ * Each kind of selection has one view (ui/inspector/*.ts) that builds its
+ * DOM from the selection and `state`. The inspector rebuilds when the
+ * selection changes, after an action, and at day rollover (main.ts), never
+ * per frame: a rebuild replaces the buttons, and a button replaced
+ * mid-click never fires.
+ */
+
+const inspectorEl = document.querySelector<HTMLElement>('#inspector')!;
+const breadcrumbEl = document.querySelector<HTMLElement>('#inspector-breadcrumb')!;
+const bodyEl = document.querySelector<HTMLElement>('#inspector-body')!;
+const networkEls = [document.querySelector<HTMLElement>('#econ-summary')!, document.querySelector<HTMLElement>('#sidebar-tab-content')!];
+
+let redrawPools: (() => void) | null = null;
+/** What the view was last built for, so a rebuild of the same thing keeps its scroll position. */
+let renderedKey = '';
+
+/** Whether this selection still refers to something in the game. */
+function stillExists(state: SimState, selection: Selection): boolean {
+  if (selection.kind === 'route') return ops.rotationsServing(state, selection.a, selection.b).length > 0;
+  return true;
+}
+
+/** The trail from Network to `selection`, each step with what selecting it shows. */
+function trail(selection: Selection): { label: string; target: Selection }[] {
+  const steps = [{ label: 'Network', target: NETWORK }];
+  if (selection.kind === 'route') steps.push({ label: `${selection.a} – ${selection.b}`, target: selection });
+  return steps;
+}
+
+function renderBreadcrumb(selection: Selection): void {
+  const backButton = document.createElement('button');
+  backButton.type = 'button';
+  backButton.className = 'inspector-back';
+  backButton.textContent = '‹';
+  backButton.title = 'Back (Esc)';
+  backButton.setAttribute('aria-label', 'Back');
+  backButton.addEventListener('click', () => back());
+
+  const steps = trail(selection);
+  const crumbs = steps.flatMap((step, i) => {
+    const last = i === steps.length - 1;
+    const crumb = document.createElement(last ? 'span' : 'button');
+    crumb.className = last ? 'inspector-crumb is-current' : 'inspector-crumb';
+    crumb.textContent = step.label;
+    if (!last) {
+      (crumb as HTMLButtonElement).type = 'button';
+      crumb.addEventListener('click', () => select(step.target));
+    }
+    const nodes: Node[] = [crumb];
+    if (!last) nodes.push(document.createTextNode(' › '));
+    return nodes;
+  });
+  breadcrumbEl.replaceChildren(backButton, ...crumbs);
+}
+
+/** Rebuild the inspector for the current selection. */
+export function renderInspector(state: SimState): void {
+  let selection = getSelection();
+  // A selection that has stopped existing (its last flight removed) falls
+  // back to Network rather than showing an empty view.
+  if (!stillExists(state, selection)) {
+    replaceSelection(NETWORK);
+    selection = getSelection();
+  }
+
+  const atNetwork = selection.kind === 'network';
+  inspectorEl.hidden = atNetwork;
+  for (const el of networkEls) el.hidden = !atNetwork;
+  redrawPools = null;
+  if (atNetwork) {
+    bodyEl.replaceChildren();
+    renderedKey = '';
+    return;
+  }
+
+  renderBreadcrumb(selection);
+  const key = selection.kind === 'route' ? `route:${selection.a}-${selection.b}` : selection.kind;
+  // A rebuild of the same selection (after an action, or at rollover)
+  // keeps the reader's place; a new selection starts at the top.
+  const scroll = key === renderedKey ? inspectorEl.scrollTop : 0;
+  renderedKey = key;
+  if (selection.kind === 'route') {
+    const view = buildRouteView(state, selection.a, selection.b, () => renderInspector(state));
+    bodyEl.replaceChildren(view.root);
+    redrawPools = view.redrawPools;
+  }
+  inspectorEl.scrollTop = scroll;
+}
+
+/** Redraw just the plane pools, with whatever the hovered radial button would change. */
+export function redrawInspectorPreview(): void {
+  redrawPools?.();
+}
