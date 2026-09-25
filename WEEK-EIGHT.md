@@ -166,7 +166,7 @@ once the rest works.
 
 ## Next: filling out North America (a separate thread)
 
-**Status: slices 1 and 2 done.** The owner has settled the scope (see
+**Status: slices 1–3 done.** The owner has settled the scope (see
 "Decisions").
 
 Grow the map from 40 airports to about 150, filling in the US and
@@ -301,14 +301,46 @@ passing.
      a second copy of the Toronto market. LaGuardia shrank as New York
      stopped being counted twice, so YUL–LGA fell from 14.7k to 9.7k
      potential a day.
-3. **The fill-out.** Replace the hand-typed North American list with a
-   filter over OurAirports: `large_airport` or `medium_airport`,
-   `scheduled_service` yes, country US or CA, one per metro
-   (decision 3). Take them by catchment population until the file
-   holds about 150. Keep the hand-typed list for the world hubs.
-   Display names come from a short-name table for the largest, and
-   OurAirports' name trimmed for the rest. Bump `SAVE_KEY` (the
-   airport set changes under old saves' `knownAirports`).
+3. **Done: the fill-out, to 150 airports.** `buildAirports.ts` adds
+   111 US and Canadian airports to the 39 hand-kept ones. `SAVE_KEY`
+   is `v46`.
+   - **Order:** `FILL_HUBS` (29 main hubs, named by hand) first, then
+     every large airport, then medium ones. At each step it adds the
+     candidate that would take the most people not already nearer an
+     airport on the map, and never within 60 km of one
+     (`METRO_SEPARATION_KM`, just over `MIN_MARKET_NM`).
+   - **Why not a straight ranking by people within 60 km:** tried
+     first. It favoured fields on the edge of big cities (Islip,
+     Michigan City, Ontario CA) and small fields beside a city's real
+     airport (Truckee beside Reno, St. Augustine beside Jacksonville).
+     Those then kept the real airport out by being too close to it.
+     Taking large before medium fixed the second problem.
+   - **People count only toward an airport in their own country**, and
+     a city never swallows a place across a border. Before this, El
+     Paso, McAllen and Brownsville counted Mexican cities, and
+     Singapore counted Johor Bahru (now 5.6M, real 5.9M).
+   - **Existing airports shrink** where a neighbour now shares their
+     area: Boston 0.72× (Providence, Worcester, Manchester), Los
+     Angeles 0.78× (Ontario CA), Toronto 0.86× (Hamilton).
+   - **Names:** OurAirports' municipality, cut at a comma or slash, with
+     `FILL_NAMES` for the confusing ones (Ontario, California;
+     Portland, Maine; London, Ontario; Rockford). West Palm Beach
+     carries the code DJT, as the source has it.
+   - **Checks:** with the target set to 39, the new code rebuilds the
+     slice 2 file byte for byte. Time zones are right for Arizona,
+     Saskatchewan, Hawaii and Alaska.
+   - **Balance moved a lot, as expected:**
+     - Propeller-range pairs went from 93 to 1,247, and 1,131 of them
+       carry more than one Propeller's worth each way.
+     - Six seeds: YUL 6/6 survive (mean $2.5M), YYZ 6/6 ($3.9M), BOS
+       4/6 ($1.07M). YHZ, PHL and LHR still all bust.
+     - The balance pass (slice 5) owns this.
+   - **Cost:**
+     - A headless year takes 4.6 s, about 12 ms of sim per day
+       (a day lasts 1.8 s of real time at 100×).
+     - The browser holds 60 fps at 1× (median frame 16.7 ms, worst
+       17.8 ms).
+     - Labels already overlap around Detroit, which is slice 4.
 4. **Map legibility.** The north-east will have far more airports on
    the same canvas. Label thinning by zoom and importance (deferred in
    the map pass above) becomes necessary here.

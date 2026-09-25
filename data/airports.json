@@ -5,7 +5,7 @@
     "lat": 45.4678,
     "lon": -73.7423,
     "utcOffsetMinutes": -300,
-    "population": 3845524
+    "population": 3844450
   },
   {
     "iata": "YYZ",
@@ -13,7 +13,7 @@
     "lat": 43.6759,
     "lon": -79.6294,
     "utcOffsetMinutes": -300,
-    "population": 7561839
+    "population": 6493145
   },
   {
     "iata": "YOW",
@@ -133,7 +133,7 @@
     "lat": 40.7772,
     "lon": -73.8726,
     "utcOffsetMinutes": -300,
-    "population": 14811485,
+    "population": 13471640,
     "maxAircraftType": "NARROWBODY",
     "capacityPerDay": 120
   },
@@ -143,7 +143,7 @@
     "lat": 42.362,
     "lon": -71.0079,
     "utcOffsetMinutes": -300,
-    "population": 4748593
+    "population": 3437175
   },
   {
     "iata": "DTW",
@@ -151,7 +151,7 @@
     "lat": 42.2138,
     "lon": -83.3538,
     "utcOffsetMinutes": -300,
-    "population": 3486437
+    "population": 3224001
   },
   {
     "iata": "PHL",
@@ -159,7 +159,7 @@
     "lat": 39.8719,
     "lon": -75.2411,
     "utcOffsetMinutes": -300,
-    "population": 4197183
+    "population": 4063820
   },
   {
     "iata": "DCA",
@@ -175,7 +175,7 @@
     "lat": 41.9786,
     "lon": -87.9048,
     "utcOffsetMinutes": -360,
-    "population": 7796470
+    "population": 7739653
   },
   {
     "iata": "ATL",
@@ -191,7 +191,7 @@
     "lat": 25.796,
     "lon": -80.2898,
     "utcOffsetMinutes": -300,
-    "population": 4123168
+    "population": 3716609
   },
   {
     "iata": "DFW",
@@ -207,7 +207,7 @@
     "lat": 33.9425,
     "lon": -118.408,
     "utcOffsetMinutes": -480,
-    "population": 9694103
+    "population": 7568403
   },
   {
     "iata": "YVR",
@@ -215,7 +215,7 @@
     "lat": 49.1939,
     "lon": -123.184,
     "utcOffsetMinutes": -480,
-    "population": 2838771
+    "population": 2414463
   },
   {
     "iata": "MEX",
@@ -295,7 +295,7 @@
     "lat": 1.3502,
     "lon": 103.994,
     "utcOffsetMinutes": 480,
-    "population": 11112637
+    "population": 5638700
   },
   {
     "iata": "GRU",
@@ -312,5 +312,893 @@
     "lon": 28.2468,
     "utcOffsetMinutes": 120,
     "population": 15124375
+  },
+  {
+    "iata": "SFO",
+    "name": "San Francisco",
+    "lat": 37.6198,
+    "lon": -122.3748,
+    "utcOffsetMinutes": -480,
+    "population": 5587924
+  },
+  {
+    "iata": "IAH",
+    "name": "Houston Intercontinental",
+    "lat": 29.9844,
+    "lon": -95.3414,
+    "utcOffsetMinutes": -360,
+    "population": 3856677
+  },
+  {
+    "iata": "SEA",
+    "name": "Seattle–Tacoma",
+    "lat": 47.4479,
+    "lon": -122.3103,
+    "utcOffsetMinutes": -480,
+    "population": 3750510
+  },
+  {
+    "iata": "DEN",
+    "name": "Denver",
+    "lat": 39.86,
+    "lon": -104.6738,
+    "utcOffsetMinutes": -420,
+    "population": 2907368
+  },
+  {
+    "iata": "MSP",
+    "name": "Minneapolis–St Paul",
+    "lat": 44.8801,
+    "lon": -93.2217,
+    "utcOffsetMinutes": -360,
+    "population": 3201624
+  },
+  {
+    "iata": "PHX",
+    "name": "Phoenix Sky Harbor",
+    "lat": 33.4353,
+    "lon": -112.0059,
+    "utcOffsetMinutes": -420,
+    "population": 4139647
+  },
+  {
+    "iata": "LAS",
+    "name": "Las Vegas",
+    "lat": 36.0834,
+    "lon": -115.1518,
+    "utcOffsetMinutes": -480,
+    "population": 1710444
+  },
+  {
+    "iata": "SAN",
+    "name": "San Diego",
+    "lat": 32.7336,
+    "lon": -117.19,
+    "utcOffsetMinutes": -480,
+    "population": 2980252
+  },
+  {
+    "iata": "MCO",
+    "name": "Orlando",
+    "lat": 28.4294,
+    "lon": -81.309,
+    "utcOffsetMinutes": -300,
+    "population": 1721228
+  },
+  {
+    "iata": "CLT",
+    "name": "Charlotte",
+    "lat": 35.214,
+    "lon": -80.9431,
+    "utcOffsetMinutes": -300,
+    "population": 1789161
+  },
+  {
+    "iata": "SLC",
+    "name": "Salt Lake City",
+    "lat": 40.7889,
+    "lon": -111.9799,
+    "utcOffsetMinutes": -420,
+    "population": 1821575
+  },
+  {
+    "iata": "PDX",
+    "name": "Portland, Oregon",
+    "lat": 45.5887,
+    "lon": -122.598,
+    "utcOffsetMinutes": -480,
+    "population": 1976497
+  },
+  {
+    "iata": "STL",
+    "name": "St. Louis",
+    "lat": 38.7487,
+    "lon": -90.37,
+    "utcOffsetMinutes": -360,
+    "population": 1973137
+  },
+  {
+    "iata": "MCI",
+    "name": "Kansas City",
+    "lat": 39.3017,
+    "lon": -94.7139,
+    "utcOffsetMinutes": -360,
+    "population": 1766212
+  },
+  {
+    "iata": "TPA",
+    "name": "Tampa",
+    "lat": 27.9755,
+    "lon": -82.5332,
+    "utcOffsetMinutes": -300,
+    "population": 2663651
+  },
+  {
+    "iata": "AUS",
+    "name": "Austin",
+    "lat": 30.1975,
+    "lon": -97.662,
+    "utcOffsetMinutes": -360,
+    "population": 1655030
+  },
+  {
+    "iata": "SAT",
+    "name": "San Antonio",
+    "lat": 29.5337,
+    "lon": -98.4698,
+    "utcOffsetMinutes": -360,
+    "population": 1896822
+  },
+  {
+    "iata": "MSY",
+    "name": "New Orleans",
+    "lat": 29.9934,
+    "lon": -90.2647,
+    "utcOffsetMinutes": -360,
+    "population": 1108018
+  },
+  {
+    "iata": "BNA",
+    "name": "Nashville",
+    "lat": 36.1245,
+    "lon": -86.6782,
+    "utcOffsetMinutes": -360,
+    "population": 1438069
+  },
+  {
+    "iata": "CLE",
+    "name": "Cleveland",
+    "lat": 41.4117,
+    "lon": -81.8498,
+    "utcOffsetMinutes": -300,
+    "population": 1856805
+  },
+  {
+    "iata": "PIT",
+    "name": "Pittsburgh",
+    "lat": 40.4915,
+    "lon": -80.2329,
+    "utcOffsetMinutes": -300,
+    "population": 1458151
+  },
+  {
+    "iata": "CVG",
+    "name": "Cincinnati",
+    "lat": 39.0488,
+    "lon": -84.6678,
+    "utcOffsetMinutes": -300,
+    "population": 1333629
+  },
+  {
+    "iata": "CMH",
+    "name": "Columbus",
+    "lat": 39.998,
+    "lon": -82.8919,
+    "utcOffsetMinutes": -300,
+    "population": 1578956
+  },
+  {
+    "iata": "IND",
+    "name": "Indianapolis",
+    "lat": 39.7173,
+    "lon": -86.2944,
+    "utcOffsetMinutes": -300,
+    "population": 1630176
+  },
+  {
+    "iata": "RDU",
+    "name": "Raleigh–Durham",
+    "lat": 35.8787,
+    "lon": -78.7873,
+    "utcOffsetMinutes": -300,
+    "population": 1355024
+  },
+  {
+    "iata": "HNL",
+    "name": "Honolulu",
+    "lat": 21.3184,
+    "lon": -157.9257,
+    "utcOffsetMinutes": -600,
+    "population": 1370465
+  },
+  {
+    "iata": "YYC",
+    "name": "Calgary",
+    "lat": 51.1188,
+    "lon": -114.0099,
+    "utcOffsetMinutes": -420,
+    "population": 1526809
+  },
+  {
+    "iata": "YEG",
+    "name": "Edmonton",
+    "lat": 53.3097,
+    "lon": -113.58,
+    "utcOffsetMinutes": -420,
+    "population": 1290390
+  },
+  {
+    "iata": "YWG",
+    "name": "Winnipeg",
+    "lat": 49.91,
+    "lon": -97.2399,
+    "utcOffsetMinutes": -360,
+    "population": 807296
+  },
+  {
+    "iata": "ONT",
+    "name": "Ontario, California",
+    "lat": 34.056,
+    "lon": -117.601,
+    "utcOffsetMinutes": -480,
+    "population": 5891813
+  },
+  {
+    "iata": "SMF",
+    "name": "Sacramento",
+    "lat": 38.6954,
+    "lon": -121.591,
+    "utcOffsetMinutes": -480,
+    "population": 2208218
+  },
+  {
+    "iata": "BDL",
+    "name": "Hartford",
+    "lat": 41.9386,
+    "lon": -72.688,
+    "utcOffsetMinutes": -300,
+    "population": 2081423
+  },
+  {
+    "iata": "YHM",
+    "name": "Hamilton",
+    "lat": 43.1713,
+    "lon": -79.9294,
+    "utcOffsetMinutes": -300,
+    "population": 2027696
+  },
+  {
+    "iata": "PVD",
+    "name": "Providence",
+    "lat": 41.725,
+    "lon": -71.4257,
+    "utcOffsetMinutes": -300,
+    "population": 1820011
+  },
+  {
+    "iata": "MKE",
+    "name": "Milwaukee",
+    "lat": 42.9472,
+    "lon": -87.8966,
+    "utcOffsetMinutes": -360,
+    "population": 1755897
+  },
+  {
+    "iata": "DJT",
+    "name": "West Palm Beach",
+    "lat": 26.6832,
+    "lon": -80.0956,
+    "utcOffsetMinutes": -300,
+    "population": 1442412
+  },
+  {
+    "iata": "JAX",
+    "name": "Jacksonville",
+    "lat": 30.4925,
+    "lon": -81.6878,
+    "utcOffsetMinutes": -300,
+    "population": 1361168
+  },
+  {
+    "iata": "OKC",
+    "name": "Oklahoma City",
+    "lat": 35.3934,
+    "lon": -97.5982,
+    "utcOffsetMinutes": -360,
+    "population": 1274726
+  },
+  {
+    "iata": "ORF",
+    "name": "Norfolk",
+    "lat": 36.8953,
+    "lon": -76.201,
+    "utcOffsetMinutes": -300,
+    "population": 1257489
+  },
+  {
+    "iata": "MEM",
+    "name": "Memphis",
+    "lat": 35.0438,
+    "lon": -89.9763,
+    "utcOffsetMinutes": -360,
+    "population": 1141885
+  },
+  {
+    "iata": "SDF",
+    "name": "Louisville",
+    "lat": 38.1706,
+    "lon": -85.7351,
+    "utcOffsetMinutes": -300,
+    "population": 1125280
+  },
+  {
+    "iata": "FAT",
+    "name": "Fresno",
+    "lat": 36.7758,
+    "lon": -119.718,
+    "utcOffsetMinutes": -480,
+    "population": 1061007
+  },
+  {
+    "iata": "GSO",
+    "name": "Greensboro",
+    "lat": 36.0994,
+    "lon": -79.9373,
+    "utcOffsetMinutes": -300,
+    "population": 1016263
+  },
+  {
+    "iata": "TUS",
+    "name": "Tucson",
+    "lat": 32.115,
+    "lon": -110.9381,
+    "utcOffsetMinutes": -420,
+    "population": 952819
+  },
+  {
+    "iata": "ABQ",
+    "name": "Albuquerque",
+    "lat": 35.04,
+    "lon": -106.6089,
+    "utcOffsetMinutes": -420,
+    "population": 911349
+  },
+  {
+    "iata": "BUF",
+    "name": "Buffalo",
+    "lat": 42.9405,
+    "lon": -78.7322,
+    "utcOffsetMinutes": -300,
+    "population": 860621
+  },
+  {
+    "iata": "ELP",
+    "name": "El Paso",
+    "lat": 31.8099,
+    "lon": -106.3756,
+    "utcOffsetMinutes": -420,
+    "population": 873047
+  },
+  {
+    "iata": "BHM",
+    "name": "Birmingham",
+    "lat": 33.5629,
+    "lon": -86.7507,
+    "utcOffsetMinutes": -360,
+    "population": 872453
+  },
+  {
+    "iata": "RSW",
+    "name": "Fort Myers",
+    "lat": 26.5347,
+    "lon": -81.7528,
+    "utcOffsetMinutes": -300,
+    "population": 843319
+  },
+  {
+    "iata": "ALB",
+    "name": "Albany",
+    "lat": 42.7483,
+    "lon": -73.8017,
+    "utcOffsetMinutes": -300,
+    "population": 805700
+  },
+  {
+    "iata": "PSP",
+    "name": "Palm Springs",
+    "lat": 33.8297,
+    "lon": -116.507,
+    "utcOffsetMinutes": -480,
+    "population": 771919
+  },
+  {
+    "iata": "TUL",
+    "name": "Tulsa",
+    "lat": 36.1971,
+    "lon": -95.8862,
+    "utcOffsetMinutes": -360,
+    "population": 760207
+  },
+  {
+    "iata": "OMA",
+    "name": "Omaha",
+    "lat": 41.3032,
+    "lon": -95.8941,
+    "utcOffsetMinutes": -360,
+    "population": 754086
+  },
+  {
+    "iata": "RIC",
+    "name": "Richmond",
+    "lat": 37.5052,
+    "lon": -77.3197,
+    "utcOffsetMinutes": -300,
+    "population": 676627
+  },
+  {
+    "iata": "YYJ",
+    "name": "Victoria",
+    "lat": 48.6472,
+    "lon": -123.4278,
+    "utcOffsetMinutes": -480,
+    "population": 671939
+  },
+  {
+    "iata": "DSM",
+    "name": "Des Moines",
+    "lat": 41.534,
+    "lon": -93.6567,
+    "utcOffsetMinutes": -360,
+    "population": 666161
+  },
+  {
+    "iata": "COS",
+    "name": "Colorado Springs",
+    "lat": 38.8058,
+    "lon": -104.701,
+    "utcOffsetMinutes": -420,
+    "population": 637315
+  },
+  {
+    "iata": "GRR",
+    "name": "Grand Rapids",
+    "lat": 42.8808,
+    "lon": -85.5228,
+    "utcOffsetMinutes": -300,
+    "population": 636993
+  },
+  {
+    "iata": "BOI",
+    "name": "Boise",
+    "lat": 43.5644,
+    "lon": -116.223,
+    "utcOffsetMinutes": -420,
+    "population": 568340
+  },
+  {
+    "iata": "RNO",
+    "name": "Reno",
+    "lat": 39.4991,
+    "lon": -119.768,
+    "utcOffsetMinutes": -480,
+    "population": 556050
+  },
+  {
+    "iata": "ROC",
+    "name": "Rochester",
+    "lat": 43.1189,
+    "lon": -77.6724,
+    "utcOffsetMinutes": -300,
+    "population": 549374
+  },
+  {
+    "iata": "SYR",
+    "name": "Syracuse",
+    "lat": 43.1112,
+    "lon": -76.1063,
+    "utcOffsetMinutes": -300,
+    "population": 540785
+  },
+  {
+    "iata": "CHS",
+    "name": "Charleston",
+    "lat": 32.8962,
+    "lon": -80.0382,
+    "utcOffsetMinutes": -300,
+    "population": 513507
+  },
+  {
+    "iata": "PWM",
+    "name": "Portland, Maine",
+    "lat": 43.6462,
+    "lon": -70.3093,
+    "utcOffsetMinutes": -300,
+    "population": 505219
+  },
+  {
+    "iata": "GEG",
+    "name": "Spokane",
+    "lat": 47.6199,
+    "lon": -117.534,
+    "utcOffsetMinutes": -480,
+    "population": 503308
+  },
+  {
+    "iata": "PNS",
+    "name": "Pensacola",
+    "lat": 30.4727,
+    "lon": -87.1866,
+    "utcOffsetMinutes": -360,
+    "population": 494824
+  },
+  {
+    "iata": "SRQ",
+    "name": "Sarasota",
+    "lat": 27.3946,
+    "lon": -82.5544,
+    "utcOffsetMinutes": -300,
+    "population": 464636
+  },
+  {
+    "iata": "SAV",
+    "name": "Savannah",
+    "lat": 32.1266,
+    "lon": -81.2,
+    "utcOffsetMinutes": -300,
+    "population": 452395
+  },
+  {
+    "iata": "TYS",
+    "name": "Knoxville",
+    "lat": 35.811,
+    "lon": -83.994,
+    "utcOffsetMinutes": -300,
+    "population": 424154
+  },
+  {
+    "iata": "ANC",
+    "name": "Anchorage",
+    "lat": 61.179,
+    "lon": -149.9926,
+    "utcOffsetMinutes": -540,
+    "population": 382710
+  },
+  {
+    "iata": "YLW",
+    "name": "Kelowna",
+    "lat": 49.9561,
+    "lon": -119.378,
+    "utcOffsetMinutes": -480,
+    "population": 308015
+  },
+  {
+    "iata": "YXE",
+    "name": "Saskatoon",
+    "lat": 52.1707,
+    "lon": -106.7008,
+    "utcOffsetMinutes": -360,
+    "population": 292008
+  },
+  {
+    "iata": "MYR",
+    "name": "Myrtle Beach",
+    "lat": 33.6797,
+    "lon": -78.9283,
+    "utcOffsetMinutes": -300,
+    "population": 179435
+  },
+  {
+    "iata": "OGG",
+    "name": "Kahului",
+    "lat": 20.8963,
+    "lon": -156.4318,
+    "utcOffsetMinutes": -600,
+    "population": 172450
+  },
+  {
+    "iata": "LIH",
+    "name": "Lihue",
+    "lat": 21.9744,
+    "lon": -159.3371,
+    "utcOffsetMinutes": -600,
+    "population": 79549
+  },
+  {
+    "iata": "KOA",
+    "name": "Kailua-Kona",
+    "lat": 19.7388,
+    "lon": -156.0456,
+    "utcOffsetMinutes": -600,
+    "population": 58162
+  },
+  {
+    "iata": "ISP",
+    "name": "Islip",
+    "lat": 40.7963,
+    "lon": -73.1017,
+    "utcOffsetMinutes": -300,
+    "population": 2439271
+  },
+  {
+    "iata": "MHT",
+    "name": "Manchester",
+    "lat": 42.9326,
+    "lon": -71.4357,
+    "utcOffsetMinutes": -300,
+    "population": 1416301
+  },
+  {
+    "iata": "SCK",
+    "name": "Stockton",
+    "lat": 37.8933,
+    "lon": -121.2381,
+    "utcOffsetMinutes": -480,
+    "population": 1520311
+  },
+  {
+    "iata": "ABE",
+    "name": "Allentown",
+    "lat": 40.6518,
+    "lon": -75.4428,
+    "utcOffsetMinutes": -300,
+    "population": 817600
+  },
+  {
+    "iata": "DAY",
+    "name": "Dayton",
+    "lat": 39.9024,
+    "lon": -84.2194,
+    "utcOffsetMinutes": -300,
+    "population": 971773
+  },
+  {
+    "iata": "SWF",
+    "name": "Newburgh",
+    "lat": 41.5042,
+    "lon": -74.1089,
+    "utcOffsetMinutes": -300,
+    "population": 959229
+  },
+  {
+    "iata": "LEX",
+    "name": "Lexington",
+    "lat": 38.0351,
+    "lon": -84.6067,
+    "utcOffsetMinutes": -300,
+    "population": 883167
+  },
+  {
+    "iata": "CAK",
+    "name": "Akron",
+    "lat": 40.9161,
+    "lon": -81.4422,
+    "utcOffsetMinutes": -300,
+    "population": 882390
+  },
+  {
+    "iata": "HRL",
+    "name": "Harlingen",
+    "lat": 26.2285,
+    "lon": -97.6544,
+    "utcOffsetMinutes": -360,
+    "population": 881599
+  },
+  {
+    "iata": "ORH",
+    "name": "Worcester",
+    "lat": 42.2673,
+    "lon": -71.8757,
+    "utcOffsetMinutes": -300,
+    "population": 873712
+  },
+  {
+    "iata": "LNS",
+    "name": "Lancaster",
+    "lat": 40.1217,
+    "lon": -76.2961,
+    "utcOffsetMinutes": -300,
+    "population": 864831
+  },
+  {
+    "iata": "MSN",
+    "name": "Madison",
+    "lat": 43.1399,
+    "lon": -89.3375,
+    "utcOffsetMinutes": -360,
+    "population": 651006
+  },
+  {
+    "iata": "MGC",
+    "name": "Michigan City",
+    "lat": 41.7033,
+    "lon": -86.8212,
+    "utcOffsetMinutes": -300,
+    "population": 714506
+  },
+  {
+    "iata": "YXU",
+    "name": "London, Ontario",
+    "lat": 43.0328,
+    "lon": -81.149,
+    "utcOffsetMinutes": -300,
+    "population": 683677
+  },
+  {
+    "iata": "VRB",
+    "name": "Vero Beach",
+    "lat": 27.6556,
+    "lon": -80.4179,
+    "utcOffsetMinutes": -300,
+    "population": 681512
+  },
+  {
+    "iata": "MRY",
+    "name": "Monterey",
+    "lat": 36.5868,
+    "lon": -121.8442,
+    "utcOffsetMinutes": -480,
+    "population": 666004
+  },
+  {
+    "iata": "BFL",
+    "name": "Bakersfield",
+    "lat": 35.4336,
+    "lon": -119.057,
+    "utcOffsetMinutes": -480,
+    "population": 636589
+  },
+  {
+    "iata": "CHA",
+    "name": "Chattanooga",
+    "lat": 35.0353,
+    "lon": -85.2038,
+    "utcOffsetMinutes": -300,
+    "population": 635177
+  },
+  {
+    "iata": "ATW",
+    "name": "Appleton",
+    "lat": 44.2585,
+    "lon": -88.519,
+    "utcOffsetMinutes": -360,
+    "population": 603889
+  },
+  {
+    "iata": "YXX",
+    "name": "Abbotsford",
+    "lat": 49.0253,
+    "lon": -122.361,
+    "utcOffsetMinutes": -480,
+    "population": 602222
+  },
+  {
+    "iata": "STS",
+    "name": "Santa Rosa",
+    "lat": 38.509,
+    "lon": -122.813,
+    "utcOffsetMinutes": -480,
+    "population": 601391
+  },
+  {
+    "iata": "PVU",
+    "name": "Provo",
+    "lat": 40.2189,
+    "lon": -111.7224,
+    "utcOffsetMinutes": -420,
+    "population": 588497
+  },
+  {
+    "iata": "RFD",
+    "name": "Rockford",
+    "lat": 42.1954,
+    "lon": -89.0972,
+    "utcOffsetMinutes": -360,
+    "population": 581506
+  },
+  {
+    "iata": "ICT",
+    "name": "Wichita",
+    "lat": 37.6503,
+    "lon": -97.4286,
+    "utcOffsetMinutes": -360,
+    "population": 577468
+  },
+  {
+    "iata": "GSP",
+    "name": "Greenville",
+    "lat": 34.8957,
+    "lon": -82.2189,
+    "utcOffsetMinutes": -300,
+    "population": 577260
+  },
+  {
+    "iata": "TOL",
+    "name": "Toledo",
+    "lat": 41.5868,
+    "lon": -83.8078,
+    "utcOffsetMinutes": -300,
+    "population": 557706
+  },
+  {
+    "iata": "LIT",
+    "name": "Little Rock",
+    "lat": 34.7292,
+    "lon": -92.2236,
+    "utcOffsetMinutes": -360,
+    "population": 555820
+  },
+  {
+    "iata": "SLE",
+    "name": "Salem",
+    "lat": 44.9095,
+    "lon": -123.003,
+    "utcOffsetMinutes": -480,
+    "population": 553939
+  },
+  {
+    "iata": "YPQ",
+    "name": "Peterborough",
+    "lat": 44.2323,
+    "lon": -78.3621,
+    "utcOffsetMinutes": -300,
+    "population": 540669
+  },
+  {
+    "iata": "FNT",
+    "name": "Flint",
+    "lat": 42.9693,
+    "lon": -83.7434,
+    "utcOffsetMinutes": -300,
+    "population": 531596
+  },
+  {
+    "iata": "DAB",
+    "name": "Daytona Beach",
+    "lat": 29.1825,
+    "lon": -81.0595,
+    "utcOffsetMinutes": -300,
+    "population": 525984
+  },
+  {
+    "iata": "PSC",
+    "name": "Pasco",
+    "lat": 46.2647,
+    "lon": -119.119,
+    "utcOffsetMinutes": -480,
+    "population": 516610
+  },
+  {
+    "iata": "HTS",
+    "name": "Huntington",
+    "lat": 38.3667,
+    "lon": -82.558,
+    "utcOffsetMinutes": -300,
+    "population": 502200
+  },
+  {
+    "iata": "BTR",
+    "name": "Baton Rouge",
+    "lat": 30.5332,
+    "lon": -91.1496,
+    "utcOffsetMinutes": -360,
+    "population": 477189
+  },
+  {
+    "iata": "CRP",
+    "name": "Corpus Christi",
+    "lat": 27.7704,
+    "lon": -97.5012,
+    "utcOffsetMinutes": -360,
+    "population": 452292
   }
 ]
