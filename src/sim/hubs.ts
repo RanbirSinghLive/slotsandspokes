@@ -143,6 +143,22 @@ export function connectingFlowsAt(state: SimState, hub: string): ConnectingFlow[
   return flows.sort((x, y) => y.passengers - x.passengers);
 }
 
+/**
+ * Connecting flows that start or end at `airport` but change planes
+ * somewhere else: its own passengers heading onward through another hub
+ * (Toronto–St. Louis via O'Hare, seen from Toronto). Busiest first. Only
+ * an airport it flies to can be that hub, so only those are searched.
+ */
+export function onwardFlowsFrom(state: SimState, airport: string): ConnectingFlow[] {
+  const flows: ConnectingFlow[] = [];
+  for (const hub of spokesOf(state, airport).keys()) {
+    for (const flow of connectingFlowsAt(state, hub)) {
+      if (flow.a === airport || flow.b === airport) flows.push(flow);
+    }
+  }
+  return flows.sort((x, y) => y.passengers - x.passengers);
+}
+
 /** Connecting passengers a day changing planes at this airport. */
 export function connectingPassengersThrough(state: SimState, hub: string): number {
   return connectingFlowsAt(state, hub).reduce((total, flow) => total + flow.passengers, 0);

@@ -1524,8 +1524,11 @@ plane flying into the hub (`applyHubStyleChange()`). Where a plane's day
 overflows, rotations move to other planes in the same pool; the change is
 refused only when no plane has room.
 
-**On the map**, hovering a hub draws its connecting flows, and dashed
-lines to the best new spokes (`suggestSpokes()`: known airports in range
+**On the map**, hovering a hub draws its connecting flows. Fainter dashed
+curves show its own passengers who connect onward somewhere else
+(`onwardFlowsFrom()`: Toronto–St. Louis via O'Hare, seen from Toronto).
+Trips are one stop at most: a passenger changes planes once or not at
+all. Dashed lines also go to the best new spokes (`suggestSpokes()`: known airports in range
 of a plane based there, valued once their route is established and
 capped at what one daily round trip could carry). The map menu's **Plan
 hub** (`sim/hubPlanner.ts`) lists moves — another daily round trip to a

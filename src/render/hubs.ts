@@ -2,7 +2,7 @@ import { geoPath } from 'd3-geo';
 import type { LineString } from 'geojson';
 import { projection } from './projection';
 import { airports } from './airports';
-import { connectingFlowsAt, suggestSpokes } from '../sim/hubs';
+import { connectingFlowsAt, onwardFlowsFrom, suggestSpokes, type ConnectingFlow } from '../sim/hubs';
 import { HUB_STYLES, hubStyleAt } from '../sim/hubStyle';
 import type { SimState } from '../sim/state';
 
@@ -13,6 +13,9 @@ import type { SimState } from '../sim/state';
  * - Each connecting flow is a curve from one spoke to the other, bent
  *   through the hub — the trip those passengers actually make — and
  *   thicker the more of them there are. The busiest few are labelled.
+ * - Passengers from this airport who change planes somewhere else
+ *   (Toronto–St. Louis via O'Hare, seen from Toronto) are fainter dashed
+ *   curves from here, bent through the airport where they connect.
  * - The best new spokes (sim/hubs.ts's suggestSpokes()) are dashed lines
  *   out from the hub, labelled with what they'd earn a day once grown.
  * - The hub itself gets a line saying how many connect and how it's run.
@@ -21,6 +24,9 @@ import type { SimState } from '../sim/state';
  */
 
 const FLOW_STROKE = 'rgba(94, 214, 200, 0.75)';
+const ONWARD_STROKE = 'rgba(94, 214, 200, 0.4)';
+const ONWARD_LABEL = '#9fe3da';
+const LABELLED_ONWARD_FLOWS = 2;
 const FLOW_LABEL = '#5ed6c8';
 const SUGGESTION_STROKE = '#7ab8ff';
 const LABEL_FONT = '11px ui-monospace, Consolas, monospace';
@@ -48,6 +54,37 @@ function money(amount: number): string {
   return amount >= 1000 ? `$${(amount / 1000).toFixed(1)}k` : `$${Math.round(amount)}`;
 }
 
+/**
+ * A curve from `a` to `b` that passes through `via` at its midpoint, the
+ * trip connecting passengers make. Returns the point `t` of the way along
+ * it, for placing a label.
+ */
+function strokeFlowCurve(
+  ctx: CanvasRenderingContext2D,
+  a: [number, number],
+  via: [number, number],
+  b: [number, number],
+  t: number,
+): [number, number] {
+  // A quadratic curve whose control point is placed so the curve passes
+  // through `via` at its midpoint: for t = 0.5 a quadratic sits at
+  // (a + 2c + b) / 4, so c = 2·via − (a + b) / 2.
+  const control: [number, number] = [2 * via[0] - (a[0] + b[0]) / 2, 2 * via[1] - (a[1] + b[1]) / 2];
+  ctx.beginPath();
+  ctx.moveTo(a[0], a[1]);
+  ctx.quadraticCurveTo(control[0], control[1], b[0], b[1]);
+  ctx.stroke();
+  return [
+    (1 - t) * (1 - t) * a[0] + 2 * (1 - t) * t * control[0] + t * t * b[0],
+    (1 - t) * (1 - t) * a[1] + 2 * (1 - t) * t * control[1] + t * t * b[1],
+  ];
+}
+
+/** Width for a flow, by its share of the busiest one drawn alongside it. */
+function flowWidth(flow: ConnectingFlow, busiest: number): number {
+  return 1 + (MAX_FLOW_WIDTH - 1) * Math.sqrt(flow.passengers / busiest);
+}
+
 /** Whether hovering this airport has anything to show. */
 export function hasHubView(state: SimState, iata: string): boolean {
   return state.schedule.some((leg) => leg.origin === iata || leg.dest === iata);
@@ -59,31 +96,36 @@ export function drawHubView(ctx: CanvasRenderingContext2D, state: SimState, hub:
 
   const flows = connectingFlowsAt(state, hub);
   const busiest = flows[0]?.passengers ?? 0;
+  const onward = onwardFlowsFrom(state, hub);
+  const busiestOnward = onward[0]?.passengers ?? 0;
   ctx.save();
   ctx.lineCap = 'round';
+
+  // Onward flows first, so the ones connecting here draw on top.
+  ctx.strokeStyle = ONWARD_STROKE;
+  ctx.setLineDash([4, 5]);
+  onward.forEach((flow, i) => {
+    const other = flow.a === hub ? flow.b : flow.a;
+    const via = screenPoint(flow.hub);
+    const end = screenPoint(other);
+    if (!via || !end) return;
+    ctx.lineWidth = flowWidth(flow, busiestOnward);
+    // Labelled near the far end, away from the labels crowding the hub.
+    const [x, y] = strokeFlowCurve(ctx, hubPoint, via, end, 0.8);
+    if (i < LABELLED_ONWARD_FLOWS) label(ctx, `${hub}–${other} via ${flow.hub} ${Math.round(flow.passengers)}/day`, x, y, ONWARD_LABEL);
+  });
+  ctx.setLineDash([]);
+
+  ctx.strokeStyle = FLOW_STROKE;
   flows.forEach((flow, i) => {
     const a = screenPoint(flow.a);
     const b = screenPoint(flow.b);
     if (!a || !b) return;
-    // A quadratic curve whose control point is placed so the curve passes
-    // through the hub at its midpoint: for t = 0.5 a quadratic sits at
-    // (a + 2c + b) / 4, so c = 2·hub − (a + b) / 2.
-    const control: [number, number] = [2 * hubPoint[0] - (a[0] + b[0]) / 2, 2 * hubPoint[1] - (a[1] + b[1]) / 2];
-    ctx.beginPath();
-    ctx.moveTo(a[0], a[1]);
-    ctx.quadraticCurveTo(control[0], control[1], b[0], b[1]);
-    ctx.strokeStyle = FLOW_STROKE;
-    ctx.lineWidth = 1 + (MAX_FLOW_WIDTH - 1) * Math.sqrt(flow.passengers / busiest);
-    ctx.stroke();
-
-    if (i < LABELLED_FLOWS) {
-      // Label a quarter of the way along, on the first spoke's side, so
-      // labels for flows sharing a spoke don't stack on the hub.
-      const t = 0.25;
-      const x = (1 - t) * (1 - t) * a[0] + 2 * (1 - t) * t * control[0] + t * t * b[0];
-      const y = (1 - t) * (1 - t) * a[1] + 2 * (1 - t) * t * control[1] + t * t * b[1];
-      label(ctx, `${flow.a}–${flow.b} ${Math.round(flow.passengers)}/day`, x, y, FLOW_LABEL);
-    }
+    ctx.lineWidth = flowWidth(flow, busiest);
+    // Label a quarter of the way along, on the first spoke's side, so
+    // labels for flows sharing a spoke don't stack on the hub.
+    const [x, y] = strokeFlowCurve(ctx, a, hubPoint, b, 0.25);
+    if (i < LABELLED_FLOWS) label(ctx, `${flow.a}–${flow.b} ${Math.round(flow.passengers)}/day`, x, y, FLOW_LABEL);
   });
   ctx.restore();
 
@@ -119,4 +161,8 @@ export function drawHubView(ctx: CanvasRenderingContext2D, state: SimState, hub:
     hubPoint[1] + 22,
     FLOW_LABEL,
   );
+  const connectingOnward = onward.reduce((total, flow) => total + flow.passengers, 0);
+  if (connectingOnward >= 0.5) {
+    label(ctx, `${Math.round(connectingOnward)}/day connect onward elsewhere`, hubPoint[0], hubPoint[1] + 40, ONWARD_LABEL);
+  }
 }
