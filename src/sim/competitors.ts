@@ -8,7 +8,6 @@ import { networkAirports } from './reach';
 import {
   FREQUENCY_GROWTH_PROBABILITY_PER_DAY,
   MAX_RIVAL_ENTRIES,
-  PLAYER_MARKET_WEIGHT,
   pressureFactor,
   RIVAL_TARGETS_PLAYER,
   RIVAL_ENTRY_INTERVAL_DAYS,
@@ -17,6 +16,7 @@ import {
   recentlyClosedByRival,
   rivalNetworkRoom,
 } from './pressure';
+import { moneyOnTable } from './attractiveness';
 import { rivalSecuresCapacity } from './market';
 import type { SimState } from './state';
 
@@ -199,10 +199,11 @@ const SEED_CODES = new Set((competitorsData as { code: string }[]).map((route) =
 /**
  * A new rival airline arrives, once the calendar says one is due (see
  * sim/pressure.ts): the k-th arrives on day FIRST + k * INTERVAL. It
- * opens a single daily flight on a market next to the player's network,
- * weighted by potential demand and by PLAYER_MARKET_WEIGHT for markets the
- * player already flies, so the newcomer tends to land on something the
- * player built. Markets must be between airports the player knows and
+ * opens a single daily flight on a market next to the player's network.
+ * With chance RIVAL_TARGETS_PLAYER it goes after one of the player's own
+ * markets, weighted by the money left on the table there
+ * (sim/attractiveness.ts); otherwise, or if no player market has any,
+ * it takes a market next to the network weighted by potential demand. Markets must be between airports the player knows and
  * within regional range, like every competitor route.
  *
  * "How many have arrived" is read off the routes (airlines that are not in
@@ -238,13 +239,21 @@ export function rollRivalEntry(state: SimState, dayStartMinute: number): void {
   const [nameRoll, seedAfterName] = nextRandom(seedAfterMarket);
   state.rngSeed = seedAfterName;
 
-  // Most of the time the newcomer goes straight for something the player
-  // built; otherwise it takes the best market next to the network.
-  const playerCandidates = candidates.filter(([a, b]) => playerMarkets.has(marketKey(a, b)));
-  const marketPool = playerCandidates.length > 0 && targetRoll < RIVAL_TARGETS_PLAYER ? playerCandidates : candidates;
-  const weights = marketPool.map(
-    ([a, b]) => potentialDailyDemand(a, b) * (playerMarkets.has(marketKey(a, b)) ? PLAYER_MARKET_WEIGHT : 1),
+  // Most of the time the newcomer goes after something the player built,
+  // weighted by the money it leaves on the table (sim/attractiveness.ts):
+  // passengers turned away and a fat margin. A player market with nothing
+  // on the table isn't a target at all, so a lean airline is left alone
+  // and the newcomer takes the best market next to the network instead.
+  const onTable = new Map(
+    candidates
+      .filter(([a, b]) => playerMarkets.has(marketKey(a, b)))
+      .map(([a, b]) => [marketKey(a, b), moneyOnTable(state, a, b).perDay] as const)
+      .filter(([, perDay]) => perDay > 0),
   );
+  const playerCandidates = candidates.filter(([a, b]) => onTable.has(marketKey(a, b)));
+  const targetsPlayer = playerCandidates.length > 0 && targetRoll < RIVAL_TARGETS_PLAYER;
+  const marketPool = targetsPlayer ? playerCandidates : candidates;
+  const weights = marketPool.map(([a, b]) => (targetsPlayer ? onTable.get(marketKey(a, b))! : potentialDailyDemand(a, b)));
 
   const [origin, dest] = pickWeighted(marketPool, weights, marketRoll);
   const rival = pool[Math.min(pool.length - 1, Math.floor(nameRoll * pool.length))];

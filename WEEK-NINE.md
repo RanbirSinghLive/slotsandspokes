@@ -7,8 +7,8 @@ fill-out, fare stances, the side panel and the headless player) lives in
 **State at handoff:** save key `airgame-save-v46`. Week eight's headless
 player and `npm run balance` give every balance change a measured
 before and after (baseline below). Route views now show a route's share
-of slot fees and leases. **Thread 1 and thread 2's slice 1 are done;
-thread 3 is next.**
+of slot fees and leases. **Thread 1, thread 2's slice 1 and thread
+3's slice 1 are done; thread 3's slice 2 is next.**
 
 ---
 
@@ -234,12 +234,31 @@ hub's connections, entry is expensive, and rivals mostly go elsewhere.
   route view shows a market's attractiveness as a warning before anyone
   enters.
 
+**Slice 1 as built:** `sim/attractiveness.ts`'s `moneyOnTable()`: the
+passengers a market turns away (up to one rival flight each way) at the
+going fare, plus half its last-week margin after slot fees and leases.
+`rollRivalEntry()` weights the player's markets by it, and skips player
+markets with nothing on the table. `PLAYER_MARKET_WEIGHT` is gone.
+
+- **It lands where the money is.** From YUL (seed 2), the sitter's
+  entrants hit Montréal–Philadelphia ($32.6k a day on the table) and
+  Montréal–Boston ($31k). The sitter's fat routes carry $30k+ a day on
+  the table each.
+- **The effect is small, as expected**: at most 5 new airlines a game.
+  Sitter means fell at YHZ ($18.6M → $12.3M) and LHR ($13.3M →
+  $11.3M), about the same elsewhere. Starter busts rose 15 → 18 of 36,
+  since a starter's four fat routes are now targets.
+- **Most rival moves don't go through entry.** Existing rivals open
+  routes near their networks by potential (`rollCompetitorRouteOpenings()`),
+  and those ignore the money on the table: the same YUL game's
+  Cascade Connect opened onto a player market with $0 on it. Slice 2
+  should make both paths follow attractiveness.
+
 Slices:
-1. **Attractiveness, and entry weighted by it.** Same entry timer,
-   new choice of market. Measured: the sitter's fat markets get
-   contested.
-2. **The entry rate follows the network's attractiveness.** The timer
-   goes; harvesting draws more rivals. Measured: the sitter declines.
+1. **Attractiveness, and entry weighted by it.** (Done.)
+2. **The entry rate follows the network's attractiveness**, and existing
+   rivals' openings weigh player markets by it too. The timer goes;
+   harvesting draws more rivals. Measured: the sitter declines.
 3. **Deterrence: frequency dominance and hub feed.**
 4. **Deterrence: slot control.** Rivals pay for slots at congested
    airports, and can be priced out.

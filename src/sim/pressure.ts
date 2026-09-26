@@ -31,9 +31,6 @@ export const RIVAL_FIRST_ENTRY_DAY = 15;
 export const RIVAL_ENTRY_INTERVAL_DAYS = 20;
 export const MAX_RIVAL_ENTRIES = 5;
 
-/** A rival weights a market the player already flies this many times over one they don't. */
-export const PLAYER_MARKET_WEIGHT = 3;
-
 /** How many daily flights any competitor will run on one route. */
 export const RIVAL_FREQUENCY_CAP = 4;
 /**

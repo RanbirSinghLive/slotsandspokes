@@ -939,7 +939,18 @@ day (`rollCompetitorFrequencyGrowth()`).
 **New rivals enter.** From day 15, one new airline every 20 days, up to 5
 (`rollRivalEntry()`, names from `rival-airlines.json`). Each opens one
 daily flight on a market next to the player's network. 70% of the time
-it targets a market the player already flies, weighted 3× toward them.
+it goes after one of the player's own markets, weighted by the **money
+on the table** there (`sim/attractiveness.ts`, dollars a day):
+
+- passengers turned away (today's demand beyond the player's seats, up
+  to what one rival flight each way carries), at the going fare;
+- half of the route's last-week margin after its share of slot fees and
+  leases (`sim/routeCosts.ts`), if positive.
+
+A player market with nothing on the table isn't a target, so a lean
+airline's markets are left alone and the newcomer takes a market next to
+the network, weighted by potential. Existing rivals' own route openings
+(above) still weigh markets by potential only.
 
 **Rivals take your yield** (`rivalYieldFactor()`). Markets here are
 seat-limited, so a rival splitting demand would still leave the player's

@@ -23,7 +23,7 @@ import type { SimState } from './state';
  * competitors here are peer startups flying comparable equipment rather
  * than mainline carriers.
  */
-const COMPETITOR_ASSUMED_SEATS = 50;
+export const COMPETITOR_ASSUMED_SEATS = 50;
 
 const seatsByTypeCode = new Map<string, number>(
   (aircraftTypesData as { code: string; seats: number }[]).map((type) => [type.code, type.seats]),
