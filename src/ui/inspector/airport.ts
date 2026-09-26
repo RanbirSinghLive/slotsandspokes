@@ -1,4 +1,4 @@
-import { airportCapacityPerDay, airportLoad, dailyMovementsAt } from '../../sim/airports';
+import { airportLoad, dailyMovementsAt, slotCapacityPerDay } from '../../sim/airports';
 import { daysUntilReturn, expediteCost, expediteRepair } from '../../sim/aog';
 import { congestionParameters } from '../../sim/delays';
 import { connectingPassengersThrough } from '../../sim/hubs';
@@ -133,7 +133,7 @@ function loadAndSlots(state: SimState, iata: string): HTMLElement[] {
   const load = airportLoad(state, iata);
   const { delayChance, maxDelayMinutes } = congestionParameters(load);
   const loadLine = line(
-    `Airport load: ${Math.round(load * 100)}% at peak (${dailyMovementsAt(state, iata)} of ${airportCapacityPerDay(iata)} movements/day)` +
+    `Airport load: ${Math.round(load * 100)}% at peak (${dailyMovementsAt(state, iata)} movements a day; slots stop at ${slotCapacityPerDay(state, iata)})` +
       (delayChance > 0
         ? `. Congestion delays ${Math.round(delayChance * 100)}% of flights here, up to ${maxDelayMinutes} min.`
         : '. No congestion.'),

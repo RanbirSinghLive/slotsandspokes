@@ -1,4 +1,4 @@
-import { allAirports, airportCapacityPerDay, dailyDeparturesAt, dailyMovementsAt } from './airports';
+import { allAirports, dailyDeparturesAt, dailyMovementsAt, slotCapacityPerDay } from './airports';
 import type { SimState } from './state';
 
 /**
@@ -27,8 +27,10 @@ import type { SimState } from './state';
  * price first) and released at the day's rollover once nothing uses them,
  * most expensive first: use it or lose it.
  *
- * An airport with no room left (movements at capacity) has no slots to
- * give, whatever the price.
+ * An airport with no room left has no slots to give, whatever the price.
+ * Room is judged at the peak (sim/airports.ts's slotCapacityPerDay()),
+ * for the player and every rival alike, so a busy hub closes to newcomers
+ * once its busiest hours are full.
  */
 
 /**
@@ -91,7 +93,7 @@ export function slotFeesPerDayAt(state: SimState, iata: string): number {
  */
 export function nextSlotFees(state: SimState, iata: string, count: number, extraMovements = 0): (number | null)[] {
   const average = averageServedMovements(state);
-  const capacity = airportCapacityPerDay(iata);
+  const capacity = slotCapacityPerDay(state, iata);
   const fees: (number | null)[] = [];
   for (let i = 0; i < count; i++) {
     const movements = dailyMovementsAt(state, iata) + extraMovements + i * MOVEMENTS_PER_PAIR;

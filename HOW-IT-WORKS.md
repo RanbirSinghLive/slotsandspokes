@@ -963,7 +963,7 @@ which a one-route entrant can't sell. Both take months to build.
 **Rivals need slots too** (`rivalSlotQuote()` in `sim/slots.ts`). A
 rival opening a route or adding a flight needs a slot pair at both ends
 at today's price, checked before it leases a plane, and gets none at an
-airport with no room left in its day. It pays them daily from then on
+airport whose busiest hours are full. It pays them daily from then on
 (`CompetitorOffering.slotFeesPerDay`, in its route costs,
 `sim/rivalEconomics.ts`). Seed routes pay nothing for the slots they
 start with. Since slot prices climb with an airport's traffic, a player
@@ -971,9 +971,7 @@ who took a hub's slots early holds them far cheaper than a rival
 arriving once it's busy: the slot-control moat. Money on the table is
 also reduced by what a rival's slots would cost, and is zero at a full
 airport. By day 240 from YUL, rivals pay about $190k a day in slots,
-their busiest routes $8k–9k each, enough to turn some to losses. A
-"full" airport means its whole day is full, not its peak: rivals still
-squeeze into a congested hub, at a price.
+their busiest routes $8k–9k each, enough to turn some to losses.
 
 **Seeing it.** The route view's **Rivals' view** line shows a route as a
 rival sees it: the money on the table and what draws it (passengers you
@@ -1700,6 +1698,19 @@ when taken, like a lease. Slots are taken automatically when a rotation
 needs them (the route builder quotes the price first) and released at
 rollover once unused, most expensive first. A full airport has no slots
 at any price, and the route builder refuses the rotation.
+
+**Full means full at the peak.** An airport gives slots for as many
+takeoffs and landings a day as keep its busiest hours within capacity
+(`slotCapacityPerDay()`): its daily capacity over its hub style's peak
+factor, so 157 of Montréal's 236 on the default rolling style. The same
+limit binds the player and every rival, first come first served, as at
+real slot-controlled airports. Rationing only the whole day let rivals
+keep buying into a player's congested hub: from YUL they reached 164 of
+222 movements by day 240, with congestion delaying 60% of flights by up
+to 75 minutes. Rationed to the peak, YUL fills at 156 (78 the player's,
+78 rivals'), with delays of 34% up to 54 minutes. A hub run in waves has
+a sharper peak, so it closes at fewer flights. The airport view shows
+where slots stop ("68 movements a day; slots stop at 80").
 
 
 ---

@@ -68,6 +68,30 @@ cost, and anything that hands out a permanent edge cheaply is a bug.
    five, then holds. Tuning should not make it faster.
 8. **Moats protect partly.** They discount what rivals see and raise
    what it costs them to come; they never make a market untouchable.
+9. **Slots are rationed to the peak, for everyone** (the owner's option
+   2). An airport gives slots for as many movements a day as keep its
+   busiest hours within capacity (`slotCapacityPerDay()`: daily capacity
+   over the hub style's peak factor), first come first served.
+
+   Why: rationing only the whole day let rivals keep buying into a
+   player's congested hub. From YUL (steady, seed 1) by day 240 rivals
+   had 164 of 222 movements, the player had cut itself to 58, and
+   congestion delayed 60% of flights by up to 75 minutes. Rationed to
+   the peak, YUL fills at 156 of 157 (78 each) with delays of 34% up to
+   54 minutes.
+
+   Measured (six seeds): steady medians rose sharply (YUL $45.0M →
+   $66.4M, YYZ $65.7M → $90.7M, BOS $46.2M → $58.2M, PHL $70.1M →
+   $77.4M, YHZ $7.5M → $11.5M, LHR $87.1M → $103.8M); sitters a little
+   ($13–18M → $14–18M). Growing beats sitting by 4.5–8×.
+
+   Two consequences:
+   - **The game is rich again.** The structure is right (sitting erodes,
+     moats pay), but the amounts are back near where thread 3 started.
+     The next balance step is the level of costs and lease rates, not
+     the rules.
+   - **The report now takes 30 minutes** (bigger airlines are slower to
+     simulate). Worth a performance pass before more tuning.
 
 ### Explicitly out of scope
 
@@ -489,16 +513,6 @@ Still live, and still named by this plan:
 
 - **Goals before or after the pressure?** Drafted after, so goals can
   name the moats. Goals first would give playtests direction sooner.
-- **Should a congested peak refuse slots?** Today an airport refuses a
-  slot only when its whole day is full. Measured from YUL (steady
-  player, seed 1): the player stops adding at home once congestion
-  delays 10% of flights (day 60: 124 of 236 movements, 112 its own), but
-  rivals keep paying their way in. By day 240 the day is 222 of 236
-  movements, 164 of them rivals', the peak load is 1.41, congestion
-  delays 60% of flights by up to 75 minutes, and the player has cut
-  itself to 58. Rivals took over the player's home. The alternative is
-  refusing any slot that would push an airport's peak load past 1, for
-  everyone alike. Explained to the owner; awaiting the call.
 - **Should the headless player read markets in words too?** Honest
   balance says yes, once thread 2 hides the numbers. It currently scores
   markets by exact potential.

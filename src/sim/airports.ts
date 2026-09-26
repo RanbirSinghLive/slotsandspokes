@@ -96,6 +96,20 @@ export function airportLoad(state: SimState, iata: string): number {
   return (dailyMovementsAt(state, iata) * HUB_STYLES[hubStyleAt(state, iata)].peakFactor) / capacity;
 }
 
+/**
+ * Takeoffs and landings a day an airport gives slots for: as many as keep
+ * its busiest hours within capacity (a peak load of 1), so the hub style's
+ * peak factor sets it. Slots are rationed to the peak, as at real
+ * slot-controlled airports, because the peak is where congestion delays
+ * come from; rationing only the whole day let a hub fill until most of its
+ * flights queued. The same limit for the player and every rival
+ * (sim/slots.ts): an airport's slots go to whoever takes them first.
+ * A hub run in waves has a sharper peak, so it fills at fewer flights.
+ */
+export function slotCapacityPerDay(state: SimState, iata: string): number {
+  return Math.floor(airportCapacityPerDay(iata) / HUB_STYLES[hubStyleAt(state, iata)].peakFactor);
+}
+
 export function allAirports(): AirportSpec[] {
   return airports;
 }

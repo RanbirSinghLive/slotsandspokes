@@ -1,6 +1,6 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { classRank } from './aircraftClasses';
-import { airportCapacityPerDay, dailyMovementsAt } from './airports';
+import { dailyMovementsAt, slotCapacityPerDay } from './airports';
 import { minuteOfDayToTimeString } from './clock';
 import { greatCircleDistanceNm } from './geo';
 import { policyFare } from './pricing';
@@ -251,8 +251,8 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
   const full = plan.slotQuotes.find((quote) => quote.full);
   if (full) {
     return fail(
-      `${full.iata} is full: ${dailyMovementsAt(state, full.iata)} of its ${airportCapacityPerDay(full.iata)} takeoffs and landings a day ` +
-        `are taken, so it has no slots left. Grow somewhere quieter, or carry the traffic on fewer, bigger aircraft.`,
+      `${full.iata} is full: ${dailyMovementsAt(state, full.iata)} takeoffs and landings a day already fill its busiest hours ` +
+        `(room for ${slotCapacityPerDay(state, full.iata)}), so it has no slots left. Grow somewhere quieter, or carry the traffic on fewer, bigger aircraft.`,
     );
   }
 
