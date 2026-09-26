@@ -62,6 +62,12 @@ cost, and anything that hands out a permanent edge cheaply is a bug.
    hunger for service speeds up how fast a new route builds there.
 5. **Balance targets are set per headless persona** (below) and checked
    with `npm run balance` before and after every thread.
+6. **Five market sizes** (Tiny to Huge), not three.
+7. **Sitting erodes slowly.** Today's shape is kept: from YUL a sitter's
+   margin falls from about $50k a day in month two to $7–15k by month
+   five, then holds. Tuning should not make it faster.
+8. **Moats protect partly.** They discount what rivals see and raise
+   what it costs them to come; they never make a market untouchable.
 
 ### Explicitly out of scope
 
@@ -483,12 +489,16 @@ Still live, and still named by this plan:
 
 - **Goals before or after the pressure?** Drafted after, so goals can
   name the moats. Goals first would give playtests direction sooner.
-- **How slow should sitting erode?** Drafted as a decline from about
-  month four. Faster makes the game tenser; slower is kinder to people
-  who play in short sessions.
-- **How much should a moat protect?** Full protection (no entry at a
-  controlled hub) makes the late game a fortress; partial protection
-  keeps rivals probing. Drafted as partial.
+- **Should a congested peak refuse slots?** Today an airport refuses a
+  slot only when its whole day is full. Measured from YUL (steady
+  player, seed 1): the player stops adding at home once congestion
+  delays 10% of flights (day 60: 124 of 236 movements, 112 its own), but
+  rivals keep paying their way in. By day 240 the day is 222 of 236
+  movements, 164 of them rivals', the peak load is 1.41, congestion
+  delays 60% of flights by up to 75 minutes, and the player has cut
+  itself to 58. Rivals took over the player's home. The alternative is
+  refusing any slot that would push an airport's peak load past 1, for
+  everyone alike. Explained to the owner; awaiting the call.
 - **Should the headless player read markets in words too?** Honest
   balance says yes, once thread 2 hides the numbers. It currently scores
   markets by exact potential.
@@ -501,5 +511,3 @@ Still live, and still named by this plan:
   extreme (and the target becomes "always busts, not before day 30"),
   or define a milder reckless player (grows fast but still cuts
   losers) and aim that one at a third.
-- **Five sizes, or three?** You suggested small, medium and large.
-  Five gives a trunk route somewhere to stand out; three is simpler.
