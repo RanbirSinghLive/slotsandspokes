@@ -27,6 +27,32 @@ let redrawPools: (() => void) | null = null;
 /** What the view was last built for, so a rebuild of the same thing keeps its scroll position. */
 let renderedKey = '';
 
+// A rebuild replaces every slider, so one that arrives while the pointer
+// is held down in the panel (a slider mid-drag) waits for the release.
+let pointerDown = false;
+let rebuildWaiting: SimState | null = null;
+inspectorEl.addEventListener('pointerdown', () => {
+  pointerDown = true;
+});
+window.addEventListener('pointerup', () => {
+  pointerDown = false;
+  if (rebuildWaiting) {
+    const state = rebuildWaiting;
+    rebuildWaiting = null;
+    renderInspector(state);
+  }
+});
+
+/**
+ * Rebuild for the day's new numbers (main.ts calls this at rollover),
+ * unless the player is mid-drag in the panel, in which case it happens on
+ * release.
+ */
+export function refreshInspectorForNewDay(state: SimState): void {
+  if (pointerDown) rebuildWaiting = state;
+  else renderInspector(state);
+}
+
 /** Whether this selection still refers to something in the game. */
 function stillExists(state: SimState, selection: Selection): boolean {
   if (selection.kind === 'route') return ops.rotationsServing(state, selection.a, selection.b).length > 0;

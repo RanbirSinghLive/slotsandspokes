@@ -11,7 +11,6 @@ import { legsServingMarket, type ScheduleLeg } from '../sim/schedule';
 import { USABLE_DAY_MINUTES } from '../sim/utilisation';
 import { applyRotation, autoPickTail, planRotation, type RotationPlan } from '../sim/rotations';
 import { minuteOfDayToTimeString, renderScheduleWarnings, scheduleProblems } from './panels';
-import { addCommercialRow } from './commercial';
 import { hideCompetitionTooltip } from './competitionTooltip';
 import type { SimState } from '../sim/state';
 
@@ -611,13 +610,11 @@ function updateFormValidation(chain: Airport[], dest: Airport, state: SimState):
 /**
  * Add a planned rotation to the schedule (sim/rotations.ts's
  * applyRotation() does the work), then bring the page up to date: new
- * schedule warnings, and a Commercial row for each market that is new.
- * Returns the new leg ids.
+ * schedule warnings. Returns the new leg ids.
  */
 export function commitRotation(state: SimState, tail: string, plan: RotationPlan): string[] {
-  const { legIds, newMarkets } = applyRotation(state, tail, plan);
+  const { legIds } = applyRotation(state, tail, plan);
   renderScheduleWarnings(scheduleProblems(state));
-  for (const market of newMarkets) addCommercialRow(market.origin, market.dest, state);
   return legIds;
 }
 

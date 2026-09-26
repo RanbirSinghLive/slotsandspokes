@@ -1,4 +1,6 @@
 import { marketKey } from '../sim/schedule';
+import type { SimState } from '../sim/state';
+import { routeBase } from './routeActions';
 
 /**
  * What the side panel is showing: the inspector (ui/inspector/). Map
@@ -64,4 +66,9 @@ export function back(): boolean {
 
 export function onSelectionChange(listener: () => void): void {
   listeners.push(listener);
+}
+
+/** Select a route with its base airport first, so the breadcrumb leads through the airport its planes fly from. */
+export function selectRoute(state: SimState, a: string, b: string): void {
+  select(routeBase(state, a, b) === b ? { kind: 'route', a: b, b: a } : { kind: 'route', a, b });
 }

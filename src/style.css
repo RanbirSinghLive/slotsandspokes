@@ -28,8 +28,7 @@ body {
   box-sizing: border-box;
 }
 
-/* #fleet-tab, #commercial-panel,
-   #ontime-panel, and #executive-panel are the sidebar's tab-content
+/* #fleet-tab, #ontime-panel and #executive-panel are the sidebar's tab-content
    panes now (#sidebar-tab-content, inside <aside id="panel">) — siblings
    that take the same slot there, whichever one isn't [hidden]. Without
    this override, the ID selectors below (specificity 1-0-0) would beat
@@ -38,7 +37,6 @@ body {
    nothing — same gotcha as #map used to share with them back when they
    were full-screen panels instead. */
 #fleet-tab[hidden],
-#commercial-panel[hidden],
 #ontime-panel[hidden],
 #executive-panel[hidden] {
   display: none;
@@ -1095,58 +1093,7 @@ body {
   cursor: not-allowed;
 }
 
-/* Week two's "Commercial" panel — one row per market, with route-level
-   levers (fare, marketing spend) plus the pax/revenue/cost/margin figures
-   those levers produce. See ui/commercial.ts. Week six: lives in the
-   sidebar's tab system now, narrower than the full canvas-width area it
-   used to get — an 11-column table with two slider columns genuinely
-   doesn't fit that width, so this scrolls horizontally (overflow-x)
-   rather than trying to cram every column into it. */
-#commercial-panel {
-  overflow-x: auto;
-}
-
-/* table-layout was `fixed` with explicit per-column percentages before
-   week six, sized against the old full-width container — at the
-   sidebar's width those percentages would crush every column illegibly
-   rather than the table just scrolling. Back to natural `auto` sizing
-   (each column as wide as its own content/sliders actually need) lets
-   the table overflow #commercial-panel's box instead, which is what
-   that panel's own new `overflow-x: auto` is there to handle. */
-#commercial-table {
-  width: 100%;
-  min-width: 700px;
-  border-collapse: collapse;
-}
-
-#commercial-table th,
-#commercial-table td {
-  text-align: left;
-  padding: 6px 10px 6px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  white-space: nowrap;
-}
-
-#commercial-table th {
-  color: #6b7694;
-  font-weight: 400;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.commercial-status.seat-capped {
-  color: #7fd88f;
-}
-
-.commercial-status.demand-capped {
-  color: #ffb37a;
-}
-
-/* Stacked, not side by side — same reasoning as the schedule table's fare
-   control needed: a slider wide enough to actually drag, plus a value
-   readout wide enough for "$1000/day", don't both fit in one row within
-   a ~12%-of-687px column. */
+/* The fare policy slider (ui/farePolicy.ts): slider above its value. */
 .lever-control {
   display: flex;
   flex-direction: column;
@@ -2101,9 +2048,9 @@ body {
   font-size: 10px;
 }
 
-/* Week six's airline-wide fare policy (sim/pricing.ts, ui/commercial.ts):
-   one control that prices the whole network, so per-market fare stops
-   being the same slider-drag repeated once per route. */
+/* The airline-wide fare policy (sim/pricing.ts, ui/farePolicy.ts), at
+   the top of the Fleet tab: one control that prices the whole network, so
+   per-market fare is the exception, set in a route's own view. */
 #fare-policy-section {
   margin-bottom: 20px;
   max-width: 460px;
@@ -3097,4 +3044,25 @@ button.inspector-crumb:hover {
 .inspector-link:hover {
   color: #fff;
   text-decoration: underline;
+}
+
+/* A lever in the route view (ui/inspector/route.ts): label, slider, then
+   the value and any reset, on one line. */
+.inspector-lever {
+  display: grid;
+  /* Fixed value and reset columns, so the sliders in every row line up. */
+  grid-template-columns: 70px 1fr 110px 52px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.inspector-lever input[type='range'] {
+  width: 100%;
+  accent-color: #6b7694;
+}
+
+.lever-label {
+  color: #9aa3b8;
+  font-size: 12px;
 }

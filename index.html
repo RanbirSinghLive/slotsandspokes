@@ -117,12 +117,6 @@
             <path d="M22 2 15 22 11 13 2 9 22 2Z" />
           </svg>
         </button>
-        <button type="button" data-tab="commercial" aria-label="Commercial" title="Commercial — fares and marketing by market" hidden>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
-            <polyline points="17 6 23 6 23 12" />
-          </svg>
-        </button>
         <button type="button" data-tab="ontime" aria-label="On-Time" title="On-Time — reliability by route">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10" />
@@ -197,6 +191,14 @@
       </section>
       <div id="sidebar-tab-content">
         <div id="fleet-tab">
+          <section id="fare-policy-section">
+            <h2>Fare policy <button type="button" class="info-mark" aria-label="What this means" data-info="Prices every market from its recommended fare, so you set this once instead of per route. A market can instead follow a stance against its rivals, or be priced by hand, in its route view: click the route on the map.">i</button></h2>
+            <div class="lever-control">
+              <input type="range" id="fare-policy-slider" min="50" max="250" step="5" value="100" aria-label="Fare policy" />
+              <span class="lever-value" id="fare-policy-value"></span>
+            </div>
+            <div id="fare-policy-status"></div>
+          </section>
           <section id="market-section">
             <h2>Lessor <button type="button" class="info-mark" aria-label="What this means" data-info="Every airline leases from this one market, first come first served — including your rivals. Each class arrives on its own timer, up to a few listed at once; an arrival that finds the shelf full is lost. Bigger classes reach the market later in the game.">i</button></h2>
             <div id="market-strip"></div>
@@ -218,34 +220,6 @@
             </table>
             <div id="rotations-empty">No rotations yet. Tap an airport on the map and choose Route.</div>
           </section>
-        </div>
-        <div id="commercial-panel" hidden>
-          <section id="fare-policy-section">
-                    <h2>Fare policy <button type="button" class="info-mark" aria-label="What this means" data-info="Prices every market from its recommended fare, so you set this once instead of per route. Override an individual market below only when it needs to differ.">i</button></h2>
-            <div class="lever-control">
-              <input type="range" id="fare-policy-slider" min="50" max="250" step="5" value="100" />
-              <span class="lever-value" id="fare-policy-value"></span>
-            </div>
-            <div id="fare-policy-status"></div>
-          </section>
-          <table id="commercial-table">
-            <thead>
-              <tr>
-                <th>Market</th>
-                <th>Freq</th>
-                <th>Pax/day</th>
-                <th>Load</th>
-                <th>Share</th>
-                <th>Revenue</th>
-                <th>Cost</th>
-                <th>Margin</th>
-                <th>Status</th>
-                <th>Fare</th>
-                <th>Marketing</th>
-              </tr>
-            </thead>
-            <tbody id="commercial-rows"></tbody>
-          </table>
         </div>
         <div id="ontime-panel" hidden>
           <h2>On-time performance by route</h2>

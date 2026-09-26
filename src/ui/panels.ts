@@ -1,5 +1,4 @@
 import { legsServingMarket, marketKey, validateSchedule } from '../sim/schedule';
-import { removeCommercialRow } from './commercial';
 import { allRotations, utilisationProblems, type Rotation } from '../sim/utilisation';
 import { classByCode } from '../sim/aircraftClasses';
 import { planeIconElement } from './planeIcons';
@@ -176,7 +175,6 @@ export function removeRotation(rotation: Rotation, state: SimState): void {
     if (legsServingMarket(leg.origin, leg.dest, state.schedule) > 0) continue;
     const key = marketKey(leg.origin, leg.dest);
     delete state.routeSettings[key];
-    removeCommercialRow(key);
   }
 
   renderScheduleWarnings(scheduleProblems(state));

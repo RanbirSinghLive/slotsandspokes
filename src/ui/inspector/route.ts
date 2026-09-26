@@ -1,6 +1,7 @@
 import { forecastStance, type StanceForecast } from '../../sim/fareForecast';
 import { rivalYieldFactor } from '../../sim/pressure';
-import { setFareStance } from '../../sim/pricing';
+import { policyFare, setFareStance, setHandFare, setMarketingSpend } from '../../sim/pricing';
+import { summarizeMarket } from '../../sim/marketSummary';
 import { rivalResponseChance } from '../../sim/rivalResponse';
 import { reliabilityDemandFactor, trailingMarketOtp } from '../../sim/routeOtp';
 import { legsServingMarket, marketKey, recommendedFare } from '../../sim/schedule';
@@ -110,6 +111,7 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
 
   const stances = buildStances(state, a, b, changed);
   if (stances) root.append(stances);
+  root.append(...buildFareAndMarketing(state, a, b, changed));
 
   // The planes this route draws on, pooled at its base.
   const base = ops.routeBase(state, a, b);
@@ -127,6 +129,126 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   root.append(buildRouteOtp(state, a, b));
 
   return { root, redrawPools };
+}
+
+/** Fare slider range around the policy fare, and its step. */
+const FARE_STEP = 5;
+const FARE_MIN_FACTOR = 0.5;
+const FARE_MAX_FACTOR = 1.5;
+const MARKETING_STEP = 50;
+const MARKETING_MAX = 1000;
+
+function roundToStep(value: number, step: number): number {
+  return Math.round(value / step) * step;
+}
+
+/** The market's day at its current settings (sim/marketSummary.ts), in one line. */
+function describeEconomics(state: SimState, a: string, b: string): { text: string; losing: boolean } {
+  const settings = state.routeSettings[marketKey(a, b)];
+  const summary = summarizeMarket(a, b, state, settings);
+  const load = summary.totalSeats > 0 ? summary.pax / summary.totalSeats : 0;
+  return {
+    text:
+      `A day at these settings: ${summary.pax} passengers, ${Math.round(load * 100)}% full, ${Math.round(summary.share * 100)}% share · ` +
+      `${money(summary.revenue)} revenue, ${money(summary.cost)} cost, ${signedMoney(summary.margin)} margin · ` +
+      (summary.seatCapped ? 'seats are the limit.' : 'demand is the limit.'),
+    losing: summary.margin < 0,
+  };
+}
+
+/**
+ * The market's two levers: its fare (set by hand here, which takes it off
+ * the policy and off any stance) and its daily marketing spend
+ * (sim/marketDemand.ts), with what a day looks like at the current
+ * settings. Dragging updates the numbers in place; the whole view rebuilds
+ * on release, so a rebuild never takes a slider out from under the pointer.
+ */
+function buildFareAndMarketing(state: SimState, a: string, b: string, changed: () => void): HTMLElement[] {
+  const settings = state.routeSettings[marketKey(a, b)];
+  if (!settings) return [];
+
+  const heading = document.createElement('h2');
+  heading.textContent = 'Fare and marketing';
+
+  const economics = line('');
+  const redrawEconomics = () => {
+    const { text, losing } = describeEconomics(state, a, b);
+    economics.textContent = text;
+    economics.classList.toggle('is-over', losing);
+  };
+
+  // Fare: centred on the policy fare, stretched to include the current
+  // fare if a stance has taken it outside that range.
+  const base = policyFare(state, a, b);
+  const fareSlider = document.createElement('input');
+  fareSlider.type = 'range';
+  fareSlider.step = String(FARE_STEP);
+  fareSlider.min = String(Math.min(roundToStep(base * FARE_MIN_FACTOR, FARE_STEP), settings.fare));
+  fareSlider.max = String(Math.max(roundToStep(base * FARE_MAX_FACTOR, FARE_STEP), settings.fare));
+  fareSlider.value = String(settings.fare);
+  fareSlider.setAttribute('aria-label', 'Fare');
+  const fareValue = document.createElement('span');
+  fareValue.className = 'lever-value';
+  const pricedBy = () =>
+    settings.fareIsOverridden ? 'by hand' : settings.fareStance ? (STANCES.find((s) => s.stance === settings.fareStance)?.name ?? '') : 'policy';
+  const redrawFare = () => {
+    fareValue.textContent = `$${settings.fare} · ${pricedBy()}`;
+    fareValue.classList.toggle('lever-value--overridden', settings.fareIsOverridden);
+  };
+  fareSlider.addEventListener('input', () => {
+    setHandFare(state, a, b, Number(fareSlider.value));
+    redrawFare();
+    redrawEconomics();
+  });
+  fareSlider.addEventListener('change', changed);
+  const fareRow = document.createElement('div');
+  fareRow.className = 'inspector-lever';
+  const fareLabel = document.createElement('span');
+  fareLabel.className = 'lever-label';
+  fareLabel.textContent = 'Fare';
+  fareRow.append(fareLabel, fareSlider, fareValue);
+  if (settings.fareIsOverridden || settings.fareStance) {
+    const reset = document.createElement('button');
+    reset.type = 'button';
+    reset.className = 'lever-reset';
+    reset.textContent = 'Policy';
+    reset.title = `Back to the airline-wide fare policy ($${base})`;
+    reset.addEventListener('click', () => {
+      setFareStance(state, a, b, null);
+      changed();
+    });
+    fareRow.append(reset);
+  }
+
+  const marketingSlider = document.createElement('input');
+  marketingSlider.type = 'range';
+  marketingSlider.min = '0';
+  marketingSlider.max = String(MARKETING_MAX);
+  marketingSlider.step = String(MARKETING_STEP);
+  marketingSlider.value = String(settings.marketingSpend);
+  marketingSlider.setAttribute('aria-label', 'Marketing spend');
+  const marketingValue = document.createElement('span');
+  marketingValue.className = 'lever-value';
+  const redrawMarketing = () => {
+    marketingValue.textContent = `$${settings.marketingSpend}/day`;
+  };
+  marketingSlider.addEventListener('input', () => {
+    setMarketingSpend(state, a, b, Number(marketingSlider.value));
+    redrawMarketing();
+    redrawEconomics();
+  });
+  marketingSlider.addEventListener('change', changed);
+  const marketingRow = document.createElement('div');
+  marketingRow.className = 'inspector-lever';
+  const marketingLabel = document.createElement('span');
+  marketingLabel.className = 'lever-label';
+  marketingLabel.textContent = 'Marketing';
+  marketingRow.append(marketingLabel, marketingSlider, marketingValue);
+
+  redrawFare();
+  redrawMarketing();
+  redrawEconomics();
+  return [heading, fareRow, marketingRow, economics];
 }
 
 const STANCES: { stance: FareStance; name: string }[] = [

@@ -43,7 +43,7 @@ export type FlightResult = {
    * (`state.spilloverByMarket`, sim/state.ts) — positive if this flight
    * was seat-capped and added its own recoverable spill to it, negative
    * if it had spare room and drew from what an earlier flight on this
-   * market left behind. The caller (sim/step.ts, ui/commercial.ts) is
+   * market left behind. The caller (sim/step.ts, sim/marketSummary.ts) is
    * the one that actually owns the pool; flightResult() stays a pure
    * function of its inputs, same as before, just reporting the delta
    * rather than mutating anything itself.
@@ -83,7 +83,7 @@ export type DemandBreakdown = {
 // fraction of its seats regardless of day. Fare itself is no longer flat —
 // see `routeSettings.fare` below, week two's "Pricing" loop, set at the
 // market level rather than per leg (sim/state.ts's RouteSettings).
-// Exported so ui/commercial.ts can tell whether a market's `pax` figure is
+// Exported so sim/marketSummary.ts can tell whether a market's `pax` figure is
 // pinned at this ceiling (seat-capped — more demand exists than the plane
 // can hold) or below it (demand-capped — raising fare will cost real pax).
 export const LOAD_FACTOR = 0.75;
@@ -104,7 +104,7 @@ const RECAPTURE_RATE = 0.4;
 
 /**
  * The block-hours-and-departure cost of one leg, independent of how many
- * passengers it carries. Exported so ui/commercial.ts can show a market's
+ * passengers it carries. Exported so a market's summary can show its
  * expected cost without duplicating this formula.
  *
  * Week six's fuel price mechanic (sim/fuel.ts) splits costPerBlockHour

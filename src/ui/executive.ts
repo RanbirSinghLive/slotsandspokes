@@ -126,7 +126,7 @@ function renderSummary(forecast: CashForecast): void {
 /**
  * Rebuild the chart and summary from `state` — called whenever the
  * Executive panel becomes visible, same "refresh on select, not every
- * tick" pattern ui/onTime.ts and ui/commercial.ts already use, since
+ * tick" pattern ui/onTime.ts already uses, since
  * nothing here needs to react faster than a panel switch. The Loans
  * half of this same panel (ui/loans.ts) refreshes on its own, every
  * frame regardless of which panel is showing — it already has to, since

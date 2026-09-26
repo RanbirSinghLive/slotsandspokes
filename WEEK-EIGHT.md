@@ -379,7 +379,26 @@ passing.
 
 ## Next: the inspector (map clicks open in the side panel)
 
-**Status: slices 1 and 2 done.**
+**Status: slices 1–3 done.**
+
+Slice 3 as built:
+- The route view has **Fare and marketing**: a fare slider (by hand,
+  clearing any stance), Policy to go back, a marketing slider, and a day
+  at those settings (passengers, full, share, revenue, cost, margin,
+  seats or demand the limit). The rules are `setHandFare()` and
+  `setMarketingSpend()` in `sim/pricing.ts`, which the old tab broke by
+  writing state from the UI.
+- The fare policy slider moved to the top of the Fleet tab
+  (`ui/farePolicy.ts`), counting markets on policy, on a stance and by
+  hand. The hidden Commercial tab and `ui/commercial.ts` are gone.
+  Nothing could reach its controls since the fewer-tabs pass.
+- The On-Time tab stays: its delay causes and cancellations are
+  network-wide. Each route in its table links to the route view.
+- A rollover rebuild waits while the pointer is held down in the panel,
+  so a slider mid-drag at 100x isn't replaced.
+- Checked with real drags in the preview: the fare ($360 → $445 by hand,
+  stance cleared on release), marketing ($250/day, cost up by exactly
+  that), Policy reset, an On-Time route link, and the drag hold.
 
 Slice 2 as built:
 - Airport clicks select the airport. The popover card, its HTML and CSS,

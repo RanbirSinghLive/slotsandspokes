@@ -111,8 +111,8 @@ export type ActiveFlight = {
  * individual scheduled leg. Fare is deliberately a route-level decision:
  * a market with two daily frequencies still has exactly one fare, not two
  * independently adjustable ones, to keep the game's decision space
- * manageable as more levers (marketing spend today, more later — see
- * ui/commercial.ts) get added to this same record.
+ * manageable as more levers (marketing spend today, more later — see a
+ * route's view, ui/inspector/route.ts) get added to this same record.
  */
 /** A way of pricing a market against its rivals (sim/pricing.ts). */
 export type FareStance = 'undercut' | 'match' | 'premium';

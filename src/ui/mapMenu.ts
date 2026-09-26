@@ -6,7 +6,7 @@ import { connectingPassengersThrough, spokesOf } from '../sim/hubs';
 import { HUB_STYLES, HUB_STYLE_ORDER, hubStyleAt } from '../sim/hubStyle';
 import { setMapPreview, type MapPreview } from '../render/preview';
 import type { SimState } from '../sim/state';
-import { select } from './selection';
+import { select, selectRoute } from './selection';
 import { redrawInspectorPreview, renderInspector } from './inspector/inspector';
 import { candidateTailsAt } from '../sim/rotations';
 import { armRouteBuilderAt, describeSlotQuotes } from './routeBuilder';
@@ -378,9 +378,7 @@ function openRouteMenu(a: string, b: string, state: SimState, x: number, y: numb
   notice = null;
   hover = null;
 
-  // The route's base first, so the panel's breadcrumb leads through it.
-  const base = ops.routeBase(state, a, b);
-  select(base === b ? { kind: 'route', a: b, b: a } : { kind: 'route', a, b });
+  selectRoute(state, a, b);
   renderHint();
   showRadial({ x: anchorX, y: anchorY, actions: routeActions(a, b, state), onHint, onPreview });
 }

@@ -1,4 +1,5 @@
 import type { SimState } from '../sim/state';
+import { selectRoute } from './selection';
 
 const marketRowsBody = document.querySelector<HTMLTableSectionElement>('#ontime-rows')!;
 const causeRowsBody = document.querySelector<HTMLTableSectionElement>('#ontime-causes-rows')!;
@@ -62,7 +63,7 @@ function onTimePctClass(pct: number): string | null {
  * rebuilt by updateOnTimePanel() every time the panel opens, same
  * "no live inputs to lose focus on" shape ui/panels.ts's fleet and
  * rotations tables use, not the "build once, patch in place" discipline
- * ui/commercial.ts needs for its own live `<input>`s.
+ * live `<input>`s need.
  * Exported anyway, for symmetry with every other panel's setup function
  * main.ts calls once at startup.
  */
@@ -71,9 +72,8 @@ export function setupOnTimePanel(): void {}
 /**
  * Rebuild both tables from `state.onTimeByMarket` and
  * `state.delayMinutesByCause` — called whenever the On-Time panel
- * becomes visible, in case either changed while it wasn't (the same
- * "refresh on select, not every tick" pattern ui/commercial.ts already
- * uses).
+ * becomes visible, in case either changed while it wasn't ("refresh on
+ * select, not every tick").
  *
  * The per-route table is sorted worst-first: the point of this panel is
  * surfacing which routes are actually unreliable, not an alphabetical
@@ -95,8 +95,15 @@ export function updateOnTimePanel(state: SimState): void {
     const [origin, dest] = key.split('-');
     const row = document.createElement('tr');
 
+    // Each route opens its own view (ui/inspector/route.ts), with its
+    // day-by-day reliability and turn buffer.
     const marketCell = document.createElement('td');
-    marketCell.textContent = `${origin} ↔ ${dest}`;
+    const link = document.createElement('button');
+    link.type = 'button';
+    link.className = 'inspector-link';
+    link.textContent = `${origin} ↔ ${dest}`;
+    link.addEventListener('click', () => selectRoute(state, origin, dest));
+    marketCell.append(link);
 
     const arrivedCell = document.createElement('td');
     arrivedCell.textContent = String(arrived);

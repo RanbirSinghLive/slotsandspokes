@@ -34,9 +34,9 @@ import {
 } from './ui/routeBuilder';
 import { handleMapMenuMouseDown, handleMapMenuKeyDown, hideMapMenu, isMapMenuOpen } from './ui/mapMenu';
 import { back, getSelection, NETWORK, onSelectionChange, select } from './ui/selection';
-import { renderInspector } from './ui/inspector/inspector';
+import { refreshInspectorForNewDay, renderInspector } from './ui/inspector/inspector';
 import { isHubPlannerOpen } from './ui/hubPlanner';
-import { setupCommercialPanel, updateCommercialPanel } from './ui/commercial';
+import { setupFarePolicy, updateFarePolicy } from './ui/farePolicy';
 import { setupOnTimePanel, updateOnTimePanel } from './ui/onTime';
 import { setupExecutivePanel, updateExecutivePanel } from './ui/executive';
 import { setupExecutivesPanel, updateExecutivesPanel } from './ui/executives';
@@ -75,7 +75,7 @@ renderScheduleWarnings(scheduleProblems(state));
 // declaration further down this file, so it's hoisted and safely callable
 // here even though this line runs before its own definition.
 setupRouteBuilder(state, () => switchToSidebarTab('fleet'));
-setupCommercialPanel(state);
+setupFarePolicy(state);
 setupOnTimePanel();
 setupExecutivePanel();
 setupExecutivesPanel();
@@ -169,15 +169,11 @@ function syncCompetitorAirlineDropdown(): void {
   }
 }
 
-// Week six: sidebar tabs. Each of these used to be a full-screen panel
-// that replaced the map (`canvas.hidden = true`); now they're content
-// panes inside the sidebar (#sidebar-tab-content) that replace each other,
-// while the map stays visible and interactive underneath the whole time.
-// Same element IDs as before — only their CSS treatment and DOM position
-// changed — so nothing in ui/commercial.ts,
-// ui/onTime.ts, or ui/executive.ts needed to change.
+// Sidebar tabs: content panes inside the sidebar (#sidebar-tab-content)
+// that replace each other, while the map stays visible and interactive
+// underneath the whole time. Anything about one route or airport is in the
+// inspector instead (ui/inspector/).
 const fleetTabEl = document.querySelector<HTMLDivElement>('#fleet-tab')!;
-const commercialPanelEl = document.querySelector<HTMLDivElement>('#commercial-panel')!;
 const onTimePanelEl = document.querySelector<HTMLDivElement>('#ontime-panel')!;
 const executivePanelEl = document.querySelector<HTMLDivElement>('#executive-panel')!;
 const techTreePanelEl = document.querySelector<HTMLDivElement>('#tech-tree-panel')!;
@@ -270,7 +266,6 @@ let latestFractionalMinute = state.simMinute;
 // layer you toggle, not a destination you navigate to.
 type SidebarTab =
   | 'fleet'
-  | 'commercial'
   | 'ontime'
   | 'executive'
   | 'techtree'
@@ -300,6 +295,7 @@ let runwayPauseRequested = false;
 function render(nowMs: number = performance.now()): void {
   updateClock(state);
   updatePanel(state);
+  if (sidebarTab === 'fleet') updateFarePolicy(state);
   updateTicker(state);
   updateMarket(state);
   updatePoolBars(state);
@@ -531,7 +527,7 @@ function tick(nowMs: number): void {
     saveState(state);
     // The day's numbers have moved (demand, the last-7-days bars, rival
     // fares), so whatever the inspector shows is rebuilt once per day.
-    if (getSelection().kind !== 'network') renderInspector(state);
+    if (getSelection().kind !== 'network') refreshInspectorForNewDay(state);
   }
 
   // Week five's failure state: the instant every loan slot is spoken for
@@ -605,9 +601,7 @@ window.addEventListener('keydown', (event) => {
 
 /**
  * Switch which sidebar tab is showing — refreshes whichever one just
- * became visible, in case its data changed while it was hidden (the
- * commercial panel only refreshes its numeric cells, never rebuilding the
- * fare/marketing sliders themselves — see ui/commercial.ts). Called by the
+ * became visible, in case its data changed while it was hidden. Called by the
  * sidebar's own tab buttons *and* by ui/routeBuilder.ts's
  * onRouteConfirmed callback, which jumps to Fleet so a newly added
  * rotation is visible in the rotations list straight away.
@@ -617,7 +611,6 @@ function switchToSidebarTab(tab: SidebarTab): void {
 
   sidebarTab = tab;
   fleetTabEl.hidden = tab !== 'fleet';
-  commercialPanelEl.hidden = tab !== 'commercial';
   onTimePanelEl.hidden = tab !== 'ontime';
   executivePanelEl.hidden = tab !== 'executive';
   techTreePanelEl.hidden = tab !== 'techtree';
@@ -628,7 +621,6 @@ function switchToSidebarTab(tab: SidebarTab): void {
 
   syncSidebarTabButtons();
 
-  if (tab === 'commercial') updateCommercialPanel(state);
   if (tab === 'ontime') updateOnTimePanel(state);
   if (tab === 'executive') {
     updateExecutivesPanel(state);

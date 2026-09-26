@@ -102,8 +102,8 @@ function utility(segment: Segment, fare: number, dailyFrequency: number, goingRa
   return segment.intercept - segment.weightPrice * relativeFare(fare, goingRate) + segment.weightSchedule * scheduleFit;
 }
 
-// The "Commercial" panel's marketing-spend lever (ui/commercial.ts, week
-// two): daily dollars spent promoting one specific market, added as a
+// A market's marketing-spend lever (its route view, ui/inspector/route.ts):
+// daily dollars spent promoting one specific market, added as a
 // bonus only to *your* utility — a competitor's offering is unaffected by
 // what you spend, and "stay home" always stays at a fixed 0. `log2` again
 // gives diminishing returns, same reasoning as scheduleFit above: the

@@ -43,14 +43,11 @@ export type MarketSummary = {
  * flightResult() the real simulation uses — not a reimplementation of the
  * pax/revenue/cost formula, so nothing that reads this can ever drift from
  * what step() actually does. `routeSettings` is passed in explicitly
- * (rather than read from state) so a caller mid-edit — ui/commercial.ts's
- * sliders — can show the *hypothetical* result of a value not committed
- * yet.
- *
- * Originally lived in ui/commercial.ts; moved here (week eight) so
- * render/mapmodes.ts's profitability mapmode can call the identical
- * formula instead of a second copy of it. Pure sim logic throughout —
- * nothing here touches the DOM — so the move cost nothing.
+ * (rather than read from state) so a caller mid-edit — the route view's
+ * sliders (ui/inspector/route.ts) — can show the *hypothetical* result of
+ * a value not committed yet. In the sim rather than the UI so
+ * render/mapmodes.ts's profitability mapmode calls the identical formula
+ * instead of a second copy of it.
  */
 export function summarizeMarket(origin: string, dest: string, state: SimState, routeSettings: RouteSettings): MarketSummary {
   // Sorted by depart time to approximate the same chronological order

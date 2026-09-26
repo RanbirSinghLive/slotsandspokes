@@ -172,7 +172,7 @@ function buildRow(spec: { label: string; depth: number; hint: string }, refs: Ro
 // Every figure comes from the same sim/economy.ts's flightResult() the
 // simulation itself runs, via its `demandBreakdown`, rather than
 // recomputing the chain here. Same anti-drift reasoning as the cost
-// tree, and the same reason ui/commercial.ts calls the real function
+// tree, and the same reason sim/marketSummary.ts calls the real function
 // instead of reimplementing it.
 // ---------------------------------------------------------------------
 
@@ -209,7 +209,7 @@ type FunnelTotals = {
  *
  * Legs are walked per market in departure order so the shared spill pool
  * fills and drains in the same sequence step.ts's arrivals would produce;
- * ui/commercial.ts's own preview does exactly this, for the same reason.
+ * sim/marketSummary.ts's preview does exactly this, for the same reason.
  */
 function computeFunnel(state: SimState): FunnelTotals {
   const totals: FunnelTotals = {

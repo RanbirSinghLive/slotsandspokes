@@ -256,9 +256,10 @@ that reason, both being the sidebar's two lifetime numbers.
 
 ## The On-Time panel (`src/ui/onTime.ts`) — week four
 
-A Reports-menu view answering two questions the HUD's single lifetime
-On-time stat can't: which *routes* are actually unreliable, and *why*
-flights are delayed at all, across the whole airline.
+A sidebar tab answering two questions the HUD's single lifetime On-time
+stat can't: which *routes* are actually unreliable, and *why* flights are
+delayed at all, across the whole airline. Each route in its table opens
+that route's view, with its day-by-day reliability and turn buffer.
 
 `SimState.onTimeByMarket: Record<marketKey, { departed, onTime }>`
 mirrors `flightsDepartedTotal`/`flightsOnTimeTotal` exactly, just split
@@ -1154,89 +1155,47 @@ already exist, which regroups them around the new base — the one remaining
 way to break a rotation from outside, and the red flag plus the remove
 button are the repair path.
 
-## The Commercial panel (`src/ui/commercial.ts`)
+## Fare and marketing (`src/ui/inspector/route.ts`, rules in `src/sim/pricing.ts`)
 
-A fourth view, one row per market, that makes route-level revenue
-management legible and *editable* — where the rotation board and demand
-map both started read-only, this one didn't, since the whole point is
-levers to pull. Raised the same way the rotation board was: not on the
-original layers/loops list, but a real gap once the Pricing loop's
-per-leg fare slider made clear that fare (and future levers) needed a
-route-level home instead.
+A route's own levers live in its route view, under **Fare and
+marketing**:
+- **Fare.** Dragging it prices the market by hand (`setHandFare()`),
+  which takes it off the policy and off any stance. **Policy** puts it
+  back. The slider spans half to one and a half times the policy fare,
+  stretched to include the current fare.
+- **Marketing** ($0–$1,000 a day in $50 steps, `setMarketingSpend()`). A
+  daily charge, made at rollover (`step.ts`), not per flight. It adds a
+  log-scaled bonus to *your* utility only (`sim/choiceModel.ts`), and it
+  speeds up demand growth (`sim/marketDemand.ts`).
+- **A day at these settings**: passengers, how full, share, revenue,
+  cost, margin, and whether **seats or demand is the limit**.
 
-Each row: market, frequency, pax/day, load factor, **market share**,
-revenue, cost, margin, a Seat-capped/Demand-capped status, and two
-levers — Fare (see "Pricing," above) and Marketing spend. Market share
-(`sim/choiceModel.ts`'s `trafficShare()`) answers a different question
-than `bookingShare()` does: it excludes "stay home" from the softmax
-denominator, so it's "of the people who fly this market, what fraction
-fly you" rather than "what fraction of the whole addressable population
-books at all." Any market with no direct competitor is trivially 100%.
-Direct-competitor-only for now — connecting itineraries aren't modeled
-(WEEK-TWO.md decision 1), so a rival reachable only by connecting
-through a third city can't pull share away here yet. Every number comes
-from calling
-`sim/economy.ts`'s real `flightResult()` once per leg serving that
-market and summing the results — never a reimplementation of the pax/
-revenue/cost formula, so this panel can't quietly drift from what the
-simulation actually does. `routeSettings` is passed into that call
-directly rather than read from `state`, so a slider mid-drag shows the
-*hypothetical* result of a value not committed yet, live.
+Seats are the limit when passengers are pinned at the combined
+load-factor ceiling of every plane serving the market. Raising the fare
+there trades away demand nobody could fly anyway. Demand is the limit
+anywhere short of that ceiling, where every passenger is real and a
+higher fare costs some.
 
-Since spill-and-recapture (week four, see "Economy," above), this
-market's legs are sorted by depart time first — approximating the same
-chronological order `step.ts` actually processes arrivals in — and the
-loop threads its own local `previewSpillover` variable through each
-`flightResult()` call, not `state.spilloverByMarket`: this is a
-hypothetical full-day run-through, not a read of wherever the real,
-currently-playing day happens to be.
+**Share** (`trafficShare()`) is "of the people who fly this market, what
+fraction fly you". It leaves "stay home" out of the softmax, unlike
+`bookingShare()`. A market with no direct rival is 100%. Connecting
+itineraries aren't modelled, so only direct rivals take share.
 
-**Seat-capped vs. demand-capped** is the single most useful thing this
-panel adds: a market is seat-capped when its passengers are pinned at
-the combined load-factor ceiling of every plane actually serving it
-(summed per leg's own aircraft type as of M13/M14, not one type times
-frequency — a market split across a Propeller and a Regional sums 25 and 75
-seats' worth of ceiling, not double whichever type happens to be
-hardcoded) — there's more demand than the fleet can carry, so raising
-fare trades away spare demand nobody could fly anyway (free margin);
-anything short of that ceiling is demand-capped (every passenger is
-real, so raising fare costs real pax). Previously the only way to know
-which case a market was in was to run the headless script and read the
-numbers by hand.
+The numbers come from `summarizeMarket()`, which calls the real
+`flightResult()` once per leg and sums the results, so they can't drift
+from what the simulation does. Legs run in departure order, with a local
+spill pool: a hypothetical full day, not a read of the day in progress.
+Settings are passed in, so a slider mid-drag shows the result of a value
+not yet committed.
 
-**Marketing spend** (`sim/choiceModel.ts`'s `marketingBonus()`) is the
-first lever added *because* `RouteSettings` was already a record, not a
-single `fare` field — a per-market daily dollar amount, log-scaled for
-diminishing returns, added only to *your* own utility term (competitors
-are unaffected by what you spend). Charged once per day per market at
-day-rollover (`step.ts`), not per flight, since it's a market-level
-decision that doesn't scale with how many flights happen to land that
-day. Bounded $0–$1,000 in $50 steps. More levers can join this same
-record later without changing its shape again.
+Dragging updates the numbers in place, and the view rebuilds on release.
+A rollover rebuild that arrives mid-drag waits for the release
+(`refreshInspectorForNewDay()`), so a rebuild never takes a slider out
+from under the pointer.
 
-Same live-input build discipline as the schedule table: sliders are
-built once per market (`setupCommercialPanel()` at startup,
-`addCommercialRow()` when the M10 route builder creates a genuinely new
-market) and never rebuilt, only their numeric sibling cells
-(`refreshRow()`) — called on every slider `input` event for that row,
-and for every row when the Commercial view is selected, in case a
-frequency changed while it wasn't open.
-
-**The same layout bug as the schedule table's Fare column repeated
-itself** at a larger scale: automatic table layout let two
-`<input type="range">`s per row push the table's content width past its
-container (951px of table in a 687px panel), silently overflowing off
-the right edge of the screen with no visual sign anything was wrong.
-Same fix, this time across ten columns: `table-layout: fixed` with
-explicit per-column percentages, and each lever's slider/readout stacked
-vertically instead of side by side.
-
-Verified in-browser: dragging Québec-Halifax's fare down from $230 to
-$120 (a demand-capped market) doubled its pax from 6 to 12 and revenue
-recomputed correctly live; adding $500/day of marketing spend on top of
-that raised pax further to 14 *and* correctly added the $500 into that
-market's displayed cost — the panel doesn't let marketing spend look
-free just because it's charged elsewhere in the simulation.
+The airline-wide **fare policy** is at the top of the Fleet tab
+(`ui/farePolicy.ts`), with a count of how many markets follow it, how
+many are on a stance, and how many are priced by hand.
 
 ## Randomness (`src/sim/rng.ts`)
 
@@ -1474,14 +1433,16 @@ pool. Stimulation is a public good.
 ## Fare policy (`src/sim/pricing.ts`) — week six
 
 One airline-wide multiplier on `recommendedFare()` prices the whole
-network. Per-market override stays available, and
-`RouteSettings.fareIsOverridden` marks those so a policy change sweeps
-everything except the routes deliberately priced differently.
+network (the slider at the top of the Fleet tab, `setFarePolicy()`). A
+market can leave it two ways, both in its route view: a fare stance
+against its rivals (below), or a fare set by hand
+(`RouteSettings.fareIsOverridden`). A policy change re-prices everything
+else.
 
-This replaced twenty identical slider-drags. Per-market pricing was busy
-work that got *worse* the larger your network grew, which is backwards.
-It doesn't remove the static optimum — competitors would have to react to
-price for that — but you now find it once instead of per route.
+One number for the whole network, because per-market pricing was busy
+work that got *worse* the larger the network grew. Where it matters,
+against a rival who answers your fare, the stances make it a choice
+rather than a slider.
 
 ---
 

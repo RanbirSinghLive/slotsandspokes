@@ -103,3 +103,38 @@ export function applyFarePolicy(state: SimState): void {
       : policyFare(state, leg.origin, leg.dest);
   }
 }
+
+/** Price a market by hand from now on: off the policy, and off any stance. */
+export function setHandFare(state: SimState, origin: string, dest: string, fare: number): void {
+  const settings = state.routeSettings[marketKey(origin, dest)];
+  if (!settings) return;
+  settings.fare = Math.max(1, Math.round(fare));
+  settings.fareIsOverridden = true;
+  settings.fareStance = null;
+}
+
+/** Set the airline-wide fare policy (clamped to its range) and re-price every market that follows it. */
+export function setFarePolicy(state: SimState, multiplier: number): void {
+  state.farePolicyMultiplier = Math.min(FARE_POLICY_MAX, Math.max(FARE_POLICY_MIN, multiplier));
+  applyFarePolicy(state);
+}
+
+/** Daily marketing spend on one market (sim/marketDemand.ts), never negative. */
+export function setMarketingSpend(state: SimState, origin: string, dest: string, spendPerDay: number): void {
+  const settings = state.routeSettings[marketKey(origin, dest)];
+  if (!settings) return;
+  settings.marketingSpend = Math.max(0, Math.round(spendPerDay));
+}
+
+/** How the markets flown today are priced: by policy, by a stance, or by hand. */
+export function pricingSummary(state: SimState): { policy: number; stance: number; hand: number } {
+  const counts = { policy: 0, stance: 0, hand: 0 };
+  for (const key of new Set(state.schedule.map((leg) => marketKey(leg.origin, leg.dest)))) {
+    const settings = state.routeSettings[key];
+    if (!settings) continue;
+    if (settings.fareIsOverridden) counts.hand++;
+    else if (settings.fareStance) counts.stance++;
+    else counts.policy++;
+  }
+  return counts;
+}
