@@ -206,12 +206,13 @@ export function rollCompetitorRouteOpenings(state: SimState, dayStartMinute: num
       NEW_ROUTE_PROBABILITY_PER_DAY * pressureFactor(state) * rivalNetworkRoom(state, code) * (1 + moneyInReach / RIVAL_OPENING_MONEY_SCALE);
     if (openRoll >= openChance) continue;
 
+    // Cheapest and most selective test first: few pairs touch its network.
     const candidates = ALL_MARKET_PAIRS.filter(
       ([a, b]) =>
-        !servedKeys.has(marketKey(a, b)) &&
-        !recentlyClosedByRival(state, code, a, b) &&
         (airlineAirports.has(a) || airlineAirports.has(b)) &&
-        marketDistanceNm(a, b) <= COMPETITOR_MAX_ROUTE_NM,
+        marketDistanceNm(a, b) <= COMPETITOR_MAX_ROUTE_NM &&
+        !servedKeys.has(marketKey(a, b)) &&
+        !recentlyClosedByRival(state, code, a, b),
     );
     if (candidates.length === 0) continue; // nothing left within reach of its network
 

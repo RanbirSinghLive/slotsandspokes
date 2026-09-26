@@ -89,10 +89,16 @@ export function slotFeesPerDayAt(state: SimState, iata: string): number {
  * taken — each one adds traffic, so each costs a little more than the
  * last. `extraMovements` is traffic not on the schedule yet (a rotation
  * being previewed), counted as if it were. Null for any pair beyond the
- * airport's capacity.
+ * airport's capacity. `average` is averageServedMovements(), passed in by a
+ * caller pricing several airports against the same traffic.
  */
-export function nextSlotFees(state: SimState, iata: string, count: number, extraMovements = 0): (number | null)[] {
-  const average = averageServedMovements(state);
+export function nextSlotFees(
+  state: SimState,
+  iata: string,
+  count: number,
+  extraMovements = 0,
+  average: number = averageServedMovements(state),
+): (number | null)[] {
   const capacity = slotCapacityPerDay(state, iata);
   const fees: (number | null)[] = [];
   for (let i = 0; i < count; i++) {
@@ -120,8 +126,10 @@ export function nextSlotFees(state: SimState, iata: string, count: number, extra
  * and pay nothing.
  */
 export function rivalSlotQuote(state: SimState, a: string, b: string): number | null {
-  const [atA] = nextSlotFees(state, a, 1);
-  const [atB] = nextSlotFees(state, b, 1);
+  // Both ends priced against the same average, counted once.
+  const average = averageServedMovements(state);
+  const [atA] = nextSlotFees(state, a, 1, 0, average);
+  const [atB] = nextSlotFees(state, b, 1, 0, average);
   if (atA === null || atB === null) return null;
   return atA + atB;
 }

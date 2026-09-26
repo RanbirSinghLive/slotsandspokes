@@ -481,6 +481,42 @@ home by far.
 
 ---
 
+## Thread 7: performance (asked for after decision 9)
+
+The balance report went from 14 to 30 minutes once slot rationing let
+airlines grow bigger. Every later balance step needs many reports, so
+find what the time goes on with a CPU profile of a big airline's year,
+and fix the hot spots without changing any result: headless output and
+the balance report must come out exactly the same before and after.
+
+**Status: first pass done.** A steady year from YYZ went from 14 s to 8 s
+and from LHR 13 s to 7 s; the balance report from 30 to 21 minutes. The
+headless output of both and all 144 games of the report came out
+identical. The changes, each exact by construction:
+- The daily demand pass works out route reliability only where seats
+  are offered (the only place it's used; it was 11% of the run), and
+  reads each pair's key and potential from a table built once
+  (`MARKET_PAIR_TABLE`) instead of rebuilding 17,020 keys a day.
+- The departure loop keeps its set of today's flown and cancelled legs
+  between minutes, reading only what was appended (both lists are only
+  appended to or replaced), instead of rebuilding it 1,440 times a day.
+- A plane still in the air skips the in-order scan of the whole
+  schedule, which could only have reached the same answer.
+- `summarizeMarket()` asks for connecting passengers once per direction,
+  not once per flight (per direction, not per market, since the two
+  directions add the same terms in a different order).
+- A rival slot quote counts airport traffic once, not once per end.
+- Rivals' route openings test "does it touch our network" first of the
+  pure filters over every city pair.
+
+What's left: working out connecting flows is about a quarter of a big
+airline's year, mostly the check that its inputs haven't changed. The
+report's 144 games are also independent, so running them side by side
+would cut its wall-clock time by the number of cores, with no change to
+the simulation.
+
+---
+
 ## Carried forward from week eight
 
 Still live, and still named by this plan:

@@ -1,4 +1,4 @@
-import { potentialDailyDemand, ALL_MARKET_PAIRS } from './demand';
+import { MARKET_PAIR_TABLE, potentialDailyDemand } from './demand';
 import { marketKey } from './schedule';
 import { reliabilityDemandFactor, trailingMarketOtp } from './routeOtp';
 import { dailySeatsByMarket, hungerBoost, hungerByAirport } from './serviceLevel';
@@ -190,9 +190,9 @@ export function rollDailyMarketDemand(state: SimState): void {
   // on the same morning's service.
   const hunger = hungerByAirport(state, seatsByMarket);
 
-  for (const [origin, dest] of ALL_MARKET_PAIRS) {
-    const key = marketKey(origin, dest);
-    const potential = currentPotentialDemand(state, origin, dest);
+  for (const { origin, dest, key, basePotential } of MARKET_PAIR_TABLE) {
+    // currentPotentialDemand(), from the pair's precomputed potential.
+    const potential = basePotential * state.demandGrowthMultiplier;
     const floor = Math.min(VIRGIN_MARKET_PDEW, potential);
     const current = state.marketDemand[key] ?? floor;
 
@@ -206,8 +206,9 @@ export function rollDailyMarketDemand(state: SimState): void {
     // How reliably the player has flown this market lately (sim/routeOtp.ts):
     // above the neutral line it speeds growth up, below it slows growth,
     // and far enough below it reverses it. Neutral on a market the player
-    // doesn't fly or has barely flown yet.
-    const reliability = reliabilityDemandFactor(trailingMarketOtp(state, origin, dest).otp);
+    // doesn't fly or has barely flown yet. Only needed where seats are
+    // offered (the branches below), so only worked out there.
+    const reliability = seatsOffered > 0 ? reliabilityDemandFactor(trailingMarketOtp(state, origin, dest).otp) : 0;
 
     let next: number;
     if (seatsOffered > 0 && reliability >= 0) {

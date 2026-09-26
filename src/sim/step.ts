@@ -114,6 +114,34 @@ function hasEarlierLegPending(state: SimState, leg: ScheduleLeg, doneToday: Set<
   );
 }
 
+/**
+ * The leg ids in today's completed and cancelled lists, as a set kept from
+ * one minute to the next rather than rebuilt 1,440 times a day. Both lists
+ * are only ever appended to or replaced with a new array (the rollover,
+ * sim/turnBuffer.ts), never edited in place, so the set stays exact by
+ * reading only what was appended since last time, and starts again when
+ * either list is a different array or has shrunk. Module-level, not in
+ * `SimState`: it's derived, and a fresh run or a loaded save rebuilds it.
+ */
+let doneCache: { completed: string[]; cancelled: string[]; completedRead: number; cancelledRead: number; ids: Set<string> } | null = null;
+
+function doneTodaySet(state: SimState): Set<string> {
+  const completed = state.completedToday;
+  const cancelled = state.cancelledToday;
+  if (
+    !doneCache ||
+    doneCache.completed !== completed ||
+    doneCache.cancelled !== cancelled ||
+    doneCache.completedRead > completed.length ||
+    doneCache.cancelledRead > cancelled.length
+  ) {
+    doneCache = { completed, cancelled, completedRead: 0, cancelledRead: 0, ids: new Set() };
+  }
+  for (; doneCache.completedRead < completed.length; doneCache.completedRead++) doneCache.ids.add(completed[doneCache.completedRead]);
+  for (; doneCache.cancelledRead < cancelled.length; doneCache.cancelledRead++) doneCache.ids.add(cancelled[doneCache.cancelledRead]);
+  return doneCache.ids;
+}
+
 export function step(state: SimState): void {
   // Home-local, not UTC: the airline's day starts at its home city's
   // midnight (sim/clock.ts).
@@ -307,7 +335,7 @@ export function step(state: SimState): void {
   // sets: every due leg is checked against them every minute, and a list
   // search there grows with the square of the schedule. Kept in step with
   // the lists by the three places below that add to them.
-  const doneToday = new Set([...state.completedToday, ...state.cancelledToday]);
+  const doneToday = doneTodaySet(state);
   const airborne = new Set(state.activeFlights.map((flight) => flight.legId));
 
   for (const leg of state.schedule) {
@@ -321,6 +349,10 @@ export function step(state: SimState): void {
     // simply never departs.
     if (state.groundedTails.includes(leg.tail)) continue;
     if (isAog(state, leg.tail)) continue;
+    // A plane still in the air toward this leg's origin just runs late:
+    // the leg waits for it. Checked before the in-order scan below, which
+    // walks the whole schedule and would only reach the same answer.
+    if (aircraft.status !== 'ground') continue;
     // A plane flies its day in order: a leg waits until every earlier leg
     // of that plane's day has flown or been cancelled. Without this, a
     // plane that started the day at the wrong airport could fly a later
@@ -331,15 +363,13 @@ export function step(state: SimState): void {
     // Parked at another airport when this leg is due (stranded there by
     // an earlier closure or curfew): it can't fly this one, so cancel it
     // and let the plane pick up its day from the next leg that leaves
-    // from where it is. A plane still in the air toward the origin just
-    // runs late, below.
-    if (aircraft.status === 'ground' && aircraft.atAirport !== leg.origin) {
+    // from where it is.
+    if (aircraft.atAirport !== leg.origin) {
       state.cancelledToday.push(leg.legId);
       doneToday.add(leg.legId);
       recordCancellation(state, leg, 'position');
       continue;
     }
-    if (aircraft.status !== 'ground') continue;
     if (state.simMinute < aircraft.groundSinceMinute + MIN_TURN_MINUTES) continue; // still turning around
 
     // The 22:00 curfew (sim/curfew.ts): a rotation that can't be back at

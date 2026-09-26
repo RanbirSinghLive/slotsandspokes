@@ -70,6 +70,18 @@ export function summarizeMarket(origin: string, dest: string, state: SimState, r
   // reflects wherever the real, currently-running day actually is, not a
   // clean full-day-from-scratch hypothetical.
   let previewSpillover = 0;
+  // Connecting passengers per direction, asked for once rather than once
+  // per flight: the answer is the same for every leg flying that way.
+  const connectingByDirection = new Map<string, number>();
+  const connectingFor = (from: string, to: string) => {
+    const direction = `${from}>${to}`;
+    let connecting = connectingByDirection.get(direction);
+    if (connecting === undefined) {
+      connecting = connectingDemandOnMarket(state, from, to);
+      connectingByDirection.set(direction, connecting);
+    }
+    return connecting;
+  };
   for (const leg of legs) {
     const type = aircraftTypeForLeg(leg, state);
     const result = flightResult(
@@ -78,7 +90,7 @@ export function summarizeMarket(origin: string, dest: string, state: SimState, r
       state.fuelPriceIndex,
       state.fuelEfficiencyMultiplier,
       actualDailyDemand(state, leg.origin, leg.dest),
-      connectingDemandOnMarket(state, leg.origin, leg.dest),
+      connectingFor(leg.origin, leg.dest),
       freq,
       routeSettings,
       state.competitorRoutes,

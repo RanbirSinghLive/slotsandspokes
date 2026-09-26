@@ -157,3 +157,13 @@ export const ALL_MARKET_PAIRS: [string, string][] = (() => {
 const potentialByPair = new Map<string, number>(
   ALL_MARKET_PAIRS.map(([a, b]) => [pairKey(a, b), gravityDemand(airportsByIata.get(a)!, airportsByIata.get(b)!)]),
 );
+
+/**
+ * ALL_MARKET_PAIRS with each pair's key and potential worked out once, for
+ * passes that visit every pair every day (sim/marketDemand.ts): building
+ * 17,020 keys and looking them up again each day was a measurable part of
+ * a headless year.
+ */
+export const MARKET_PAIR_TABLE: { origin: string; dest: string; key: string; basePotential: number }[] = ALL_MARKET_PAIRS.map(
+  ([origin, dest]) => ({ origin, dest, key: pairKey(origin, dest), basePotential: potentialDailyDemand(origin, dest) }),
+);
