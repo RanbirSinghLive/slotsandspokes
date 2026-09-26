@@ -7,7 +7,7 @@ fill-out, fare stances, the side panel and the headless player) lives in
 **State at handoff:** save key `airgame-save-v46`. Week eight's headless
 player and `npm run balance` give every balance change a measured
 before and after (baseline below). Route views now show a route's share
-of slot fees and leases. **Nothing in this plan is started.**
+of slot fees and leases. **Thread 1 is done; thread 2 is next.**
 
 ---
 
@@ -74,6 +74,33 @@ cost, and anything that hands out a permanent edge cheaply is a bug.
 ---
 
 ## Thread 1: the measuring stick (headless personas)
+
+**Status: done.** `headless/player.ts` has `sitter` and `reckless`, and
+`npm run balance` runs all four players (144 games, about 8 minutes).
+
+**Today's game, measured** (day 365, seeds 1–6):
+
+| Persona | Busts | Median year-end cash, by home |
+|---|---|---|
+| starter | 23/36 | YYZ $4.1M, BOS $1.0M, YUL $629k; PHL, YHZ and LHR all bust |
+| steady | 1/36 | $15M (YHZ) to $91M (YUL) |
+| sitter | 1/36 | $6.8M (YHZ) to $17.6M (YUL); planes 4.3–4.8 |
+| reckless | 36/36, day 10–51 | bust everywhere |
+
+What it says:
+- **Sitting is never punished.** From YUL the sitter's margin peaks at
+  about $79k a day around day 90, dips to $46k as rivals arrive, then
+  settles at about $60k a day for the rest of the year. Five planes and
+  no effort make $7–18M. This is the gap thread 3 exists to close.
+- **Growth at any cost is already punished, and hard.** Every reckless
+  game busts within two months. The lessor lets it lease faster than new
+  routes build demand, and it never cuts. So thread 4 (shocks) isn't
+  needed to stop reckless growth; its job is narrower: to punish a
+  steady player caught with a thin cushion. The reckless target below
+  should be read as "busts", not "busts a third of the time", unless the
+  owner wants a gentler reckless player to aim at.
+- Halifax's one steady bust and one sitter bust are the same seed: the
+  sitter hadn't reached five planes yet, so it was still playing steady.
 
 Two more players in `headless/player.ts`, so the targets below can be
 checked rather than argued:
@@ -267,5 +294,11 @@ Still live, and still named by this plan:
 - **Should the headless player read markets in words too?** Honest
   balance says yes, once thread 2 hides the numbers. It currently scores
   markets by exact potential.
+- **What should reckless mean?** Today's reckless player busts in every
+  game within two months, so the "a third bust" target can't be tuned
+  toward without making leasing much safer. Either keep it as the
+  extreme (and the target becomes "always busts, not before day 30"),
+  or define a milder reckless player (grows fast but still cuts
+  losers) and aim that one at a third.
 - **Five sizes, or three?** You suggested small, medium and large.
   Five gives a trunk route somewhere to stand out; three is simpler.

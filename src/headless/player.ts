@@ -12,7 +12,7 @@ import { isAircraftTypeAllowedAt, legsServingMarket, marketKey, recommendedFare 
 import type { FareStance, SimState } from '../sim/state';
 import { TURN_BUFFER_CHOICES } from '../sim/turnBuffer';
 import { spillingMarkets } from '../sim/unmetDemand';
-import { utilisationPools } from '../sim/utilisation';
+import { aircraftUtilisation, utilisationPools } from '../sim/utilisation';
 import { airportLoad } from '../sim/airports';
 import { congestionParameters } from '../sim/delays';
 
@@ -30,10 +30,19 @@ import { congestionParameters } from '../sim/delays';
  *   habit is a small function with one threshold, run in a fixed order,
  *   so when a balance number moves the reason can be read here. There is
  *   no lookahead and no randomness: two runs from one seed still match.
+ * - **sitter** plays steady until it has SITTER_FLEET_SIZE planes, then
+ *   only harvests: it keeps its schedule running (slack, cutting losers,
+ *   stances, returning idle planes) but never leases, opens or adds a
+ *   flight again. It is the player the game should punish slowly
+ *   (WEEK-NINE.md, thread 1).
+ * - **reckless** grows at any cost: it leases the biggest plane the lessor
+ *   allows every day it can, fills every plane's day to the curfew
+ *   wherever the riders are, and never cuts, buffers or looks at
+ *   congestion, slot fees or rivals. The game should punish it quickly.
  */
 
-export type PlayerKind = 'starter' | 'steady';
-export const PLAYER_KINDS: PlayerKind[] = ['starter', 'steady'];
+export type PlayerKind = 'starter' | 'steady' | 'sitter' | 'reckless';
+export const PLAYER_KINDS: PlayerKind[] = ['starter', 'steady', 'sitter', 'reckless'];
 
 export type Player = {
   kind: PlayerKind;
@@ -44,11 +53,13 @@ export type Player = {
 };
 
 export function createPlayer(kind: PlayerKind): Player {
-  return kind === 'starter' ? starterPlayer() : steadyPlayer();
+  if (kind === 'starter') return starterPlayer();
+  if (kind === 'reckless') return recklessPlayer();
+  return steadyPlayer(kind);
 }
 
 /**
- * The command line's `--player starter|steady` (steady when left out),
+ * The command line's `--player starter|steady|sitter|reckless` (steady when left out),
  * and the other arguments in order without it, so each runner keeps its
  * own positional arguments.
  */
@@ -115,10 +126,15 @@ export const STANCE_REVIEW_DAYS = 7;
 /** Stances in the order they win ties: Match first, since it's the neutral choice. */
 const STANCE_PREFERENCE: FareStance[] = ['match', 'undercut', 'premium'];
 
+/** Planes the sitter grows to before it stops growing. */
+export const SITTER_FLEET_SIZE = 5;
+/** How much of its day a plane can already fly before the reckless player stops looking for more to give it. */
+const RECKLESS_FULL_SHARE = 0.9;
+
 const airports = airportsData as RotationStop[];
 const airportByIata = new Map(airports.map((airport) => [airport.iata, airport]));
 
-// --- The two players -----------------------------------------------------
+// --- The players -----------------------------------------------------------
 
 function starterPlayer(): Player {
   return {
@@ -128,6 +144,35 @@ function starterPlayer(): Player {
       return [];
     },
     playDay: () => [],
+  };
+}
+
+function recklessPlayer(): Player {
+  return {
+    kind: 'reckless',
+    open: (state) => {
+      for (const aircraft of state.aircraft) fillPlane(state, aircraft.tail, { latestLanding: Infinity });
+      return [];
+    },
+    playDay: (state) => {
+      const log: string[] = [];
+      // The biggest plane the lessor will let it have, every day it can.
+      for (const option of [...actions.planeOptions(state, state.homeAirport)].reverse()) {
+        if (!option.listing || option.disabledReason) continue;
+        const leased = actions.leasePlane(state, state.homeAirport, option.code);
+        if (leased.ok) {
+          log.push(leased.message);
+          break;
+        }
+      }
+      // Every plane's day filled to the curfew, wherever the riders are.
+      for (const aircraft of state.aircraft) {
+        if (aircraftUtilisation(state, aircraft.tail).share >= RECKLESS_FULL_SHARE) continue;
+        const opened = fillPlane(state, aircraft.tail, { latestLanding: Infinity });
+        if (opened.length > 0) log.push(`${aircraft.tail} now flies ${opened.join(', ')}.`);
+      }
+      return log;
+    },
   };
 }
 
@@ -180,10 +225,12 @@ function coolingDown(state: SimState, memory: Memory, key: string): boolean {
   return dayIndex(state) - (memory.lastDropped.get(key) ?? -Infinity) < REOPEN_COOLDOWN_DAYS;
 }
 
-function steadyPlayer(): Player {
+function steadyPlayer(kind: 'steady' | 'sitter'): Player {
+  // Set once the sitter reaches its size, and never cleared: from then on it only harvests.
+  let harvesting = false;
   const memory: Memory = { lastTouched: new Map(), lastDropped: new Map(), idleDays: new Map(), openedOn: new Map(), tightUntil: new Map(), stanceReviewed: new Map() };
   return {
-    kind: 'steady',
+    kind,
     open: (state) => {
       for (const aircraft of state.aircraft) {
         fillPlane(state, aircraft.tail, {
@@ -194,15 +241,16 @@ function steadyPlayer(): Player {
       }
       return [];
     },
-    playDay: (state) => [
-      ...leaveSlack(state, memory),
-      ...cutLosers(state, memory),
-      ...feedSpill(state, memory),
-      ...openMarkets(state, memory),
-      ...leaseWhenFull(state, memory),
-      ...returnIdle(state, memory),
-      ...pickStances(state, memory),
-    ],
+    playDay: (state) => {
+      if (kind === 'sitter' && state.aircraft.length >= SITTER_FLEET_SIZE) harvesting = true;
+      return [
+        ...leaveSlack(state, memory),
+        ...cutLosers(state, memory),
+        ...(harvesting ? [] : [...feedSpill(state, memory), ...openMarkets(state, memory), ...leaseWhenFull(state, memory)]),
+        ...returnIdle(state, memory),
+        ...pickStances(state, memory),
+      ];
+    },
   };
 }
 

@@ -10,7 +10,7 @@ import { createPlayer, PLAYER_KINDS, playerFromArgs, type PlayerKind } from './p
  * The balance report: every home in HOMES, over every seed in SEEDS,
  * played by each headless player (headless/player.ts), for a year.
  *
- *   npm run balance                   # both players, a year
+ *   npm run balance                   # every player, a year
  *   npm run balance -- 180            # a different horizon, in days
  *   npm run balance -- --player steady
  *
@@ -116,7 +116,7 @@ function printTable(kind: PlayerKind, results: RunResult[], days: number): void 
   for (const row of body) console.log(`  ${line(row)}`);
 }
 
-// Without --player, both; with it, just that one.
+// Without --player, all of them; with it, just that one.
 const passedPlayer = process.argv.includes('--player');
 const { kind, rest: args } = playerFromArgs(process.argv.slice(2));
 const players = passedPlayer ? [kind] : PLAYER_KINDS;

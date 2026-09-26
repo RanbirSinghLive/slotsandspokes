@@ -622,6 +622,14 @@ planner the route builder uses, and the ring's actions in
   remembers what it changed: a market is left alone for 7 days after a
   change, gets no flight back for 30 days after one is dropped, and is
   judged only on the days since it was last opened.
+- **sitter** plays steady until it has 5 planes, then only harvests:
+  slack, cutting losers, stances and returning idle planes, but no more
+  leasing, opening or adding. It measures whether sitting on profit
+  costs anything (today it doesn't: its margin plateaus).
+- **reckless** leases the biggest plane the lessor allows every day it
+  can and fills every plane's day to 22:00 wherever the riders are,
+  never cutting and ignoring congestion, slot fees and rivals. Today it
+  busts in every game within two months.
 - **starter** fills the starting plane's day to 22:00 on the first
   morning and never does anything again. It is the floor: an unattended
   start. From Halifax, London or Philadelphia it runs out of money within
@@ -634,8 +642,8 @@ that was flown, and prints `GAME OVER on day N`.
 
 **`npm run balance`** (`src/headless/balance.ts`) is the report to read
 before and after a balance change: six homes (YUL, YYZ, BOS, PHL, YHZ,
-LHR) × six seeds, a year each, played by both players (72 games, about
-5½ minutes). Per home it prints busts and the average day they happened,
+LHR) × six seeds, a year each, played by all four players (144 games,
+about 8 minutes). Per home it prints busts and the average day they happened,
 median, mean, worst and best cash, and the planes, markets and flights a
 day of the airlines still flying, and writes every game to
 `balance-output.csv` (git-ignored). `-- 180` changes the horizon;
