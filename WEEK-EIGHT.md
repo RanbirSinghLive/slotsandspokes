@@ -9,7 +9,9 @@ Aircraft delivery lead times and **training lines** are done and
 committed. **The Grow tab — one pipeline view — is next.** A North
 American fill-out is under way as a separate thread (see "Next: filling
 out North America"), and fare stances are drafted as another (see
-"Next: fare stances and the price war").
+"Next: fare stances and the price war"). A headless player that
+leases, cuts losers and picks stances is drafted as a third (see "Next:
+a headless player that plays").
 
 ---
 
@@ -434,6 +436,129 @@ as cancelled, so nothing on screen said so.
   out on day 237, where it used to end the year at $1.57M. Its full
   schedule, packed to 22:00 with no buffer, loses a rotation to the
   curfew most days.
+
+---
+
+## Next: a headless player that plays (a separate thread)
+
+**Status: drafted, not started.**
+
+Every balance number comes from `openStarterRoutes()` (`headless/
+newGame.ts`). It fills the starting plane's day on the first morning and
+then does nothing for a year. It never leases a second plane, never
+drops a losing route, never adds a flight where passengers are turned
+away, and never reacts to a rival. It also packs the day to 22:00 with
+no slack, so the default YUL run loses a rotation to the curfew most
+days and goes bust on day 237.
+
+So a number like "Halifax busts 6 of 6" describes an airline nobody
+plays. It can't tell a hopeless home from a neglected one, and it says
+nothing about the mid-game: second planes, the Regional on day 40, price
+wars. The North American balance slice, the fare-stance open questions
+and any future goal ladder all need this first.
+
+### The blocker: the player's actions live in `ui/`
+
+The actions a player takes from the ring (add or remove a flight,
+remove a route, lease or return a plane, set a turn buffer) are in
+`ui/routeActions.ts`. That file imports `ui/routeBuilder.ts` and
+`ui/panels.ts`, which touch the DOM, so Node can't load it. That also
+breaks CLAUDE.md's rule 4: whether a plane can be leased, and which
+rotation a new flight becomes, are game rules.
+
+### Decisions (proposed, for the owner)
+
+1. **No cheating.** The player acts only through the functions a
+   button calls, and reads only what the screen shows: cash, each
+   market's P&L history, passengers turned away, how full each plane's
+   day is, the lessor's listings, and the stance forecast. It never
+   reads rival internals or future weather.
+2. **It decides once a day, at rollover.** That is roughly how often
+   someone at 1× acts, and it keeps a year's run near today's 4 seconds.
+3. **Deterministic.** No randomness of its own; ties go to data order,
+   the same as the starter. Two runs from one seed still match.
+4. **Habits, not a search.** Each habit is a small named function with
+   one threshold, applied in a fixed order. When a number moves, the
+   reason can be read in the code. No lookahead or optimiser.
+5. **Keep the starter as the floor.** `--player starter` or
+   `--player steady` on run, sweep and balance. The gap between the two
+   measures how much playing well is worth, which is a balance number
+   in itself.
+
+### The habits
+
+In order, once a day:
+
+1. **Leave slack.** Don't add a rotation that lands after about 21:00.
+   Give a route a turn buffer once it has a curfew or knock-on
+   cancellation in a week.
+2. **Cut losers.** Drop a flight on a market with 14 losing days in a
+   row. Give a new market 21 days to ramp up first, since demand grows
+   into new service.
+3. **Feed spill.** Add a flight on a profitable market that turned
+   passengers away yesterday, if a plane based there has room.
+4. **Open markets.** A plane with room flies the best unserved market
+   from its base, scored the same way the starter scores them.
+5. **Lease.** Once a class's pool at a base is about 85% booked and cash
+   covers the lease reserve plus a margin, take the next listing at
+   home. Prefer the largest class that has debuted and that its best
+   market can fill.
+6. **Return.** Give back a plane that flew nothing for 7 days, if the
+   fee is covered.
+7. **Pick a stance** on each contested market every 7 days: whichever
+   `forecastStance()` says makes the most over its window.
+
+### Slices
+
+1. **Move the actions into the sim** (`sim/playerActions.ts`):
+   - add flight, remove flight, remove route, lease, return, and turn
+     buffer, each with its preview;
+   - the thin UI wrapper that re-renders the schedule warnings stays in
+     `ui/`.
+
+   No behaviour change, checked by headless output matching exactly
+   before and after. Worth doing even if the rest waits.
+2. **The player frame and the first habits** (`headless/player.ts`):
+   - `playDay(state)`, called at rollover from `run.ts` and `sweep.ts`,
+     plus the `--player` flag;
+   - habits 1, 2 and 5 (slack, cutting losers, leasing).
+
+   Enough to see whether the default YUL run survives the year.
+3. **Growth habits:** 3, 4 and 6 (spill, new markets, returns).
+4. **Stances:** habit 7.
+5. **`npm run balance`:** the scratchpad six-homes × six-seeds script,
+   checked in. It prints mean cash, busts, planes and markets at day 365
+   for both players. Record the baseline here. The North American
+   balance slice starts from it.
+
+### Out of scope
+
+- Hubs and multi-stop rotations. The player flies out-and-backs from
+  its bases, and connecting traffic is whatever falls out of that.
+- New bases away from home.
+- Crew, training lines, missions and loans (all switched off or
+  unreachable).
+- Tuning the game itself. This thread only measures; balance changes
+  belong to the thread that finds them.
+
+### Open questions for the owner
+
+- **Are the thresholds a fair "decent player"?** Examples: 14 losing
+  days, 85% full, a 21:00 cutoff. The alternative is two or three
+  personalities (cautious, aggressive) and reporting the range.
+- **Should the player's decisions be printed?** A day-by-day log like
+  "day 41: leased Regional C-R002 at YUL" would make a run readable,
+  and could later seed the in-game advisor.
+
+### Done when
+
+- `npm run headless` from YUL uses the steady player by default and
+  says what it did.
+- `npm run balance` prints both players for six homes.
+- A year's run still takes seconds.
+- Nothing under `src/sim/` changed behaviour, apart from the actions
+  moving there.
+- HOW-IT-WORKS and CLAUDE.md's headless section describe the player.
 
 ---
 
