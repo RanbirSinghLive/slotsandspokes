@@ -6,10 +6,12 @@ import type { SimState } from './state';
  * Time pressure: the reason to keep building. Nothing here hurts a player
  * who keeps growing; it makes standing still lose ground.
  *
- * - **Rivals enter.** From day RIVAL_FIRST_ENTRY_DAY a new airline arrives
- *   every RIVAL_ENTRY_INTERVAL_DAYS, up to MAX_RIVAL_ENTRIES, on a market
- *   next to the player's network (sim/competitors.ts). They favour the
- *   markets the player already flies.
+ * - **Rivals enter.** From day RIVAL_FIRST_ENTRY_DAY new airlines arrive,
+ *   up to MAX_RIVAL_ENTRIES, more often the more money the player's
+ *   network leaves on the table (sim/attractiveness.ts), on a market next
+ *   to the player's network (sim/competitors.ts). They go after the player
+ *   markets with the most on the table, and so do existing rivals' new
+ *   routes.
  * - **Rivals grow.** Every competitor, old or new, is more likely to open
  *   routes and add flights the longer the game has run, scaled by
  *   pressureFactor().
@@ -28,8 +30,25 @@ import type { SimState } from './state';
  */
 
 export const RIVAL_FIRST_ENTRY_DAY = 15;
-export const RIVAL_ENTRY_INTERVAL_DAYS = 20;
 export const MAX_RIVAL_ENTRIES = 5;
+
+/**
+ * Profit attracts entry (CLAUDE.md, the game's philosophy). From
+ * RIVAL_FIRST_ENTRY_DAY, each day's chance of a new airline arriving is
+ * this much per dollar a day left on the table across the player's
+ * network (sim/attractiveness.ts): $100k a day is a 5% daily chance, a new
+ * airline every three weeks or so. A lean network leaves little on the
+ * table and draws few.
+ */
+export const RIVAL_ENTRY_CHANCE_PER_DOLLAR = 0.05 / 100_000;
+/** The most likely a new airline gets on any one day, however much is on the table. */
+export const MAX_RIVAL_ENTRY_CHANCE_PER_DAY = 0.1;
+/**
+ * Money on the table on the player's markets within an existing rival's
+ * reach multiplies its daily chance of opening a route by
+ * 1 + money / this: $200k a day in reach doubles it.
+ */
+export const RIVAL_OPENING_MONEY_SCALE = 200_000;
 
 /** How many daily flights any competitor will run on one route. */
 export const RIVAL_FREQUENCY_CAP = 4;

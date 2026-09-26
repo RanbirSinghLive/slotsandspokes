@@ -8,9 +8,11 @@ import { networkAirports } from './reach';
 import {
   FREQUENCY_GROWTH_PROBABILITY_PER_DAY,
   MAX_RIVAL_ENTRIES,
+  MAX_RIVAL_ENTRY_CHANCE_PER_DAY,
   pressureFactor,
+  RIVAL_ENTRY_CHANCE_PER_DOLLAR,
+  RIVAL_OPENING_MONEY_SCALE,
   RIVAL_TARGETS_PLAYER,
-  RIVAL_ENTRY_INTERVAL_DAYS,
   RIVAL_FIRST_ENTRY_DAY,
   RIVAL_FREQUENCY_CAP,
   recentlyClosedByRival,
@@ -122,6 +124,21 @@ function pickWeighted<T>(items: T[], weights: number[], roll: number): T {
   return items[items.length - 1]; // floating-point safety net
 }
 
+/**
+ * The money on the table (sim/attractiveness.ts) on every market the
+ * player flies that has any, by market key: worked out once a day and
+ * shared by the entry and opening rolls.
+ */
+function moneyByPlayerMarket(state: SimState): Map<string, number> {
+  const money = new Map<string, number>();
+  for (const key of new Set(state.schedule.map((leg) => marketKey(leg.origin, leg.dest)))) {
+    const [a, b] = key.split('-');
+    const perDay = moneyOnTable(state, a, b).perDay;
+    if (perDay > 0) money.set(key, perDay);
+  }
+  return money;
+}
+
 /** Competitors are peer startups on regional equipment, so their new routes stay within this. */
 const COMPETITOR_MAX_ROUTE_NM = 850;
 
@@ -134,12 +151,13 @@ const COMPETITOR_MAX_ROUTE_NM = 850;
  * the airline's network fills (sim/pressure.ts's rivalNetworkRoom()), so
  * openings slow down and stop at RIVAL_MAX_ROUTES_PER_AIRLINE.
  *
- * Candidates are weighted by potentialDailyDemand() (sim/demand.ts) —
- * *potential*, not the stimulated actual demand, on purpose: a
- * competitor sizing up a market should be drawn to how big it could get,
- * the same judgment a player makes, not to how little traffic it happens
- * to carry while nobody serves it. Weighted rather than deterministic so
- * they don't all pile onto the single biggest pair. A freshly-opened route starts small
+ * The player's markets in its reach that leave money on the table
+ * (sim/attractiveness.ts) raise that chance (RIVAL_OPENING_MONEY_SCALE),
+ * and with chance RIVAL_TARGETS_PLAYER it opens on one of them, weighted
+ * by the money there. Otherwise it picks any market in reach weighted by
+ * potentialDailyDemand() (sim/demand.ts): *potential*, not the stimulated
+ * actual demand, on purpose, since a competitor sizing up a market should
+ * be drawn to how big it could get. A freshly-opened route starts small
  * (dailyFrequency 1) at this map's recommendedFare() (sim/schedule.ts) —
  * the same default a player's own new route gets — and is stamped with
  * `dayStartMinute` as its `openedAtMinute`, which is what lets
@@ -148,12 +166,9 @@ const COMPETITOR_MAX_ROUTE_NM = 850;
  */
 export function rollCompetitorRouteOpenings(state: SimState, dayStartMinute: number): void {
   const roster = [...new Map(state.competitorRoutes.map((c) => [c.code, { airline: c.airline, code: c.code }])).values()];
+  const money = moneyByPlayerMarket(state);
 
   for (const { airline, code } of roster) {
-    const [openRoll, seedAfterOpen] = nextRandom(state.rngSeed);
-    state.rngSeed = seedAfterOpen;
-    if (openRoll >= NEW_ROUTE_PROBABILITY_PER_DAY * pressureFactor(state) * rivalNetworkRoom(state, code)) continue;
-
     const servedKeys = new Set(
       state.competitorRoutes.filter((c) => c.code === code).map((c) => marketKey(c.origin, c.dest)),
     );
@@ -164,6 +179,26 @@ export function rollCompetitorRouteOpenings(state: SimState, dayStartMinute: num
     const airlineAirports = new Set(
       state.competitorRoutes.filter((c) => c.code === code).flatMap((c) => [c.origin, c.dest]),
     );
+    // The player's markets within this airline's reach that leave money on
+    // the table: they make it keener to open a route, and are where it
+    // mostly goes when it does.
+    const inReach = [...money.entries()].filter(([key]) => {
+      const [a, b] = key.split('-');
+      return (
+        !servedKeys.has(key) &&
+        !recentlyClosedByRival(state, code, a, b) &&
+        (airlineAirports.has(a) || airlineAirports.has(b)) &&
+        marketDistanceNm(a, b) <= COMPETITOR_MAX_ROUTE_NM
+      );
+    });
+    const moneyInReach = inReach.reduce((sum, [, perDay]) => sum + perDay, 0);
+
+    const [openRoll, seedAfterOpen] = nextRandom(state.rngSeed);
+    state.rngSeed = seedAfterOpen;
+    const openChance =
+      NEW_ROUTE_PROBABILITY_PER_DAY * pressureFactor(state) * rivalNetworkRoom(state, code) * (1 + moneyInReach / RIVAL_OPENING_MONEY_SCALE);
+    if (openRoll >= openChance) continue;
+
     const candidates = ALL_MARKET_PAIRS.filter(
       ([a, b]) =>
         !servedKeys.has(marketKey(a, b)) &&
@@ -173,10 +208,15 @@ export function rollCompetitorRouteOpenings(state: SimState, dayStartMinute: num
     );
     if (candidates.length === 0) continue; // nothing left within reach of its network
 
-    const weights = candidates.map(([a, b]) => potentialDailyDemand(a, b));
-    const [pickRoll, seedAfterPick] = nextRandom(state.rngSeed);
+    const [targetRoll, seedAfterTarget] = nextRandom(state.rngSeed);
+    const [pickRoll, seedAfterPick] = nextRandom(seedAfterTarget);
     state.rngSeed = seedAfterPick;
-    const [origin, dest] = pickWeighted(candidates, weights, pickRoll);
+    // Most of the time, the player market with the most on the table;
+    // otherwise any market in reach, by potential.
+    const targetsPlayer = inReach.length > 0 && targetRoll < RIVAL_TARGETS_PLAYER;
+    const [origin, dest] = targetsPlayer
+      ? (pickWeighted(inReach.map(([key]) => key), inReach.map(([, perDay]) => perDay), pickRoll).split('-') as [string, string])
+      : pickWeighted(candidates, candidates.map(([a, b]) => potentialDailyDemand(a, b)), pickRoll);
     // A new route needs a plane to fly it, leased from the same market the
     // player uses (sim/market.ts). No plane, no route today.
     if (!rivalSecuresCapacity(state, code, 1)) continue;
@@ -197,30 +237,38 @@ export function rollCompetitorRouteOpenings(state: SimState, dayStartMinute: num
 const SEED_CODES = new Set((competitorsData as { code: string }[]).map((route) => route.code));
 
 /**
- * A new rival airline arrives, once the calendar says one is due (see
- * sim/pressure.ts): the k-th arrives on day FIRST + k * INTERVAL. It
- * opens a single daily flight on a market next to the player's network.
- * With chance RIVAL_TARGETS_PLAYER it goes after one of the player's own
- * markets, weighted by the money left on the table there
- * (sim/attractiveness.ts); otherwise, or if no player market has any,
- * it takes a market next to the network weighted by potential demand. Markets must be between airports the player knows and
- * within regional range, like every competitor route.
+ * A new rival airline arrives. From RIVAL_FIRST_ENTRY_DAY, each day has a
+ * chance of one, which grows with the money the player's network leaves
+ * on the table (sim/pressure.ts, sim/attractiveness.ts), up to
+ * MAX_RIVAL_ENTRIES in a game. It opens a single daily flight on a market
+ * next to the player's network. With chance RIVAL_TARGETS_PLAYER it goes
+ * after one of the player's own markets, weighted by the money on the
+ * table there; otherwise, or if no player market has any, it takes a
+ * market next to the network weighted by potential demand. Markets must be
+ * between airports the player knows and within regional range, like every
+ * competitor route.
  *
  * "How many have arrived" is read off the routes (airlines that are not in
- * the seed data), so there is no counter to keep in `SimState`. If the
- * player has no network yet, or nothing qualifies, it simply tries again
- * tomorrow. Uses the seeded random stream; call it from the day rollover.
+ * the seed data), so there is no counter to keep in `SimState`. Uses the
+ * seeded random stream; call it from the day rollover.
  */
 export function rollRivalEntry(state: SimState, dayStartMinute: number): void {
   const day = dayIndex(state, dayStartMinute);
   const codesInUse = new Set(state.competitorRoutes.map((route) => route.code));
   const entered = [...codesInUse].filter((code) => !SEED_CODES.has(code)).length;
   if (entered >= MAX_RIVAL_ENTRIES) return;
-  if (day < RIVAL_FIRST_ENTRY_DAY + entered * RIVAL_ENTRY_INTERVAL_DAYS) return;
+  if (day < RIVAL_FIRST_ENTRY_DAY) return;
+
+  // Whether one comes today at all: the more the network leaves on the
+  // table, the likelier.
+  const money = moneyByPlayerMarket(state);
+  const networkMoney = [...money.values()].reduce((sum, perDay) => sum + perDay, 0);
+  const [arrivalRoll, seedAfterArrival] = nextRandom(state.rngSeed);
+  state.rngSeed = seedAfterArrival;
+  if (arrivalRoll >= Math.min(MAX_RIVAL_ENTRY_CHANCE_PER_DAY, networkMoney * RIVAL_ENTRY_CHANCE_PER_DOLLAR)) return;
 
   const known = new Set(state.knownAirports);
   const network = networkAirports(state);
-  const playerMarkets = new Set(state.schedule.map((leg) => marketKey(leg.origin, leg.dest)));
   const candidates = ALL_MARKET_PAIRS.filter(
     ([a, b]) =>
       known.has(a) &&
@@ -244,16 +292,10 @@ export function rollRivalEntry(state: SimState, dayStartMinute: number): void {
   // passengers turned away and a fat margin. A player market with nothing
   // on the table isn't a target at all, so a lean airline is left alone
   // and the newcomer takes the best market next to the network instead.
-  const onTable = new Map(
-    candidates
-      .filter(([a, b]) => playerMarkets.has(marketKey(a, b)))
-      .map(([a, b]) => [marketKey(a, b), moneyOnTable(state, a, b).perDay] as const)
-      .filter(([, perDay]) => perDay > 0),
-  );
-  const playerCandidates = candidates.filter(([a, b]) => onTable.has(marketKey(a, b)));
+  const playerCandidates = candidates.filter(([a, b]) => money.has(marketKey(a, b)));
   const targetsPlayer = playerCandidates.length > 0 && targetRoll < RIVAL_TARGETS_PLAYER;
   const marketPool = targetsPlayer ? playerCandidates : candidates;
-  const weights = marketPool.map(([a, b]) => (targetsPlayer ? onTable.get(marketKey(a, b))! : potentialDailyDemand(a, b)));
+  const weights = marketPool.map(([a, b]) => (targetsPlayer ? money.get(marketKey(a, b))! : potentialDailyDemand(a, b)));
 
   const [origin, dest] = pickWeighted(marketPool, weights, marketRoll);
   const rival = pool[Math.min(pool.length - 1, Math.floor(nameRoll * pool.length))];

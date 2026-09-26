@@ -936,9 +936,11 @@ airline with room. Each
 rival route has a 0.8% × pressure daily chance to add a flight, up to 4 a
 day (`rollCompetitorFrequencyGrowth()`).
 
-**New rivals enter.** From day 15, one new airline every 20 days, up to 5
-(`rollRivalEntry()`, names from `rival-airlines.json`). Each opens one
-daily flight on a market next to the player's network. 70% of the time
+**New rivals enter.** From day 15, up to 5 new airlines
+(`rollRivalEntry()`, names from `rival-airlines.json`), with a daily
+chance of 5% for every $100k a day of money on the table across the
+player's network (below), at most 10% a day. A lean network draws few.
+Each opens one daily flight on a market next to the player's network. 70% of the time
 it goes after one of the player's own markets, weighted by the **money
 on the table** there (`sim/attractiveness.ts`, dollars a day):
 
@@ -949,8 +951,18 @@ on the table** there (`sim/attractiveness.ts`, dollars a day):
 
 A player market with nothing on the table isn't a target, so a lean
 airline's markets are left alone and the newcomer takes a market next to
-the network, weighted by potential. Existing rivals' own route openings
-(above) still weigh markets by potential only.
+the network, weighted by potential.
+
+**Existing rivals follow the money too.** Each airline's daily chance of
+opening a route (above) is multiplied by 1 + the money on the table on
+player markets within its reach / $200k, and 70% of the time it opens on
+one of those markets, weighted by the money
+(`rollCompetitorRouteOpenings()`). Since there are only seven airline
+names, this is where lasting pressure on a harvesting airline comes
+from: from YUL a sitting airline's margin erodes from about $50k a day
+in month two to $7–12k a day, while one that keeps growing keeps
+earning. Rivals grow outward from their own networks, all in North
+America, so none reaches London's markets.
 
 **Rivals take your yield** (`rivalYieldFactor()`). Markets here are
 seat-limited, so a rival splitting demand would still leave the player's

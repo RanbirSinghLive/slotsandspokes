@@ -8,7 +8,7 @@ fill-out, fare stances, the side panel and the headless player) lives in
 player and `npm run balance` give every balance change a measured
 before and after (baseline below). Route views now show a route's share
 of slot fees and leases. **Thread 1, thread 2's slice 1 and thread
-3's slice 1 are done; thread 3's slice 2 is next.**
+3's slices 1–2 are done. Next in order: thread 2's slices 2–3.**
 
 ---
 
@@ -254,11 +254,54 @@ markets with nothing on the table. `PLAYER_MARKET_WEIGHT` is gone.
   Cascade Connect opened onto a player market with $0 on it. Slice 2
   should make both paths follow attractiveness.
 
+**Slice 2 as built:**
+- **New airlines** arrive with a daily chance of 5% per $100k a day on
+  the table across the network (`RIVAL_ENTRY_CHANCE_PER_DOLLAR`, capped
+  at 10% a day), from day 15, up to 5. The 20-day timer is gone.
+- **Existing rivals** open routes with their old chance × (1 + money on
+  the table on player markets in reach / $200k), and 70% of the time on
+  one of those markets, weighted by the money
+  (`rollCompetitorRouteOpenings()`). Only 7 airline names exist, so this
+  is where lasting pressure comes from.
+- **The scale needed softening.** At $50k (money doubling the chance)
+  the steady player's margin went from $264k a day at day 90 to about
+  zero from day 180 for the rest of the year: growth stopped paying. At
+  $200k, from YUL it keeps growing after its peak ($17.7M at day 180 to
+  $25.4M at day 360, $23–77k a day), while the sitter erodes to
+  $7–12k a day.
+
+Measured (six seeds, day 365):
+
+| Persona | Thread 2 baseline | Slice 2 |
+|---|---|---|
+| starter busts | 15/36 | 7/36 |
+| steady median, north-east | $67M–$86M | $29M–$45M |
+| steady, YHZ | $44M | $2.2M, 1 bust |
+| steady, LHR | $73M | $97M |
+| sitter median | $17M–$21M | $9.5M–$15.7M (YHZ $3.1M) |
+| reckless | 36/36 bust | 36/36 bust |
+
+What it says:
+- **Sitting now costs.** A sitting airline makes about a third of what a
+  growing one does in the north-east, and its margin erodes from month
+  three. It still ends the year well ahead, which is right for a player
+  who stops: the pressure is erosion, not a forced loss.
+- **The starter survives far more** (7 busts, from 15), since one plane's
+  four full routes leave little on the table.
+- **London is untouched.** Existing rivals grow from their own networks,
+  all in North America, so none can reach Heathrow's markets, and only
+  the five new airlines can. London is now the easiest home by far
+  ($97M). It needs rivals based in Europe (a data change).
+- **Halifax punishes growth.** Its thin markets swarm with rivals as soon
+  as the steady player makes money there, and it busts once in six while
+  the sitter survives every seed. Partly fair (not growth at any cost),
+  partly the headless player leasing on last week's margin without seeing
+  rivals coming. Worth watching once moats exist (slice 3).
+
 Slices:
 1. **Attractiveness, and entry weighted by it.** (Done.)
 2. **The entry rate follows the network's attractiveness**, and existing
-   rivals' openings weigh player markets by it too. The timer goes;
-   harvesting draws more rivals. Measured: the sitter declines.
+   rivals' openings weigh player markets by it too. (Done.)
 3. **Deterrence: frequency dominance and hub feed.**
 4. **Deterrence: slot control.** Rivals pay for slots at congested
    airports, and can be priced out.
@@ -348,6 +391,9 @@ Still live, and still named by this plan:
 - **Should the headless player read markets in words too?** Honest
   balance says yes, once thread 2 hides the numbers. It currently scores
   markets by exact potential.
+- **Rivals in Europe?** London has no existing rival that can reach it,
+  so the new pressure barely touches it. Seed data for a European
+  rival or two would fix that. Worth doing before tuning further?
 - **What should reckless mean?** Today's reckless player busts in every
   game within two months, so the "a third bust" target can't be tuned
   toward without making leasing much safer. Either keep it as the
