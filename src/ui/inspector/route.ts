@@ -12,6 +12,7 @@ import { getMapPreview } from '../../render/preview';
 import { WINDOW_DAYS, buildBipolarBars, dayLabel, money as pnlMoney } from '../pnlBars';
 import { buildPoolRows } from '../poolBars';
 import * as ops from '../routeActions';
+import { rivalLinksOn } from './rival';
 
 /**
  * The inspector's view of one route (ui/inspector/inspector.ts): what
@@ -84,16 +85,16 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   if (rivals.length > 0) {
     const factor = rivalYieldFactor(a, b, legsServingMarket(a, b, state.schedule), state.competitorRoutes);
     const cut = Math.round((1 - factor) * 100);
-    root.append(
-      line(
-        // Their fare moves in response to yours (sim/competitors.ts), so
-        // it's shown next to what you charge.
-        `Rivals: ${rivals.map((r) => `${r.airline} ${r.dailyFrequency}/day at $${r.fare.toLocaleString()}`).join(', ')}` +
-          ` (you: $${(state.routeSettings[marketKey(a, b)]?.fare ?? 0).toLocaleString()})` +
-          (cut > 0 ? `. They cut your fares ${cut}%: more flights of your own reduce it.` : ''),
-        'inspector-line is-warn',
-      ),
+    // Their fare moves in response to yours (sim/competitors.ts), so it's
+    // shown next to what you charge. Each name opens that rival's view.
+    const rivalsLine = line('', 'inspector-line is-warn');
+    rivalsLine.append(
+      'Rivals: ',
+      ...rivalLinksOn(state, a, b),
+      ` (you: $${(state.routeSettings[marketKey(a, b)]?.fare ?? 0).toLocaleString()})` +
+        (cut > 0 ? `. They cut your fares ${cut}%: more flights of your own reduce it.` : ''),
     );
+    root.append(rivalsLine);
   }
 
   // Full and priced at a premium: rivals are coming for the passengers

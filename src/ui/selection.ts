@@ -16,7 +16,10 @@ export type Selection =
   | { kind: 'airports' }
   | { kind: 'airport'; iata: string }
   /** A route, `a` first: the airport the breadcrumb leads through (its base, when opened from the map). */
-  | { kind: 'route'; a: string; b: string };
+  | { kind: 'route'; a: string; b: string }
+  | { kind: 'rivals' }
+  /** A rival airline, by its two-letter code. */
+  | { kind: 'rival'; code: string };
 
 export const NETWORK: Selection = { kind: 'network' };
 
@@ -34,6 +37,7 @@ export function getSelection(): Selection {
 function sameSelection(x: Selection, y: Selection): boolean {
   if (x.kind === 'route' && y.kind === 'route') return marketKey(x.a, x.b) === marketKey(y.a, y.b);
   if (x.kind === 'airport' && y.kind === 'airport') return x.iata === y.iata;
+  if (x.kind === 'rival' && y.kind === 'rival') return x.code === y.code;
   return x.kind === y.kind;
 }
 

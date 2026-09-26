@@ -138,6 +138,10 @@ function selectCompetitorAirline(button: HTMLButtonElement): void {
     .forEach((b) => b.classList.toggle('active', b === button));
   closeAllDropdowns(); // function declaration, hoisted — defined further down with the other view groups
   hideCompetitionTooltip(); // stale position/content for whatever was hovered under the old filter
+  // The side panel follows the filter: one airline opens its view, "All
+  // competitors" the list of rivals (ui/inspector/rival.ts).
+  const code = state.competitorRoutes.find((route) => route.airline === selectedCompetitorAirline)?.code;
+  select(code ? { kind: 'rival', code } : { kind: 'rivals' });
   render();
 }
 
@@ -358,6 +362,12 @@ function render(nowMs: number = performance.now()): void {
   // The route the side panel is showing, on top of whichever layer drew routes.
   const selection = getSelection();
   if (selection.kind === 'route') drawSelectedRoute(ctx, selection.a, selection.b);
+  // A selected rival: its whole network, so its reach reads at a glance.
+  if (selection.kind === 'rival') {
+    for (const route of state.competitorRoutes) {
+      if (route.code === selection.code) drawSelectedRoute(ctx, route.origin, route.dest);
+    }
+  }
 
   // Hovering a plane (not the route line) shows its own story: why it's
   // late (ui/flightTooltip.ts) and how that lateness spreads through the
@@ -634,13 +644,15 @@ function switchToSidebarTab(tab: SidebarTab): void {
 }
 
 /**
- * Which tab button reads as active: Airports whenever the inspector is
- * showing something (every inspector view sits under Airports in its
- * breadcrumb), otherwise the Network view's current tab.
+ * Which tab button reads as active: Airports while the inspector shows
+ * the airports list, an airport or a route (all under Airports in its
+ * breadcrumb), none while it shows rivals, otherwise the Network view's
+ * current tab.
  */
 function syncSidebarTabButtons(): void {
-  const inspecting = getSelection().kind !== 'network';
-  sidebarTabButtons.forEach((b) => b.classList.toggle('active', inspecting ? b.dataset.tab === 'airports' : b.dataset.tab === sidebarTab));
+  const kind = getSelection().kind;
+  const active = kind === 'network' ? sidebarTab : kind === 'rivals' || kind === 'rival' ? null : 'airports';
+  sidebarTabButtons.forEach((b) => b.classList.toggle('active', b.dataset.tab === active));
 }
 
 sidebarTabButtons.forEach((button) => {

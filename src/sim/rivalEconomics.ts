@@ -87,3 +87,27 @@ export function closeLosingRivalRoutes(state: SimState): void {
   }
   state.competitorRoutes = state.competitorRoutes.filter((route) => !closing.has(route));
 }
+
+export type RivalRouteOutlook = RivalRouteResult & {
+  /** Days in a row it has lost money, as of the last rollover. */
+  losingDays: number;
+  /** Days of its grace period left, during which losses can't close it. */
+  graceDaysLeft: number;
+  /**
+   * If it keeps losing money: days until closeLosingRivalRoutes() closes
+   * it (the later of its grace ending and its streak reaching
+   * RIVAL_CLOSE_AFTER_LOSING_DAYS). Null while it's making money.
+   */
+  closesInDays: number | null;
+};
+
+/** Where one rival route stands today: what it makes, its losing streak, and how long until losses would close it. */
+export function rivalRouteOutlook(state: SimState, route: CompetitorOffering): RivalRouteOutlook {
+  const result = rivalRouteDailyResult(state, route);
+  const losingDays = route.losingDays ?? 0;
+  const daysOpen = Math.floor((state.simMinute - route.openedAtMinute) / MINUTES_PER_DAY);
+  const graceDaysLeft = Math.max(0, RIVAL_CLOSE_GRACE_DAYS - daysOpen);
+  const closesInDays =
+    result.margin < 0 ? Math.max(1, graceDaysLeft, RIVAL_CLOSE_AFTER_LOSING_DAYS - losingDays) : null;
+  return { ...result, losingDays, graceDaysLeft, closesInDays };
+}

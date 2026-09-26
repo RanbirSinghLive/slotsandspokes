@@ -167,7 +167,28 @@ once the rest works.
 
 ## Next: filling out North America (a separate thread)
 
-**Status: slices 1–3 done.** The owner has settled the scope (see
+**Status: all four slices done.**
+
+Slice 4 as built:
+- `rivals` and `rival(code)` selections, with views in
+  `ui/inspector/rival.ts` and the breadcrumb Network › Rivals ›
+  Ironbridge Airlines. Every rival name in a route's view links to it.
+  Its routes that you also fly link to your route view.
+- The Competition overlay's airline picker drives the panel: an airline
+  opens its view, "All competitors" the list.
+- The map draws a selected rival's whole network in the selection teal.
+- `rivalRouteOutlook()` in `sim/rivalEconomics.ts` gives each route's
+  margin, losing streak, grace left and days until it would close.
+- A selection that stops existing now falls back to its breadcrumb
+  parent (a gone rival to the Rivals list), not straight to Network.
+- **What it showed straight away:** Ironbridge owns a Propeller and three
+  Regionals but is costed as Narrowbodies on every route, because its
+  class comes from the whole airline's size. That's −$51,884 a day, with
+  4 of its 7 routes losing and saved only by their grace periods. The
+  rival-cost issue from the fare-stance findings, now visible in the
+  game.
+
+ The owner has settled the scope (see
 "Decisions").
 
 Grow the map from 40 airports to about 150, filling in the US and

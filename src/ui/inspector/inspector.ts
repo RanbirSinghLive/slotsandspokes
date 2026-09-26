@@ -3,6 +3,7 @@ import * as ops from '../routeActions';
 import { back, getSelection, NETWORK, replaceSelection, select, type Selection } from '../selection';
 import { buildAirportView } from './airport';
 import { buildAirportsView } from './airports';
+import { buildRivalView, buildRivalsView, rivalName } from './rival';
 import { buildRouteView } from './route';
 
 /**
@@ -57,13 +58,19 @@ export function refreshInspectorForNewDay(state: SimState): void {
 function stillExists(state: SimState, selection: Selection): boolean {
   if (selection.kind === 'route') return ops.rotationsServing(state, selection.a, selection.b).length > 0;
   if (selection.kind === 'airport') return state.knownAirports.includes(selection.iata);
+  if (selection.kind === 'rival') return state.competitorRoutes.some((route) => route.code === selection.code);
   return true;
 }
 
 /** The trail from Network to `selection`, each step with what selecting it shows. */
-function trail(selection: Selection): { label: string; target: Selection }[] {
+function trail(state: SimState, selection: Selection): { label: string; target: Selection }[] {
   const steps: { label: string; target: Selection }[] = [{ label: 'Network', target: NETWORK }];
   if (selection.kind === 'network') return steps;
+  if (selection.kind === 'rivals' || selection.kind === 'rival') {
+    steps.push({ label: 'Rivals', target: { kind: 'rivals' } });
+    if (selection.kind === 'rival') steps.push({ label: rivalName(state, selection.code), target: selection });
+    return steps;
+  }
   steps.push({ label: 'Airports', target: { kind: 'airports' } });
   if (selection.kind === 'airport') steps.push({ label: selection.iata, target: selection });
   if (selection.kind === 'route') {
@@ -77,10 +84,11 @@ function trail(selection: Selection): { label: string; target: Selection }[] {
 function selectionKey(selection: Selection): string {
   if (selection.kind === 'route') return `route:${selection.a}-${selection.b}`;
   if (selection.kind === 'airport') return `airport:${selection.iata}`;
+  if (selection.kind === 'rival') return `rival:${selection.code}`;
   return selection.kind;
 }
 
-function renderBreadcrumb(selection: Selection): void {
+function renderBreadcrumb(state: SimState, selection: Selection): void {
   const backButton = document.createElement('button');
   backButton.type = 'button';
   backButton.className = 'inspector-back';
@@ -89,7 +97,7 @@ function renderBreadcrumb(selection: Selection): void {
   backButton.setAttribute('aria-label', 'Back');
   backButton.addEventListener('click', () => back());
 
-  const steps = trail(selection);
+  const steps = trail(state, selection);
   const crumbs = steps.flatMap((step, i) => {
     const last = i === steps.length - 1;
     const crumb = document.createElement(last ? 'span' : 'button');
@@ -109,10 +117,12 @@ function renderBreadcrumb(selection: Selection): void {
 /** Rebuild the inspector for the current selection. */
 export function renderInspector(state: SimState): void {
   let selection = getSelection();
-  // A selection that has stopped existing (its last flight removed) falls
-  // back to Network rather than showing an empty view.
-  if (!stillExists(state, selection)) {
-    replaceSelection(NETWORK);
+  // A selection that has stopped existing (its last flight removed, a
+  // rival gone from the map) falls back to the step above it in the
+  // breadcrumb, rather than showing an empty view.
+  while (!stillExists(state, selection)) {
+    const steps = trail(state, selection);
+    replaceSelection(steps[steps.length - 2]?.target ?? NETWORK);
     selection = getSelection();
   }
 
@@ -126,7 +136,7 @@ export function renderInspector(state: SimState): void {
     return;
   }
 
-  renderBreadcrumb(selection);
+  renderBreadcrumb(state, selection);
   const key = selectionKey(selection);
   // A rebuild of the same selection (after an action, or at rollover)
   // keeps the reader's place; a new selection starts at the top.
@@ -141,6 +151,10 @@ export function renderInspector(state: SimState): void {
     const view = buildAirportView(state, selection.iata, rebuild);
     bodyEl.replaceChildren(view.root);
     redrawPools = view.redrawPools;
+  } else if (selection.kind === 'rival') {
+    bodyEl.replaceChildren(buildRivalView(state, selection.code));
+  } else if (selection.kind === 'rivals') {
+    bodyEl.replaceChildren(buildRivalsView(state));
   } else {
     bodyEl.replaceChildren(buildAirportsView(state, rebuild));
   }

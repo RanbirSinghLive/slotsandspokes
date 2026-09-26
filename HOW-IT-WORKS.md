@@ -991,25 +991,34 @@ same rule as the canvas layers.
 
 **The inspector** (`src/ui/inspector/`, `src/ui/selection.ts`). The panel
 shows whatever is selected. At **Network** it is the summary and tabs
-above. Everything else sits under **Airports**:
+above. Everything else sits under **Airports** or **Rivals**:
 
 | Selection | How you get there | What it shows |
 |---|---|---|
 | Airports list | the Airports tab | every known airport (served, or all known), sortable by departures, load, slots or waiting riders |
 | An airport | click its dot, or its row | presence, waiting riders, load, slots, grounded planes with Expedite, Plan hub, planes based there, and every market flown from it |
 | A route | click its line, or a market row | the route view: flights, demand, rivals, fare stances, pools, margin and on-time |
+| Rivals list | "All competitors" in the Competition overlay, or the breadcrumb | every rival airline, biggest first: routes (and how many against you), estimated margin a day, routes losing money |
+| A rival | its name anywhere in the panel, or picking it in the Competition overlay | its fleet, routes against the 20-route cap, the class its routes are costed as, every route worst first (fare against the going rate, margin a day, losing streak, grace left, about when it closes), and markets it closed recently |
 
-The breadcrumb reads Network › Airports › YYZ › YYZ – ORD. A route opened
-from the map goes under its base airport. The map marks the selection: a
-teal ring around a selected airport, a teal glow along a selected route.
+The breadcrumb reads Network › Airports › YYZ › YYZ – ORD, or Network ›
+Rivals › Ironbridge Airlines. A route opened from the map goes under its
+base airport. The map marks the selection: a teal ring around a selected
+airport, a teal glow along a selected route or along every route of a
+selected rival.
+
+A rival's route outlook (`rivalRouteOutlook()`, `sim/rivalEconomics.ts`)
+uses the same rules that close its routes. Margins are estimates with
+your own economics, since rivals keep no books.
 The radial ring still opens at the click for actions, with its hover
 hints in a label under it.
 
 Getting back: Esc steps back once nothing else wants it. It listens in
 the capture phase, so the ring, the hub planner and the route builder
 each close first. The ‹ button, a breadcrumb link, another sidebar tab,
-or a click on empty map also work. A selection that stops existing falls
-back to Network. A hidden panel reopens when something is selected.
+or a click on empty map also work. A selection that stops existing (a
+route's last flight removed, a rival gone from the map) falls back to the
+step above it in the breadcrumb. A hidden panel reopens when something is selected.
 
 The selection is UI state, not saved. A view is rebuilt when the
 selection changes, after an action, and at day rollover, never per
