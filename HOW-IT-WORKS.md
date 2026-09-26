@@ -632,6 +632,16 @@ planner the route builder uses, and the ring's actions in
 after every simulated minute, writes a row for the part of the final day
 that was flown, and prints `GAME OVER on day N`.
 
+**`npm run balance`** (`src/headless/balance.ts`) is the report to read
+before and after a balance change: six homes (YUL, YYZ, BOS, PHL, YHZ,
+LHR) × six seeds, a year each, played by both players (72 games, about
+5½ minutes). Per home it prints busts and the average day they happened,
+median, mean, worst and best cash, and the planes, markets and flights a
+day of the airlines still flying, and writes every game to
+`balance-output.csv` (git-ignored). `-- 180` changes the horizon;
+`--player steady` runs one player. One seed can mislead badly: London's
+steady runs end anywhere from $325k to $90M.
+
 Balance work that needs a better player should add a habit to
 `player.ts`, not hand-write a schedule. (Until September 2026 the runner
 flew a hand-authored three-aircraft network no player could have, which

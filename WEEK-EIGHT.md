@@ -441,7 +441,47 @@ as cancelled, so nothing on screen said so.
 
 ## Next: a headless player that plays (a separate thread)
 
-**Status: slices 1–4 and 6 done.**
+**Status: all six slices done.** This thread is finished; the balance
+thread starts from the baseline below.
+
+**Slice 5 as built:** `npm run balance` (`headless/balance.ts`) plays
+six homes × six seeds for a year with each player: 72 games in about
+5½ minutes. Per home it prints busts (with the average day), median,
+mean, worst and best cash, and the planes, markets and flights a day of
+the airlines still flying. It writes every game to
+`balance-output.csv`. `-- 180` changes the horizon, and `--player steady`
+runs one player.
+
+**The baseline** (day 365, seeds 1–6):
+
+| Home | Starter: busts | Starter: mean cash | Steady: busts | Steady: median | Steady: worst–best | Planes |
+|---|---|---|---|---|---|---|
+| YUL | 3/6 (day 281) | $961k | 0/6 | $90.7M | $59.9M–$96.8M | 18.8 |
+| YYZ | 0/6 | $4.0M | 0/6 | $67.8M | $30.9M–$117M | 19.0 |
+| BOS | 2/6 (day 307) | $1.2M | 0/6 | $68.1M | $25.6M–$82.9M | 15.2 |
+| PHL | 6/6 (day 126) | bust | 0/6 | $72.8M | $49.4M–$90.4M | 16.0 |
+| YHZ | 6/6 (day 71) | bust | 1/6 (day 168) | $15.4M | bust–$32.9M | 7.4 |
+| LHR | 6/6 (day 110) | bust | 0/6 | $34.1M | $325k–$89.7M | 14.8 |
+
+What it says, for the balance thread:
+- **Playing well is worth 20–100× the unattended start**, and a
+  careful player almost never goes bust (1 of 36). Not playing at all
+  is fatal outside the north-east core. The early game is harsh and the
+  mid-game is easy.
+- **A year makes a careful airline $13M–$90M from $500k.** Planes pay
+  for themselves within days, and the only thing that stops growth is
+  congestion at home, at 15–20 planes. That's the balance thread's
+  first problem.
+- **Halifax is the only home that stays hard,** and still averages
+  $13M. London flies 15 planes on under 4 markets a day: Heathrow's
+  pairs are big enough that stacking them works, until a rival's fares
+  make it fail (its worst seed ended on $325k).
+- **Route margins leave out slot fees and leases.** Both are charged
+  airline-wide at midnight, so a route's margin, its 7-day bars and the
+  route view's "a day at these settings" never include them. The
+  player judges routes by those numbers, and so does a person. Not
+  built; worth a line in the route view (its share of slot fees at each
+  end) before tuning slot prices.
 
 **Slice 4 as built:** habit 7 compares the three stances' forecasts
 (`forecastStance()`) on each contested market every 7 days and takes the
@@ -699,8 +739,8 @@ In order, once a day:
 ### Done when
 
 - `npm run headless` from YUL uses the steady player by default and
-  says what it did.
-- `npm run balance` prints both players for six homes.
+  says what it did. (Done.)
+- `npm run balance` prints both players for six homes. (Done.)
 - A year's run still takes seconds, at any airline size (slice 6).
 - Nothing under `src/sim/` changed behaviour, apart from the actions
   moving there.

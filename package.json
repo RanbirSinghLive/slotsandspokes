@@ -10,6 +10,7 @@
     "headless": "tsx src/headless/run.ts",
     "sweep": "tsx src/headless/sweep.ts",
     "lease": "tsx src/headless/lease.ts",
+    "balance": "tsx src/headless/balance.ts",
     "airports": "tsx src/headless/buildAirports.ts",
     "lakes": "tsx src/headless/buildLakes.ts",
     "rivers": "tsx src/headless/buildRivers.ts"
