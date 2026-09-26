@@ -465,7 +465,10 @@ export function step(state: SimState): void {
         const blockMinutes = flight.arriveMinute - flight.departMinute;
 
         {
-          const marketFrequency = legsServingMarket(flight.origin, flight.dest, state.schedule);
+          // At least this flight: a route removed while its last flight
+          // was in the air has no legs left on the schedule, and demand
+          // per flight would be divided by zero.
+          const marketFrequency = Math.max(1, legsServingMarket(flight.origin, flight.dest, state.schedule));
           const key = marketKey(flight.origin, flight.dest);
           const spilloverAvailable = state.spilloverByMarket[key] ?? 0;
           const result = flightResult(
