@@ -1,6 +1,7 @@
 import type { SimState } from '../../sim/state';
 import * as ops from '../routeActions';
 import { back, getSelection, NETWORK, replaceSelection, select, type Selection } from '../selection';
+import { buildAircraftView, buildFleetView } from './aircraft';
 import { buildAirportView } from './airport';
 import { buildAirportsView } from './airports';
 import { buildRivalView, buildRivalsView, rivalName } from './rival';
@@ -59,6 +60,7 @@ function stillExists(state: SimState, selection: Selection): boolean {
   if (selection.kind === 'route') return ops.rotationsServing(state, selection.a, selection.b).length > 0;
   if (selection.kind === 'airport') return state.knownAirports.includes(selection.iata);
   if (selection.kind === 'rival') return state.competitorRoutes.some((route) => route.code === selection.code);
+  if (selection.kind === 'aircraft') return state.aircraft.some((aircraft) => aircraft.tail === selection.tail);
   return true;
 }
 
@@ -66,6 +68,11 @@ function stillExists(state: SimState, selection: Selection): boolean {
 function trail(state: SimState, selection: Selection): { label: string; target: Selection }[] {
   const steps: { label: string; target: Selection }[] = [{ label: 'Network', target: NETWORK }];
   if (selection.kind === 'network') return steps;
+  if (selection.kind === 'fleet' || selection.kind === 'aircraft') {
+    steps.push({ label: 'Fleet', target: { kind: 'fleet' } });
+    if (selection.kind === 'aircraft') steps.push({ label: selection.tail, target: selection });
+    return steps;
+  }
   if (selection.kind === 'rivals' || selection.kind === 'rival') {
     steps.push({ label: 'Rivals', target: { kind: 'rivals' } });
     if (selection.kind === 'rival') steps.push({ label: rivalName(state, selection.code), target: selection });
@@ -85,6 +92,7 @@ function selectionKey(selection: Selection): string {
   if (selection.kind === 'route') return `route:${selection.a}-${selection.b}`;
   if (selection.kind === 'airport') return `airport:${selection.iata}`;
   if (selection.kind === 'rival') return `rival:${selection.code}`;
+  if (selection.kind === 'aircraft') return `aircraft:${selection.tail}`;
   return selection.kind;
 }
 
@@ -151,6 +159,10 @@ export function renderInspector(state: SimState): void {
     const view = buildAirportView(state, selection.iata, rebuild);
     bodyEl.replaceChildren(view.root);
     redrawPools = view.redrawPools;
+  } else if (selection.kind === 'aircraft') {
+    bodyEl.replaceChildren(buildAircraftView(state, selection.tail, rebuild));
+  } else if (selection.kind === 'fleet') {
+    bodyEl.replaceChildren(buildFleetView(state));
   } else if (selection.kind === 'rival') {
     bodyEl.replaceChildren(buildRivalView(state, selection.code));
   } else if (selection.kind === 'rivals') {

@@ -67,6 +67,19 @@ export type Aircraft = {
   baseAirport: string | null;
 };
 
+/** How one leg went, once it has landed. */
+export type LegResult = {
+  /** Minutes after its scheduled time that it left. */
+  departLateMinutes: number;
+  /** Minutes after its scheduled arrival that it landed (0 or less: on the dot or early). */
+  arriveLateMinutes: number;
+  onTime: boolean;
+  /** The delay rolled for it, by cause (sim/delays.ts). */
+  delayByCause: DelayBreakdown;
+  passengers: number;
+  margin: number;
+};
+
 export type ActiveFlight = {
   legId: string;
   tail: string;
@@ -203,6 +216,13 @@ export type SimState = {
    */
   weatherByAirport: Record<string, WeatherEvent>;
   completedToday: string[];
+  /**
+   * How each leg that landed today went, by legId, recorded on arrival
+   * (sim/step.ts): the flight's own record vanishes when it lands, and the
+   * aircraft view (ui/inspector/aircraft.ts) shows a plane's whole day.
+   * Cleared at rollover. Optional so older saves load: absent means none.
+   */
+  todayLegResults?: Record<string, LegResult>;
   /**
    * Legs cancelled during the day by the 22:00 curfew (sim/curfew.ts), so
    * the departure loop stops trying to fly them. Reset at rollover. The
@@ -645,6 +665,7 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     competitorRoutes: loadCompetitorRoutes(),
     weatherByAirport: {},
     completedToday: [],
+    todayLegResults: {},
     cancelledToday: [],
     todayRevenue: 0,
     todayCost: 0,

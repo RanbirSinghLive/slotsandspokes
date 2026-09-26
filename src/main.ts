@@ -362,6 +362,16 @@ function render(nowMs: number = performance.now()): void {
   // The route the side panel is showing, on top of whichever layer drew routes.
   const selection = getSelection();
   if (selection.kind === 'route') drawSelectedRoute(ctx, selection.a, selection.b);
+  // A selected plane: every route it flies today.
+  if (selection.kind === 'aircraft') {
+    const drawn = new Set<string>();
+    for (const leg of state.schedule) {
+      const key = [leg.origin, leg.dest].sort().join('-');
+      if (leg.tail !== selection.tail || drawn.has(key)) continue;
+      drawn.add(key);
+      drawSelectedRoute(ctx, leg.origin, leg.dest);
+    }
+  }
   // A selected rival: its whole network, so its reach reads at a glance.
   if (selection.kind === 'rival') {
     for (const route of state.competitorRoutes) {
@@ -385,8 +395,14 @@ function render(nowMs: number = performance.now()): void {
   } else {
     hideFlightTooltip();
   }
+  // A selected plane in the air keeps its cascade drawn without hovering,
+  // so its day stays readable while the panel shows it.
+  const selectedFlight = selection.kind === 'aircraft' ? state.activeFlights.find((f) => f.tail === selection.tail) : undefined;
+  if (selectedFlight && selectedFlight !== hoveredFlight) {
+    drawDelayCascade(ctx, selectedFlight, projectRestOfDay(state, selectedFlight.tail), latestFractionalMinute);
+  }
 
-  drawAircraft(ctx, state, latestFractionalMinute, hoveredFlight?.legId ?? null);
+  drawAircraft(ctx, state, latestFractionalMinute, hoveredFlight?.legId ?? selectedFlight?.legId ?? null);
   // The unmet-demand pips around airports belong to the Demand layer.
   drawAirports(ctx, state, demandOverlayOn);
   // The airport the side panel is showing, on top of its dot.
@@ -646,12 +662,13 @@ function switchToSidebarTab(tab: SidebarTab): void {
 /**
  * Which tab button reads as active: Airports while the inspector shows
  * the airports list, an airport or a route (all under Airports in its
- * breadcrumb), none while it shows rivals, otherwise the Network view's
- * current tab.
+ * breadcrumb), Fleet while it shows the fleet or a plane, none while it
+ * shows rivals, otherwise the Network view's current tab.
  */
 function syncSidebarTabButtons(): void {
   const kind = getSelection().kind;
-  const active = kind === 'network' ? sidebarTab : kind === 'rivals' || kind === 'rival' ? null : 'airports';
+  const active =
+    kind === 'network' ? sidebarTab : kind === 'fleet' || kind === 'aircraft' ? 'fleet' : kind === 'rivals' || kind === 'rival' ? null : 'airports';
   sidebarTabButtons.forEach((b) => b.classList.toggle('active', b.dataset.tab === active));
 }
 
@@ -839,6 +856,15 @@ canvas.addEventListener('mousedown', (event) => {
   // always live now (week six), so there's no "different panel" case to
   // exempt this from anymore — every click on the canvas reaches here.
   if (handleRouteBuilderMouseDown(event, state)) {
+    render();
+    return;
+  }
+
+  // A plane in the air, drawn on top of everything, gets the click before
+  // the airports and routes under it: it opens that plane's view.
+  const clickedFlight = findFlightAt(event.clientX, event.clientY, state, latestFractionalMinute);
+  if (clickedFlight) {
+    select({ kind: 'aircraft', tail: clickedFlight.tail });
     render();
     return;
   }

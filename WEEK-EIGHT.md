@@ -167,7 +167,14 @@ once the rest works.
 
 ## Next: filling out North America (a separate thread)
 
-**Status: all four slices done.**
+**Status: all five slices done.** Slice 5, the aircraft view, was checked
+in the preview:
+- a rotations-table link and a click on a plane in flight both open it
+  (the plane wins over Toronto's dot just under it);
+- its day reads as a knock-on chain: the leg in the air 10 min late
+  (age), the next two heading for 13 and 16 min late;
+- Return to lessor is blocked while the plane has flights, and says so;
+- the map highlights all four of its routes.
 
 Slice 4 as built:
 - `rivals` and `rival(code)` selections, with views in
@@ -512,6 +519,22 @@ Slice 2 as built:
    per-route On-Time move into the route view. The popover code goes.
 4. **Rival airline view.** Its routes, fares, losing streaks and fleet,
    linked from every rival name. It helps the price war.
+5. **Aircraft view and Fleet list** (asked for after slice 4). A plane is
+   the unit of the core loop, and how a delay spreads through one
+   plane's day is the map's main lesson. But its day was scattered: a
+   rotations row, a hover tooltip, the lease menu, the airport ring.
+   Network › Fleet › C-P001 shows:
+   - its specs, where it is now, and how much of its day is used;
+   - its whole day in order: flown legs with how late and why,
+     passengers and margin; the one in the air; upcoming legs with
+     projected lateness; cancelled ones;
+   - Return to lessor.
+
+   The map pins its routes and its delay cascade while it's selected.
+   Ways in: clicking a plane in flight, the rotations table, and its
+   airport's view. Needs today's result per flown leg, which vanished
+   on landing: `SimState.todayLegResults`, optional, cleared at
+   rollover.
 
 This replaces the tab regrouping the Grow tab note mentioned for
 Airports, Commercial and On-Time. The Grow tab itself (the pipeline

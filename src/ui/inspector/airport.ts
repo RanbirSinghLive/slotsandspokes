@@ -16,6 +16,7 @@ import { money as pnlMoney } from '../pnlBars';
 import { buildPoolRows } from '../poolBars';
 import * as ops from '../routeActions';
 import { select } from '../selection';
+import { aircraftLink } from './aircraft';
 
 /**
  * The inspector's view of one airport (ui/inspector/inspector.ts): how
@@ -94,8 +95,20 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
   redrawPools();
   const basedHere = utilisationPools(state, iata).some((pool) => pool.planes > 0);
   root.append(heading('Planes based here'));
-  if (basedHere) root.append(pools);
-  else root.append(line('No aircraft based here.'));
+  if (basedHere) {
+    // Each plane by tail, opening its own day (ui/inspector/aircraft.ts).
+    const tails = document.createElement('div');
+    tails.className = 'inspector-line';
+    state.aircraft
+      .filter((aircraft) => aircraft.baseAirport === iata)
+      .forEach((aircraft, i) => {
+        if (i > 0) tails.append(', ');
+        tails.append(aircraftLink(aircraft.tail));
+      });
+    root.append(pools, tails);
+  } else {
+    root.append(line('No aircraft based here.'));
+  }
 
   root.append(heading('Markets'), marketRows(state, iata));
   return { root, redrawPools };

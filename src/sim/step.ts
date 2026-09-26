@@ -154,6 +154,7 @@ export function step(state: SimState): void {
 
     state.completedToday = [];
     state.cancelledToday = [];
+    state.todayLegResults = {};
     state.todayRevenue = 0;
     state.todayCost = 0;
     state.todayMargin = 0;
@@ -448,6 +449,9 @@ export function step(state: SimState): void {
     if (state.simMinute < flight.arriveMinute) continue;
 
     const aircraft = state.aircraft.find((a) => a.tail === flight.tail);
+    // What this flight carried and made, kept for today's leg results below.
+    let flightPassengers = 0;
+    let flightMargin = 0;
     if (aircraft) {
       aircraft.status = 'ground';
       aircraft.atAirport = flight.dest;
@@ -475,6 +479,8 @@ export function step(state: SimState): void {
             spilloverAvailable,
           );
           state.spilloverByMarket[key] = spilloverAvailable + result.spilloverDelta;
+          flightPassengers = result.pax;
+          flightMargin = result.margin;
           state.cash += result.margin;
           state.todayRevenue += result.revenue;
           state.todayCost += result.cost;
@@ -515,6 +521,17 @@ export function step(state: SimState): void {
       marketOnTimeToday.onTime += 1;
       if (state.activeTarget) state.activeTarget.flightsOnTime += 1;
     }
+
+    // How this leg went, for the aircraft view: the flight record itself
+    // is gone once it lands.
+    (state.todayLegResults ??= {})[flight.legId] = {
+      departLateMinutes: flight.departMinute - flight.scheduledDepartMinute,
+      arriveLateMinutes: flight.arriveMinute - flight.scheduledArriveMinute,
+      onTime,
+      delayByCause: flight.delayByCause,
+      passengers: flightPassengers,
+      margin: flightMargin,
+    };
 
     state.completedToday.push(flight.legId);
     state.activeFlights.splice(i, 1);

@@ -1001,21 +1001,29 @@ same rule as the canvas layers.
 
 **The inspector** (`src/ui/inspector/`, `src/ui/selection.ts`). The panel
 shows whatever is selected. At **Network** it is the summary and tabs
-above. Everything else sits under **Airports** or **Rivals**:
+above. Everything else sits under **Airports**, **Fleet** or **Rivals**:
 
 | Selection | How you get there | What it shows |
 |---|---|---|
 | Airports list | the Airports tab | every known airport (served, or all known), sortable by departures, load, slots or waiting riders |
 | An airport | click its dot, or its row | presence, waiting riders, load, slots, grounded planes with Expedite, Plan hub, planes based there, and every market flown from it |
 | A route | click its line, or a market row | the route view: flights, demand, rivals, fare stances, pools, margin and on-time |
+| Fleet list | the breadcrumb, from a plane | every aircraft: base, how much of its day it uses, on time today, AOG |
+| An aircraft | click it in flight on the map, its row in the rotations table, or its tail in an airport's view | its specs and age (and what the age does to its delays), where it is now, how much of the day it uses, its whole day in order (flown legs with how late and why, passengers and margin; the one in the air; upcoming legs with projected lateness; cancelled ones), its rotations, and Return to lessor |
 | Rivals list | "All competitors" in the Competition overlay, or the breadcrumb | every rival airline, biggest first: routes (and how many against you), estimated margin a day, routes losing money |
 | A rival | its name anywhere in the panel, or picking it in the Competition overlay | its fleet, routes against the 20-route cap, its average seats per flight and any planes beyond what its flying needs, every route worst first (fare against the going rate, margin a day, losing streak, grace left, about when it closes), and markets it closed recently |
 
 The breadcrumb reads Network › Airports › YYZ › YYZ – ORD, or Network ›
 Rivals › Ironbridge Airlines. A route opened from the map goes under its
 base airport. The map marks the selection: a teal ring around a selected
-airport, a teal glow along a selected route or along every route of a
-selected rival.
+airport, a teal glow along a selected route, along every route of a
+selected rival, or along every route a selected plane flies. A selected
+plane in the air also keeps its delay cascade drawn (`drawDelayCascade()`),
+as hovering it does.
+
+A flight's own record (`ActiveFlight`) goes when it lands, so each landed
+leg's result (how late it left and landed, why, passengers, margin) is
+kept in `SimState.todayLegResults` until rollover, for the aircraft view.
 
 A rival's route outlook (`rivalRouteOutlook()`, `sim/rivalEconomics.ts`)
 uses the same rules that close its routes. Margins are estimates with

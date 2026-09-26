@@ -1,5 +1,6 @@
 import { legsServingMarket, marketKey, validateSchedule } from '../sim/schedule';
 import { allRotations, utilisationProblems, type Rotation } from '../sim/utilisation';
+import { select } from './selection';
 import { classByCode } from '../sim/aircraftClasses';
 import { planeIconElement } from './planeIcons';
 import { updatePnlHistoryPanel } from './pnlHistory';
@@ -119,10 +120,17 @@ function renderRotations(state: SimState): void {
     row.className = 'rotation-row';
     if (!rotation.closed) row.classList.add('rotation-row--open');
 
+    // The plane opens its own view (ui/inspector/aircraft.ts): its whole
+    // day, leg by leg.
     const planeCell = document.createElement('td');
     const typeCode = state.aircraft.find((a) => a.tail === rotation.tail)?.typeCode ?? '';
-    planeCell.append(planeIconElement(typeCode), classByCode(typeCode)?.name ?? typeCode);
-    planeCell.title = rotation.tail;
+    const planeLink = document.createElement('button');
+    planeLink.type = 'button';
+    planeLink.className = 'inspector-link';
+    planeLink.append(planeIconElement(typeCode), classByCode(typeCode)?.name ?? typeCode);
+    planeLink.title = `${rotation.tail}: open its day`;
+    planeLink.addEventListener('click', () => select({ kind: 'aircraft', tail: rotation.tail }));
+    planeCell.append(planeLink);
 
     const routeCell = document.createElement('td');
     routeCell.className = 'rotation-route-cell';

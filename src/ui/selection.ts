@@ -18,6 +18,9 @@ export type Selection =
   /** A route, `a` first: the airport the breadcrumb leads through (its base, when opened from the map). */
   | { kind: 'route'; a: string; b: string }
   | { kind: 'rivals' }
+  | { kind: 'fleet' }
+  /** One of the player's aircraft, by tail. */
+  | { kind: 'aircraft'; tail: string }
   /** A rival airline, by its two-letter code. */
   | { kind: 'rival'; code: string };
 
@@ -38,6 +41,7 @@ function sameSelection(x: Selection, y: Selection): boolean {
   if (x.kind === 'route' && y.kind === 'route') return marketKey(x.a, x.b) === marketKey(y.a, y.b);
   if (x.kind === 'airport' && y.kind === 'airport') return x.iata === y.iata;
   if (x.kind === 'rival' && y.kind === 'rival') return x.code === y.code;
+  if (x.kind === 'aircraft' && y.kind === 'aircraft') return x.tail === y.tail;
   return x.kind === y.kind;
 }
 
