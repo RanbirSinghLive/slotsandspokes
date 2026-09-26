@@ -524,12 +524,15 @@ export type SimState = {
   rivalClosures?: RivalClosure[];
   /**
    * Lifetime cancellations by cause — the same shape (and the same
-   * purpose) as `delayMinutesByCause`. Three causes, each with a
-   * different answer available to the player: crew shortages are
-   * answered by reserve depth, mechanical events by maintenance
-   * staffing and younger airframes, and weather by nothing at all.
+   * purpose) as `delayMinutesByCause`. Each cause has a different answer
+   * available to the player: crew shortages are answered by reserve
+   * depth, mechanical events by maintenance staffing and younger
+   * airframes, curfew by slack in the day, and weather by nothing at all.
+   * `position` is a leg whose plane was parked at another airport when it
+   * was due (stranded by an earlier disruption); optional so older saves
+   * load, absent meaning none.
    */
-  cancellationsByCause: { crew: number; mechanical: number; weather: number; curfew: number };
+  cancellationsByCause: { crew: number; mechanical: number; weather: number; curfew: number; position?: number };
   /**
    * Week six's cancellations: legs that should have operated today and
    * didn't. `flightsScheduled*` counts what was on the books, so

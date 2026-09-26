@@ -18,6 +18,7 @@ const CANCEL_CAUSE_LABELS: [keyof SimState['cancellationsByCause'], string][] = 
   ['mechanical', 'Aircraft AOG'],
   ['weather', 'Airport closed'],
   ['curfew', 'Delays ran past 22:00'],
+  ['position', 'Aircraft out of position'],
 ];
 
 // Below BAD_THRESHOLD: red, matching the app's existing "flag a real
@@ -158,7 +159,7 @@ export function updateOnTimePanel(state: SimState): void {
   cancelRowsBody.innerHTML = '';
   const totalCancelled = state.flightsCancelledTotal;
   for (const [key, label] of CANCEL_CAUSE_LABELS) {
-    const count = state.cancellationsByCause[key];
+    const count = state.cancellationsByCause[key] ?? 0;
     const share = totalCancelled > 0 ? count / totalCancelled : 0;
     const row = document.createElement('tr');
 

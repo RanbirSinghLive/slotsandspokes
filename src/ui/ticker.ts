@@ -309,7 +309,38 @@ function pollRivalFareEvents(state: SimState): void {
   }
 }
 
+/**
+ * A leg cancelled because its plane was parked at another airport
+ * (sim/step.ts): the plane was stranded by an earlier disruption and
+ * picks its day up from where it is. Said here because nothing else on
+ * screen would show a flight that simply didn't happen.
+ */
+let hasSeenInitialPositions = false;
+let lastPositionCount = 0;
+let previousCancelled = new Set<string>();
+
+function pollPositionEvents(state: SimState): void {
+  const count = state.cancellationsByCause.position ?? 0;
+  const cancelled = new Set(state.cancelledToday);
+  if (hasSeenInitialPositions && count > lastPositionCount) {
+    for (const legId of cancelled) {
+      if (previousCancelled.has(legId)) continue;
+      const leg = state.schedule.find((l) => l.legId === legId);
+      const aircraft = leg && state.aircraft.find((a) => a.tail === leg.tail);
+      if (!leg || !aircraft || aircraft.status !== 'ground' || aircraft.atAirport === leg.origin) continue;
+      pushEvent(
+        state.simMinute,
+        `${leg.tail} is at ${aircraft.atAirport}, not ${leg.origin}: ${leg.origin}→${leg.dest} cancelled. It picks up its day from ${aircraft.atAirport}`,
+      );
+    }
+  }
+  hasSeenInitialPositions = true;
+  lastPositionCount = count;
+  previousCancelled = cancelled;
+}
+
 export function updateTicker(state: SimState): void {
+  pollPositionEvents(state);
   pollAogEvents(state);
   pollRivalFareEvents(state);
   pollMarketEvents(state);

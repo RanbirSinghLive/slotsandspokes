@@ -96,7 +96,7 @@ const aircraftTypesByCode = new Map<string, EconomyAircraftType>(
  * slow that route's demand growth.
  */
 function recordCancellation(state: SimState, leg: ScheduleLeg, cause: keyof SimState['cancellationsByCause']): void {
-  state.cancellationsByCause[cause] += 1;
+  state.cancellationsByCause[cause] = (state.cancellationsByCause[cause] ?? 0) + 1;
   state.todayFlightsCancelled += 1;
   state.flightsCancelledTotal += 1;
   state.npsPointsTotal += CANCELLATION_NPS_SCORE;
@@ -105,6 +105,17 @@ function recordCancellation(state: SimState, leg: ScheduleLeg, cause: keyof SimS
   state.todayNpsScoredFlights += 1;
   const market = (state.todayOnTimeByMarket[marketKey(leg.origin, leg.dest)] ??= { arrived: 0, onTime: 0, cancelled: 0 });
   market.cancelled += 1;
+}
+
+/** Whether an earlier leg of this plane's day hasn't flown or been cancelled yet. */
+function hasEarlierLegPending(state: SimState, leg: ScheduleLeg): boolean {
+  return state.schedule.some(
+    (other) =>
+      other.tail === leg.tail &&
+      other.departMinute < leg.departMinute &&
+      !state.completedToday.includes(other.legId) &&
+      !state.cancelledToday.includes(other.legId),
+  );
 }
 
 export function step(state: SimState): void {
@@ -310,8 +321,24 @@ export function step(state: SimState): void {
     // simply never departs.
     if (state.groundedTails.includes(leg.tail)) continue;
     if (isAog(state, leg.tail)) continue;
+    // A plane flies its day in order: a leg waits until every earlier leg
+    // of that plane's day has flown or been cancelled. Without this, a
+    // plane that started the day at the wrong airport could fly a later
+    // leg first and then an overdue earlier one, ending the day back where
+    // it started, every day, while its other routes never flew.
+    if (hasEarlierLegPending(state, leg)) continue;
     if (isAirportClosed(state, leg.origin)) continue;
-    if (aircraft.status !== 'ground' || aircraft.atAirport !== leg.origin) continue;
+    // Parked at another airport when this leg is due (stranded there by
+    // an earlier closure or curfew): it can't fly this one, so cancel it
+    // and let the plane pick up its day from the next leg that leaves
+    // from where it is. A plane still in the air toward the origin just
+    // runs late, below.
+    if (aircraft.status === 'ground' && aircraft.atAirport !== leg.origin) {
+      state.cancelledToday.push(leg.legId);
+      recordCancellation(state, leg, 'position');
+      continue;
+    }
+    if (aircraft.status !== 'ground') continue;
     if (state.simMinute < aircraft.groundSinceMinute + MIN_TURN_MINUTES) continue; // still turning around
 
     // The 22:00 curfew (sim/curfew.ts): a rotation that can't be back at

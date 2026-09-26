@@ -59,6 +59,20 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   title.textContent = `${a} – ${b}`;
   root.append(title);
 
+  // Flights that should have flown and didn't: everything below that
+  // forecasts a day assumes they operate, so say so first.
+  const reliability = state.onTimeHistoryByMarket[marketKey(a, b)];
+  const days = Math.min(WINDOW_DAYS, reliability?.arrived.length ?? 0);
+  const operated = (reliability?.arrived.slice(-days) ?? []).reduce((sum, n) => sum + n, 0);
+  if (days >= 2 && operated === 0) {
+    root.append(
+      line(
+        `None of this route's flights has operated in the last ${days} days. The numbers below assume they do: see why under On-time.`,
+        'inspector-line is-over',
+      ),
+    );
+  }
+
   const short = readout.demandNow > readout.seatsPerFlight;
   const presence = line(
     `${summary.rotations.length} flight${summary.rotations.length === 1 ? '' : 's'}/day · ${summary.byClass.map((c) => `${c.name} x${c.count}`).join(', ')}`,

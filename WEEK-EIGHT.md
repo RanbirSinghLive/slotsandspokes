@@ -407,6 +407,29 @@ passing.
 
 ---
 
+## Fixed: planes stranded out of position
+
+Found in a playthrough: a plane that ended one day away from base flew
+its legs out of order from then on, looping LGA–DCA every day while its
+Toronto and Boston legs never flew. Worse, those legs were never counted
+as cancelled, so nothing on screen said so.
+
+- `step.ts` now flies each plane's day in order, and cancels a due leg
+  whose plane is parked elsewhere, with a new cause, "aircraft out of
+  position" (optional in `cancellationsByCause`, so saves load).
+- The ticker names it, the On-Time tab counts it, and the route view
+  warns when none of a route's flights has operated in the last days.
+- **Every balance number before this fix is suspect.** The headless
+  starter player was caught in the same loop from about day 14 and
+  quietly flew about half its schedule. Six-seed means barely moved
+  (YUL $981k → $959k, YYZ $4.12M → $3.98M, BOS $1.13M → $1.22M), but
+  busts rose (YUL 3/6, BOS 2/6, LHR 6/6). The default YUL run now runs
+  out on day 237, where it used to end the year at $1.57M. Its full
+  schedule, packed to 22:00 with no buffer, loses a rotation to the
+  curfew most days.
+
+---
+
 ## Next: the inspector (map clicks open in the side panel)
 
 **Status: slices 1–3 done.**

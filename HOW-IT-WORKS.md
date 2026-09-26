@@ -150,7 +150,9 @@ order:
    instance) between calls.
 2. **Depart** — any leg in `state.schedule` whose `departMinute` has arrived
    ("at or after," not only the exact minute — see below), not already
-   flown or in the air today, flown by an aircraft that's on the ground at
+   flown or in the air today, and the next leg of its plane's day (every
+   earlier leg of that plane has flown or been cancelled: a plane flies its
+   day in order), flown by an aircraft that's on the ground at
    the right airport *and* past its minimum turnaround
    (`groundSinceMinute + MIN_TURN_MINUTES`), takes off: the aircraft flips
    to `airborne` and an `ActiveFlight` is created with `blockMinutes`
@@ -584,10 +586,11 @@ packed to 22:00 loses flights to the curfew. **The run stops at $0**, as the gam
 (see Cash runway): it checks after every simulated minute, writes a row
 for the part of the final day that was flown, and prints `GAME OVER on
 day N`. Over six seeds, Halifax busts by about day 95, and Philadelphia
-and London by about day 180 (one London seed survives). From the dense
-north-east core the same player does well: YUL (flying YYZ, YOW, LGA and
-BOS) ends the year at about $1.57M on the default seed, Toronto and
-Boston survive every seed, and Montréal five of six. Balance work that needs a better
+and London by about day 180. From the dense north-east core it does
+better: Toronto survives every seed, Boston and Montréal about half of
+them. The default seed from YUL (flying YYZ, YOW, LGA and BOS) runs out on
+day 237: its day is packed to 22:00 with no turn buffer on a 20-year-old
+plane, so the curfew cuts its last rotation most days. Balance work that needs a better
 player should add the behaviour to `newGame.ts`, not hand-write a
 schedule. (Until September 2026 the runner flew a hand-authored
 three-aircraft network no player could have, which is why older sections
@@ -1631,7 +1634,7 @@ double-charged.
 The second axis of reliability. On-Time only describes flights that
 operated; **Completion Factor** is `completed / scheduled`.
 
-Three causes, each with a different answer available:
+Each cause has a different answer available:
 
 - **Crew shortage** — answered by reserve depth.
 - **Unscheduled maintenance** (AOG) — a daily per-aircraft roll scaling
@@ -1639,6 +1642,16 @@ Three causes, each with a different answer available:
   metal.
 - **Severe weather** — an airport closes outright. No answer at all,
   which is why it's kept rare.
+- **Curfew** — a rotation that can't be back at base by 22:00 on the
+  delay it's carrying is cancelled whole before it leaves. Answered by
+  slack in the day: a turn buffer, or fewer rotations.
+- **Aircraft out of position** — a leg is due while its plane is parked
+  at another airport, stranded there by an earlier closure or curfew.
+  The leg is cancelled, and the plane picks up its day from the next leg
+  that leaves from where it is. The ticker says where it was. Without
+  this, a stranded plane flew its legs out of order and could loop
+  between two airports every day, while its other routes silently never
+  flew.
 
 A cancellation scores a flat **-80 NPS** rather than extending the delay
 curve, which floors at -50: a cancellation isn't a very late flight, it's
