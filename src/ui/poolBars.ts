@@ -2,6 +2,7 @@ import { capacityColor } from '../render/airports';
 import { USABLE_DAY_MINUTES, utilisationPools, type ClassPool, type PoolEffect } from '../sim/utilisation';
 import { getMapPreview } from '../render/preview';
 import { planeIconElement } from './planeIcons';
+import { select } from './selection';
 import type { SimState } from '../sim/state';
 
 /**
@@ -9,8 +10,8 @@ import type { SimState } from '../sim/state';
  * class's flying day is booked. A bar that is nearly full says "add a
  * plane of this class"; one that is nearly empty says the plane is idle
  * money. The same rows appear in two places: the always-on overlay in the
- * corner of the map (the whole fleet), and inside the airport and route
- * cards (just the planes based at that airport).
+ * corner of the map (the whole fleet), and in the side panel's airport and
+ * route views (just the planes based at that airport).
  *
  * Colour is the capacity ring's own scale (green to amber as it fills,
  * red once over-booked), so a red ring on the map and a red bar here mean
@@ -18,6 +19,11 @@ import type { SimState } from '../sim/state';
  */
 
 const overlayEl = document.querySelector<HTMLElement>('#pool-bars')!;
+
+// The overlay is the quickest way to the Fleet list: clicking it opens the
+// Fleet view in the side panel, so no one has to hunt for a plane's dot.
+overlayEl.title = 'Open the Fleet list';
+overlayEl.addEventListener('click', () => select({ kind: 'fleet' }));
 
 function hours(minutes: number): string {
   return (minutes / 60).toFixed(1);
