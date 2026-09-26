@@ -9,7 +9,8 @@ player and `npm run balance` give every balance change a measured
 before and after (baseline below). Route views now show a route's share
 of slot fees and leases. **Thread 1, thread 2's slice 1 and thread
 3's slices 1–2 are done, and so are thread 6 (Europe) and thread 2
-(all three slices). Next in order: thread 3's slices 3–5 (moats).**
+(all three slices). Thread 3's slice 3 (the first moats) is done;
+next is its slice 4 (slot control).**
 
 ---
 
@@ -315,7 +316,19 @@ Slices:
 1. **Attractiveness, and entry weighted by it.** (Done.)
 2. **The entry rate follows the network's attractiveness**, and existing
    rivals' openings weigh player markets by it too. (Done.)
-3. **Deterrence: frequency dominance and hub feed.**
+3. **Deterrence: frequency dominance and hub feed.** (Done.)
+   `moneyOnTable()` is discounted by the player's flights each way /
+   (flights + 4) (four a day halve it, one keeps 20%) and by the share of
+   the market's passengers connecting through the player's hub, which a
+   one-route entrant can't sell. Measured against the Europe baseline
+   (steady medians): YUL $38.2M → $40.7M, YYZ $54.9M → $62.2M, BOS
+   $42.8M → $39.8M, PHL flat, YHZ $3.6M with a bust → $5.5M with none,
+   LHR $64.5M → $89.4M. Sitters gain a little ($10–15M → $12–18M), since
+   a few flights build almost no moat, so growing now beats sitting by
+   3.5–7.5×. London is on top again: about 8 flights a day on each of
+   its huge markets plus Heathrow's connections is exactly the moat this
+   rewards. Whether the biggest city should also be the richest home is
+   a balance question, not a bug.
 4. **Deterrence: slot control.** Rivals pay for slots at congested
    airports, and can be priced out.
 5. **Legibility:** the ticker's reasons and the route view's warning.

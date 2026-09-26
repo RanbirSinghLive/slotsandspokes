@@ -954,6 +954,12 @@ on the table** there (`sim/attractiveness.ts`, dollars a day):
 - half of the route's last-week margin after its share of slot fees and
   leases (`sim/routeCosts.ts`), if positive.
 
+**Moats** discount the money on the table: by the player's flights each
+way / (flights + 4) (four a day halve it; booking share follows
+frequency, so one rival flight against many gets little), and by the
+share of the market's passengers connecting through the player's hub,
+which a one-route entrant can't sell. Both take months to build.
+
 A player market with nothing on the table isn't a target, so a lean
 airline's markets are left alone and the newcomer takes a market next to
 the network, weighted by potential.
