@@ -1,4 +1,4 @@
-import type { PoolEffect } from '../sim/utilisation';
+import type { MapPreview, RoutePreview } from '../sim/playerActions';
 
 /**
  * What the map should show for the radial button currently under the
@@ -8,22 +8,11 @@ import type { PoolEffect } from '../sim/utilisation';
  * menu (ui/mapMenu.ts) is the only writer.
  *
  * A preview is never state and never saved; it exists only while a button
- * is hovered.
+ * is hovered. Its shape is sim/playerActions.ts's, since each action's
+ * preview function builds one.
  */
 
-export type RoutePreview = {
-  origin: string;
-  dest: string;
-  /** add: green, remove: red dashed, change: amber. */
-  kind: 'add' | 'remove' | 'change';
-};
-
-export type MapPreview = {
-  /** How pool bookings would change, for the bars and the base rings. */
-  effects: PoolEffect[];
-  /** Routes to draw emphasised on the map. */
-  routes: RoutePreview[];
-};
+export type { MapPreview, RoutePreview };
 
 let current: MapPreview | null = null;
 

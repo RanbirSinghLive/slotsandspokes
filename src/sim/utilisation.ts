@@ -207,7 +207,7 @@ export type ClassPool = {
 
 /**
  * A hypothetical change to one pool's bookings and size: what a hover
- * preview says an action *would* do (ui/routeActions.ts). Negative frees
+ * preview says an action *would* do (sim/playerActions.ts). Negative frees
  * time.
  * Never applied to state; only ever added on top of a read.
  */

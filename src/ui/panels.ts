@@ -1,4 +1,5 @@
-import { legsServingMarket, marketKey, validateSchedule } from '../sim/schedule';
+import { removeRotation as removeRotationFromSchedule } from '../sim/playerActions';
+import { validateSchedule } from '../sim/schedule';
 import { allRotations, utilisationProblems, type Rotation } from '../sim/utilisation';
 import { select } from './selection';
 import { classByCode } from '../sim/aircraftClasses';
@@ -160,31 +161,11 @@ function renderRotations(state: SimState): void {
 }
 
 /**
- * Remove a whole rotation — every leg of it — from `state.schedule` (the
- * array step() reads from). For any market left with no legs at all, drops
- * the now-orphaned RouteSettings entry and Commercial row too, since a
- * fare/marketing lever with nothing flying it would otherwise linger.
- *
- * A flight already airborne on one of these legs is unaffected:
- * ActiveFlight carries its own copied data independent of state.schedule
- * (see sim/state.ts), so it finishes the sector it's on and simply has
- * nothing to fly next.
+ * The rotations table's remove button: sim/playerActions.ts takes the
+ * rotation out, then the warnings are redrawn for the new schedule.
  */
 export function removeRotation(rotation: Rotation, state: SimState): void {
-  for (const leg of rotation.legs) {
-    const index = state.schedule.indexOf(leg);
-    if (index !== -1) state.schedule.splice(index, 1);
-  }
-
-  // Checked after every leg is gone, not as each one goes, so a rotation
-  // that flies the same market twice doesn't decide the market is orphaned
-  // while its own second leg is still in the array.
-  for (const leg of rotation.legs) {
-    if (legsServingMarket(leg.origin, leg.dest, state.schedule) > 0) continue;
-    const key = marketKey(leg.origin, leg.dest);
-    delete state.routeSettings[key];
-  }
-
+  removeRotationFromSchedule(state, rotation);
   renderScheduleWarnings(scheduleProblems(state));
 }
 

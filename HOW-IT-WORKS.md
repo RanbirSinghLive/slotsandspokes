@@ -1112,10 +1112,17 @@ cancels.
 writes it into the schedule. `ui/routeBuilder.ts` keeps only the page:
 the gesture's `idle` / `armed` / `confirming` state machine (transient UI
 state, not in `SimState`), the popover, and `commitRotation()`, which
-calls `applyRotation()` and then refreshes the schedule warnings and adds
-Commercial rows for new markets. The map menu's add-frequency and
-change-gauge actions (`ui/routeActions.ts`) and the headless runner use
-the same functions, so every rotation is created the same way.
+calls `applyRotation()` and then refreshes the schedule warnings. The
+map menu's actions and the headless runner use the same functions, so
+every rotation is created the same way.
+
+**Every other player action is in the sim too.** Adding or removing a
+flight, changing gauge, removing a route, the turn buffer, hub style,
+and leasing or returning a plane are in `sim/playerActions.ts`, each as a
+`preview…` (can it be done, and if not why, plus what the map should
+draw) and the change itself. `ui/routeActions.ts` passes them through
+and redraws the schedule warnings after a change. So a headless player
+can take exactly the actions a player can, with the same refusals.
 
 ### What gets built is a rotation, not a leg
 

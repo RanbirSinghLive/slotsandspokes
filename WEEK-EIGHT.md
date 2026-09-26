@@ -441,7 +441,14 @@ as cancelled, so nothing on screen said so.
 
 ## Next: a headless player that plays (a separate thread)
 
-**Status: drafted, not started.**
+**Status: slice 1 done.** The actions are in `sim/playerActions.ts`, and
+`ui/routeActions.ts` is a pass-through that redraws the schedule
+warnings after a change. The `MapPreview` type moved with them, and
+`render/preview.ts` re-exports it. Headless output for YUL and YYZ over
+a year matched the run before the move byte for byte. In Node, add
+flight, lease, remove flight, remove route and turn buffer all work on
+a started game. In the preview, a turn buffer's hover preview, setting
+it and setting it back through the ring all behaved as before.
 
 Every balance number comes from `openStarterRoutes()` (`headless/
 newGame.ts`). It fills the starting plane's day on the first morning and
