@@ -2,5 +2,14 @@
   {"airline": "Capital Wings", "code": "CW", "origin": "YOW", "dest": "YUL", "dailyFrequency": 1},
   {"airline": "Trillium Air", "code": "TA", "origin": "YUL", "dest": "YYZ", "dailyFrequency": 2},
   {"airline": "Trillium Air", "code": "TA", "origin": "YYZ", "dest": "YOW", "dailyFrequency": 3},
-  {"airline": "Bluenose Regional", "code": "BR", "origin": "YQB", "dest": "YHZ", "dailyFrequency": 1}
+  {"airline": "Bluenose Regional", "code": "BR", "origin": "YQB", "dest": "YHZ", "dailyFrequency": 1},
+  {"airline": "Albion Regional", "code": "AR", "origin": "LHR", "dest": "MAN", "dailyFrequency": 2},
+  {"airline": "Albion Regional", "code": "AR", "origin": "LHR", "dest": "EDI", "dailyFrequency": 2},
+  {"airline": "Albion Regional", "code": "AR", "origin": "MAN", "dest": "DUB", "dailyFrequency": 1},
+  {"airline": "Lowlands Air", "code": "LW", "origin": "AMS", "dest": "LHR", "dailyFrequency": 2},
+  {"airline": "Lowlands Air", "code": "LW", "origin": "AMS", "dest": "CDG", "dailyFrequency": 1},
+  {"airline": "Rhine Express", "code": "RX", "origin": "FRA", "dest": "MUC", "dailyFrequency": 2},
+  {"airline": "Rhine Express", "code": "RX", "origin": "DUS", "dest": "BER", "dailyFrequency": 1},
+  {"airline": "Meseta Air", "code": "MS", "origin": "MAD", "dest": "BCN", "dailyFrequency": 3},
+  {"airline": "Meseta Air", "code": "MS", "origin": "MAD", "dest": "LIS", "dailyFrequency": 1}
 ]

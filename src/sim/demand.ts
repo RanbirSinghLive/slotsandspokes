@@ -132,7 +132,7 @@ export function marketDistanceNm(originIata: string, destIata: string): number {
 }
 
 /**
- * Every unordered airport pair — 11,175 for this map's 150 airports. Static
+ * Every unordered airport pair — 17,020 for this map's 185 airports. Static
  * geography, computed once at module load rather than on every use.
  *
  * Lives here rather than in any one consumer because two separate places

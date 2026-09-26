@@ -4,7 +4,7 @@ import { marketDistanceNm } from './demand';
 import type { SimState } from './state';
 
 /**
- * Fog by reach. The world is 150 airports but a new game shows only the
+ * Fog by reach. The world is 185 airports but a new game shows only the
  * ones you could actually fly to, and the map opens up as the airline
  * grows:
  *

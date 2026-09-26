@@ -274,6 +274,286 @@
     "population": 216827
   },
   {
+    "iata": "MAN",
+    "name": "Manchester",
+    "lat": 53.3494,
+    "lon": -2.2795,
+    "utcOffsetMinutes": 0,
+    "population": 8485781
+  },
+  {
+    "iata": "BHX",
+    "name": "Birmingham",
+    "lat": 52.4539,
+    "lon": -1.748,
+    "utcOffsetMinutes": 0,
+    "population": 6032559
+  },
+  {
+    "iata": "EDI",
+    "name": "Edinburgh",
+    "lat": 55.9501,
+    "lon": -3.3723,
+    "utcOffsetMinutes": 0,
+    "population": 1662006
+  },
+  {
+    "iata": "GLA",
+    "name": "Glasgow",
+    "lat": 55.8719,
+    "lon": -4.4331,
+    "utcOffsetMinutes": 0,
+    "population": 2108238
+  },
+  {
+    "iata": "MAD",
+    "name": "Madrid Barajas",
+    "lat": 40.4934,
+    "lon": -3.5722,
+    "utcOffsetMinutes": 60,
+    "population": 5903247
+  },
+  {
+    "iata": "BCN",
+    "name": "Barcelona",
+    "lat": 41.2971,
+    "lon": 2.0785,
+    "utcOffsetMinutes": 60,
+    "population": 4055803
+  },
+  {
+    "iata": "AGP",
+    "name": "Málaga",
+    "lat": 36.6749,
+    "lon": -4.4991,
+    "utcOffsetMinutes": 60,
+    "population": 1579039
+  },
+  {
+    "iata": "PMI",
+    "name": "Palma de Mallorca",
+    "lat": 39.5517,
+    "lon": 2.7388,
+    "utcOffsetMinutes": 60,
+    "population": 978261
+  },
+  {
+    "iata": "LIS",
+    "name": "Lisbon",
+    "lat": 38.7813,
+    "lon": -9.1359,
+    "utcOffsetMinutes": 0,
+    "population": 2643211
+  },
+  {
+    "iata": "OPO",
+    "name": "Porto",
+    "lat": 41.2481,
+    "lon": -8.6814,
+    "utcOffsetMinutes": 0,
+    "population": 2536097
+  },
+  {
+    "iata": "FCO",
+    "name": "Rome Fiumicino",
+    "lat": 41.8045,
+    "lon": 12.252,
+    "utcOffsetMinutes": 60,
+    "population": 4119028
+  },
+  {
+    "iata": "MXP",
+    "name": "Milan Malpensa",
+    "lat": 45.6306,
+    "lon": 8.7281,
+    "utcOffsetMinutes": 60,
+    "population": 6391016
+  },
+  {
+    "iata": "VCE",
+    "name": "Venice",
+    "lat": 45.5053,
+    "lon": 12.3519,
+    "utcOffsetMinutes": 60,
+    "population": 2588785
+  },
+  {
+    "iata": "NAP",
+    "name": "Naples",
+    "lat": 40.886,
+    "lon": 14.2908,
+    "utcOffsetMinutes": 60,
+    "population": 4429445
+  },
+  {
+    "iata": "MUC",
+    "name": "Munich",
+    "lat": 48.3538,
+    "lon": 11.7861,
+    "utcOffsetMinutes": 60,
+    "population": 3632616
+  },
+  {
+    "iata": "BER",
+    "name": "Berlin Brandenburg",
+    "lat": 52.3617,
+    "lon": 13.5023,
+    "utcOffsetMinutes": 60,
+    "population": 4583432
+  },
+  {
+    "iata": "HAM",
+    "name": "Hamburg",
+    "lat": 53.6304,
+    "lon": 9.9882,
+    "utcOffsetMinutes": 60,
+    "population": 3957289
+  },
+  {
+    "iata": "DUS",
+    "name": "Düsseldorf",
+    "lat": 51.2895,
+    "lon": 6.7668,
+    "utcOffsetMinutes": 60,
+    "population": 11021671
+  },
+  {
+    "iata": "BRU",
+    "name": "Brussels",
+    "lat": 50.9014,
+    "lon": 4.4844,
+    "utcOffsetMinutes": 60,
+    "population": 8091856
+  },
+  {
+    "iata": "ZRH",
+    "name": "Zürich",
+    "lat": 47.4581,
+    "lon": 8.5481,
+    "utcOffsetMinutes": 60,
+    "population": 2846480
+  },
+  {
+    "iata": "GVA",
+    "name": "Geneva",
+    "lat": 46.2381,
+    "lon": 6.109,
+    "utcOffsetMinutes": 60,
+    "population": 707697
+  },
+  {
+    "iata": "VIE",
+    "name": "Vienna",
+    "lat": 48.1103,
+    "lon": 16.5697,
+    "utcOffsetMinutes": 60,
+    "population": 2584268
+  },
+  {
+    "iata": "NCE",
+    "name": "Nice",
+    "lat": 43.6584,
+    "lon": 7.2159,
+    "utcOffsetMinutes": 60,
+    "population": 1166298
+  },
+  {
+    "iata": "LYS",
+    "name": "Lyon",
+    "lat": 45.726,
+    "lon": 5.0901,
+    "utcOffsetMinutes": 60,
+    "population": 2100760
+  },
+  {
+    "iata": "MRS",
+    "name": "Marseille",
+    "lat": 43.4381,
+    "lon": 5.2125,
+    "utcOffsetMinutes": 60,
+    "population": 2279662
+  },
+  {
+    "iata": "TLS",
+    "name": "Toulouse",
+    "lat": 43.6291,
+    "lon": 1.3638,
+    "utcOffsetMinutes": 60,
+    "population": 1299722
+  },
+  {
+    "iata": "CPH",
+    "name": "Copenhagen",
+    "lat": 55.6179,
+    "lon": 12.656,
+    "utcOffsetMinutes": 60,
+    "population": 2168685
+  },
+  {
+    "iata": "ARN",
+    "name": "Stockholm Arlanda",
+    "lat": 59.6485,
+    "lon": 17.9288,
+    "utcOffsetMinutes": 60,
+    "population": 2691193
+  },
+  {
+    "iata": "OSL",
+    "name": "Oslo",
+    "lat": 60.1939,
+    "lon": 11.1004,
+    "utcOffsetMinutes": 60,
+    "population": 1384731
+  },
+  {
+    "iata": "HEL",
+    "name": "Helsinki",
+    "lat": 60.3184,
+    "lon": 24.9633,
+    "utcOffsetMinutes": 120,
+    "population": 2098611
+  },
+  {
+    "iata": "WAW",
+    "name": "Warsaw Chopin",
+    "lat": 52.1657,
+    "lon": 20.9671,
+    "utcOffsetMinutes": 60,
+    "population": 2873868
+  },
+  {
+    "iata": "PRG",
+    "name": "Prague",
+    "lat": 50.1009,
+    "lon": 14.2599,
+    "utcOffsetMinutes": 60,
+    "population": 2246734
+  },
+  {
+    "iata": "BUD",
+    "name": "Budapest",
+    "lat": 47.4302,
+    "lon": 19.2624,
+    "utcOffsetMinutes": 60,
+    "population": 3133834
+  },
+  {
+    "iata": "ATH",
+    "name": "Athens",
+    "lat": 37.9364,
+    "lon": 23.9445,
+    "utcOffsetMinutes": 120,
+    "population": 2591910
+  },
+  {
+    "iata": "IST",
+    "name": "Istanbul",
+    "lat": 41.2749,
+    "lon": 28.7321,
+    "utcOffsetMinutes": 180,
+    "population": 15994038
+  },
+  {
     "iata": "DXB",
     "name": "Dubai",
     "lat": 25.2498,

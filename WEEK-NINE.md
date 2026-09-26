@@ -350,6 +350,60 @@ moats those threads make real.
 
 ---
 
+## Thread 6: Europe (airports and rivals)
+
+**Status: done.**
+- 35 European airports added to AIRPORTS (Manchester, Madrid, Rome,
+  Munich, Istanbul and so on); the map holds 185. The North American
+  fill-out now adds a fixed 111 (`FILL_ADDED_COUNT`), and all 150
+  airports already on the map came out byte-identical. Dense Europe gives
+  big 60 km catchments: Manchester 8.5M (it takes Liverpool, Leeds and
+  Sheffield), Düsseldorf 11M (the Ruhr), Brussels 8.1M. That's the same
+  rule as North America's, so they stay.
+- Four fictional European airlines seeded (`data/competitors.json`):
+  Albion Regional (London–Manchester, London–Edinburgh,
+  Manchester–Dublin), Lowlands Air (Amsterdam–London, Amsterdam–Paris),
+  Rhine Express (Frankfurt–Munich, Düsseldorf–Berlin), Meseta Air
+  (Madrid–Barcelona, Madrid–Lisbon).
+- London now has 10 neighbours in a Propeller's reach, not 4.
+
+Measured (six seeds, day 365):
+
+| London | Before | After |
+|---|---|---|
+| steady median | $97M | $64.5M (north-east: $38M–$58M) |
+| steady markets | 4.0 | 9.3 |
+| sitter median | $15.6M | $11.1M |
+| starter | $2.6M, no busts | $4.7M, no busts |
+| reckless | bust by day 14 | bust by day 124 |
+
+London is no longer the outlier. The other homes moved too (steady
+north-east $29M–$45M → $38M–$58M): the new airlines share the random
+draws and the lessor, so every game's dice fall differently, within the
+spread between seeds. The report now takes 17 minutes instead of 11,
+since 185 airports make about 50% more pairs for the daily demand pass.
+
+**Asked for by the owner after thread 3's slice 2.** London was the one
+home the new pressure couldn't reach: every existing rival grows
+outward from its own network, and all four seed rivals fly in eastern
+Canada, so none could get to Heathrow's markets. London was also a
+four-market home (Paris, Amsterdam, Frankfurt, Dublin), so its airlines
+stacked planes on those four.
+
+1. **European airports.** About 30 more, one per metro, hand-listed in
+   `buildAirports.ts`'s AIRPORTS (names only; coordinates, catchments
+   and time zones come from the data as for every other airport). The
+   North American fill-out adds a fixed number of airports rather than
+   filling to a total, so it comes out exactly as before.
+2. **European rival seeds.** A few fictional airlines on European
+   trunks in `data/competitors.json`, so rivals grow around London the
+   way they do around Montréal.
+
+Measured with `npm run balance`: London should stop being the easiest
+home by far.
+
+---
+
 ## Carried forward from week eight
 
 Still live, and still named by this plan:

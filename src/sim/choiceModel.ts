@@ -19,7 +19,7 @@ import { recommendedFare } from './schedule';
 // `competitorRoutes` list instead of reading a fixed import directly, so
 // they reflect `state.competitorRoutes` — which the competitor AI
 // (`sim/competitors.ts`) can grow over time — rather than only ever
-// seeing `data/competitors.json`'s original four seed routes.
+// seeing `data/competitors.json`'s seed routes.
 
 function competitorsServingMarket(
   origin: string,

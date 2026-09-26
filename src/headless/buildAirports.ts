@@ -43,8 +43,7 @@ import { fileURLToPath } from 'node:url';
  *
  * **Which airports.** The hand-kept list below (AIRPORTS), then a
  * fill-out of the US and Canada from every large or medium airport with
- * scheduled service (FILL_COUNTRIES), until the map holds
- * FILL_TARGET_COUNT. The main hubs in FILL_HUBS go first, so a metro
+ * scheduled service (FILL_COUNTRIES), FILL_ADDED_COUNT of them. The main hubs in FILL_HUBS go first, so a metro
  * with two big airports keeps the one people know (San Francisco, not
  * Oakland). After them, airports are added one at a time, each time the
  * one that would take the most people not already nearer another airport
@@ -110,6 +109,41 @@ const AIRPORTS: [iata: string, name: string][] = [
   ['FRA', 'Frankfurt'],
   ['DUB', 'Dublin'],
   ['KEF', 'Reykjavík Keflavík'],
+  ['MAN', 'Manchester'],
+  ['BHX', 'Birmingham'],
+  ['EDI', 'Edinburgh'],
+  ['GLA', 'Glasgow'],
+  ['MAD', 'Madrid Barajas'],
+  ['BCN', 'Barcelona'],
+  ['AGP', 'Málaga'],
+  ['PMI', 'Palma de Mallorca'],
+  ['LIS', 'Lisbon'],
+  ['OPO', 'Porto'],
+  ['FCO', 'Rome Fiumicino'],
+  ['MXP', 'Milan Malpensa'],
+  ['VCE', 'Venice'],
+  ['NAP', 'Naples'],
+  ['MUC', 'Munich'],
+  ['BER', 'Berlin Brandenburg'],
+  ['HAM', 'Hamburg'],
+  ['DUS', 'Düsseldorf'],
+  ['BRU', 'Brussels'],
+  ['ZRH', 'Zürich'],
+  ['GVA', 'Geneva'],
+  ['VIE', 'Vienna'],
+  ['NCE', 'Nice'],
+  ['LYS', 'Lyon'],
+  ['MRS', 'Marseille'],
+  ['TLS', 'Toulouse'],
+  ['CPH', 'Copenhagen'],
+  ['ARN', 'Stockholm Arlanda'],
+  ['OSL', 'Oslo'],
+  ['HEL', 'Helsinki'],
+  ['WAW', 'Warsaw Chopin'],
+  ['PRG', 'Prague'],
+  ['BUD', 'Budapest'],
+  ['ATH', 'Athens'],
+  ['IST', 'Istanbul'],
   // Rest of the world
   ['DXB', 'Dubai'],
   ['HND', 'Tokyo Haneda'],
@@ -118,9 +152,14 @@ const AIRPORTS: [iata: string, name: string][] = [
   ['JNB', 'Johannesburg O.R. Tambo'],
 ];
 
-/** The fill-out: which countries, and how many airports the map should hold in total. */
+/**
+ * The fill-out: which countries, and how many airports it adds (the hubs
+ * in FILL_HUBS included). A count to add rather than a total for the map,
+ * so adding to the hand-kept list elsewhere (Europe) doesn't take airports
+ * away from North America.
+ */
 const FILL_COUNTRIES = ['US', 'CA'];
-const FILL_TARGET_COUNT = 150;
+const FILL_ADDED_COUNT = 111;
 /**
  * The closest two airports on the map may be. A little over
  * sim/demand.ts's MIN_MARKET_NM (30 nm, 56 km), so every pair of airports
@@ -385,7 +424,7 @@ function chooseFillAirports(alreadyChosen: AirportPoint[], candidates: AirportPo
 
   for (const tier of [true, false]) {
     let remaining = candidates.filter((c) => c.large === tier && !chosen.includes(c));
-    while (chosen.length < FILL_TARGET_COUNT) {
+    while (added.length < FILL_ADDED_COUNT) {
       remaining = remaining.filter((c) => !tooClose(c));
       if (remaining.length === 0) break;
       let best = remaining[0];
