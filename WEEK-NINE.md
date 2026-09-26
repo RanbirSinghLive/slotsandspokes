@@ -8,7 +8,8 @@ fill-out, fare stances, the side panel and the headless player) lives in
 player and `npm run balance` give every balance change a measured
 before and after (baseline below). Route views now show a route's share
 of slot fees and leases. **Thread 1, thread 2's slice 1 and thread
-3's slices 1–2 are done. Next in order: thread 2's slices 2–3.**
+3's slices 1–2 are done, and so are thread 6 (Europe) and thread 2's
+slice 2. Next in order: thread 2's slice 3.**
 
 ---
 
@@ -194,9 +195,17 @@ Slices:
    The airport view says it in words. Measured with `balance`: the
    starter should survive more often; the steady player's early months
    get quicker.
-2. **Sizes in words everywhere.** One `marketSize()` function in the
-   sim that every panel calls; the numbers leave the route form,
-   tooltips, route view and Airports list.
+2. **Sizes in words everywhere.** (Done.) `sim/marketSize.ts`: five sizes
+   for a city pair (potential under 40, 150, 600, 3,000 riders a day, or
+   more) and five for an airport's riders waiting (under 3k, 8k, 20k,
+   60k), from the map's spread; and how full a flight would be, in
+   words. The numbers left the draw-a-route tooltip and form, the route
+   view, the ring's Add flight hint, the airport view and the Airports
+   list (sorted by size, not the hidden number). Passengers turned away,
+   the fare slider's day and the hub planner's connecting passengers stay
+   numbers: they're about the player's own flights. "Unserved" became
+   "Not in your network", which no longer clashes with "Well served".
+   Five sizes, not the owner's three, as drafted; still an open question.
 3. **The map hint.** Underserved airports marked subtly, so a player
    can spot an edge by looking (CLAUDE.md: the map is not decoration).
 

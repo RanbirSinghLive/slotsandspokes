@@ -1560,6 +1560,21 @@ Actual demand is a property of the **market**, not of any airline —
 everyone flying it grows it, everyone serving it draws from the same
 pool. Stimulation is a public good.
 
+**Markets in words** (`src/sim/marketSize.ts`). The game never prints a
+market's potential or today's demand as a number. A city pair is Tiny,
+Small, Medium, Large or Huge by its potential riders a day both ways
+(under 40, 150, 600, 3,000, or more; Halifax–Charlottetown is Tiny,
+Montréal–Toronto Huge). An airport's riders waiting across all its pairs
+get the same five words on their own scale (under 3k, 8k, 20k, 60k).
+Whether a route's flights would fill is also words, from today's demand
+per flight against the seats: "more people want it than the seats hold",
+"fills most seats", "about half full for now", "mostly empty for now".
+They appear in the draw-a-route tooltip and form, the route view, the
+ring's Add flight hint, the airport view and the Airports list (sorted by
+size). What the player observes on their own flights stays in numbers:
+passengers turned away, the fare slider's day at these settings, the hub
+planner's connecting passengers. The Dev tab keeps its numbers.
+
 **Hunger for service** (`src/sim/serviceLevel.ts`) speeds growth up
 where nobody flies yet. Each morning every airport's seats, from every
 airline (`dailySeatsByMarket()`, which moved there), are set against its
@@ -1631,7 +1646,7 @@ The headless players price every market they open on Match, and
 
 ## Airports: presence, capacity and slots (`src/sim/airports.ts`, `src/sim/slots.ts`)
 
-**Level** — from the player's daily departures there: Unserved (0),
+**Level** — from the player's daily departures there: Not in your network (0),
 Outstation (1–2), Focus city (3–5), Base (6–9), Hub (10+). Read off the map: the dot grows
 with departures, and Base and Hub get a faint halo.
 

@@ -17,7 +17,7 @@ type AirportSpec = { iata: string; name: string; population: number; capacityPer
 const airports = airportsData as AirportSpec[];
 const byIata = new Map(airports.map((a) => [a.iata, a]));
 
-export type AirportLevel = 'Unserved' | 'Outstation' | 'Focus city' | 'Base' | 'Hub';
+export type AirportLevel = 'Not in your network' | 'Outstation' | 'Focus city' | 'Base' | 'Hub';
 
 /** Daily departures the airline operates from this airport. The input to everything below. */
 export function dailyDeparturesAt(state: SimState, iata: string): number {
@@ -30,7 +30,7 @@ export function dailyDeparturesAt(state: SimState, iata: string): number {
  * flown.
  */
 export function airportLevel(departures: number): AirportLevel {
-  if (departures === 0) return 'Unserved';
+  if (departures === 0) return 'Not in your network';
   if (departures <= 2) return 'Outstation';
   if (departures <= 5) return 'Focus city';
   if (departures <= 9) return 'Base';

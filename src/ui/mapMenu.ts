@@ -12,6 +12,7 @@ import { candidateTailsAt } from '../sim/rotations';
 import { armRouteBuilderAt, describeSlotQuotes } from './routeBuilder';
 import { hideCompetitionTooltip } from './competitionTooltip';
 import { hideRadial, showRadial, updateRadial, type RadialAction } from './radial';
+import { demandAgainstSeats } from '../sim/marketSize';
 import * as ops from './routeActions';
 import { planeIconInner } from './planeIcons';
 import { AIRCRAFT_CLASSES } from '../sim/aircraftClasses';
@@ -251,12 +252,14 @@ function openAirportMenu(airport: Airport, state: SimState): void {
 
 // --- Routes ---------------------------------------------------------------
 
-/** What the add-flight button says, including how thin the demand would be spread. */
-function addFlightLabel(className: string, readout: ReturnType<typeof ops.marketReadout>): string {
+/**
+ * What the add-flight button says: how full the market's flights would be
+ * with one more round trip on it, in words (sim/marketSize.ts).
+ */
+function addFlightLabel(state: SimState, a: string, b: string, className: string, readout: ReturnType<typeof ops.marketReadout>): string {
   const seats = AIRCRAFT_CLASSES.find((c) => c.name === className)?.seats ?? 0;
-  const wantedAfter = Math.round(readout.demandTotal / (readout.legs + 2));
-  const thin = wantedAfter < 0.4 * seats ? ', mostly empty for now' : '';
-  return `Add a ${className} flight (about ${wantedAfter} passengers wanted per flight after, ${seats} seats${thin})`;
+  const fill = demandAgainstSeats(state, a, b, readout.legs + 2, seats);
+  return `Add a ${className} flight (${seats} seats; with it, flights here would be ${fill.short ? 'full' : fill.words})`;
 }
 
 function routeActions(a: string, b: string, state: SimState): RadialAction[] {
@@ -339,7 +342,7 @@ function routeActions(a: string, b: string, state: SimState): RadialAction[] {
     {
       id: 'flight-up',
       label: addFlight.ok
-        ? `${addFlightLabel(addFlight.className, readout)}. ${describeSlotQuotes(addFlight.plan.slotQuotes)} Hold to add several.`
+        ? `${addFlightLabel(state, a, b, addFlight.className, readout)}. ${describeSlotQuotes(addFlight.plan.slotQuotes)} Hold to add several.`
         : 'Add a flight',
       icon: ICON.plus,
       angleDeg: -56,

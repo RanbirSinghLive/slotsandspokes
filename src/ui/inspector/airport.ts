@@ -3,6 +3,7 @@ import { daysUntilReturn, expediteCost, expediteRepair } from '../../sim/aog';
 import { congestionParameters } from '../../sim/delays';
 import { connectingPassengersThrough } from '../../sim/hubs';
 import { planHub } from '../../sim/hubPlanner';
+import { airportDemandSize } from '../../sim/marketSize';
 import { describeServiceLevel, hungerAt } from '../../sim/serviceLevel';
 import { HUB_STYLES, hubStyleAt } from '../../sim/hubStyle';
 import { nextSlotFees, slotFeesPerDayAt, slotsHeld } from '../../sim/slots';
@@ -70,12 +71,14 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
     ),
   );
 
+  // How many people want to fly from here, in words (sim/marketSize.ts);
+  // the passengers you turn away are yours to count, so they stay a number.
   const unmet = unmetDemandByAirport(state).get(iata);
   if (unmet) {
-    const round = (n: number) => Math.round(n).toLocaleString();
     root.append(
       line(
-        `Waiting: ${round(unmet.latent)} potential riders/day${unmet.spilled >= 1 ? `, ${round(unmet.spilled)} turned away` : ''}`,
+        `Waiting to fly: ${airportDemandSize(unmet.latent)}` +
+          (unmet.spilled >= 1 ? ` · you turn away ${Math.round(unmet.spilled).toLocaleString()} a day` : ''),
         unmet.spilled >= 1 ? 'inspector-line is-warn' : 'inspector-line',
       ),
     );

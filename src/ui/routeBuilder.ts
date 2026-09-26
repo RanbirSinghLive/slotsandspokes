@@ -4,7 +4,7 @@ import aircraftTypesData from '../../data/aircraft-types.json';
 import { projection } from '../render/projection';
 import { findNearestAirport, type Airport } from '../render/airports';
 import { greatCircleDistanceNm } from '../sim/geo';
-import { actualDailyDemand, currentPotentialDemand } from '../sim/marketDemand';
+import { demandAgainstSeats, marketSize, neverFills } from '../sim/marketSize';
 import { suppressedMarketReason } from '../sim/demand';
 import { nextSlotFees, type SlotQuote } from '../sim/slots';
 import { legsServingMarket, type ScheduleLeg } from '../sim/schedule';
@@ -43,8 +43,8 @@ const routeHoverTooltipTitle = document.querySelector<HTMLElement>('#route-hover
 const routeHoverTooltipBody = document.querySelector<HTMLElement>('#route-hover-tooltip-body')!;
 
 /**
- * Same PDEW/CAP formula updateFormValidation() uses (see its own
- * comment), just computed for a candidate that hasn't been clicked yet.
+ * The same market read updateFormValidation() gives (see its own
+ * comment), for a candidate that hasn't been clicked yet.
  * Assumes this candidate adds two frequencies to the market — the leg out
  * and the leg back — because the minimal rotation is exactly that
  * out-and-back, and a hovered airport isn't yet part of a chain whose
@@ -67,22 +67,17 @@ function showRouteHoverTooltip(
   if (type) {
     const existingFrequency = legsServingMarket(origin.iata, candidate.iata, state.schedule);
     const newFrequency = existingFrequency + 2;
-    const pdew = Math.round(actualDailyDemand(state, origin.iata, candidate.iata) / newFrequency);
-    const potentialPdew = Math.round(currentPotentialDemand(state, origin.iata, candidate.iata) / newFrequency);
     const distanceNm = greatCircleDistanceNm(origin, candidate);
     const outOfRange = distanceNm > type.rangeNm;
 
-    // "now → potential" (week six): with market stimulation, what a
-    // market carries today and what it could carry once built are very
-    // different numbers, and the second is the one route choice actually
-    // turns on. Collapses to a single figure on a market already at
-    // maturity, where the two are equal.
+    // The market in words (sim/marketSize.ts): how big the city pair is,
+    // and whether this plane would fill today. The numbers stay hidden;
+    // the player learns them by flying.
     const suppressed = suppressedMarketReason(origin.iata, candidate.iata);
+    const fill = demandAgainstSeats(state, origin.iata, candidate.iata, newFrequency, type.seats);
     const pdewText = suppressed
       ? 'No market — same city'
-      : potentialPdew > pdew
-        ? `PDEW: ${pdew} → ${potentialPdew}`
-        : `PDEW: ${pdew}`;
+      : `${marketSize(state, origin.iata, candidate.iata)} market · ${type.seats} seats, ${fill.words}`;
 
     // A stop can be comfortably in range from here and still be a dead
     // end, because the rotation has to get *home*: the range ring is drawn
@@ -97,17 +92,17 @@ function showRouteHoverTooltip(
     const cannotGetHome = !outOfRange && candidate.iata !== base.iata && homeNm > type.rangeNm;
 
     routeHoverTooltipBody.textContent = outOfRange
-      ? `${pdewText}  CAP: ${type.seats} — out of range (${Math.round(distanceNm)} nm)`
+      ? `${pdewText} — out of range (${Math.round(distanceNm)} nm)`
       : cannotGetHome
-        ? `${pdewText}  CAP: ${type.seats} — ${base.iata} is ${Math.round(homeNm)} nm back, too far to close directly; needs another stop`
-        : `${pdewText}  CAP: ${type.seats}  ·  ${candidate.iata} ${nextSlotText(state, candidate.iata)}`;
+        ? `${pdewText} — ${base.iata} is ${Math.round(homeNm)} nm back, too far to close directly; needs another stop`
+        : `${pdewText}  ·  ${candidate.iata} ${nextSlotText(state, candidate.iata)}`;
     routeHoverTooltipBody.classList.toggle('out-of-range', outOfRange);
     routeHoverTooltipBody.classList.toggle('needs-another-stop', cannotGetHome);
     // Thin now means "can never fill this aircraft even fully grown" —
     // testing today's actual instead would fire on virtually every market
     // in the early game, since they all start at the virgin floor, and a
     // warning that's always on is no warning at all.
-    routeHoverTooltipBody.classList.toggle('thin-market', !outOfRange && potentialPdew < type.seats);
+    routeHoverTooltipBody.classList.toggle('thin-market', !outOfRange && neverFills(state, origin.iata, candidate.iata, newFrequency, type.seats));
   } else {
     routeHoverTooltipBody.textContent = '';
     routeHoverTooltipBody.classList.remove('out-of-range', 'thin-market', 'needs-another-stop');
@@ -545,39 +540,30 @@ function updateFormValidation(chain: Airport[], dest: Airport, state: SimState):
       `${minuteOfDayToTimeString(firstLeg.departMinute)}–${minuteOfDayToTimeString(plan.arriveBackMinute)}`
     : '';
 
-  // Week four's PDEW/CAP readout, for the leg being added right now: the
-  // un-minmaxed demand-vs-capacity ceiling for that market, shown even if
-  // the checks below end up blocking this specific attempt — still useful
-  // context for a market you might come back and draw differently.
-  // `newFrequency` is the existing schedule's frequency on this market
-  // *plus* however many of this rotation's own legs serve it (a rotation
-  // that shuttles YFC↔YQM twice adds four) — the same denominator
-  // sim/economy.ts's flightResult() divides the market's demand by, just
-  // read before committing instead of after, so this can never drift from
-  // what the flight would actually carry once it's flying. CAP is the
-  // plane's raw seat count, not the load-factor-adjusted ceiling — the
-  // whole point is showing the number *before* any of the
-  // fare/yield/competition knobs apply.
+  // The market read for the leg being added (sim/marketSize.ts): its
+  // size in words and whether this plane would fill, shown even if the
+  // checks below block this attempt, since it's still useful context.
+  // `newFrequency` is the existing schedule's flights on this market plus
+  // however many of this rotation's own legs serve it (a rotation that
+  // shuttles YFC↔YQM twice adds four): the same count sim/economy.ts's
+  // flightResult() divides the market's demand by.
   if (type) {
     const fromThisRotation = plan.legs.filter(
       (leg) =>
         (leg.origin === origin.iata && leg.dest === dest.iata) || (leg.origin === dest.iata && leg.dest === origin.iata),
     ).length;
     const newFrequency = legsServingMarket(origin.iata, dest.iata, state.schedule) + Math.max(fromThisRotation, 1);
-    const pdew = Math.round(actualDailyDemand(state, origin.iata, dest.iata) / newFrequency);
-    const potentialPdew = Math.round(currentPotentialDemand(state, origin.iata, dest.iata) / newFrequency);
     // A suppressed market (sim/demand.ts) carries nobody. Deliberately
     // still buildable — the restriction is soft — but saying so plainly
     // beats letting someone discover it from an empty P&L.
     const suppressed = suppressedMarketReason(origin.iata, dest.iata);
+    const fill = demandAgainstSeats(state, origin.iata, dest.iata, newFrequency, type.seats);
     formPdew.textContent = suppressed
       ? `${origin.iata}–${dest.iata}: no market — ${suppressed}`
-      : potentialPdew > pdew
-        ? `${origin.iata}–${dest.iata} PDEW: ${pdew} now → ${potentialPdew} potential  CAP: ${type.seats}`
-        : `${origin.iata}–${dest.iata} PDEW: ${pdew}  CAP: ${type.seats}`;
-    // See the hover tooltip's own note: thin is judged on potential, not
-    // on what the market happens to carry before anyone has built it.
-    formPdew.classList.toggle('thin-market', potentialPdew < type.seats);
+      : `${origin.iata}–${dest.iata}: ${marketSize(state, origin.iata, dest.iata)} market · ${type.seats} seats, ${fill.words}`;
+    // See the hover tooltip's own note: thin is judged on the market fully
+    // grown, not on what it carries before anyone has built it.
+    formPdew.classList.toggle('thin-market', neverFills(state, origin.iata, dest.iata, newFrequency, type.seats));
   } else {
     formPdew.textContent = '';
     formPdew.classList.remove('thin-market');

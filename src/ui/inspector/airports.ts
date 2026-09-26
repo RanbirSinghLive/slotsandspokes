@@ -1,5 +1,6 @@
 import { airportLoad, dailyDeparturesAt, airportLevel } from '../../sim/airports';
 import { slotFeesPerDayAt, slotsHeld } from '../../sim/slots';
+import { airportDemandSize, sizeRank, type Size } from '../../sim/marketSize';
 import type { SimState } from '../../sim/state';
 import { unmetDemandByAirport } from '../../sim/unmetDemand';
 import { airports } from '../../render/airports';
@@ -42,10 +43,17 @@ const COLUMNS: Column[] = [
     format: (row) => (row.slotPairs > 0 ? `${row.slotPairs} · $${row.slotFees.toLocaleString()}` : '—'),
     numeric: true,
   },
-  { key: 'waiting', label: 'Waiting', title: 'Potential riders a day you are not carrying', format: (row) => Math.round(row.waiting).toLocaleString(), numeric: true },
+  {
+    key: 'waiting',
+    label: 'Waiting',
+    title: 'How many people want to fly from here that you are not carrying, in words',
+    format: (row) => SIZE_BY_RANK[row.waiting],
+    numeric: true,
+  },
 ];
 
 const namesByIata = new Map(airports.map((airport) => [airport.iata, airport.name]));
+const SIZE_BY_RANK: Size[] = ['Tiny', 'Small', 'Medium', 'Large', 'Huge'];
 
 // How the table is sorted and filtered: the player's choice, kept while
 // they move around the inspector, not saved.
@@ -62,7 +70,8 @@ function buildRows(state: SimState): Row[] {
     load: airportLoad(state, iata),
     slotPairs: slotsHeld(state, iata),
     slotFees: slotFeesPerDayAt(state, iata),
-    waiting: unmet.get(iata)?.latent ?? 0,
+    // Sorted by size, not by the hidden number (sim/marketSize.ts).
+    waiting: sizeRank(airportDemandSize(unmet.get(iata)?.latent ?? 0)),
   }));
 }
 

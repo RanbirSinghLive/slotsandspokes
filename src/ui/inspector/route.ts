@@ -1,6 +1,7 @@
 import { forecastStance, type StanceForecast } from '../../sim/fareForecast';
 import { rivalYieldFactor } from '../../sim/pressure';
 import { policyFare, setFareStance, setHandFare, setMarketingSpend } from '../../sim/pricing';
+import { demandAgainstSeats, marketSize } from '../../sim/marketSize';
 import { summarizeMarket } from '../../sim/marketSummary';
 import { rivalResponseChance } from '../../sim/rivalResponse';
 import { routeFixedCosts } from '../../sim/routeCosts';
@@ -74,23 +75,24 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
     );
   }
 
-  const short = readout.demandNow > readout.seatsPerFlight;
+  const fill = demandAgainstSeats(state, a, b, readout.legs, readout.seatsPerFlight);
+  const short = fill.short;
   const presence = line(
     `${summary.rotations.length} flight${summary.rotations.length === 1 ? '' : 's'}/day · ${summary.byClass.map((c) => `${c.name} x${c.count}`).join(', ')}`,
   );
   presence.classList.toggle('is-over', short);
   root.append(presence);
 
-  // A route you have only just opened has almost no demand, however big
-  // the city pair is: demand is built by flying it, over weeks
-  // (sim/marketDemand.ts). Saying so is what stops "20,000 potential" from
-  // reading as "add ten flights".
-  const young = readout.demandNow < 0.4 * readout.seatsPerFlight;
+  // The market in words (sim/marketSize.ts): how big the city pair is, and
+  // how full a flight is today. A route you have only just opened has
+  // almost no demand, however big the city pair is: demand is built by
+  // flying it, over weeks (sim/marketDemand.ts). Saying so is what stops a
+  // Huge market from reading as "add ten flights".
   root.append(
     line(
-      `Per flight: ${readout.demandNow} passengers wanted${readout.demandPotential > readout.demandNow ? ` (${readout.demandPotential} potential)` : ''}, ${readout.seatsPerFlight} seats.` +
-        (short ? ' Demand exceeds seats: add a flight or upgauge.' : '') +
-        (young ? ' Demand is still growing: extra flights fly emptier for now.' : ''),
+      `${marketSize(state, a, b)} market · ${readout.seatsPerFlight} seats a flight, ${fill.words}.` +
+        (short ? ' Add a flight or a bigger plane.' : '') +
+        (fill.thin ? ' It grows as you fly it: extra flights fly emptier for now.' : ''),
     ),
   );
 
