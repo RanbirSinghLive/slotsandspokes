@@ -1,5 +1,7 @@
 import { loadMissions } from '../sim/missions';
+import { moneyOnTable, RIVAL_MARGIN_SHARE } from '../sim/attractiveness';
 import { networkAirports } from '../sim/reach';
+import { legsServingMarket, recommendedFare } from '../sim/schedule';
 import { AIRCRAFT_CLASSES } from '../sim/aircraftClasses';
 import type { SimState } from '../sim/state';
 
@@ -118,6 +120,26 @@ function pollMissionEvents(state: SimState): void {
   }
 }
 
+/**
+ * Why a rival came, when it opens on a market the player flies: what it
+ * read there (sim/attractiveness.ts), the passengers turned away or the
+ * margin after costs, whichever was the bigger draw. Empty elsewhere.
+ */
+function entryReason(state: SimState, a: string, b: string): string {
+  if (legsServingMarket(a, b, state.schedule) === 0) return '';
+  const table = moneyOnTable(state, a, b);
+  const spillValue = table.turnedAway * recommendedFare(a, b);
+  const marginValue = RIVAL_MARGIN_SHARE * Math.max(0, table.fullyCostedMargin);
+  if (spillValue <= 0 && marginValue <= 0) return '';
+  return spillValue >= marginValue
+    ? `: you're turning away about ${Math.round(table.turnedAway)} a day there`
+    : `: you make ${money(table.fullyCostedMargin)} a day there after costs`;
+}
+
+function money(amount: number): string {
+  return `$${Math.round(amount).toLocaleString()}`;
+}
+
 let hasSeenInitialRivals = false;
 /** Every rival route seen last poll, by identity, with what the ticker needs to describe it once it's gone. */
 const seenRoutes = new Map<string, { frequency: number; airline: string; origin: string; dest: string }>();
@@ -151,7 +173,7 @@ function pollRivalEvents(state: SimState): void {
     if (!touchesNetwork(route)) continue;
 
     if (previous === undefined) {
-      pushEvent(state.simMinute, `${route.airline} opens ${route.origin}–${route.dest}`);
+      pushEvent(state.simMinute, `${route.airline} opens ${route.origin}–${route.dest}${entryReason(state, route.origin, route.dest)}`);
     } else if (route.dailyFrequency > previous) {
       pushEvent(state.simMinute, `${route.airline} adds a flight on ${route.origin}–${route.dest} (${route.dailyFrequency}/day)`);
     }

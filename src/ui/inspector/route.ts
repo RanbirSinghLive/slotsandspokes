@@ -3,6 +3,7 @@ import { rivalYieldFactor } from '../../sim/pressure';
 import { policyFare, setFareStance, setHandFare, setMarketingSpend } from '../../sim/pricing';
 import { demandAgainstSeats, marketSize } from '../../sim/marketSize';
 import { summarizeMarket } from '../../sim/marketSummary';
+import { moneyOnTable } from '../../sim/attractiveness';
 import { rivalResponseChance } from '../../sim/rivalResponse';
 import { routeFixedCosts } from '../../sim/routeCosts';
 import { reliabilityDemandFactor, trailingMarketOtp } from '../../sim/routeOtp';
@@ -127,6 +128,9 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
     );
   }
 
+  const rivalsView = describeRivalsView(state, a, b);
+  if (rivalsView) root.append(rivalsView);
+
   const stances = buildStances(state, a, b, changed);
   if (stances) root.append(stances);
   root.append(...buildFareAndMarketing(state, a, b, changed));
@@ -147,6 +151,41 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   root.append(buildRouteOtp(state, a, b));
 
   return { root, redrawPools };
+}
+
+/**
+ * The route as a rival sees it (sim/attractiveness.ts): the money it leaves
+ * on the table and why, what the player's moats keep back, and what a
+ * rival's slots would cost. The warning before anyone comes, and the
+ * reason they would: turned-away passengers and a fat margin draw them;
+ * more flights, a hub feeding the route, and dear or full slots keep them
+ * out. Null when there's nothing on the table.
+ */
+function describeRivalsView(state: SimState, a: string, b: string): HTMLElement | null {
+  const table = moneyOnTable(state, a, b);
+  const draws: string[] = [];
+  if (table.turnedAway >= 1) draws.push(`you turn away about ${Math.round(table.turnedAway)} a day`);
+  if (table.fullyCostedMargin > 0) draws.push(`you make ${money(table.fullyCostedMargin)} a day after costs`);
+  if (draws.length === 0) return null;
+
+  const kept: string[] = [`your frequency keeps ${Math.round(table.dominance * 100)}% of it`];
+  if (table.hubFeed >= 0.01) kept.push(`your hub's connections ${Math.round(table.hubFeed * 100)}%`);
+  const slots =
+    table.rivalSlotFees === null
+      ? 'and an airport here is full, so no rival can get in'
+      : `and a rival would pay ${money(table.rivalSlotFees)} a day in slots`;
+  const text =
+    table.perDay >= 1
+      ? `Rivals' view: about ${money(table.perDay)} a day to be had here. ${capitalise(draws.join(' and '))}; ${kept.join(', ')}, ${slots}.`
+      : `Rivals' view: nothing worth taking. ${capitalise(draws.join(' and '))}, but ${kept.join(', ')}, ${slots}.`;
+  return line(text, table.perDay >= RIVALS_VIEW_WARN_PER_DAY ? 'inspector-line is-warn' : 'inspector-line');
+}
+
+/** Money on the table (a day) at which the rivals' view turns amber: enough to be worth a rival's while. */
+const RIVALS_VIEW_WARN_PER_DAY = 1000;
+
+function capitalise(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 /** Fare slider range around the policy fare, and its step. */

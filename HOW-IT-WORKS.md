@@ -975,6 +975,15 @@ their busiest routes $8k–9k each, enough to turn some to losses. A
 "full" airport means its whole day is full, not its peak: rivals still
 squeeze into a congested hub, at a price.
 
+**Seeing it.** The route view's **Rivals' view** line shows a route as a
+rival sees it: the money on the table and what draws it (passengers you
+turn away, your margin after costs), what your moats keep back (your
+frequency's share, your hub's connections), and what a rival's slots
+would cost, or that an airport is full. It turns amber at $1,000 a day.
+When a rival opens on a market you fly, the ticker says why: "…: you're
+turning away about 40 a day there" or "…: you make $9,000 a day there
+after costs", whichever drew it more.
+
 A player market with nothing on the table isn't a target, so a lean
 airline's markets are left alone and the newcomer takes a market next to
 the network, weighted by potential.

@@ -9,8 +9,8 @@ player and `npm run balance` give every balance change a measured
 before and after (baseline below). Route views now show a route's share
 of slot fees and leases. **Thread 1, thread 2's slice 1 and thread
 3's slices 1–2 are done, and so are thread 6 (Europe) and thread 2
-(all three slices). Thread 3's slices 3 and 4 (moats) are done;
-next is its slice 5 (legibility).**
+(all three slices). Thread 3 is done (all five slices). Next in
+order: thread 4 (shocks).**
 
 ---
 
@@ -346,6 +346,13 @@ Slices:
    airports in one pass, checked equal to the old count on 400 days, and
    the full report reproduced exactly in 14 minutes.
 5. **Legibility:** the ticker's reasons and the route view's warning.
+   (Done.) The route view's "Rivals' view" line: the money on the table
+   and what draws it, what the player's frequency and hub keep back, and
+   a rival's slot cost (or a full airport), amber at $1,000 a day. On the
+   owner's LaGuardia save, LGA–BOS reads about $13,700 a day (95 turned
+   away), LGA–DCA about $600 (half kept by the hub's connections). The
+   ticker adds the reason when a rival opens on a player market: the
+   turned-away passengers or the margin, whichever drew it more.
 
 ---
 
