@@ -587,16 +587,31 @@ planner the route builder uses, and the ring's actions in
      plane has no room. On 4 or more days it loses a flight: the plane
      can't get round in time, and a buffer would make that worse. One
      bad day is left alone, since a storm at home cancels a flight on
-     every market.
+     every market. A plane that loses a flight this way gets no new ones
+     for 30 days, unless it has nothing left to fly.
   2. **Cut losers.** A market that made no money for 14 days in a row
      loses a flight, once it has flown 21 days.
-  3. **Lease when full.** Once a class's pool at home is 85% booked and
+  3. **Feed spill.** A market turning passengers away (the map's "turned
+     away") that made money last week gets one more flight, if a plane
+     of its class at base has room before 21:00.
+  4. **Open markets.** Every plane with time left flies the best market
+     from its base that nothing flies yet, if it has riders for a full
+     plane each way.
+  5. **Lease when full.** Once a class's pool at home is 85% booked and
      last week made money overall, it leases the largest class on offer
      whose best market has riders for a full round trip, if cash covers
      the lessor's reserve plus 30 more days of that lease. Then it fills
      that plane's day at once.
+  6. **Return idle planes.** A plane that flew nothing for 7 days goes
+     back to the lessor, if the fee can be paid.
 
-  A market it changed is left alone for 7 days, so the change can show.
+  It never adds flights at an airport where congestion already delays
+  10% or more of flights, the figure on the airport view's load line.
+  Without that it packed its home airport past capacity and read the
+  resulting cancellations as problems with individual markets. It
+  remembers what it changed: a market is left alone for 7 days after a
+  change, gets no flight back for 30 days after one is dropped, and is
+  judged only on the days since it was last opened.
 - **starter** fills the starting plane's day to 22:00 on the first
   morning and never does anything again. It is the floor: an unattended
   start. From Halifax, London or Philadelphia it runs out of money within
@@ -1802,8 +1817,7 @@ The current plan is the newest `WEEK-*.md`. As of September 2026:
 - **The Grow tab as one pipeline view** (WEEK-EIGHT.md) — next up.
 - **More tech tree branches** — fuel efficiency is still the only one.
 - **Ancillary revenue** (bag fees), designed twice and never built.
-- **The rest of the steady headless player** — it doesn't yet open new
-  markets, feed spill, return planes or choose stances (WEEK-EIGHT.md).
+- **Fare stances for the steady headless player** (WEEK-EIGHT.md).
 - **Per-base time zones** — every plane flies on the home clock.
 
 Open balance questions rather than missing features: margin favoured

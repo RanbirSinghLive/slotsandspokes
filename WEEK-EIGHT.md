@@ -441,7 +441,46 @@ as cancelled, so nothing on screen said so.
 
 ## Next: a headless player that plays (a separate thread)
 
-**Status: slices 1, 2 and 6 done.**
+**Status: slices 1, 2, 3 and 6 done.**
+
+**Slice 3 as built:** habits 3 (feed spill), 4 (open markets) and 6
+(return idle planes), in the order the draft gave. The first version
+churned: from YUL it opened 238 markets and dropped 189 flights in a
+year, reopening some routes ten times. Three fixes, each something a
+careful player would do:
+- **Busy airports.** It kept adding flights at home until YUL ran at
+  130% of peak capacity, with congestion delaying 60% of flights. The
+  knock-on delays hit the curfew, and slack read those cancellations as
+  one market's problem. It now adds nothing at an airport where
+  congestion delays 10% or more of flights (`BUSY_DELAY_CHANCE`). That
+  is also the first thing that stops its growth.
+- **Tight planes.** Slack freed a plane's time and "open markets" filled
+  it again the next day. A plane that lost a flight to cancellations
+  now gets no new ones for 30 days, unless it has nothing left to fly
+  (otherwise it sat idle and was returned for a six-figure fee).
+- **Judged since reopening.** A reopened market inherited the last
+  stint's cancellations and was dropped the next day. The player
+  remembers when it opened each market and judges only the days since.
+
+It also found a game bug: removing a route while its last flight was in
+the air made cash NaN when that flight landed (demand per flight divided
+by zero flights). Fixed in `step.ts`: the landing flight counts as one.
+
+A year from six homes, seed 1 (starter results as before):
+
+| Home | Steady player | Planes | Legs a day |
+|---|---|---|---|
+| YUL | $79.8M | 20 | 90 |
+| YYZ | $71.3M | 21 | 56 |
+| YHZ | $13.3M | 11 | 48 |
+| BOS | $57.8M | 16 | 72 |
+| PHL | $84.8M | 17 | 84 |
+| LHR | $104M | 27 | 100 |
+
+No home goes bust, and every year runs in 8–13 s. Home-airport
+congestion now caps growth at 15–30 planes, but each of those planes is
+still hugely profitable. That's the balance thread's problem, as noted
+under slice 2.
 
 **Slice 6 as built:** a year from YUL with the steady player (48 planes,
 172 legs a day) went from 122 s to 11 s; LHR from 15 s to 8 s; the
