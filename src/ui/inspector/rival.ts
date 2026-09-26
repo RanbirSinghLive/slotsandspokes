@@ -1,7 +1,7 @@
-import { classByCode, pluralClassName } from '../../sim/aircraftClasses';
+import { classByCode } from '../../sim/aircraftClasses';
 import { dayIndex } from '../../sim/clock';
 import type { CompetitorOffering } from '../../sim/competitors';
-import { preferredRivalClass, rivalFlights } from '../../sim/market';
+import { FLIGHTS_PER_RIVAL_PLANE, rivalFlights } from '../../sim/market';
 import { RIVAL_CLOSE_AFTER_LOSING_DAYS, RIVAL_MAX_ROUTES_PER_AIRLINE, RIVAL_REOPEN_COOLDOWN_DAYS } from '../../sim/pressure';
 import { rivalRouteOutlook } from '../../sim/rivalEconomics';
 import { legsServingMarket, marketKey, recommendedFare } from '../../sim/schedule';
@@ -130,11 +130,16 @@ export function buildRivalView(state: SimState, code: string): HTMLElement {
       `${routes.length} of ${RIVAL_MAX_ROUTES_PER_AIRLINE} routes · ${flights} flights/day · fleet: ${fleetText || 'none'}`,
     ),
   );
-  // Rivals don't assign planes to routes: every route is costed as the
-  // class the airline's size calls for (sim/rivalEconomics.ts), which is
-  // what makes a big airline's small routes so expensive.
+  // Rivals don't assign planes to routes: every route is flown by the
+  // fleet on average (sim/rivalEconomics.ts). Planes beyond what its
+  // flying needs are still leased, and paid for across its routes.
+  const seatsPerFlight = fleet.length > 0 ? Math.round(fleet.reduce((sum, typeCode) => sum + (classByCode(typeCode)?.seats ?? 0), 0) / fleet.length) : 0;
+  const spare = fleet.length - Math.ceil(flights / FLIGHTS_PER_RIVAL_PLANE);
   root.append(
-    line(`Costed as ${pluralClassName(classByCode(preferredRivalClass(flights))?.name ?? preferredRivalClass(flights))} on every route, for an airline this size.`),
+    line(
+      `Its routes average ${seatsPerFlight} seats a flight.` +
+        (spare > 0 ? ` ${spare} plane${spare === 1 ? '' : 's'} more than its flying needs, paid for across its routes.` : ''),
+    ),
   );
 
   const outlooks = routes

@@ -3,7 +3,7 @@ import { rivalBookingShare } from './choiceModel';
 import type { CompetitorOffering } from './competitors';
 import { LOAD_FACTOR, legCost, type EconomyAircraftType } from './economy';
 import { leaseRateFor } from './leasing';
-import { FLIGHTS_PER_RIVAL_PLANE, preferredRivalClass, rivalFlights } from './market';
+import { preferredRivalClass, rivalFlights } from './market';
 import { actualDailyDemand } from './marketDemand';
 import { RIVAL_CLOSE_AFTER_LOSING_DAYS, RIVAL_CLOSE_GRACE_DAYS, RIVAL_REOPEN_COOLDOWN_DAYS } from './pressure';
 import { computeBlockMinutes, legsServingMarket, marketKey } from './schedule';
@@ -19,13 +19,16 @@ import type { SimState } from './state';
  *                rival in the softmax), capped by its seats at the
  *                standard load factor
  *   revenue    = passengers × its fare
- *   cost       = its flights × legCost() for the class the airline flies,
- *                plus this route's share of that airline's plane leases
+ *   cost       = its flights × the fleet's average legCost() per flight,
+ *                plus this route's share of the fleet's plane leases
  *
  * A rival "daily flight" is one departure here, the same unit the choice
- * model compares against the player's legs. The class is the one the
- * airline's size calls for (sim/market.ts's preferredRivalClass()), since
- * rivals don't assign planes to routes.
+ * model compares against the player's legs. Rivals don't assign planes to
+ * routes, so every route is flown by the airline's actual fleet
+ * (`state.competitorFleets`) on average: its seats and its cost per
+ * flight averaged over the planes it has, and its leases shared out by
+ * each route's part of the airline's flights. A plane it keeps without
+ * enough flying for it is paid for across all its routes.
  */
 
 type TypeSpec = EconomyAircraftType & { code: string; cruiseKts: number };
@@ -35,8 +38,23 @@ const typesByCode = new Map((aircraftTypesData as TypeSpec[]).map((type) => [typ
 
 export type RivalRouteResult = { passengers: number; revenue: number; cost: number; margin: number };
 
+/**
+ * The rival's planes by class. An airline with no fleet on record (only
+ * before sim/market.ts's ensureRivalFleets() has run) is taken to fly the
+ * class its size calls for.
+ */
+function fleetMix(state: SimState, code: string): { type: TypeSpec; count: number }[] {
+  const fleet = state.competitorFleets[code] ?? [];
+  const classes = fleet.length > 0 ? fleet : [preferredRivalClass(rivalFlights(state, code))];
+  const counts = new Map<string, number>();
+  for (const typeCode of classes) counts.set(typeCode, (counts.get(typeCode) ?? 0) + 1);
+  return [...counts.entries()].map(([typeCode, count]) => ({ type: typesByCode.get(typeCode)!, count }));
+}
+
 export function rivalRouteDailyResult(state: SimState, route: CompetitorOffering): RivalRouteResult {
-  const type = typesByCode.get(preferredRivalClass(rivalFlights(state, route.code)))!;
+  const mix = fleetMix(state, route.code);
+  const planes = mix.reduce((sum, { count }) => sum + count, 0);
+  const average = (valueOf: (type: TypeSpec) => number) => mix.reduce((sum, { type, count }) => sum + valueOf(type) * count, 0) / planes;
 
   const settings = state.routeSettings[marketKey(route.origin, route.dest)];
   const playerLegs = legsServingMarket(route.origin, route.dest, state.schedule);
@@ -47,13 +65,16 @@ export function rivalRouteDailyResult(state: SimState, route: CompetitorOffering
     settings?.marketingSpend ?? 0,
     state.competitorRoutes,
   );
-  const seats = route.dailyFrequency * Math.round(type.seats * LOAD_FACTOR);
+  const seats = route.dailyFrequency * Math.round(average((type) => type.seats) * LOAD_FACTOR);
   const passengers = Math.min(actualDailyDemand(state, route.origin, route.dest) * share, seats);
   const revenue = passengers * route.fare;
 
-  const block = computeBlockMinutes(route.origin, route.dest, type.cruiseKts);
-  const flying = route.dailyFrequency * legCost(block, type, state.fuelPriceIndex, 1);
-  const leases = (route.dailyFrequency / FLIGHTS_PER_RIVAL_PLANE) * leaseRateFor(type.code);
+  const costPerFlight = average((type) =>
+    legCost(computeBlockMinutes(route.origin, route.dest, type.cruiseKts), type, state.fuelPriceIndex, 1),
+  );
+  const flying = route.dailyFrequency * costPerFlight;
+  const fleetLeases = mix.reduce((sum, { type, count }) => sum + leaseRateFor(type.code) * count, 0);
+  const leases = (route.dailyFrequency / Math.max(1, rivalFlights(state, route.code))) * fleetLeases;
   const cost = flying + leases;
 
   return { passengers, revenue, cost, margin: revenue - cost };

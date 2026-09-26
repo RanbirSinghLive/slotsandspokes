@@ -184,9 +184,18 @@ Slice 4 as built:
 - **What it showed straight away:** Ironbridge owns a Propeller and three
   Regionals but is costed as Narrowbodies on every route, because its
   class comes from the whole airline's size. That's −$51,884 a day, with
-  4 of its 7 routes losing and saved only by their grace periods. The
-  rival-cost issue from the fare-stance findings, now visible in the
-  game.
+  4 of its 7 routes losing and saved only by their grace periods.
+- **Fixed after the slice:** rival routes are now costed with the
+  airline's actual fleet, on average (see the fare-stance findings).
+  - Rivals are mostly profitable now, and keep about 12% more routes
+    open in the dense north-east.
+  - Six-seed headless: YUL $1.34M → $981k (one bust), YYZ $3.49M →
+    $4.12M, BOS $823k → $1.13M (all survive). YHZ, PHL and LHR are
+    unchanged.
+  - The stance choice now sometimes decides the outcome:
+    Montréal–LaGuardia's rival closes under Undercut or Match but
+    survives Premium, while Skyline survives every stance on the
+    Toronto trunks.
 
  The owner has settled the scope (see
 "Decisions").
@@ -502,12 +511,12 @@ answering the open questions, so they stay open).
   ban is per airline, and new entrants aim at the player's markets
   (`RIVAL_TARGETS_PLAYER`). Slice 4 should decide whether a closure
   protects the market from everyone for a while.
-- **Rival costs swamp the fare lever.** A rival's class comes from its
-  whole airline's size (`preferredRivalClass()`), so a big airline's
-  2-a-day route is costed as Widebodies: Ironbridge lost $33k–53k a
-  day on O'Hare–Toronto at *any* fare. Most rival routes forecast to
-  close whatever stance you pick, so the choice rarely decides
-  anything. Also slice 4.
+- **Rival costs swamped the fare lever** (fixed). A rival's class came
+  from its whole airline's size (`preferredRivalClass()`), so a big
+  airline's 2-a-day route was costed as Widebodies: Ironbridge lost
+  $33k–53k a day on O'Hare–Toronto at *any* fare. Routes are now costed
+  with the rival's actual fleet on average, and the stance forecast can
+  come out either way.
 - **The card is tall.** The radial menu can land on its lower rows
   when a route is clicked low on the screen.
 

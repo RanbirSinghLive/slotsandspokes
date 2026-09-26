@@ -583,10 +583,11 @@ within the year, as rival airlines pile onto its markets and a day
 packed to 22:00 loses flights to the curfew. **The run stops at $0**, as the game does
 (see Cash runway): it checks after every simulated minute, writes a row
 for the part of the final day that was flown, and prints `GAME OVER on
-day N`. Over six seeds, Halifax busts by day 85 and London and
-Philadelphia by day 345. From the dense north-east core the same player
-does well: YUL (flying YYZ, YOW, LGA and BOS) ends the year at $2.2M on
-the default seed, and Montréal and Toronto survive every seed. Balance work that needs a better
+day N`. Over six seeds, Halifax busts by about day 95, and Philadelphia
+and London by about day 180 (one London seed survives). From the dense
+north-east core the same player does well: YUL (flying YYZ, YOW, LGA and
+BOS) ends the year at about $1.57M on the default seed, Toronto and
+Boston survive every seed, and Montréal five of six. Balance work that needs a better
 player should add the behaviour to `newGame.ts`, not hand-write a
 schedule. (Until September 2026 the runner flew a hand-authored
 three-aircraft network no player could have, which is why older sections
@@ -910,10 +911,16 @@ Rivals keep no books, so each day `rivalRouteDailyResult()` estimates a
 route's profit with the player's own formulas: passengers are market
 demand × the route's booking share (`choiceModel.ts`'s
 `rivalBookingShare()`, with the player and every rival in the softmax),
-capped by its seats at the standard load factor, paying its fare. The
-cost is its flights × `legCost()` for the class the airline's size calls
-for, plus its share of the airline's plane leases (one plane per three
-daily flights).
+capped by its seats at the standard load factor, paying its fare. Rivals
+don't assign planes to routes, so every route is flown by the airline's
+actual fleet (`competitorFleets`) on average:
+- its seats per flight are the fleet's average;
+- its cost is its flights × the fleet's average `legCost()` per flight;
+- plus its share of the fleet's leases, by its part of the airline's
+  flights.
+
+A plane the airline keeps without enough flying for it (after a route
+closes, say) is paid for across all its routes.
 
 A route isn't judged until it has run 60 days
 (`RIVAL_CLOSE_GRACE_DAYS`), because markets start small and grow as
@@ -999,7 +1006,7 @@ above. Everything else sits under **Airports** or **Rivals**:
 | An airport | click its dot, or its row | presence, waiting riders, load, slots, grounded planes with Expedite, Plan hub, planes based there, and every market flown from it |
 | A route | click its line, or a market row | the route view: flights, demand, rivals, fare stances, pools, margin and on-time |
 | Rivals list | "All competitors" in the Competition overlay, or the breadcrumb | every rival airline, biggest first: routes (and how many against you), estimated margin a day, routes losing money |
-| A rival | its name anywhere in the panel, or picking it in the Competition overlay | its fleet, routes against the 20-route cap, the class its routes are costed as, every route worst first (fare against the going rate, margin a day, losing streak, grace left, about when it closes), and markets it closed recently |
+| A rival | its name anywhere in the panel, or picking it in the Competition overlay | its fleet, routes against the 20-route cap, its average seats per flight and any planes beyond what its flying needs, every route worst first (fare against the going rate, margin a day, losing streak, grace left, about when it closes), and markets it closed recently |
 
 The breadcrumb reads Network › Airports › YYZ › YYZ – ORD, or Network ›
 Rivals › Ironbridge Airlines. A route opened from the map goes under its
