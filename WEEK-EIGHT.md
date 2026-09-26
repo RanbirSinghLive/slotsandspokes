@@ -441,7 +441,25 @@ as cancelled, so nothing on screen said so.
 
 ## Next: a headless player that plays (a separate thread)
 
-**Status: slices 1 and 2 done.**
+**Status: slices 1, 2 and 6 done.**
+
+**Slice 6 as built:** a year from YUL with the steady player (48 planes,
+172 legs a day) went from 122 s to 11 s; LHR from 15 s to 8 s; the
+starter is unchanged at 3–4 s. Headless output for all four matched the
+runs before byte for byte. Two fixes:
+- **Connecting flows** (`sim/hubs.ts`): `connectingFlowsAt()` writes its
+  inputs as a string (spokes with flights and establishment, demand
+  growth, hub style, nonstop spoke pairs) and reuses the last answer
+  while it matches, so it's exact. Nonstop pairs come from one pass over
+  the schedule and rival routes instead of one per pair.
+- **The departure loop** (`step.ts`): every due leg was checked against
+  today's completed, cancelled and airborne lists every minute, and the
+  fly-in-order check searched them again, so the work grew with the
+  square of the schedule. They're sets for the length of the loop now,
+  updated at the three places the loop adds to the lists.
+
+In the preview, the game ran at 20× with no console errors, and an
+airport's view showed its connecting passengers.
 
 **Slice 2 as built** (`headless/player.ts`):
 - `createPlayer('starter' | 'steady')`. `startHeadlessGame()` takes the
@@ -485,8 +503,8 @@ as cancelled, so nothing on screen said so.
   (`connectingFlowsAt()` in `sim/hubs.ts`), recomputed from scratch
   whenever a flight departs, an AOG is covered or a rival weighs a
   response. They only change when the schedule does, so they can be
-  worked out once per schedule. That fix is added below as slice 6,
-  since `npm run balance` would take half an hour without it.
+  worked out once per schedule. That became slice 6 (done, above),
+  since `npm run balance` would have taken half an hour without it.
 
 Every balance number comes from `openStarterRoutes()` (`headless/
 newGame.ts`). It fills the starting plane's day on the first morning and

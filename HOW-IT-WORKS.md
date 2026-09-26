@@ -1583,6 +1583,16 @@ is scaled by its booking share at its fare over its share at the going
 rate, capped at 1.5× for pricing under it. Before this, connecting
 passengers ignored price and kept an over-priced hub full.
 
+**Worked out once per change, not per question.** Every departure asks
+for the flows at both ends, and working them out visits every pair of a
+hub's spokes, so a thirty-spoke hub made them most of the simulation's
+time. `connectingFlowsAt()` writes out its inputs as a short string: the
+spokes with their flights and establishment, demand growth, the hub
+style, and which spoke pairs anyone flies nonstop. It reuses the last
+answer for that hub while the string matches. The answer is exact, and a
+"what if" copy of the state (the hub planner's, the ring's) gets its own
+right answer. The cache is a module variable, never saved.
+
 **Hub styles** trade connections against the airport and the planes:
 
 | Style | Connections | Peak congestion | Extra ground time per arrival |

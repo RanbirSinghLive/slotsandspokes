@@ -1,6 +1,6 @@
 import { marketDistanceNm } from './demand';
 import { actualDailyDemand, currentPotentialDemand } from './marketDemand';
-import { legsServingMarket, recommendedFare } from './schedule';
+import { legsServingMarket, marketKey, recommendedFare } from './schedule';
 import { HUB_STYLES, hubStyleAt, type HubStyle } from './hubStyle';
 import { planRespace, applyRespace, workingCopy, type TurnBufferPlan } from './turnBuffer';
 import type { SimState } from './state';
@@ -103,8 +103,9 @@ function frequencyChance(flightsPerDay: number): number {
 
 /**
  * Connecting passengers between spokes `a` and `b` through `hub`, given
- * each spoke route's flights per day and establishment. Split out so suggested
- * new spokes can be valued with the same formula as real ones.
+ * each spoke route's flights per day and establishment, and whether anyone
+ * flies A–B nonstop. Split out so suggested new spokes can be valued with
+ * the same formula as real ones.
  */
 function flowBetween(
   state: SimState,
@@ -115,8 +116,9 @@ function flowBetween(
   flightsB: number,
   establishedA: number,
   establishedB: number,
+  nonstopFlown: boolean,
 ): number {
-  const nonstop = flownNonstop(state, a, b) ? NONSTOP_DISCOUNT : 1;
+  const nonstop = nonstopFlown ? NONSTOP_DISCOUNT : 1;
   return (
     currentPotentialDemand(state, a, b) *
     CONNECT_SHARE *
@@ -128,19 +130,66 @@ function flowBetween(
   );
 }
 
-/** Every connecting flow through `hub`, busiest first. */
+/**
+ * The last flows worked out at each hub, with the inputs they came from.
+ *
+ * Why a cache: the flows feed every departure's demand (step.ts), the
+ * daily AOG and rival-response rolls, and the map, so they're asked for
+ * many times a simulated minute. Working them out is a pass over every
+ * pair of spokes, which grows with the square of the hub's size: at
+ * thirty spokes it was two-thirds of all simulation time. Yet the answer
+ * only changes when one of its inputs does, and those are few: the
+ * spokes and their flights, how built-up each spoke route is, demand
+ * growth, the hub's style, and which spoke pairs anyone flies nonstop.
+ *
+ * So each call writes those inputs out as a string, which is cheap, and
+ * reuses the last answer when the string matches. That makes it exact by
+ * construction: a different input is a different string. It also doesn't
+ * care which object it was handed, so a "what if" copy of the state (the
+ * hub planner's, the radial menu's) gets the right answer too.
+ *
+ * Module-level, not in `SimState`: it holds nothing a save needs, and
+ * a fresh page or run simply starts empty.
+ */
+const flowCache = new Map<string, { inputs: string; flows: ConnectingFlow[] }>();
+
+/** Every connecting flow through `hub`, busiest first. Callers must not modify the result. */
 export function connectingFlowsAt(state: SimState, hub: string): ConnectingFlow[] {
   const spokes = [...spokesOf(state, hub).entries()];
+  const spokeSet = new Set(spokes.map(([spoke]) => spoke));
+
+  // Spoke pairs flown nonstop, by the player or a rival: one pass over
+  // each list instead of one per pair.
+  const nonstop = new Set<string>();
+  for (const leg of state.schedule) {
+    if (spokeSet.has(leg.origin) && spokeSet.has(leg.dest)) nonstop.add(marketKey(leg.origin, leg.dest));
+  }
+  for (const route of state.competitorRoutes) {
+    if (spokeSet.has(route.origin) && spokeSet.has(route.dest)) nonstop.add(marketKey(route.origin, route.dest));
+  }
+  const established = spokes.map(([spoke]) => establishment(state, spoke, hub));
+
+  const inputs = [
+    hubStyleAt(state, hub),
+    state.demandGrowthMultiplier,
+    spokes.map(([spoke, flights], i) => `${spoke}:${flights}:${established[i]}`).join(','),
+    [...nonstop].sort().join(','),
+  ].join('|');
+  const cached = flowCache.get(hub);
+  if (cached && cached.inputs === inputs) return cached.flows;
+
   const flows: ConnectingFlow[] = [];
   for (let i = 0; i < spokes.length; i++) {
     for (let j = i + 1; j < spokes.length; j++) {
       const [a, flightsA] = spokes[i];
       const [b, flightsB] = spokes[j];
-      const passengers = flowBetween(state, hub, a, b, flightsA, flightsB, establishment(state, a, hub), establishment(state, hub, b));
+      const passengers = flowBetween(state, hub, a, b, flightsA, flightsB, established[i], established[j], nonstop.has(marketKey(a, b)));
       if (passengers >= 0.5) flows.push({ hub, a, b, passengers });
     }
   }
-  return flows.sort((x, y) => y.passengers - x.passengers);
+  flows.sort((x, y) => y.passengers - x.passengers);
+  flowCache.set(hub, { inputs, flows });
+  return flows;
 }
 
 /**
@@ -217,7 +266,7 @@ export function suggestSpokes(state: SimState, hub: string, limit = 3): SpokeSug
     let passengers = 0;
     let revenuePerDay = 0;
     for (const [spoke, flights] of spokes) {
-      const flow = flowBetween(state, hub, candidate, spoke, 1, flights, 1, establishment(state, hub, spoke));
+      const flow = flowBetween(state, hub, candidate, spoke, 1, flights, 1, establishment(state, hub, spoke), flownNonstop(state, candidate, spoke));
       passengers += flow;
       revenuePerDay += flow * (recommendedFare(candidate, hub) + recommendedFare(hub, spoke));
     }

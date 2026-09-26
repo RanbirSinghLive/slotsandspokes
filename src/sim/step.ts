@@ -107,14 +107,10 @@ function recordCancellation(state: SimState, leg: ScheduleLeg, cause: keyof SimS
   market.cancelled += 1;
 }
 
-/** Whether an earlier leg of this plane's day hasn't flown or been cancelled yet. */
-function hasEarlierLegPending(state: SimState, leg: ScheduleLeg): boolean {
+/** Whether an earlier leg of this plane's day hasn't flown or been cancelled yet. `doneToday` holds the ids that have. */
+function hasEarlierLegPending(state: SimState, leg: ScheduleLeg, doneToday: Set<string>): boolean {
   return state.schedule.some(
-    (other) =>
-      other.tail === leg.tail &&
-      other.departMinute < leg.departMinute &&
-      !state.completedToday.includes(other.legId) &&
-      !state.cancelledToday.includes(other.legId),
+    (other) => other.tail === leg.tail && other.departMinute < leg.departMinute && !doneToday.has(other.legId),
   );
 }
 
@@ -307,14 +303,17 @@ export function step(state: SimState): void {
     applyDailyLoanInterest(state);
   }
 
+  // Leg ids already flown or cancelled today, and those in the air now, as
+  // sets: every due leg is checked against them every minute, and a list
+  // search there grows with the square of the schedule. Kept in step with
+  // the lists by the three places below that add to them.
+  const doneToday = new Set([...state.completedToday, ...state.cancelledToday]);
+  const airborne = new Set(state.activeFlights.map((flight) => flight.legId));
+
   for (const leg of state.schedule) {
     if (minuteOfDay < leg.departMinute) continue; // not due yet today
 
-    const alreadyHandledToday =
-      state.completedToday.includes(leg.legId) ||
-      state.cancelledToday.includes(leg.legId) ||
-      state.activeFlights.some((f) => f.legId === leg.legId);
-    if (alreadyHandledToday) continue;
+    if (doneToday.has(leg.legId) || airborne.has(leg.legId)) continue; // already handled today
 
     const aircraft = state.aircraft.find((a) => a.tail === leg.tail);
     if (!aircraft) continue; // this tail isn't part of the active fleet yet
@@ -327,7 +326,7 @@ export function step(state: SimState): void {
     // plane that started the day at the wrong airport could fly a later
     // leg first and then an overdue earlier one, ending the day back where
     // it started, every day, while its other routes never flew.
-    if (hasEarlierLegPending(state, leg)) continue;
+    if (hasEarlierLegPending(state, leg, doneToday)) continue;
     if (isAirportClosed(state, leg.origin)) continue;
     // Parked at another airport when this leg is due (stranded there by
     // an earlier closure or curfew): it can't fly this one, so cancel it
@@ -336,6 +335,7 @@ export function step(state: SimState): void {
     // runs late, below.
     if (aircraft.status === 'ground' && aircraft.atAirport !== leg.origin) {
       state.cancelledToday.push(leg.legId);
+      doneToday.add(leg.legId);
       recordCancellation(state, leg, 'position');
       continue;
     }
@@ -349,6 +349,7 @@ export function step(state: SimState): void {
     if (rotation && breaksCurfew(state, rotation, state.simMinute, dayStart)) {
       for (const cancelled of rotation.legs) {
         state.cancelledToday.push(cancelled.legId);
+        doneToday.add(cancelled.legId);
         recordCancellation(state, cancelled, 'curfew');
       }
       continue;
@@ -442,6 +443,7 @@ export function step(state: SimState): void {
       marketingSpend: routeSettings.marketingSpend,
     };
     state.activeFlights.push(activeFlight);
+    airborne.add(activeFlight.legId);
   }
 
   for (let i = state.activeFlights.length - 1; i >= 0; i--) {
