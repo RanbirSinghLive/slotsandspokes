@@ -77,7 +77,7 @@ export function legUtilisationMinutes(blockMinutes: number, turnBuffer = 0): num
 }
 
 /** `legUtilisationMinutes` for a leg already on the schedule, reading its route's buffer from `state`. */
-function scheduledLegMinutes(state: SimState, leg: ScheduleLeg): number {
+export function scheduledLegMinutes(state: SimState, leg: ScheduleLeg): number {
   return legUtilisationMinutes(leg.blockMinutes, extraTurnMinutes(state, leg.origin, leg.dest));
 }
 

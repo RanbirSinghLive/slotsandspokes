@@ -1254,6 +1254,17 @@ marketing**:
   speeds up demand growth (`sim/marketDemand.ts`).
 - **A day at these settings**: passengers, how full, share, revenue,
   cost, margin, and whether **seats or demand is the limit**.
+- **After its share of fixed costs** (`sim/routeCosts.ts`): that margin
+  less the route's share of slot fees and plane leases. Both are paid
+  airline-wide at midnight, so the route's own margin and 7-day bars
+  never include them. Slot fees at each end are shared by the route's
+  share of the player's movements at that airport. Leases are pooled by
+  aircraft class across the airline and shared by the minutes each route
+  flies (block plus turn). Flying a class less puts more of its lease on
+  every route still flying it, so a spare plane shows up as a heavier
+  burden on the rest. Summed over every route, the shares come back to
+  the airline's total slot fees and the leases of every class that
+  flies. It only reports; nothing here changes what is charged.
 
 Seats are the limit when passengers are pinned at the combined
 load-factor ceiling of every plane serving the market. Raising the fare

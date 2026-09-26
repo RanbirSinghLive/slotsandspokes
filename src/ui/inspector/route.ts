@@ -3,6 +3,7 @@ import { rivalYieldFactor } from '../../sim/pressure';
 import { policyFare, setFareStance, setHandFare, setMarketingSpend } from '../../sim/pricing';
 import { summarizeMarket } from '../../sim/marketSummary';
 import { rivalResponseChance } from '../../sim/rivalResponse';
+import { routeFixedCosts } from '../../sim/routeCosts';
 import { reliabilityDemandFactor, trailingMarketOtp } from '../../sim/routeOtp';
 import { legsServingMarket, marketKey, recommendedFare } from '../../sim/schedule';
 import type { FareStance, SimState } from '../../sim/state';
@@ -157,17 +158,33 @@ function roundToStep(value: number, step: number): number {
   return Math.round(value / step) * step;
 }
 
-/** The market's day at its current settings (sim/marketSummary.ts), in one line. */
-function describeEconomics(state: SimState, a: string, b: string): { text: string; losing: boolean } {
+/**
+ * The market's day at its current settings (sim/marketSummary.ts), in one
+ * line, and under it what the route costs beyond its own flights: its
+ * share of slot fees at each end and of its planes' class leases
+ * (sim/routeCosts.ts), and the margin once they're paid.
+ */
+function describeEconomics(state: SimState, a: string, b: string): { text: string; losing: boolean; fixed: string; fullyLosing: boolean } {
   const settings = state.routeSettings[marketKey(a, b)];
   const summary = summarizeMarket(a, b, state, settings);
   const load = summary.totalSeats > 0 ? summary.pax / summary.totalSeats : 0;
+  const costs = routeFixedCosts(state, a, b);
+  const fullMargin = summary.margin - costs.slotsPerDay - costs.leasePerDay;
+  const slotParts = costs.slots.filter((slot) => slot.perDay >= 0.5).map((slot) => `${slot.iata} ${money(slot.perDay)}`);
+  const leaseParts = costs.lease.map(
+    (entry) => `${entry.className} ${money(entry.perDay)} (${Math.round(entry.share * 100)}% of the class's flying, which uses ${Math.round(entry.poolUse * 100)}% of its day)`,
+  );
   return {
     text:
       `A day at these settings: ${summary.pax} passengers, ${Math.round(load * 100)}% full, ${Math.round(summary.share * 100)}% share · ` +
       `${money(summary.revenue)} revenue, ${money(summary.cost)} cost, ${signedMoney(summary.margin)} margin · ` +
       (summary.seatCapped ? 'seats are the limit.' : 'demand is the limit.'),
     losing: summary.margin < 0,
+    fixed:
+      `After its share of fixed costs: ${signedMoney(fullMargin)}/day. ` +
+      `Slots ${money(costs.slotsPerDay)}${slotParts.length > 0 ? ` (${slotParts.join(', ')})` : ''} · ` +
+      `lease ${money(costs.leasePerDay)}${leaseParts.length > 0 ? `: ${leaseParts.join('; ')}` : ''}.`,
+    fullyLosing: fullMargin < 0,
   };
 }
 
@@ -186,10 +203,16 @@ function buildFareAndMarketing(state: SimState, a: string, b: string, changed: (
   heading.textContent = 'Fare and marketing';
 
   const economics = line('');
+  const fixedCosts = line('');
+  fixedCosts.title =
+    'Slot fees and leases are paid airline-wide each midnight. Slot fees are shared by each airport\'s movements; ' +
+    'a class\'s leases by the minutes its planes fly, so flying a class less puts more of its lease on each route.';
   const redrawEconomics = () => {
-    const { text, losing } = describeEconomics(state, a, b);
+    const { text, losing, fixed, fullyLosing } = describeEconomics(state, a, b);
     economics.textContent = text;
     economics.classList.toggle('is-over', losing);
+    fixedCosts.textContent = fixed;
+    fixedCosts.classList.toggle('is-over', fullyLosing);
   };
 
   // Fare: centred on the policy fare, stretched to include the current
@@ -263,7 +286,7 @@ function buildFareAndMarketing(state: SimState, a: string, b: string, changed: (
   redrawFare();
   redrawMarketing();
   redrawEconomics();
-  return [heading, fareRow, marketingRow, economics];
+  return [heading, fareRow, marketingRow, economics, fixedCosts];
 }
 
 const STANCES: { stance: FareStance; name: string }[] = [

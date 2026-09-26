@@ -750,6 +750,19 @@ In order, once a day:
 
 ## Next: the inspector (map clicks open in the side panel)
 
+**Added after slice 5: fixed costs in the route view.** The headless
+player's baseline showed a route's margin leaves out slot fees and
+leases, both paid airline-wide at midnight. The owner asked for both in
+the route view, with a class's leases spread over the flying that class
+does, so idle capacity weighs on the routes still flying.
+`sim/routeCosts.ts` does the split; the route view's Fare and marketing
+block adds "After its share of fixed costs: …". The shares sum exactly
+to the airline's totals (checked from YUL and LHR at day 120). The same
+check found the steady player's YUL airline paying $62k a day in slot
+fees, almost all at home, which no route showed before. The headless
+player still judges routes on their own margin; switching it to this one
+is a balance-thread decision.
+
 **Status: slices 1–3 done.**
 
 Slice 3 as built:
