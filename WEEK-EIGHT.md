@@ -441,14 +441,52 @@ as cancelled, so nothing on screen said so.
 
 ## Next: a headless player that plays (a separate thread)
 
-**Status: slice 1 done.** The actions are in `sim/playerActions.ts`, and
-`ui/routeActions.ts` is a pass-through that redraws the schedule
-warnings after a change. The `MapPreview` type moved with them, and
-`render/preview.ts` re-exports it. Headless output for YUL and YYZ over
-a year matched the run before the move byte for byte. In Node, add
-flight, lease, remove flight, remove route and turn buffer all work on
-a started game. In the preview, a turn buffer's hover preview, setting
-it and setting it back through the ring all behaved as before.
+**Status: slices 1 and 2 done.**
+
+**Slice 2 as built** (`headless/player.ts`):
+- `createPlayer('starter' | 'steady')`. `startHeadlessGame()` takes the
+  player and calls its `open()`; `run.ts` and `sweep.ts` call
+  `playDay()` after every finished day and take `--player` (steady by
+  default). `run.ts` prints the player's decisions after the run.
+- The starter is the old `openStarterRoutes()`, unchanged: a year from
+  YUL and from YYZ matched the old output byte for byte.
+- The steady player's opening lands by 21:00, then it runs habits 1, 2
+  and 5 every day. A market it changed is left alone for 7 days.
+- Habit 1 needed two things the draft didn't have. **A cancelled flight
+  costs nothing**, so a market cancelled every day reads $0, not a loss:
+  slack has to act on cancellations directly. **One bad day is
+  weather**: the first version buffered every market on the day a storm
+  hit home. It now waits for 2 cancelling days in a week (buffer) or 4
+  (drop a flight).
+
+**What it found** (seed 1, a year):
+
+| Home | Starter | Steady |
+|---|---|---|
+| YUL | bust, day 237 | $140M, 48 planes, 172 legs a day |
+| YYZ | $4.4M | $128M, 52 planes |
+| YHZ | bust | $2.05M, 1 plane |
+| LHR | bust | $82M, 47 planes on 4 markets |
+
+- **Growth is unbounded.** Every plane leased pays for itself within
+  days, so an airline that simply keeps leasing ends the year 250 times
+  richer. Nothing pushes back: no market saturates enough, the lessor
+  always has another Propeller, and costs don't rise with size. London
+  flies 47 planes on four markets. This is the balance thread's first
+  problem, and the reason a player's second month feels like a solved
+  game.
+- **Halifax stalls instead of dying.** It cut a losing and an
+  over-cancelled flight early, leaving its plane 41% booked, so it never
+  qualified to lease. Refilling spare time is habit 4 (slice 3).
+- **The sim slows down as the airline grows**: about 180 ms per
+  simulated day at 41 planes, so a year's run takes about a minute
+  instead of 4 seconds. The browser at 100× has the same cost per
+  minute. In a profile, about 65% is connecting-passenger flows
+  (`connectingFlowsAt()` in `sim/hubs.ts`), recomputed from scratch
+  whenever a flight departs, an AOG is covered or a rival weighs a
+  response. They only change when the schedule does, so they can be
+  worked out once per schedule. That fix is added below as slice 6,
+  since `npm run balance` would take half an hour without it.
 
 Every balance number comes from `openStarterRoutes()` (`headless/
 newGame.ts`). It fills the starting plane's day on the first morning and
@@ -537,6 +575,10 @@ In order, once a day:
    checked in. It prints mean cash, busts, planes and markets at day 365
    for both players. Record the baseline here. The North American
    balance slice starts from it.
+6. **Connecting flows once per schedule** (found in slice 2). Cache
+   `connectingFlowsAt()` and what's built on it, keyed on the schedule,
+   so a big airline's day costs about what a small one's does. Headless
+   output must match exactly before and after. Best done before slice 5.
 
 ### Out of scope
 
@@ -562,7 +604,7 @@ In order, once a day:
 - `npm run headless` from YUL uses the steady player by default and
   says what it did.
 - `npm run balance` prints both players for six homes.
-- A year's run still takes seconds.
+- A year's run still takes seconds, at any airline size (slice 6).
 - Nothing under `src/sim/` changed behaviour, apart from the actions
   moving there.
 - HOW-IT-WORKS and CLAUDE.md's headless section describe the player.

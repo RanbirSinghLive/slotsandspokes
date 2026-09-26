@@ -5,6 +5,7 @@ import { setFareStance } from '../sim/pricing';
 import { crewRequirement } from '../sim/crew';
 import { step } from '../sim/step';
 import { startHeadlessGame } from './newGame';
+import { createPlayer, playerFromArgs, type PlayerKind } from './player';
 
 /**
  * Balance-tuning sweep: run the same simulated network many times over,
@@ -18,6 +19,12 @@ import { startHeadlessGame } from './newGame';
  *
  *   npm run sweep -- fare
  *   npm run sweep -- marketing 200
+ *   npm run sweep -- fare 120 YYZ --player starter
+ *
+ * Each run is played by a headless player (headless/player.ts), steady
+ * unless `--player` says otherwise. A lever is applied once, to the
+ * markets the player opens on the first morning; markets it opens later
+ * start from the game's defaults.
  *
  * Every run in a sweep uses the *same* RNG seed on purpose (see
  * SWEEP_SEED). Different seeds would mean different weather, different
@@ -150,7 +157,8 @@ type SweepRow = {
 function runOne(lever: Lever, value: number, days: number): SweepRow {
   // A real new game (see newGame.ts), with the lever applied once its
   // starter routes exist, so fare and marketing levers have markets to touch.
-  const state = startHeadlessGame(home, SWEEP_SEED);
+  const player = createPlayer(playerKind);
+  const state = startHeadlessGame(home, SWEEP_SEED, player);
   const startingCash = state.cash;
   lever.apply(state, value);
 
@@ -165,6 +173,7 @@ function runOne(lever: Lever, value: number, days: number): SweepRow {
     totalRevenue += state.todayRevenue;
     totalCost += state.todayCost;
     legsFlown += state.completedToday.length;
+    player.playDay(state);
   }
 
   return {
@@ -212,12 +221,13 @@ function printTable(lever: Lever, rows: SweepRow[]): void {
   console.log('');
 }
 
-const leverName = process.argv[2];
+const { kind: playerKind, rest: args }: { kind: PlayerKind; rest: string[] } = playerFromArgs(process.argv.slice(2));
+const leverName = args[0];
 const lever = LEVERS.find((l) => l.name === leverName);
 
 if (!lever) {
   console.log('');
-  console.log('  Usage: npm run sweep -- <lever> [days] [home IATA]');
+  console.log('  Usage: npm run sweep -- <lever> [days] [home IATA] [--player starter|steady]');
   console.log('');
   console.log('  Levers:');
   for (const l of LEVERS) {
@@ -227,10 +237,10 @@ if (!lever) {
   process.exit(leverName ? 1 : 0);
 }
 
-const days = Number(process.argv[3]) || DEFAULT_DAYS;
-const home = process.argv[4] || DEFAULT_HOME_AIRPORT;
+const days = Number(args[1]) || DEFAULT_DAYS;
+const home = args[2] || DEFAULT_HOME_AIRPORT;
 
-console.log(`Sweeping "${lever.name}" across ${lever.values.length} values, ${days} days each, from ${home}, seed ${SWEEP_SEED}...`);
+console.log(`Sweeping "${lever.name}" across ${lever.values.length} values, ${days} days each, from ${home}, seed ${SWEEP_SEED}, ${playerKind} player...`);
 const rows = lever.values.map((value) => runOne(lever, value, days));
 
 printTable(lever, rows);

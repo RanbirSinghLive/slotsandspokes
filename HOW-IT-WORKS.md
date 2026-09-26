@@ -561,8 +561,8 @@ yet (see WEEK-TWO.md's "Layers").
 ## Headless runner (`src/headless/run.ts`)
 
 `npm run headless` runs a game in Node with no browser, calling `step()`
-in a plain loop. Optional arguments: days (default 365) and home airport
-(default YUL) — `npm run headless -- 90 YHZ`. It writes one CSV row per
+in a plain loop. Optional arguments: days (default 365), home airport
+(default YUL) and `--player` — `npm run headless -- 90 YHZ --player starter`. It writes one CSV row per
 day to `headless-output.csv` (git-ignored) with cash, revenue, cost,
 margin, legs flown and the fuel price index, read after the day's last
 minute but before the next rollover resets the day's totals.
@@ -570,31 +570,47 @@ minute but before the next rollover resets the day's totals.
 **It plays the real game.** `startHeadlessGame()` in
 `src/headless/newGame.ts` makes the same two calls the browser does —
 `createNewGameState()`, then `chooseHome()` — with a fixed seed so runs
-repeat exactly. Because a new game has no routes, `openStarterRoutes()`
-then plays a deliberately plain opening: for each plane, keep adding
-out-and-back rotations from home to the known airport with the most
-potential demand per flight already on that market, until the plane's
-day is full. Every rotation goes through `planRotation()` /
-`applyRotation()` (`sim/rotations.ts`), the same rules and commit as the
-route builder, so it can't build anything a player couldn't.
+repeat exactly. A headless player (`src/headless/player.ts`) then opens
+routes for the starting plane, and the runner calls its `playDay()` after
+every finished day. It prints what the player did, day by day, after
+the run. The player only acts through what a person can: the rotation
+planner the route builder uses, and the ring's actions in
+`sim/playerActions.ts`. Pick one with `--player`:
 
-The starter player never leases more planes, changes fares, or responds
-to rivals. What it measures is an unattended start, and that is harsh:
-from Halifax, London or Philadelphia one Propeller runs out of money
-within the year, as rival airlines pile onto its markets and a day
-packed to 22:00 loses flights to the curfew. **The run stops at $0**, as the game does
-(see Cash runway): it checks after every simulated minute, writes a row
-for the part of the final day that was flown, and prints `GAME OVER on
-day N`. Over six seeds, Halifax busts by about day 95, and Philadelphia
-and London by about day 180. From the dense north-east core it does
-better: Toronto survives every seed, Boston and Montréal about half of
-them. The default seed from YUL (flying YYZ, YOW, LGA and BOS) runs out on
-day 237: its day is packed to 22:00 with no turn buffer on a 20-year-old
-plane, so the curfew cuts its last rotation most days. Balance work that needs a better
-player should add the behaviour to `newGame.ts`, not hand-write a
-schedule. (Until September 2026 the runner flew a hand-authored
-three-aircraft network no player could have, which is why older sections
-quote much rosier numbers.)
+- **steady** (the default) plays like a careful player checking in once
+  a day. Its opening fills the plane's day with out-and-backs from home,
+  each time to the known airport with the most potential demand per
+  flight already on that market, and never takes a rotation that lands
+  after 21:00. Then, every day, in order:
+  1. **Leave slack.** A market with cancellations on 2–3 of the last 7
+     days gets 15 more minutes of turn buffer, or loses a flight if the
+     plane has no room. On 4 or more days it loses a flight: the plane
+     can't get round in time, and a buffer would make that worse. One
+     bad day is left alone, since a storm at home cancels a flight on
+     every market.
+  2. **Cut losers.** A market that made no money for 14 days in a row
+     loses a flight, once it has flown 21 days.
+  3. **Lease when full.** Once a class's pool at home is 85% booked and
+     last week made money overall, it leases the largest class on offer
+     whose best market has riders for a full round trip, if cash covers
+     the lessor's reserve plus 30 more days of that lease. Then it fills
+     that plane's day at once.
+
+  A market it changed is left alone for 7 days, so the change can show.
+- **starter** fills the starting plane's day to 22:00 on the first
+  morning and never does anything again. It is the floor: an unattended
+  start. From Halifax, London or Philadelphia it runs out of money within
+  the year, and the default seed from YUL runs out on day 237 as the
+  curfew cuts its last rotation most days.
+
+**The run stops at $0**, as the game does (see Cash runway): it checks
+after every simulated minute, writes a row for the part of the final day
+that was flown, and prints `GAME OVER on day N`.
+
+Balance work that needs a better player should add a habit to
+`player.ts`, not hand-write a schedule. (Until September 2026 the runner
+flew a hand-authored three-aircraft network no player could have, which
+is why older sections quote much rosier numbers.)
 
 ## Rendering (`src/render/`, plus `main.ts`'s loop)
 
@@ -1509,7 +1525,7 @@ frequencies are held where they are. The route view shows, per stance:
 Undercut chases a rival down to its floor (65% of the going rate), so
 it costs you margin for as long as the war lasts.
 
-The headless starter player prices every market it opens on Match, and
+The headless players price every market they open on Match, and
 `npm run sweep -- stance` compares the three across a run.
 
 ---
@@ -1745,8 +1761,10 @@ That also needs the *number* of random draws per day to stay constant,
 which was broken once by a roll that skipped already-grounded aircraft;
 see `rollDailyMechanicalGroundings()`.
 
-The lever is applied after the starter routes exist, so fare and
-marketing levers have markets to act on. On the current start (YUL,
+The lever is applied to the markets the player opens on the first
+morning, so fare and marketing levers have markets to act on; markets it
+opens later start from the game's defaults. `--player starter` sweeps
+with the do-nothing player, which keeps the network fixed. On the current start (YUL,
 60 days) the fare curve peaks at about 0.8× the recommended fare.
 
 
@@ -1774,8 +1792,8 @@ The current plan is the newest `WEEK-*.md`. As of September 2026:
 - **The Grow tab as one pipeline view** (WEEK-EIGHT.md) — next up.
 - **More tech tree branches** — fuel efficiency is still the only one.
 - **Ancillary revenue** (bag fees), designed twice and never built.
-- **A smarter headless player** — it doesn't lease, price or respond to
-  rivals (see Headless runner).
+- **The rest of the steady headless player** — it doesn't yet open new
+  markets, feed spill, return planes or choose stances (WEEK-EIGHT.md).
 - **Per-base time zones** — every plane flies on the home clock.
 
 Open balance questions rather than missing features: margin favoured

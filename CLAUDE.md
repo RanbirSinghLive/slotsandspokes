@@ -71,9 +71,9 @@ and so does a save reloaded mid-game.
 
 `npm run headless` and `npm run sweep` start a game **the same way the browser
 does**: `startHeadlessGame()` in `src/headless/newGame.ts` calls
-`createNewGameState()` and then `chooseHome()`. Then a simple starter player
-opens routes through the same `planRotation()`/`applyRotation()` the route
-builder uses. Never hand-build a schedule or starting state for balance work.
+`createNewGameState()` and then `chooseHome()`. Then a headless player
+(`src/headless/player.ts`) plays it, once a day, only through the route
+planner and the actions in `sim/playerActions.ts` that the page uses. Never hand-build a schedule or starting state for balance work.
 If a new mechanic needs a player decision to work, give the headless player a
 policy for it; otherwise balance numbers describe a different game.
 

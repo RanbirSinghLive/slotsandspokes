@@ -4,18 +4,23 @@ import { isInsolvent } from '../sim/loans';
 import { DEFAULT_HOME_AIRPORT } from '../sim/state';
 import { step } from '../sim/step';
 import { startHeadlessGame } from './newGame';
+import { createPlayer, playerFromArgs } from './player';
 
 const MINUTES_PER_DAY = 1440;
 const SEED = 1;
 
 // `npm run headless -- 30` runs 30 days instead of the default year;
-// `npm run headless -- 30 YHZ` also starts from Halifax instead of the default home.
-const days = Number(process.argv[2]) || 365;
-const home = process.argv[3] || DEFAULT_HOME_AIRPORT;
+// `npm run headless -- 30 YHZ` also starts from Halifax instead of the default home;
+// `--player starter` plays it with the do-nothing player instead of the steady one.
+const { kind: playerKind, rest: args } = playerFromArgs(process.argv.slice(2));
+const days = Number(args[0]) || 365;
+const home = args[1] || DEFAULT_HOME_AIRPORT;
 
-// A real new game (see newGame.ts): the starting fleet at `home`, routes
-// opened by the same rules the route builder uses.
-const state = startHeadlessGame(home, SEED);
+// A real new game (see newGame.ts): the starting fleet at `home`, played
+// by a headless player (headless/player.ts) through the same rules and
+// actions a person has.
+const player = createPlayer(playerKind);
+const state = startHeadlessGame(home, SEED, player);
 const startingCash = state.cash;
 
 const rows: string[] = ['day,cash,revenue,cost,margin,legsFlown,fuelPriceIndex'];
@@ -25,6 +30,8 @@ const rows: string[] = ['day,cash,revenue,cost,margin,legsFlown,fuelPriceIndex']
 // checks after every simulated minute too, and stops the run there: any
 // day after it describes a game nobody could still be playing.
 let gameOverDay: number | null = null;
+// What the player did, day by day, printed after the run so it reads as a story.
+const decisions: string[] = [];
 
 for (let day = 1; day <= days && gameOverDay === null; day++) {
   for (let minute = 0; minute < MINUTES_PER_DAY; minute++) {
@@ -53,6 +60,10 @@ for (let day = 1; day <= days && gameOverDay === null; day++) {
       state.fuelPriceIndex.toFixed(3),
     ].join(','),
   );
+
+  if (gameOverDay === null) {
+    for (const decision of player.playDay(state)) decisions.push(`  day ${day}: ${decision}`);
+  }
 }
 
 const outputPath = fileURLToPath(new URL('../../headless-output.csv', import.meta.url));
@@ -60,6 +71,8 @@ writeFileSync(outputPath, rows.join('\n') + '\n');
 
 const markets = new Set(state.schedule.map((leg) => [leg.origin, leg.dest].sort().join('-')));
 const daysRun = gameOverDay ?? days;
+console.log(`${playerKind} player, ${decisions.length} decision${decisions.length === 1 ? '' : 's'}:`);
+for (const decision of decisions) console.log(decision);
 console.log(`Ran ${daysRun} simulated days from ${home}: ${state.aircraft.length} aircraft, ${state.schedule.length} daily legs on ${[...markets].join(', ') || 'no routes'}.`);
 console.log(`Cash: $${Math.round(startingCash).toLocaleString()} -> $${Math.round(state.cash).toLocaleString()}`);
 if (gameOverDay !== null) {
