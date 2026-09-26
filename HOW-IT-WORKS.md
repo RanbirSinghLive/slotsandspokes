@@ -1532,6 +1532,23 @@ Actual demand is a property of the **market**, not of any airline —
 everyone flying it grows it, everyone serving it draws from the same
 pool. Stimulation is a public good.
 
+**Hunger for service** (`src/sim/serviceLevel.ts`) speeds growth up
+where nobody flies yet. Each morning every airport's seats, from every
+airline (`dailySeatsByMarket()`, which moved there), are set against its
+potential passengers. At no seats an airport is fully starved (1); at
+`WELL_SERVED_SEATS_PER_POTENTIAL` (0.005 seats a day per potential
+passenger) or more it's well served (0). A market's growth rate is
+multiplied by 1 plus 2× the average of its two ends' hunger, so up to 3×
+between two starved airports. There are no incumbent airlines in this
+world, so at the start every airport is starved: the first routes build
+fast, and the edge wears off as someone serves each airport (the game's
+philosophy in CLAUDE.md). The airport view says it in words: "Starved
+for service", "Underserved" or "Well served", with what that means for a
+new route. The benchmark is set where an airport flown hard gets there:
+the steady headless player's home by its first month or two, Toronto
+and O'Hare by day 120. At 0.02 almost nothing ever counted as served,
+and the boost was just a flat 3× everywhere.
+
 ---
 
 ## Fare policy (`src/sim/pricing.ts`) — week six

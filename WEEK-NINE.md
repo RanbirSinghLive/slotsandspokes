@@ -7,7 +7,8 @@ fill-out, fare stances, the side panel and the headless player) lives in
 **State at handoff:** save key `airgame-save-v46`. Week eight's headless
 player and `npm run balance` give every balance change a measured
 before and after (baseline below). Route views now show a route's share
-of slot fees and leases. **Thread 1 is done; thread 2 is next.**
+of slot fees and leases. **Thread 1 and thread 2's slice 1 are done;
+thread 3 is next.**
 
 ---
 
@@ -152,8 +153,42 @@ how full your planes are and how many you turn away.
   somewhere starved is a real edge, and it wears off as the airport
   gets served, by you or by rivals, which is the idea in miniature.
 
+**Slice 1 as built:** `sim/serviceLevel.ts` works out each airport's
+hunger every morning (seats from every airline against its potential),
+and `rollDailyMarketDemand()` multiplies a market's growth by
+1 + 2 × the average hunger of its ends. `dailySeatsByMarket()` moved
+there from `marketDemand.ts`. The airport view says "Starved for
+service", "Underserved" or "Well served", with what it means for a new
+route.
+
+- **The benchmark had to be reachable.** The gravity model's potential
+  dwarfs any airline here: LaGuardia at day 120 had 1,000 seats against
+  496,000 potential riders. There are no incumbent airlines, so at the
+  start every airport is starved. At a first benchmark of 0.02 seats per
+  potential rider almost nothing ever counted as served, and the boost
+  was a flat 3× everywhere, which goes against the idea. At 0.005 an
+  airport flown hard becomes well served (the steady player's home, then
+  Toronto and O'Hare by day 120), while places nobody flies stay starved.
+  On the owner's LaGuardia save: Toronto well served, LaGuardia and
+  Washington National underserved, Boston starved.
+- **Measured** (six seeds, day 365):
+
+  | Persona | Before | After |
+  |---|---|---|
+  | starter busts | 23/36 | 15/36 (YUL and BOS never; LHR 4/6; YHZ 5/6; PHL 6/6) |
+  | steady median | $15M–$91M | $44M–$86M |
+  | sitter median | $7M–$18M | $14M–$21M |
+  | reckless | 36/36 bust | 36/36 bust, a little later |
+
+  The early game is kinder, as intended. The rich mid-game got richer,
+  since the boost only makes starting faster. Wearing profit down is
+  thread 3's job.
+- The presence line above it can read "Unserved · 0 departures/day"
+  (meaning *you* don't fly there) next to "Well served" (meaning
+  someone does). Worth rewording in slice 2.
+
 Slices:
-1. **Hunger for service in the sim, and the faster ramp.**
+1. **Hunger for service in the sim, and the faster ramp.** (Done.)
    `sim/serviceLevel.ts`: seats by all airlines per airport against its
    potential, and the ramp multiplier in `rollDailyMarketDemand()`.
    The airport view says it in words. Measured with `balance`: the

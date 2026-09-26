@@ -1,7 +1,7 @@
-import aircraftTypesData from '../../data/aircraft-types.json';
 import { potentialDailyDemand, ALL_MARKET_PAIRS } from './demand';
 import { marketKey } from './schedule';
 import { reliabilityDemandFactor, trailingMarketOtp } from './routeOtp';
+import { dailySeatsByMarket, hungerBoost, hungerByAirport } from './serviceLevel';
 import type { SimState } from './state';
 
 /**
@@ -92,20 +92,6 @@ const DECAY_RATE = 0.015;
  */
 const DAILY_DEMAND_GROWTH = 0.003;
 
-/**
- * Seats a competitor frequency is assumed to carry. Competitors have no
- * fleet in this model — `CompetitorOffering` (sim/competitors.ts) carries
- * a frequency and a fare but no aircraft type — so their contribution to
- * stimulating a market needs a stand-in gauge. A small-regional number,
- * between the propeller and regional classes the player can buy, on the reasoning that
- * competitors here are peer startups flying comparable equipment rather
- * than mainline carriers.
- */
-const COMPETITOR_ASSUMED_SEATS = 50;
-
-const seatsByTypeCode = new Map<string, number>(
-  (aircraftTypesData as { code: string; seats: number }[]).map((type) => [type.code, type.seats]),
-);
 
 /** Potential demand including however much global growth has accumulated so far. */
 export function currentPotentialDemand(state: SimState, origin: string, dest: string): number {
@@ -122,34 +108,6 @@ export function actualDailyDemand(state: SimState, origin: string, dest: string)
   const stored = state.marketDemand[marketKey(origin, dest)];
   if (stored !== undefined) return stored;
   return Math.min(VIRGIN_MARKET_PDEW, currentPotentialDemand(state, origin, dest));
-}
-
-/**
- * Total daily seats every airline puts into each market, keyed by
- * marketKey() — the player's scheduled legs at their real aircraft's
- * gauge, plus each competitor's frequency at an assumed one. This is what
- * drives stimulation: seats, not frequencies, because "is this market
- * genuinely served" is a question about capacity offered, and one daily
- * 19-seater means something very different on a 9-PDEW market than on a
- * 4,600-PDEW one.
- *
- * Every market at once, because the daily pass needs every pair, and one
- * walk of the schedule is far cheaper than one walk per pair.
- */
-function dailySeatsByMarket(state: SimState): Map<string, number> {
-  const seatsByTail = new Map(state.aircraft.map((a) => [a.tail, seatsByTypeCode.get(a.typeCode) ?? 0]));
-  const seats = new Map<string, number>();
-  const add = (key: string, count: number) => seats.set(key, (seats.get(key) ?? 0) + count);
-
-  for (const leg of state.schedule) {
-    const tailSeats = seatsByTail.get(leg.tail);
-    if (tailSeats === undefined) continue; // a scheduled leg with no aircraft to fly it offers nothing
-    add(marketKey(leg.origin, leg.dest), tailSeats);
-  }
-  for (const competitor of state.competitorRoutes) {
-    add(marketKey(competitor.origin, competitor.dest), competitor.dailyFrequency * COMPETITOR_ASSUMED_SEATS);
-  }
-  return seats;
 }
 
 /**
@@ -228,6 +186,9 @@ function serviceSaturation(seatsOffered: number, potential: number): number {
 export function rollDailyMarketDemand(state: SimState): void {
   state.demandGrowthMultiplier *= 1 + DAILY_DEMAND_GROWTH;
   const seatsByMarket = dailySeatsByMarket(state);
+  // Worked out once, before any market moves, so every market is judged
+  // on the same morning's service.
+  const hunger = hungerByAirport(state, seatsByMarket);
 
   for (const [origin, dest] of ALL_MARKET_PAIRS) {
     const key = marketKey(origin, dest);
@@ -254,7 +215,9 @@ export function rollDailyMarketDemand(state: SimState): void {
         STIMULATION_RATE *
         serviceSaturation(seatsOffered, potential) *
         marketingRateMultiplier(marketingSpend) *
-        reliability;
+        reliability *
+        // A route to places nobody serves builds faster (sim/serviceLevel.ts).
+        hungerBoost(hunger, origin, dest);
       next = current + (potential - current) * rate;
     } else if (seatsOffered > 0) {
       // Unreliable enough to lose passengers: the same slide toward the

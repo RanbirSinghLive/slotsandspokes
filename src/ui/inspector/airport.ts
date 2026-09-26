@@ -3,6 +3,7 @@ import { daysUntilReturn, expediteCost, expediteRepair } from '../../sim/aog';
 import { congestionParameters } from '../../sim/delays';
 import { connectingPassengersThrough } from '../../sim/hubs';
 import { planHub } from '../../sim/hubPlanner';
+import { describeServiceLevel, hungerAt } from '../../sim/serviceLevel';
 import { HUB_STYLES, hubStyleAt } from '../../sim/hubStyle';
 import { nextSlotFees, slotFeesPerDayAt, slotsHeld } from '../../sim/slots';
 import type { SimState } from '../../sim/state';
@@ -79,6 +80,11 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
       ),
     );
   }
+
+  // How starved the airport is for service (sim/serviceLevel.ts): in
+  // words, not numbers, since it's a judgement about where to go next.
+  const service = describeServiceLevel(hungerAt(state, iata));
+  root.append(line(`${service.label}: ${service.description}.`));
 
   root.append(...loadAndSlots(state, iata));
   root.append(...groundedPlanes(state, iata, changed));
