@@ -4,7 +4,7 @@ import { projection, fitProjection, baselineScale } from './render/projection';
 import { drawBasemap } from './render/basemap';
 import { drawTerminator } from './render/terminator';
 import { drawRoutes, drawSelectedRoute } from './render/routes';
-import { drawAirports, airports, setKnownAirports, nearestAirportCandidate } from './render/airports';
+import { drawAirports, drawSelectedAirport, airports, setKnownAirports, nearestAirportCandidate } from './render/airports';
 import { drawHubView, hasHubView } from './render/hubs';
 import { drawFog } from './render/fog';
 import { drawWeatherEffects } from './render/weather';
@@ -45,7 +45,6 @@ import { setupTechTreePanel, updateTechTreePanel } from './ui/techTree';
 import { setupDevPanel, updateDevPanel } from './ui/devTools';
 import { setupMissionsPanel, updateMissionsPanel } from './ui/missions';
 import { setupCrewPanel, updateCrewPanel } from './ui/crew';
-import { setupAirportsPanel, updateAirportsPanel } from './ui/airports';
 import { setupInfoTooltips } from './ui/infoTooltip';
 import { updateTicker } from './ui/ticker';
 import { updateAlerts } from './ui/alerts';
@@ -85,7 +84,6 @@ setupTechTreePanel(state);
 setupDevPanel();
 setupMissionsPanel(state);
 setupCrewPanel(state);
-setupAirportsPanel();
 setupInfoTooltips();
 setupLoans(state);
 setupGameControls(state);
@@ -183,7 +181,6 @@ const commercialPanelEl = document.querySelector<HTMLDivElement>('#commercial-pa
 const onTimePanelEl = document.querySelector<HTMLDivElement>('#ontime-panel')!;
 const executivePanelEl = document.querySelector<HTMLDivElement>('#executive-panel')!;
 const techTreePanelEl = document.querySelector<HTMLDivElement>('#tech-tree-panel')!;
-const airportsPanelEl = document.querySelector<HTMLDivElement>('#airports-panel')!;
 const crewPanelEl = document.querySelector<HTMLDivElement>('#crew-panel')!;
 const missionsPanelEl = document.querySelector<HTMLDivElement>('#missions-panel')!;
 const devPanelEl = document.querySelector<HTMLDivElement>('#dev-panel')!;
@@ -277,7 +274,6 @@ type SidebarTab =
   | 'ontime'
   | 'executive'
   | 'techtree'
-  | 'airports'
   | 'crew'
   | 'missions'
   | 'dev'
@@ -334,7 +330,6 @@ function render(nowMs: number = performance.now()): void {
   // complete on any tick.
   if (sidebarTab === 'missions') updateMissionsPanel(state);
   if (sidebarTab === 'crew') updateCrewPanel(state);
-  if (sidebarTab === 'airports') updateAirportsPanel(state);
 
   const cssWidth = window.innerWidth - currentPanelWidthPx;
   const cssHeight = window.innerHeight;
@@ -388,6 +383,8 @@ function render(nowMs: number = performance.now()): void {
   drawAircraft(ctx, state, latestFractionalMinute, hoveredFlight?.legId ?? null);
   // The unmet-demand pips around airports belong to the Demand layer.
   drawAirports(ctx, state, demandOverlayOn);
+  // The airport the side panel is showing, on top of its dot.
+  if (selection.kind === 'airport') drawSelectedAirport(ctx, selection.iata);
 
   // Hovering one of your airports (and not a plane) shows who connects
   // through it and where to fly next (render/hubs.ts). Drawn after the
@@ -472,6 +469,7 @@ panelToggleButton.addEventListener('click', () => setPanelHidden(!panelHidden));
 onSelectionChange(() => {
   if (panelHidden && getSelection().kind !== 'network') setPanelHidden(false);
   renderInspector(state);
+  syncSidebarTabButtons();
   render();
 });
 
@@ -623,13 +621,12 @@ function switchToSidebarTab(tab: SidebarTab): void {
   onTimePanelEl.hidden = tab !== 'ontime';
   executivePanelEl.hidden = tab !== 'executive';
   techTreePanelEl.hidden = tab !== 'techtree';
-  airportsPanelEl.hidden = tab !== 'airports';
   crewPanelEl.hidden = tab !== 'crew';
   missionsPanelEl.hidden = tab !== 'missions';
   devPanelEl.hidden = tab !== 'dev';
   gameTabEl.hidden = tab !== 'game';
 
-  sidebarTabButtons.forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+  syncSidebarTabButtons();
 
   if (tab === 'commercial') updateCommercialPanel(state);
   if (tab === 'ontime') updateOnTimePanel(state);
@@ -644,9 +641,24 @@ function switchToSidebarTab(tab: SidebarTab): void {
   render();
 }
 
+/**
+ * Which tab button reads as active: Airports whenever the inspector is
+ * showing something (every inspector view sits under Airports in its
+ * breadcrumb), otherwise the Network view's current tab.
+ */
+function syncSidebarTabButtons(): void {
+  const inspecting = getSelection().kind !== 'network';
+  sidebarTabButtons.forEach((b) => b.classList.toggle('active', inspecting ? b.dataset.tab === 'airports' : b.dataset.tab === sidebarTab));
+}
+
 sidebarTabButtons.forEach((button) => {
   button.addEventListener('click', () => {
-    // The tabs belong to the Network view, so a tab click leaves the inspector.
+    // Airports opens the inspector's list. Every other tab belongs to the
+    // Network view, so it leaves the inspector.
+    if (button.dataset.tab === 'airports') {
+      select({ kind: 'airports' });
+      return;
+    }
     select(NETWORK);
     switchToSidebarTab(button.dataset.tab as SidebarTab);
   });
@@ -810,11 +822,11 @@ const CLICK_SLOP_PX = 4;
 
 canvas.addEventListener('mousedown', (event) => {
   ringOpenAtMouseDown = isMapMenuOpen();
-  // Any stale airport-detail popover (ui/mapMenu.ts) gets cleared
-  // before deciding what this click actually does — otherwise arming a
-  // route, or just starting a pan, would leave the previous click's
-  // popover visibly hanging around underneath it. Unconditional and
-  // first, so every path below starts from the same clean state.
+  // Any open ring (ui/mapMenu.ts) gets closed before deciding what this
+  // click actually does, otherwise arming a route, or just starting a
+  // pan, would leave the previous click's ring hanging around underneath
+  // it. Unconditional and first, so every path below starts from the same
+  // clean state.
   hideMapMenu();
 
   // M10's route-creation gesture (ui/routeBuilder.ts) gets first refusal
@@ -913,13 +925,19 @@ window.addEventListener('mouseup', (event) => {
 });
 
 // Esc steps the inspector back one level, but only when nothing else on
-// screen wants Esc first. Registered before those handlers, so it sees the
-// route builder and the ring still open on the press that closes them.
-window.addEventListener('keydown', (event) => {
-  if (event.key !== 'Escape' || choosingHome) return;
-  if (isRouteBuilderActive() || isMapMenuOpen() || isHubPlannerOpen()) return;
-  back();
-});
+// screen wants Esc first. Listening in the capture phase runs this before
+// every ordinary keydown listener (the route builder's, the ring's, the hub
+// planner's), whenever they were added, so it sees them still open on the
+// press that closes them.
+window.addEventListener(
+  'keydown',
+  (event) => {
+    if (event.key !== 'Escape' || choosingHome) return;
+    if (isRouteBuilderActive() || isMapMenuOpen() || isHubPlannerOpen()) return;
+    back();
+  },
+  { capture: true },
+);
 window.addEventListener('keydown', handleRouteBuilderKeyDown);
 window.addEventListener('keydown', handleMapMenuKeyDown);
 

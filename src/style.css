@@ -754,54 +754,6 @@ body {
   cursor: crosshair;
 }
 
-/* Week six: a floating popover anchored to the destination airport that
-   was just clicked (ui/routeBuilder.ts's positionPopover()), Google-Maps
-   info-window-style, rather than a fixed section in the sidebar always in
-   the same place regardless of where on the map the route actually is.
-   No dimmed backdrop the way the loan modals get — this doesn't block
-   anything else, it's a contextual popover on the map itself, not an
-   interruption. */
-/* Week eight: click an airport with no plane selected, get the airport —
-   see ui/mapMenu.ts. Same info-window styling as #new-route-popover
-   below (dark card, amber-tinted border, positioned near the click), but
-   its own ID rather than sharing one: the two pop up under different
-   conditions (a plane selected vs. not) and are never open at once, so
-   there's nothing to gain from merging them, and every future edit to
-   one would otherwise risk silently touching the other. Blue-tinted
-   border instead of amber — informational, not a decision being built. */
-#airport-detail-popover {
-  position: fixed;
-  z-index: 25;
-  max-width: 280px;
-  padding: 10px;
-  background: #0e1016;
-  border: 1px solid rgba(74, 144, 217, 0.35);
-  border-radius: 6px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: 13px;
-  color: #cdd3e0;
-}
-
-#airport-detail-popover[hidden] {
-  display: none;
-}
-
-#airport-detail-title {
-  font-size: 14px;
-  color: #fff;
-  margin: 0 0 8px;
-}
-
-#airport-detail-presence,
-#airport-detail-load,
-#airport-detail-slots,
-#airport-detail-based,
-#airport-detail-markets {
-  margin-bottom: 6px;
-  color: #9aa3b8;
-}
-
 .route-otp-line {
   color: #9aa3b8;
   font-size: 12px;
@@ -813,35 +765,6 @@ body {
 
 .route-otp-line.is-problem {
   color: #ff8080;
-}
-
-.market-link {
-  padding: 0;
-  font-family: inherit;
-  font-size: inherit;
-  color: #cdd3e0;
-  background: transparent;
-  border: none;
-  text-decoration: underline;
-  text-decoration-color: rgba(205, 211, 224, 0.4);
-  cursor: pointer;
-}
-
-.market-link:hover {
-  color: #7ab8ff;
-  text-decoration-color: #7ab8ff;
-}
-
-/* Same red as everything else "over" (the capacity ring on the map, the
-   crew-short pool rows) — an airport past its capacity is the same class
-   of problem those already flag. */
-#airport-detail-presence.airport-detail-over,
-#airport-detail-load.airport-detail-over {
-  color: #ff8080;
-}
-
-#airport-detail-load.airport-detail-warn {
-  color: #ffb347;
 }
 
 /* Week eight's second deep dive: acting on an airport used to always mean
@@ -995,7 +918,7 @@ body {
   color: #ff8080;
 }
 
-/* Planes grounded with an AOG at this airport (ui/mapMenu.ts's fillAogs). */
+/* Planes grounded with an AOG at this airport (ui/inspector/airport.ts). */
 .airport-aog-row {
   display: flex;
   flex-direction: column;
@@ -1022,32 +945,12 @@ body {
   cursor: not-allowed;
 }
 
-#airport-detail-pools {
-  margin-bottom: 6px;
-}
-
-#airport-detail-demand {
-  margin-bottom: 6px;
-  color: #9aa3b8;
-}
-
-#airport-detail-demand.airport-detail-over {
-  color: #ffb347;
-}
-
-/* The hover line inside the card: what the hovered button does, or why it
-   can't. Reserves its height so the card doesn't jump as the text comes
-   and goes. */
-#airport-detail-hint {
-  margin-top: 8px;
-  min-height: 2.6em;
-  color: #ffd166;
-}
-
-#airport-detail-hint.is-problem {
-  color: #ff8080;
-}
-
+/* A floating popover anchored to the destination airport that was just
+   clicked (ui/routeBuilder.ts's positionPopover()), info-window style,
+   rather than a fixed section in the sidebar always in the same place
+   regardless of where on the map the route actually is. No dimmed
+   backdrop the way the loan modals get: it doesn't block anything else,
+   it's a contextual popover on the map itself, not an interruption. */
 #new-route-popover {
   position: fixed;
   z-index: 25;
@@ -1808,36 +1711,6 @@ body {
 
 .hub-planner-notice.is-problem {
   color: #ff8080;
-}
-
-/* The Plan hub button on an airport card: always there, quiet when the
-   hub is fine, yellow then red as sim/hubPlanner.ts finds value missed. */
-#airport-detail-plan-hub {
-  margin-top: 8px;
-  padding: 4px 10px;
-  font: inherit;
-  font-size: 12px;
-  color: #cdd3e0;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-#airport-detail-plan-hub[hidden] {
-  display: none;
-}
-
-#airport-detail-plan-hub.is-warn {
-  color: #0a0c12;
-  background: #ffd166;
-  border-color: #ffd166;
-}
-
-#airport-detail-plan-hub.is-act {
-  color: #0a0c12;
-  background: #ff8080;
-  border-color: #ff8080;
 }
 
 .modal-box--game-over {
@@ -2807,133 +2680,6 @@ body {
   font-size: 13px;
 }
 
-/* Week six's Airports tab (sim/airports.ts, ui/airports.ts): presence and
-   connectivity per field, plus the ledger of slots held (sim/slots.ts). */
-#airports-panel section {
-  margin-bottom: 26px;
-}
-
-#airports-panel h2 {
-  margin: 0 0 8px;
-  font-size: 11px;
-  font-weight: 400;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #6b7694;
-}
-
-.airports-note,
-#airports-presence-note {
-  margin: 0 0 10px;
-  color: #9aa3b8;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-#airports-presence-note {
-  margin: 10px 0 0;
-}
-
-.airport-row {
-  display: grid;
-  grid-template-columns: 42px 1fr auto auto 46px;
-  align-items: baseline;
-  gap: 8px;
-  padding: 5px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  font-size: 12px;
-}
-
-.airport-code {
-  color: #cdd3e0;
-  font-weight: 500;
-}
-
-.airport-name {
-  color: #6b7694;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.airport-level {
-  color: #9aa3b8;
-  white-space: nowrap;
-}
-
-.airport-departures {
-  color: #9aa3b8;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-/* The connectivity uplift is the reason to concentrate, so it gets the
-   same green everything else beneficial uses. */
-.airport-uplift {
-  color: #7fd88f;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.airport-uplift-none {
-  color: #4a5266;
-  text-align: right;
-}
-
-.airport-slot-block {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 6px;
-  padding: 10px 12px;
-  margin-bottom: 10px;
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.airport-slot-header {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-
-.airport-slot-counts {
-  margin-bottom: 8px;
-  color: #9aa3b8;
-  font-size: 12px;
-}
-
-.airport-slot-over {
-  margin-left: 8px;
-  color: #ff8080;
-}
-
-.airport-slot-buy {
-  font-family: inherit;
-  font-size: 12px;
-  color: #9aa3b8;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  padding: 3px 9px;
-  cursor: pointer;
-}
-
-.airport-slot-buy:hover:not(:disabled) {
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.5);
-}
-
-.airport-slot-buy:disabled {
-  color: #4a5266;
-  border-color: rgba(255, 255, 255, 0.08);
-  cursor: default;
-}
-
-.airport-slot-note {
-  margin-top: 6px;
-  color: #6b7694;
-  font-size: 11px;
-}
-
 /* Week six phase one: the airline's own presence at a hovered airport,
    below the operator legend. The map dots encode the same numbers
    visually; this is the exact reading of them. */
@@ -3231,4 +2977,124 @@ button.inspector-crumb:hover {
 #radial-hint.is-problem {
   color: #ff8080;
   border-color: rgba(255, 128, 128, 0.35);
+}
+
+/* The airport view's market rows and the Airports list (ui/inspector/). */
+.inspector-view h2 {
+  margin: 14px 0 6px;
+}
+
+.inspector-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.inspector-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 0;
+  font: inherit;
+  text-align: left;
+  color: #cdd3e0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+
+.inspector-row:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.inspector-row-detail {
+  color: #9aa3b8;
+}
+
+.inspector-row-detail.is-over {
+  color: #ff8080;
+}
+
+.inspector-plan-hub {
+  margin: 4px 0 6px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: #cdd3e0;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.inspector-plan-hub.is-warn {
+  color: #0a0c12;
+  background: #ffd166;
+  border-color: #ffd166;
+}
+
+.inspector-plan-hub.is-act {
+  color: #0a0c12;
+  background: #ff8080;
+  border-color: #ff8080;
+}
+
+.inspector-filter {
+  display: flex;
+  gap: 4px;
+  margin: 4px 0 8px;
+}
+
+.inspector-filter button {
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: #9aa3b8;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.inspector-filter button.is-active {
+  color: #fff;
+  background: #3a4258;
+  border-color: #6b7694;
+}
+
+.inspector-table {
+  width: 100%;
+}
+
+.inspector-table-row {
+  cursor: pointer;
+}
+
+.inspector-table-row:hover td {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.inspector-table td.is-over {
+  color: #ff8080;
+}
+
+.inspector-sort,
+.inspector-link {
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.inspector-link {
+  color: #cdd3e0;
+}
+
+.inspector-sort:hover,
+.inspector-link:hover {
+  color: #fff;
+  text-decoration: underline;
 }

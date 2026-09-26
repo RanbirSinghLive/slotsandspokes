@@ -9,7 +9,12 @@ import { marketKey } from '../sim/schedule';
  * UI state only. It never goes in SimState: it isn't part of the game,
  * isn't saved, and the simulation never reads it.
  */
-export type Selection = { kind: 'network' } | { kind: 'route'; a: string; b: string };
+export type Selection =
+  | { kind: 'network' }
+  | { kind: 'airports' }
+  | { kind: 'airport'; iata: string }
+  /** A route, `a` first: the airport the breadcrumb leads through (its base, when opened from the map). */
+  | { kind: 'route'; a: string; b: string };
 
 export const NETWORK: Selection = { kind: 'network' };
 
@@ -26,6 +31,7 @@ export function getSelection(): Selection {
 
 function sameSelection(x: Selection, y: Selection): boolean {
   if (x.kind === 'route' && y.kind === 'route') return marketKey(x.a, x.b) === marketKey(y.a, y.b);
+  if (x.kind === 'airport' && y.kind === 'airport') return x.iata === y.iata;
   return x.kind === y.kind;
 }
 

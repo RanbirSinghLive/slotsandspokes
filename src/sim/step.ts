@@ -473,7 +473,7 @@ export function step(state: SimState): void {
     const onTime = isOnTimeArrival(flight.arriveMinute, flight.scheduledArriveMinute);
     const arrivedMarketKey = marketKey(flight.origin, flight.dest);
     const marketOnTime = (state.onTimeByMarket[arrivedMarketKey] ??= { arrived: 0, onTime: 0 });
-    // Today's per-market copy feeds the route card's daily bars and
+    // Today's per-market copy feeds the route view's daily bars and
     // reliability's effect on demand (sim/routeOtp.ts).
     const marketOnTimeToday = (state.todayOnTimeByMarket[arrivedMarketKey] ??= { arrived: 0, onTime: 0, cancelled: 0 });
     state.flightsArrivedTotal += 1;

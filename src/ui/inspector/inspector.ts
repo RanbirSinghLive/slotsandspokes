@@ -1,6 +1,8 @@
 import type { SimState } from '../../sim/state';
 import * as ops from '../routeActions';
 import { back, getSelection, NETWORK, replaceSelection, select, type Selection } from '../selection';
+import { buildAirportView } from './airport';
+import { buildAirportsView } from './airports';
 import { buildRouteView } from './route';
 
 /**
@@ -28,14 +30,28 @@ let renderedKey = '';
 /** Whether this selection still refers to something in the game. */
 function stillExists(state: SimState, selection: Selection): boolean {
   if (selection.kind === 'route') return ops.rotationsServing(state, selection.a, selection.b).length > 0;
+  if (selection.kind === 'airport') return state.knownAirports.includes(selection.iata);
   return true;
 }
 
 /** The trail from Network to `selection`, each step with what selecting it shows. */
 function trail(selection: Selection): { label: string; target: Selection }[] {
-  const steps = [{ label: 'Network', target: NETWORK }];
-  if (selection.kind === 'route') steps.push({ label: `${selection.a} – ${selection.b}`, target: selection });
+  const steps: { label: string; target: Selection }[] = [{ label: 'Network', target: NETWORK }];
+  if (selection.kind === 'network') return steps;
+  steps.push({ label: 'Airports', target: { kind: 'airports' } });
+  if (selection.kind === 'airport') steps.push({ label: selection.iata, target: selection });
+  if (selection.kind === 'route') {
+    steps.push({ label: selection.a, target: { kind: 'airport', iata: selection.a } });
+    steps.push({ label: `${selection.a} – ${selection.b}`, target: selection });
+  }
   return steps;
+}
+
+/** A name for what a selection points at, so a rebuild can tell "the same thing again" from "something new". */
+function selectionKey(selection: Selection): string {
+  if (selection.kind === 'route') return `route:${selection.a}-${selection.b}`;
+  if (selection.kind === 'airport') return `airport:${selection.iata}`;
+  return selection.kind;
 }
 
 function renderBreadcrumb(selection: Selection): void {
@@ -85,15 +101,22 @@ export function renderInspector(state: SimState): void {
   }
 
   renderBreadcrumb(selection);
-  const key = selection.kind === 'route' ? `route:${selection.a}-${selection.b}` : selection.kind;
+  const key = selectionKey(selection);
   // A rebuild of the same selection (after an action, or at rollover)
   // keeps the reader's place; a new selection starts at the top.
   const scroll = key === renderedKey ? inspectorEl.scrollTop : 0;
   renderedKey = key;
+  const rebuild = () => renderInspector(state);
   if (selection.kind === 'route') {
-    const view = buildRouteView(state, selection.a, selection.b, () => renderInspector(state));
+    const view = buildRouteView(state, selection.a, selection.b, rebuild);
     bodyEl.replaceChildren(view.root);
     redrawPools = view.redrawPools;
+  } else if (selection.kind === 'airport') {
+    const view = buildAirportView(state, selection.iata, rebuild);
+    bodyEl.replaceChildren(view.root);
+    redrawPools = view.redrawPools;
+  } else {
+    bodyEl.replaceChildren(buildAirportsView(state, rebuild));
   }
   inspectorEl.scrollTop = scroll;
 }

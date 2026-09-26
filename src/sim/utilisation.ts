@@ -249,7 +249,7 @@ export function utilisationPools(state: SimState, base?: string): ClassPool[] {
 /**
  * The fullest class pool at each base, keyed by airport. What the ring on
  * the map shows: one number that says "something here is running out",
- * with the per-class detail one click away in the airport card. Planes
+ * with the per-class detail one click away in the airport's view. Planes
  * with no base are left out, since they cannot fly a rotation yet.
  */
 export function worstPoolShareByBase(state: SimState, effects: PoolEffect[] = []): Map<string, number> {

@@ -11,7 +11,7 @@ import type { FareStance, SimState } from './state';
  * What each fare stance (sim/pricing.ts) would lead to on a contested
  * market, if nothing else changed: where your fare and the rivals' fares
  * settle, what each side makes a day there, and whether a rival would
- * close the route. It is what the route card shows, so the choice between
+ * close the route. It is what the route view shows, so the choice between
  * stances is a choice between visible outcomes rather than a guess.
  *
  * Worked out by running the game's own daily rules forward on a copy of

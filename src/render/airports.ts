@@ -396,3 +396,29 @@ export function airportPresence(state: SimState, iata: string) {
     slotFeesPerDay: slotFeesPerDayAt(state, iata),
   };
 }
+
+const SELECTED_RING = '#5ed6c8';
+const SELECTED_GLOW = 'rgba(94, 214, 200, 0.25)';
+/** Clear of the largest dot and its halo, so the ring reads as a marker rather than part of the dot. */
+const SELECTED_RING_RADIUS_PX = 17;
+
+/**
+ * The airport the side panel is showing (ui/selection.ts): a teal ring
+ * around its dot, in the same colour as a selected route's highlight
+ * (render/routes.ts), so the map shows which airport the panel describes.
+ */
+export function drawSelectedAirport(ctx: CanvasRenderingContext2D, iata: string): void {
+  const airport = airports.find((a) => a.iata === iata);
+  if (!airport || !isAirportKnown(iata)) return;
+  const point = projection([airport.lon, airport.lat]);
+  if (!point) return;
+  ctx.save();
+  for (const [strokeStyle, lineWidth] of [[SELECTED_GLOW, 7], [SELECTED_RING, 2]] as const) {
+    ctx.beginPath();
+    ctx.arc(point[0], point[1], SELECTED_RING_RADIUS_PX, 0, 2 * Math.PI);
+    ctx.strokeStyle = strokeStyle;
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
+  }
+  ctx.restore();
+}

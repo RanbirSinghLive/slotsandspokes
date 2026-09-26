@@ -27,7 +27,7 @@ function hours(minutes: number): string {
  * Rows for every class that has at least one plane. `effects` are what a
  * hovered button would change (see render/preview.ts): a row it touches
  * shows a ghost segment for the change and "now -> then". With `base` set,
- * only effects at that base count (the airport and route cards); without
+ * only effects at that base count (the airport and route views); without
  * it, all of them (the whole-fleet overlay).
  */
 export function buildPoolRows(pools: ClassPool[], effects: PoolEffect[] = [], base?: string): HTMLElement[] {

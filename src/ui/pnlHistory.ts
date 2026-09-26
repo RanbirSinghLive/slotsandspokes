@@ -10,7 +10,7 @@ import { WINDOW_DAYS, buildBipolarBars, buildUnipolarBars, dayLabel, money } fro
  * (sim/pnlHistory.ts's recordDailyPnlHistory()). The Today rows above
  * answer "how did today go"; one day's numbers can't say whether the
  * network is actually improving — this is the trend a single day hides.
- * The bars themselves (ui/pnlBars.ts) are shared with a route card's own
+ * The bars themselves (ui/pnlBars.ts) are shared with a route view's own
  * mini history chart (ui/mapMenu.ts), which asks the same question about
  * one market instead of the whole network.
  *

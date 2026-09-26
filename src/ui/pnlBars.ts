@@ -1,6 +1,6 @@
 /**
  * The bar-building guts shared by the sidebar's "Last 7 Days" charts
- * (ui/pnlHistory.ts) and a route card's own mini history chart
+ * (ui/pnlHistory.ts) and a route view's own mini history chart
  * (ui/mapMenu.ts) — same rolling-window numbers (sim/pnlHistory.ts), two
  * different places that want to show them at two different sizes with
  * two different headers, so only the bars themselves are shared here.

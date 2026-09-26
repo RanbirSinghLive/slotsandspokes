@@ -8,7 +8,7 @@ import type { SimState } from '../sim/state';
 /**
  * The Plan hub window: everything about one hub's connections on one
  * screen, with no timeline anywhere (the player never authors times).
- * Opened from the button on an airport card (ui/mapMenu.ts), which is
+ * Opened from the button in an airport's view (ui/inspector/airport.ts), which is
  * always there and turns yellow, then red, as sim/hubPlanner.ts finds more
  * value being missed.
  *

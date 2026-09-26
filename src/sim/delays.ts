@@ -129,7 +129,7 @@ const CONGESTION_MAX_DELAY_BASE = 15;
 const CONGESTION_MAX_DELAY_PER_UNIT = 40;
 const CONGESTION_MAX_OVERLOAD = 1.5;
 
-/** The chance and worst case a departure faces at this load — exported so the airport card can show them. */
+/** The chance and worst case a departure faces at this load — exported so the airport view can show them. */
 export function congestionParameters(load: number): { delayChance: number; maxDelayMinutes: number } {
   if (load <= CONGESTION_ONSET_LOAD) return { delayChance: 0, maxDelayMinutes: 0 };
   const pressure = Math.min(CONGESTION_MAX_OVERLOAD, (load - CONGESTION_ONSET_LOAD) / (1 - CONGESTION_ONSET_LOAD));

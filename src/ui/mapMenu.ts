@@ -1,45 +1,36 @@
-import { nearestAirportCandidate, airportPresence, type Airport } from '../render/airports';
+import { nearestAirportCandidate, type Airport } from '../render/airports';
 import { findNearestOwnRoute } from '../render/routes';
 import { projection } from '../render/projection';
-import { utilisationPools } from '../sim/utilisation';
-import { unmetDemandByAirport } from '../sim/unmetDemand';
 import { TURN_BUFFER_CHOICES } from '../sim/turnBuffer';
 import { connectingPassengersThrough, spokesOf } from '../sim/hubs';
 import { HUB_STYLES, HUB_STYLE_ORDER, hubStyleAt } from '../sim/hubStyle';
-import { hasHubView } from '../render/hubs';
-import { planHub } from '../sim/hubPlanner';
-import { daysUntilReturn, expediteCost, expediteRepair } from '../sim/aog';
-import { openHubPlanner } from './hubPlanner';
-import { buildPoolRows } from './poolBars';
-import { getMapPreview, setMapPreview, type MapPreview } from '../render/preview';
+import { setMapPreview, type MapPreview } from '../render/preview';
 import type { SimState } from '../sim/state';
 import { select } from './selection';
 import { redrawInspectorPreview, renderInspector } from './inspector/inspector';
 import { candidateTailsAt } from '../sim/rotations';
 import { armRouteBuilderAt, describeSlotQuotes } from './routeBuilder';
-import { nextSlotFees, slotFeesPerDayAt, slotsHeld } from '../sim/slots';
 import { hideCompetitionTooltip } from './competitionTooltip';
 import { hideRadial, showRadial, updateRadial, type RadialAction } from './radial';
 import * as ops from './routeActions';
 import { planeIconInner } from './planeIcons';
 import { AIRCRAFT_CLASSES } from '../sim/aircraftClasses';
-import { airportCapacityPerDay, airportLoad, dailyMovementsAt } from '../sim/airports';
-import { congestionParameters } from '../sim/delays';
 import { USEFUL_LIFE_YEARS } from '../sim/leasing';
 
 /**
- * Click something on the map, get a ring of actions for it, and its
- * details. Two kinds of thing can be clicked:
+ * Click something on the map, get a ring of actions for it at the click,
+ * and its details in the side panel (the inspector, ui/inspector/). Two
+ * kinds of thing can be clicked:
  *
- * - An **airport**: draw a route from it, or add a plane based there. Its
- *   details show in a card beside the ring.
+ * - An **airport**: draw a route from it, add or return a plane based
+ *   there, or change its hub style.
  * - A **route** (the line between two airports): add or remove a flight,
- *   move a flight up or down a size class, or remove the whole route. Its
- *   details show in the side panel (the inspector, ui/inspector/), and the
- *   ring's hover hints in a small label under the ring.
+ *   move a flight up or down a size class, set its turn buffer, or remove
+ *   the whole route.
  *
- * This module only decides which actions each ring has and what the
- * airport card says. Drawing the ring is ui/radial.ts; what an action does to the
+ * The ring's hover hints show in a small label under the ring. This
+ * module only decides which actions each ring has and selects what was
+ * clicked. Drawing the ring is ui/radial.ts; what an action does to the
  * network is ui/routeActions.ts, and through it the route builder's own
  * planning, so nothing here re-implements a rule.
  *
@@ -48,26 +39,12 @@ import { USEFUL_LIFE_YEARS } from '../sim/leasing';
  * calls in here once it has said no.
  */
 
-const MAX_MARKET_ROWS = 6;
 // Short enough to fit a button: the full names are in each button's label.
 const HUB_STYLE_ICON_TEXT = { rolling: 'Roll', banked: 'Bank', tight: 'Tight' } as const;
-const CARD_OFFSET_PX = 16;
 
-const cardEl = document.querySelector<HTMLElement>('#airport-detail-popover')!;
-const titleEl = document.querySelector<HTMLElement>('#airport-detail-title')!;
-const presenceEl = document.querySelector<HTMLElement>('#airport-detail-presence')!;
-const loadEl = document.querySelector<HTMLElement>('#airport-detail-load')!;
-const slotsEl = document.querySelector<HTMLElement>('#airport-detail-slots')!;
-const aogEl = document.querySelector<HTMLElement>('#airport-detail-aog')!;
-const basedEl = document.querySelector<HTMLElement>('#airport-detail-based')!;
-const marketsEl = document.querySelector<HTMLElement>('#airport-detail-markets')!;
-const poolsEl = document.querySelector<HTMLElement>('#airport-detail-pools')!;
-const demandEl = document.querySelector<HTMLElement>('#airport-detail-demand')!;
-const hintEl = document.querySelector<HTMLElement>('#airport-detail-hint')!;
 const ringHintEl = document.querySelector<HTMLElement>('#radial-hint')!;
 /** How far below the click point the ring's hint label sits: clear of the ring's buttons. */
 const RING_HINT_OFFSET_PX = 84;
-const planHubButton = document.querySelector<HTMLButtonElement>('#airport-detail-plan-hub')!;
 
 const ICON = {
   route: '<circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M7.5 16.5 16.5 7.5"/>',
@@ -101,37 +78,28 @@ let anchorY = 0;
 // elsewhere on the map still says what it did.
 let notice: string | null = null;
 let hover: { text: string; problem: boolean } | null = null;
-let cardPoolBase: string | null = null;
-let cardPoolState: SimState | null = null;
 
 function money(amount: number): string {
   return `$${Math.round(amount).toLocaleString()}`;
 }
 
 export function hideMapMenu(): void {
-  cardEl.hidden = true;
   ringHintEl.hidden = true;
   hideRadial();
   setMapPreview(null);
-  cardPoolBase = null;
-  cardPoolState = null;
   open = null;
   openState = null;
   notice = null;
   hover = null;
 }
 
+/** The ring's hint: what the hovered button does or why it can't, else the last action's result. */
 function renderHint(): void {
   const text = hover?.text ?? notice ?? '';
-  // An airport's hint sits in its card; a route has no card, so its hint
-  // gets a label of its own under the ring.
-  const el = open?.kind === 'route' ? ringHintEl : hintEl;
-  el.textContent = text;
-  el.classList.toggle('is-problem', !!hover?.problem);
-  if (el === ringHintEl) {
-    ringHintEl.hidden = text === '';
-    positionRingHint();
-  }
+  ringHintEl.textContent = text;
+  ringHintEl.classList.toggle('is-problem', !!hover?.problem);
+  ringHintEl.hidden = text === '';
+  positionRingHint();
 }
 
 /** Centre the ring's hint under the click point, or above it when there's no room below. */
@@ -149,189 +117,13 @@ function onHint(text: string | null, problem: boolean): void {
   renderHint();
 }
 
-function positionCard(): void {
-  cardEl.style.left = `${anchorX + CARD_OFFSET_PX}px`;
-  cardEl.style.top = `${anchorY + CARD_OFFSET_PX}px`;
-
-  const rect = cardEl.getBoundingClientRect();
-  const overflowX = rect.right - window.innerWidth;
-  const overflowY = rect.bottom - window.innerHeight;
-  if (overflowX > 0) cardEl.style.left = `${anchorX + CARD_OFFSET_PX - overflowX - 8}px`;
-  if (overflowY > 0) cardEl.style.top = `${anchorY + CARD_OFFSET_PX - overflowY - 8}px`;
+function onPreview(preview: MapPreview | null): void {
+  setMapPreview(preview);
+  redrawInspectorPreview();
 }
 
 // --- Airports -----------------------------------------------------------
 
-/** The class pools for the planes based at `base`, as bars; `emptyText` when there are none. */
-function fillPools(base: string | null, state: SimState, emptyText: string): void {
-  cardPoolBase = base;
-  cardPoolState = state;
-  const pools = base ? utilisationPools(state, base) : [];
-  basedEl.textContent = pools.every((pool) => pool.planes === 0) ? emptyText : `Planes based at ${base}:`;
-  renderCardPools();
-}
-
-/** Redraw the card's bars, applying whatever the hovered button would change. */
-function renderCardPools(): void {
-  if (!cardPoolBase || !cardPoolState) {
-    poolsEl.replaceChildren();
-    return;
-  }
-  const pools = utilisationPools(cardPoolState, cardPoolBase);
-  poolsEl.replaceChildren(...buildPoolRows(pools, getMapPreview()?.effects, cardPoolBase));
-}
-
-function onPreview(preview: MapPreview | null): void {
-  setMapPreview(preview);
-  renderCardPools();
-  redrawInspectorPreview();
-}
-
-function fillAirportCard(airport: Airport, state: SimState): void {
-  titleEl.textContent = `${airport.iata} — ${airport.name}`;
-
-  const presence = airportPresence(state, airport.iata);
-  const connecting = Math.round(connectingPassengersThrough(state, airport.iata));
-  presenceEl.textContent =
-    `${presence.level} · ${presence.departures} departure${presence.departures === 1 ? '' : 's'}/day` +
-    (connecting > 0 ? ` · ${connecting} connecting/day (${HUB_STYLES[hubStyleAt(state, airport.iata)].name})` : '');
-  presenceEl.classList.remove('airport-detail-over');
-
-  fillAirportLoad(airport.iata, state);
-
-  const unmet = unmetDemandByAirport(state).get(airport.iata);
-  const round = (n: number) => Math.round(n).toLocaleString();
-  demandEl.textContent = unmet
-    ? `Waiting: ${round(unmet.latent)} potential riders/day${unmet.spilled >= 1 ? `, ${round(unmet.spilled)} turned away` : ''}`
-    : '';
-  demandEl.classList.toggle('airport-detail-over', !!unmet && unmet.spilled >= 1);
-
-  fillPools(airport.iata, state, 'No aircraft based here.');
-  fillAogs(airport.iata, state);
-  fillPlanHubButton(airport.iata, state);
-
-  // Every market this airport touches, either direction, with how many
-  // legs serve it.
-  const frequencyByOther = new Map<string, number>();
-  for (const leg of state.schedule) {
-    if (leg.origin === airport.iata) frequencyByOther.set(leg.dest, (frequencyByOther.get(leg.dest) ?? 0) + 1);
-    else if (leg.dest === airport.iata) frequencyByOther.set(leg.origin, (frequencyByOther.get(leg.origin) ?? 0) + 1);
-  }
-  const markets = [...frequencyByOther.entries()].sort((a, b) => b[1] - a[1]);
-  if (markets.length === 0) {
-    marketsEl.replaceChildren(document.createTextNode('No markets served.'));
-  } else {
-    const shown = markets.slice(0, MAX_MARKET_ROWS);
-    const rest = markets.length - shown.length;
-    const nodes: (Node | string)[] = ['Markets: '];
-    // Each one opens that route's own ring (gauge, add/remove flight),
-    // same place clicking its line on the map goes. The line only takes a
-    // click within a few pixels of itself and loses to a nearby airport
-    // dot, so on a short route, or one zoomed far out, it can be nearly
-    // unclickable — this is a way in that doesn't depend on screen
-    // geometry at all.
-    shown.forEach(([other, freq], i) => {
-      if (i > 0) nodes.push(', ');
-      const link = document.createElement('button');
-      link.type = 'button';
-      link.className = 'market-link';
-      link.textContent = `${other} (${freq})`;
-      link.addEventListener('click', (event) => {
-        event.stopPropagation();
-        openRouteMenu(airport.iata, other, state, anchorX, anchorY);
-      });
-      nodes.push(link);
-    });
-    if (rest > 0) nodes.push(`, +${rest} more`);
-    marketsEl.replaceChildren(...nodes);
-  }
-}
-
-/**
- * How busy the field is against its capacity (sim/airports.ts), and what
- * that's costing in congestion delays — the same number the glow around
- * the airport on the map encodes, spelled out.
- */
-function fillAirportLoad(iata: string, state: SimState): void {
-  const load = airportLoad(state, iata);
-  const { delayChance, maxDelayMinutes } = congestionParameters(load);
-  loadEl.textContent =
-    `Airport load: ${Math.round(load * 100)}% at peak (${dailyMovementsAt(state, iata)} of ${airportCapacityPerDay(iata)} movements/day)` +
-    (delayChance > 0
-      ? `. Congestion delays ${Math.round(delayChance * 100)}% of flights here, up to ${maxDelayMinutes} min.`
-      : '. No congestion.');
-  loadEl.classList.toggle('airport-detail-warn', delayChance > 0 && load < 1);
-  loadEl.classList.toggle('airport-detail-over', load >= 1);
-
-  // Slots (sim/slots.ts): what you hold here, and what the next pair
-  // would cost — priced from this same traffic, so a busy airport reads
-  // as both congested above and expensive here.
-  const held = slotsHeld(state, iata);
-  const [next] = nextSlotFees(state, iata, 1);
-  const nextText = next === null ? 'no slots left' : next === 0 ? 'next pair free' : `next pair $${next.toLocaleString()}/day`;
-  slotsEl.textContent =
-    held > 0
-      ? `Slots: ${held} pair${held === 1 ? '' : 's'} held, $${slotFeesPerDayAt(state, iata).toLocaleString()}/day · ${nextText}.`
-      : `Slots: none held · ${nextText}.`;
-}
-
-/**
- * Planes based here that are grounded with an AOG (sim/aog.ts): what's
- * wrong, when they're back, and a button to pay for a day sooner. What
- * each AOG cancels goes in the ticker, not here.
- */
-function fillAogs(iata: string, state: SimState): void {
-  aogEl.replaceChildren(
-    ...state.aogs
-      .filter((event) => event.base === iata)
-      .map((event) => {
-        const row = document.createElement('div');
-        row.className = 'airport-aog-row';
-        const days = daysUntilReturn(state, event);
-        const text = document.createElement('span');
-        text.textContent = `${event.tail} AOG (${event.fault}), back in ${days} day${days === 1 ? '' : 's'}`;
-        row.append(text);
-        const cost = expediteCost(state, event.tail);
-        if (cost !== null) {
-          const expedite = document.createElement('button');
-          expedite.type = 'button';
-          expedite.textContent = `Expedite: $${cost.toLocaleString()} for a day sooner`;
-          expedite.disabled = state.cash < cost;
-          if (expedite.disabled) expedite.title = `Needs $${cost.toLocaleString()} on hand.`;
-          expedite.addEventListener('click', (clickEvent) => {
-            clickEvent.stopPropagation();
-            const result = expediteRepair(state, event.tail);
-            notice = result.ok ? result.message : result.reason;
-            refresh();
-          });
-          row.append(expedite);
-        }
-        return row;
-      }),
-  );
-}
-
-/**
- * The Plan hub button (ui/hubPlanner.ts): on every airport you fly to, so
- * it's always where a player looks for it, and coloured by how much value
- * sim/hubPlanner.ts finds being missed there — plain when the hub is fine,
- * yellow when it's worth a look, red when it's worth acting on.
- */
-function fillPlanHubButton(iata: string, state: SimState): void {
-  planHubButton.hidden = !hasHubView(state, iata);
-  if (planHubButton.hidden) return;
-  const plan = planHub(state, iata);
-  planHubButton.classList.toggle('is-warn', plan.urgency === 'warn');
-  planHubButton.classList.toggle('is-act', plan.urgency === 'act');
-  planHubButton.textContent =
-    plan.urgency === 'none' ? 'Plan hub' : `Plan hub · about $${Math.round(plan.missedPerDay).toLocaleString()}/day missed`;
-}
-
-planHubButton.addEventListener('click', (event) => {
-  event.stopPropagation();
-  if (open?.kind !== 'airport' || !openState) return;
-  openHubPlanner(openState, open.airport.iata, refresh);
-});
 
 function airportActions(airport: Airport, state: SimState): RadialAction[] {
   const hasPlane = candidateTailsAt(state, airport.iata).length > 0;
@@ -380,7 +172,7 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
   }));
 
   // Hub style (sim/hubStyle.ts): each choice planned up front, like the
-  // route card's turn buffer, so one the base can't absorb is greyed out
+  // route ring's turn buffer, so one the base can't absorb is greyed out
   // with the reason, and hovering one previews its effect on the pools.
   const current = hubStyleAt(state, airport.iata);
   const spokeCount = spokesOf(state, airport.iata).size;
@@ -452,9 +244,7 @@ function openAirportMenu(airport: Airport, state: SimState): void {
   notice = null;
   hover = null;
 
-  fillAirportCard(airport, state);
-  cardEl.hidden = false;
-  positionCard();
+  select({ kind: 'airport', iata: airport.iata });
   renderHint();
   showRadial({ x: anchorX, y: anchorY, actions: airportActions(airport, state), onHint, onPreview });
 }
@@ -588,7 +378,9 @@ function openRouteMenu(a: string, b: string, state: SimState, x: number, y: numb
   notice = null;
   hover = null;
 
-  select({ kind: 'route', a, b });
+  // The route's base first, so the panel's breadcrumb leads through it.
+  const base = ops.routeBase(state, a, b);
+  select(base === b ? { kind: 'route', a: b, b: a } : { kind: 'route', a, b });
   renderHint();
   showRadial({ x: anchorX, y: anchorY, actions: routeActions(a, b, state), onHint, onPreview });
 }
@@ -606,7 +398,7 @@ function refresh(): void {
   setMapPreview(null);
 
   if (open.kind === 'airport') {
-    fillAirportCard(open.airport, state);
+    renderInspector(state);
     updateRadial(airportActions(open.airport, state));
   } else {
     // The inspector shows the route; with nothing flying it any more it
@@ -667,7 +459,7 @@ export function handleMapMenuMouseDown(event: MouseEvent, state: SimState): bool
   return false;
 }
 
-/** Whether the info card and ring are showing, so the hover tooltip can stay out of their way. */
+/** Whether a ring is showing, so the hover tooltip can stay out of its way. */
 export function isMapMenuOpen(): boolean {
   return open !== null;
 }

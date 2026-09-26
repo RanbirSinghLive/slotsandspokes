@@ -265,7 +265,7 @@ export type SimState = {
   /**
    * Each finished day's arrivals and on-time arrivals per market, oldest
    * first, capped at PNL_HISTORY_MAX_DAYS (sim/routeOtp.ts), plus that
-   * day's cancellations. What the route card's reliability bars read, and
+   * day's cancellations. What the route view's reliability bars read, and
    * what reliability's effect on demand growth (sim/marketDemand.ts) is
    * judged on.
    */

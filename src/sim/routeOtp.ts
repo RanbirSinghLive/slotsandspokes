@@ -20,7 +20,7 @@ import type { SimState } from './state';
  * is judged on.
  */
 
-/** How many finished days reliability is judged over, for both the route card and demand growth. */
+/** How many finished days reliability is judged over, for both the route view and demand growth. */
 export const ROUTE_OTP_WINDOW_DAYS = 7;
 
 /**

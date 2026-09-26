@@ -1,0 +1,175 @@
+import { airportLoad, dailyDeparturesAt, airportLevel } from '../../sim/airports';
+import { slotFeesPerDayAt, slotsHeld } from '../../sim/slots';
+import type { SimState } from '../../sim/state';
+import { unmetDemandByAirport } from '../../sim/unmetDemand';
+import { airports } from '../../render/airports';
+import { select } from '../selection';
+
+/**
+ * The inspector's list of airports (ui/inspector/inspector.ts): every
+ * airport you can see, as a table you can sort, each row opening that
+ * airport's view. What the map shows spread out (dot size, glow, pips),
+ * lined up so you can compare: where you're strongest, which fields are
+ * filling up, what slots cost, where passengers are waiting.
+ */
+
+type Row = {
+  iata: string;
+  name: string;
+  departures: number;
+  load: number;
+  slotPairs: number;
+  slotFees: number;
+  waiting: number;
+};
+
+type Column = { key: keyof Row; label: string; title: string; format: (row: Row) => string; numeric: boolean };
+
+const COLUMNS: Column[] = [
+  { key: 'iata', label: 'Airport', title: 'Airport code', format: (row) => row.iata, numeric: false },
+  {
+    key: 'departures',
+    label: 'Dep/day',
+    title: 'Your departures a day, and the level that makes you here',
+    format: (row) => (row.departures > 0 ? `${row.departures} ${airportLevel(row.departures)}` : '—'),
+    numeric: true,
+  },
+  { key: 'load', label: 'Load', title: 'How full the field is at peak, every airline counted', format: (row) => `${Math.round(row.load * 100)}%`, numeric: true },
+  {
+    key: 'slotFees',
+    label: 'Slots',
+    title: 'Slot pairs you hold here, and what they cost a day',
+    format: (row) => (row.slotPairs > 0 ? `${row.slotPairs} · $${row.slotFees.toLocaleString()}` : '—'),
+    numeric: true,
+  },
+  { key: 'waiting', label: 'Waiting', title: 'Potential riders a day you are not carrying', format: (row) => Math.round(row.waiting).toLocaleString(), numeric: true },
+];
+
+const namesByIata = new Map(airports.map((airport) => [airport.iata, airport.name]));
+
+// How the table is sorted and filtered: the player's choice, kept while
+// they move around the inspector, not saved.
+let sortKey: keyof Row = 'departures';
+let sortDescending = true;
+let servedOnly = true;
+
+function buildRows(state: SimState): Row[] {
+  const unmet = unmetDemandByAirport(state);
+  return state.knownAirports.map((iata) => ({
+    iata,
+    name: namesByIata.get(iata) ?? iata,
+    departures: dailyDeparturesAt(state, iata),
+    load: airportLoad(state, iata),
+    slotPairs: slotsHeld(state, iata),
+    slotFees: slotFeesPerDayAt(state, iata),
+    waiting: unmet.get(iata)?.latent ?? 0,
+  }));
+}
+
+function compare(a: Row, b: Row): number {
+  const x = a[sortKey];
+  const y = b[sortKey];
+  const order = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y));
+  // Ties fall back to the code, so the order never depends on anything else.
+  return (sortDescending ? -order : order) || a.iata.localeCompare(b.iata);
+}
+
+/** Build the list. `changed` rebuilds the inspector, for a new sort or filter. */
+export function buildAirportsView(state: SimState, changed: () => void): HTMLElement {
+  const root = document.createElement('div');
+  root.className = 'inspector-view';
+
+  const title = document.createElement('h3');
+  title.className = 'inspector-title';
+  title.textContent = 'Airports';
+  root.append(title);
+
+  const allRows = buildRows(state);
+  const served = allRows.filter((row) => row.departures > 0);
+  const totalFees = allRows.reduce((sum, row) => sum + row.slotFees, 0);
+  const summary = document.createElement('div');
+  summary.className = 'inspector-line';
+  summary.textContent =
+    `${served.length} served of ${allRows.length} known.` +
+    (totalFees > 0 ? ` Slot fees: $${totalFees.toLocaleString()}/day.` : ' No slots held yet: the first pair at an airport nobody serves is free.');
+  root.append(summary);
+
+  // Served only, or every airport you can see.
+  const filter = document.createElement('div');
+  filter.className = 'inspector-filter';
+  for (const [label, value] of [['Served', true], ['All known', false]] as const) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = label;
+    button.classList.toggle('is-active', servedOnly === value);
+    button.addEventListener('click', () => {
+      servedOnly = value;
+      changed();
+    });
+    filter.append(button);
+  }
+  root.append(filter);
+
+  const rows = (servedOnly ? served : allRows).sort(compare);
+  if (rows.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'inspector-line';
+    empty.textContent = 'You fly from nowhere yet. Tap an airport on the map to add a plane or draw a route.';
+    root.append(empty);
+    return root;
+  }
+
+  const table = document.createElement('table');
+  table.className = 'panel-table inspector-table';
+  const headRow = document.createElement('tr');
+  for (const column of COLUMNS) {
+    const th = document.createElement('th');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'inspector-sort';
+    button.title = `${column.title}. Click to sort.`;
+    button.textContent = column.label + (sortKey === column.key ? (sortDescending ? ' ▾' : ' ▴') : '');
+    button.addEventListener('click', () => {
+      // A new column starts with the biggest first (or A to Z for names);
+      // clicking the same one again flips it.
+      if (sortKey === column.key) sortDescending = !sortDescending;
+      else {
+        sortKey = column.key;
+        sortDescending = column.numeric;
+      }
+      changed();
+    });
+    th.append(button);
+    headRow.append(th);
+  }
+  const thead = document.createElement('thead');
+  thead.append(headRow);
+
+  const tbody = document.createElement('tbody');
+  for (const row of rows) {
+    const tr = document.createElement('tr');
+    tr.className = 'inspector-table-row';
+    tr.title = row.name;
+    for (const column of COLUMNS) {
+      const td = document.createElement('td');
+      if (column.key === 'iata') {
+        // A real button, so the row can be reached from the keyboard; the
+        // whole row is clickable too.
+        const link = document.createElement('button');
+        link.type = 'button';
+        link.className = 'inspector-link';
+        link.textContent = row.iata;
+        td.append(link);
+      } else {
+        td.textContent = column.format(row);
+      }
+      if (column.key === 'load' && row.load >= 1) td.classList.add('is-over');
+      tr.append(td);
+    }
+    tr.addEventListener('click', () => select({ kind: 'airport', iata: row.iata }));
+    tbody.append(tr);
+  }
+  table.append(thead, tbody);
+  root.append(table);
+  return root;
+}

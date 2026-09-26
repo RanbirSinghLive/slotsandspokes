@@ -37,7 +37,7 @@ import type { SimState } from './state';
  * reason is what the menu shows on the greyed-out button.
  */
 
-/** The choices the route card offers, in minutes. */
+/** The choices the route's ring offers, in minutes. */
 export const TURN_BUFFER_CHOICES = [0, 15, 30, 45, 60];
 
 /** Same nudge the route builder uses to dodge two tails departing the same market at the same minute. */

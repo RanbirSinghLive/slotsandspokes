@@ -379,28 +379,24 @@ passing.
 
 ## Next: the inspector (map clicks open in the side panel)
 
-**Status: slice 1 done.** Checked in the preview:
-- a route click shows the route view with the map highlight;
-- ring hints show under the ring, refusals in red;
-- the first Esc closes the ring, the second returns to Network;
-- stance buttons work from the panel;
-- removing a route falls back to Network;
-- an empty-map click closes the ring first, then returns to Network;
-- a hidden panel reopens on selection.
+**Status: slices 1 and 2 done.**
 
-Airport clicks still open the popover, so a click on an airport sitting
-on a route line (Flint on O'Hare–Toronto) opens that airport's card
-while the panel keeps the route. Slice 2 ends that.
-
-Clicking a route or airport opens a popover card over the map. The
-route card has outgrown that: service, demand, rivals, three stance
-forecasts, plane pools, margin and on-time charts. It covers the very
-thing you clicked, and the radial menu lands on its buttons. The
-Airports, Commercial and On-Time tabs are hidden since the fewer-tabs
-pass, so their per-route and per-airport detail has nowhere to live.
-
-The side panel becomes an **inspector**: the detail for whatever is
-selected, reached by clicking the map or by links in the panel itself.
+Slice 2 as built:
+- Airport clicks select the airport. The popover card, its HTML and CSS,
+  and the old Airports tab (`ui/airports.ts`) are gone. `ui/mapMenu.ts`
+  went from 920 lines to 469.
+- The Airports tab button is back and opens the list. The tab bar shows
+  Airports as active whenever the inspector is open.
+- Esc listens in the capture phase. The first version stepped back *and*
+  closed the hub planner on one press, because the planner's listener
+  was added first.
+- Checked with real clicks in the preview:
+  - the tab opens the list; sorting and the Served/All filter work;
+  - a row opens the airport, a market row opens the route;
+  - breadcrumb links jump up levels, and a map click on an airport
+    opens it with the ring;
+  - Plan hub opens the planner, and Esc closes it without leaving the
+    airport.
 
 ### Decisions
 
