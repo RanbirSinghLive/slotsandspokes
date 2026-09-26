@@ -1,8 +1,10 @@
 import { recommendedFare, marketKey } from './schedule';
 import { summarizeMarket } from './marketSummary';
+import { addRivalFlight } from './competitors';
 import { rivalSecuresCapacity } from './market';
 import { pressureFactor, recentlyClosedByRival, rivalNetworkRoom } from './pressure';
 import { nextRandom } from './rng';
+import { rivalSlotQuote } from './slots';
 import type { SimState } from './state';
 
 /**
@@ -73,8 +75,7 @@ export function rollRivalCapacityResponse(state: SimState, dayStartMinute: numbe
     const onMarket = state.competitorRoutes.filter((route) => marketKey(route.origin, route.dest) === key);
     const withRoom = onMarket.filter((route) => route.dailyFrequency < RESPONSE_FREQUENCY_CAP).sort((x, y) => y.dailyFrequency - x.dailyFrequency);
     if (withRoom.length > 0) {
-      const route = withRoom[0];
-      if (rivalSecuresCapacity(state, route.code, 1)) route.dailyFrequency += 1;
+      addRivalFlight(state, withRoom[0]);
       continue;
     }
 
@@ -88,7 +89,9 @@ export function rollRivalCapacityResponse(state: SimState, dayStartMinute: numbe
         rivalNetworkRoom(state, route.code) > 0 &&
         [route.origin, route.dest].some((iata) => iata === a || iata === b),
     );
-    if (!neighbour || !rivalSecuresCapacity(state, neighbour.code, 1)) continue;
+    if (!neighbour) continue;
+    const slotFees = rivalSlotQuote(state, a, b);
+    if (slotFees === null || !rivalSecuresCapacity(state, neighbour.code, 1)) continue;
     state.competitorRoutes.push({
       airline: neighbour.airline,
       code: neighbour.code,
@@ -98,6 +101,7 @@ export function rollRivalCapacityResponse(state: SimState, dayStartMinute: numbe
       fare: recommendedFare(a, b),
       baseFare: recommendedFare(a, b),
       openedAtMinute: dayStartMinute,
+      slotFeesPerDay: slotFees,
     });
   }
 }

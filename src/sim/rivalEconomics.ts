@@ -75,7 +75,8 @@ export function rivalRouteDailyResult(state: SimState, route: CompetitorOffering
   const flying = route.dailyFrequency * costPerFlight;
   const fleetLeases = mix.reduce((sum, { type, count }) => sum + leaseRateFor(type.code) * count, 0);
   const leases = (route.dailyFrequency / Math.max(1, rivalFlights(state, route.code))) * fleetLeases;
-  const cost = flying + leases;
+  // Its slots, at the prices it took them (sim/slots.ts's rivalSlotQuote()).
+  const cost = flying + leases + (route.slotFeesPerDay ?? 0);
 
   return { passengers, revenue, cost, margin: revenue - cost };
 }

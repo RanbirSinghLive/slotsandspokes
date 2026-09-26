@@ -9,8 +9,8 @@ player and `npm run balance` give every balance change a measured
 before and after (baseline below). Route views now show a route's share
 of slot fees and leases. **Thread 1, thread 2's slice 1 and thread
 3's slices 1–2 are done, and so are thread 6 (Europe) and thread 2
-(all three slices). Thread 3's slice 3 (the first moats) is done;
-next is its slice 4 (slot control).**
+(all three slices). Thread 3's slices 3 and 4 (moats) are done;
+next is its slice 5 (legibility).**
 
 ---
 
@@ -329,8 +329,22 @@ Slices:
    its huge markets plus Heathrow's connections is exactly the moat this
    rewards. Whether the biggest city should also be the richest home is
    a balance question, not a bug.
-4. **Deterrence: slot control.** Rivals pay for slots at congested
-   airports, and can be priced out.
+4. **Deterrence: slot control.** (Done.) Rivals need a slot pair at
+   both ends at today's price to open a route or add a flight (checked
+   before leasing a plane), get none at an airport whose day is full, and
+   pay them daily (`slotFeesPerDay`, in their route costs); seed routes
+   pay nothing for what they start with. Money on the table is reduced by
+   a rival's slot cost, and is zero at a full airport. Steady medians
+   rose (YUL $40.7M → $45.0M, BOS $39.8M → $46.2M, PHL $57.8M → $70.1M,
+   YHZ $5.5M → $7.5M, LHR about flat) while sitters barely moved: slots
+   taken early are the builder's moat. By day 240 rivals around YUL pay
+   about $190k a day in slots, and some routes turn to losses. A full
+   day, not a congested peak, is what refuses a slot, so rivals still
+   crowd a busy hub (YUL's peak load reached 1.41), paying dearly.
+   Quoting slots for every rival made `averageServedMovements()` a
+   hotspot (the report went from 17 to 24 minutes); it now tallies all
+   airports in one pass, checked equal to the old count on 400 days, and
+   the full report reproduced exactly in 14 minutes.
 5. **Legibility:** the ticker's reasons and the route view's warning.
 
 ---

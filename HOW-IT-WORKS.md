@@ -960,6 +960,21 @@ frequency, so one rival flight against many gets little), and by the
 share of the market's passengers connecting through the player's hub,
 which a one-route entrant can't sell. Both take months to build.
 
+**Rivals need slots too** (`rivalSlotQuote()` in `sim/slots.ts`). A
+rival opening a route or adding a flight needs a slot pair at both ends
+at today's price, checked before it leases a plane, and gets none at an
+airport with no room left in its day. It pays them daily from then on
+(`CompetitorOffering.slotFeesPerDay`, in its route costs,
+`sim/rivalEconomics.ts`). Seed routes pay nothing for the slots they
+start with. Since slot prices climb with an airport's traffic, a player
+who took a hub's slots early holds them far cheaper than a rival
+arriving once it's busy: the slot-control moat. Money on the table is
+also reduced by what a rival's slots would cost, and is zero at a full
+airport. By day 240 from YUL, rivals pay about $190k a day in slots,
+their busiest routes $8k–9k each, enough to turn some to losses. A
+"full" airport means its whole day is full, not its peak: rivals still
+squeeze into a congested hub, at a price.
+
 A player market with nothing on the table isn't a target, so a lean
 airline's markets are left alone and the newcomer takes a market next to
 the network, weighted by potential.

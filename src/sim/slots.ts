@@ -44,11 +44,26 @@ const SLOT_PRICE_EXPONENT = 1.5;
 /** A slot pair adds a takeoff and a landing. */
 const MOVEMENTS_PER_PAIR = 2;
 
-/** Average daily movements across every airport some airline serves; 0 when nobody flies anywhere. */
+/**
+ * Average daily movements across every airport some airline serves; 0 when
+ * nobody flies anywhere. The same count as dailyMovementsAt(), tallied for
+ * every airport in one pass over the schedule and rival routes: it's asked
+ * for on every slot quote, including every rival's, and asking
+ * dailyMovementsAt() airport by airport walked both lists once per airport.
+ */
 function averageServedMovements(state: SimState): number {
-  const served = allAirports()
-    .map((airport) => dailyMovementsAt(state, airport.iata))
-    .filter((movements) => movements > 0);
+  const movements = new Map<string, number>();
+  const add = (iata: string, count: number) => movements.set(iata, (movements.get(iata) ?? 0) + count);
+  for (const leg of state.schedule) {
+    add(leg.origin, 1);
+    add(leg.dest, 1);
+  }
+  for (const route of state.competitorRoutes) {
+    if (route.dailyFrequency === 0) continue;
+    add(route.origin, 2 * route.dailyFrequency);
+    if (route.dest !== route.origin) add(route.dest, 2 * route.dailyFrequency);
+  }
+  const served = [...movements.values()].filter((count) => count > 0);
   return served.length > 0 ? served.reduce((total, n) => total + n, 0) / served.length : 0;
 }
 
@@ -90,6 +105,23 @@ export function nextSlotFees(state: SimState, iata: string, count: number, extra
     }
   }
   return fees;
+}
+
+/**
+ * What one more daily round trip costs a rival in slots, per day: a pair
+ * at each end at today's price. Null if either airport is full. Rivals
+ * pay for slots like the player, at the price when they take them
+ * (`CompetitorOffering.slotFeesPerDay`), so an airline that moved into a
+ * hub early holds its slots cheaper than one arriving once the hub is
+ * busy, and a full airport takes no newcomers: the slot-control moat
+ * (WEEK-NINE.md, thread 3). Seed routes hold theirs from before the game
+ * and pay nothing.
+ */
+export function rivalSlotQuote(state: SimState, a: string, b: string): number | null {
+  const [atA] = nextSlotFees(state, a, 1);
+  const [atB] = nextSlotFees(state, b, 1);
+  if (atA === null || atB === null) return null;
+  return atA + atB;
 }
 
 export type SlotQuote = { iata: string; fees: number[]; full: boolean };

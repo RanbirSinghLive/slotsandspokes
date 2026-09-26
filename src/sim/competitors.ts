@@ -20,6 +20,7 @@ import {
 } from './pressure';
 import { moneyOnTable } from './attractiveness';
 import { rivalSecuresCapacity } from './market';
+import { rivalSlotQuote } from './slots';
 import type { SimState } from './state';
 
 /**
@@ -45,6 +46,12 @@ export type CompetitorOffering = {
   /** The fare it opened at, and drifts back to when the player isn't competing with it. */
   baseFare: number;
   openedAtMinute: number;
+  /**
+   * Slot fees this route pays a day, locked when each flight's slots were
+   * taken (sim/slots.ts's rivalSlotQuote()). Optional: seed routes and
+   * routes from older saves hold theirs from before and pay nothing.
+   */
+  slotFeesPerDay?: number;
   /**
    * Consecutive days this route has lost money (sim/rivalEconomics.ts);
    * reset by any profitable day. Optional so saves from before rivals
@@ -217,8 +224,11 @@ export function rollCompetitorRouteOpenings(state: SimState, dayStartMinute: num
     const [origin, dest] = targetsPlayer
       ? (pickWeighted(inReach.map(([key]) => key), inReach.map(([, perDay]) => perDay), pickRoll).split('-') as [string, string])
       : pickWeighted(candidates, candidates.map(([a, b]) => potentialDailyDemand(a, b)), pickRoll);
-    // A new route needs a plane to fly it, leased from the same market the
-    // player uses (sim/market.ts). No plane, no route today.
+    // A new route needs slots at both ends (checked first, so no plane is
+    // leased for a route that can't fly) and a plane, leased from the same
+    // market the player uses (sim/market.ts). No slot or no plane, no route today.
+    const slotFees = rivalSlotQuote(state, origin, dest);
+    if (slotFees === null) continue;
     if (!rivalSecuresCapacity(state, code, 1)) continue;
 
     state.competitorRoutes.push({
@@ -230,6 +240,7 @@ export function rollCompetitorRouteOpenings(state: SimState, dayStartMinute: num
       fare: recommendedFare(origin, dest),
       baseFare: recommendedFare(origin, dest),
       openedAtMinute: dayStartMinute,
+      slotFeesPerDay: slotFees,
     });
   }
 }
@@ -299,7 +310,10 @@ export function rollRivalEntry(state: SimState, dayStartMinute: number): void {
 
   const [origin, dest] = pickWeighted(marketPool, weights, marketRoll);
   const rival = pool[Math.min(pool.length - 1, Math.floor(nameRoll * pool.length))];
-  // A new airline needs its first plane from the market, like anyone.
+  // A new airline needs slots at both ends and its first plane from the
+  // market, like anyone.
+  const slotFees = rivalSlotQuote(state, origin, dest);
+  if (slotFees === null) return;
   if (!rivalSecuresCapacity(state, rival.code, 1)) return;
   state.competitorRoutes.push({
     airline: rival.airline,
@@ -310,6 +324,7 @@ export function rollRivalEntry(state: SimState, dayStartMinute: number): void {
     fare: recommendedFare(origin, dest),
     baseFare: recommendedFare(origin, dest),
     openedAtMinute: dayStartMinute,
+    slotFeesPerDay: slotFees,
   });
 }
 
@@ -325,10 +340,21 @@ export function rollCompetitorFrequencyGrowth(state: SimState): void {
   for (const route of state.competitorRoutes) {
     const [roll, nextSeed] = nextRandom(state.rngSeed);
     state.rngSeed = nextSeed;
-    if (roll < chance && route.dailyFrequency < RIVAL_FREQUENCY_CAP && rivalSecuresCapacity(state, route.code, 1)) {
-      route.dailyFrequency += 1;
-    }
+    if (roll < chance && route.dailyFrequency < RIVAL_FREQUENCY_CAP) addRivalFlight(state, route);
   }
+}
+
+/**
+ * One more daily flight on a rival route, if it can get the slots at both
+ * ends (checked first) and a plane. Its slot fees are added at today's
+ * price. Whether it happened.
+ */
+export function addRivalFlight(state: SimState, route: CompetitorOffering): boolean {
+  const slotFees = rivalSlotQuote(state, route.origin, route.dest);
+  if (slotFees === null || !rivalSecuresCapacity(state, route.code, 1)) return false;
+  route.dailyFrequency += 1;
+  route.slotFeesPerDay = (route.slotFeesPerDay ?? 0) + slotFees;
+  return true;
 }
 
 // --- Fare response ------------------------------------------------------------

@@ -2,6 +2,7 @@ import aircraftTypesData from '../../data/aircraft-types.json';
 import { connectingDemandOnMarket } from './hubs';
 import { actualDailyDemand } from './marketDemand';
 import { routeFixedCosts } from './routeCosts';
+import { rivalSlotQuote } from './slots';
 import { marketKey, recommendedFare } from './schedule';
 import { COMPETITOR_ASSUMED_SEATS } from './serviceLevel';
 import type { SimState } from './state';
@@ -31,6 +32,9 @@ import type { SimState } from './state';
  * - **hub feed**: passengers connecting through the player's hub ride the
  *   whole itinerary, which a one-route entrant can't sell. Discounted by
  *   the share of the market's passengers who are connecting.
+ * - **slot control**: an entrant pays today's slot price at both ends
+ *   (sim/slots.ts), which a busy hub drives up, and nothing is on the
+ *   table at a full airport.
  */
 
 const seatsByTypeCode = new Map((aircraftTypesData as { code: string; seats: number }[]).map((type) => [type.code, type.seats]));
@@ -50,6 +54,8 @@ export type MoneyOnTable = {
   dominance: number;
   /** How much of the table the hub's connecting passengers keep from rivals, 0–1. */
   hubFeed: number;
+  /** What a rival's slots for one daily round trip would cost a day, or null if either airport is full. */
+  rivalSlotFees: number | null;
   /** Dollars a day a rival could expect: the turned-away passengers at the going fare, plus its share of the margin, less what the moats keep. */
   perDay: number;
 };
@@ -57,7 +63,7 @@ export type MoneyOnTable = {
 export function moneyOnTable(state: SimState, a: string, b: string): MoneyOnTable {
   const key = marketKey(a, b);
   const legs = state.schedule.filter((leg) => marketKey(leg.origin, leg.dest) === key);
-  if (legs.length === 0) return { turnedAway: 0, fullyCostedMargin: 0, dominance: 0, hubFeed: 0, perDay: 0 };
+  if (legs.length === 0) return { turnedAway: 0, fullyCostedMargin: 0, dominance: 0, hubFeed: 0, rivalSlotFees: null, perDay: 0 };
 
   const classByTail = new Map(state.aircraft.map((aircraft) => [aircraft.tail, aircraft.typeCode]));
   const seats = legs.reduce((sum, leg) => sum + (seatsByTypeCode.get(classByTail.get(leg.tail) ?? '') ?? 0), 0);
@@ -77,11 +83,15 @@ export function moneyOnTable(state: SimState, a: string, b: string): MoneyOnTabl
   const hubFeed = connecting + local > 0 ? connecting / (connecting + local) : 0;
 
   const onTable = turnedAway * recommendedFare(a, b) + RIVAL_MARGIN_SHARE * Math.max(0, fullyCostedMargin);
+  // What getting in would cost: slots at both ends at today's price, and
+  // nothing to be had at all if either airport is full.
+  const rivalSlotFees = rivalSlotQuote(state, a, b);
   return {
     turnedAway,
     fullyCostedMargin,
     dominance,
     hubFeed,
-    perDay: onTable * (1 - dominance) * (1 - hubFeed),
+    rivalSlotFees,
+    perDay: rivalSlotFees === null ? 0 : Math.max(0, onTable * (1 - dominance) * (1 - hubFeed) - rivalSlotFees),
   };
 }
