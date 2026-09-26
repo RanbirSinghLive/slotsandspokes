@@ -1587,7 +1587,11 @@ world, so at the start every airport is starved: the first routes build
 fast, and the edge wears off as someone serves each airport (the game's
 philosophy in CLAUDE.md). The airport view says it in words: "Starved
 for service", "Underserved" or "Well served", with what that means for a
-new route. The benchmark is set where an airport flown hard gets there:
+new route. On the map, the **Demand layer** draws a faint dashed teal
+ring round every airport at least a quarter starved, stronger the
+hungrier it is (only with that layer, since early on almost everything
+is starved). As you and rivals serve a region its rings fade, so the
+untouched edges show. The benchmark is set where an airport flown hard gets there:
 the steady headless player's home by its first month or two, Toronto
 and O'Hare by day 120. At 0.02 almost nothing ever counted as served,
 and the boost was just a flat 3× everywhere.

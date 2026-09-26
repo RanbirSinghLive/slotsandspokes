@@ -5,6 +5,7 @@ import { slotFeesPerDayAt, slotsHeld } from '../sim/slots';
 import { worstPoolShareByBase } from '../sim/utilisation';
 import { getMapPreview } from './preview';
 import { pipCount, unmetDemandByAirport, unmetDemandInputs, type AirportUnmet } from '../sim/unmetDemand';
+import { hungerByAirport } from '../sim/serviceLevel';
 import type { SimState } from '../sim/state';
 
 export type Airport = {
@@ -57,6 +58,16 @@ const PIP_FIRST_ANGLE_DEG = 40;
 const PIP_LAST_ANGLE_DEG = 320;
 const PIP_HOLLOW = '#9aa3b8';
 const PIP_SPILLED = '#ffb347';
+/**
+ * The hunger ring (sim/serviceLevel.ts): a faint dashed ring outside the
+ * pips round an airport starved or underserved for service, stronger the
+ * hungrier it is. Teal, the colour nothing else on the map uses for
+ * warnings, since it marks an opportunity rather than a problem.
+ */
+const HUNGER_RING_RGB = '94, 214, 196';
+const HUNGER_RING_OFFSET = PIP_ORBIT_OFFSET + 5;
+/** Below this hunger an airport counts as well served and gets no ring. */
+const HUNGER_RING_MIN = 0.25;
 
 const MARKER_RADIUS = 3;
 // The load at which congestion delays start (sim/delays.ts), and so the
@@ -135,6 +146,22 @@ function presenceRadius(departures: number): number {
  */
 let unmetCache: { state: SimState; inputs: string; byIata: Map<string, AirportUnmet> } | null = null;
 
+/**
+ * The last hungerByAirport() answer. Hunger moves when seats move (a route,
+ * a plane, a rival) or a day ends (demand grows), so this key is enough to
+ * redraw it at least once a day without working it out every frame.
+ */
+let hungerCache: { state: SimState; inputs: string; byIata: Map<string, number> } | null = null;
+
+function cachedHunger(state: SimState): Map<string, number> {
+  const rivalFlights = state.competitorRoutes.reduce((total, route) => total + route.dailyFrequency, 0);
+  const inputs = `${unmetDemandInputs(state)}|${state.competitorRoutes.length}|${rivalFlights}`;
+  if (hungerCache?.state !== state || hungerCache.inputs !== inputs) {
+    hungerCache = { state, inputs, byIata: hungerByAirport(state) };
+  }
+  return hungerCache.byIata;
+}
+
 function cachedUnmetDemand(state: SimState): Map<string, AirportUnmet> {
   const inputs = unmetDemandInputs(state);
   if (unmetCache?.state !== state || unmetCache.inputs !== inputs) {
@@ -169,6 +196,9 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState, sho
   // Only with the Demand layer on: always drawn, the pips cluttered every
   // airport all the time with something the player mostly isn't asking about.
   const unmetByIata = showUnmetDemand ? cachedUnmetDemand(state) : new Map<string, never>();
+  // How starved each airport is for service, shown with the same layer:
+  // most of the map starts starved, so always on it would be noise.
+  const hungerByIata = showUnmetDemand ? cachedHunger(state) : new Map<string, number>();
   const previewEffects = getMapPreview()?.effects ?? [];
   const previewShareByIata = previewEffects.length > 0 ? worstPoolShareByBase(state, previewEffects) : null;
 
@@ -258,6 +288,18 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState, sho
           ctx.stroke();
         }
       }
+    }
+
+    const hunger = hungerByIata.get(airport.iata) ?? 0;
+    if (hunger >= HUNGER_RING_MIN) {
+      ctx.save();
+      ctx.setLineDash([2, 3]);
+      ctx.beginPath();
+      ctx.arc(x, y, radius + HUNGER_RING_OFFSET, 0, 2 * Math.PI);
+      ctx.strokeStyle = `rgba(${HUNGER_RING_RGB}, ${0.15 + 0.45 * hunger})`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
     }
 
     ctx.beginPath();

@@ -8,8 +8,8 @@ fill-out, fare stances, the side panel and the headless player) lives in
 player and `npm run balance` give every balance change a measured
 before and after (baseline below). Route views now show a route's share
 of slot fees and leases. **Thread 1, thread 2's slice 1 and thread
-3's slices 1–2 are done, and so are thread 6 (Europe) and thread 2's
-slice 2. Next in order: thread 2's slice 3.**
+3's slices 1–2 are done, and so are thread 6 (Europe) and thread 2
+(all three slices). Next in order: thread 3's slices 3–5 (moats).**
 
 ---
 
@@ -206,8 +206,12 @@ Slices:
    numbers: they're about the player's own flights. "Unserved" became
    "Not in your network", which no longer clashes with "Well served".
    Five sizes, not the owner's three, as drafted; still an open question.
-3. **The map hint.** Underserved airports marked subtly, so a player
-   can spot an edge by looking (CLAUDE.md: the map is not decoration).
+3. **The map hint.** (Done.) With the Demand layer on, a faint dashed
+   teal ring round each airport at least a quarter starved, stronger the
+   hungrier. Only with that layer: at the start almost everything is
+   starved, so always on it would be noise. Cached against seats, rivals
+   and the day, not worked out per frame. The Demand layer's own lines
+   dominate at full-map zoom, so the rings read best zoomed in.
 
 ---
 
