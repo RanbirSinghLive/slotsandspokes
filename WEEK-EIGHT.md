@@ -169,44 +169,8 @@ once the rest works.
 
 ## Next: filling out North America (a separate thread)
 
-**Status: all five slices done.** Slice 5, the aircraft view, was checked
-in the preview:
-- a rotations-table link and a click on a plane in flight both open it
-  (the plane wins over Toronto's dot just under it);
-- its day reads as a knock-on chain: the leg in the air 10 min late
-  (age), the next two heading for 13 and 16 min late;
-- Return to lessor is blocked while the plane has flights, and says so;
-- the map highlights all four of its routes.
-
-Slice 4 as built:
-- `rivals` and `rival(code)` selections, with views in
-  `ui/inspector/rival.ts` and the breadcrumb Network › Rivals ›
-  Ironbridge Airlines. Every rival name in a route's view links to it.
-  Its routes that you also fly link to your route view.
-- The Competition overlay's airline picker drives the panel: an airline
-  opens its view, "All competitors" the list.
-- The map draws a selected rival's whole network in the selection teal.
-- `rivalRouteOutlook()` in `sim/rivalEconomics.ts` gives each route's
-  margin, losing streak, grace left and days until it would close.
-- A selection that stops existing now falls back to its breadcrumb
-  parent (a gone rival to the Rivals list), not straight to Network.
-- **What it showed straight away:** Ironbridge owns a Propeller and three
-  Regionals but is costed as Narrowbodies on every route, because its
-  class comes from the whole airline's size. That's −$51,884 a day, with
-  4 of its 7 routes losing and saved only by their grace periods.
-- **Fixed after the slice:** rival routes are now costed with the
-  airline's actual fleet, on average (see the fare-stance findings).
-  - Rivals are mostly profitable now, and keep about 12% more routes
-    open in the dense north-east.
-  - Six-seed headless: YUL $1.34M → $981k (one bust), YYZ $3.49M →
-    $4.12M, BOS $823k → $1.13M (all survive). YHZ, PHL and LHR are
-    unchanged.
-  - The stance choice now sometimes decides the outcome:
-    Montréal–LaGuardia's rival closes under Undercut or Match but
-    survives Premium, while Skyline survives every stance on the
-    Toronto trunks.
-
- The owner has settled the scope (see
+**Status: slices 1–3 done; slice 4 (map labels) and slice 5 (balance)
+not started.** The owner has settled the scope (see
 "Decisions").
 
 Grow the map from 40 airports to about 150, filling in the US and
@@ -763,7 +727,42 @@ fees, almost all at home, which no route showed before. The headless
 player still judges routes on their own margin; switching it to this one
 is a balance-thread decision.
 
-**Status: slices 1–3 done.**
+**Status: all five slices done.** Slice 5, the aircraft view, was checked
+in the preview:
+- a rotations-table link and a click on a plane in flight both open it
+  (the plane wins over Toronto's dot just under it);
+- its day reads as a knock-on chain: the leg in the air 10 min late
+  (age), the next two heading for 13 and 16 min late;
+- Return to lessor is blocked while the plane has flights, and says so;
+- the map highlights all four of its routes.
+
+Slice 4 as built:
+- `rivals` and `rival(code)` selections, with views in
+  `ui/inspector/rival.ts` and the breadcrumb Network › Rivals ›
+  Ironbridge Airlines. Every rival name in a route's view links to it.
+  Its routes that you also fly link to your route view.
+- The Competition overlay's airline picker drives the panel: an airline
+  opens its view, "All competitors" the list.
+- The map draws a selected rival's whole network in the selection teal.
+- `rivalRouteOutlook()` in `sim/rivalEconomics.ts` gives each route's
+  margin, losing streak, grace left and days until it would close.
+- A selection that stops existing now falls back to its breadcrumb
+  parent (a gone rival to the Rivals list), not straight to Network.
+- **What it showed straight away:** Ironbridge owns a Propeller and three
+  Regionals but is costed as Narrowbodies on every route, because its
+  class comes from the whole airline's size. That's −$51,884 a day, with
+  4 of its 7 routes losing and saved only by their grace periods.
+- **Fixed after the slice:** rival routes are now costed with the
+  airline's actual fleet, on average (see the fare-stance findings).
+  - Rivals are mostly profitable now, and keep about 12% more routes
+    open in the dense north-east.
+  - Six-seed headless: YUL $1.34M → $981k (one bust), YYZ $3.49M →
+    $4.12M, BOS $823k → $1.13M (all survive). YHZ, PHL and LHR are
+    unchanged.
+  - The stance choice now sometimes decides the outcome:
+    Montréal–LaGuardia's rival closes under Undercut or Match but
+    survives Premium, while Skyline survives every stance on the
+    Toronto trunks.
 
 Slice 3 as built:
 - The route view has **Fare and marketing**: a fare slider (by hand,

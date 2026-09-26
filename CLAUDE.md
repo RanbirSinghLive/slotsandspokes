@@ -20,6 +20,16 @@ The map is not decoration. The player must be able to learn things by looking
 at it that a table would not tell them — chiefly how a delay on one sector
 cascades through the rest of that aircraft's day.
 
+**The game's philosophy.** The player wins by finding small advantages and
+exploiting them before competition arbitrages them away: an underserved
+city, passengers nobody is carrying, a fare gap, a slot, a well-placed
+connection. Every edge is temporary by default, and profit is a signal
+rivals read. Durable advantages (moats) exist but take a long time to build:
+control of a hub's slots and connections, a network whose reach no
+single-route rival can match. So sitting on profit should erode, growth
+should pay but not at any cost, and a mechanic that hands out a permanent
+edge cheaply is a bug. Judge every new mechanic against this.
+
 Not in scope unless asked: passenger simulation at the individual level,
 daylight saving, and per-base time zones (see `sim/clock.ts`).
 **The current plan is the newest `WEEK-*.md`. Don't build a system it doesn't
