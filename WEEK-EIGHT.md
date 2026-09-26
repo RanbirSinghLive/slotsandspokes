@@ -441,7 +441,47 @@ as cancelled, so nothing on screen said so.
 
 ## Next: a headless player that plays (a separate thread)
 
-**Status: slices 1, 2, 3 and 6 done.**
+**Status: slices 1–4 and 6 done.**
+
+**Slice 4 as built:** habit 7 compares the three stances' forecasts
+(`forecastStance()`) on each contested market every 7 days and takes the
+best margin, with ties going to Match. Taken at face value it cost every home
+a third of its year (YUL $79.8M → $53.8M), because the forecast
+overrates Premium. That finding went to the fare-stance thread's open
+questions. The player now rules out a stance whose response chance
+is 5% a day or more (`RIVAL_RESPONSE_LIMIT`), which leaves Premium only
+where the market isn't full. Undercut is never chosen.
+
+Two more fixes the runs showed a careful player would make:
+- **A lease has to pay for itself.** Halifax leased three $10k/day
+  Regionals while the airline made a few thousand a day, and went bust.
+  Leasing now needs last week's average daily margin to cover the new
+  lease.
+- **Cut fast when cash is running out.** London stacked twelve flights a
+  day on Amsterdam and Paris, and lost $32k a day when revenue halved
+  (probably a rival cutting fares). Cash ran out before 14 losing
+  days were up. When last week's losses would empty the bank within 60
+  days, the player now drops a flight from the worst-losing market every
+  day. The game's own "Cash is running out" warning tells players the same.
+- It also skips a rotation whose new slot fees exceed a quarter of what
+  a full plane would take in fares (`SLOT_FEE_LIMIT_SHARE`). It didn't
+  change any of these six runs, but a slot-controlled airport could
+  otherwise swallow a whole new plane's margin.
+
+A year from six homes, seed 1:
+
+| Home | Slice 3 | Slice 4 | Planes |
+|---|---|---|---|
+| YUL | $79.8M | $78.4M | 20 |
+| YYZ | $71.3M | $78.6M | 23 |
+| YHZ | $13.3M | $15.4M | 8 |
+| BOS | $57.8M | $61.6M | 16 |
+| PHL | $84.8M | $82.5M | 16 |
+| LHR | $104M | $325k (22 emergency cuts) | 8 |
+
+One seed swings a lot: London's run took a different path and only just
+survived. Slice 5's six-seed report is where these numbers start to
+mean something.
 
 **Slice 3 as built:** habits 3 (feed spill), 4 (open markets) and 6
 (return idle planes), in the order the draft gave. The first version
@@ -933,6 +973,18 @@ half a year of the market to yourself. Coexisting is sometimes right.
 - **After a rival closes:** should the stance fall back to policy
   automatically (as drafted), or stay on Undercut in case another rival
   enters?
+- **The forecast overrates Premium** (found by the headless player,
+  slice 4 of its thread). It holds rival flights where they are, but on
+  a full market Premium carries about a 15% daily chance of a rival
+  adding a flight, and rivals do. Toronto's Pittsburgh route went from 1
+  rival flight a day to 8, and LaGuardia's from 1 to 5, while margins
+  fell below what Match would have made. Premium's forecast margin beats
+  Match by 10–15%, so a player who trusts the headline number loses
+  money. Should the forecast price in the likely response, or show the
+  response more loudly than a percentage?
+- **Undercut never forecasts best.** Rivals follow you down, so it only
+  pays if a rival closing is worth something, and nothing protects the
+  market after one leaves (see "What building it showed").
 
 ---
 

@@ -5,10 +5,11 @@ import { potentialDailyDemand } from '../sim/demand';
 import { greatCircleDistanceNm } from '../sim/geo';
 import { cashNeededToLease } from '../sim/leasing';
 import * as actions from '../sim/playerActions';
+import { forecastStance } from '../sim/fareForecast';
 import { setFareStance } from '../sim/pricing';
-import { applyRotation, planRotation, type RotationStop } from '../sim/rotations';
-import { isAircraftTypeAllowedAt, legsServingMarket, marketKey } from '../sim/schedule';
-import type { SimState } from '../sim/state';
+import { applyRotation, planRotation, type RotationPlan, type RotationStop } from '../sim/rotations';
+import { isAircraftTypeAllowedAt, legsServingMarket, marketKey, recommendedFare } from '../sim/schedule';
+import type { FareStance, SimState } from '../sim/state';
 import { TURN_BUFFER_CHOICES } from '../sim/turnBuffer';
 import { spillingMarkets } from '../sim/unmetDemand';
 import { utilisationPools } from '../sim/utilisation';
@@ -90,6 +91,29 @@ export const IDLE_DAYS_TO_RETURN = 7;
  * Past it, every new flight makes every other one there later.
  */
 export const BUSY_DELAY_CHANCE = 0.1;
+/**
+ * The daily chance of a rival answering with more flights (the route
+ * view's "X% a day they add a flight") above which a stance is ruled out.
+ * The forecast holds rival flights where they are, so it can't price that
+ * answer in; at 5% a day a new rival flight is likely within a month.
+ */
+export const RIVAL_RESPONSE_LIMIT = 0.05;
+/**
+ * The most a rotation's new slot fees (the route form's "New slots" line)
+ * may be, as a share of what a full plane would take in fares on it. Past
+ * this, a slot-controlled airport's fees eat what the flight could earn.
+ */
+export const SLOT_FEE_LIMIT_SHARE = 0.25;
+/**
+ * Days of cash left, at last week's average loss, below which the player
+ * stops waiting for LOSING_DAYS_TO_CUT and cuts the worst market every
+ * day: the game's own "Cash is running out" warning.
+ */
+export const EMERGENCY_RUNWAY_DAYS = 60;
+/** Days between the player's looks at each contested market's fare stance. */
+export const STANCE_REVIEW_DAYS = 7;
+/** Stances in the order they win ties: Match first, since it's the neutral choice. */
+const STANCE_PREFERENCE: FareStance[] = ['match', 'undercut', 'premium'];
 
 const airports = airportsData as RotationStop[];
 const airportByIata = new Map(airports.map((airport) => [airport.iata, airport]));
@@ -128,6 +152,8 @@ export type Memory = {
   openedOn: Map<string, number>;
   /** Day until which each plane gets no new flights, by tail: its day just proved too tight to fly. */
   tightUntil: Map<string, number>;
+  /** Day the player last weighed each contested market's fare stance, by market key. */
+  stanceReviewed: Map<string, number>;
 };
 
 /** Days since this market was last opened: its record before that belongs to an earlier stint. */
@@ -155,12 +181,16 @@ function coolingDown(state: SimState, memory: Memory, key: string): boolean {
 }
 
 function steadyPlayer(): Player {
-  const memory: Memory = { lastTouched: new Map(), lastDropped: new Map(), idleDays: new Map(), openedOn: new Map(), tightUntil: new Map() };
+  const memory: Memory = { lastTouched: new Map(), lastDropped: new Map(), idleDays: new Map(), openedOn: new Map(), tightUntil: new Map(), stanceReviewed: new Map() };
   return {
     kind: 'steady',
     open: (state) => {
       for (const aircraft of state.aircraft) {
-        fillPlane(state, aircraft.tail, { latestLanding: LATEST_LANDING_MINUTE, onOpen: (key) => memory.openedOn.set(key, dayIndex(state)) });
+        fillPlane(state, aircraft.tail, {
+          latestLanding: LATEST_LANDING_MINUTE,
+          checkSlotFees: true,
+          onOpen: (key) => memory.openedOn.set(key, dayIndex(state)),
+        });
       }
       return [];
     },
@@ -171,6 +201,7 @@ function steadyPlayer(): Player {
       ...openMarkets(state, memory),
       ...leaseWhenFull(state, memory),
       ...returnIdle(state, memory),
+      ...pickStances(state, memory),
     ],
   };
 }
@@ -188,6 +219,8 @@ type FillOptions = {
   minScore?: number;
   /** Told about each market a rotation is added to, by market key. */
   onOpen?: (key: string) => void;
+  /** Skip rotations whose new slot fees aren't worth paying (slotsWorthPaying()). */
+  checkSlotFees?: boolean;
 };
 
 /**
@@ -226,7 +259,8 @@ function fillPlane(state: SimState, tail: string, options: FillOptions): string[
 
     const pick = candidates.find(({ dest }) => {
       const plan = planRotation([home], dest, tail, state);
-      return plan.error === null && plan.arriveBackMinute <= options.latestLanding;
+      if (plan.error !== null || plan.arriveBackMinute > options.latestLanding) return false;
+      return !options.checkSlotFees || slotsWorthPaying(plan, aircraft.typeCode);
     });
     if (!pick) break; // this plane's day is full, or nothing is in reach
     applyRotation(state, tail, planRotation([home], pick.dest, tail, state));
@@ -235,6 +269,19 @@ function fillPlane(state: SimState, tail: string, options: FillOptions): string[
     opened.push(`${home.iata}–${pick.dest.iata}`);
   }
   return opened;
+}
+
+/**
+ * Whether a planned rotation's new slot fees are worth paying: under
+ * SLOT_FEE_LIMIT_SHARE of the fares a full plane would take on it, at the
+ * recommended fare for each leg.
+ */
+function slotsWorthPaying(plan: RotationPlan, typeCode: string): boolean {
+  const fees = plan.slotQuotes.reduce((sum, quote) => sum + quote.fees.reduce((total, fee) => total + fee, 0), 0);
+  if (fees === 0) return true;
+  const seats = classByCode(typeCode)?.seats ?? 0;
+  const fullPlaneFares = plan.legs.reduce((sum, leg) => sum + seats * recommendedFare(leg.origin, leg.dest), 0);
+  return fees <= SLOT_FEE_LIMIT_SHARE * fullPlaneFares;
 }
 
 /** Riders a day a market needs, per flight already on it, to be worth a plane of this class: a full plane each way. */
@@ -309,9 +356,14 @@ function leaveSlack(state: SimState, memory: Memory): string[] {
  * RAMP_UP_DAYS to grow into its service. A day with every flight
  * cancelled counts as losing: it earned nothing and still took the
  * plane's time.
+ *
+ * When the airline as a whole is losing fast enough to run out of cash
+ * within EMERGENCY_RUNWAY_DAYS, it doesn't wait: every day it also drops
+ * a flight from whichever market lost the most last week, the way the
+ * game's "Cash is running out" warning tells a player to.
  */
 function cutLosers(state: SimState, memory: Memory): string[] {
-  const log: string[] = [];
+  const log: string[] = [...cutInEmergency(state, memory)];
   for (const [a, b] of scheduledMarkets(state)) {
     const key = marketKey(a, b);
     if (!settled(state, memory, key)) continue;
@@ -328,6 +380,32 @@ function cutLosers(state: SimState, memory: Memory): string[] {
   return log;
 }
 
+/** Last week's margin on a market, per day. Null with less than a week of history. */
+function lastWeekMargin(state: SimState, key: string): number | null {
+  const revenue = (state.revenueHistoryByMarket[key] ?? []).slice(-7);
+  const cost = (state.costHistoryByMarket[key] ?? []).slice(-7);
+  if (revenue.length < 7) return null;
+  return revenue.reduce((sum, r, i) => sum + r - cost[i], 0) / 7;
+}
+
+function cutInEmergency(state: SimState, memory: Memory): string[] {
+  const lastWeek = state.marginHistory.slice(-7);
+  if (lastWeek.length < 7) return [];
+  const averageMargin = lastWeek.reduce((sum, margin) => sum + margin, 0) / 7;
+  if (averageMargin >= 0 || state.cash / -averageMargin >= EMERGENCY_RUNWAY_DAYS) return [];
+
+  let worst: { a: string; b: string; margin: number } | null = null;
+  for (const [a, b] of scheduledMarkets(state)) {
+    const margin = lastWeekMargin(state, marketKey(a, b));
+    if (margin !== null && margin < 0 && (!worst || margin < worst.margin)) worst = { a, b, margin };
+  }
+  if (!worst) return [];
+  const dropped = dropOneFlight(state, memory, worst.a, worst.b);
+  if (!dropped.ok) return [];
+  const runway = Math.round(state.cash / -averageMargin);
+  return [`Cash runs out in about ${runway} days; ${worst.a}–${worst.b} lost $${Math.round(-worst.margin).toLocaleString()}/day last week: ${dropped.message}`];
+}
+
 /**
  * Habit 3, feed spill. A market that turns passengers away (the map's
  * "turned away": today's demand is more than the seats on it) and made
@@ -342,11 +420,11 @@ function feedSpill(state: SimState, memory: Memory): string[] {
     const key = marketKey(a, b);
     if (!spilling.has(key) || !settled(state, memory, key) || coolingDown(state, memory, key)) continue;
     if (daysFlown(state, memory, key) < 7 || tooBusy(state, a) || tooBusy(state, b)) continue;
-    const revenue = (state.revenueHistoryByMarket[key] ?? []).slice(-7);
-    const cost = (state.costHistoryByMarket[key] ?? []).slice(-7);
-    if (revenue.length < 7 || revenue.reduce((sum, r, i) => sum + r - cost[i], 0) <= 0) continue;
+    const margin = lastWeekMargin(state, key);
+    if (margin === null || margin <= 0) continue;
     const preview = actions.previewAddFlight(state, a, b);
     if (!preview.ok || preview.plan.arriveBackMinute > LATEST_LANDING_MINUTE) continue;
+    if (!slotsWorthPaying(preview.plan, state.aircraft.find((a) => a.tail === preview.tail)!.typeCode)) continue;
     const added = actions.addFlight(state, a, b);
     if (added.ok) {
       memory.lastTouched.set(key, dayIndex(state));
@@ -375,6 +453,7 @@ function openMarkets(state: SimState, memory: Memory): string[] {
       unservedOnly: true,
       avoid: (key) => coolingDown(state, memory, key) || tooBusy(state, otherEnd(key, aircraft.baseAirport!)),
       minScore: worthFlying(aircraft.typeCode),
+      checkSlotFees: true,
       onOpen: (key) => memory.openedOn.set(key, dayIndex(state)),
     });
     if (opened.length > 0) log.push(`${aircraft.tail} had time to spare: opened ${opened.join(', ')}.`);
@@ -404,6 +483,36 @@ function returnIdle(state: SimState, memory: Memory): string[] {
 }
 
 /**
+ * Habit 7, pick a stance. Every STANCE_REVIEW_DAYS, on each market a rival
+ * also flies, it reads the route view's forecast (sim/fareForecast.ts)
+ * for all three stances and takes the one that makes the most a day once
+ * fares settle, among those a rival isn't likely to answer with more
+ * flights (RIVAL_RESPONSE_LIMIT). Ties go to Match. It doesn't try to win
+ * a price war for its own sake: a rival leaving shows up only as what the
+ * market makes.
+ */
+function pickStances(state: SimState, memory: Memory): string[] {
+  const log: string[] = [];
+  const contested = new Set(state.competitorRoutes.map((route) => marketKey(route.origin, route.dest)));
+  for (const [a, b] of scheduledMarkets(state)) {
+    const key = marketKey(a, b);
+    if (!contested.has(key) || !state.routeSettings[key]) continue;
+    if (dayIndex(state) - (memory.stanceReviewed.get(key) ?? -Infinity) < STANCE_REVIEW_DAYS) continue;
+    memory.stanceReviewed.set(key, dayIndex(state));
+
+    const forecasts = STANCE_PREFERENCE.map((stance) => forecastStance(state, a, b, stance)).filter(
+      (forecast) => forecast.stance === 'match' || forecast.responseChance < RIVAL_RESPONSE_LIMIT,
+    );
+    const best = forecasts.reduce((top, forecast) => (forecast.margin > top.margin ? forecast : top));
+    const current = state.routeSettings[key].fareStance ?? null;
+    if (best.stance === current) continue;
+    setFareStance(state, a, b, best.stance);
+    log.push(`${a}–${b} is contested: ${best.stance} (forecast $${Math.round(best.margin).toLocaleString()}/day at $${best.fare}).`);
+  }
+  return log;
+}
+
+/**
  * The best market from `home` for a plane of this class: in its range,
  * at an airport that takes it, not cooling down after a cut, scored the
  * way fillPlane() scores. Null when there's nothing.
@@ -425,10 +534,11 @@ function bestMarketFor(state: SimState, home: string, typeCode: string, memory: 
 
 /**
  * Habit 5, lease when full. Once a class's pool at home is
- * LEASE_WHEN_POOL_SHARE booked and last week made money overall, lease
- * one more plane: the largest class on offer whose best market has the
- * riders to fill a round trip, with cash to cover the lessor's reserve
- * plus LEASE_SAFETY_DAYS more. Then give it a day at once, since an idle
+ * LEASE_WHEN_POOL_SHARE booked, lease one more plane: the largest class
+ * on offer whose best market has the riders to fill a round trip, whose
+ * lease last week's average daily margin could pay on its own, with cash
+ * to cover the lessor's reserve plus LEASE_SAFETY_DAYS more. Not while
+ * home is too busy. Then give it a day at once, since an idle
  * plane is only cost. One lease a day at most.
  */
 function leaseWhenFull(state: SimState, memory: Memory): string[] {
@@ -437,13 +547,16 @@ function leaseWhenFull(state: SimState, memory: Memory): string[] {
   const pools = utilisationPools(state, home).filter((pool) => pool.planes > 0);
   if (!pools.some((pool) => pool.share >= LEASE_WHEN_POOL_SHARE)) return [];
   const lastWeek = state.marginHistory.slice(-7);
-  if (lastWeek.length < 7 || lastWeek.reduce((sum, margin) => sum + margin, 0) <= 0) return [];
+  if (lastWeek.length < 7) return [];
+  const averageMargin = lastWeek.reduce((sum, margin) => sum + margin, 0) / 7;
 
   const options = actions.planeOptions(state, home);
   for (const cls of [...AIRCRAFT_CLASSES].reverse()) {
     const option = options.find((o) => o.code === cls.code);
     if (!option?.listing || option.disabledReason) continue;
     const price = option.listing.leasePricePerDay;
+    // What the airline already makes a day has to carry the new lease on its own.
+    if (averageMargin < price) continue;
     if (state.cash < cashNeededToLease(price) + LEASE_SAFETY_DAYS * price) continue;
     const market = bestMarketFor(state, home, cls.code, memory);
     if (!market || market.score < worthFlying(cls.code)) continue;
@@ -454,6 +567,7 @@ function leaseWhenFull(state: SimState, memory: Memory): string[] {
     const opened = fillPlane(state, tail, {
       latestLanding: LATEST_LANDING_MINUTE,
       avoid: (key) => coolingDown(state, memory, key),
+      checkSlotFees: true,
       onOpen: (key) => memory.openedOn.set(key, dayIndex(state)),
     });
     return [`${leased.message} Flying ${opened.length > 0 ? opened.join(', ') : 'nothing yet'}.`];

@@ -590,23 +590,33 @@ planner the route builder uses, and the ring's actions in
      every market. A plane that loses a flight this way gets no new ones
      for 30 days, unless it has nothing left to fly.
   2. **Cut losers.** A market that made no money for 14 days in a row
-     loses a flight, once it has flown 21 days.
+     loses a flight, once it has flown 21 days. When last week's losses
+     would run the airline out of cash within 60 days, it doesn't wait:
+     it drops a flight from the worst-losing market every day.
   3. **Feed spill.** A market turning passengers away (the map's "turned
      away") that made money last week gets one more flight, if a plane
      of its class at base has room before 21:00.
   4. **Open markets.** Every plane with time left flies the best market
      from its base that nothing flies yet, if it has riders for a full
      plane each way.
-  5. **Lease when full.** Once a class's pool at home is 85% booked and
-     last week made money overall, it leases the largest class on offer
-     whose best market has riders for a full round trip, if cash covers
-     the lessor's reserve plus 30 more days of that lease. Then it fills
+  5. **Lease when full.** Once a class's pool at home is 85% booked, it
+     leases the largest class on offer whose best market has riders for
+     a full round trip, whose lease last week's average daily margin
+     could pay on its own, if cash covers the lessor's reserve plus 30
+     more days of that lease. Then it fills
      that plane's day at once.
   6. **Return idle planes.** A plane that flew nothing for 7 days goes
      back to the lessor, if the fee can be paid.
+  7. **Pick stances.** Every 7 days, on each market a rival also flies,
+     it takes the stance whose forecast (`sim/fareForecast.ts`) makes
+     the most once fares settle, ties to Match. It rules out a stance
+     with a 5% or higher daily chance of a rival adding a flight: the
+     forecast holds rival flights fixed, so on a full market it
+     overrates Premium, which rivals answer with capacity.
 
-  It never adds flights at an airport where congestion already delays
-  10% or more of flights, the figure on the airport view's load line.
+  It skips a rotation whose new slot fees are more than a quarter of
+  what a full plane would take in fares on it. It never adds flights at
+  an airport where congestion already delays 10% or more of flights, the figure on the airport view's load line.
   Without that it packed its home airport past capacity and read the
   resulting cancellations as problems with individual markets. It
   remembers what it changed: a market is left alone for 7 days after a
@@ -1817,7 +1827,6 @@ The current plan is the newest `WEEK-*.md`. As of September 2026:
 - **The Grow tab as one pipeline view** (WEEK-EIGHT.md) — next up.
 - **More tech tree branches** — fuel efficiency is still the only one.
 - **Ancillary revenue** (bag fees), designed twice and never built.
-- **Fare stances for the steady headless player** (WEEK-EIGHT.md).
 - **Per-base time zones** — every plane flies on the home clock.
 
 Open balance questions rather than missing features: margin favoured
