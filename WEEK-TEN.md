@@ -6,7 +6,7 @@ moats, shocks, real costs, Europe, home difficulty) lives in
 with playtest findings as they come (see "Playtest notes"), and the
 order changes with them.
 
-**State at handoff:** save key `airgame-save-v46`. The game pushes back
+**State at handoff:** save key `airgame-save-v46`. **Thread 1 is done; thread 2 is next.** The game pushes back
 the way CLAUDE.md's philosophy asks: over a year a careful airline makes
 $6.5M–$19M, a sitter $2M–$5M and eroding, an unattended one-plane start
 survives the Standard homes, a reckless one always busts
@@ -54,6 +54,14 @@ systems are kept only if they serve this; the rest go.
 ---
 
 ## Thread 1: keep or cut the parked systems
+
+**Status: done.** The owner decided each system (table below). The two
+cuts are in: the fuel random walk (`b19b1a9`) and the loans
+(`a640641`), each with headless output byte-identical before and after,
+since both were switched off. The Grow tab is dropped from the plan. The
+rest are redesigns that live in their own threads: missions and the
+Tech Tree become thread 2's ladder and innovations, executives thread 8,
+crew thread 9 (awaiting the owner's pick of direction).
 
 Small, and first, because threads 2 and 3 depend on what survives. Each
 system is either brought into the design or removed from the code (a
