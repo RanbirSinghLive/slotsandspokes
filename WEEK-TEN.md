@@ -59,15 +59,15 @@ Small, and first, because threads 2 and 3 depend on what survives. Each
 system is either brought into the design or removed from the code (a
 parked system still costs every change that touches it).
 
-| System | Today | Proposal |
+| System | Today | Decision (settled with the owner) |
 |---|---|---|
-| Missions (`sim/missions.ts`) | 8 early checklists, switched off | **Replace** with thread 2's ladder; reuse the module's shape |
-| Tech Tree (`sim/techTree.ts`) | one fuel-efficiency branch, spends Reputation, hidden | **Fold** its upgrades into milestone unlocks, then remove the tree |
-| Executives (`sim/executives.ts`) | C-suite paid in Reputation, hidden | **Cut** (or re-price in cash as a later, separate idea) |
-| Loans (`sim/loans.ts`) | unreachable: $0 ends the game | **Cut** the offer machinery; keep `isInsolvent()` |
-| Crew (`sim/crew.ts`) | pilots, cabin, mechanics, training lines; switched off | **Open question**: the biggest parked system |
+| Missions (`sim/missions.ts`) | 8 early checklists, switched off | **Replaced** by thread 2's ladder |
+| Tech Tree (`sim/techTree.ts`) | one fuel-efficiency branch, spends Reputation, hidden | **Folded** into thread 2 as **innovations**: airline programmes a milestone makes available (a loyalty scheme, winglet retrofits, online booking), not "unlocks" |
+| Executives (`sim/executives.ts`) | CEO, COO, CFO, CCO paid in Reputation, hidden | **Kept and reworked** (thread 8): no CEO, since the player is the CEO; CFO, COO and CCO chosen from candidate pools that widen as NPS rises; paid in money for their bonuses. Flavour in a game that is otherwise numbers |
+| Loans (`sim/loans.ts`) | unreachable: $0 ends the game | **Cut** the offer machinery; keep `isInsolvent()` and the game-over screen |
+| Crew (`sim/crew.ts`) | pools, hiring, training lines, payroll; switched off | **Explored** in thread 9: woven into the map, not a tab |
 | Fuel drift (`FUEL_PRICE_MOVES`) | off; shocks set fuel now | **Cut** the random walk; shocks are the fuel story |
-| The Grow tab | never built; half moot with crew off | **Cut** from the plan unless crew returns |
+| The Grow tab | never built | **Dropped** |
 
 Measured: `npm run balance` before and after each cut (it should not
 move, since everything cut is switched off).
@@ -77,14 +77,22 @@ move, since everything cut is switched off).
 The spine of the week.
 
 - **Tiers**, each a handful of milestones, each milestone naming an edge
-  or moat in words the player can act on. A first draft to argue with:
+  or moat in words the player can act on. The owner asked for the first
+  route at the start and circumnavigation near the end; the rest is
+  Claude's draft:
 
-  | Tier | Milestones (examples) | Unlocks |
+  | Tier | Milestones | Opens |
   |---|---|---|
-  | Start-up | first route profitable after costs; a route at 80% load for a week; open an underserved (starved) city first | **Regional** on the lessor |
-  | Regional carrier | serve 8 airports; a hub with 25 connecting passengers a day; survive a shock | **Narrowbody**; a younger-airframe listing |
-  | Network airline | 60% of a busy airport's slots; four routes each dominant (4+ daily); NPS above a mark for a month | **Widebody**; a second base |
-  | International | a route to another continent; 100 connecting a day at one hub | open |
+  | Start-up | **fly your first route**; a route profitable after its fixed costs for a week; a route at 80% load for a week; be first into a starved city | **Regional** on the lessor |
+  | Regional carrier | serve 8 airports; a hub with 25 connecting passengers a day; come through a shock still profitable | **Narrowbody**; innovations: online booking, a younger-airframe listing |
+  | Network airline | hold 60% of a busy airport's slots; four routes each flown 4+ times a day; NPS above a mark for a month; a second base | **Widebody**; innovations: loyalty scheme, winglet retrofits |
+  | International | a route to another continent; 100 connecting passengers a day at one hub | innovations: codeshare-style feed |
+  | Global | **round the world**: your network lets a passenger circumnavigate the globe (a chain of your routes, connections allowed, that crosses every meridian and returns home) | the last tier: bragging rights |
+
+- **Innovations, not unlocks** (the owner's word): airline programmes
+  that a milestone makes available and that the player then chooses to
+  adopt, most for money, each with a lasting effect. The Tech Tree's one
+  real upgrade (fuel efficiency) becomes "winglet retrofits".
 
 - **Unlocks replace debut days** (`sim/market.ts`'s `ClassRhythm`): a
   class's listings start arriving when its milestone is met, not on a
@@ -157,6 +165,49 @@ From week eight's fare-stance thread and week nine's findings:
 
 ---
 
+## Thread 8: executives (reworked)
+
+The owner wants them kept for flavour: named people with backgrounds, in
+a game that is otherwise all numbers.
+
+- **No CEO:** the player is the CEO. Three chairs: **CFO**, **COO**,
+  **CCO** (the existing `data/executives.json` candidates, CEO removed).
+- **Paid in money,** not Reputation: a signing fee and a daily salary,
+  in exchange for their bonuses (delay reduction, NPS, maintenance,
+  marketing and so on, as today).
+- **Candidate pools widen as NPS rises:** a small airline with a poor
+  record attracts journeymen; a well-regarded one can hire the stars. The
+  candidates on offer are grouped by the NPS they need.
+- Shown in the side panel (Network › Executives), not a separate tab.
+
+## Thread 9: crew, woven into the map (an exploration)
+
+Crew is the largest parked system (pools, hiring, training lines,
+reserve depth, groundings, payroll, about 1,200 lines). The owner wants
+it back only as something to optimise **on the map**, not in a tab. Three
+directions, not exclusive:
+
+1. **Crew bases.** Crews live at bases, and a plane's day must start and
+   end where its crew lives. Opening a crew base at an outstation (a
+   cost, on the airport's ring) lets planes overnight there and fly longer
+   days; the map shows crew bases as a mark on the airport. What to
+   optimise: where to base crews, versus long ferry legs home.
+2. **Crew hours as a second pool bar.** Beside each base's plane pools, a
+   crew-hours bar: flying hours booked against the crews based there.
+   Hiring is a ring action at the base, with a lead time (the training
+   line, simplified). What to optimise: hire ahead of growth, not after
+   the bar turns red.
+3. **Fatigue into delays and NPS.** Long duty days and tight turns tire
+   crews: more delays and a lower NPS on the day's later flights. It
+   rides on levers already on the map (turn buffers, how full a plane's
+   day is). What to optimise: slack against utilisation.
+
+**Claude's lean:** 2 and 3 first. They add a real trade-off (hire ahead,
+leave slack) using bars and levers already on the map, with no new
+screen. 1 is the richer idea but changes how rotations work, and fits
+with the "second base" milestone. For the owner to choose before any of
+it is built.
+
 ## Carried forward from week nine
 
 - **Thread 5 (goal ladder)** becomes this plan's thread 2.
@@ -176,21 +227,21 @@ From week eight's fare-stance thread and week nine's findings:
 1. Thread 1 (keep or cut): decisions first, since 2 and 3 build on them.
 2. Thread 2, slice 1 (the ladder and the Goals view).
 3. Thread 5's "pursue milestones", then thread 2, slice 2 (class unlocks).
-4. Thread 3 (NPS).
+4. Thread 3 (NPS), then thread 8 (executives), which builds on it.
 5. Thread 4 (map), thread 6 (fare stances), in either order.
 6. The rest of thread 5, and thread 7.
+7. Thread 9 (crew), once the owner picks a direction.
 
 ## Open questions for the owner
 
-- **Crew: keep, cut, or park longer?** It's the largest parked system
-  (pools, hiring, training lines, groundings, payroll).
+- **Crew: which of thread 9's directions?**
 - **Do rivals get bigger aircraft by date, or also gated?** Gating them by
   the player's progress would be strange; by date keeps the world moving
   on its own.
 - **Which milestone unlocks each class?** The table in thread 2 is a draft.
 - **How strong should NPS be in booking share?** A tie-breaker, or a real
   lever?
-- **Executives: cut, or re-price in cash later?**
+- **Executives: how much NPS opens each pool, and what do they cost?**
 
 ## Playtest notes
 
