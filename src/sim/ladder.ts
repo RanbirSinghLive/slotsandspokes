@@ -131,13 +131,13 @@ export function roundTheWorld(state: SimState): { spanDegrees: number; complete:
 // --- The ladder -----------------------------------------------------------------
 
 /** Congestion at which an airport counts as busy, for slot control. */
-const BUSY_AIRPORT_LOAD = 0.75;
+export const BUSY_AIRPORT_LOAD = 0.75;
 /**
  * Load factor that counts as nearly full. Planes sell at most
  * sim/economy.ts's LOAD_FACTOR (75%) of their seats, so a full route
  * shows about 76%; this is nearly there.
  */
-const NEARLY_FULL = 0.72;
+export const NEARLY_FULL = 0.72;
 /**
  * Connecting passengers a day through one airport for the two hub
  * milestones. The connecting model runs large for big cities: a careful
@@ -155,7 +155,7 @@ const BIG_HUB_PASSENGERS = 750;
 const GOOD_NPS = 15;
 const GOOD_NPS_MIN_FLIGHTS = 1000;
 /** Days a route has to be flown to count as holding a city (the P&L history's length, sim/pnlHistory.ts). */
-const HOLD_DAYS = 30;
+export const HOLD_DAYS = 30;
 
 export const LADDER: Tier[] = [
   {

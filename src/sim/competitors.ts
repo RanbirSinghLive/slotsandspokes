@@ -59,6 +59,9 @@ export type CompetitorOffering = {
    * could close routes still load: absent means 0.
    */
   losingDays?: number;
+  /** Consecutive profitable days, and yesterday's passengers over seats (sim/rivalEconomics.ts), for the rival's ladder (sim/rivalLadder.ts). Absent in an older save. */
+  profitableDays?: number;
+  loadFactor?: number;
 };
 
 /**

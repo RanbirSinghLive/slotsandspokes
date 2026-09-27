@@ -456,6 +456,8 @@ export type SimState = {
    * by one appointment.
    */
   executives: ExecutiveSlots;
+  /** Each rival airline's milestones met on the ladder, by code then milestone id: the day met (sim/rivalLadder.ts). Optional: made on first use. */
+  rivalMilestones?: Record<string, Record<string, number>>;
   /** Leases signed and not yet delivered (sim/fleetTiming.ts). Optional: absent in an older save. */
   inboundLeases?: InboundLease[];
   /** Crew bases and their crews, by IATA (sim/crews.ts). Optional: an older save gets bases made at its first rollover. */

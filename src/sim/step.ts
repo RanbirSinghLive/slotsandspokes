@@ -35,6 +35,7 @@ import { dayIndex, minuteOfDay as homeMinuteOfDay } from './clock';
 import { rollRivalCapacityResponse } from './rivalResponse';
 import { applyFarePolicy } from './pricing';
 import { closeLosingRivalRoutes } from './rivalEconomics';
+import { rollDailyRivalMilestones } from './rivalLadder';
 import type { SimState, ActiveFlight } from './state';
 
 const aircraftTypesByCode = new Map<string, EconomyAircraftType>(
@@ -292,6 +293,8 @@ export function step(state: SimState): void {
     // Rivals first withdraw from routes that keep losing money
     // (sim/rivalEconomics.ts), then grow.
     closeLosingRivalRoutes(state);
+    // Rivals climb the ladder too, judged on the routes just scored (sim/rivalLadder.ts).
+    rollDailyRivalMilestones(state);
     rollCompetitorRouteOpenings(state, state.simMinute);
     rollCompetitorFrequencyGrowth(state);
     rollRivalEntry(state, state.simMinute);

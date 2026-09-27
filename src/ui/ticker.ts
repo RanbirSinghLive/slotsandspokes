@@ -1,4 +1,6 @@
 import { airlineCalled, classOpen, LADDER, milestoneById, tiersClimbed } from '../sim/ladder';
+import { rivalTiersClimbed } from '../sim/rivalLadder';
+import { pluralClassName } from '../sim/aircraftClasses';
 import { classByCode } from '../sim/aircraftClasses';
 import { money } from './format';
 import { RIVAL_CLOSE_AFTER_LOSING_DAYS, RIVAL_SQUEEZED_RESPITE_DAYS } from '../sim/pressure';
@@ -210,6 +212,26 @@ function pollFleetEvents(state: SimState): void {
   }
   seenTails = tails;
   seenCrews = crews;
+}
+
+// Each rival's tiers climbed at the last poll (sim/rivalLadder.ts).
+const seenRivalTiers = new Map<string, number>();
+
+/** A rival the player competes with near home climbing a tier, and the planes that opens to it. */
+function pollRivalLadderEvents(state: SimState): void {
+  const network = networkAirports(state);
+  for (const code of new Set(state.competitorRoutes.map((route) => route.code))) {
+    const tiers = rivalTiersClimbed(state, code);
+    const before = seenRivalTiers.get(code);
+    seenRivalTiers.set(code, tiers);
+    if (before === undefined || tiers <= before) continue;
+    const routes = state.competitorRoutes.filter((route) => route.code === code);
+    if (!routes.some((route) => network.has(route.origin) || network.has(route.dest))) continue;
+    const opens = LADDER[tiers - 1]?.opensClasses ?? [];
+    if (opens.length === 0) continue;
+    const names = opens.map((typeCode) => pluralClassName(AIRCRAFT_CLASSES.find((c) => c.code === typeCode)?.name ?? typeCode)).join(', ');
+    pushEvent(state.simMinute, `${routes[0].airline} has earned ${names}: it's now ${airlineCalled(LADDER[tiers])}`);
+  }
 }
 
 let hasSeenInitialRivals = false;
@@ -490,6 +512,7 @@ export function updateTicker(state: SimState): void {
   pollMarketEvents(state);
   pollReachEvents(state);
   pollRivalEvents(state);
+  pollRivalLadderEvents(state);
   pollRivalPainEvents(state);
   pollWeatherEvents(state);
 }

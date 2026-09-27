@@ -37,7 +37,7 @@ const MINUTES_PER_DAY = 1440;
 
 const typesByCode = new Map((aircraftTypesData as TypeSpec[]).map((type) => [type.code, type]));
 
-export type RivalRouteResult = { passengers: number; revenue: number; cost: number; margin: number };
+export type RivalRouteResult = { passengers: number; seats: number; revenue: number; cost: number; margin: number };
 
 /**
  * The rival's planes by class. An airline with no fleet on record (only
@@ -79,12 +79,12 @@ export function rivalRouteDailyResult(state: SimState, route: CompetitorOffering
   // Its slots, at the prices it took them (sim/slots.ts's rivalSlotQuote()).
   const cost = flying + leases + (route.slotFeesPerDay ?? 0);
 
-  return { passengers, revenue, cost, margin: revenue - cost };
+  return { passengers, seats, revenue, cost, margin: revenue - cost };
 }
 
 /**
  * Once a day, from step.ts's rollover: update every rival route's losing
- * streak, and close any route past its grace period that has lost money
+ * and profitable streaks and its load factor, and close any route past its grace period that has lost money
  * RIVAL_CLOSE_AFTER_LOSING_DAYS days running. The airline keeps the
  * plane, so its next route opening doesn't need a new lease, and won't
  * reopen the same market for RIVAL_REOPEN_COOLDOWN_DAYS. An airline whose
@@ -96,8 +96,14 @@ export function closeLosingRivalRoutes(state: SimState): void {
   // so the order routes are listed in can't change who closes.
   const closing = new Set<CompetitorOffering>();
   for (const route of state.competitorRoutes) {
-    const losing = rivalRouteDailyResult(state, route).margin < 0;
+    const result = rivalRouteDailyResult(state, route);
+    const losing = result.margin < 0;
     route.losingDays = losing ? (route.losingDays ?? 0) + 1 : 0;
+    // What the rival's own ladder reads (sim/rivalLadder.ts).
+    route.profitableDays = result.margin > 0 ? (route.profitableDays ?? 0) + 1 : 0;
+    // `seats` is already capped at LOAD_FACTOR of the real seats, so scale
+    // back: this is passengers over seats, the same load factor the player's reads.
+    route.loadFactor = result.seats > 0 ? (result.passengers * LOAD_FACTOR) / result.seats : 0;
     const pastGrace = state.simMinute - route.openedAtMinute >= graceMinutes;
     if (pastGrace && route.losingDays >= RIVAL_CLOSE_AFTER_LOSING_DAYS) closing.add(route);
   }

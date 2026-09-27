@@ -1,4 +1,5 @@
 import { dayIndex } from './clock';
+import { biggestOpenRivalClass, rivalClassOpen } from './rivalLadder';
 import { isReturning, startReturn } from './fleetTiming';
 import { nextRandom } from './rng';
 import { leaseRateFor } from './leasing';
@@ -22,10 +23,9 @@ import type { Aircraft, SimState } from './state';
  * Rivals draw from the same shelf when they grow (see rivalSecuresCapacity()),
  * so leasing the last Regional before Trillium Air does is a real move.
  *
- * Who may take a class differs. The player earns each bigger class on the
- * ladder (sim/ladder.ts's classOpen(): Regionals as a regional carrier and
- * so on), not on a date. Rivals take a class from its `rivalDay`, as the
- * world moving on its own, whatever the player has done.
+ * Every airline earns each bigger class on the ladder, not on a date: the
+ * player (sim/ladder.ts's classOpen(): Regionals as a regional carrier and
+ * so on) and each rival alike (sim/rivalLadder.ts).
  */
 
 export type MarketListing = {
@@ -43,16 +43,14 @@ export type MarketState = {
   nextListingId: number;
 };
 
-type ClassRhythm = { rivalDay: number; initial: number; intervalDays: number; cap: number };
+type ClassRhythm = { initial: number; intervalDays: number; cap: number };
 
+/** Each class's shelf: how many are listed on day 0, how often another arrives, and the most listed at once. */
 export const MARKET_RHYTHM: Record<string, ClassRhythm> = {
-  PROP: { rivalDay: 0, initial: 3, intervalDays: 4, cap: 3 },
-  // Every airline starts on Propellers. Rivals move up to Regionals from
-  // day 40 and the bigger classes months after; the player moves up by
-  // climbing the ladder instead.
-  REGIONAL: { rivalDay: 40, initial: 1, intervalDays: 10, cap: 2 },
-  NARROWBODY: { rivalDay: 80, initial: 1, intervalDays: 20, cap: 2 },
-  WIDEBODY: { rivalDay: 180, initial: 1, intervalDays: 35, cap: 1 },
+  PROP: { initial: 3, intervalDays: 4, cap: 3 },
+  REGIONAL: { initial: 1, intervalDays: 10, cap: 2 },
+  NARROWBODY: { initial: 1, intervalDays: 20, cap: 2 },
+  WIDEBODY: { initial: 1, intervalDays: 35, cap: 1 },
 };
 
 /** Listed airframes are this many years old, give or take: 15 to 24. */
@@ -69,14 +67,14 @@ const RIVAL_WIDEBODY_FLIGHTS = 14;
 const RIVAL_CLASS_LADDER = ['WIDEBODY', 'NARROWBODY', 'REGIONAL', 'PROP'];
 
 /**
- * Whether a rival may take this class's next listing: only from the
- * class's `rivalDay`, and never the last Propeller. That is the class
- * every airline starts and first grows with, and rivals act before the
- * player each day, so without this they could empty the only shelf the
- * player can grow from.
+ * Whether a rival may take this class's next listing: only once its own
+ * ladder opens the class (sim/rivalLadder.ts), as the player's does, and
+ * never the last Propeller. That is the class every airline starts and
+ * first grows with, and rivals act before the player each day, so without
+ * this they could empty the only shelf the player can grow from.
  */
-function rivalMayTake(state: SimState, typeCode: string): boolean {
-  if (dayIndex(state) < (MARKET_RHYTHM[typeCode]?.rivalDay ?? 0)) return false;
+function rivalMayTake(state: SimState, code: string, typeCode: string): boolean {
+  if (!rivalClassOpen(state, code, typeCode)) return false;
   return typeCode !== 'PROP' || listingsOf(state, typeCode).length > 1;
 }
 
@@ -191,7 +189,10 @@ export function ensureRivalFleets(state: SimState): void {
     if (state.competitorFleets[code]) continue;
     const flights = rivalFlights(state, code);
     const planes = Math.max(1, Math.ceil(flights / FLIGHTS_PER_RIVAL_PLANE));
-    state.competitorFleets[code] = Array.from({ length: planes }, () => preferredRivalClass(flights));
+    // The biggest class its ladder has opened (sim/rivalLadder.ts): a
+    // newcomer's first plane is a Propeller.
+    const typeCode = biggestOpenRivalClass(state, code, preferredRivalClass(flights), RIVAL_CLASS_LADDER);
+    state.competitorFleets[code] = Array.from({ length: planes }, () => typeCode);
   }
 }
 
@@ -208,7 +209,7 @@ export function rivalSecuresCapacity(state: SimState, code: string, extraFlights
   if (fleet.length >= needed) return true;
   const preferred = preferredRivalClass(rivalFlights(state, code) + extraFlights);
   for (const typeCode of RIVAL_CLASS_LADDER.slice(RIVAL_CLASS_LADDER.indexOf(preferred))) {
-    if (rivalMayTake(state, typeCode) && takeListing(state, typeCode)) {
+    if (rivalMayTake(state, code, typeCode) && takeListing(state, typeCode)) {
       // Only recorded once it has a plane: a rival whose entry fails today
       // shouldn't leave an empty fleet behind.
       state.competitorFleets[code] = [...fleet, typeCode];

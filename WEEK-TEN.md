@@ -6,7 +6,7 @@ moats, shocks, real costs, Europe, home difficulty) lives in
 with playtest findings as they come (see "Playtest notes"), and the
 order changes with them.
 
-**State at handoff:** save key `airgame-save-v46`. **All threads through 12 are done.** The game pushes back
+**State at handoff:** save key `airgame-save-v46`. **All threads through 13 are done.** The game pushes back
 the way CLAUDE.md's philosophy asks: over a year a careful airline makes
 $6.5M–$19M, a sitter $2M–$5M and eroding, an unattended one-plane start
 survives the Standard homes, a reckless one always busts
@@ -529,6 +529,25 @@ habit, and the crew buffers went (hiring with the lease replaced them).
 **For the owner:** the game may now be easier for a careful or bold
 player than the philosophy wants (bold rarely busts), and Halifax is
 unwinnable for every player. Both are for the next plan.
+
+## Thread 13: rivals earn aircraft on the same ladder
+
+Asked for by the owner: rivals had fixed dates for bigger classes (day
+40, 80, 180); they should meet the same goals as the player.
+
+**Status: done.** `sim/rivalLadder.ts`: the same tiers, milestones and
+thresholds judged on each rival's own routes, with stand-ins where a
+rival has no equivalent (hub: 4+ routes from one airport; a good name: 8
+routes flown 90+ days; a second base: 3+ routes from each of two
+airports). Seed incumbents start with Start-up met (they fly Regionals);
+newcomers, the home rival included, start on Propellers. The fixed dates
+are gone. A rival's view shows its tier; the ticker says when a nearby
+rival earns a class. Incumbents reach Narrowbodies around days 100–150,
+Widebodies from about 165, close to the old dates; newcomers mostly stay
+small. Steady median cash (thread 12 → 13): YUL $11.3M → $17.2M, YYZ
+$34.1M → $38.5M, BOS $38.5M → $14.0M, PHL $64.4M → $56.9M, LHR $66.6M →
+$68.3M: within seed noise overall. Judging only a rival's current tier
+keeps the daily check cheap.
 
 ## Carried forward from week nine
 

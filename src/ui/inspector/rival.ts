@@ -1,4 +1,5 @@
 import { classByCode } from '../../sim/aircraftClasses';
+import { rivalLadderInWords } from '../../sim/rivalLadder';
 import { line, heading } from './dom';
 import { money } from '../format';
 import { dayIndex } from '../../sim/clock';
@@ -114,6 +115,8 @@ export function buildRivalView(state: SimState, code: string): HTMLElement {
     line(
       `${routes.length} of ${RIVAL_MAX_ROUTES_PER_AIRLINE} routes · ${flights} flights/day · fleet: ${fleetText || 'none'}`,
     ),
+    // Rivals earn bigger planes on the same ladder (sim/rivalLadder.ts).
+    line(`On the ladder: ${rivalLadderInWords(state, code)}.`),
   );
   // Rivals don't assign planes to routes: every route is flown by the
   // fleet on average (sim/rivalEconomics.ts). Planes beyond what its

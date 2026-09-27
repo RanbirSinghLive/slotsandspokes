@@ -829,6 +829,30 @@ The accumulator loop (`main.ts`) turns real frame time into whole simulated
 minutes (`step()` calls) plus a continuous fractional minute for rendering,
 per the pattern in CLAUDE.md's "Time" section.
 
+## Rivals on the ladder (`src/sim/rivalLadder.ts`)
+
+Rivals climb the same ladder as the player to lease bigger aircraft: the
+same tiers, milestones and thresholds, each judged on the rival's own
+routes (their profitable streak and load factor, recorded daily by
+`closeLosingRivalRoutes()`). Rivals are simpler airlines, so three
+milestones use a stand-in:
+
+| Milestone | For a rival |
+|---|---|
+| A hub (150 connecting a day) | four or more routes from one airport |
+| A good name (NPS) | eight routes each flown 90 days or more |
+| A second base | three or more routes from each of two airports |
+
+The seed incumbents are established regional airlines: they start with
+Start-up met and fly Regionals. Newcomers, the home-city rival
+included, start on Propellers. Checked daily at rollover
+(`rollDailyRivalMilestones()`), only for the tier each rival is working
+on (`state.rivalMilestones`). A rival's view says where it stands, and
+the ticker says when one flying near the player earns a class. Measured:
+incumbents take their first Narrowbody around days 100–150 and
+Widebodies from about day 165; newcomers often stay on Propellers or
+Regionals all year.
+
 ## Competitor routes (`src/sim/competitors.ts`)
 
 Each game holds its own mutable copy of every rival route in
@@ -1408,22 +1432,22 @@ costs. It arrives immediately, parked and based where it was leased.
 **One shared lessor.** The player and every rival lease from the same
 market, first come first served — it is the game's main pacing gate.
 Each class has a rhythm (`MARKET_RHYTHM`). Every class is on the shelf
-from day 0, but **the player may lease a bigger class only once the
-ladder opens it** (`classOpen()` in `sim/ladder.ts`): Regionals on
-finishing Start-up, Narrowbodies on finishing Regional carrier,
-Widebodies on finishing Network airline. Rivals have no ladder, so they
-keep a date (`rivalDay`) before which they may not take that class:
+from day 0, but **every airline may lease a bigger class only once its
+own ladder opens it**: the player (`classOpen()` in `sim/ladder.ts`) and
+each rival alike (`rivalClassOpen()`, see Rivals on the ladder below).
+Regionals on finishing Start-up, Narrowbodies on finishing Regional
+carrier, Widebodies on finishing Network airline.
 
-| Class | Stocked at day 0 | Rivals from | Then one every | Max listed |
-|---|---|---|---|---|
-| Propeller | 3 | day 0 | 4 days | 3 |
-| Regional | 1 | day 40 | 10 days | 2 |
-| Narrowbody | 1 | day 80 | 20 days | 2 |
-| Widebody | 1 | day 180 | 35 days | 1 |
+| Class | Stocked at day 0 | Then one every | Max listed |
+|---|---|---|---|
+| Propeller | 3 | 4 days | 3 |
+| Regional | 1 | 10 days | 2 |
+| Narrowbody | 1 | 20 days | 2 |
+| Widebody | 1 | 35 days | 1 |
 
-A player who climbs fast gets a bigger class before rivals may touch it,
-and a shelf nobody has picked over: an early edge, like any other, that
-lasts until the rivals' date arrives. A locked class says why in the
+A player who climbs before the rivals near it gets a bigger class and a
+shelf nobody has picked over: an early edge, like any other, that lasts
+until they climb too. A locked class says why in the
 lease fan ("Regionals open when you become a regional carrier: see
 Goals") and shows as locked in the Fleet tab's lessor strip; the ticker
 announces new listings only of classes the player can lease, so a locked
@@ -1433,7 +1457,8 @@ A pop-up announces each class the moment it opens.
 An arrival that finds the shelf full is lost, not queued. When a rival
 grows (`rivalSecuresCapacity()`, three daily flights per airframe) it
 takes a listing too: the class its size calls for (Regional; Narrowbody
-from 6 daily flights; Widebody from 14), falling back to smaller ones.
+from 6 daily flights; Widebody from 14), if its ladder has opened it,
+falling back to smaller ones.
 So leasing the last Regional before a rival does is a real move. Rivals
 fall back as far as a Propeller, but never take the last one listed: it
 is the class every airline starts and first grows with, and rivals act
