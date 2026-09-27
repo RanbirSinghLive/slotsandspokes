@@ -5,6 +5,7 @@ import { demandAgainstSeats, marketSize } from '../../sim/marketSize';
 import { summarizeMarket } from '../../sim/marketSummary';
 import { formatLoadFactor, marketLoadFactor } from '../../sim/loadFactor';
 import { moneyOnTable } from '../../sim/attractiveness';
+import { describeShock } from '../../sim/shocks';
 import { rivalResponseChance } from '../../sim/rivalResponse';
 import { routeFixedCosts } from '../../sim/routeCosts';
 import { reliabilityDemandFactor, trailingMarketOtp } from '../../sim/routeOtp';
@@ -136,6 +137,10 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
       ),
     );
   }
+
+  // A shock running now (sim/shocks.ts), if it touches this route.
+  const shockLine = describeShock(state)?.onRoute(a, b);
+  if (shockLine) root.append(line(shockLine, 'inspector-line is-warn'));
 
   const rivalsView = describeRivalsView(state, a, b);
   if (rivalsView) root.append(rivalsView);

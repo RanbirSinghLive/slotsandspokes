@@ -388,6 +388,33 @@ Slices:
 
 ## Thread 4: shocks
 
+**Status: done** (all three slices, `sim/shocks.ts`). As drafted, with
+two additions: at most one shock at a time, none before day 60, **30
+calm days after each** (the first runs put a recession the day after a
+fuel spike ended, which read as arbitrary), and a 1-in-90 daily chance
+(about three a year). Fuel prices don't otherwise move
+(`FUEL_PRICE_MOVES` is off), so a spike sets the index. Legible in the
+ticker (start, with what it does and for how long; end), the alert
+strip, and the route view.
+
+Measured (six seeds, day 365):
+
+| Persona | Before | With shocks |
+|---|---|---|
+| steady median | $10M–$27M, no busts | $6.5M–$19.4M; one YYZ bust (day 94) |
+| sitter median | $2.4M–$6.9M | $1.9M–$5.3M |
+| starter | core survives | YUL 3/6 and BOS 1/6 bust: an unattended airline can't answer a shock |
+| reckless | all bust | all bust, before day 60, so before any shock |
+
+Steady is now in the $5M–$20M band: bruised, not broken. The reckless
+player dies before shocks can start, so "busts through shocks" can't be
+measured with it; a milder reckless player would be needed.
+
+Home ratings (thread 10) first ran 180 days and so counted shock busts:
+Montréal and O'Hare turned Hard on one unlucky seed each. They're now
+rated over the first 90 days, where the early valley is crossed or not:
+68 Standard, 33 Hard, 68 Brutal.
+
 **The idea.** Growth at any cost should be dangerous because the world
 isn't steady. A thin cash cushion and an over-extended fleet should be
 what a shock punishes.
@@ -633,7 +660,7 @@ predicted which starts fail: Philadelphia's LaGuardia market is 31,700
 riders a day and its starter still goes under by day 77, because its
 best routes are short hops where a fare barely covers a departure. So
 `npm run homes` (`headless/buildHomeDifficulty.ts`) plays the unattended
-starter from every home city for 180 days on two seeds and writes
+starter from every home city for 90 days (first 180; see thread 4) on two seeds and writes
 `data/home-difficulty.json`: Standard (lasted every game), Hard (went
 under in some, or not until day 60 on average), Brutal (went under in
 every game before that). 169 cities: 54 Standard, 44 Hard, 71 Brutal; it

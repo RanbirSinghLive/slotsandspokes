@@ -1,3 +1,4 @@
+import { inStormSeason, STORM_SEASON_MULTIPLIER, STORM_SEVERITY_MULTIPLIER } from './shocks';
 import { dayIndex } from './clock';
 import airportsData from '../../data/airports.json';
 import { greatCircleDistanceNm } from './geo';
@@ -137,8 +138,10 @@ export function rollDailyWeather(state: SimState, dayStartMinute: number): void 
   function rollDuration(): number {
     return Math.round(MIN_DURATION_MINUTES + roll() * (MAX_DURATION_MINUTES - MIN_DURATION_MINUTES));
   }
-  function rollSeverity(): WeatherSeverity {
-    return roll() < SEVERE_WEATHER_PROBABILITY ? 'severe' : 'moderate';
+  // Inside a storm season (sim/shocks.ts) storms close airports more often.
+  function rollSeverity(iata: string): WeatherSeverity {
+    const chance = SEVERE_WEATHER_PROBABILITY * (inStormSeason(state, iata) ? STORM_SEVERITY_MULTIPLIER : 1);
+    return roll() < chance ? 'severe' : 'moderate';
   }
 
   // Spread first, from whatever survived the expiry check above (i.e.
@@ -154,7 +157,7 @@ export function rollDailyWeather(state: SimState, dayStartMinute: number): void 
         // delay the next one over, which is how it actually works.
         state.weatherByAirport[neighbor] = {
           kind: source.kind,
-          severity: rollSeverity(),
+          severity: rollSeverity(neighbor),
           endsAtMinute: dayStartMinute + rollDuration(),
         };
       }
@@ -162,15 +165,19 @@ export function rollDailyWeather(state: SimState, dayStartMinute: number): void 
   }
 
   const dayOfYear = dayIndex(state, dayStartMinute) % 365;
-  const kind = seasonalKind(dayOfYear);
-  if (!kind) return; // outside both seasons — no new storms originate, but existing ones still expire/spread on schedule
+  const season = seasonalKind(dayOfYear);
 
   for (const airport of airports) {
     if (state.weatherByAirport[airport.iata]) continue;
-    if (roll() < DAILY_ORIGINATION_PROBABILITY) {
+    // Outside both seasons no new storms form, except inside a storm
+    // season (sim/shocks.ts), where they form more often in any season.
+    const storming = inStormSeason(state, airport.iata);
+    const kind = season ?? (storming ? 'thunderstorm' : null);
+    if (!kind) continue;
+    if (roll() < DAILY_ORIGINATION_PROBABILITY * (storming ? STORM_SEASON_MULTIPLIER : 1)) {
       state.weatherByAirport[airport.iata] = {
         kind,
-        severity: rollSeverity(),
+        severity: rollSeverity(airport.iata),
         endsAtMinute: dayStartMinute + rollDuration(),
       };
     }

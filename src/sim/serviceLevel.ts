@@ -1,6 +1,7 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { ALL_MARKET_PAIRS, potentialDailyDemand } from './demand';
 import { marketKey } from './schedule';
+import { recessionFactor } from './shocks';
 import type { SimState } from './state';
 
 /**
@@ -95,7 +96,8 @@ export function hungerByAirport(state: SimState, seatsByMarket: Map<string, numb
   }
   const hunger = new Map<string, number>();
   for (const [iata, basePotential] of basePotentialByAirport) {
-    const potential = basePotential * state.demandGrowthMultiplier;
+    // currentPotentialDemand()'s multiplier: growth, less any recession (sim/shocks.ts).
+    const potential = basePotential * state.demandGrowthMultiplier * recessionFactor(state);
     const served = potential > 0 ? (seatsByAirport.get(iata) ?? 0) / potential : 1;
     hunger.set(iata, 1 - Math.min(1, served / WELL_SERVED_SEATS_PER_POTENTIAL));
   }

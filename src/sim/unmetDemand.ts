@@ -2,6 +2,7 @@ import aircraftTypesData from '../../data/aircraft-types.json';
 import { ALL_MARKET_PAIRS } from './demand';
 import { actualDailyDemand, currentPotentialDemand } from './marketDemand';
 import { marketKey } from './schedule';
+import { recessionFactor } from './shocks';
 import type { SimState } from './state';
 
 /**
@@ -55,7 +56,7 @@ function playerSeatsByMarket(state: SimState): Map<string, number> {
  */
 export function unmetDemandInputs(state: SimState): string {
   const seats = [...playerSeatsByMarket(state)].map(([key, count]) => `${key}:${count}`).join(',');
-  return `${state.demandGrowthMultiplier}|${state.knownAirports.length}|${seats}`;
+  return `${state.demandGrowthMultiplier}|${recessionFactor(state)}|${state.knownAirports.length}|${seats}`;
 }
 
 /** Per-airport latent and spilled demand, passengers a day. */

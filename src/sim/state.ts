@@ -1,4 +1,5 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
+import type { Shock } from './shocks';
 import { startingSimMinute } from './clock';
 import type { ScheduleLeg } from './schedule';
 import { leaseAircraft } from './leasing';
@@ -302,6 +303,8 @@ export type SimState = {
   loadHistoryByMarket?: Record<string, { passengers: number[]; seats: number[] }>;
   /** The same for the whole network, so a route since closed still counts for the days it flew. */
   loadHistory?: { passengers: number[]; seats: number[] };
+  /** The shock running now, or the last one until another starts (sim/shocks.ts's activeShock() says which). Optional: older saves have none. */
+  shock?: Shock | null;
   /**
    * Week five's second HUD quality signal (see sim/nps.ts and
    * WEEK-FIVE.md's "Reputation" design): the running sum of every revenue

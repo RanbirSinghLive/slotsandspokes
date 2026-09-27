@@ -1,3 +1,4 @@
+import { activeShock, describeShock, shockEndedLine, type Shock } from '../sim/shocks';
 import { loadMissions } from '../sim/missions';
 import { moneyOnTable, RIVAL_MARGIN_SHARE } from '../sim/attractiveness';
 import { networkAirports } from '../sim/reach';
@@ -138,6 +139,27 @@ function entryReason(state: SimState, a: string, b: string): string {
 
 function money(amount: number): string {
   return `$${Math.round(amount).toLocaleString()}`;
+}
+
+/** The shock running at the last poll, by its start day and kind, or null. */
+let seenShock: Shock | null | undefined;
+
+/**
+ * Shocks (sim/shocks.ts): announced when one starts, with what it does and
+ * for how long, and again when it's over. The first poll only records what
+ * is running, so loading a save doesn't announce it again.
+ */
+function pollShockEvents(state: SimState): void {
+  const running = activeShock(state);
+  if (seenShock === undefined) {
+    seenShock = running;
+    return;
+  }
+  // The same shock (or still none) since the last poll: nothing to say.
+  if (seenShock?.startDay === running?.startDay && seenShock?.kind === running?.kind) return;
+  if (seenShock) pushEvent(state.simMinute, shockEndedLine(seenShock));
+  if (running) pushEvent(state.simMinute, describeShock(state)!.headline);
+  seenShock = running;
 }
 
 let hasSeenInitialRivals = false;
@@ -362,6 +384,7 @@ function pollPositionEvents(state: SimState): void {
 }
 
 export function updateTicker(state: SimState): void {
+  pollShockEvents(state);
   pollPositionEvents(state);
   pollAogEvents(state);
   pollRivalFareEvents(state);

@@ -1,3 +1,4 @@
+import { describeShock } from '../sim/shocks';
 import { scheduleProblems } from './panels';
 import { runwayAlertMessage } from './runway';
 import type { SimState } from '../sim/state';
@@ -43,6 +44,11 @@ function collectAlerts(state: SimState): Alert[] {
   for (const tail of state.groundedTails) {
     alerts.push({ key: `grounded:${tail}`, message: `${tail} is grounded — not enough crew to fly it today`, tab: 'crew' });
   }
+
+  // A shock running now (sim/shocks.ts): a condition of the whole world
+  // for weeks, so it sits in the strip for as long as it lasts.
+  const shock = describeShock(state);
+  if (shock) alerts.push({ key: shock.key, message: shock.headline, tab: 'fleet' });
 
   // Cash running out ends the game, so it goes first: of everything in
   // this strip, it's the one problem that can't be fixed after the fact.

@@ -3,6 +3,7 @@ import { actualDailyDemand, currentPotentialDemand } from './marketDemand';
 import { legsServingMarket, marketKey, recommendedFare } from './schedule';
 import { HUB_STYLES, hubStyleAt, type HubStyle } from './hubStyle';
 import { planRespace, applyRespace, workingCopy, type TurnBufferPlan } from './turnBuffer';
+import { recessionFactor } from './shocks';
 import type { SimState } from './state';
 import aircraftTypesData from '../../data/aircraft-types.json';
 
@@ -172,6 +173,7 @@ export function connectingFlowsAt(state: SimState, hub: string): ConnectingFlow[
   const inputs = [
     hubStyleAt(state, hub),
     state.demandGrowthMultiplier,
+    recessionFactor(state),
     spokes.map(([spoke, flights], i) => `${spoke}:${flights}:${established[i]}`).join(','),
     [...nonstop].sort().join(','),
   ].join('|');

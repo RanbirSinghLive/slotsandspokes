@@ -3,6 +3,7 @@ import { flightResult, type EconomyAircraftType } from './economy';
 import { MIN_TURN_MINUTES, legsServingMarket, marketKey, type ScheduleLeg } from './schedule';
 import { breaksCurfew, rotationStartingWith } from './curfew';
 import { rollDailyWeather, isAirportClosed } from './weather';
+import { rollDailyShocks } from './shocks';
 import { airportLoad } from './airports';
 import { connectingDemandOnMarket } from './hubs';
 import { rollTotalDelayMinutes, isOnTimeArrival } from './delays';
@@ -294,6 +295,8 @@ export function step(state: SimState): void {
     // Weather (sim/weather.ts) is a daily-scale event, not a per-minute
     // one — origination, spread, and expiry all happen once here rather
     // than being checked on every tick.
+    // Shocks first (sim/shocks.ts): the weather, fuel and demand rolls below read them.
+    rollDailyShocks(state);
     rollDailyWeather(state, state.simMinute);
 
     // Week four's competitor AI (sim/competitors.ts): once a day, each

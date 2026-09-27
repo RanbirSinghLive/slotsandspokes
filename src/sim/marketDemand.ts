@@ -2,6 +2,7 @@ import { MARKET_PAIR_TABLE, potentialDailyDemand } from './demand';
 import { marketKey } from './schedule';
 import { reliabilityDemandFactor, trailingMarketOtp } from './routeOtp';
 import { dailySeatsByMarket, hungerBoost, hungerByAirport } from './serviceLevel';
+import { recessionFactor } from './shocks';
 import type { SimState } from './state';
 
 /**
@@ -95,7 +96,16 @@ const DAILY_DEMAND_GROWTH = 0.003;
 
 /** Potential demand including however much global growth has accumulated so far. */
 export function currentPotentialDemand(state: SimState, origin: string, dest: string): number {
-  return potentialDailyDemand(origin, dest) * state.demandGrowthMultiplier;
+  return potentialDailyDemand(origin, dest) * potentialMultiplier(state);
+}
+
+/**
+ * What every market's gravity-model potential is multiplied by today:
+ * demand growth so far, and a recession's fall while one runs
+ * (sim/shocks.ts).
+ */
+export function potentialMultiplier(state: SimState): number {
+  return state.demandGrowthMultiplier * recessionFactor(state);
 }
 
 /**
@@ -189,10 +199,11 @@ export function rollDailyMarketDemand(state: SimState): void {
   // Worked out once, before any market moves, so every market is judged
   // on the same morning's service.
   const hunger = hungerByAirport(state, seatsByMarket);
+  const multiplier = potentialMultiplier(state);
 
   for (const { origin, dest, key, basePotential } of MARKET_PAIR_TABLE) {
     // currentPotentialDemand(), from the pair's precomputed potential.
-    const potential = basePotential * state.demandGrowthMultiplier;
+    const potential = basePotential * multiplier;
     const floor = Math.min(VIRGIN_MARKET_PDEW, potential);
     const current = state.marketDemand[key] ?? floor;
 

@@ -28,7 +28,14 @@ import { createPlayer } from './player';
  * it after a change to costs, fares or demand.
  */
 
-const DAYS = 180;
+/**
+ * How long each start is played. A new airline crosses the early valley,
+ * or doesn't, within about this: Philadelphia's and Madrid's starters go
+ * under between days 63 and 88. Later trouble (shocks, which start from
+ * sim/shocks.ts's FIRST_SHOCK_DAY, and rivals) is the mid-game's, not the
+ * start's, and would make a rating say more about luck than the city.
+ */
+const DAYS = 90;
 const SEEDS = [1, 2];
 const HARD_BUST_DAY = 60;
 const MINUTES_PER_DAY = 1440;
