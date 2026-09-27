@@ -1,10 +1,8 @@
 import { writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { homeOptions, type HomeDifficulty } from '../sim/homes';
-import { isInsolvent } from '../sim/insolvency';
-import { step } from '../sim/step';
-import { startHeadlessGame } from './newGame';
-import { createPlayer } from './player';
+import type { GameSpec } from './balanceGame';
+import { playGames, workersFor } from './parallel';
 
 /**
  * Builds data/home-difficulty.json: how hard each home city is to start
@@ -38,22 +36,6 @@ import { createPlayer } from './player';
 const DAYS = 90;
 const SEEDS = [1, 2];
 const HARD_BUST_DAY = 60;
-const MINUTES_PER_DAY = 1440;
-
-/** The day the unattended airline went under, or null if it lasted DAYS. */
-function bustDay(home: string, seed: number): number | null {
-  const player = createPlayer('starter');
-  const state = startHeadlessGame(home, seed, player);
-  for (let day = 1; day <= DAYS; day++) {
-    for (let minute = 0; minute < MINUTES_PER_DAY; minute++) {
-      step(state);
-      if (isInsolvent(state)) return day;
-    }
-    player.playDay(state);
-  }
-  return null;
-}
-
 function rate(busts: (number | null)[]): HomeDifficulty {
   const failed = busts.filter((day): day is number => day !== null);
   if (failed.length === 0) return 'Standard';
@@ -62,16 +44,21 @@ function rate(busts: (number | null)[]): HomeDifficulty {
   return 'Brutal';
 }
 
-const output = homeOptions().map((option) => {
-  const busts = SEEDS.map((seed) => bustDay(option.iata, seed));
-  const difficulty = rate(busts);
-  if (process.stdout.isTTY) process.stdout.write(`\r  ${option.iata} ${difficulty}      `);
-  return { iata: option.iata, difficulty, bustDays: busts };
+// Every home on every seed, played side by side (headless/parallel.ts):
+// the starter, the airline left to itself, for DAYS days.
+const homes = homeOptions();
+const specs: GameSpec[] = homes.flatMap((option) => SEEDS.map((seed) => ({ home: option.iata, seed, player: 'starter' as const, days: DAYS })));
+const played = await playGames(specs, workersFor(specs.length, process.argv));
+const output = homes.map((option, i) => {
+  const busts = SEEDS.map((_, s) => played[i * SEEDS.length + s].bustDay);
+  return { iata: option.iata, difficulty: rate(busts), bustDays: busts };
 });
-if (process.stdout.isTTY) process.stdout.write('\r' + ' '.repeat(30) + '\r');
 
 const outputPath = fileURLToPath(new URL('../../data/home-difficulty.json', import.meta.url));
 writeFileSync(outputPath, '[\n' + output.map((entry) => '  ' + JSON.stringify(entry)).join(',\n') + '\n]\n');
 const counts = (['Standard', 'Hard', 'Brutal'] as HomeDifficulty[]).map((d) => `${output.filter((e) => e.difficulty === d).length} ${d}`);
 console.log(`Wrote ${output.length} home cities: ${counts.join(', ')}.`);
-for (const entry of output) console.log(`  ${entry.iata}  ${entry.difficulty.padEnd(8)}  ${entry.bustDays.map((d) => (d === null ? 'lasted' : `bust d${d}`)).join(', ')}`);
+// The per-home list only when run on its own: the balance report runs this
+// too, and wants just the totals.
+const runDirectly = process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (runDirectly) for (const entry of output) console.log(`  ${entry.iata}  ${entry.difficulty.padEnd(8)}  ${entry.bustDays.map((d) => (d === null ? 'lasted' : `bust d${d}`)).join(', ')}`);

@@ -323,9 +323,10 @@ forecast doubled the steady report's time (to about 3m47s); thread 7.
   inside a forecast; now once per forecast. One steady year from Toronto
   9.6 s → 7.4 s, identical results. What remains is inherent (every leg
   booked each forecast day) and connecting flows' cache key.
-  **For the owner:** running the report's 180 games side by side on
-  several cores would cut its ~6–8 minutes by the core count. It isn't
-  done, since you turned down parallel runs before; say if you'd like it.
+- **Parallel runs (the owner said yes):** the balance report and the
+  home ratings play their games in worker threads, one per spare core,
+  longest first (`src/headless/parallel.ts`). Byte-identical results;
+  the full report 8 minutes → 3, `npm run homes` 48 s → 17 s.
 - **Docs:** HOW-IT-WORKS lost its history (the week-four competitor
   account rewritten as current state, week tags on headings, "Verified…"
   test notes, "used to" passages): 2,198 → 2,053 lines. CLAUDE.md is

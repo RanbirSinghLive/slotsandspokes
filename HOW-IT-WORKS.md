@@ -663,12 +663,17 @@ that was flown, and prints `GAME OVER on day N`.
 **`npm run balance`** (`src/headless/balance.ts`) is the report to read
 before and after a balance change: six homes (YUL, YYZ, BOS, PHL, YHZ,
 LHR) × six seeds, a year each, played by all five players (180 games,
-about 6 minutes). Per home it prints busts and the average day they happened,
+about 3 minutes). The games run side by side, one worker thread per
+spare core (`src/headless/parallel.ts`, `balanceWorker.ts`), each handed
+the next game as it finishes, longest first; every game is seeded and
+independent, so the results are exactly those of one at a time (checked:
+the CSV is byte-identical). `--workers 1` plays them one at a time. Per home it prints busts and the average day they happened,
 median, mean, worst and best cash, the planes, markets and flights a
 day of the airlines still flying, and the median ladder tiers climbed,
 and writes every game to `balance-output.csv` (git-ignored). The full
 report then re-rates every home (`npm run homes`), so the ratings can't
-go stale after a tuning change. `-- 180` changes the horizon;
+go stale after a tuning change (`npm run homes` uses the same workers:
+17 seconds for 338 starts). `-- 180` changes the horizon;
 `--player steady` runs one player and skips the re-rating. One seed can mislead badly: London's
 steady runs end anywhere from $325k to $90M.
 

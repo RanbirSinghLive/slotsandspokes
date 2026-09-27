@@ -1,11 +1,8 @@
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { isInsolvent } from '../sim/insolvency';
-import { marketKey } from '../sim/schedule';
-import { tiersClimbed } from '../sim/ladder';
-import { step } from '../sim/step';
-import { startHeadlessGame } from './newGame';
-import { createPlayer, PLAYER_KINDS, playerFromArgs, type PlayerKind } from './player';
+import { type GameSpec, type RunResult } from './balanceGame';
+import { playGames, workersFor } from './parallel';
+import { PLAYER_KINDS, playerFromArgs, type PlayerKind } from './player';
 
 /**
  * The balance report: every home in HOMES, over every seed in SEEDS,
@@ -14,6 +11,7 @@ import { createPlayer, PLAYER_KINDS, playerFromArgs, type PlayerKind } from './p
  *   npm run balance                   # every player, a year
  *   npm run balance -- 180            # a different horizon, in days
  *   npm run balance -- --player steady   # one player, and no re-rating of homes
+ *   npm run balance -- --workers 1       # one game at a time (default: a game per spare core)
  *
  * One seed can mislead: rival openings, weather and breakdowns differ
  * from seed to seed, and one run from London survived by $325k where
@@ -25,51 +23,8 @@ import { createPlayer, PLAYER_KINDS, playerFromArgs, type PlayerKind } from './p
  * PHL), a thin edge (YHZ) and a world hub (LHR).
  */
 
-const MINUTES_PER_DAY = 1440;
 const HOMES = ['YUL', 'YYZ', 'BOS', 'PHL', 'YHZ', 'LHR'];
 const SEEDS = [1, 2, 3, 4, 5, 6];
-
-type RunResult = {
-  home: string;
-  seed: number;
-  player: PlayerKind;
-  cash: number;
-  /** The day cash reached $0, or null if the airline lasted the run. */
-  bustDay: number | null;
-  planes: number;
-  markets: number;
-  flightsPerDay: number;
-  /** Ladder tiers climbed by the end (sim/ladder.ts): 0 is still a start-up. */
-  tiers: number;
-};
-
-/** One game, the same way run.ts plays it: stop at $0, checked every minute, as the browser does. */
-function playOne(home: string, seed: number, kind: PlayerKind, days: number): RunResult {
-  const player = createPlayer(kind);
-  const state = startHeadlessGame(home, seed, player);
-  let bustDay: number | null = null;
-  for (let day = 1; day <= days && bustDay === null; day++) {
-    for (let minute = 0; minute < MINUTES_PER_DAY; minute++) {
-      step(state);
-      if (isInsolvent(state)) {
-        bustDay = day;
-        break;
-      }
-    }
-    if (bustDay === null) player.playDay(state);
-  }
-  return {
-    home,
-    seed,
-    player: kind,
-    cash: state.cash,
-    bustDay,
-    planes: state.aircraft.length,
-    markets: new Set(state.schedule.map((leg) => marketKey(leg.origin, leg.dest))).size,
-    flightsPerDay: state.schedule.length,
-    tiers: tiersClimbed(state),
-  };
-}
 
 function money(amount: number): string {
   const sign = amount < 0 ? '-' : '';
@@ -128,22 +83,15 @@ const { kind, rest: args } = playerFromArgs(process.argv.slice(2));
 const players = passedPlayer ? [kind] : PLAYER_KINDS;
 const days = Number(args[0]) || 365;
 
-const results: RunResult[] = [];
+const specs: GameSpec[] = players.flatMap((player) => HOMES.flatMap((home) => SEEDS.map((seed) => ({ home, seed, player, days }))));
+const workerCount = workersFor(specs.length, process.argv);
 const started = Date.now();
-for (const player of players) {
-  for (const home of HOMES) {
-    for (const seed of SEEDS) {
-      results.push(playOne(home, seed, player, days));
-      // A progress line that rewrites itself, only where a terminal can show that.
-      if (process.stdout.isTTY) process.stdout.write(`\r  ${player}: ${home} seed ${seed}   `);
-    }
-  }
-}
+const results = await playGames(specs, workerCount);
 if (process.stdout.isTTY) process.stdout.write('\r' + ' '.repeat(40) + '\r');
 
 for (const player of players) printTable(player, results.filter((r) => r.player === player), days);
 console.log('');
-console.log(`  ${results.length} games in ${Math.round((Date.now() - started) / 1000)} s.`);
+console.log(`  ${results.length} games in ${Math.round((Date.now() - started) / 1000)} s, ${workerCount} at a time.`);
 
 
 const csv = [
