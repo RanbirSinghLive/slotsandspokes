@@ -61,17 +61,6 @@ body {
   max-width: calc(100vw - var(--panel-width) - 24px);
 }
 
-#competition-airline-select {
-  font-family: inherit;
-  font-size: inherit;
-  color: #cdd3e0;
-  background: #0a0c12;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  padding: 3px 6px;
-  margin-left: 8px;
-}
-
 #speed-controls,
 #view-toggle {
   display: flex;
@@ -137,12 +126,6 @@ body {
 /* The Game tab: New Game, Save and Load (ui/gameControls.ts). */
 #game-tab section {
   margin-bottom: 24px;
-}
-
-.game-tab-description {
-  margin: 0 0 8px;
-  color: #9aa3b8;
-  font-size: 12px;
 }
 
 #save-game-button,
@@ -1555,15 +1538,6 @@ body {
   font-size: 12px;
 }
 
-/* How much room is left before the cash floor ends the game — same
-   #ff8080 the rest of the app uses for "actually broken," since running
-   past it is now genuinely fatal rather than just uncomfortable. */
-.modal-warning {
-  margin: 0;
-  color: #ff8080;
-  font-size: 12px;
-}
-
 /* The game-over screen is the one modal you can't dismiss without
    starting over — a slightly harder red border marks that it's not just
    another routine pop-up, same #ff8080 the rest of the app already uses
@@ -1839,12 +1813,6 @@ body {
   color: #6b7694;
 }
 
-.dev-note {
-  margin: 0 0 12px;
-  color: #6b7694;
-  font-size: 12px;
-}
-
 .dev-totals {
   display: flex;
   gap: 20px;
@@ -2003,13 +1971,6 @@ body {
   color: #6b7694;
 }
 
-.fare-policy-description {
-  margin: 0 0 10px;
-  color: #9aa3b8;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
 #fare-policy-status {
   margin-top: 6px;
   color: #6b7694;
@@ -2062,13 +2023,6 @@ body {
   letter-spacing: 0.05em;
 }
 
-.ontime-note {
-  margin: 0 0 8px;
-  color: #9aa3b8;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
 #ontime-completion {
   margin-bottom: 12px;
   font-size: 13px;
@@ -2087,10 +2041,6 @@ body {
 
 #competition-tooltip-presence:empty {
   display: none;
-}
-
-#competition-tooltip-presence.presence-over {
-  color: #ff8080;
 }
 
 /* The ⓘ mark: a real button, so it's tappable and keyboard-focusable
@@ -2144,44 +2094,6 @@ body {
 
 #info-tooltip[hidden] {
   display: none;
-}
-
-/* Flavour text is real content but a returning player
-   scanning a list doesn't want eight paragraphs in the way, so every
-   flavour block collapses behind its own header. A <button> rather than a
-   <div> so it's keyboard-reachable and announces itself as interactive —
-   the whole point of hiding content is that you can find it again. */
-.expandable-header {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  width: 100%;
-  padding: 0;
-  margin: 0 0 4px;
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-}
-
-.expand-chevron {
-  flex: 1;
-  color: #4a5266;
-  font-size: 9px;
-}
-
-.expand-chevron::before {
-  content: '▸';
-}
-
-.expandable-header.expanded .expand-chevron::before {
-  content: '▾';
-}
-
-.expandable-header:hover .expand-chevron {
-  color: #9aa3b8;
 }
 
 /* Fare stances in the route view (ui/inspector/route.ts). */
