@@ -1,5 +1,5 @@
 import airportsData from '../../data/airports.json';
-import { projection } from './projection';
+import { projection, baselineScale } from './projection';
 import { dailyDeparturesAt, airportLevel, airportLoad } from '../sim/airports';
 import { slotFeesPerDayAt, slotsHeld } from '../sim/slots';
 import { worstPoolShareByBase } from '../sim/utilisation';
@@ -307,14 +307,27 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState, sho
     ctx.fillStyle = served ? MARKER_FILL : UNSERVED_FILL;
     ctx.fill();
 
-    pendingLabels.push({ iata: airport.iata, x, y, radius, served, departures, population: airport.population });
+    pendingLabels.push({
+      iata: airport.iata,
+      name: airport.name,
+      home: airport.iata === state.homeAirport,
+      x,
+      y,
+      radius,
+      served,
+      departures,
+      population: airport.population,
+    });
   }
 
-  placeLabels(ctx, pendingLabels);
+  placeLabels(ctx, pendingLabels, projection.scale() >= baselineScale * NAMES_FOR_ALL_ZOOM);
 }
 
 type PendingLabel = {
   iata: string;
+  /** The airport's name ("Düsseldorf", "London Heathrow"), shown beside the code where there's room. */
+  name: string;
+  home: boolean;
   x: number;
   y: number;
   radius: number;
@@ -326,6 +339,13 @@ type PendingLabel = {
 type Box = { left: number; top: number; right: number; bottom: number };
 
 const LABEL_HEIGHT_PX = 12;
+/**
+ * Zoomed in this far past the fit (projection.ts's baselineScale), every
+ * airport tries its name beside its code; below it, only home and the
+ * airports the airline flies to do, since those are the ones a player
+ * reads about in the panel and the ticker.
+ */
+const NAMES_FOR_ALL_ZOOM = 1.8;
 const LABEL_GAP_PX = 4;
 
 function boxesOverlap(a: Box, b: Box): boolean {
@@ -333,20 +353,23 @@ function boxesOverlap(a: Box, b: Box): boolean {
 }
 
 /**
- * Draw every airport's code without letting two of them overlap.
+ * Draw every airport's label without letting two of them overlap.
  *
  * This is a "greedy" label placer: the most important airports claim
- * their spot first (busiest for you, then biggest city), and each later
- * label tries right, left, above and below its dot, taking the first
- * spot that doesn't overlap a label — or a dot — already on the map. If
- * all four are taken, that code is simply not drawn at this zoom; the dot
- * is still there, still hoverable, and zooming in pulls the airports far
- * enough apart for the label to come back. Greedy placement isn't
- * optimal, but it's predictable and cheap, which is what a per-frame
- * renderer needs.
+ * their spot first (home, then busiest for you, then biggest city), and
+ * each later label tries right, left, above and below its dot, taking the
+ * first spot that doesn't overlap a label — or a dot — already on the
+ * map. A label tries its long form first, the code and the airport's name
+ * ("DUS Düsseldorf"), for home and the airports the airline flies to, or
+ * for every airport once zoomed in (`namesForAll`); where that doesn't
+ * fit, the code alone. If nothing fits, the label isn't drawn at this
+ * zoom; the dot is still there, still hoverable, and zooming in pulls the
+ * airports far enough apart for it to come back. So the map thins itself
+ * by importance as it zooms out. Greedy placement isn't optimal, but it's
+ * predictable and cheap, which is what a per-frame renderer needs.
  */
-function placeLabels(ctx: CanvasRenderingContext2D, labels: PendingLabel[]): void {
-  labels.sort((a, b) => b.departures - a.departures || b.population - a.population);
+function placeLabels(ctx: CanvasRenderingContext2D, labels: PendingLabel[], namesForAll: boolean): void {
+  labels.sort((a, b) => Number(b.home) - Number(a.home) || b.departures - a.departures || b.population - a.population);
 
   // Every dot is an obstacle too, so a label never sits on a neighbour's marker.
   const taken: Box[] = labels.map((l) => ({
@@ -356,24 +379,27 @@ function placeLabels(ctx: CanvasRenderingContext2D, labels: PendingLabel[]): voi
     bottom: l.y + l.radius,
   }));
 
+  const half = LABEL_HEIGHT_PX / 2;
   for (const label of labels) {
-    const width = ctx.measureText(label.iata).width;
-    const half = LABEL_HEIGHT_PX / 2;
+    const texts = label.home || label.served || namesForAll ? [`${label.iata} ${label.name}`, label.iata] : [label.iata];
     const offset = label.radius + LABEL_GAP_PX;
-    // Each candidate is the text's left edge and vertical centre.
-    const candidates: [number, number][] = [
-      [label.x + offset, label.y], // right (the long-standing default)
-      [label.x - offset - width, label.y], // left
-      [label.x - width / 2, label.y - offset - half], // above
-      [label.x - width / 2, label.y + offset + half], // below
-    ];
-    for (const [textX, textY] of candidates) {
-      const box = { left: textX, top: textY - half, right: textX + width, bottom: textY + half };
-      if (taken.some((other) => boxesOverlap(box, other))) continue;
-      taken.push(box);
-      ctx.fillStyle = label.served ? SERVED_LABEL_FILL : LABEL_FILL;
-      ctx.fillText(label.iata, textX, textY);
-      break;
+    placing: for (const text of texts) {
+      const width = ctx.measureText(text).width;
+      // Each candidate is the text's left edge and vertical centre.
+      const candidates: [number, number][] = [
+        [label.x + offset, label.y], // right (the long-standing default)
+        [label.x - offset - width, label.y], // left
+        [label.x - width / 2, label.y - offset - half], // above
+        [label.x - width / 2, label.y + offset + half], // below
+      ];
+      for (const [textX, textY] of candidates) {
+        const box = { left: textX, top: textY - half, right: textX + width, bottom: textY + half };
+        if (taken.some((other) => boxesOverlap(box, other))) continue;
+        taken.push(box);
+        ctx.fillStyle = label.served || label.home ? SERVED_LABEL_FILL : LABEL_FILL;
+        ctx.fillText(text, textX, textY);
+        break placing;
+      }
     }
   }
 }
