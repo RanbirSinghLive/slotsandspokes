@@ -43,9 +43,16 @@ export function playGames(specs: GameSpec[], workers: number): Promise<RunResult
   const order = specs.map((_, i) => i).sort((a, b) => (PLAYER_WEIGHT[specs[b].player] ?? 1) * specs[b].days - (PLAYER_WEIGHT[specs[a].player] ?? 1) * specs[a].days);
   return new Promise((resolve, reject) => {
     const results: RunResult[] = new Array(specs.length);
+    const pool: Worker[] = [];
     let next = 0;
     let done = 0;
     let running = workers;
+    // One failed game fails the run, and every worker is stopped, or the
+    // live ones would keep the process from ever exiting.
+    const fail = (error: unknown) => {
+      for (const each of pool) void each.terminate();
+      reject(error);
+    };
     for (let w = 0; w < workers; w++) {
       // A worker can't start from a .ts file directly, so it starts from
       // this one line: register tsx (as `npm run` does for this process),
@@ -54,6 +61,7 @@ export function playGames(specs: GameSpec[], workers: number): Promise<RunResult
         `import('tsx/esm/api').then(({ register }) => { register(); return import(${JSON.stringify(WORKER_URL)}); });`,
         { eval: true },
       );
+      pool.push(worker);
       const handOut = () => {
         if (next < order.length) {
           const index = order[next++];
@@ -68,7 +76,7 @@ export function playGames(specs: GameSpec[], workers: number): Promise<RunResult
         progress(++done, specs.length);
         handOut();
       });
-      worker.on('error', reject);
+      worker.on('error', fail);
       handOut();
     }
   });

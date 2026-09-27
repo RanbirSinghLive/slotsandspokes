@@ -582,10 +582,9 @@ function updateFormValidation(chain: Airport[], dest: Airport, state: SimState):
     formPdew.classList.remove('thin-market');
   }
 
-  // Week seven's headline: what this rotation costs in aeroplane, and what
-  // the base has left afterwards. Spare is reported in aircraft rather
-  // than minutes because that's the number that answers "is another
-  // airframe worth it" — see sim/utilisation.ts's BaseUtilisation.
+  // What this rotation costs in aeroplane, and what the base has left
+  // afterwards: spare in aircraft rather than minutes, because that's the
+  // number that answers "is another airframe worth it".
   const spareBefore = plan.spareMinutesBefore / USABLE_DAY_MINUTES;
   const spareAfter = (plan.spareMinutesBefore - plan.rotationMinutes) / USABLE_DAY_MINUTES;
   formUtilisation.textContent =

@@ -57,7 +57,7 @@ export function marketAppeal(state: SimState, a: string, b: string): number {
 }
 
 /** Rival flights a day on each market, by marketKey(). */
-export function rivalFlightsByMarket(state: SimState): Map<string, number> {
+function rivalFlightsByMarket(state: SimState): Map<string, number> {
   const byMarket = new Map<string, number>();
   for (const route of state.competitorRoutes) {
     const key = marketKey(route.origin, route.dest);

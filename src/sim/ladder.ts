@@ -452,6 +452,3 @@ export function milestoneById(id: string): Milestone | undefined {
   return allMilestones.find((milestone) => milestone.id === id);
 }
 
-export function tierOf(id: string): Tier | undefined {
-  return LADDER.find((tier) => tier.milestones.some((milestone) => milestone.id === id));
-}

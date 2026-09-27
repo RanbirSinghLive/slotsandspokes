@@ -80,10 +80,6 @@ let repeatingId: string | null = null;
 let repeatDelayTimer: ReturnType<typeof setTimeout> | null = null;
 let repeatIntervalTimer: ReturnType<typeof setInterval> | null = null;
 
-export function isRadialOpen(): boolean {
-  return current !== null;
-}
-
 export function hideRadial(): void {
   current?.onPreview?.(null);
   stopRepeat();

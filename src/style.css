@@ -28,17 +28,14 @@ body {
   box-sizing: border-box;
 }
 
-/* #fleet-tab, #ontime-panel and #executive-panel are the sidebar's tab-content
-   panes now (#sidebar-tab-content, inside <aside id="panel">) — siblings
-   that take the same slot there, whichever one isn't [hidden]. Without
-   this override, the ID selectors below (specificity 1-0-0) would beat
-   the browser's own default `[hidden] { display: none }` rule (0-1-0)
-   and the [hidden] attribute toggle in main.ts would silently do
-   nothing — same gotcha as #map used to share with them back when they
-   were full-screen panels instead. */
+/* #fleet-tab and #ontime-panel are the sidebar's tab-content panes
+   (#sidebar-tab-content, inside <aside id="panel">): siblings that take
+   the same slot, whichever one isn't [hidden]. Without this override, the
+   ID selectors below (specificity 1-0-0) would beat the browser's own
+   default `[hidden] { display: none }` rule (0-1-0), and the [hidden]
+   toggle in main.ts would silently do nothing. */
 #fleet-tab[hidden],
-#ontime-panel[hidden],
-#executive-panel[hidden] {
+#ontime-panel[hidden] {
   display: none;
 }
 
@@ -1843,50 +1840,6 @@ body {
   background: #3a4258;
   border: 1px solid #6b7694;
   color: #fff;
-}
-
-/* The Executive tab: the C-suite (ui/executives.ts) and the financial
-   runway forecast (ui/executive.ts), separate modules sharing one screen.
-   Week six: lives in the sidebar's tab system now — overflow-x so the
-   420px-wide sidebar can still scroll to see the full 520px-wide chart
-   canvas rather than clipping it. */
-#executive-panel {
-  overflow-x: auto;
-}
-
-#executive-panel h2 {
-  margin: 0 0 12px;
-  font-size: 11px;
-  font-weight: 400;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #6b7694;
-}
-
-#executive-chart {
-  display: block;
-  width: 520px;
-  height: 200px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-}
-
-#executive-summary {
-  margin-top: 12px;
-  font-size: 14px;
-}
-
-/* Same #ff8080 the rest of the app already uses for "worth worrying
-   about" — a zero-cash date approaching, not decorative. */
-#executive-summary.executive-summary--warning {
-  color: #ff8080;
-}
-
-#executive-delta {
-  margin-top: 4px;
-  color: #6b7694;
-  font-size: 12px;
 }
 
 /* Week six's Dev tab (ui/devTools.ts) — a live cost decomposition, built

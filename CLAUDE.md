@@ -101,7 +101,7 @@ src/ui/        DOM panels, tooltips, menus, save/load
 src/headless/  Node entry points: run, sweep, lease, and the data builders
 ```
 
-Find a mechanic's module by name (`crew.ts`, `slots.ts`, `competitors.ts`…)
+Find a mechanic's module by name (`crews.ts`, `slots.ts`, `competitors.ts`…)
 rather than keeping a file list here.
 
 ---

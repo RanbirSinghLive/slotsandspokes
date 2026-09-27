@@ -1,15 +1,11 @@
 import type { SimState } from './state';
 
 /**
- * Week five's runway forecast (see WEEK-FIVE.md): a rolling window of
- * recent daily closing-cash balances is enough to project the current
- * trend forward, no new simulation logic beyond keeping that window
- * around — the same "UI reads what the sim already computes" principle
- * the PDEW/CAP work and the On-Time panel both already follow, just with
- * one small new field (`SimState.cashHistory`) to read from.
+ * The cash runway: daily closing balances (`SimState.cashHistory`, the
+ * last CASH_HISTORY_MAX_DAYS) projected forward in a straight line, for
+ * the Runway card and warning (ui/runway.ts) and the Money view's chart.
  */
 export const CASH_HISTORY_MAX_DAYS = 30;
-export const FORECAST_DAYS_AHEAD = 14;
 
 /**
  * Called once per simulated day, from step.ts's day-rollover — at the very
@@ -26,55 +22,9 @@ export function recordDailyCashHistory(state: SimState): void {
   }
 }
 
-export type CashForecast = {
-  /** Recent daily closing balances, oldest first — a direct copy of `state.cashHistory`. */
-  history: number[];
-  /** Average day-over-day change across the whole history window. */
-  dailyDelta: number;
-  /** Projected cash for each of the next FORECAST_DAYS_AHEAD days, starting from *today's* live cash. */
-  projected: number[];
-  /**
-   * Days until Cash reaches zero at the current trend — null if the trend
-   * isn't heading toward zero at all (flat or rising) or if there isn't
-   * enough history yet to trust a slope. It answers "if
-   * nothing changes," not "when does the game actually end."
-   */
-  daysUntilZero: number | null;
-};
-
-/**
- * A straight-line projection from the history window's average daily
- * delta — deliberately the simplest model that could work, same
- * "deliberately crude" spirit as every other derived number in sim/.
- * Needs at least two history points to have a slope at all; with fewer,
- * `dailyDelta` is 0 and the projection is a flat line at today's cash.
- */
-export function computeCashForecast(state: SimState): CashForecast {
-  const history = state.cashHistory;
-
-  let dailyDelta = 0;
-  if (history.length >= 2) {
-    dailyDelta = (history[history.length - 1] - history[0]) / (history.length - 1);
-  }
-
-  const projected: number[] = [];
-  let running = state.cash;
-  for (let i = 0; i < FORECAST_DAYS_AHEAD; i++) {
-    running += dailyDelta;
-    projected.push(running);
-  }
-
-  let daysUntilZero: number | null = null;
-  if (history.length >= 2 && dailyDelta < 0 && state.cash > 0) {
-    daysUntilZero = Math.ceil(state.cash / -dailyDelta);
-  }
-
-  return { history, dailyDelta, projected, daysUntilZero };
-}
-
 /**
  * How many days of the last week the always-visible runway warning looks
- * at. Shorter than the forecast's 30-day window on purpose: the warning's
+ * at. Shorter than the 30 days of history on purpose: the warning's
  * job is to react to what the player just changed. Averaged over a month,
  * a route cut last Tuesday would keep the alarm ringing for weeks after
  * the bleeding stopped.
@@ -89,8 +39,8 @@ export type CashRunway = {
 };
 
 /**
- * "If the last week repeats, when does Cash run out?" — the same
- * straight-line idea as computeCashForecast(), over RUNWAY_WINDOW_DAYS.
+ * "If the last week repeats, when does Cash run out?" A straight line
+ * through the closing balances over RUNWAY_WINDOW_DAYS.
  * Null until there are two closing balances to draw a line through.
  */
 export function cashRunway(state: SimState): CashRunway | null {

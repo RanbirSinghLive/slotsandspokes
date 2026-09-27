@@ -43,7 +43,7 @@ export function cashNeededToLease(leasePricePerDay: number): number {
 /**
  * Aircraft come from the lessor second-hand, and age is the trade the
  * player makes: an old airframe leases cheaply but is late more often
- * (sim/delays.ts's age cause), breaks down more often (sim/crew.ts's AOG
+ * (sim/delays.ts's age cause), breaks down more often (sim/aog.ts's
  * roll) and passengers like it less (sim/nps.ts). The rate card in
  * data/lease-rates.json is the price of a *new* airframe; age takes a
  * straight-line discount off it.

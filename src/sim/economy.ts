@@ -91,14 +91,11 @@ export const RECAPTURE_RATE = 0.4;
  * passengers it carries. Exported so a market's summary can show its
  * expected cost without duplicating this formula.
  *
- * Week six's fuel price mechanic (sim/fuel.ts) splits costPerBlockHour
- * into a fixed slice (crew, maintenance, overhead — still blended into
- * that one flat figure, not modeled separately) and a fuel-sensitive
- * slice (FUEL_SHARE_OF_BLOCK_HOUR_COST), rather than touching the
- * aircraft-type data itself: `fuelPriceIndex` (1.0 = baseline) multiplies
- * directly into that fuel slice, and `fuelEfficiencyMultiplier` (1.0 =
- * no mitigation adopted, lower is better) multiplies on top of it — the
- * hook a future tech tree's fuel-efficiency initiatives can turn down.
+ * costPerBlockHour splits into a fuel-sensitive slice
+ * (FUEL_SHARE_OF_BLOCK_HOUR_COST) and the rest (flying crews,
+ * maintenance, overhead): `fuelPriceIndex` (1.0 = baseline, sim/fuelPrice.ts)
+ * multiplies the fuel slice, and `fuelEfficiencyMultiplier` (lower is
+ * better; winglet retrofits, sim/innovations.ts) multiplies on top.
  */
 export function legCost(
   blockMinutes: number,

@@ -132,61 +132,6 @@ export function aircraftUtilisation(state: SimState, tail: string): AircraftUtil
   };
 }
 
-export type BaseUtilisation = {
-  base: string;
-  aircraft: AircraftUtilisation[];
-  /** Total usable minutes the based fleet offers — one full day each. */
-  capacityMinutes: number;
-  usedMinutes: number;
-  share: number;
-  spareMinutes: number;
-  /**
-   * How much of another aircraft the spare capacity amounts to. The
-   * headline number for "is it worth another airframe?" — 0.05 says you
-   * are paying for 5% of a plane you aren't using, 0.9 says you nearly
-   * have room for a whole extra rotation.
-   */
-  spareAircraft: number;
-};
-
-/**
- * Utilisation pooled by base, which is the level the decision actually
- * lives at. Frequencies belong to a base rather than to a named tail
- * (agreed directly): per-tail figures can't answer "have I got a spare
- * aeroplane's worth of gaps scattered across the fleet", and that is the
- * question the whole pivot exists to make answerable.
- *
- * An aircraft with no base assigned is pooled under `null` and reported
- * separately — it can't fly a rotation until it has one.
- */
-export function utilisationByBase(state: SimState): BaseUtilisation[] {
-  const byBase = new Map<string, AircraftUtilisation[]>();
-
-  for (const aircraft of state.aircraft) {
-    const key = aircraft.baseAirport ?? '';
-    const list = byBase.get(key) ?? [];
-    list.push(aircraftUtilisation(state, aircraft.tail));
-    byBase.set(key, list);
-  }
-
-  return [...byBase.entries()]
-    .map(([base, list]) => {
-      // Grounded planes (AOG) add no capacity until they're back.
-      const capacityMinutes = list.filter((a) => !isGrounded(state, a.tail)).length * USABLE_DAY_MINUTES;
-      const usedMinutes = list.reduce((total, a) => total + a.minutes, 0);
-      return {
-        base,
-        aircraft: list,
-        capacityMinutes,
-        usedMinutes,
-        share: capacityMinutes > 0 ? usedMinutes / capacityMinutes : 0,
-        spareMinutes: capacityMinutes - usedMinutes,
-        spareAircraft: (capacityMinutes - usedMinutes) / USABLE_DAY_MINUTES,
-      };
-    })
-    .sort((a, b) => b.usedMinutes - a.usedMinutes);
-}
-
 /**
  * One of the four aircraft-class pools: every plane of a class, optionally
  * only those based at one airport. This is the level a player decides at
@@ -382,26 +327,4 @@ export function utilisationProblems(state: SimState): string[] {
     }
   }
   return problems;
-}
-
-/**
- * Where an aircraft's legs actually start from, used to suggest a base
- * for airframes acquired before bases were a concept. The most common
- * origin among its legs; null if it flies nothing.
- */
-export function impliedBase(state: SimState, tail: string): string | null {
-  const counts = new Map<string, number>();
-  for (const leg of state.schedule) {
-    if (leg.tail !== tail) continue;
-    counts.set(leg.origin, (counts.get(leg.origin) ?? 0) + 1);
-  }
-  let best: string | null = null;
-  let bestCount = 0;
-  for (const [origin, count] of counts) {
-    if (count > bestCount) {
-      best = origin;
-      bestCount = count;
-    }
-  }
-  return best;
 }

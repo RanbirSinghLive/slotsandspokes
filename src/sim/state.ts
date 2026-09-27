@@ -115,24 +115,19 @@ export type ActiveFlight = {
    * in the air. Together with `origin`/`dest` (to look up who's competing)
    * and `legsServingMarket` (recomputed fresh at arrival, since adding a
    * frequency mid-flight *should* immediately split demand differently),
-   * that's everything sim/economy.ts needs. Flights saved before marketing
-   * was removed also carry a `marketingSpend`, which nothing reads.
+   * that's everything sim/economy.ts needs.
    */
   fare: number;
 };
 
-/**
- * Week two's "Pricing" and "Commercial" levers, one entry per *market*
- * (an origin-dest pair, either direction — see `marketKey()`), not per
- * individual scheduled leg. Fare is deliberately a route-level decision:
- * a market with two daily frequencies still has exactly one fare, not two
- * independently adjustable ones, to keep the game's decision space
- * manageable. Saves from before marketing was removed also carry a
- * `marketingSpend` here, which nothing reads.
- */
 /** A way of pricing a market against its rivals (sim/pricing.ts). */
 export type FareStance = 'undercut' | 'match' | 'premium';
 
+/**
+ * One market's settings (an origin-dest pair, either direction, keyed by
+ * `marketKey()`): its fare and how that fare is set. One fare per market,
+ * however many flights fly it.
+ */
 export type RouteSettings = {
   fare: number;
   /**

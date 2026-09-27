@@ -66,7 +66,8 @@ export function rollRivalCapacityResponse(state: SimState, dayStartMinute: numbe
   const markets = [...new Set(state.schedule.map((leg) => marketKey(leg.origin, leg.dest)))].sort();
   for (const key of markets) {
     // Always drawn, whatever happens, so the number of random draws a day
-    // doesn't depend on which markets happen to qualify (see sim/crew.ts).
+    // doesn't depend on which markets happen to qualify: a balance
+    // comparison stays on the same random stream either way.
     const [roll, next] = nextRandom(state.rngSeed);
     state.rngSeed = next;
     const [a, b] = key.split('-');

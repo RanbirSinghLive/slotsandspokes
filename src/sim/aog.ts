@@ -142,8 +142,8 @@ export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
 
   for (const aircraft of state.aircraft) {
     // Always draw, whatever the outcome below, so how many random numbers a
-    // day consumes doesn't depend on who happens to be grounded — see
-    // sim/crew.ts's note on why that keeps balance comparisons honest.
+    // day consumes doesn't depend on who happens to be grounded, so a
+    // balance comparison stays on the same random stream either way.
     const [roll, afterRoll] = nextRandom(state.rngSeed);
     const [durationRoll, afterDuration] = nextRandom(afterRoll);
     state.rngSeed = afterDuration;

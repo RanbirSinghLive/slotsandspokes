@@ -40,7 +40,6 @@ import { refreshInspectorForNewDay, renderInspector } from './ui/inspector/inspe
 import { isHubPlannerOpen } from './ui/hubPlanner';
 import { setupFarePolicy, updateFarePolicy } from './ui/farePolicy';
 import { setupOnTimePanel, updateOnTimePanel } from './ui/onTime';
-import { setupExecutivePanel, updateExecutivePanel } from './ui/executive';
 import { setupDevPanel, updateDevPanel } from './ui/devTools';
 import { setupInfoTooltips } from './ui/infoTooltip';
 import { updateTicker } from './ui/ticker';
@@ -74,7 +73,6 @@ renderScheduleWarnings(scheduleProblems(state));
 setupRouteBuilder(state, () => switchToSidebarTab('fleet'));
 setupFarePolicy(state);
 setupOnTimePanel();
-setupExecutivePanel();
 setupDevPanel();
 setupInfoTooltips();
 setupGameOver();
@@ -171,7 +169,6 @@ function syncCompetitorAirlineDropdown(): void {
 // inspector instead (ui/inspector/).
 const fleetTabEl = document.querySelector<HTMLDivElement>('#fleet-tab')!;
 const onTimePanelEl = document.querySelector<HTMLDivElement>('#ontime-panel')!;
-const executivePanelEl = document.querySelector<HTMLDivElement>('#executive-panel')!;
 const devPanelEl = document.querySelector<HTMLDivElement>('#dev-panel')!;
 const gameTabEl = document.querySelector<HTMLDivElement>('#game-tab')!;
 const sidebarTabButtons = document.querySelectorAll<HTMLButtonElement>('#sidebar-tabs button');
@@ -260,7 +257,6 @@ let latestFractionalMinute = state.simMinute;
 type SidebarTab =
   | 'fleet'
   | 'ontime'
-  | 'executive'
   | 'dev'
   | 'game';
 let sidebarTab: SidebarTab = 'fleet';
@@ -621,14 +617,12 @@ function switchToSidebarTab(tab: SidebarTab): void {
   sidebarTab = tab;
   fleetTabEl.hidden = tab !== 'fleet';
   onTimePanelEl.hidden = tab !== 'ontime';
-  executivePanelEl.hidden = tab !== 'executive';
   devPanelEl.hidden = tab !== 'dev';
   gameTabEl.hidden = tab !== 'game';
 
   syncSidebarTabButtons();
 
   if (tab === 'ontime') updateOnTimePanel(state);
-  if (tab === 'executive') updateExecutivePanel(state);
   if (tab === 'game') updateGameControls();
 
   render();
