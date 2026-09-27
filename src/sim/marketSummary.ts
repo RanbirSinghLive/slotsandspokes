@@ -51,7 +51,19 @@ export type MarketSummary = {
  * render/mapmodes.ts's profitability mapmode calls the identical formula
  * instead of a second copy of it.
  */
-export function summarizeMarket(origin: string, dest: string, state: SimState, routeSettings: RouteSettings): MarketSummary {
+export function summarizeMarket(
+  origin: string,
+  dest: string,
+  state: SimState,
+  routeSettings: RouteSettings,
+  /**
+   * Connecting passengers by direction ("A>B"), to reuse across calls
+   * where they can't change: a forecast re-summarising one market day
+   * after day on a fixed schedule (sim/fareForecast.ts). Filled in as
+   * they're worked out. Left out, each call works them out afresh.
+   */
+  connectingByDirection: Map<string, number> = new Map(),
+): MarketSummary {
   // Sorted by depart time to approximate the same chronological order
   // step.ts's arrivals actually process spill-and-recapture in — a
   // hypothetical full-day preview, not a live read of `state`'s own
@@ -74,7 +86,6 @@ export function summarizeMarket(origin: string, dest: string, state: SimState, r
   let previewSpillover = 0;
   // Connecting passengers per direction, asked for once rather than once
   // per flight: the answer is the same for every leg flying that way.
-  const connectingByDirection = new Map<string, number>();
   const connectingFor = (from: string, to: string) => {
     const direction = `${from}>${to}`;
     let connecting = connectingByDirection.get(direction);

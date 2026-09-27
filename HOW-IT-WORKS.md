@@ -254,14 +254,6 @@ output — and, per the note above, also exactly the quantity
 `knockOnDelayMinutes()` now reads to push that *next* leg's own arrival
 delay a bit further still.
 
-Verified in-browser after the rework: bought the oldest available
-1900D (C-FQAE, 21 years) and flew it alone on a short shuttle for 20
-simulated days at 20x speed — On-time (the HUD stat, departure-side)
-settled at 72%, and the Fleet panel's live status caught one specific
-flight 77 minutes late in the air, consistent with a 21-year-old
-airframe's expected age-driven severity range. Zero console errors
-across the run.
-
 A full-year run (3 aircraft, several seeds) never produced a "stranded"
 aircraft — a tail sitting at the wrong airport for its next scheduled
 leg — because the schedule's turn buffers (46–59 minutes) comfortably
@@ -280,7 +272,7 @@ since a "running" performance stat that blanked out every midnight
 would defeat the point — it sits next to `Cash` in the HUD for exactly
 that reason, both being the sidebar's two lifetime numbers.
 
-## The On-Time panel (`src/ui/onTime.ts`) — week four
+## The On-Time panel (`src/ui/onTime.ts`)
 
 A sidebar tab answering two questions the HUD's single lifetime On-time
 stat can't: which *routes* are actually unreliable, and *why* flights are
@@ -400,20 +392,6 @@ doesn't care which way you're flying" simplification this model
 already had, just carried through consistently rather than inventing a
 new directional distinction nothing else respects.
 
-Verified directly against `flightResult()`: a thin slice fed an
-artificial 20-passenger pool topped up to exactly its 14-seat ceiling,
-drawing precisely 13 and leaving 7 behind — the boundary math is
-exact. A throwaway multi-day script confirmed the pool genuinely
-accumulates during real `step()` runs on the fixed headless network
-(YOW-YUL and YUL-YYZ built up 850+ pax of unclaimed spill), even though
-that network's total cash came back byte-for-byte unchanged — every
-leg on every one of its saturated markets turned out to already be
-seat-capped in *both* directions, so there was nothing to recapture
-into. A legitimate outcome for an oversaturated fixed network, caught
-by checking the pool's actual activity rather than trusting the
-top-line number alone. Deterministic across repeated 60-day headless
-runs.
-
 `legsServingMarket` (`sim/schedule.ts`) counts every currently-scheduled
 leg between this pair, either direction — the route's total daily demand
 (`sim/demand.ts`) is split evenly across all of them, so a second daily
@@ -442,24 +420,6 @@ sits in between. `economy.ts` still only sees the single blended number
 `bookingShare()` returns — it applies one flat fare to everyone, since no
 fare-by-segment lever exists yet, so the segments differ only in how they
 each react to that same fare and frequency, not in what they pay.
-
-Verified via the headless runner: the Ottawa-Montréal-Toronto corridor
-still fills to the old 59-pax ceiling regardless (plenty of demand there
-to absorb any of this), while every Atlantic Canada leg the fleet flies
-today is demand-starved *and* trimmed further by booking share — YQM-YYG
-down to 3 pax, YYG-YFC to a single passenger, on a 78-seat aircraft.
-Total daily revenue is $51,430 (down slightly from $51,615's single-
-segment v1, $128,760 before any of week two's layers existed), and some
-days still finish with a negative margin. Confirmed to match exactly
-between the headless runner and a live browser run at the same simulated
-moment. Segmenting demand this way also made the *aggregate* price
-sensitivity much sharper than the single-segment version — bookingShare
-at a hypothetical $300 fare drops to ~0.57 now versus ~0.73 before, since
-half of all demand (leisure) is genuinely price-sensitive — which is
-exactly the lever the pricing loop (below) now lets the player actually
-pull. Frequency's effect (from the previous milestone) is unchanged:
-adding a daily frequency to a market still measurably raises its booking
-share today, no pricing lever required to see it.
 
 **Competitors** (`data/competitors.json`, week two's "Competition"
 layer) started on four markets — three on the busy Ottawa-Montréal-
@@ -549,7 +509,7 @@ code path needed. `revenue` is unaffected (pax count doesn't depend on
 delay), so this is also why the economy no longer produces the same
 margin every day — see Headless runner, below.
 
-## O-D demand (`src/sim/demand.ts`) — week two, layer 1
+## O-D demand (`src/sim/demand.ts`)
 
 `dailyDemand(originIata, destIata)` estimates how many people want to
 travel between two airports on an average day — a gravity model, the
@@ -728,13 +688,9 @@ and, when it's `'map'`, two independent booleans (`demandOverlayOn`,
 of the base map that frame. `basemap.ts` is the one layer always drawn
 first, every time the map panel is visible.
 
-**This is a week-four rework.** Demand and Competition used to be two
-more entries in an exclusive `View` enum alongside Ops — full-screen
-modes you had to leave the map to check, losing the ability to draw a
-route while looking at either. They're overlays now: independent on/off
-toggles (two buttons in the Maps dropdown, no longer exclusive-view
-buttons) that layer on top of the one persistent map panel instead of
-replacing it.
+Demand and Competition are overlays: independent on/off toggles (two
+buttons in the Maps dropdown) layered on the one persistent map panel,
+so a route can be drawn while either is showing.
 
 **The map panel** — draw order back to front, every frame:
 
@@ -799,22 +755,13 @@ replacing it.
    to try the code and name ("DUS Düsseldorf"), as does every airport
    zoomed in past 1.8× the fit; where a name doesn't fit, the code alone;
    where nothing fits, no label at that zoom. So the map thins itself by
-   importance as it zooms out. Both `demand.ts` and
-   `competition.ts` used to draw their own airports (population-sized
-   circles for Demand, a plain call to the same `drawAirports()` for
-   Competition) back when each was a full-screen exclusive view with
-   nothing else on screen to share airports with; layering them
-   simultaneously would have doubled every airport dot, so both stopped
-   drawing airports themselves in the week-four rework.
+   importance as it zooms out. The overlays never draw airports
+   themselves, so layering them never doubles a dot.
 7. `weather.ts`'s `drawWeatherEffects()` — flash/particle effects at
    airports with active weather (see "Weather," below).
 8. The route-builder's own preview (below).
 
-**One unified hover system**, not two. Competition used to have its own
-separate hover system (`findCompetitionHover`, `showCompetitionTooltip`)
-that only ran in that one exclusive mode; the route builder's own
-PDEW/CAP tooltip (see "Route builder," below) only ran while a route was
-armed. Now one `mousemove` handler runs whenever `panelView === 'map'`,
+**One hover system.** One `mousemove` handler runs whenever `panelView === 'map'`,
 with a clear priority: if the route builder reports it handled the move
 (a route is armed), its own PDEW/CAP/range tooltip wins, and the general
 one is explicitly hidden to avoid stacking two tooltips over the same
@@ -877,106 +824,32 @@ The accumulator loop (`main.ts`) turns real frame time into whole simulated
 minutes (`step()` calls) plus a continuous fractional minute for rendering,
 per the pattern in CLAUDE.md's "Time" section.
 
-## The competitor AI (`src/sim/competitors.ts`) — week four
+## Competitor routes (`src/sim/competitors.ts`)
 
-*The week-four account of how rivals first came alive. Parts are now
-superseded: new airlines do enter mid-game, and rivals respond to fares
-and to premiums. The current behaviour is in **Rival pressure**, below.*
+Each game holds its own mutable copy of every rival route in
+`state.competitorRoutes` (`CompetitorOffering`): airline, two-letter
+code, ends, daily flights, today's fare and the fare it drifts back to,
+when it opened, the slot fees it pays and its losing run. The seed
+routes (`data/competitors.json`, loaded by `loadCompetitorRoutes()`)
+start as incumbents: priced 10% under the going rate, and stamped with
+`PRE_EXISTING_OPENED_AT_MINUTE` (a large finite negative number, not
+`-Infinity`, which JSON would turn into `null`) so they never read as
+news. How rivals open, grow, price, respond and close is in **Rival
+pressure**, below.
 
-Competitor service was static from week two through week three — fixed
-routes and fares in `data/competitors.json`, loaded once, never
-touched again; `SimState` had no competitor field at all, and
-`sim/choiceModel.ts` read the frozen JSON import directly. Requested
-directly: make competitors actually open new routes while a game is
-running.
+Everything that books passengers reads the live list: the choice model
+(`sim/choiceModel.ts`), `flightResult()` and the market summaries take
+`state.competitorRoutes`, so a route opened today takes bookings today.
+The Competition overlay (`render/competition.ts`) rebuilds its lookups
+from the same list each frame.
 
-**The data moved.** `CompetitorOffering` (the type) and
-`loadCompetitorRoutes()` (a fresh per-game copy) now live in
-`sim/competitors.ts`,
-not `sim/choiceModel.ts`. Every seed route gets a new
-`openedAtMinute` field, stamped with a sentinel
-(`PRE_EXISTING_OPENED_AT_MINUTE`, a large finite negative number — not
-`-Infinity`, since `JSON.stringify(-Infinity)` produces `null` and
-would silently break `SimState`'s JSON-round-trip requirement) so the
-render layer's "just opened" flash (below) never mistakes an original
-route for news. `SimState.competitorRoutes` holds each game's own
-mutable copy — a new required field, another `ui/save.ts` version bump
-(v5 → v6).
-
-**The AI itself**, `rollCompetitorRouteOpenings(state, dayStartMinute)`,
-runs once a day from `step.ts`'s day-rollover, right alongside
-`rollDailyWeather()` — same cadence, same reasoning: this is a day-scale
-event, not worth re-checking every minute. The roster (which airline
-*names* can act) is derived from whichever airlines already have at
-least one route, so this never invents a fourth carrier — only the
-three from `data/competitors.json` can expand. Each gets an independent
-3%-per-day roll (`nextRandom()`, threading `state.rngSeed` forward, same
-determinism rule as every other random model in `sim/`); on a hit, it
-picks one of its not-yet-served markets via a demand-weighted random
-draw (`dailyDemand()` as the weight, so bigger markets are more likely
-targets without it being deterministic about always taking the single
-biggest one) and adds a new route at frequency 1, priced at this map's
-own `recommendedFare()` — the same default a player's own new route
-gets. Verified with a throwaway 120-simulated-day script (`nextRandom()`,
-deleted after, not committed): the seed 4 routes grew to 9, each
-correctly weighted toward the busiest (golden-triangle) pairs, no
-airline ever duplicating a market it already served.
-
-**Wiring this into the choice model was the bigger change.**
-`sim/choiceModel.ts`'s `bookingShare()`/`trafficShare()` used to read a
-fixed import directly; both now take a `competitorRoutes` parameter
-instead, and `sim/economy.ts`'s `flightResult()` gained the same
-parameter, threaded down from every caller (`step.ts`'s arrival
-handling, `ui/commercial.ts`'s market summary) as `state.competitorRoutes`.
-Without this, a newly-opened competitor route would only ever be a
-cosmetic line on the map — this is what actually makes it steal real
-booking share and market share from the player the moment it opens.
-`render/competition.ts` needed the equivalent fix on the drawing side:
-its `competitorRoutesByAirline`/`allCompetitorMarketKeys` used to be
-built once at import time from the static data (the exact "snapshot
-never reflects reality again" bug `ownRoutesFrom()`'s own comment
-already documented and fixed for the player's *own* routes back in
-week two) — now recomputed fresh from `state.competitorRoutes` on every
-call, so the Competition overlay and its hover tooltips pick up an
-AI-opened route immediately, no reload needed.
-
-**The map flash.** `CompetitorOffering.openedAtMinute` is a plain
-`state` fact, but *when* to actually flash it on screen is a real-time
-question, not a sim-time one — a fixed sim-minute window would flicker
-past instantly at 20x speed and linger too long at 1x.
-`render/competition.ts`'s `drawNewCompetitorRouteFlashes()` tracks
-"have I already shown this route's opening" using wall-clock
-`performance.now()` timestamps kept entirely in the render layer —
-never written to `state`, the same category of transient, UI-owned
-bookkeeping as `ui/rotationBoard.ts`'s drag state or this file's own
-`latestFractionalMinute` — by diffing `state.competitorRoutes` against
-what it's already seen. The very first call just records whatever's
-already there (so a fresh page load or a resumed save doesn't flash
-every pre-existing route at once); anything that shows up after that is
-genuinely new. A newly-discovered route gets a pulsing, fading amber
-arc (`#ffd166`, the same "new/highlighted" color already used for
-"served by both" in the overlay above) plus a small "Airline opens
-X–Y" label, for about 4 real seconds, drawn unconditionally on the map
-panel — not gated behind the Competition or Demand overlay toggles,
-since a rival opening a route is news worth noticing even if you
-weren't specifically looking at the competitive layer. `main.ts`'s
-`render()` gained an optional `nowMs` parameter (defaulting to
-`performance.now()`, so its many incidental call sites — button
-clicks, panel switches — don't need to change) so the main `tick()`
-loop can pass through the exact `requestAnimationFrame` timestamp it
-already has, rather than the flash animation reading a second, slightly
-different clock.
-
-Verified live in the browser (temporarily boosting the daily open
-probability to make the test fast, reverted before committing): two
-competitor routes opened within seconds of a fresh game starting, each
-correctly drawing a pulsing amber arc with a fading label that
-disappeared after ~4 seconds; the Competition overlay's route count
-jumped immediately to match, with no page reload; the airline filter
-dropdown still listed exactly the original three carriers. Zero console
-errors, and the headless runner's 30-day balance check still produces
-a deterministic (same-seed, same-result) outcome at the real 3%
-probability.
+**The map flash.** When a rival route appears, the map draws a pulsing
+amber arc and an "Airline opens X–Y" label for about 4 real seconds,
+whatever overlay is on (`drawNewCompetitorRouteFlashes()`). When to
+flash is a real-time question, so the renderer keeps its own record of
+routes it has already shown, in wall-clock time, never in `state`; the
+first call only records what's there, so loading a save doesn't flash
+every route.
 
 ## Rival pressure (`src/sim/pressure.ts`, `src/sim/competitors.ts`, `src/sim/rivalResponse.ts`)
 
@@ -1136,7 +1009,7 @@ not one.
 
 ---
 
-## The event ticker (`src/ui/ticker.ts`) — week four
+## The event ticker (`src/ui/ticker.ts`)
 
 The map flash above only reads as news if you're actually looking at
 the map. `ui/ticker.ts` adds a persistent, always-visible strip fixed
@@ -1169,16 +1042,6 @@ and a long one crawl. Restarting a CSS animation cleanly requires
 setting `animation: none`, forcing a reflow (reading `offsetWidth`),
 then reapplying it — otherwise the browser just continues whatever
 frame the previous animation was already on instead of starting over.
-
-Verified in-browser (competitor probability still boosted from the
-flash test above): three "Airline opens X–Y" messages appeared and
-scrolled correctly; switching to the Commercial panel at 20x speed
-confirmed updates keep happening regardless of `panelView`. A
-throwaway 365-day script (deleted after, not committed) confirmed the
-weather side of the same diff pattern fires correctly and often —
-dozens of winter snowstorm-formation events across the year, matching
-the weather model's already-verified seasonal rates. Zero console
-errors.
 
 ## Panel (`src/ui/panels.ts`)
 
@@ -1355,7 +1218,7 @@ can fix it.
 The popover's headline reading: "Uses 14% of an aircraft — YUL has 1.00
 spare, 0.86 after this."
 
-## Rotations list (`src/ui/panels.ts`) — week seven, phase C
+## Rotations list (`src/ui/panels.ts`)
 
 The Gantt rotation board and the per-leg schedule table are both gone. The
 Fleet tab lists rotations instead: one row per rotation with its chain
@@ -1487,14 +1350,6 @@ year (525,600 calls to `step()`) at 0.57 real CPU seconds — no
 measurable change from the pre-weather baseline. At most 10 plain
 objects, a handful of comparisons once a day; nowhere close to
 mattering next to everything else `step()` already does every minute.
-
-Verified via the headless runner across a full year: snowstorms only on
-winter-window days, thunderstorms only on summer-window days (54/50
-storm-days out of 365 respectively); a plausible spread chain (Québec
-City thunderstorm on day 152, then Ottawa — its nearest neighbor — on
-day 154); never more than 4 storms active across the whole map at once.
-Verified in-browser: snow particles render and drift at an airport with
-an active snowstorm, no console errors.
 
 ## Persistence (`src/ui/save.ts`)
 
@@ -1685,7 +1540,7 @@ retrofits turn down (see Innovations).
 
 ---
 
-## Market stimulation (`src/sim/marketDemand.ts`) — week six
+## Market stimulation (`src/sim/marketDemand.ts`)
 
 Demand became **two numbers**. `potentialDailyDemand()` (the gravity
 model) is the ceiling a market could reach; `state.marketDemand` is what
@@ -1813,7 +1668,7 @@ and the boost was just a flat 3× everywhere.
 
 ---
 
-## Fare policy (`src/sim/pricing.ts`) — week six
+## Fare policy (`src/sim/pricing.ts`)
 
 One airline-wide multiplier on `recommendedFare()` prices the whole
 network (the slider at the top of the Fleet tab, `setFarePolicy()`). A
@@ -1945,8 +1800,8 @@ it uses (`connectingDemandOnMarket()`), where it books seats and pays
 fares like local traffic. **They react to price** like local passengers
 (`economy.ts`'s `connectingPriceResponse()`): a route's connecting demand
 is scaled by its booking share at its fare over its share at the going
-rate, capped at 1.5× for pricing under it. Before this, connecting
-passengers ignored price and kept an over-priced hub full.
+rate, capped at 1.5× for pricing under it, so an over-priced hub
+doesn't stay full on connections alone.
 
 **Worked out once per change, not per question.** Every departure asks
 for the flows at both ends, and working them out visits every pair of a
@@ -1998,7 +1853,7 @@ passengers of any style and earned the least.
 
 ---
 
-## Crew (`src/sim/crew.ts`) — week six
+## Crew (`src/sim/crew.ts`)
 
 Pools of headcount, never named individuals — a real roster means duty
 times, rest rules and pairing, which is a second scheduling problem
@@ -2045,7 +1900,7 @@ double-charged.
 
 ---
 
-## Cancellations (`src/sim/step.ts`, `src/sim/weather.ts`, `src/sim/crew.ts`) — week six
+## Cancellations (`src/sim/step.ts`, `src/sim/weather.ts`, `src/sim/crew.ts`)
 
 The second axis of reliability. On-Time only describes flights that
 operated; **Completion Factor** is `completed / scheduled`.
@@ -2168,7 +2023,7 @@ with the do-nothing player, which keeps the network fixed. On the current start 
 
 ---
 
-## The Dev tab (`src/ui/devTools.ts`) — week six
+## The Dev tab (`src/ui/devTools.ts`)
 
 A development tool, and deliberately *not* a hand-drawn diagram of the
 model: every leaf reads a real number out of `state`, so it can't drift

@@ -44,10 +44,10 @@ const RESPONSE_CHANCE_MAX = 0.3;
 export const RESPONSE_FREQUENCY_CAP = 8;
 
 /** Whether this market is one rivals want to move in on, and how badly (the day's response chance; 0 when not). */
-export function rivalResponseChance(state: SimState, a: string, b: string): number {
+export function rivalResponseChance(state: SimState, a: string, b: string, connectingByDirection?: Map<string, number>): number {
   const settings = state.routeSettings[marketKey(a, b)];
   if (!settings) return 0;
-  const summary = summarizeMarket(a, b, state, settings);
+  const summary = summarizeMarket(a, b, state, settings, connectingByDirection);
   if (summary.freq === 0 || !summary.seatCapped) return 0;
   const premium = settings.fare / recommendedFare(a, b) - EXPENSIVE_FARE_SHARE;
   if (premium <= 0) return 0;

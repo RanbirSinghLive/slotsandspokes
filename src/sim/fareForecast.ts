@@ -72,6 +72,9 @@ export function forecastStance(state: SimState, origin: string, dest: string, st
   const onMarket = work.competitorRoutes.filter((route) => marketKey(route.origin, route.dest) === key);
   const losingDays = new Map<CompetitorOffering, number>(onMarket.map((route) => [route, route.losingDays ?? 0]));
   const flightsBefore = new Map<CompetitorOffering, number>(onMarket.map((route) => [route, route.dailyFrequency]));
+  // The schedule and demand are held fixed, so the market's connecting
+  // passengers are too: worked out once, not on every simulated day.
+  const connecting = new Map<string, number>();
   const closesIn = new Map<CompetitorOffering, number>();
 
   for (let day = 1; day <= FORECAST_DAYS; day++) {
@@ -96,7 +99,7 @@ export function forecastStance(state: SimState, origin: string, dest: string, st
 
     // Rivals answer a full, expensive market with flights: today's chance
     // of one, as a fraction, on the busiest rival still open with room.
-    const response = rivalResponseChance(work, origin, dest);
+    const response = rivalResponseChance(work, origin, dest, connecting);
     const answering = onMarket
       .filter((route) => !closesIn.has(route) && route.dailyFrequency < RESPONSE_FREQUENCY_CAP)
       .sort((x, y) => y.dailyFrequency - x.dailyFrequency)[0];
@@ -112,7 +115,7 @@ export function forecastStance(state: SimState, origin: string, dest: string, st
   return {
     stance,
     fare: workSettings.fare,
-    margin: summarizeMarket(origin, dest, work, workSettings).margin,
+    margin: summarizeMarket(origin, dest, work, workSettings, connecting).margin,
     rivals: onMarket.map((route) => ({
       airline: route.airline,
       fare: route.fare,
@@ -120,6 +123,6 @@ export function forecastStance(state: SimState, origin: string, dest: string, st
       closesInDays: closesIn.get(route) ?? null,
       flightsAdded: Math.round((route.dailyFrequency - flightsBefore.get(route)!) * 10) / 10,
     })),
-    responseChance: rivalResponseChance(work, origin, dest),
+    responseChance: rivalResponseChance(work, origin, dest, connecting),
   };
 }

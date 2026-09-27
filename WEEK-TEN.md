@@ -6,7 +6,7 @@ moats, shocks, real costs, Europe, home difficulty) lives in
 with playtest findings as they come (see "Playtest notes"), and the
 order changes with them.
 
-**State at handoff:** save key `airgame-save-v46`. **Threads 1–6, 8 and 10 are done.** The game pushes back
+**State at handoff:** save key `airgame-save-v46`. **Threads 1–8 and 10 are done.** The game pushes back
 the way CLAUDE.md's philosophy asks: over a year a careful airline makes
 $6.5M–$19M, a sitter $2M–$5M and eroding, an unattended one-plane start
 survives the Standard homes, a reckless one always busts
@@ -316,6 +316,20 @@ forecast doubled the steady report's time (to about 3m47s); thread 7.
   airline's year; running the balance report's games side by side would
   cut its wall-clock time by the core count (ask the owner first: see
   memory on parallel runs).
+
+**Status: done, bar one question.** As built:
+- **Performance:** the stance forecast (thread 6) re-derived a market's
+  connecting passengers on every simulated day though they can't change
+  inside a forecast; now once per forecast. One steady year from Toronto
+  9.6 s → 7.4 s, identical results. What remains is inherent (every leg
+  booked each forecast day) and connecting flows' cache key.
+  **For the owner:** running the report's 180 games side by side on
+  several cores would cut its ~6–8 minutes by the core count. It isn't
+  done, since you turned down parallel runs before; say if you'd like it.
+- **Docs:** HOW-IT-WORKS lost its history (the week-four competitor
+  account rewritten as current state, week tags on headings, "Verified…"
+  test notes, "used to" passages): 2,198 → 2,053 lines. CLAUDE.md is
+  201 lines, current.
 
 ---
 
