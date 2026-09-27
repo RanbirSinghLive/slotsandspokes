@@ -42,3 +42,11 @@ export function recordDailyPnlHistory(state: SimState): void {
     pushCapped(state.costHistoryByMarket[key], state.todayCostByMarket[key] ?? 0);
   }
 }
+
+/** A market's own margin a day over the last week, or null with less than a week flown. */
+export function lastWeekMargin(state: SimState, key: string): number | null {
+  const revenue = (state.revenueHistoryByMarket[key] ?? []).slice(-7);
+  const cost = (state.costHistoryByMarket[key] ?? []).slice(-7);
+  if (revenue.length < 7) return null;
+  return revenue.reduce((sum, r, i) => sum + r - cost[i], 0) / 7;
+}

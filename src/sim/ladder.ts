@@ -1,4 +1,5 @@
 import airportsData from '../../data/airports.json';
+import { lastWeekMargin } from './pnlHistory';
 import { airportLoad, dailyMovementsAt } from './airports';
 import { dayIndex } from './clock';
 import { connectingPassengersThrough } from './hubs';
@@ -62,14 +63,6 @@ const airportByIata = new Map((airportsData as Located[]).map((airport) => [airp
 function markets(state: SimState): [string, string][] {
   const keys = new Set(state.schedule.map((leg) => marketKey(leg.origin, leg.dest)));
   return [...keys].map((key) => key.split('-') as [string, string]);
-}
-
-/** Last week's own margin on a market, per day, or null with less than a week flown. */
-function lastWeekMargin(state: SimState, key: string): number | null {
-  const revenue = (state.revenueHistoryByMarket[key] ?? []).slice(-7);
-  const cost = (state.costHistoryByMarket[key] ?? []).slice(-7);
-  if (revenue.length < 7) return null;
-  return revenue.reduce((sum, r, i) => sum + r - cost[i], 0) / 7;
 }
 
 /** The biggest connecting flow at any one airport, passengers a day. */

@@ -1,4 +1,5 @@
 import airportsData from '../../data/airports.json';
+import { lastWeekMargin } from '../sim/pnlHistory';
 import { marketAppeal } from '../sim/whereToFly';
 import { AIRCRAFT_CLASSES, classByCode } from '../sim/aircraftClasses';
 import { dayIndex } from '../sim/clock';
@@ -517,14 +518,6 @@ function cutLosers(state: SimState, memory: Memory): string[] {
     }
   }
   return log;
-}
-
-/** Last week's margin on a market, per day. Null with less than a week of history. */
-function lastWeekMargin(state: SimState, key: string): number | null {
-  const revenue = (state.revenueHistoryByMarket[key] ?? []).slice(-7);
-  const cost = (state.costHistoryByMarket[key] ?? []).slice(-7);
-  if (revenue.length < 7) return null;
-  return revenue.reduce((sum, r, i) => sum + r - cost[i], 0) / 7;
 }
 
 function cutInEmergency(state: SimState, memory: Memory): string[] {
