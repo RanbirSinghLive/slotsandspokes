@@ -74,7 +74,7 @@ parked system still costs every change that touches it).
 | Executives (`sim/executives.ts`) | CEO, COO, CFO, CCO paid in Reputation, hidden | **Kept and reworked** (thread 8): no CEO, since the player is the CEO; CFO, COO and CCO chosen from candidate pools that widen as NPS rises; paid in money for their bonuses. Flavour in a game that is otherwise numbers |
 | Loans (`sim/loans.ts`) | unreachable: $0 ends the game | **Cut** the offer machinery; keep `isInsolvent()` and the game-over screen. **Done:** `isInsolvent()` is in `sim/insolvency.ts`, the game-over screen in `ui/gameOver.ts`; the loans, their state field, offer pop-up and table are gone; headless output identical |
 | Crew (`sim/crew.ts`) | pools, hiring, training lines, payroll; switched off | **Explored** in thread 9: woven into the map, not a tab. The owner chose all three directions |
-| Fuel drift (`FUEL_PRICE_MOVES`) | off; shocks set fuel now | **Cut** the random walk; shocks are the fuel story. **Done:** the walk, its switch, the history field and the Executive tab's fuel chart are gone; headless output identical |
+| Fuel drift (`FUEL_PRICE_MOVES`) | off; shocks set fuel now | **Cut** the random walk; shocks are the fuel story. **Done:** the walk, its switch, the history field and the Executive tab's fuel chart are gone; headless output identical. **Reversed later by the owner:** fuel comes back as a moving price with a chart and hedging, thread 10 |
 | The Grow tab | never built | **Dropped** |
 | Marketing (per-market spend) | a daily charge buying booking share and faster growth | **Cut** (asked for after the table was drafted): too similar to the fare, a second dial for the same trade. **Done:** the slider, the charge, the choice-model bonus, the growth multiplier, the state fields and the sweep lever are gone; headless output identical. The CCO whose bonus was free marketing now builds markets instead (new markets grow 25% faster) until thread 8 reworks every executive |
 
@@ -267,6 +267,38 @@ screen. 1 is the richer idea but changes how rotations work, and fits
 with the "second base" milestone. For the owner to choose before any of
 it is built.
 
+## Thread 10: fuel price and hedging
+
+Asked for by the owner after thread 1 cut the old random walk: fuel
+comes back as a price that moves every day, **in addition to** the fuel
+shock (sim/shocks.ts), with a running chart and a hedge the player can
+buy as a bet on where the price goes.
+
+- **The price moves daily**: a small, mean-reverting walk around the
+  baseline from the seeded PRNG (sim/rng.ts), so it wanders but comes
+  back; a fuel shock jumps it on top and fades as today. Deterministic,
+  in `state`, so saves and headless runs repeat.
+- **A running chart**: the last 90 days of price, with today's price and
+  the baseline marked, in a Fuel view (Network › Fuel, beside Goals), and
+  a small sparkline in the Network view's fuel row that opens it.
+- **Hedging, a bet**: "Hedge" locks today's price on the airline's fuel
+  for 30, 60 or 90 days, for an up-front premium. If fuel rises, the
+  airline pays the locked price and wins; if it falls, it still pays the
+  locked price and loses the difference. One hedge at a time; the view
+  shows what the hedge has saved or cost so far, and the chart draws the
+  locked price as a line until it runs out.
+- **Philosophy**: a hedge bought before a spike is an edge, and it's
+  temporary by construction (it runs out). The premium keeps it from
+  being free insurance: always hedging should cost money on average.
+- **Headless**: the steady player hedges when fuel is below the baseline
+  and never when above; the sitter never hedges. Balance measures that
+  the walk alone doesn't bust careful airlines, and that always-hedging
+  loses a little on average.
+
+Open for the owner: how wild the walk is (today's shock moves fuel by
+up to about 60%; the walk should be smaller, say ±15% over a month),
+and whether the premium is a flat fee or a slightly worse locked price.
+
 ## Carried forward from week nine
 
 - **Thread 5 (goal ladder)** becomes this plan's thread 2.
@@ -290,6 +322,9 @@ it is built.
 5. Thread 4 (map), thread 6 (fare stances), in either order.
 6. The rest of thread 5, and thread 7.
 7. Thread 9 (crew): hours bar and fatigue first, then crew bases.
+
+Thread 10 (fuel and hedging) is self-contained and can go any time after
+thread 2; the owner asked for it, so it's next after thread 2's slice 3.
 
 ## Open questions for the owner
 
