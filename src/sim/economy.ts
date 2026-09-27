@@ -4,7 +4,6 @@ import { FUEL_SHARE_OF_BLOCK_HOUR_COST } from './fuel';
 import { CREWS_ENABLED } from './features';
 import type { CompetitorOffering } from './competitors';
 import { rivalYieldFactor } from './pressure';
-import type { RouteSettings } from './state';
 
 /**
  * The slice of `costPerBlockHour` that used to represent crew, now
@@ -69,7 +68,7 @@ export type FlightResult = {
 export type DemandBreakdown = {
   /** This flight's share of the market's actual daily demand, after splitting across frequencies. */
   allocatedDemand: number;
-  /** How many of those actually book *you*, after the choice model weighs fare, frequency, marketing and competitors. */
+  /** How many of those actually book *you*, after the choice model weighs fare, frequency and competitors. */
   bookedDemand: number;
   /** The most this aircraft will carry — seats times LOAD_FACTOR. */
   seatCeiling: number;
@@ -81,7 +80,7 @@ export type DemandBreakdown = {
 
 // Deliberately crude for now, per WEEK-ONE.md: every flight pays the same
 // fraction of its seats regardless of day. Fare itself is no longer flat —
-// see `routeSettings.fare` below, week two's "Pricing" loop, set at the
+// see `fare` below, week two's "Pricing" loop, set at the
 // market level rather than per leg (sim/state.ts's RouteSettings).
 // Exported so sim/marketSummary.ts can tell whether a market's `pax` figure is
 // pinned at this ceiling (seat-capped — more demand exists than the plane
@@ -185,15 +184,12 @@ export function legCostBreakdown(
  * does grow the market, but over days, through stimulation — not
  * instantly within one flight's economics.) Of that per-flight slice, only
  * `bookingShare()` (`sim/choiceModel.ts`, week two's "connective piece")
- * actually books — some people, given `routeSettings.fare`,
- * `routeSettings.marketingSpend`, and this market's frequency, choose a
- * competitor or not to travel at all rather than fly you. `routeSettings.fare`
- * feeds both the choice model's price term *and* revenue directly —
- * raising it trades booked passengers for margin per passenger, the core
- * yield-management tension. Rivals on the market also cut the fare each
- * passenger pays (`rivalYieldFactor()`, sim/pressure.ts). Marketing spend, by contrast, is a pure
- * cost-for-share trade (see sim/step.ts's day-rollover handling for where
- * that cost is charged — once per day per market, not per flight).
+ * actually books — some people, given `fare` and this market's
+ * frequency, choose a competitor or not to travel at all rather than fly
+ * you. `fare` feeds both the choice model's price term *and* revenue
+ * directly — raising it trades booked passengers for margin per
+ * passenger, the core yield-management tension. Rivals on the market also
+ * cut the fare each passenger pays (`rivalYieldFactor()`, sim/pressure.ts).
  *
  * `spilloverAvailable` is this market's shared recapture pool as of right
  * now (today, before this flight) — see `SimState.spilloverByMarket`.
@@ -227,11 +223,10 @@ export function connectingPriceResponse(
   legsServingMarket: number,
   origin: string,
   dest: string,
-  marketingSpend: number,
   competitorRoutes: CompetitorOffering[],
 ): number {
-  const atFare = bookingShare(fare, legsServingMarket, origin, dest, marketingSpend, competitorRoutes);
-  const atGoingRate = bookingShare(recommendedFare(origin, dest), legsServingMarket, origin, dest, marketingSpend, competitorRoutes);
+  const atFare = bookingShare(fare, legsServingMarket, origin, dest, competitorRoutes);
+  const atGoingRate = bookingShare(recommendedFare(origin, dest), legsServingMarket, origin, dest, competitorRoutes);
   return atGoingRate > 0 ? Math.min(MAX_CONNECTING_PRICE_GAIN, atFare / atGoingRate) : 1;
 }
 
@@ -250,20 +245,15 @@ export function flightResult(
    */
   connectingDailyDemand: number,
   legsServingMarket: number,
-  // Narrowed to the two levers this actually prices from, rather than the
-  // whole RouteSettings: `fareIsOverridden` is bookkeeping for the fare
-  // policy UI (sim/pricing.ts) and has no business in the economics. It
-  // also lets step.ts pass a flight's own locked-in fare/spend directly
-  // without inventing a value for a field that means nothing here.
-  routeSettings: Pick<RouteSettings, 'fare' | 'marketingSpend'>,
+  // The one lever this prices from. A flight passes the fare it locked in
+  // at departure (step.ts), a preview the market's current or proposed one.
+  fare: number,
   competitorRoutes: CompetitorOffering[],
   spilloverAvailable: number,
 ): FlightResult {
   const demandPerFlight = marketDailyDemand / legsServingMarket;
-  const share = bookingShare(routeSettings.fare, legsServingMarket, leg.origin, leg.dest, routeSettings.marketingSpend, competitorRoutes);
-  const connecting =
-    connectingDailyDemand *
-    connectingPriceResponse(routeSettings.fare, legsServingMarket, leg.origin, leg.dest, routeSettings.marketingSpend, competitorRoutes);
+  const share = bookingShare(fare, legsServingMarket, leg.origin, leg.dest, competitorRoutes);
+  const connecting = connectingDailyDemand * connectingPriceResponse(fare, legsServingMarket, leg.origin, leg.dest, competitorRoutes);
   const bookedDemand = demandPerFlight * share + connecting / legsServingMarket;
   const seatCeiling = Math.round(type.seats * LOAD_FACTOR);
   const roundedBooked = Math.round(bookedDemand);
@@ -284,7 +274,7 @@ export function flightResult(
   }
 
   const yieldFactor = rivalYieldFactor(leg.origin, leg.dest, legsServingMarket, competitorRoutes);
-  const revenue = pax * routeSettings.fare * yieldFactor;
+  const revenue = pax * fare * yieldFactor;
   const costBreakdown = legCostBreakdown(leg.blockMinutes, type, fuelPriceIndex, fuelEfficiencyMultiplier);
   const cost = costBreakdown.fuel + costBreakdown.blockNonFuel + costBreakdown.departure;
   return {

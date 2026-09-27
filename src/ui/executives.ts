@@ -35,8 +35,8 @@ function describeEffect(effect: ExecutiveEffect): string {
       return `Delivers ${money(effect.amount)} a year, growing ${Math.round((effect.escalation - 1) * 100)}% with each payout.`;
     case 'monthly-bonus':
       return `Delivers ${money(effect.amount)} a month, growing ${Math.round((effect.escalation - 1) * 100)}% with each payout.`;
-    case 'free-marketing':
-      return `Covers the first ${money(effect.dailyAllowance)}/day of marketing spend — the promotion still counts in full.`;
+    case 'market-building':
+      return `New markets grow into your service ${Math.round((effect.growthMultiplier - 1) * 100)}% faster.`;
     case 'flight-ops':
       return `Cuts every flight's delay by ${Math.round((1 - effect.delayMultiplier) * 100)}%.`;
     case 'inflight':

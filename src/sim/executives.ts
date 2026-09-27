@@ -17,7 +17,7 @@ import type { SimState } from './state';
  * CFO's, CCO's and CEO's bonuses actually *modify*?" — and flagged that
  * nothing in the codebase had an obvious "operations quality" lever
  * waiting for a multiplier. That's no longer true. Crew, maintenance,
- * delays, NPS and marketing spend all now exist as real systems with real
+ * delays, NPS and market growth all now exist as real systems with real
  * numbers, so each executive can attach to something that was already
  * there rather than needing a stat invented for them to modify.
  *
@@ -41,8 +41,8 @@ export type ExecutiveEffect =
   | { kind: 'annual-bonus'; amount: number; escalation: number }
   /** The same, monthly. */
   | { kind: 'monthly-bonus'; amount: number; escalation: number }
-  /** Dollars of daily marketing spend the airline doesn't have to pay for. */
-  | { kind: 'free-marketing'; dailyAllowance: number }
+  /** Multiplies how fast markets grow into your service — a CCO who builds markets. */
+  | { kind: 'market-building'; growthMultiplier: number }
   /** Multiplies every flight's rolled delay — a COO who came up through operations. */
   | { kind: 'flight-ops'; delayMultiplier: number }
   /** Flat NPS points on every departure — a COO who came up through the cabin. */
@@ -199,8 +199,8 @@ export function executiveMaintenanceMultiplier(state: SimState): number {
   return effect?.kind === 'maintenance' ? effect.ageFactorMultiplier : 1;
 }
 
-/** Dollars per day of marketing the airline doesn't pay for. 0 when no CCO is appointed. */
-export function executiveFreeMarketing(state: SimState): number {
-  const effect = activeEffects(state).find((e) => e.kind === 'free-marketing');
-  return effect?.kind === 'free-marketing' ? effect.dailyAllowance : 0;
+/** How much faster markets grow into your service (sim/marketDemand.ts). 1 when no market-building CCO is appointed. */
+export function executiveMarketBuildingMultiplier(state: SimState): number {
+  const effect = activeEffects(state).find((e) => e.kind === 'market-building');
+  return effect?.kind === 'market-building' ? effect.growthMultiplier : 1;
 }

@@ -119,12 +119,6 @@ export function setFarePolicy(state: SimState, multiplier: number): void {
   applyFarePolicy(state);
 }
 
-/** Daily marketing spend on one market (sim/marketDemand.ts), never negative. */
-export function setMarketingSpend(state: SimState, origin: string, dest: string, spendPerDay: number): void {
-  const settings = state.routeSettings[marketKey(origin, dest)];
-  if (!settings) return;
-  settings.marketingSpend = Math.max(0, Math.round(spendPerDay));
-}
 
 /** How the markets flown today are priced: by policy, by a stance, or by hand. */
 export function pricingSummary(state: SimState): { policy: number; stance: number; hand: number } {

@@ -154,7 +154,7 @@ const PER_NM_RATE_LONG = 0.18;
  * frequencies still has exactly one fare, not two independently
  * adjustable ones. This is only ever a *default*: decision 3 in
  * WEEK-TWO.md is explicit that fare is a player-overridable lever, not a
- * fixed number: see sim/pricing.ts, and a route's Fare and marketing in
+ * fixed number: see sim/pricing.ts, and a route's Fare in
  * its route view (ui/inspector/route.ts).
  */
 export function recommendedFare(originIata: string, destIata: string): number {

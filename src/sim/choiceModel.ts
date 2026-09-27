@@ -102,21 +102,6 @@ function utility(segment: Segment, fare: number, dailyFrequency: number, goingRa
   return segment.intercept - segment.weightPrice * relativeFare(fare, goingRate) + segment.weightSchedule * scheduleFit;
 }
 
-// A market's marketing-spend lever (its route view, ui/inspector/route.ts):
-// daily dollars spent promoting one specific market, added as a
-// bonus only to *your* utility — a competitor's offering is unaffected by
-// what you spend, and "stay home" always stays at a fixed 0. `log2` again
-// gives diminishing returns, same reasoning as scheduleFit above: the
-// first few hundred dollars of awareness matter more than the next few
-// hundred. Zero spend contributes a zero bonus, so a market nobody has
-// ever put money into behaves exactly as it did before this lever existed.
-const MARKETING_WEIGHT = 0.5;
-const MARKETING_SCALE = 500;
-
-function marketingBonus(marketingSpend: number): number {
-  return MARKETING_WEIGHT * Math.log2(1 + marketingSpend / MARKETING_SCALE);
-}
-
 /**
  * The two softmax scores every segment-level share below is built from:
  * your own offering's score, and the summed score of every competitor
@@ -130,10 +115,9 @@ function scores(
   fare: number,
   legsServingMarket: number,
   competitors: CompetitorOffering[],
-  marketingSpend: number,
   goingRate: number,
 ): { yourScore: number; competitorScore: number } {
-  const yourScore = Math.exp(utility(segment, fare, legsServingMarket, goingRate) + marketingBonus(marketingSpend));
+  const yourScore = Math.exp(utility(segment, fare, legsServingMarket, goingRate));
   const competitorScore = competitors.reduce(
     (total, c) => total + Math.exp(utility(segment, c.fare, c.dailyFrequency, goingRate)),
     0,
@@ -145,20 +129,18 @@ function scores(
  * One segment's softmax over every offering in this market: your flight,
  * every competitor serving the same market, and a fixed "stay home"
  * option at utility 0. Your share is your term over the sum of all of
- * them — standard multinomial logit. With `competitors` empty and
- * `marketingSpend` zero this is algebraically identical to the plain
- * logistic sigmoid of your own utility, which is what this whole model
- * was before competitor data and marketing spend existed.
+ * them — standard multinomial logit. With `competitors` empty this is
+ * algebraically identical to the plain logistic sigmoid of your own
+ * utility.
  */
 function segmentBookingShare(
   segment: Segment,
   fare: number,
   legsServingMarket: number,
   competitors: CompetitorOffering[],
-  marketingSpend: number,
   goingRate: number,
 ): number {
-  const { yourScore, competitorScore } = scores(segment, fare, legsServingMarket, competitors, marketingSpend, goingRate);
+  const { yourScore, competitorScore } = scores(segment, fare, legsServingMarket, competitors, goingRate);
   const stayHomeScore = Math.exp(0);
   return yourScore / (yourScore + stayHomeScore + competitorScore);
 }
@@ -178,31 +160,27 @@ function segmentTrafficShare(
   fare: number,
   legsServingMarket: number,
   competitors: CompetitorOffering[],
-  marketingSpend: number,
   goingRate: number,
 ): number {
-  const { yourScore, competitorScore } = scores(segment, fare, legsServingMarket, competitors, marketingSpend, goingRate);
+  const { yourScore, competitorScore } = scores(segment, fare, legsServingMarket, competitors, goingRate);
   return yourScore / (yourScore + competitorScore);
 }
 
 /**
  * What fraction of a market's demand books *your* flight — versus a
  * competitor's, or not travelling at all — given this flight's fare, how
- * many daily frequencies serve the market, which market this is (to look
- * up who else is serving it), and how much of the "Commercial" panel's
- * marketing-spend lever is currently allocated to it. Blended across all
- * three segments, weighted by each one's share of the demand pool.
- * `economy.ts` calls this with one flat fare for everyone (no
- * fare-by-segment lever exists), so the segments differ only in how they
- * individually react to that same fare, frequency, and marketing spend —
- * not in what they pay or what marketing they see.
+ * many daily frequencies serve the market, and which market this is (to
+ * look up who else is serving it). Blended across all three segments,
+ * weighted by each one's share of the demand pool. `economy.ts` calls this
+ * with one flat fare for everyone (no fare-by-segment lever exists), so
+ * the segments differ only in how they react to that same fare and
+ * frequency, not in what they pay.
  */
 export function bookingShare(
   fare: number,
   legsServingMarket: number,
   originIata: string,
   destIata: string,
-  marketingSpend: number,
   competitorRoutes: CompetitorOffering[],
 ): number {
   const marketCompetitors = competitorsServingMarket(originIata, destIata, competitorRoutes);
@@ -211,7 +189,7 @@ export function bookingShare(
     (total, segment) =>
       total +
       segment.shareOfDemand *
-        segmentBookingShare(segment, fare, legsServingMarket, marketCompetitors, marketingSpend, goingRate),
+        segmentBookingShare(segment, fare, legsServingMarket, marketCompetitors, goingRate),
     0,
   );
 }
@@ -231,7 +209,6 @@ export function trafficShare(
   legsServingMarket: number,
   originIata: string,
   destIata: string,
-  marketingSpend: number,
   competitorRoutes: CompetitorOffering[],
 ): number {
   const marketCompetitors = competitorsServingMarket(originIata, destIata, competitorRoutes);
@@ -240,7 +217,7 @@ export function trafficShare(
     (total, segment) =>
       total +
       segment.shareOfDemand *
-        segmentTrafficShare(segment, fare, legsServingMarket, marketCompetitors, marketingSpend, goingRate),
+        segmentTrafficShare(segment, fare, legsServingMarket, marketCompetitors, goingRate),
     0,
   );
 }
@@ -256,7 +233,6 @@ export function rivalBookingShare(
   route: CompetitorOffering,
   playerFare: number,
   playerLegs: number,
-  playerMarketingSpend: number,
   competitorRoutes: CompetitorOffering[],
 ): number {
   const marketCompetitors = competitorsServingMarket(route.origin, route.dest, competitorRoutes);
@@ -268,7 +244,7 @@ export function rivalBookingShare(
       0,
     );
     const playerScore =
-      playerLegs > 0 ? Math.exp(utility(segment, playerFare, playerLegs, goingRate) + marketingBonus(playerMarketingSpend)) : 0;
+      playerLegs > 0 ? Math.exp(utility(segment, playerFare, playerLegs, goingRate)) : 0;
     const stayHomeScore = Math.exp(0);
     return total + segment.shareOfDemand * (rivalScore / (allRivals + playerScore + stayHomeScore));
   }, 0);

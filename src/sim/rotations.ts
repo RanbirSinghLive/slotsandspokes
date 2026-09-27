@@ -445,9 +445,9 @@ export function applyRotation(
   takeQuotedSlots(state, plan.slotQuotes);
   acquireNeededSlots(state);
 
-  // Fare/marketing are set at the market level (sim/state.ts's
-  // RouteSettings), not per leg — a brand-new market gets a fresh entry
-  // (policy fare, zero marketing spend); a rotation touching a market
+  // The fare is set at the market level (sim/state.ts's RouteSettings),
+  // not per leg — a brand-new market gets a fresh entry (the policy
+  // fare); a rotation touching a market
   // that already has one reuses it unchanged, rather than resetting
   // whatever fare the player already set there. marketKey() is
   // bidirectional, so out and back share one entry.
@@ -462,7 +462,6 @@ export function applyRotation(
       fare: policyFare(state, leg.origin, leg.dest),
       fareIsOverridden: false,
       fareStance: null,
-      marketingSpend: 0,
       turnBufferMinutes: 0,
     };
     newMarkets.push({ origin: leg.origin, dest: leg.dest });

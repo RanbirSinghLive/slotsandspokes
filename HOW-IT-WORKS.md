@@ -163,7 +163,7 @@ order:
 
 1. **Day rollover** — if this is minute 0 of a new home-local day,
    `completedToday`/`todayRevenue`/`todayCost`/`todayMargin` reset to zero,
-   the day's total marketing spend is charged (see "The Commercial panel"),
+   the day's leases, slot fees and overhead are charged,
    and `sim/weather.ts`'s `rollDailyWeather()` expires/spreads/originates
    storms (see "Weather," below) — all *before* anything else this call
    does. `cash` does not reset. The reset happens at the start of the new
@@ -337,7 +337,7 @@ can actually support that many passengers, and priced at the route
 LOAD_FACTOR    = 0.75
 RECAPTURE_RATE = 0.4
 demandPerFlight = dailyDemand(origin, dest) / legsServingMarket
-bookedDemand    = demandPerFlight * bookingShare(fare, legsServingMarket, origin, dest, marketingSpend, competitorRoutes)
+bookedDemand    = demandPerFlight * bookingShare(fare, legsServingMarket, origin, dest, competitorRoutes)
 seatCeiling     = round(seats * LOAD_FACTOR)
 if bookedDemand > seatCeiling:
   pax             = seatCeiling
@@ -368,7 +368,7 @@ lease hint says what the next plane adds; the route view shares it
 across routes by their flying minutes (`sim/routeCosts.ts`). Rivals
 don't pay it.
 
-`fare` and `marketingSpend` come from `state.routeSettings[marketKey(origin, dest)]`
+`fare` comes from `state.routeSettings[marketKey(origin, dest)]`
 (sim/state.ts's `RouteSettings`), not from the leg — see "Pricing" and
 "The Commercial panel," below, for why fare lives at the market level.
 
@@ -509,8 +509,8 @@ market — a range slider bounded to 50%-150% of that market's recommended
 fare, in $5 steps, with a live $ readout (not a free-text field, which
 the decision explicitly rules out). Dragging it mutates
 `state.routeSettings[key].fare` directly; the new fare takes effect on
-that market's very next departure (`ActiveFlight` locks in the fare —
-and marketing spend — it departed with, so a change mid-flight doesn't
+that market's very next departure (`ActiveFlight` locks in the fare it
+departed with, so a change mid-flight doesn't
 retroactively alter one already in the air).
 
 `routeSettings.fare` feeds both halves of the yield-management tension
@@ -1339,18 +1339,13 @@ already exist, which regroups them around the new base — the one remaining
 way to break a rotation from outside, and the red flag plus the remove
 button are the repair path.
 
-## Fare and marketing (`src/ui/inspector/route.ts`, rules in `src/sim/pricing.ts`)
+## A route's fare (`src/ui/inspector/route.ts`, rules in `src/sim/pricing.ts`)
 
-A route's own levers live in its route view, under **Fare and
-marketing**:
+A route's own lever lives in its route view, under **Fare**:
 - **Fare.** Dragging it prices the market by hand (`setHandFare()`),
   which takes it off the policy and off any stance. **Policy** puts it
   back. The slider spans half to one and a half times the policy fare,
   stretched to include the current fare.
-- **Marketing** ($0–$1,000 a day in $50 steps, `setMarketingSpend()`). A
-  daily charge, made at rollover (`step.ts`), not per flight. It adds a
-  log-scaled bonus to *your* utility only (`sim/choiceModel.ts`), and it
-  speeds up demand growth (`sim/marketDemand.ts`).
 - **A day at these settings**: passengers, how full, share, revenue,
   cost, margin, and whether **seats or demand is the limit**.
 - **After its share of fixed costs** (`sim/routeCosts.ts`): that margin
@@ -1418,7 +1413,7 @@ parameters — no new aircraft state needed.
 `state.weatherByAirport: Record<iata, WeatherEvent>` (a plain object,
 JSON-safe) holds at most one active event per airport. `rollDailyWeather()`
 runs once per simulated day, from `step.ts`'s existing day-rollover
-check (alongside the marketing-spend charge), not per minute:
+check, not per minute:
 
 1. **Expire** anything whose `endsAtMinute` has passed.
 2. **Spread**: every airport with an active event rolls a 25% chance,
@@ -1554,6 +1549,12 @@ ever-deepening deficit that even an excellent recovery took months to
 climb out of — locking it out of the very tools that would help. A
 mediocre airline still accrues nothing; it just doesn't go backwards.
 
+
+**There is no marketing lever.** Per-market marketing spend (a daily
+charge that bought booking share and faster demand growth) was removed
+in WEEK-TEN.md's thread 1: it was too similar to the fare, a second
+dial for the same trade. Its one surviving effect is the market-building
+CCO.
 ---
 
 ## Cash runway and the end of the game (`src/sim/insolvency.ts`, `src/sim/forecast.ts`, `src/ui/runway.ts`)
@@ -1613,7 +1614,8 @@ recommended fare, so raising price cost literally no passengers.
 
 Growth is driven by `seatsOffered / potential`, which is what makes size
 matter: one daily 19-seater saturates a 9-PDEW market and is a rounding
-error against a 4,600-PDEW one. Marketing spend multiplies that rate.
+error against a 4,600-PDEW one. A market-building CCO (sim/executives.ts)
+multiplies that rate.
 Unserved markets decay back toward the floor, more slowly than they grow.
 Only markets away from their floor are stored: a missing key reads as the
 floor, so the save grows with the markets anyone has flown, not with every
@@ -1977,8 +1979,8 @@ Reputation back into cash.
 
 Each attaches to a system that already existed rather than a stat
 invented for them: the COO's three backgrounds hit the delay roll, the
-NPS scorer and the maintenance age factor respectively; the CCO
-subsidises the marketing *charge* (the spend still counts in full); the
+NPS scorer and the maintenance age factor respectively; the CCO makes
+every market grow into your service 25% faster; the
 CEO and CFO pay escalating bonuses. Escalation resets when an incumbent
 is replaced — seniority belongs to the person, not the chair.
 
@@ -1993,7 +1995,7 @@ Effects are placeholders pending real numbers.
 cost and margin per day, profit over the run, and where margin peaks.
 Levers: `reserve` (crew depth), `fare` (a multiplier on every market's
 fare, marked as a player override so the price policy leaves it alone),
-`marketing`, and `fuel-efficiency` (the tech tree's tiers).
+and `fuel-efficiency` (the tech tree's tiers).
 
 **Every row uses the same seed**, so the lever is the only difference.
 The flip side: one seed can mislead, because outcomes vary a lot between
@@ -2004,7 +2006,7 @@ which was broken once by a roll that skipped already-grounded aircraft;
 see `rollDailyMechanicalGroundings()`.
 
 The lever is applied to the markets the player opens on the first
-morning, so fare and marketing levers have markets to act on; markets it
+morning, so the fare lever has markets to act on; markets it
 opens later start from the game's defaults. `--player starter` sweeps
 with the do-nothing player, which keeps the network fixed. On the current start (YUL,
 60 days) the fare curve peaks at about 0.8× the recommended fare.

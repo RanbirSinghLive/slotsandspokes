@@ -158,7 +158,7 @@ function explainFailure(error: string, className: string, baseIata: string): str
 
 /**
  * Take one rotation out of the schedule. A market left with no flights at
- * all loses its settings (fare, stance, marketing, turn buffer), so
+ * all loses its settings (fare, stance, turn buffer), so
  * reopening it later starts fresh.
  *
  * A flight already airborne on one of these legs is unaffected:

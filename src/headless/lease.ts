@@ -108,7 +108,6 @@ function runExperiment(experiment: Experiment): { perDay: number[]; roundTrips: 
     fare: policyFare(state, experiment.base, experiment.other),
     fareIsOverridden: false,
     fareStance: null,
-    marketingSpend: 0,
     turnBufferMinutes: 0,
   };
 

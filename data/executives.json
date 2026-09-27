@@ -49,8 +49,8 @@
     "role": "cco",
     "name": "Tomas Lindqvist",
     "background": "Commercial and distribution",
-    "flavor": "Built a low-cost carrier's entire distribution strategy on other people's channels. Gets the airline talked about without paying rate card for it.",
+    "flavor": "Built a low-cost carrier's network one town at a time: the travel agents, the local papers, the chamber of commerce. New routes fill faster when he's already told the town they're coming.",
     "reputationCost": 250,
-    "effect": { "kind": "free-marketing", "dailyAllowance": 400 }
+    "effect": { "kind": "market-building", "growthMultiplier": 1.25 }
   }
 ]

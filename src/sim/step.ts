@@ -19,7 +19,6 @@ import {
   executiveDelayMultiplier,
   executiveNpsBonus,
   executiveMaintenanceMultiplier,
-  executiveFreeMarketing,
 } from './executives';
 import { CANCELLATION_NPS_SCORE } from './nps';
 import { resolveTargetIfDue } from './targets';
@@ -187,7 +186,7 @@ export function step(state: SimState): void {
     state.todayMargin = 0;
     // Week six's cost attribution — reset in lockstep with todayCost
     // above, since these five are exactly that number split up.
-    state.todayCostByCategory = { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0, training: 0, slots: 0, maintenance: 0, overhead: 0 };
+    state.todayCostByCategory = { fuel: 0, blockNonFuel: 0, departure: 0, lease: 0, crew: 0, training: 0, slots: 0, maintenance: 0, overhead: 0 };
     // Per-market breakdown of todayRevenue/todayCost, reset in lockstep
     // with them for the same reason as todayCostByCategory above.
     state.todayRevenueByMarket = {};
@@ -205,27 +204,8 @@ export function step(state: SimState): void {
     // since nobody's actually holding a seat for anyone.
     state.spilloverByMarket = {};
 
-    // Marketing spend (week two's "Commercial" panel) is a per-day, per-
-    // market cost, not a per-flight one — charged once here rather than in
-    // the arrival loop below, since a market can have zero, one, or many
-    // flights land on a given day and the spend doesn't scale with that.
-    const totalMarketingSpend = Object.values(state.routeSettings).reduce(
-      (total, settings) => total + settings.marketingSpend,
-      0,
-    );
-    // A CCO covers the first slice of the marketing bill (sim/executives.ts).
-    // The *spend* still counts in full toward stimulation and booking
-    // share — the airline is still doing the marketing, it just isn't
-    // paying for all of it — so only the charge is reduced.
-    const chargedMarketing = Math.max(0, totalMarketingSpend - executiveFreeMarketing(state));
-    state.cash -= chargedMarketing;
-    state.todayCost += chargedMarketing;
-    state.todayCostByCategory.marketing += chargedMarketing;
-    state.todayMargin -= chargedMarketing;
-
-    // Lease cost — same "flat per-day charge" shape as marketing spend
-    // above, not tied to whether the aircraft actually flew that day.
-    // Every aircraft is leased (sim/leasing.ts).
+    // Lease cost: a flat per-day charge, not tied to whether the aircraft
+    // actually flew that day. Every aircraft is leased (sim/leasing.ts).
     const totalLeaseCost = state.aircraft.reduce((total, aircraft) => total + aircraft.leaseCostPerDay, 0);
     state.cash -= totalLeaseCost;
     state.todayCost += totalLeaseCost;
@@ -431,8 +411,8 @@ export function step(state: SimState): void {
         executiveDelayMultiplier(state),
     );
 
-    // Fare and marketing spend are market-level (RouteSettings), not
-    // per-leg — every leg on this market shares the same entry.
+    // The fare is market-level (RouteSettings), not per-leg: every leg on
+    // this market shares the same entry.
     const routeSettings = state.routeSettings[marketOnTimeKey];
 
     // Week five's NPS quality signal (sim/nps.ts): every input this needs —
@@ -468,10 +448,9 @@ export function step(state: SimState): void {
       scheduledDepartMinute: dayStart + leg.departMinute,
       delayByCause: delayBreakdown,
       delayMinutes,
-      // Locked in at departure — see ActiveFlight's note on why these
-      // aren't re-read from state.routeSettings at arrival.
+      // Locked in at departure — see ActiveFlight's note on why it isn't
+      // re-read from state.routeSettings at arrival.
       fare: routeSettings.fare,
-      marketingSpend: routeSettings.marketingSpend,
     };
     state.activeFlights.push(activeFlight);
     airborne.add(activeFlight.legId);
@@ -511,7 +490,7 @@ export function step(state: SimState): void {
             actualDailyDemand(state, flight.origin, flight.dest),
             connectingDemandOnMarket(state, flight.origin, flight.dest),
             marketFrequency,
-            { fare: flight.fare, marketingSpend: flight.marketingSpend },
+            flight.fare,
             state.competitorRoutes,
             spilloverAvailable,
           );

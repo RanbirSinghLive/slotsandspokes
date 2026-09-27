@@ -1,6 +1,6 @@
 import { forecastStance, type StanceForecast } from '../../sim/fareForecast';
 import { rivalYieldFactor } from '../../sim/pressure';
-import { policyFare, setFareStance, setHandFare, setMarketingSpend } from '../../sim/pricing';
+import { policyFare, setFareStance, setHandFare } from '../../sim/pricing';
 import { demandAgainstSeats, marketSize } from '../../sim/marketSize';
 import { summarizeMarket } from '../../sim/marketSummary';
 import { formatLoadFactor, marketLoadFactor } from '../../sim/loadFactor';
@@ -147,7 +147,7 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
 
   const stances = buildStances(state, a, b, changed);
   if (stances) root.append(stances);
-  root.append(...buildFareAndMarketing(state, a, b, changed));
+  root.append(...buildFare(state, a, b, changed));
 
   // The planes this route draws on, pooled at its base.
   const base = ops.routeBase(state, a, b);
@@ -206,8 +206,6 @@ function capitalise(text: string): string {
 const FARE_STEP = 5;
 const FARE_MIN_FACTOR = 0.5;
 const FARE_MAX_FACTOR = 1.5;
-const MARKETING_STEP = 50;
-const MARKETING_MAX = 1000;
 
 function roundToStep(value: number, step: number): number {
   return Math.round(value / step) * step;
@@ -245,18 +243,17 @@ function describeEconomics(state: SimState, a: string, b: string): { text: strin
 }
 
 /**
- * The market's two levers: its fare (set by hand here, which takes it off
- * the policy and off any stance) and its daily marketing spend
- * (sim/marketDemand.ts), with what a day looks like at the current
- * settings. Dragging updates the numbers in place; the whole view rebuilds
- * on release, so a rebuild never takes a slider out from under the pointer.
+ * The market's lever: its fare (set by hand here, which takes it off the
+ * policy and off any stance), with what a day looks like at it. Dragging
+ * updates the numbers in place; the whole view rebuilds on release, so a
+ * rebuild never takes the slider out from under the pointer.
  */
-function buildFareAndMarketing(state: SimState, a: string, b: string, changed: () => void): HTMLElement[] {
+function buildFare(state: SimState, a: string, b: string, changed: () => void): HTMLElement[] {
   const settings = state.routeSettings[marketKey(a, b)];
   if (!settings) return [];
 
   const heading = document.createElement('h2');
-  heading.textContent = 'Fare and marketing';
+  heading.textContent = 'Fare';
 
   const economics = line('');
   const fixedCosts = line('');
@@ -315,35 +312,9 @@ function buildFareAndMarketing(state: SimState, a: string, b: string, changed: (
     fareRow.append(reset);
   }
 
-  const marketingSlider = document.createElement('input');
-  marketingSlider.type = 'range';
-  marketingSlider.min = '0';
-  marketingSlider.max = String(MARKETING_MAX);
-  marketingSlider.step = String(MARKETING_STEP);
-  marketingSlider.value = String(settings.marketingSpend);
-  marketingSlider.setAttribute('aria-label', 'Marketing spend');
-  const marketingValue = document.createElement('span');
-  marketingValue.className = 'lever-value';
-  const redrawMarketing = () => {
-    marketingValue.textContent = `$${settings.marketingSpend}/day`;
-  };
-  marketingSlider.addEventListener('input', () => {
-    setMarketingSpend(state, a, b, Number(marketingSlider.value));
-    redrawMarketing();
-    redrawEconomics();
-  });
-  marketingSlider.addEventListener('change', changed);
-  const marketingRow = document.createElement('div');
-  marketingRow.className = 'inspector-lever';
-  const marketingLabel = document.createElement('span');
-  marketingLabel.className = 'lever-label';
-  marketingLabel.textContent = 'Marketing';
-  marketingRow.append(marketingLabel, marketingSlider, marketingValue);
-
   redrawFare();
-  redrawMarketing();
   redrawEconomics();
-  return [heading, fareRow, marketingRow, economics, fixedCosts];
+  return [heading, fareRow, economics, fixedCosts];
 }
 
 const STANCES: { stance: FareStance; name: string }[] = [

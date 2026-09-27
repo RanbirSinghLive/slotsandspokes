@@ -92,7 +92,7 @@ export function summarizeMarket(origin: string, dest: string, state: SimState, r
       actualDailyDemand(state, leg.origin, leg.dest),
       connectingFor(leg.origin, leg.dest),
       freq,
-      routeSettings,
+      routeSettings.fare,
       state.competitorRoutes,
       previewSpillover,
     );
@@ -105,13 +105,6 @@ export function summarizeMarket(origin: string, dest: string, state: SimState, r
     totalSeatCeiling += Math.round(type.seats * LOAD_FACTOR);
   }
 
-  // Marketing spend is a per-day, per-market cost (see step.ts's day-
-  // rollover handling), not a per-flight one — added once here, same way,
-  // so this always matches what the sim will actually charge rather than
-  // looking like the marketing lever is free.
-  cost += routeSettings.marketingSpend;
-  margin -= routeSettings.marketingSpend;
-
   // A market is "seat-capped" when every one of its flights is pinned at
   // the load-factor ceiling — there's more demand than the fleet can
   // carry there, so raising fare trades away spare demand nobody could
@@ -122,15 +115,15 @@ export function summarizeMarket(origin: string, dest: string, state: SimState, r
   const seatCapped = freq > 0 && pax >= totalSeatCeiling;
 
   // Market share (choiceModel.ts's trafficShare()) is a property of the
-  // market, not of any one leg on it — same fare/frequency/marketing
-  // spend feed it as bookingShare, just excluding "stay home" from the
+  // market, not of any one leg on it — the same fare and frequency feed
+  // it as bookingShare, just excluding "stay home" from the
   // denominator, so it answers "of people who fly this market, what
   // fraction fly you" rather than "what fraction of the addressable
   // population books at all." Direct-competitor-driven only for now —
   // connecting itineraries aren't modeled (WEEK-TWO.md decision 1), so a
   // rival reachable only by connecting through a third city can't yet
   // pull share away here.
-  const share = freq > 0 ? trafficShare(routeSettings.fare, freq, origin, dest, routeSettings.marketingSpend, state.competitorRoutes) : 1;
+  const share = freq > 0 ? trafficShare(routeSettings.fare, freq, origin, dest, state.competitorRoutes) : 1;
 
   return { freq, pax, revenue, cost, margin, seatCapped, share, totalSeats, seatCeiling: totalSeatCeiling };
 }

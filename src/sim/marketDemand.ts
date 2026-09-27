@@ -2,6 +2,7 @@ import { MARKET_PAIR_TABLE, potentialDailyDemand } from './demand';
 import { marketKey } from './schedule';
 import { reliabilityDemandFactor, trailingMarketOtp } from './routeOtp';
 import { dailySeatsByMarket, hungerBoost, hungerByAirport } from './serviceLevel';
+import { executiveMarketBuildingMultiplier } from './executives';
 import { recessionFactor } from './shocks';
 import type { SimState } from './state';
 
@@ -121,56 +122,6 @@ export function actualDailyDemand(state: SimState, origin: string, dest: string)
 }
 
 /**
- * Dollars of daily marketing that count for as much market presence as
- * one seat of daily capacity, for stimulation purposes.
- *
- * This is what makes marketing worth spending at all. Measured before
- * this existed, marketing's only effect was a small booking-share bonus
- * (sim/choiceModel.ts), and the return on it was **0.00x on nearly every
- * market** — best case 0.50x. It failed in a pincer: on a big market the
- * extra share was worthless because the flights were already seat-capped,
- * and on a small market the share gain was real but absolutely tiny (a
- * passenger or two) against a cost quoted in flat dollars. There was no
- * market size at which a flat daily fee bought enough share to pay for
- * itself, which is a structural problem, not a constant that needed
- * nudging.
- *
- * Routing it through stimulation instead fixes the shape rather than the
- * number. Because saturation divides by potential, the *same* dollar buys
- * proportionally less presence in a bigger market — so cost scales with
- * market size automatically, without a second size-dependent term. And
- * because it grows the market rather than just re-slicing it, the payoff
- * is a permanently larger market rather than a few percent of share on
- * flights that may already be full.
- *
- * Marketing still doesn't let you *carry* anyone, so over-spending on a
- * market you haven't put capacity into stays a mistake — which is the
- * right lesson, and one the Dev tab's funnel now shows directly.
- */
-const MARKETING_RATE_BOOST = 1;
-const MARKETING_SCALE = 200;
-
-/**
- * How much faster marketing spend makes a market mature — a multiplier on
- * the stimulation rate, not an addition to capacity. 1 means no spend and
- * no effect; $200/day doubles the rate, $800/day roughly triples it,
- * `log2` giving the same diminishing returns the booking-share bonus
- * already uses.
- *
- * A multiplier rather than an additive "marketing buys virtual seats"
- * term because that additive version was tried first and measured
- * net-negative everywhere: a small market is already at full saturation
- * from its own aircraft so extra presence bought nothing, and a trunk
- * market is so large that any plausible daily spend is a rounding error
- * against it. The useful band was too narrow to matter. A rate multiplier
- * applies wherever a market is still *growing*, which is the whole
- * period the spend is supposed to be shortening.
- */
-function marketingRateMultiplier(marketingSpend: number): number {
-  return 1 + MARKETING_RATE_BOOST * Math.log2(1 + marketingSpend / MARKETING_SCALE);
-}
-
-/**
  * What fraction of the latent market is actually being served, capped at
  * 1. This is the term that makes market size matter: 19 seats against 9
  * potential passengers saturates the market outright (1.0), while the
@@ -200,6 +151,7 @@ export function rollDailyMarketDemand(state: SimState): void {
   // on the same morning's service.
   const hunger = hungerByAirport(state, seatsByMarket);
   const multiplier = potentialMultiplier(state);
+  const marketBuilding = executiveMarketBuildingMultiplier(state);
 
   for (const { origin, dest, key, basePotential } of MARKET_PAIR_TABLE) {
     // currentPotentialDemand(), from the pair's precomputed potential.
@@ -208,11 +160,6 @@ export function rollDailyMarketDemand(state: SimState): void {
     const current = state.marketDemand[key] ?? floor;
 
     const seatsOffered = seatsByMarket.get(key) ?? 0;
-    // Marketing only counts where you actually fly — awareness of a
-    // service that doesn't exist sells nothing, and the branch below
-    // keeps that true without a separate check. (`routeSettings` only
-    // exists for markets a route was drawn on anyway.)
-    const marketingSpend = state.routeSettings[key]?.marketingSpend ?? 0;
 
     // How reliably the player has flown this market lately (sim/routeOtp.ts):
     // above the neutral line it speeds growth up, below it slows growth,
@@ -226,10 +173,11 @@ export function rollDailyMarketDemand(state: SimState): void {
       const rate =
         STIMULATION_RATE *
         serviceSaturation(seatsOffered, potential) *
-        marketingRateMultiplier(marketingSpend) *
         reliability *
         // A route to places nobody serves builds faster (sim/serviceLevel.ts).
-        hungerBoost(hunger, origin, dest);
+        hungerBoost(hunger, origin, dest) *
+        // A market-building CCO speeds every market up (sim/executives.ts).
+        marketBuilding;
       next = current + (potential - current) * rate;
     } else if (seatsOffered > 0) {
       // Unreliable enough to lose passengers: the same slide toward the

@@ -13,8 +13,8 @@ export const FORECAST_DAYS_AHEAD = 14;
 
 /**
  * Called once per simulated day, from step.ts's day-rollover — at the very
- * top of that block, before any of the new day's own charges (marketing,
- * lease) touch `state.cash`. That timing is what makes this
+ * top of that block, before any of the new day's own charges (leases,
+ * slots, overhead) touch `state.cash`. That timing is what makes this
  * "yesterday's closing balance," not "today's opening one": nothing else
  * changes `state.cash` between the last minute of the day that just ended
  * and this call.

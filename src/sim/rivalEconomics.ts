@@ -62,7 +62,6 @@ export function rivalRouteDailyResult(state: SimState, route: CompetitorOffering
     route,
     settings?.fare ?? 0,
     playerLegs,
-    settings?.marketingSpend ?? 0,
     state.competitorRoutes,
   );
   const seats = route.dailyFrequency * Math.round(average((type) => type.seats) * LOAD_FACTOR);

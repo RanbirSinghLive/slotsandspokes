@@ -108,16 +108,16 @@ export type ActiveFlight = {
   /** The delay actually added to this flight's arrival: `delayByCause` summed, after the executive. */
   delayMinutes: number;
   /**
-   * This flight's fare and marketing spend, both copied from its market's
-   * RouteSettings at the moment it departs (see step.ts) — not re-read at
-   * arrival, so a change the player makes mid-flight doesn't retroactively
-   * affect one already in the air. Together with `origin`/`dest` (to look
-   * up who's competing) and `legsServingMarket` (recomputed fresh at
-   * arrival, since adding a frequency mid-flight *should* immediately
-   * split demand differently), these are everything sim/economy.ts needs.
+   * This flight's fare, copied from its market's RouteSettings at the
+   * moment it departs (see step.ts) — not re-read at arrival, so a change
+   * the player makes mid-flight doesn't retroactively affect one already
+   * in the air. Together with `origin`/`dest` (to look up who's competing)
+   * and `legsServingMarket` (recomputed fresh at arrival, since adding a
+   * frequency mid-flight *should* immediately split demand differently),
+   * that's everything sim/economy.ts needs. Flights saved before marketing
+   * was removed also carry a `marketingSpend`, which nothing reads.
    */
   fare: number;
-  marketingSpend: number;
 };
 
 /**
@@ -126,8 +126,8 @@ export type ActiveFlight = {
  * individual scheduled leg. Fare is deliberately a route-level decision:
  * a market with two daily frequencies still has exactly one fare, not two
  * independently adjustable ones, to keep the game's decision space
- * manageable as more levers (marketing spend today, more later — see a
- * route's view, ui/inspector/route.ts) get added to this same record.
+ * manageable. Saves from before marketing was removed also carry a
+ * `marketingSpend` here, which nothing reads.
  */
 /** A way of pricing a market against its rivals (sim/pricing.ts). */
 export type FareStance = 'undercut' | 'match' | 'premium';
@@ -149,14 +149,6 @@ export type RouteSettings = {
    * existed, which reads the same as null.
    */
   fareStance?: FareStance | null;
-  /**
-   * Daily dollars spent promoting this specific market — a flat cost
-   * charged once per day (see step.ts's day-rollover handling), not per
-   * flight, since it's a market-level decision, not a leg-level one. Feeds
-   * a diminishing-returns bonus into sim/choiceModel.ts's booking share;
-   * 0 means no spend and no effect, same as before this lever existed.
-   */
-  marketingSpend: number;
   /**
    * Extra scheduled ground time after every flight on this market, on top
    * of MIN_TURN_MINUTES (sim/turnBuffer.ts). Slack that soaks up a late
@@ -190,8 +182,8 @@ export type SimState = {
    * One RouteSettings entry per market currently served, keyed by
    * marketKey(origin, dest) — a plain object (not a Map) so `state` keeps
    * surviving JSON.parse(JSON.stringify(state)) unchanged, per CLAUDE.md.
-   * ui/routeBuilder.ts creates a new entry here (recommendedFare() default,
-   * zero marketing spend) whenever a leg is added to a market that didn't
+   * ui/routeBuilder.ts creates a new entry here (the policy fare)
+   * whenever a leg is added to a market that didn't
    * already have one; adding a second frequency to an existing market
    * reuses the same entry rather than creating a second one.
    */
@@ -389,8 +381,8 @@ export type SimState = {
    * across the whole airline — filled in step.ts's arrival loop, right
    * beside the network-wide totals. Deliberately narrower than those: only
    * a flight's own fuel/block/departure economics (sim/economy.ts's
-   * flightResult()) are attributed to a market. Marketing, lease and crew
-   * are airline-wide overhead a plane's day is shared across, with no
+   * flightResult()) are attributed to a market. Leases, slots, overhead and crew
+   * are airline-wide costs a plane's day is shared across, with no
    * honest way to hand one market its "share" of a lease payment, so they
    * stay out — same reasoning the dev tools' cost tree already uses to
    * keep a single flight's numbers free of them.
@@ -589,8 +581,6 @@ export type SimState = {
     blockNonFuel: number;
     /** Flat per-departure charges. */
     departure: number;
-    /** Daily marketing spend, summed across every market. */
-    marketing: number;
     /** Daily lease cost, summed across every leased airframe. */
     lease: number;
     /** Daily crew salaries, everyone on the books whether or not they flew. */
@@ -712,7 +702,7 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     completedMissionIds: [],
     activeTarget: null,
     lastTargetResult: null,
-    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0, training: 0, slots: 0, maintenance: 0, overhead: 0 },
+    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, lease: 0, crew: 0, training: 0, slots: 0, maintenance: 0, overhead: 0 },
   };
   revealReach(state);
   openMarket(state);

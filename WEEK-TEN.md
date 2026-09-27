@@ -73,9 +73,10 @@ parked system still costs every change that touches it).
 | Tech Tree (`sim/techTree.ts`) | one fuel-efficiency branch, spends Reputation, hidden | **Folded** into thread 2 as **innovations**: airline programmes a milestone makes available (a loyalty scheme, winglet retrofits, online booking), not "unlocks" |
 | Executives (`sim/executives.ts`) | CEO, COO, CFO, CCO paid in Reputation, hidden | **Kept and reworked** (thread 8): no CEO, since the player is the CEO; CFO, COO and CCO chosen from candidate pools that widen as NPS rises; paid in money for their bonuses. Flavour in a game that is otherwise numbers |
 | Loans (`sim/loans.ts`) | unreachable: $0 ends the game | **Cut** the offer machinery; keep `isInsolvent()` and the game-over screen. **Done:** `isInsolvent()` is in `sim/insolvency.ts`, the game-over screen in `ui/gameOver.ts`; the loans, their state field, offer pop-up and table are gone; headless output identical |
-| Crew (`sim/crew.ts`) | pools, hiring, training lines, payroll; switched off | **Explored** in thread 9: woven into the map, not a tab |
+| Crew (`sim/crew.ts`) | pools, hiring, training lines, payroll; switched off | **Explored** in thread 9: woven into the map, not a tab. The owner chose all three directions |
 | Fuel drift (`FUEL_PRICE_MOVES`) | off; shocks set fuel now | **Cut** the random walk; shocks are the fuel story. **Done:** the walk, its switch, the history field and the Executive tab's fuel chart are gone; headless output identical |
 | The Grow tab | never built | **Dropped** |
+| Marketing (per-market spend) | a daily charge buying booking share and faster growth | **Cut** (asked for after the table was drafted): too similar to the fare, a second dial for the same trade. **Done:** the slider, the charge, the choice-model bonus, the growth multiplier, the state fields and the sweep lever are gone; headless output identical. The CCO whose bonus was free marketing now builds markets instead (new markets grow 25% faster) until thread 8 reworks every executive |
 
 Measured: `npm run balance` before and after each cut (it should not
 move, since everything cut is switched off).
@@ -210,7 +211,8 @@ directions, not exclusive:
    rides on levers already on the map (turn buffers, how full a plane's
    day is). What to optimise: slack against utilisation.
 
-**Claude's lean:** 2 and 3 first. They add a real trade-off (hire ahead,
+**The owner chose all three** ("excited to see it play"). Claude's
+original lean, kept for the order: 2 and 3 first. They add a real trade-off (hire ahead,
 leave slack) using bars and levers already on the map, with no new
 screen. 1 is the richer idea but changes how rotations work, and fits
 with the "second base" milestone. For the owner to choose before any of
@@ -238,11 +240,10 @@ it is built.
 4. Thread 3 (NPS), then thread 8 (executives), which builds on it.
 5. Thread 4 (map), thread 6 (fare stances), in either order.
 6. The rest of thread 5, and thread 7.
-7. Thread 9 (crew), once the owner picks a direction.
+7. Thread 9 (crew): hours bar and fatigue first, then crew bases.
 
 ## Open questions for the owner
 
-- **Crew: which of thread 9's directions?**
 - **Do rivals get bigger aircraft by date, or also gated?** Gating them by
   the player's progress would be strange; by date keeps the world moving
   on its own.

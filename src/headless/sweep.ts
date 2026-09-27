@@ -18,7 +18,6 @@ import { createPlayer, playerFromArgs, type PlayerKind } from './player';
  * it's what this file exists to answer.
  *
  *   npm run sweep -- fare
- *   npm run sweep -- marketing 200
  *   npm run sweep -- fare 120 YYZ --player starter
  *
  * Each run is played by a headless player (headless/player.ts), steady
@@ -111,17 +110,6 @@ const LEVERS: Lever[] = [
     format: (v) => STANCES[v],
   },
   {
-    name: 'marketing',
-    description: 'Daily marketing spend on every market',
-    values: [0, 50, 100, 200, 400, 800],
-    apply: (state, spend) => {
-      for (const settings of Object.values(state.routeSettings)) {
-        settings.marketingSpend = spend;
-      }
-    },
-    format: (v) => `$${v}/day`,
-  },
-  {
     // The exact cumulative multipliers data/tech-tree.json's five fuel
     // efficiency tiers actually produce, in order — so each row answers
     // "what is tier N of that branch really worth over a full run,"
@@ -156,7 +144,7 @@ type SweepRow = {
  */
 function runOne(lever: Lever, value: number, days: number): SweepRow {
   // A real new game (see newGame.ts), with the lever applied once its
-  // starter routes exist, so fare and marketing levers have markets to touch.
+  // starter routes exist, so the fare lever has markets to touch.
   const player = createPlayer(playerKind);
   const state = startHeadlessGame(home, SWEEP_SEED, player);
   const startingCash = state.cash;

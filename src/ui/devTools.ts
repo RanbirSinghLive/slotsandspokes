@@ -75,7 +75,6 @@ const COST_ROWS: CostRowSpec[] = [
     depth: 0,
     hint: 'Charged once at day-rollover whether or not anything flew.',
     value: (s) =>
-      s.todayCostByCategory.marketing +
       s.todayCostByCategory.lease +
       s.todayCostByCategory.crew +
       s.todayCostByCategory.training +
@@ -95,12 +94,6 @@ const COST_ROWS: CostRowSpec[] = [
     depth: 1,
     hint: 'Daily fees on every slot pair held, each locked at the price when it was taken.',
     value: (s) => s.todayCostByCategory.slots,
-  },
-  {
-    label: 'Marketing',
-    depth: 1,
-    hint: 'Daily spend summed across every market. Buys booking share through the choice model, with diminishing returns.',
-    value: (s) => s.todayCostByCategory.marketing,
   },
   {
     label: 'Lease',
@@ -264,7 +257,7 @@ function computeFunnel(state: SimState): FunnelTotals {
         actualDailyDemand(state, leg.origin, leg.dest),
         connectingDemandOnMarket(state, leg.origin, leg.dest),
         frequency,
-        settings,
+        settings.fare,
         state.competitorRoutes,
         previewSpillover,
       );
@@ -306,7 +299,7 @@ const FUNNEL_ROWS: FunnelRowSpec[] = [
   {
     label: 'Booked on you',
     depth: 1,
-    hint: 'After the choice model: everyone else picked a competitor or chose not to travel. A big drop here means your fare, frequency or marketing is losing the comparison — not that the market is small.',
+    hint: 'After the choice model: everyone else picked a competitor or chose not to travel. A big drop here means your fare or frequency is losing the comparison — not that the market is small.',
     value: (t) => t.booked,
   },
   {

@@ -4,7 +4,7 @@ import type { SimState } from '../sim/state';
 /**
  * The airline-wide fare policy (sim/pricing.ts), in the Network view's
  * Fleet tab: one slider pricing every market that follows it, and a line
- * saying how many do. A market's own fare, stance and marketing are in
+ * saying how many do. A market's own fare and stance are in
  * its route view (ui/inspector/route.ts).
  *
  * The slider is built once in the markup and only its value and the
