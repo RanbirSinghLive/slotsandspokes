@@ -517,6 +517,65 @@ the simulation.
 
 ---
 
+## Thread 8: cost level (asked for after thread 7)
+
+The rules now have the right shape (sitting erodes slowly, moats pay,
+reckless growth busts), but the amounts are far too big: a steady
+airline turns $500k into $58M–$104M in a year. A single Propeller runs
+at a 40–50% margin; real airlines run at 5–15%. The cause is operating
+cost: `data/aircraft-types.json` has a Propeller at $1,100 a block hour
+and $350 a departure, about half of a real turboprop's all-in cost, and
+the same for the bigger classes. Leases are a small part of the bill.
+
+The lever: scale every class's cost per block hour and per departure
+by one factor (rivals are costed from the same numbers), chosen by
+measurement.
+
+**Status: done at 1.7×** (every class's cost per block hour and per
+departure). Explored on a small grid (steady, sitter and starter from
+YUL, PHL, YHZ and LHR, two seeds) at 1.5×, 1.65×, 1.8×, 2×, 2.5× and
+with the block hour alone scaled: the response is steep (2.5× busts
+everyone, 2× busts the core starter and sitter), and scaling departures
+too made no difference to the thin short-haul homes.
+
+It also exposed a headless player weakness: a brand-new route starts at
+the demand floor and loses money for weeks (a Propeller took $8k a day
+against $26k of costs in Halifax), and the emergency rule cut every
+route by day 18 and returned the plane. Emergency cuts now spare routes
+still in their 21-day ramp-up while the cash would last that long.
+
+Measured (six seeds, day 365):
+
+| Persona | Before | At 1.7× |
+|---|---|---|
+| steady median, north-east | $58M–$91M | $22M–$40M (one YUL bust, day 102) |
+| steady, LHR | $104M | $37.5M |
+| steady, YHZ | $11.5M | $35k median, 2 busts in 6 |
+| sitter median | $13M–$18M | $3M–$7M (YHZ 4 busts in 6) |
+| starter | core survives | YUL/YYZ/BOS/LHR survive on $1.4M–$2.4M; PHL and YHZ bust |
+| reckless | all bust | all bust, sooner |
+
+The report now takes about 4½ minutes, since airlines are smaller.
+
+Against the targets: the sitter, starter and reckless land where
+proposed, and steady is about 3× less rich, but still above the
+$5M–$20M band. Pushing costs further breaks the early game before it
+tames the mid-game: the valley a new airline crosses while its first
+routes build demand is what gives out first (Halifax already can't cross
+it at 1.7×). What's left of the mid-game's richness comes from scale,
+which a uniform cost can't touch without hurting a one-plane start more.
+
+**Proposed targets** (Claude's, for the owner to confirm), a year, six
+seeds:
+- **steady**: median year-end cash of about $5M–$20M (10–40× the start),
+  no busts in the north-east core, Halifax mostly surviving;
+- **sitter**: a fraction of steady's, still eroding slowly (decision 7);
+- **starter**: survives in the core on a thin margin, busts at the
+  edges: the floor;
+- **reckless**: busts.
+
+---
+
 ## Carried forward from week eight
 
 Still live, and still named by this plan:

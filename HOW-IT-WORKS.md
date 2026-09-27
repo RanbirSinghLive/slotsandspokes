@@ -333,6 +333,14 @@ cost    = (blockMinutes / 60) * costPerBlockHour + costPerDeparture
 margin  = revenue - cost
 ```
 
+**Operating costs** (`data/aircraft-types.json`): per block hour and per
+departure, Propeller $1,870 and $600, Regional $5,600 and $1,480,
+Narrowbody $8,850 and $3,050, Widebody $16,300 and $6,400. Set in the
+cost pass (WEEK-NINE.md, thread 8) at 1.7× their earlier values, close
+to real all-in costs: at the old level a single Propeller ran at a
+40–50% margin and a careful airline made $58M–$104M in a year. Rivals
+are costed from the same numbers.
+
 `fare` and `marketingSpend` come from `state.routeSettings[marketKey(origin, dest)]`
 (sim/state.ts's `RouteSettings`), not from the leg — see "Pricing" and
 "The Commercial panel," below, for why fare lives at the market level.

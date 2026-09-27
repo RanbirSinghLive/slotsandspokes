@@ -4,8 +4,8 @@
     "name": "Propeller",
     "seats": 25,
     "cruiseKts": 280,
-    "costPerBlockHour": 1100,
-    "costPerDeparture": 350,
+    "costPerBlockHour": 1870,
+    "costPerDeparture": 600,
     "rangeNm": 380,
     "crewTier": 1
   },
@@ -14,8 +14,8 @@
     "name": "Regional",
     "seats": 75,
     "cruiseKts": 360,
-    "costPerBlockHour": 3300,
-    "costPerDeparture": 870,
+    "costPerBlockHour": 5600,
+    "costPerDeparture": 1480,
     "rangeNm": 850,
     "crewTier": 2
   },
@@ -24,8 +24,8 @@
     "name": "Narrowbody",
     "seats": 150,
     "cruiseKts": 450,
-    "costPerBlockHour": 5200,
-    "costPerDeparture": 1800,
+    "costPerBlockHour": 8850,
+    "costPerDeparture": 3050,
     "rangeNm": 2400,
     "crewTier": 3
   },
@@ -34,8 +34,8 @@
     "name": "Widebody",
     "seats": 300,
     "cruiseKts": 470,
-    "costPerBlockHour": 9600,
-    "costPerDeparture": 3750,
+    "costPerBlockHour": 16300,
+    "costPerDeparture": 6400,
     "rangeNm": 5500,
     "crewTier": 3
   }

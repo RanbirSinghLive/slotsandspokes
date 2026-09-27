@@ -408,7 +408,9 @@ function leaveSlack(state: SimState, memory: Memory): string[] {
  * When the airline as a whole is losing fast enough to run out of cash
  * within EMERGENCY_RUNWAY_DAYS, it doesn't wait: every day it also drops
  * a flight from whichever market lost the most last week, the way the
- * game's "Cash is running out" warning tells a player to.
+ * game's "Cash is running out" warning tells a player to. Markets still in
+ * their RAMP_UP_DAYS are spared while the cash would last that long:
+ * they're expected to lose money at first.
  */
 function cutLosers(state: SimState, memory: Memory): string[] {
   const log: string[] = [...cutInEmergency(state, memory)];
@@ -442,16 +444,20 @@ function cutInEmergency(state: SimState, memory: Memory): string[] {
   const averageMargin = lastWeek.reduce((sum, margin) => sum + margin, 0) / 7;
   if (averageMargin >= 0 || state.cash / -averageMargin >= EMERGENCY_RUNWAY_DAYS) return [];
 
+  // A new route loses money while its market builds (the route view says
+  // so); a careful player rides that out while the cash lasts that long,
+  // and cuts anything once it doesn't.
+  const runway = state.cash / -averageMargin;
   let worst: { a: string; b: string; margin: number } | null = null;
   for (const [a, b] of scheduledMarkets(state)) {
+    if (runway >= RAMP_UP_DAYS && daysFlown(state, memory, marketKey(a, b)) < RAMP_UP_DAYS) continue;
     const margin = lastWeekMargin(state, marketKey(a, b));
     if (margin !== null && margin < 0 && (!worst || margin < worst.margin)) worst = { a, b, margin };
   }
   if (!worst) return [];
   const dropped = dropOneFlight(state, memory, worst.a, worst.b);
   if (!dropped.ok) return [];
-  const runway = Math.round(state.cash / -averageMargin);
-  return [`Cash runs out in about ${runway} days; ${worst.a}–${worst.b} lost $${Math.round(-worst.margin).toLocaleString()}/day last week: ${dropped.message}`];
+  return [`Cash runs out in about ${Math.round(runway)} days; ${worst.a}–${worst.b} lost $${Math.round(-worst.margin).toLocaleString()}/day last week: ${dropped.message}`];
 }
 
 /**
