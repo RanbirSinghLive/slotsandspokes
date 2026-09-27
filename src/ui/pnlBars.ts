@@ -23,13 +23,19 @@ export function dayLabel(indexFromEnd: number): string {
 }
 
 /** Plain bars from a zero baseline, the tallest day in `shown` at full height. */
-export function buildUnipolarBars(shown: number[], tooltipFor: (value: number, indexFromEnd: number) => string): HTMLDivElement {
+export function buildUnipolarBars(
+  shown: number[],
+  tooltipFor: (value: number, indexFromEnd: number) => string,
+  /** The last value is today's, still running: its bar is drawn lighter. */
+  lastIsLive = false,
+): HTMLDivElement {
   const bars = document.createElement('div');
   bars.className = 'pnl-chart-bars';
   const max = Math.max(1, ...shown);
   shown.forEach((value, i) => {
     const bar = document.createElement('div');
     bar.className = 'pnl-chart-bar';
+    if (lastIsLive && i === shown.length - 1) bar.classList.add('is-live');
     bar.style.height = `${(value / max) * 100}%`;
     bar.title = tooltipFor(value, shown.length - i);
     bars.appendChild(bar);
@@ -38,7 +44,12 @@ export function buildUnipolarBars(shown: number[], tooltipFor: (value: number, i
 }
 
 /** A profit half and a loss half sharing one zero line, colored to say which without reading an axis. */
-export function buildBipolarBars(shown: number[], tooltipFor: (value: number, indexFromEnd: number) => string): HTMLDivElement {
+export function buildBipolarBars(
+  shown: number[],
+  tooltipFor: (value: number, indexFromEnd: number) => string,
+  /** The last value is today's, still running: its bar is drawn lighter. */
+  lastIsLive = false,
+): HTMLDivElement {
   const bars = document.createElement('div');
   bars.className = 'pnl-chart-bars pnl-chart-bars--bipolar';
 
@@ -52,6 +63,7 @@ export function buildBipolarBars(shown: number[], tooltipFor: (value: number, in
   shown.forEach((value, i) => {
     const cell = document.createElement('div');
     cell.className = 'pnl-chart-cell';
+    if (lastIsLive && i === shown.length - 1) cell.classList.add('is-live');
 
     const profitHalf = document.createElement('div');
     profitHalf.className = 'pnl-chart-cell-half pnl-chart-cell-half--profit';

@@ -1071,12 +1071,14 @@ cell coloured good/fair/poor; a heading re-sorts, a row opens the
 route); Goals and Head office open theirs. The network's trailing NPS is
 kept for 30 days (`state.npsHistory`) for its trend.
 
-Below the cards: today's revenue/cost/margin,
-a fleet table (tail, type, status, and either the current airport or
-`origin → dest (N min)` while airborne — with `, N min late` appended when
-`arriveMinute > scheduledArriveMinute`, M9), and the schedule table below.
-The econ/fleet parts are rebuilt from `state` every render — a pure read,
-same rule as the canvas layers.
+Below the cards, **Last 7 days** (`ui/pnlHistory.ts`): Revenue, Cost and
+Margin as bar charts of the six finished days plus today, live, drawn
+lighter as the rightmost bar and growing as flights land; each header
+shows today's figure. Early in the day margin reads as a loss, since
+leases, slots and overhead are charged at midnight. Then the fare policy,
+the lessor, and the rotations list. The summary (cards and charts) shows
+only at Network on the Fleet tab. All of it is a pure read of `state`,
+like the canvas layers.
 
 **The inspector** (`src/ui/inspector/`, `src/ui/selection.ts`). The panel
 shows whatever is selected. At **Network** it is the summary and tabs

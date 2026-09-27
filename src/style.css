@@ -757,6 +757,13 @@ body {
   width: 100%;
 }
 
+/* Today's bar, still running (ui/pnlHistory.ts): lighter, so it doesn't
+   read as a finished day. */
+.pnl-chart-bar.is-live,
+.pnl-chart-cell.is-live .pnl-chart-bar {
+  opacity: 0.55;
+}
+
 .pnl-chart-bar--positive {
   background: #5fc98a;
 }

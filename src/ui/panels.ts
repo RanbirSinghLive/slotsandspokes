@@ -81,9 +81,6 @@ function linkCard(card: HTMLElement, label: string, value: string): void {
   valueEl.textContent = `${value} ›`;
   card.replaceChildren(labelEl, valueEl);
 }
-const revenueEl = document.querySelector<HTMLSpanElement>('#panel-revenue')!;
-const costEl = document.querySelector<HTMLSpanElement>('#panel-cost')!;
-const marginEl = document.querySelector<HTMLSpanElement>('#panel-margin')!;
 const rotationsBody = document.querySelector<HTMLTableSectionElement>('#rotations-table tbody')!;
 const rotationsEmptyEl = document.querySelector<HTMLDivElement>('#rotations-empty')!;
 const scheduleWarningsEl = document.querySelector<HTMLUListElement>('#schedule-warnings')!;
@@ -145,9 +142,6 @@ export function updatePanel(state: SimState): void {
   // Where the airline stands on the ladder (sim/ladder.ts), and head office.
   linkCard(goalsEl, 'Goals', goalsSummary(state));
   linkCard(headOfficeEl, 'Head office', headOfficeSummary(state));
-  revenueEl.textContent = money(state.todayRevenue);
-  costEl.textContent = money(state.todayCost);
-  marginEl.textContent = money(state.todayMargin);
   updatePnlHistoryPanel(state);
 
   renderRotations(state);

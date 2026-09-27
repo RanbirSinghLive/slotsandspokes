@@ -3,71 +3,58 @@ import type { SimState } from '../sim/state';
 import { WINDOW_DAYS, buildBipolarBars, buildUnipolarBars, dayLabel, money } from './pnlBars';
 
 /**
- * "Last 7 Days" bar charts under the sidebar's Today figures (see
- * ui/panels.ts) — three small vertical-bar charts, Revenue/Cost/Margin,
- * one bar per finished day, reading straight from
- * SimState.revenueHistory/costHistory/marginHistory
- * (sim/pnlHistory.ts's recordDailyPnlHistory()). The Today rows above
- * answer "how did today go"; one day's numbers can't say whether the
- * network is actually improving — this is the trend a single day hides.
- * The bars themselves (ui/pnlBars.ts) are shared with a route view's own
- * mini history chart (ui/mapMenu.ts), which asks the same question about
- * one market instead of the whole network.
+ * The sidebar's "Last 7 days" bar charts (see ui/panels.ts): three small
+ * vertical-bar charts, Revenue/Cost/Margin, one bar per day. The six
+ * before today come from SimState.revenueHistory/costHistory/marginHistory
+ * (sim/pnlHistory.ts's recordDailyPnlHistory()); the rightmost is today,
+ * live, drawn lighter and growing as flights land, and each header shows
+ * today's figure. So one glance gives both how today is going and whether
+ * the network is improving. The bars themselves (ui/pnlBars.ts) are shared
+ * with a route view's own mini history chart (ui/mapMenu.ts).
  *
- * Rebuilt only when a new day has actually landed — this data changes
- * once a day (at step.ts's rollover), not every rendered frame, and
- * `updatePanel()` (ui/panels.ts) calls in here every frame same as the
- * rest of the sidebar.
+ * Rebuilt only when a figure a player could see has changed (a new day,
+ * or a flight landing), not every frame, though `updatePanel()`
+ * (ui/panels.ts) calls in here every frame.
  */
 
 const containerEl = document.querySelector<HTMLDivElement>('#pnl-history')!;
 
-function buildHeader(label: string, latest: number | undefined): HTMLDivElement {
+function buildHeader(label: string, today: number): HTMLDivElement {
   const header = document.createElement('div');
   header.className = 'pnl-chart-header';
   const labelEl = document.createElement('span');
   labelEl.textContent = label;
   const statEl = document.createElement('span');
   statEl.className = 'pnl-chart-stat';
-  statEl.textContent = latest === undefined ? '' : money(latest);
+  statEl.textContent = `${money(today)} today`;
   header.append(labelEl, statEl);
   return header;
 }
 
-function buildChart(label: string, history: number[], bipolar: boolean): HTMLDivElement {
-  const shown = history.slice(-WINDOW_DAYS);
+function buildChart(label: string, history: number[], today: number, bipolar: boolean): HTMLDivElement {
+  const shown = [...history.slice(-(WINDOW_DAYS - 1)), today];
   const block = document.createElement('div');
   block.className = 'pnl-chart';
-  block.append(buildHeader(label, shown[shown.length - 1]));
+  block.append(buildHeader(label, today));
 
-  const tooltipFor = (value: number, indexFromEnd: number) => `${dayLabel(indexFromEnd)}: ${money(value)}`;
-  block.appendChild(bipolar ? buildBipolarBars(shown, tooltipFor) : buildUnipolarBars(shown, tooltipFor));
+  // The last bar is today; the others count back from yesterday.
+  const tooltipFor = (value: number, indexFromEnd: number) =>
+    indexFromEnd === 1 ? `Today so far: ${money(value)}` : `${dayLabel(indexFromEnd - 1)}: ${money(value)}`;
+  block.appendChild(bipolar ? buildBipolarBars(shown, tooltipFor, true) : buildUnipolarBars(shown, tooltipFor, true));
   return block;
 }
 
-let lastRenderedDay = -1;
+let lastSignature = '';
 
-/**
- * Rebuilds the three charts if (and only if) a new day has landed since
- * the last call. Safe to call every frame — the day check makes repeat
- * calls within the same day free.
- */
+/** Rebuilds the three charts when today's figures or the day have changed. Safe to call every frame. */
 export function updatePnlHistoryPanel(state: SimState): void {
-  const day = dayIndex(state);
-  if (day === lastRenderedDay) return;
-  lastRenderedDay = day;
-
-  if (state.revenueHistory.length === 0) {
-    const note = document.createElement('div');
-    note.className = 'pnl-chart-note';
-    note.textContent = 'Not enough history yet — check back after your first full day.';
-    containerEl.replaceChildren(note);
-    return;
-  }
+  const signature = `${dayIndex(state)}:${Math.round(state.todayRevenue)}:${Math.round(state.todayCost)}`;
+  if (signature === lastSignature) return;
+  lastSignature = signature;
 
   containerEl.replaceChildren(
-    buildChart('Revenue', state.revenueHistory, false),
-    buildChart('Cost', state.costHistory, false),
-    buildChart('Margin', state.marginHistory, true),
+    buildChart('Revenue', state.revenueHistory, state.todayRevenue, false),
+    buildChart('Cost', state.costHistory, state.todayCost, false),
+    buildChart('Margin', state.marginHistory, state.todayMargin, true),
   );
 }
