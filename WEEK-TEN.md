@@ -424,3 +424,12 @@ thread 2; the owner asked for it, so it's next after thread 2's slice 3.
 
 *(The owner adds findings from play here; each becomes a slice or moves
 one up.)*
+
+- **A rival at home from day one** (asked for with thread 8): some rival
+  starts on one route from the chosen home, so every start differs.
+  **Done:** a local start-up on one of home's five biggest markets, picked
+  by seed and weighted by size, so the best market isn't always the
+  contested one. Counts as one of the five rival entries. Starter busts
+  rise where it lands on the starter's route (Montréal 1 → 4 of 6,
+  Boston 0 → 2); steady and sitter within noise. `npm run homes`
+  re-run: 16 of 169 ratings changed, Brutal 68 → 73.

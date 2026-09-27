@@ -329,6 +329,58 @@ export function rollRivalEntry(state: SimState, dayStartMinute: number): void {
   });
 }
 
+/** How many of home's biggest markets the home rival picks among. */
+const HOME_RIVAL_CHOICES = 5;
+
+/**
+ * A rival already flying from the player's home on day one: a local
+ * start-up from the rival pool, on one daily route to somewhere the player
+ * can see. Picked by the seeded stream from home's HOME_RIVAL_CHOICES
+ * biggest markets that no rival flies yet, weighted by potential demand,
+ * so every start differs, even from the same home, and the single best
+ * market isn't always the contested one. It is an incumbent, like the
+ * seed routes: priced a little under the going rate, holding its slots
+ * and its plane from before the game. It counts as one of the game's
+ * MAX_RIVAL_ENTRIES newcomers. Called once, when the home is chosen.
+ */
+export function placeHomeRival(state: SimState): void {
+  const home = state.homeAirport;
+  const served = new Set(state.competitorRoutes.map((route) => marketKey(route.origin, route.dest)));
+  const known = new Set(state.knownAirports);
+  const markets = ALL_MARKET_PAIRS.filter(
+    ([a, b]) =>
+      (a === home || b === home) &&
+      known.has(a) &&
+      known.has(b) &&
+      !served.has(marketKey(a, b)) &&
+      marketDistanceNm(a, b) <= COMPETITOR_MAX_ROUTE_NM &&
+      potentialDailyDemand(a, b) > 0,
+  )
+    .sort((x, y) => potentialDailyDemand(y[0], y[1]) - potentialDailyDemand(x[0], x[1]))
+    .slice(0, HOME_RIVAL_CHOICES);
+  const codesInUse = new Set(state.competitorRoutes.map((route) => route.code));
+  const pool = (rivalPoolData as { airline: string; code: string }[]).filter((rival) => !codesInUse.has(rival.code));
+  if (markets.length === 0 || pool.length === 0) return;
+
+  const [marketRoll, seedAfterMarket] = nextRandom(state.rngSeed);
+  const [nameRoll, seedAfterName] = nextRandom(seedAfterMarket);
+  state.rngSeed = seedAfterName;
+  const [a, b] = pickWeighted(markets, markets.map(([x, y]) => potentialDailyDemand(x, y)), marketRoll);
+  const rival = pool[Math.min(pool.length - 1, Math.floor(nameRoll * pool.length))];
+  const origin = a === home ? a : b;
+  const dest = a === home ? b : a;
+  state.competitorRoutes.push({
+    airline: rival.airline,
+    code: rival.code,
+    origin,
+    dest,
+    dailyFrequency: 1,
+    fare: incumbentFare(origin, dest),
+    baseFare: incumbentFare(origin, dest),
+    openedAtMinute: PRE_EXISTING_OPENED_AT_MINUTE,
+  });
+}
+
 /**
  * Competitors add flights to routes they already fly, up to
  * RIVAL_FREQUENCY_CAP, with a small daily chance per route that grows with

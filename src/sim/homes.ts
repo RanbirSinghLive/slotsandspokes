@@ -1,4 +1,6 @@
 import airportsData from '../../data/airports.json';
+import { placeHomeRival } from './competitors';
+import { ensureRivalFleets } from './market';
 import homeDifficultyData from '../../data/home-difficulty.json';
 import { AIRCRAFT_CLASSES } from './aircraftClasses';
 import { marketDistanceNm, potentialDailyDemand } from './demand';
@@ -78,4 +80,8 @@ export function chooseHome(state: SimState, iata: string): void {
   // around the city actually chosen.
   state.knownAirports = [];
   revealReach(state);
+  // A rival already flies from the new home (sim/competitors.ts), with
+  // its plane from before the game (sim/market.ts).
+  placeHomeRival(state);
+  ensureRivalFleets(state);
 }
