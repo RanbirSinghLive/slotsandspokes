@@ -1,3 +1,5 @@
+import { money } from './format';
+
 /**
  * The bar-building guts shared by the sidebar's "Last 7 Days" charts
  * (ui/pnlHistory.ts) and a route view's own mini history chart
@@ -14,11 +16,6 @@
  */
 
 export const WINDOW_DAYS = 7;
-
-export function money(amount: number): string {
-  const sign = amount < 0 ? '-' : '';
-  return `${sign}$${Math.abs(Math.round(amount)).toLocaleString()}`;
-}
 
 /** "Yesterday" for the most recent entry, "N days ago" further back — the window has no "today" in it, since today isn't finished yet. */
 export function dayLabel(indexFromEnd: number): string {
@@ -79,3 +76,5 @@ export function buildBipolarBars(shown: number[], tooltipFor: (value: number, in
 
   return bars;
 }
+
+export { money };

@@ -1,4 +1,6 @@
 import { cashRunway, RUNWAY_WINDOW_DAYS } from '../../sim/forecast';
+import { line, heading } from './dom';
+import { money } from '../format';
 import type { SimState } from '../../sim/state';
 
 /**
@@ -7,24 +9,6 @@ import type { SimState } from '../../sim/state';
  * rate, a week's average day, and today's costs by kind. What the Cash
  * card's colour is summing up.
  */
-
-function line(text: string, className = 'inspector-line'): HTMLElement {
-  const el = document.createElement('div');
-  el.className = className;
-  el.textContent = text;
-  return el;
-}
-
-function heading(text: string): HTMLElement {
-  const el = document.createElement('h2');
-  el.textContent = text;
-  return el;
-}
-
-function money(amount: number): string {
-  const sign = amount < 0 ? '−' : '';
-  return `${sign}$${Math.abs(Math.round(amount)).toLocaleString()}`;
-}
 
 const SVG = 'http://www.w3.org/2000/svg';
 const CHART_WIDTH = 300;

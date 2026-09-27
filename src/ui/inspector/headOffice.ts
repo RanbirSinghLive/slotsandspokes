@@ -1,4 +1,6 @@
 import { dayIndex } from '../../sim/clock';
+import { line, heading } from './dom';
+import { money } from '../format';
 import { FUEL_PRICE_BASELINE } from '../../sim/fuel';
 import { activeHedge, describeFuelPrice } from '../../sim/fuelPrice';
 import type { SimState } from '../../sim/state';
@@ -13,23 +15,6 @@ import { formatNps, networkNps } from '../../sim/nps';
  * (sim/fuelPrice.ts), and the innovations the ladder opens
  * (sim/innovations.ts), and the executives (sim/executives.ts).
  */
-
-function line(text: string, className = 'inspector-line'): HTMLElement {
-  const el = document.createElement('div');
-  el.className = className;
-  el.textContent = text;
-  return el;
-}
-
-function heading(text: string): HTMLElement {
-  const el = document.createElement('h2');
-  el.textContent = text;
-  return el;
-}
-
-function money(amount: number): string {
-  return `$${Math.round(amount).toLocaleString()}`;
-}
 
 /** One innovation: what it does and costs, and a button to adopt it, or why it can't be yet. */
 function innovationCard(state: SimState, option: InnovationOption, changed: () => void): HTMLElement {

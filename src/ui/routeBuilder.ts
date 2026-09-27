@@ -1,4 +1,5 @@
 import { geoCircle, geoPath } from 'd3-geo';
+import { money } from './format';
 import type { LineString } from 'geojson';
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { projection } from '../render/projection';
@@ -111,10 +112,6 @@ function showRouteHoverTooltip(
   routeHoverTooltip.hidden = false;
   routeHoverTooltip.style.left = `${screenX + 16}px`;
   routeHoverTooltip.style.top = `${screenY + 16}px`;
-}
-
-function money(amount: number): string {
-  return `$${Math.round(amount).toLocaleString()}`;
 }
 
 /**

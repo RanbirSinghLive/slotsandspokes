@@ -1,4 +1,5 @@
 import { airlineCalled, currentTier, isMilestoneMet, LADDER, openedSoFar, tiersClimbed, type Milestone } from '../../sim/ladder';
+import { line, heading } from './dom';
 import type { SimState } from '../../sim/state';
 import { select } from '../selection';
 
@@ -9,19 +10,6 @@ import { select } from '../selection';
  * ahead. It's the game's answer to "what should I be doing?". The
  * innovations it opens are adopted at Head office (ui/inspector/headOffice.ts).
  */
-
-function line(text: string, className = 'inspector-line'): HTMLElement {
-  const el = document.createElement('div');
-  el.className = className;
-  el.textContent = text;
-  return el;
-}
-
-function heading(text: string): HTMLElement {
-  const el = document.createElement('h2');
-  el.textContent = text;
-  return el;
-}
 
 /** One milestone as a row: its name and what to do, then met (and when) or how close. */
 function milestoneRow(state: SimState, milestone: Milestone): HTMLElement {

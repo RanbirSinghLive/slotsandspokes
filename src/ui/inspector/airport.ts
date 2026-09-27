@@ -1,4 +1,5 @@
 import { airportLoad, dailyMovementsAt, slotCapacityPerDay } from '../../sim/airports';
+import { line, heading } from './dom';
 import { whereToFlyFrom } from '../../sim/whereToFly';
 import { openRouteForm } from '../routeBuilder';
 import { formatNps, marketNps } from '../../sim/nps';
@@ -38,19 +39,6 @@ export type AirportView = {
 };
 
 const namesByIata = new Map(airports.map((airport) => [airport.iata, airport.name]));
-
-function line(text: string, className = 'inspector-line'): HTMLElement {
-  const el = document.createElement('div');
-  el.className = className;
-  el.textContent = text;
-  return el;
-}
-
-function heading(text: string): HTMLElement {
-  const el = document.createElement('h2');
-  el.textContent = text;
-  return el;
-}
 
 /**
  * Build the view. `changed` is called after the player changes something

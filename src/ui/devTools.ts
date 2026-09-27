@@ -1,4 +1,5 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
+import { money } from './format';
 import { airlineFuelPrice } from '../sim/fuelPrice';
 import { bookingPerks } from '../sim/innovations';
 import { flightResult, type EconomyAircraftType } from '../sim/economy';
@@ -132,11 +133,6 @@ const COST_ROWS: CostRowSpec[] = [
 
 type RowRefs = { amount: HTMLSpanElement; share: HTMLSpanElement; bar: HTMLDivElement };
 const rowRefs: RowRefs[] = [];
-
-function money(amount: number): string {
-  const sign = amount < 0 ? '-' : '';
-  return `${sign}$${Math.abs(Math.round(amount)).toLocaleString()}`;
-}
 
 /** Shared by the cost tree and the revenue funnel — same row shape, different numbers in it. */
 function buildRow(spec: { label: string; depth: number; hint: string }, refs: RowRefs[]): HTMLDivElement {

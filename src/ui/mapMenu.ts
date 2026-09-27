@@ -1,4 +1,5 @@
 import { nearestAirportCandidate, type Airport } from '../render/airports';
+import { money } from './format';
 import { findNearestOwnRoute } from '../render/routes';
 import { projection } from '../render/projection';
 import { TURN_BUFFER_CHOICES } from '../sim/turnBuffer';
@@ -80,10 +81,6 @@ let anchorY = 0;
 // elsewhere on the map still says what it did.
 let notice: string | null = null;
 let hover: { text: string; problem: boolean } | null = null;
-
-function money(amount: number): string {
-  return `$${Math.round(amount).toLocaleString()}`;
-}
 
 export function hideMapMenu(): void {
   ringHintEl.hidden = true;

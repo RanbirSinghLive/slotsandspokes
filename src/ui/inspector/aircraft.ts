@@ -1,4 +1,6 @@
 import { classByCode } from '../../sim/aircraftClasses';
+import { line, heading } from './dom';
+import { money } from '../format';
 import { aogFor, daysUntilReturn } from '../../sim/aog';
 import { projectRestOfDay } from '../../sim/cascade';
 import { minuteOfDay, minuteOfDayToTimeString } from '../../sim/clock';
@@ -18,23 +20,6 @@ import { select, selectRoute } from '../selection';
  * wants to teach; this is where that day reads in order, leg by leg, with
  * how late each one ran and why.
  */
-
-function money(amount: number): string {
-  return `${amount < 0 ? '−' : ''}$${Math.round(Math.abs(amount)).toLocaleString()}`;
-}
-
-function line(text: string, className = 'inspector-line'): HTMLElement {
-  const el = document.createElement('div');
-  el.className = className;
-  el.textContent = text;
-  return el;
-}
-
-function heading(text: string): HTMLElement {
-  const el = document.createElement('h2');
-  el.textContent = text;
-  return el;
-}
 
 function title(text: string): HTMLElement {
   const el = document.createElement('h3');

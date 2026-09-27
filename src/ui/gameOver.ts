@@ -1,4 +1,5 @@
 import { isInsolvent } from '../sim/insolvency';
+import { money } from './format';
 import { clearSavedState } from './save';
 import type { SimState } from '../sim/state';
 
@@ -10,11 +11,6 @@ import type { SimState } from '../sim/state';
 const gameOverModal = document.querySelector<HTMLDivElement>('#game-over-modal')!;
 const gameOverReasonEl = document.querySelector<HTMLParagraphElement>('#game-over-reason')!;
 const gameOverNewGameButton = document.querySelector<HTMLButtonElement>('#game-over-new-game')!;
-
-function formatMoney(amount: number): string {
-  const sign = amount < 0 ? '-' : '';
-  return `${sign}$${Math.abs(Math.round(amount)).toLocaleString()}`;
-}
 
 /** Wire the new-game button. Called once at startup. */
 export function setupGameOver(): void {
@@ -32,6 +28,6 @@ export function setupGameOver(): void {
 export function updateGameOver(state: SimState): boolean {
   const insolvent = isInsolvent(state);
   gameOverModal.hidden = !insolvent;
-  if (insolvent) gameOverReasonEl.textContent = `Cash has run out (${formatMoney(state.cash)}). This airline is finished.`;
+  if (insolvent) gameOverReasonEl.textContent = `Cash has run out (${money(state.cash)}). This airline is finished.`;
   return insolvent;
 }

@@ -1,4 +1,6 @@
 import { forecastStance, type StanceForecast } from '../../sim/fareForecast';
+import { line } from './dom';
+import { money } from '../format';
 import { RIVAL_SQUEEZED_RESPITE_DAYS } from '../../sim/pressure';
 import { brandInWords, formatNps, marketNps, networkNps } from '../../sim/nps';
 import { rivalYieldFactor } from '../../sim/pressure';
@@ -35,19 +37,8 @@ export type RouteView = {
   redrawPools: () => void;
 };
 
-function money(amount: number): string {
-  return `$${Math.round(amount).toLocaleString()}`;
-}
-
 function signedMoney(amount: number): string {
   return `${amount < 0 ? '−' : '+'}${money(Math.abs(amount))}`;
-}
-
-function line(text: string, className = 'inspector-line'): HTMLElement {
-  const el = document.createElement('div');
-  el.className = className;
-  el.textContent = text;
-  return el;
 }
 
 /**

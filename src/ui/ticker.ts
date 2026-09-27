@@ -1,4 +1,5 @@
 import { airlineCalled, LADDER, milestoneById, tiersClimbed } from '../sim/ladder';
+import { money } from './format';
 import { RIVAL_CLOSE_AFTER_LOSING_DAYS, RIVAL_SQUEEZED_RESPITE_DAYS } from '../sim/pressure';
 import { activeHedge } from '../sim/fuelPrice';
 import { activeShock, describeShock, shockEndedLine, type Shock } from '../sim/shocks';
@@ -103,10 +104,6 @@ function entryReason(state: SimState, a: string, b: string): string {
   return spillValue >= marginValue
     ? `: you're turning away about ${Math.round(table.turnedAway)} a day there`
     : `: you make ${money(table.fullyCostedMargin)} a day there after costs`;
-}
-
-function money(amount: number): string {
-  return `$${Math.round(amount).toLocaleString()}`;
 }
 
 /** Milestones met, and tiers climbed, as of the last poll (sim/ladder.ts). */

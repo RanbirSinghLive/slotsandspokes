@@ -1,4 +1,6 @@
 import { classByCode } from '../../sim/aircraftClasses';
+import { line, heading } from './dom';
+import { money } from '../format';
 import { dayIndex } from '../../sim/clock';
 import type { CompetitorOffering } from '../../sim/competitors';
 import { FLIGHTS_PER_RIVAL_PLANE, rivalFlights } from '../../sim/market';
@@ -16,23 +18,6 @@ import { select, selectRoute } from '../selection';
  * from the other side: which of their routes are hurting, and which they
  * can afford to hold.
  */
-
-function money(amount: number): string {
-  return `${amount < 0 ? '−' : ''}$${Math.round(Math.abs(amount)).toLocaleString()}`;
-}
-
-function line(text: string, className = 'inspector-line'): HTMLElement {
-  const el = document.createElement('div');
-  el.className = className;
-  el.textContent = text;
-  return el;
-}
-
-function heading(text: string): HTMLElement {
-  const el = document.createElement('h2');
-  el.textContent = text;
-  return el;
-}
 
 function title(text: string): HTMLElement {
   const el = document.createElement('h3');

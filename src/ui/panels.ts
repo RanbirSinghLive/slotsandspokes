@@ -1,4 +1,5 @@
 import { removeRotation as removeRotationFromSchedule } from '../sim/playerActions';
+import { money } from './format';
 import { formatNps, networkNps } from '../sim/nps';
 import { validateSchedule } from '../sim/schedule';
 import { allRotations, utilisationProblems, type Rotation } from '../sim/utilisation';
@@ -106,11 +107,6 @@ export function renderScheduleWarnings(problems: string[]): void {
   }
 }
 
-function formatMoney(amount: number): string {
-  const sign = amount < 0 ? '-' : '';
-  return `${sign}$${Math.abs(Math.round(amount)).toLocaleString()}`;
-}
-
 /**
  * Refresh the sidebar from `state`. Called once per rendered frame, same as
  * the canvas draw calls — this is a plain read of state, same rule as
@@ -118,8 +114,8 @@ function formatMoney(amount: number): string {
  */
 export function updatePanel(state: SimState): void {
   const trends = networkTrends(state);
-  cashEl.textContent = formatMoney(state.cash);
-  showTrend(cashEl.closest<HTMLElement>('.stat-card')!, trends.cash, (now, before) => `${now >= before ? '+' : '−'}${formatMoney(Math.abs(now - before))}`);
+  cashEl.textContent = money(state.cash);
+  showTrend(cashEl.closest<HTMLElement>('.stat-card')!, trends.cash, (now, before) => `${now >= before ? '+' : '−'}${money(Math.abs(now - before))}`);
   // On-time and Completion over the last week once there is one (sim/trends.ts),
   // so the figure and its colour agree; the lifetime share until then.
   const percent = (share: number) => `${Math.round(share * 100)}%`;
@@ -149,9 +145,9 @@ export function updatePanel(state: SimState): void {
   // Where the airline stands on the ladder (sim/ladder.ts), and head office.
   linkCard(goalsEl, 'Goals', goalsSummary(state));
   linkCard(headOfficeEl, 'Head office', headOfficeSummary(state));
-  revenueEl.textContent = formatMoney(state.todayRevenue);
-  costEl.textContent = formatMoney(state.todayCost);
-  marginEl.textContent = formatMoney(state.todayMargin);
+  revenueEl.textContent = money(state.todayRevenue);
+  costEl.textContent = money(state.todayCost);
+  marginEl.textContent = money(state.todayMargin);
   updatePnlHistoryPanel(state);
 
   renderRotations(state);
