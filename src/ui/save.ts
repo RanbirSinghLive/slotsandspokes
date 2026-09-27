@@ -1,4 +1,5 @@
 import type { SimState } from '../sim/state';
+import { ensureCrewBases } from '../sim/crews';
 
 // Bumped by hand whenever SimState's shape changes in a breaking way —
 // bare-bones versioning, not a migration system. An old save under a
@@ -21,7 +22,12 @@ export function loadSavedState(): SimState | null {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as SimState;
+    const state = JSON.parse(raw) as SimState;
+    // Bring an older save's crews up to the current shape before anything
+    // draws them: the map reads them on the very first frame, before any
+    // rollover would (sim/crews.ts).
+    ensureCrewBases(state);
+    return state;
   } catch {
     return null;
   }

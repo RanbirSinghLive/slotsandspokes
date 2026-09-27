@@ -148,15 +148,16 @@ export function crewBases(state: SimState): Record<string, CrewBase> {
 
 /** Crews of this class a base has now. */
 export function crewsOf(base: CrewBase | undefined, classCode: string): number {
-  return base?.crewsByClass[classCode] ?? 0;
+  // `?.` on crewsByClass too: a base from an older save lacks it until ensureCrewBases() runs.
+  return base?.crewsByClass?.[classCode] ?? 0;
 }
 
 /** Crews of this class on their way to a base: hired, or retraining for it. */
 export function crewsArriving(base: CrewBase | undefined, classCode: string): number {
   if (!base) return 0;
   return (
-    base.hiring.filter((batch) => batch.classCode === classCode).reduce((sum, batch) => sum + batch.count, 0) +
-    base.retraining.filter((batch) => batch.classCode === classCode).reduce((sum, batch) => sum + batch.count, 0)
+    (base.hiring ?? []).filter((batch) => batch.classCode === classCode).reduce((sum, batch) => sum + batch.count, 0) +
+    (base.retraining ?? []).filter((batch) => batch.classCode === classCode).reduce((sum, batch) => sum + batch.count, 0)
   );
 }
 
