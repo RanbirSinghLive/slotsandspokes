@@ -3,6 +3,7 @@ import { recommendedFare } from './schedule';
 import { FUEL_SHARE_OF_BLOCK_HOUR_COST } from './fuel';
 import { CREWS_ENABLED } from './features';
 import type { CompetitorOffering } from './competitors';
+import type { BookingPerks } from './innovations';
 import { rivalYieldFactor } from './pressure';
 
 /**
@@ -97,9 +98,9 @@ export const LOAD_FACTOR = 0.75;
  * as `LOAD_FACTOR`/`AVG_FARE`: a flat rate, not fit to any real study,
  * picked to make recapture a real but partial rescue rather than either
  * "spill is always fully recovered" (too generous) or "recapture
- * doesn't exist" (the old behavior this replaces).
+ * doesn't exist". A loyalty scheme (sim/innovations.ts) raises it.
  */
-const RECAPTURE_RATE = 0.4;
+export const RECAPTURE_RATE = 0.4;
 
 /**
  * The block-hours-and-departure cost of one leg, independent of how many
@@ -195,7 +196,7 @@ export function legCostBreakdown(
  * now (today, before this flight) — see `SimState.spilloverByMarket`.
  * Two outcomes, mutually exclusive:
  *   - This flight's own booked demand exceeds its seats: it's seat-capped
- *     at the old flat ceiling, same as before, but now a `RECAPTURE_RATE`
+ *     at the old flat ceiling, same as before, but now a `perks.recaptureRate`
  *     fraction of the overflow it couldn't carry gets deposited into the
  *     pool for a later flight on this same market to pick up, instead of
  *     the whole overflow just vanishing.
@@ -250,6 +251,10 @@ export function flightResult(
   fare: number,
   competitorRoutes: CompetitorOffering[],
   spilloverAvailable: number,
+  // What the airline's adopted innovations change about booking
+  // (sim/innovations.ts): the ticket's yield and how many turned-away
+  // passengers wait for a later flight.
+  perks: BookingPerks,
 ): FlightResult {
   const demandPerFlight = marketDailyDemand / legsServingMarket;
   const share = bookingShare(fare, legsServingMarket, leg.origin, leg.dest, competitorRoutes);
@@ -265,7 +270,7 @@ export function flightResult(
   if (roundedBooked > seatCeiling) {
     pax = seatCeiling;
     spilled = roundedBooked - seatCeiling;
-    spilloverDelta = Math.round(spilled * RECAPTURE_RATE);
+    spilloverDelta = Math.round(spilled * perks.recaptureRate);
   } else {
     const spareCapacity = seatCeiling - roundedBooked;
     recaptured = Math.min(spareCapacity, spilloverAvailable);
@@ -274,7 +279,7 @@ export function flightResult(
   }
 
   const yieldFactor = rivalYieldFactor(leg.origin, leg.dest, legsServingMarket, competitorRoutes);
-  const revenue = pax * fare * yieldFactor;
+  const revenue = pax * fare * yieldFactor * perks.yieldMultiplier;
   const costBreakdown = legCostBreakdown(leg.blockMinutes, type, fuelPriceIndex, fuelEfficiencyMultiplier);
   const cost = costBreakdown.fuel + costBreakdown.blockNonFuel + costBreakdown.departure;
   return {

@@ -169,7 +169,7 @@ export function renderInspector(state: SimState): void {
   } else if (selection.kind === 'fleet') {
     bodyEl.replaceChildren(buildFleetView(state));
   } else if (selection.kind === 'goals') {
-    bodyEl.replaceChildren(buildGoalsView(state));
+    bodyEl.replaceChildren(buildGoalsView(state, rebuild));
   } else if (selection.kind === 'rival') {
     bodyEl.replaceChildren(buildRivalView(state, selection.code));
   } else if (selection.kind === 'rivals') {

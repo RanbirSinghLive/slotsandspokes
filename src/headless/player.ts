@@ -1,6 +1,16 @@
 import airportsData from '../../data/airports.json';
 import { AIRCRAFT_CLASSES, classByCode } from '../sim/aircraftClasses';
 import { dayIndex } from '../sim/clock';
+import { RECAPTURE_RATE } from '../sim/economy';
+import { connectingPassengersThrough } from '../sim/hubs';
+import {
+  CODESHARE_FEED_FACTOR,
+  DIRECT_BOOKING_YIELD,
+  LOYALTY_RECAPTURE_RATE,
+  runningCostOf,
+  WINGLET_FUEL_FACTOR,
+  type InnovationId,
+} from '../sim/innovations';
 import { potentialDailyDemand } from '../sim/demand';
 import { greatCircleDistanceNm } from '../sim/geo';
 import { cashNeededToLease } from '../sim/leasing';
@@ -12,6 +22,7 @@ import { applyRotation, planRotation, type RotationPlan, type RotationStop } fro
 import { isAircraftTypeAllowedAt, legsServingMarket, marketKey, recommendedFare } from '../sim/schedule';
 import type { FareStance, SimState } from '../sim/state';
 import { TURN_BUFFER_CHOICES } from '../sim/turnBuffer';
+import { networkAirports } from '../sim/reach';
 import { spillingMarkets } from '../sim/unmetDemand';
 import { aircraftUtilisation, utilisationPools } from '../sim/utilisation';
 import { airportLoad } from '../sim/airports';
@@ -126,6 +137,16 @@ export const EMERGENCY_RUNWAY_DAYS = 60;
 export const STANCE_REVIEW_DAYS = 7;
 /** Stances in the order they win ties: Match first, since it's the neutral choice. */
 const STANCE_PREFERENCE: FareStance[] = ['match', 'undercut', 'premium'];
+
+/**
+ * An innovation (sim/innovations.ts) is adopted when its one-off price
+ * pays back from its estimated gain within this many days, or, for a
+ * running cost, when the gain beats the cost by INNOVATION_RUNNING_MARGIN.
+ */
+export const INNOVATION_PAYBACK_DAYS = 90;
+export const INNOVATION_RUNNING_MARGIN = 1.5;
+/** Cash an adoption must leave behind, as days of the airline's leases, so it never starves the fleet. */
+const INNOVATION_RESERVE_DAYS = 60;
 
 /** Planes the sitter grows to before it stops growing. */
 export const SITTER_FLEET_SIZE = 5;
@@ -250,6 +271,7 @@ function steadyPlayer(kind: 'steady' | 'sitter'): Player {
         ...(harvesting ? [] : [...feedSpill(state, memory), ...openMarkets(state, memory), ...leaseWhenFull(state, memory)]),
         ...returnIdle(state, memory),
         ...pickStances(state, memory),
+        ...adoptInnovations(state),
       ];
     },
   };
@@ -629,4 +651,50 @@ function leaseWhenFull(state: SimState, memory: Memory): string[] {
     return [`${leased.message} Flying ${opened.length > 0 ? opened.join(', ') : 'nothing yet'}.`];
   }
   return [];
+}
+
+// --- Innovations ---------------------------------------------------------------
+
+/**
+ * What an innovation would gain the airline a day, roughly, from the day
+ * just flown: the share of revenue, fuel or connecting fares it changes.
+ * A player's rule of thumb, not the sim's own sum, and deliberately
+ * cautious: younger airframes and the loyalty scheme's rival deterrence
+ * gain in ways a day's books don't show, so they're valued by what is
+ * countable only.
+ */
+function innovationGainPerDay(state: SimState, id: InnovationId): number {
+  const lastWeek = state.revenueHistory.slice(-7);
+  const revenue = lastWeek.length > 0 ? lastWeek.reduce((sum, r) => sum + r, 0) / lastWeek.length : 0;
+  if (id === 'online-booking') return revenue * (DIRECT_BOOKING_YIELD - 1);
+  if (id === 'winglets') return state.todayCostByCategory.fuel * (1 - WINGLET_FUEL_FACTOR);
+  // Recapture only helps flights that turn people away: a tenth of revenue is a fair guess at how much that is.
+  if (id === 'loyalty-scheme') return revenue * 0.1 * (LOYALTY_RECAPTURE_RATE - RECAPTURE_RATE);
+  if (id === 'codeshare-feed') {
+    let connecting = 0;
+    for (const hub of networkAirports(state)) connecting = Math.max(connecting, connectingPassengersThrough(state, hub));
+    // Each connecting passenger rides two legs, at about the going fare on each.
+    const markets = scheduledMarkets(state);
+    const averageFare = markets.length > 0 ? markets.reduce((sum, [a, b]) => sum + recommendedFare(a, b), 0) / markets.length : 0;
+    return connecting * (CODESHARE_FEED_FACTOR - 1) * 2 * averageFare;
+  }
+  // Younger airframes: worth it once the airline leases often, so valued
+  // as a tenth of the fleet's daily lease bill.
+  return state.aircraft.reduce((sum, aircraft) => sum + aircraft.leaseCostPerDay, 0) * 0.1;
+}
+
+/** Adopt whichever open innovations pay for themselves soon enough and leave cash to spare. */
+function adoptInnovations(state: SimState): string[] {
+  const done: string[] = [];
+  const leases = state.aircraft.reduce((sum, aircraft) => sum + aircraft.leaseCostPerDay, 0);
+  for (const option of actions.innovationOptions(state)) {
+    if (option.adopted || option.blocked) continue;
+    if (state.cash < option.oneOffPrice + INNOVATION_RESERVE_DAYS * leases) continue;
+    const gain = innovationGainPerDay(state, option.id);
+    const runningCost = runningCostOf(option.id, state.revenueHistory.slice(-1)[0] ?? 0);
+    if (runningCost > 0 ? gain < runningCost * INNOVATION_RUNNING_MARGIN : option.oneOffPrice > gain * INNOVATION_PAYBACK_DAYS) continue;
+    const adopted = actions.adoptInnovation(state, option.id);
+    if (adopted.ok) done.push(adopted.message);
+  }
+  return done;
 }

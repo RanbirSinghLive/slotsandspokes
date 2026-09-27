@@ -6,7 +6,7 @@ moats, shocks, real costs, Europe, home difficulty) lives in
 with playtest findings as they come (see "Playtest notes"), and the
 order changes with them.
 
-**State at handoff:** save key `airgame-save-v46`. **Thread 1 is done; thread 2 is next.** The game pushes back
+**State at handoff:** save key `airgame-save-v46`. **Threads 1 and 2 are done.** The game pushes back
 the way CLAUDE.md's philosophy asks: over a year a careful airline makes
 $6.5M–$19M, a sitter $2M–$5M and eroding, an unattended one-plane start
 survives the Standard homes, a reckless one always busts
@@ -82,6 +82,8 @@ Measured: `npm run balance` before and after each cut (it should not
 move, since everything cut is switched off).
 
 ## Thread 2: the milestone ladder and unlocks
+
+**Status: done** (three slices, below).
 
 The spine of the week.
 
@@ -163,9 +165,33 @@ the steady player over-expanding on props with thin cash (Boston seed 3
 goes from 6 to 10 props at $400k on day 48), not the ladder: thread 5.
 Halifax still reaches Start-up's end only near day 191.
 
-Slices: (1) the ladder model and the Goals view, with unlocks still
-cosmetic (done); (2) class unlocks replace debut days (done); (3) the
-other unlocks (innovations, younger airframes, second base).
+**Slice 3 as built:** `sim/innovations.ts`, five programmes adopted in
+the Goals view: online booking (+4% yield) and younger airframes
+(leases refurbished 8 years younger) on becoming a network airline; a
+loyalty scheme (recapture 60% not 40%, a quarter of the money on the
+table kept from rivals, 2% of revenue a day) and winglet retrofits (10%
+less fuel) on becoming international; a codeshare feed (30% more
+connecting passengers, $6,000 a day) on becoming global. The Tech Tree
+(its tab, data, state field) is gone: winglets are its one real effect.
+**The second base is not an unlock:** leasing at any airport already
+works, so it stays a milestone only. With nothing adopted, headless
+output is byte-identical. The steady player adopts on a 90-day payback
+(most between days 100 and 200). Steady median cash at day 365:
+
+| | YUL | YYZ | BOS | PHL | YHZ | LHR |
+|---|---|---|---|---|---|---|
+| Slice 2 | $9.6M | $18.1M | $10.7M | $27.6M | $218k | $64.2M |
+| Slice 3 | $12.7M | $19.5M | $17.8M | $30.0M | $218k | $77.6M |
+
+Busts unchanged; starter and reckless identical (they never climb); the
+sitter up a little. **Open for the owner:** the prices are small beside
+a $10M airline, and the edges last for good, which CLAUDE.md's
+philosophy warns against. Two fixes to weigh from play: price them as a
+share of the airline's size, or let rivals catch up (online booking
+stops being an edge once everyone sells online).
+
+Slices: (1) the ladder model and the Goals view (done); (2) class
+unlocks replace debut days (done); (3) innovations (done).
 
 ## Thread 3: quality as NPS
 

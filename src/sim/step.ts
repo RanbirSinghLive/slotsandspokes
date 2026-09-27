@@ -8,6 +8,7 @@ import { airportLoad } from './airports';
 import { connectingDemandOnMarket } from './hubs';
 import { rollTotalDelayMinutes, isOnTimeArrival } from './delays';
 import { rollCompetitorRouteOpenings, rollCompetitorFrequencyGrowth, rollRivalEntry, rollDailyRivalFares } from './competitors';
+import { bookingPerks, runningCostForDay } from './innovations';
 import { networkOverheadPerDay } from './overhead';
 import { rollDailyMarketDemand, actualDailyDemand } from './marketDemand';
 import { revealReach } from './reach';
@@ -180,6 +181,10 @@ export function step(state: SimState): void {
     // The ladder (sim/ladder.ts), judged on the histories just recorded.
     checkMilestones(state);
 
+    // The loyalty scheme costs a share of revenue, so it's worked out from
+    // the day that just ended, before the totals reset below.
+    const innovationCost = runningCostForDay(state, state.todayRevenue);
+
     state.completedToday = [];
     state.cancelledToday = [];
     state.todayLegResults = {};
@@ -188,7 +193,7 @@ export function step(state: SimState): void {
     state.todayMargin = 0;
     // Week six's cost attribution — reset in lockstep with todayCost
     // above, since these five are exactly that number split up.
-    state.todayCostByCategory = { fuel: 0, blockNonFuel: 0, departure: 0, lease: 0, crew: 0, training: 0, slots: 0, maintenance: 0, overhead: 0 };
+    state.todayCostByCategory = { fuel: 0, blockNonFuel: 0, departure: 0, lease: 0, crew: 0, training: 0, slots: 0, maintenance: 0, overhead: 0, innovations: 0 };
     // Per-market breakdown of todayRevenue/todayCost, reset in lockstep
     // with them for the same reason as todayCostByCategory above.
     state.todayRevenueByMarket = {};
@@ -220,6 +225,12 @@ export function step(state: SimState): void {
     state.todayCost += overhead;
     state.todayCostByCategory.overhead += overhead;
     state.todayMargin -= overhead;
+
+    // Adopted innovations' running costs (sim/innovations.ts).
+    state.cash -= innovationCost;
+    state.todayCost += innovationCost;
+    state.todayCostByCategory.innovations = innovationCost;
+    state.todayMargin -= innovationCost;
 
     // Slot fees (sim/slots.ts): the same flat-per-day shape as the lease.
     // Anything the schedule needs and doesn't hold is taken first (a
@@ -495,6 +506,7 @@ export function step(state: SimState): void {
             flight.fare,
             state.competitorRoutes,
             spilloverAvailable,
+            bookingPerks(state),
           );
           state.spilloverByMarket[key] = spilloverAvailable + result.spilloverDelta;
           flightPassengers = result.pax;

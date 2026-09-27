@@ -221,7 +221,7 @@ export const LADDER: Tier[] = [
     id: 'regional',
     name: 'Regional carrier',
     needed: 3,
-    opens: ['Narrowbody aircraft on the lessor', 'Innovation: online booking'],
+    opens: ['Narrowbody aircraft on the lessor', 'Innovations: online booking, younger airframes'],
     opensClasses: ['NARROWBODY'],
     milestones: [
       {
@@ -304,7 +304,7 @@ export const LADDER: Tier[] = [
     id: 'international',
     name: 'International',
     needed: 2,
-    opens: ['Innovation: codeshare-style feed'],
+    opens: ['Innovation: codeshare feed'],
     milestones: [
       {
         id: 'ocean-crossing',

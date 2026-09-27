@@ -2,7 +2,16 @@ import airportsData from '../../data/airports.json';
 import { AIRCRAFT_CLASSES, classByCode, classRank, pluralClassName } from './aircraftClasses';
 import { applyHubStyleChange, planHubStyleChange } from './hubs';
 import { HUB_STYLES, type HubStyle } from './hubStyle';
-import { cashNeededToLease, LEASE_RESERVE_DAYS, leaseAircraft, loadLeaseRates } from './leasing';
+import {
+  adoptBlockedReason,
+  adoptInnovation as adoptInnovationRule,
+  INNOVATIONS,
+  isAdopted,
+  leasedAge,
+  type Innovation,
+  type InnovationId,
+} from './innovations';
+import { cashNeededToLease, LEASE_RESERVE_DAYS, leaseAircraft, leaseRateFor, loadLeaseRates } from './leasing';
 import { daysUntilNextListing, listingsOf, returnBlockedReason, returnFee, returnLease, takeListing, type MarketListing } from './market';
 import { classOpen, tierThatOpens } from './ladder';
 import { actualDailyDemand, currentPotentialDemand } from './marketDemand';
@@ -404,14 +413,26 @@ function days(count: number): string {
 }
 
 /**
+ * The airframe a listing becomes once leased: the same one, unless the
+ * airline has younger airframes (sim/innovations.ts), which refurbish it
+ * on the way out at the younger airframe's rate.
+ */
+function asLeased(state: SimState, listing: MarketListing): MarketListing {
+  const ageYears = leasedAge(state, listing.ageYears);
+  if (ageYears === listing.ageYears) return listing;
+  return { ...listing, ageYears, leasePricePerDay: leaseRateFor(listing.typeCode, ageYears) };
+}
+
+/**
  * One choice per class: the next airframe the shared lessor has listed
- * (sim/market.ts), or why there isn't one to take.
+ * (sim/market.ts), as the airline would get it, or why there isn't one
+ * to take.
  */
 export function planeOptions(state: SimState, iata: string): PlaneOption[] {
   return loadLeaseRates().map((rate) => {
     const cls = classByCode(rate.typeCode)!;
     const listings = listingsOf(state, rate.typeCode);
-    const listing = listings[0] ?? null;
+    const listing = listings[0] ? asLeased(state, listings[0]) : null;
     let disabledReason: string | undefined;
     if (!isAircraftTypeAllowedAt(iata, rate.typeCode)) {
       disabledReason = `Too large to operate at ${iata}.`;
@@ -444,11 +465,13 @@ export function leasePlane(state: SimState, iata: string, typeCode: string): Out
   const listing = takeListing(state, typeCode);
   if (!listing) return { ok: false, reason: `No ${option.name} on the market.` };
 
-  const aircraft = leaseAircraft(state, typeCode, iata, listing.ageYears, listing.leasePricePerDay);
+  const leased = asLeased(state, listing);
+  const aircraft = leaseAircraft(state, typeCode, iata, leased.ageYears, leased.leasePricePerDay);
   revealReach(state);
+  const refurbished = leased.ageYears === listing.ageYears ? '' : `, refurbished from ${listing.ageYears}`;
   return {
     ok: true,
-    message: `${option.name} leased at ${iata}: ${listing.ageYears} yrs old, $${listing.leasePricePerDay.toLocaleString()}/day (${aircraft.tail}).`,
+    message: `${option.name} leased at ${iata}: ${leased.ageYears} yrs old${refurbished}, $${leased.leasePricePerDay.toLocaleString()}/day (${aircraft.tail}).`,
   };
 }
 
@@ -468,4 +491,25 @@ export function returnOptions(state: SimState, iata: string): { tail: string; na
 
 export function returnPlane(state: SimState, tail: string): Outcome<{ message: string }> {
   return returnLease(state, tail);
+}
+
+// --- Innovations --------------------------------------------------------------
+
+export type InnovationOption = Innovation & {
+  adopted: boolean;
+  /** Why it can't be adopted now, or null if it can. */
+  blocked: string | null;
+};
+
+/** Every innovation (sim/innovations.ts), with whether it's running and why it can't be adopted yet. */
+export function innovationOptions(state: SimState): InnovationOption[] {
+  return INNOVATIONS.map((innovation) => ({
+    ...innovation,
+    adopted: isAdopted(state, innovation.id),
+    blocked: isAdopted(state, innovation.id) ? null : adoptBlockedReason(state, innovation),
+  }));
+}
+
+export function adoptInnovation(state: SimState, id: InnovationId): Outcome<{ message: string }> {
+  return adoptInnovationRule(state, id);
 }

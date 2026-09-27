@@ -184,6 +184,7 @@ function describeRivalsView(state: SimState, a: string, b: string): HTMLElement 
 
   const kept: string[] = [`your frequency keeps ${Math.round(table.dominance * 100)}% of it`];
   if (table.hubFeed >= 0.01) kept.push(`your hub's connections ${Math.round(table.hubFeed * 100)}%`);
+  if (table.loyalty > 0) kept.push(`your loyalty scheme ${Math.round(table.loyalty * 100)}%`);
   const slots =
     table.rivalSlotFees === null
       ? 'and an airport here is full, so no rival can get in'

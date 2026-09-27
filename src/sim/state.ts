@@ -315,8 +315,8 @@ export type SimState = {
    * `applyDailyReputationChange()` based on that day's On-Time percentage
    * and average NPS (see `todayFlightsDeparted`/`todayFlightsOnTime`/
    * `todayNpsPoints` above). Starts at 0 — a brand-new airline with no
-   * track record yet, not already "good" or "bad." Nothing spends this
-   * yet; it exists so a future tech tree has something real to draw down.
+   * track record yet, not already "good" or "bad." Executives spend
+   * it until thread 3 of WEEK-TEN.md replaces it with NPS.
    */
   reputation: number;
   /**
@@ -412,24 +412,15 @@ export type SimState = {
   fuelPriceIndex: number;
   /**
    * A multiplier on the fuel-sensitive slice of every flight's cost, 1.0
-   * meaning "no mitigation adopted yet" — lower is better (less fuel
-   * burned for the same flying). Nothing sets this below 1.0 yet; it
-   * exists so a future tech tree's fuel-efficiency initiatives have
-   * something real to turn down, same "exists so a future tech tree has
-   * something real to draw down" reasoning `reputation` above already
-   * has.
+   * meaning no mitigation — lower is better (less fuel burned for the
+   * same flying). Winglet retrofits (sim/innovations.ts) turn it down.
    */
   fuelEfficiencyMultiplier: number;
   /**
-   * Week six's tech tree (sim/techTree.ts): IDs of every TechNode unlocked
-   * so far, in whatever order the player bought them — a plain string
-   * array, not a Set, same JSON-round-trip reasoning every other
-   * collection on this type already follows. `fuelEfficiencyMultiplier`
-   * above is the actual effect; this is just the record of what's been
-   * paid for, so the UI can show locked/unlocked state and so a node is
-   * never charged for twice.
+   * Innovations adopted (sim/innovations.ts), in the order adopted.
+   * Optional: absent in a save made before innovations existed.
    */
-  unlockedTechNodeIds: string[];
+  adoptedInnovations?: string[];
   /**
    * Week six's market stimulation model (sim/marketDemand.ts): how many
    * people actually fly each market on an average day right now, keyed by
@@ -467,7 +458,6 @@ export type SimState = {
   /**
    * Week six's C-suite (sim/executives.ts): four slots, each holding at
    * most one appointment. Paid for in Reputation, which makes the C-suite
-   * its second real spender alongside the tech tree — and makes it
    * unreachable until the airline has been good at something.
    */
   executives: ExecutiveSlots;
@@ -569,7 +559,7 @@ export type SimState = {
    */
   lastTargetResult: TargetResult | null;
   todayCostByCategory: {
-    /** Fuel, after the price index and any tech tree efficiency upgrades. */
+    /** Fuel, after the price index and winglet retrofits. */
     fuel: number;
     /** The non-fuel half of block-hour cost — crew, maintenance, overhead. */
     blockNonFuel: number;
@@ -587,6 +577,8 @@ export type SimState = {
     maintenance: number;
     /** Network overhead (sim/overhead.ts), which grows with the square of the fleet. */
     overhead: number;
+    /** Running costs of adopted innovations (sim/innovations.ts). Absent in an older save until its first rollover. */
+    innovations?: number;
   };
 };
 
@@ -669,7 +661,7 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     costHistoryByMarket: {},
     fuelPriceIndex: FUEL_PRICE_BASELINE,
     fuelEfficiencyMultiplier: 1,
-    unlockedTechNodeIds: [],
+    adoptedInnovations: [],
     marketDemand: {},
     demandGrowthMultiplier: 1,
     farePolicyMultiplier: 1,
@@ -695,7 +687,7 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     todayNpsScoredFlights: 0,
     activeTarget: null,
     lastTargetResult: null,
-    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, lease: 0, crew: 0, training: 0, slots: 0, maintenance: 0, overhead: 0 },
+    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, lease: 0, crew: 0, training: 0, slots: 0, maintenance: 0, overhead: 0, innovations: 0 },
   };
   revealReach(state);
   openMarket(state);

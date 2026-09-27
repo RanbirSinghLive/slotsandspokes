@@ -41,7 +41,6 @@ import { setupFarePolicy, updateFarePolicy } from './ui/farePolicy';
 import { setupOnTimePanel, updateOnTimePanel } from './ui/onTime';
 import { setupExecutivePanel, updateExecutivePanel } from './ui/executive';
 import { setupExecutivesPanel, updateExecutivesPanel } from './ui/executives';
-import { setupTechTreePanel, updateTechTreePanel } from './ui/techTree';
 import { setupDevPanel, updateDevPanel } from './ui/devTools';
 import { setupMissionsPanel, updateMissionsPanel } from './ui/missions';
 import { setupCrewPanel, updateCrewPanel } from './ui/crew';
@@ -79,7 +78,6 @@ setupFarePolicy(state);
 setupOnTimePanel();
 setupExecutivePanel();
 setupExecutivesPanel();
-setupTechTreePanel(state);
 setupDevPanel();
 setupMissionsPanel(state);
 setupCrewPanel(state);
@@ -179,7 +177,6 @@ function syncCompetitorAirlineDropdown(): void {
 const fleetTabEl = document.querySelector<HTMLDivElement>('#fleet-tab')!;
 const onTimePanelEl = document.querySelector<HTMLDivElement>('#ontime-panel')!;
 const executivePanelEl = document.querySelector<HTMLDivElement>('#executive-panel')!;
-const techTreePanelEl = document.querySelector<HTMLDivElement>('#tech-tree-panel')!;
 const crewPanelEl = document.querySelector<HTMLDivElement>('#crew-panel')!;
 const missionsPanelEl = document.querySelector<HTMLDivElement>('#missions-panel')!;
 const devPanelEl = document.querySelector<HTMLDivElement>('#dev-panel')!;
@@ -271,7 +268,6 @@ type SidebarTab =
   | 'fleet'
   | 'ontime'
   | 'executive'
-  | 'techtree'
   | 'crew'
   | 'missions'
   | 'dev'
@@ -637,7 +633,6 @@ function switchToSidebarTab(tab: SidebarTab): void {
   fleetTabEl.hidden = tab !== 'fleet';
   onTimePanelEl.hidden = tab !== 'ontime';
   executivePanelEl.hidden = tab !== 'executive';
-  techTreePanelEl.hidden = tab !== 'techtree';
   crewPanelEl.hidden = tab !== 'crew';
   missionsPanelEl.hidden = tab !== 'missions';
   devPanelEl.hidden = tab !== 'dev';
@@ -650,7 +645,6 @@ function switchToSidebarTab(tab: SidebarTab): void {
     updateExecutivesPanel(state);
     updateExecutivePanel(state);
   }
-  if (tab === 'techtree') updateTechTreePanel(state);
   if (tab === 'game') updateGameControls();
 
   render();

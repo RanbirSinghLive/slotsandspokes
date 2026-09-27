@@ -11,7 +11,9 @@ import { renderScheduleWarnings, scheduleProblems } from './panels';
  */
 
 export {
+  adoptInnovation,
   currentTurnBuffer,
+  innovationOptions,
   marketPnlHistory,
   marketReadout,
   planeOptions,
@@ -28,6 +30,7 @@ export {
   leasePlane,
   type MarketPnlHistory,
   type MarketSummary,
+  type InnovationOption,
   type Outcome,
   type PlaneOption,
 } from '../sim/playerActions';

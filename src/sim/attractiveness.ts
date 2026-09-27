@@ -1,5 +1,6 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { connectingDemandOnMarket } from './hubs';
+import { loyaltyKeeps } from './innovations';
 import { actualDailyDemand } from './marketDemand';
 import { routeFixedCosts } from './routeCosts';
 import { rivalSlotQuote } from './slots';
@@ -35,6 +36,8 @@ import type { SimState } from './state';
  * - **slot control**: an entrant pays today's slot price at both ends
  *   (sim/slots.ts), which a busy hub drives up, and nothing is on the
  *   table at a full airport.
+ * - **loyalty**: with a loyalty scheme (sim/innovations.ts), members
+ *   stay, so LOYALTY_KEEPS of the table is out of an entrant's reach.
  */
 
 const seatsByTypeCode = new Map((aircraftTypesData as { code: string; seats: number }[]).map((type) => [type.code, type.seats]));
@@ -54,6 +57,8 @@ export type MoneyOnTable = {
   dominance: number;
   /** How much of the table the hub's connecting passengers keep from rivals, 0–1. */
   hubFeed: number;
+  /** How much of the table the loyalty scheme keeps from rivals, 0–1. */
+  loyalty: number;
   /** What a rival's slots for one daily round trip would cost a day, or null if either airport is full. */
   rivalSlotFees: number | null;
   /** Dollars a day a rival could expect: the turned-away passengers at the going fare, plus its share of the margin, less what the moats keep. */
@@ -63,7 +68,7 @@ export type MoneyOnTable = {
 export function moneyOnTable(state: SimState, a: string, b: string): MoneyOnTable {
   const key = marketKey(a, b);
   const legs = state.schedule.filter((leg) => marketKey(leg.origin, leg.dest) === key);
-  if (legs.length === 0) return { turnedAway: 0, fullyCostedMargin: 0, dominance: 0, hubFeed: 0, rivalSlotFees: null, perDay: 0 };
+  if (legs.length === 0) return { turnedAway: 0, fullyCostedMargin: 0, dominance: 0, hubFeed: 0, loyalty: 0, rivalSlotFees: null, perDay: 0 };
 
   const classByTail = new Map(state.aircraft.map((aircraft) => [aircraft.tail, aircraft.typeCode]));
   const seats = legs.reduce((sum, leg) => sum + (seatsByTypeCode.get(classByTail.get(leg.tail) ?? '') ?? 0), 0);
@@ -86,12 +91,14 @@ export function moneyOnTable(state: SimState, a: string, b: string): MoneyOnTabl
   // What getting in would cost: slots at both ends at today's price, and
   // nothing to be had at all if either airport is full.
   const rivalSlotFees = rivalSlotQuote(state, a, b);
+  const loyalty = loyaltyKeeps(state);
   return {
     turnedAway,
     fullyCostedMargin,
     dominance,
     hubFeed,
+    loyalty,
     rivalSlotFees,
-    perDay: rivalSlotFees === null ? 0 : Math.max(0, onTable * (1 - dominance) * (1 - hubFeed) - rivalSlotFees),
+    perDay: rivalSlotFees === null ? 0 : Math.max(0, onTable * (1 - dominance) * (1 - hubFeed) * (1 - loyalty) - rivalSlotFees),
   };
 }

@@ -3,6 +3,7 @@ import { flightResult, LOAD_FACTOR, type EconomyAircraftType } from './economy';
 import { trafficShare } from './choiceModel';
 import { actualDailyDemand } from './marketDemand';
 import { connectingDemandOnMarket } from './hubs';
+import { bookingPerks } from './innovations';
 import type { RouteSettings, SimState } from './state';
 import type { ScheduleLeg } from './schedule';
 
@@ -82,6 +83,7 @@ export function summarizeMarket(origin: string, dest: string, state: SimState, r
     }
     return connecting;
   };
+  const perks = bookingPerks(state);
   for (const leg of legs) {
     const type = aircraftTypeForLeg(leg, state);
     const result = flightResult(
@@ -95,6 +97,7 @@ export function summarizeMarket(origin: string, dest: string, state: SimState, r
       routeSettings.fare,
       state.competitorRoutes,
       previewSpillover,
+      perks,
     );
     previewSpillover += result.spilloverDelta;
     pax += result.pax;

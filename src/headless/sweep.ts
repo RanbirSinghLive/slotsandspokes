@@ -1,4 +1,5 @@
 import { writeFileSync } from 'node:fs';
+import { WINGLET_FUEL_FACTOR } from '../sim/innovations';
 import { fileURLToPath } from 'node:url';
 import { DEFAULT_HOME_AIRPORT, type FareStance, type SimState } from '../sim/state';
 import { setFareStance } from '../sim/pricing';
@@ -110,14 +111,11 @@ const LEVERS: Lever[] = [
     format: (v) => STANCES[v],
   },
   {
-    // The exact cumulative multipliers data/tech-tree.json's five fuel
-    // efficiency tiers actually produce, in order — so each row answers
-    // "what is tier N of that branch really worth over a full run,"
-    // rather than sweeping a range of round numbers nothing in the game
-    // can actually reach.
+    // Without and with winglet retrofits (sim/innovations.ts), the only
+    // thing in the game that moves fuel burn: what they're worth over a run.
     name: 'fuel-efficiency',
-    description: 'Cumulative tech tree fuel efficiency, by tiers unlocked',
-    values: [1, 0.95, 0.912, 0.8664, 0.8144, 0.7737],
+    description: 'Fuel burn, without and with winglet retrofits',
+    values: [1, WINGLET_FUEL_FACTOR],
     apply: (state, multiplier) => {
       state.fuelEfficiencyMultiplier = multiplier;
     },

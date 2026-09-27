@@ -1,4 +1,5 @@
 import { marketDistanceNm } from './demand';
+import { connectingFeedMultiplier } from './innovations';
 import { actualDailyDemand, currentPotentialDemand } from './marketDemand';
 import { legsServingMarket, marketKey, recommendedFare } from './schedule';
 import { HUB_STYLES, hubStyleAt, type HubStyle } from './hubStyle';
@@ -127,7 +128,9 @@ function flowBetween(
     frequencyChance(Math.min(flightsA, flightsB)) *
     HUB_STYLES[hubStyleAt(state, hub)].connectionEfficiency *
     circuityFactor(a, hub, b) *
-    nonstop
+    nonstop *
+    // A codeshare partner sells the connection too (sim/innovations.ts).
+    connectingFeedMultiplier(state)
   );
 }
 
@@ -172,6 +175,7 @@ export function connectingFlowsAt(state: SimState, hub: string): ConnectingFlow[
 
   const inputs = [
     hubStyleAt(state, hub),
+    connectingFeedMultiplier(state),
     state.demandGrowthMultiplier,
     recessionFactor(state),
     spokes.map(([spoke, flights], i) => `${spoke}:${flights}:${established[i]}`).join(','),

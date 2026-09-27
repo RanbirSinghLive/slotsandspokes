@@ -1748,107 +1748,6 @@ body {
   font-size: 12px;
 }
 
-/* Week six's Tech Tree tab (ui/techTree.ts) — one branch (Fuel
-   Efficiency) built so far, each node its own card in a vertical chain. */
-#tech-tree-fuel-summary {
-  margin-bottom: 16px;
-  color: #9aa3b8;
-  font-size: 13px;
-}
-
-.tech-branch {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.tech-node {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 6px;
-  padding: 12px 14px;
-  background: rgba(255, 255, 255, 0.02);
-}
-
-/* A locked-but-not-yet-affordable/prereq-blocked node reads as dimmer,
-   not hidden — the flavor text is worth reading even before it's
-   reachable, same "show the whole tree, not just the unlockable edge"
-   spirit as a Paradox-style tech tree. */
-.tech-node:not(.tech-node--unlocked) {
-  opacity: 0.85;
-}
-
-.tech-node--unlocked {
-  border-color: rgba(127, 216, 143, 0.5);
-  background: rgba(127, 216, 143, 0.06);
-}
-
-.tech-node-header {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-
-.tech-node-tier {
-  color: #6b7694;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.tech-node-name {
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.tech-node-flavor {
-  margin: 0 0 8px;
-  color: #9aa3b8;
-  font-size: 12px;
-  font-style: italic;
-  line-height: 1.5;
-}
-
-.tech-node-effect {
-  margin-bottom: 10px;
-  color: #7fd88f;
-  font-size: 13px;
-}
-
-.tech-node-unlock {
-  font-family: inherit;
-  font-size: 13px;
-  color: #9aa3b8;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  padding: 4px 10px;
-  cursor: pointer;
-}
-
-.tech-node-unlock:hover:not(:disabled) {
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.5);
-}
-
-.tech-node-unlock:disabled {
-  color: #4a5266;
-  border-color: rgba(255, 255, 255, 0.08);
-  cursor: default;
-}
-
-.tech-node--unlocked .tech-node-unlock:disabled {
-  color: #7fd88f;
-  border-color: rgba(127, 216, 143, 0.4);
-}
-
-.tech-node-status {
-  margin-top: 6px;
-  min-height: 1.2em;
-  color: #6b7694;
-  font-size: 12px;
-}
-
 /* Week six's Dev tab (ui/devTools.ts) — a live cost decomposition, built
    to make the economy legible while it's being tuned. Every number here
    is read from state rather than described, so nothing can go stale. */
@@ -2417,7 +2316,7 @@ body {
   background: rgba(255, 255, 255, 0.02);
 }
 
-/* Same green the tech tree already uses for "this is yours". */
+/* Green for "this is yours". */
 .exec-candidate--appointed {
   border-color: rgba(127, 216, 143, 0.5);
   background: rgba(127, 216, 143, 0.06);
@@ -2636,14 +2535,12 @@ body {
 }
 
 /* Cards get tighter now that the prose inside them is optional. */
-.exec-candidate,
-.tech-node {
+.exec-candidate {
   padding: 9px 11px;
   margin-bottom: 7px;
 }
 
-.exec-candidate-flavor[hidden],
-.tech-node-flavor[hidden] {
+.exec-candidate-flavor[hidden] {
   display: none;
 }
 
@@ -2789,6 +2686,37 @@ button.inspector-crumb:hover {
 
 .goal-ahead {
   color: #6b7694;
+}
+
+/* An innovation in the Goals view: a card per programme, green once
+   running, dim while the ladder hasn't opened it. */
+.innovation-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 7px;
+}
+
+.innovation-card.is-adopted {
+  border-color: rgba(127, 216, 143, 0.5);
+  background: rgba(127, 216, 143, 0.06);
+}
+
+.innovation-card.is-locked {
+  opacity: 0.6;
+}
+
+.innovation-name {
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.innovation-card.is-adopted .innovation-name {
+  color: #7ed6a8;
+}
+
+.innovation-price {
+  color: #9aa3b8;
 }
 
 .inspector-pools {

@@ -1,4 +1,5 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
+import { bookingPerks } from '../sim/innovations';
 import { flightResult, type EconomyAircraftType } from '../sim/economy';
 import { actualDailyDemand, currentPotentialDemand } from '../sim/marketDemand';
 import { connectingDemandOnMarket } from '../sim/hubs';
@@ -55,7 +56,7 @@ const COST_ROWS: CostRowSpec[] = [
   {
     label: 'Fuel',
     depth: 1,
-    hint: 'The fuel-sensitive slice of block-hour cost (35% of it), multiplied by the current fuel price index and by any tech tree efficiency upgrades.',
+    hint: 'The fuel-sensitive slice of block-hour cost (35% of it), multiplied by the current fuel price index and by winglet retrofits (sim/innovations.ts).',
     value: (s) => s.todayCostByCategory.fuel,
   },
   {
@@ -260,6 +261,7 @@ function computeFunnel(state: SimState): FunnelTotals {
         settings.fare,
         state.competitorRoutes,
         previewSpillover,
+        bookingPerks(state),
       );
       previewSpillover += result.spilloverDelta;
 
@@ -496,7 +498,7 @@ export function updateDevPanel(state: SimState): void {
   const pricePct = Math.round((state.fuelPriceIndex - 1) * 100);
   const efficiencyPct = Math.round((1 - state.fuelEfficiencyMultiplier) * 100);
   const priceText = pricePct === 0 ? 'at baseline' : `${pricePct > 0 ? '+' : ''}${pricePct}% vs baseline`;
-  const efficiencyText = efficiencyPct === 0 ? 'no upgrades' : `-${efficiencyPct}% from tech tree`;
+  const efficiencyText = efficiencyPct === 0 ? 'no upgrades' : `-${efficiencyPct}% from winglets`;
   fuelDriversEl.textContent = `Fuel price ${priceText} · efficiency ${efficiencyText}`;
 
   updateFunnel(state);

@@ -380,7 +380,8 @@ remainder went nowhere). Real airline revenue management distinguishes
 total overflow ("spill") from the fraction the *same* airline recovers
 on one of its own other flights ("recapture") rather than losing it to
 a competitor or a traveler giving up — `RECAPTURE_RATE` (0.4, a flat
-crude constant, same spirit as `LOAD_FACTOR`) is that fraction.
+crude constant, same spirit as `LOAD_FACTOR`) is that fraction, 0.6
+with a loyalty scheme (see Innovations).
 `flightResult()` stays a pure function (no `state` access): it takes
 `spilloverAvailable` as an input and reports `spilloverDelta` as an
 output, and the caller (`step.ts`'s arrival handling, or
@@ -1545,7 +1546,7 @@ Three different things that are easy to confuse:
   cabin crew hold recurrent service training. Bounded to [-100, 100].
 - **Reputation** is a *stock*. Neither of the above accumulates, so
   neither can be spent. Reputation is what they feed, and it's the
-  currency the tech tree, the C-suite and service targets all draw on.
+  currency the C-suite and service targets draw on.
 
 `applyDailyReputationChange()` runs once per day at rollover, reading
 *yesterday's* figures before they're reset. Three terms: on-time against
@@ -1646,14 +1647,13 @@ stays met.
 | Tier | Needed | Milestones | Opens |
 |---|---|---|---|
 | Start-up | 4 of 4 | fly your first route; a route that makes money for a week after its share of fixed costs; a route 72% full over a week; hold a starved city no rival flies to, on a route flown 30 days | Regional aircraft |
-| Regional carrier | 3 of 4 | serve 8 airports; connect 150 a day through one airport; put a Regional into service; make money every day for a week of a shock | Narrowbody; online booking |
+| Regional carrier | 3 of 4 | serve 8 airports; connect 150 a day through one airport; put a Regional into service; make money every day for a week of a shock | Narrowbody; online booking, younger airframes |
 | Network airline | 3 of 5 | fly 60% of the movements at a busy airport; four routes 4+ a day each way; lifetime NPS 18 over 1,000 flights; planes based at two airports; put a Narrowbody into service | Widebody; loyalty scheme, winglet retrofits |
-| International | 2 of 2 | a route to another continent; connect 750 a day through one airport | codeshare-style feed |
+| International | 2 of 2 | a route to another continent; connect 750 a day through one airport | codeshare feed |
 | Global | 1 of 1 | round the world: a loop of your routes that goes all the way round the globe, reachable from home | — |
 
-The aircraft classes a tier opens are in force (see the aircraft market
-above); innovations and the second base don't exist yet (WEEK-TEN.md,
-thread 2's slice 3). Round the world is judged by walking the
+What a tier opens is in force: aircraft classes (see the aircraft
+market above) and innovations (see Innovations). Round the world is judged by walking the
 network from home and giving each airport an unwrapped longitude; an
 airport reached again a whole turn away closes a loop round the globe.
 The Network view's Goals row says the tier and how many of its
@@ -1973,17 +1973,34 @@ a different failure. NPS therefore divides by its own denominator
 
 ---
 
-## The tech tree (`src/sim/techTree.ts`) — week six
+## Innovations (`src/sim/innovations.ts`)
 
-Reputation's first spender. One branch so far — fuel efficiency — with
-five linear tiers themed on real aviation milestones, each multiplying
-`fuelEfficiencyMultiplier` down 4–6%. All five compound to roughly a 23%
-cut in fuel-sensitive cost.
+Airline programmes the ladder opens and the player chooses to adopt, in
+the Goals view (Network › Goals), each for good. Climbing a tier doesn't
+hand them out; it lets the player buy them, and each pays back only on
+an airline big enough to use it.
 
-Data and conditions are split: the JSON holds the authored parts, the
-code holds the rules. A node needs its branch's
-previous tier and enough Reputation; unlocking is a one-time payment for
-a permanent effect.
+| Innovation | Opens on becoming | Price | Effect |
+|---|---|---|---|
+| Online booking | Network airline | $400,000 once | every ticket earns 4% more (no agent's cut) |
+| Younger airframes | Network airline | $300,000 once | every plane leased from then on is refurbished 8 years younger (not below 5), at the younger airframe's rate |
+| Loyalty scheme | International | $500,000 once, then 2% of revenue a day | 60% of turned-away passengers rebook with you, not 40%; rivals see 25% less money on the table on your routes (sim/attractiveness.ts) |
+| Winglet retrofits | International | $800,000 once | 10% less fuel burned (`fuelEfficiencyMultiplier`) |
+| Codeshare feed | Global | $6,000 a day | 30% more connecting passengers at every hub (sim/hubs.ts) |
+
+The effects are read where they apply: `bookingPerks()` goes into every
+`flightResult()` (yield and recapture rate), `loyaltyKeeps()` into the
+money on the table, `connectingFeedMultiplier()` into each hub's flows
+(and its cache key), `leasedAge()` into leasing (the lease fan shows the
+refurbished age and price). Running costs are charged at rollover, under
+the cost category `innovations`; the loyalty scheme's share is of the
+day just ended. Adopting takes two clicks, since it can't be undone.
+
+The steady headless player adopts one when its one-off price pays back
+from a rough estimate of the gain within 90 days (a running cost must be
+beaten 1.5 times), leaving 60 days of leases in cash. Measured: it
+adopts most of them between days 100 and 200, and its median year-end
+cash rises 5–65% by home (WEEK-TEN.md, thread 2).
 
 ---
 
@@ -2028,7 +2045,7 @@ Effects are placeholders pending real numbers.
 cost and margin per day, profit over the run, and where margin peaks.
 Levers: `reserve` (crew depth), `fare` (a multiplier on every market's
 fare, marked as a player override so the price policy leaves it alone),
-and `fuel-efficiency` (the tech tree's tiers).
+and `fuel-efficiency` (without and with winglet retrofits).
 
 **Every row uses the same seed**, so the lever is the only difference.
 The flip side: one seed can mislead, because outcomes vary a lot between
@@ -2067,7 +2084,6 @@ easier than reading about it.
 The current plan is the newest `WEEK-*.md`. As of September 2026:
 
 - **The Grow tab as one pipeline view** (WEEK-EIGHT.md) — next up.
-- **More tech tree branches** — fuel efficiency is still the only one.
 - **Ancillary revenue** (bag fees), designed twice and never built.
 - **Per-base time zones** — every plane flies on the home clock.
 
