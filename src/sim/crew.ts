@@ -464,8 +464,7 @@ function nextId(prefix: string, existing: { id: string }[]): string {
 /**
  * Place a bulk recruitment order. Charged immediately, delivered after
  * HIRE_LEAD_TIME_DAYS — that gap is the whole point, and the UI is
- * responsible for checking affordability first (same "let the UI gate it"
- * shape sim/loans.ts's takeLoan() already uses).
+ * responsible for checking affordability first.
  */
 /**
  * Hire off the street, immediately — the expensive alternative to a
@@ -502,8 +501,7 @@ export function startTraining(state: SimState, fromTier: number, count: number):
   // Guard rather than trust the caller, unlike hireCrew() above: hiring
   // only ever adds, but this *subtracts* from a pool, and a negative
   // headcount would silently corrupt every requirement and salary
-  // calculation downstream. Same "silently does nothing if it can't"
-  // shape sim/loans.ts's repayLoan() already uses for its own guard.
+  // calculation downstream, so it silently does nothing instead.
   if (count <= 0 || count > state.crew.pilotsByTier[fromTier - 1]) return;
 
   state.cash -= trainingCost(fromTier, count);

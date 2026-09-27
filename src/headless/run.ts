@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { isInsolvent } from '../sim/loans';
+import { isInsolvent } from '../sim/insolvency';
 import { DEFAULT_HOME_AIRPORT } from '../sim/state';
 import { step } from '../sim/step';
 import { startHeadlessGame } from './newGame';
@@ -25,7 +25,7 @@ const startingCash = state.cash;
 
 const rows: string[] = ['day,cash,revenue,cost,margin,legsFlown,fuelPriceIndex'];
 
-// The game ends the moment Cash reaches $0 (sim/loans.ts's isInsolvent()),
+// The game ends the moment Cash reaches $0 (sim/insolvency.ts's isInsolvent()),
 // and the browser checks that every frame, mid-day included. So this
 // checks after every simulated minute too, and stops the run there: any
 // day after it describes a game nobody could still be playing.

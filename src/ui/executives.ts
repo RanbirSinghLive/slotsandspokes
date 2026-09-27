@@ -12,14 +12,11 @@ import {
 import type { SimState } from '../sim/state';
 
 /**
- * The C-suite half of the Executive tab — four slots above Loans and the
- * financial runway, which is where WEEK-SIX.md always intended it and
- * where the tab's own name points.
+ * The C-suite half of the Executive tab, above the financial runway.
  *
- * Rebuilt wholesale on every refresh rather than mutating in place: unlike
- * the Commercial panel there are no live inputs here to lose focus on,
- * only buttons, so the simpler approach is the right one — the same
- * reasoning ui/loans.ts's own table already documents.
+ * Rebuilt wholesale on every refresh rather than mutating in place: there
+ * are no live inputs here to lose focus on, only buttons, so the simpler
+ * approach is the right one.
  */
 
 const MINUTES_PER_DAY = 1440;

@@ -116,8 +116,7 @@ function payoutIntervalMinutes(effect: ExecutiveEffect): number | null {
 
 /**
  * Appoint `candidate`, replacing whoever held the slot. Charged in
- * Reputation; the UI checks affordability first, same "let the UI gate
- * it" shape sim/loans.ts's takeLoan() already uses.
+ * Reputation; the UI checks affordability first.
  *
  * Replacing costs the new appointment's full price — there's no refund
  * for the outgoing executive, which is what stops slot-shopping being

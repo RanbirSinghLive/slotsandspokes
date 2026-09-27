@@ -23,7 +23,6 @@ import {
 } from './executives';
 import { CANCELLATION_NPS_SCORE } from './nps';
 import { resolveTargetIfDue } from './targets';
-import { applyDailyLoanInterest } from './loans';
 import { flightSatisfactionScore } from './nps';
 import { applyDailyReputationChange, REPUTATION_FLOOR } from './reputation';
 import { recordDailyCashHistory } from './forecast';
@@ -331,12 +330,6 @@ export function step(state: SimState): void {
     // Backstop for fog by reach (sim/reach.ts): the menu actions that widen
     // reach reveal immediately; this catches anything that slipped past.
     revealReach(state);
-
-    // Week five's loan mechanic (sim/loans.ts): compound interest on every
-    // outstanding loan, once a day, same cadence as weather and the
-    // competitor AI above. Charged to each loan's own balance, not to Cash
-    // directly — see applyDailyLoanInterest()'s own comment for why.
-    applyDailyLoanInterest(state);
   }
 
   // Leg ids already flown or cancelled today, and those in the air now, as

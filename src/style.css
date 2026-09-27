@@ -952,7 +952,7 @@ body {
    clicked (ui/routeBuilder.ts's positionPopover()), info-window style,
    rather than a fixed section in the sidebar always in the same place
    regardless of where on the map the route actually is. No dimmed
-   backdrop the way the loan modals get: it doesn't block anything else,
+   backdrop the way the modals get: it doesn't block anything else,
    it's a contextual popover on the map itself, not an interruption. */
 #new-route-popover {
   position: fixed;
@@ -1390,39 +1390,8 @@ body {
   }
 }
 
-/* Week five's loan mechanic. #loans-count sits inline in the section's own
-   <h2>, so it just needs to read as secondary, not a whole new heading
-   style. */
-#loans-count {
-  color: #6b7694;
-  font-weight: 400;
-  font-size: 11px;
-}
-
-.loan-repay-button {
-  font-family: inherit;
-  font-size: 12px;
-  color: #9aa3b8;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  padding: 2px 8px;
-  cursor: pointer;
-}
-
-.loan-repay-button:hover:not(:disabled) {
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.5);
-}
-
-.loan-repay-button:disabled {
-  color: #4a5266;
-  border-color: rgba(255, 255, 255, 0.08);
-  cursor: default;
-}
-
-/* Shared shape for both the loan-offer pop-up and the game-over screen —
-   the first real centered modal in this codebase (#new-game-confirm, the
+/* Shared shape for the game-over screen and the other modals — the first
+   real centered modal in this codebase (#new-game-confirm, the
    only other confirmation dialog so far, sits inline in the HUD bar
    instead). A full-viewport backdrop, same z-index tier as #ticker, high
    enough to sit above the map and every panel. */
@@ -1729,22 +1698,14 @@ body {
   cursor: pointer;
 }
 
-#loan-offer-take,
 #game-over-new-game {
   background: #3a4258;
   border: 1px solid #6b7694;
   color: #fff;
 }
 
-#loan-offer-dismiss {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #9aa3b8;
-}
-
-/* Week five's executive ledger. Houses two sections: Loans
-   (ui/loans.ts's own concern) and the financial runway forecast
-   (ui/executive.ts) — kept as separate modules, just sharing one screen.
+/* The Executive tab: the C-suite (ui/executives.ts) and the financial
+   runway forecast (ui/executive.ts), separate modules sharing one screen.
    Week six: lives in the sidebar's tab system now — overflow-x so the
    420px-wide sidebar can still scroll to see the full 520px-wide chart
    canvas rather than clipping it. */
@@ -1759,11 +1720,6 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: #6b7694;
-}
-
-#executive-panel #loans-section {
-  margin-bottom: 32px;
-  max-width: 520px;
 }
 
 #executive-chart {

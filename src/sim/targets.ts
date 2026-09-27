@@ -120,8 +120,7 @@ const MINUTES_PER_DAY = 1440;
 /**
  * Start a commitment running from now. Callers (ui/missions.ts) are
  * responsible for not calling this while one is already active; the UI
- * hides the control in that case, same "let the UI gate it, keep the sim
- * function simple" shape sim/loans.ts's takeLoan() already uses.
+ * hides the control in that case.
  */
 export function commitTarget(state: SimState, targetOtp: number, targetNps: number): void {
   state.activeTarget = {

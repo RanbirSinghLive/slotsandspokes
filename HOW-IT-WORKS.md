@@ -1556,12 +1556,11 @@ mediocre airline still accrues nothing; it just doesn't go backwards.
 
 ---
 
-## Cash runway and the end of the game (`src/sim/loans.ts`, `src/sim/forecast.ts`, `src/ui/runway.ts`)
+## Cash runway and the end of the game (`src/sim/insolvency.ts`, `src/sim/forecast.ts`, `src/ui/runway.ts`)
 
 **The game ends the moment Cash reaches $0** (`isInsolvent()`). There is
-no borrowing: the loan code in `loans.ts` is dormant while the Executive
-tab is parked, so only the cash line decides. `main.ts` stops the clock
-and `ui/loans.ts` shows the game-over screen.
+no borrowing (loans were removed in WEEK-TEN.md's thread 1). `main.ts`
+stops the clock and `ui/gameOver.ts` shows the game-over screen.
 
 **The runway** is the warning. `cashRunway()` draws a straight line
 through the last 7 closing balances: if cash is falling, days left =

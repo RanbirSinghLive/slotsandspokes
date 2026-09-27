@@ -49,9 +49,9 @@ import { setupInfoTooltips } from './ui/infoTooltip';
 import { updateTicker } from './ui/ticker';
 import { updateAlerts } from './ui/alerts';
 import { updatePoolBars } from './ui/poolBars';
-import { setupLoans, updateLoans } from './ui/loans';
+import { setupGameOver, updateGameOver } from './ui/gameOver';
 import { updateRunway } from './ui/runway';
-import { isInsolvent } from './sim/loans';
+import { isInsolvent } from './sim/insolvency';
 import { setupGameControls, updateGameControls } from './ui/gameControls';
 import { loadSavedState, saveState } from './ui/save';
 
@@ -84,7 +84,7 @@ setupDevPanel();
 setupMissionsPanel(state);
 setupCrewPanel(state);
 setupInfoTooltips();
-setupLoans(state);
+setupGameOver();
 setupGameControls(state);
 
 const canvas = document.querySelector<HTMLCanvasElement>('#map')!;
@@ -309,13 +309,12 @@ function render(nowMs: number = performance.now()): void {
   // callback already relies on.
   updateAlerts(state, (tab) => switchToSidebarTab(tab as SidebarTab));
 
-  // The loan pop-up and the game-over screen are global overlays, not
-  // part of any one sidebar tab, so they need to keep refreshing
-  // regardless of which one is showing. Pausing on insolvency (see tick()
-  // below) is handled separately from this refresh, since render() can
-  // run before speedMultiplier itself is declared (resize()'s very first
-  // call, at startup).
-  updateLoans(state);
+  // The game-over screen is a global overlay, not part of any one sidebar
+  // tab, so it keeps refreshing whichever one is showing. Pausing on
+  // insolvency (see tick() below) is handled separately, since render()
+  // can run before speedMultiplier itself is declared (resize()'s very
+  // first call, at startup).
+  updateGameOver(state);
   if (updateRunway(state)) runwayPauseRequested = true;
 
   // The Dev tab is the one panel that refreshes every frame rather than
@@ -556,10 +555,9 @@ function tick(nowMs: number): void {
     if (getSelection().kind !== 'network') refreshInspectorForNewDay(state);
   }
 
-  // Week five's failure state: the instant every loan slot is spoken for
-  // and Cash is still gone, force a stop — there's nothing left to decide,
-  // so nothing should keep flying in the background behind the game-over
-  // screen ui/loans.ts is about to show.
+  // The failure state: the instant Cash is gone, force a stop — there's
+  // nothing left to decide, so nothing should keep flying behind the
+  // game-over screen ui/gameOver.ts is about to show.
   if (isInsolvent(state) && speedMultiplier !== 0) {
     speedMultiplier = 0;
     speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === 0));

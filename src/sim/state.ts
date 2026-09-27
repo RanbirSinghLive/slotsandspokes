@@ -10,7 +10,6 @@ import type { DelayBreakdown } from './delays';
 import type { HubStyle } from './hubStyle';
 import type { AogEvent } from './aog';
 import { createMarket, ensureRivalFleets, type MarketState } from './market';
-import type { Loan } from './loans';
 import { FUEL_PRICE_BASELINE } from './fuel';
 import type { TargetCommitment, TargetResult } from './targets';
 import { createCrewPools, type CrewPools, type PendingHire, type PendingTraining, type TrainingLine } from './crew';
@@ -360,16 +359,6 @@ export type SimState = {
    */
   rngSeed: number;
   /**
-   * Week five's failure state (see WEEK-FIVE.md): outstanding loans, taken
-   * via ui/loans.ts's pop-up whenever Cash drops to zero or below. Each
-   * loan's balance compounds daily (sim/loans.ts's
-   * applyDailyLoanInterest(), called from step.ts's day-rollover) until
-   * it's repaid in full and removed. Capped at MAX_LOANS (20) outstanding
-   * at once — needing a 21st while already at that cap is what
-   * sim/loans.ts's isInsolvent() calls game over.
-   */
-  loans: Loan[];
-  /**
    * Week five's runway forecast (sim/forecast.ts): the last
    * CASH_HISTORY_MAX_DAYS days' worth of closing Cash balances, oldest
    * first, recorded once per simulated day at the top of step.ts's
@@ -472,11 +461,6 @@ export type SimState = {
    * totals, split by where they went. Reset to zero at day-rollover
    * alongside `todayCost` itself, and **guaranteed to sum to it** — every
    * place that adds to `todayCost` adds to exactly one category here too.
-   *
-   * Loan interest is deliberately absent: it compounds onto each loan's
-   * own balance rather than being charged out of Cash (see sim/loans.ts),
-   * so it was never part of `todayCost` and including it here would break
-   * that sum.
    */
   /**
    * Week six's airline-wide fare policy (sim/pricing.ts): a multiplier on
@@ -691,7 +675,6 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     delayMinutesByCause: { age: 0, weather: 0, knockOn: 0, congestion: 0 },
     spilloverByMarket: {},
     rngSeed,
-    loans: [],
     cashHistory: [],
     revenueHistory: [],
     costHistory: [],

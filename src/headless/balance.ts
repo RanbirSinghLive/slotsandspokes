@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { isInsolvent } from '../sim/loans';
+import { isInsolvent } from '../sim/insolvency';
 import { marketKey } from '../sim/schedule';
 import { step } from '../sim/step';
 import { startHeadlessGame } from './newGame';

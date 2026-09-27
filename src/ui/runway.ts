@@ -4,8 +4,8 @@ import { money } from './pnlBars';
 
 /**
  * The cash runway warning: how many days until Cash hits zero if the last
- * week repeats. Running out ends the game on the spot (sim/loans.ts's
- * isInsolvent), and at 100x a fortnight passes in under half a minute, so
+ * week repeats. Running out ends the game on the spot
+ * (sim/insolvency.ts), and at 100x a fortnight passes in under half a minute, so
  * the player needs to see it coming in three escalating ways:
  *
  *   - A "Runway" row under Cash, always visible: amber inside a month,

@@ -2,11 +2,9 @@ import { computeCashForecast, FORECAST_DAYS_AHEAD, type CashForecast } from '../
 import type { SimState } from '../sim/state';
 
 /**
- * The Executive panel's financial-runway half — the other half (Loans:
- * outstanding balances, repayment) is ui/loans.ts's own concern, rendered
- * into the same `#executive-panel` markup but kept as separate modules,
- * same "one file per concern" shape every other panel in this codebase
- * already follows even when two features share one screen.
+ * The Executive panel's financial-runway half; the C-suite half is
+ * ui/executives.ts, in the same `#executive-panel` markup but a separate
+ * module.
  */
 
 const canvas = document.querySelector<HTMLCanvasElement>('#executive-chart')!;
@@ -127,11 +125,7 @@ function renderSummary(forecast: CashForecast): void {
  * Rebuild the chart and summary from `state` — called whenever the
  * Executive panel becomes visible, same "refresh on select, not every
  * tick" pattern ui/onTime.ts already uses, since
- * nothing here needs to react faster than a panel switch. The Loans
- * half of this same panel (ui/loans.ts) refreshes on its own, every
- * frame regardless of which panel is showing — it already has to, since
- * the loan-offer/game-over pop-ups are global overlays, not gated to
- * this panel being open.
+ * nothing here needs to react faster than a panel switch.
  */
 export function updateExecutivePanel(state: SimState): void {
   const forecast = computeCashForecast(state);

@@ -1,7 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { homeOptions, type HomeDifficulty } from '../sim/homes';
-import { isInsolvent } from '../sim/loans';
+import { isInsolvent } from '../sim/insolvency';
 import { step } from '../sim/step';
 import { startHeadlessGame } from './newGame';
 import { createPlayer } from './player';

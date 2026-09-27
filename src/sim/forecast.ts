@@ -14,7 +14,7 @@ export const FORECAST_DAYS_AHEAD = 14;
 /**
  * Called once per simulated day, from step.ts's day-rollover — at the very
  * top of that block, before any of the new day's own charges (marketing,
- * lease, loan interest) touch `state.cash`. That timing is what makes this
+ * lease) touch `state.cash`. That timing is what makes this
  * "yesterday's closing balance," not "today's opening one": nothing else
  * changes `state.cash` between the last minute of the day that just ended
  * and this call.
@@ -36,10 +36,7 @@ export type CashForecast = {
   /**
    * Days until Cash reaches zero at the current trend — null if the trend
    * isn't heading toward zero at all (flat or rising) or if there isn't
-   * enough history yet to trust a slope. Deliberately *not* trying to
-   * account for loans a player might take along the way (sim/loans.ts) —
-   * that's a real future decision the player makes interactively, not
-   * something this forecast can know in advance, so this answers "if
+   * enough history yet to trust a slope. It answers "if
    * nothing changes," not "when does the game actually end."
    */
   daysUntilZero: number | null;

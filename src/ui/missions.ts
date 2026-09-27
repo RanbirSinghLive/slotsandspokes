@@ -16,7 +16,7 @@ import type { SimState } from '../sim/state';
  * WEEK-SIX.md's original sketch put these in the Executive ledger as a
  * fourth section. That predates the sidebar tab system existing; now that
  * adding a tab is cheap, they get their own. Burying the game's only
- * statement of purpose underneath loans and a cash chart would undercut
+ * statement of purpose underneath a cash chart would undercut
  * the exact complaint this feature exists to answer.
  */
 
