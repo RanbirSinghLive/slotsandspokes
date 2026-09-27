@@ -437,6 +437,9 @@ Slices:
 
 ## Thread 5: a goal ladder
 
+**Moved to WEEK-TEN.md** (its thread 2), where the owner made progression
+the week's headline.
+
 **The idea.** Goals give a session a shape and say what a good airline
 looks like in this game. They are milestones of edges and moats, not
 chores: first underserved city opened, a hub with 50 connections a day,
