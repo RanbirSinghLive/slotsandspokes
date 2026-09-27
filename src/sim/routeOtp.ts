@@ -1,7 +1,16 @@
 import { marketKey } from './schedule';
 import { PNL_HISTORY_MAX_DAYS } from './pnlHistory';
-import { OTP_BASELINE } from './reputation';
 import type { SimState } from './state';
+
+/**
+ * 70% on-time is the neutral line: a route above it grows faster, one
+ * below grows slower (reliabilityDemandFactor() below), and the on-time
+ * map mode colours routes against it. An old fleet's own age delays cap
+ * it at about 72% even with generous turn buffers, so a well-buffered
+ * old fleet sits near neutral and a newer fleet earns a real bonus. Not
+ * fit to any real study.
+ */
+export const OTP_BASELINE = 0.7;
 
 /**
  * Reliability per route, as a daily history rather than one lifetime
@@ -26,7 +35,7 @@ export const ROUTE_OTP_WINDOW_DAYS = 7;
 /**
  * Fewer arrivals than this in the window and the route is treated as
  * neutral rather than judged. Same "a tiny sample is noise, not a signal"
- * reasoning as Reputation's REPUTATION_MIN_SAMPLE_FLIGHTS: two late
+ * reasoning as any small sample: two late
  * flights out of three on a route opened yesterday shouldn't start
  * shrinking its market.
  */
@@ -80,7 +89,7 @@ export function trailingMarketOtp(state: SimState, a: string, b: string, days = 
  * around; passengers who don't, come back and bring friends.
  *
  *   OTP 100% → 1.5   growth runs half again as fast
- *   OTP  70% → 1.0   normal growth (Reputation's own neutral line)
+ *   OTP  70% → 1.0   normal growth (the neutral line)
  *   OTP  40% → 0     growth stalls
  *   OTP  20% → -1    the market shrinks as fast as if you'd abandoned it
  *

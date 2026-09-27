@@ -4,7 +4,7 @@ import { projection } from './projection';
 import { airports } from './airports';
 import { marketKey } from '../sim/schedule';
 import { summarizeMarket } from '../sim/marketSummary';
-import { OTP_BASELINE } from '../sim/reputation';
+import { OTP_BASELINE } from '../sim/routeOtp';
 import type { SimState } from '../sim/state';
 
 /**
@@ -71,9 +71,9 @@ function profitabilityColor(margin: number, revenue: number): string {
 }
 
 /**
- * Red at 0% on-time, amber at OTP_BASELINE (Reputation's own "neutral
- * day" benchmark — see sim/reputation.ts), green at 100%. Sharing that
- * constant means this map and the Reputation number it feeds can never
+ * Red at 0% on-time, amber at OTP_BASELINE (the neutral line route
+ * growth is judged against, sim/routeOtp.ts), green at 100%. Sharing that
+ * constant means this map and the growth it drives can never
  * silently disagree about what "acceptable" means.
  */
 export function onTimeColor(pct: number): string {

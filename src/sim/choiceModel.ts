@@ -116,10 +116,14 @@ function scores(
   legsServingMarket: number,
   competitors: CompetitorOffering[],
   goingRate: number,
+  brandEdge: number,
 ): { yourScore: number; competitorScore: number } {
   const yourScore = Math.exp(utility(segment, fare, legsServingMarket, goingRate));
+  // Your name against theirs (sim/nps.ts's brandEdge()): a better NPS
+  // makes each rival's offer look that much worse, which moves passengers
+  // between airlines without changing how many travel at all.
   const competitorScore = competitors.reduce(
-    (total, c) => total + Math.exp(utility(segment, c.fare, c.dailyFrequency, goingRate)),
+    (total, c) => total + Math.exp(utility(segment, c.fare, c.dailyFrequency, goingRate) - brandEdge),
     0,
   );
   return { yourScore, competitorScore };
@@ -139,8 +143,9 @@ function segmentBookingShare(
   legsServingMarket: number,
   competitors: CompetitorOffering[],
   goingRate: number,
+  brandEdge: number,
 ): number {
-  const { yourScore, competitorScore } = scores(segment, fare, legsServingMarket, competitors, goingRate);
+  const { yourScore, competitorScore } = scores(segment, fare, legsServingMarket, competitors, goingRate, brandEdge);
   const stayHomeScore = Math.exp(0);
   return yourScore / (yourScore + stayHomeScore + competitorScore);
 }
@@ -161,8 +166,9 @@ function segmentTrafficShare(
   legsServingMarket: number,
   competitors: CompetitorOffering[],
   goingRate: number,
+  brandEdge: number,
 ): number {
-  const { yourScore, competitorScore } = scores(segment, fare, legsServingMarket, competitors, goingRate);
+  const { yourScore, competitorScore } = scores(segment, fare, legsServingMarket, competitors, goingRate, brandEdge);
   return yourScore / (yourScore + competitorScore);
 }
 
@@ -182,6 +188,8 @@ export function bookingShare(
   originIata: string,
   destIata: string,
   competitorRoutes: CompetitorOffering[],
+  /** How far your NPS on this market pulls passengers from a typical rival, in utility (sim/nps.ts's brandEdge()). */
+  brandEdge: number,
 ): number {
   const marketCompetitors = competitorsServingMarket(originIata, destIata, competitorRoutes);
   const goingRate = recommendedFare(originIata, destIata);
@@ -189,7 +197,7 @@ export function bookingShare(
     (total, segment) =>
       total +
       segment.shareOfDemand *
-        segmentBookingShare(segment, fare, legsServingMarket, marketCompetitors, goingRate),
+        segmentBookingShare(segment, fare, legsServingMarket, marketCompetitors, goingRate, brandEdge),
     0,
   );
 }
@@ -210,6 +218,8 @@ export function trafficShare(
   originIata: string,
   destIata: string,
   competitorRoutes: CompetitorOffering[],
+  /** How far your NPS on this market pulls passengers from a typical rival, in utility (sim/nps.ts's brandEdge()). */
+  brandEdge: number,
 ): number {
   const marketCompetitors = competitorsServingMarket(originIata, destIata, competitorRoutes);
   const goingRate = recommendedFare(originIata, destIata);
@@ -217,7 +227,7 @@ export function trafficShare(
     (total, segment) =>
       total +
       segment.shareOfDemand *
-        segmentTrafficShare(segment, fare, legsServingMarket, marketCompetitors, goingRate),
+        segmentTrafficShare(segment, fare, legsServingMarket, marketCompetitors, goingRate, brandEdge),
     0,
   );
 }
@@ -234,13 +244,16 @@ export function rivalBookingShare(
   playerFare: number,
   playerLegs: number,
   competitorRoutes: CompetitorOffering[],
+  /** The player's brand edge on this market (sim/nps.ts), which counts against every rival when the player flies it. */
+  brandEdge: number,
 ): number {
   const marketCompetitors = competitorsServingMarket(route.origin, route.dest, competitorRoutes);
   const goingRate = recommendedFare(route.origin, route.dest);
   return SEGMENTS.reduce((total, segment) => {
-    const rivalScore = Math.exp(utility(segment, route.fare, route.dailyFrequency, goingRate));
+    const edge = playerLegs > 0 ? brandEdge : 0;
+    const rivalScore = Math.exp(utility(segment, route.fare, route.dailyFrequency, goingRate) - edge);
     const allRivals = marketCompetitors.reduce(
-      (sum, c) => sum + Math.exp(utility(segment, c.fare, c.dailyFrequency, goingRate)),
+      (sum, c) => sum + Math.exp(utility(segment, c.fare, c.dailyFrequency, goingRate) - edge),
       0,
     );
     const playerScore =

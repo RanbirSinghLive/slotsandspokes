@@ -1533,35 +1533,45 @@ Regional, $828k for a Narrowbody and $1.08M for a Widebody.
 anyone. It is refused while the plane still has flights, is grounded by
 an AOG, or is in the air.
 
-## Reputation, NPS and the quality loop (`src/sim/nps.ts`, `src/sim/reputation.ts`) — week five
+## NPS and the quality loop (`src/sim/nps.ts`)
 
-Three different things that are easy to confuse:
+Two different things that are easy to confuse:
 
-- **On-Time performance** is a *rate* — on-time departures over all
-  departures. It only ever describes flights that actually operated.
-- **NPS** is a *score* per flight, derived (this game has no passengers to
-  survey) from four things step.ts already knows at the moment a flight
-  departs: how late it's going to be, how its fare compares to
-  competitors on that market, how old the airframe is, and what share of
-  cabin crew hold recurrent service training. Bounded to [-100, 100].
-- **Reputation** is a *stock*. Neither of the above accumulates, so
-  neither can be spent. Reputation is what they feed, and it's the
-  currency the C-suite and service targets draw on.
+- **On-Time performance** is a *rate*: on-time arrivals over arrivals.
+  It only describes flights that operated.
+- **NPS** is how passengers rate the airline. Each flight gets a score
+  (this game has no passengers to survey) from what step.ts knows as it
+  departs: how late it is, how its fare compares to rivals on the
+  market, how old the airframe is, and cabin service. A cancellation
+  scores −80. Bounded to [−100, 100].
 
-`applyDailyReputationChange()` runs once per day at rollover, reading
-*yesterday's* figures before they're reset. Three terms: on-time against
-an 80% baseline, completion factor against 98%, and average NPS. All
-three are scaled by a confidence factor for small samples — with two
-departures a day, "today's on-time %" can only be 0%, 50% or 100%, and
-reacting to that at full strength swung Reputation wildly for a
-one-plane operation.
+**What passengers respond to is the trailing NPS**: a daily moving
+average weighted 1/30 (`rollTrailingNps()` at rollover), so about the
+last month, for the network and for each market. A new airline starts
+level with a typical rival (`STARTING_NPS` = `RIVAL_NPS` = 10), since
+passengers don't know it yet; a market flown for the first time starts
+from the network's score. Starting at 0 instead cost a careful airline
+about a tenth of its first year's cash, a penalty for being new rather
+than for being bad.
 
-**Reputation is floored at zero.** Below roughly 78% on-time the daily
-delta is negative, and without a floor a struggling airline banked an
-ever-deepening deficit that even an excellent recovery took months to
-climb out of — locking it out of the very tools that would help. A
-mediocre airline still accrues nothing; it just doesn't go backwards.
+**It moves booking share against rivals** (`brandEdge()`): each point
+ahead of a typical rival's 10 is worth 0.008 of booking utility, taken
+off every rival's option in the choice model (sim/choiceModel.ts). It
+moves passengers between airlines, not how many travel, so a route with
+no rival is unaffected. Thirty points ahead is worth about a 5% fare cut
+to a leisure traveller. A careful airline's network NPS sits at 12–20
+through its first year, so across the network it's a tie-breaker; on
+one route it's a real lever, since routes range from about −27 (late,
+old planes) to +26, and a bad route loses passengers to its rival.
+Rivals' own profit estimates (sim/rivalEconomics.ts) see the same edge.
 
+Shown on the Network panel (NPS row), in the route view (with what it
+does against a rival, `brandInWords()`), on the airport view's routes,
+in the flight tooltip and in the On-Time table. The ladder's "A good
+name" asks for a trailing NPS of 15 with 1,000 flights flown.
+
+There is no Reputation stock: it was spent only by the hidden C-suite
+and service targets, and passengers never saw it.
 
 **There is no marketing lever.** Per-market marketing spend (a daily
 charge that bought booking share and faster demand growth) was removed
@@ -1672,7 +1682,7 @@ stays met.
 |---|---|---|---|
 | Start-up | 4 of 4 | fly your first route; a route that makes money for a week after its share of fixed costs; a route 72% full over a week; hold a starved city no rival flies to, on a route flown 30 days | Regional aircraft |
 | Regional carrier | 3 of 4 | serve 8 airports; connect 150 a day through one airport; put a Regional into service; make money every day for a week of a shock | Narrowbody; online booking, younger airframes |
-| Network airline | 3 of 5 | fly 60% of the movements at a busy airport; four routes 4+ a day each way; lifetime NPS 18 over 1,000 flights; planes based at two airports; put a Narrowbody into service | Widebody; loyalty scheme, winglet retrofits |
+| Network airline | 3 of 5 | fly 60% of the movements at a busy airport; four routes 4+ a day each way; trailing NPS 15, with 1,000 flights flown; planes based at two airports; put a Narrowbody into service | Widebody; loyalty scheme, winglet retrofits |
 | International | 2 of 2 | a route to another continent; connect 750 a day through one airport | codeshare feed |
 | Global | 1 of 1 | round the world: a loop of your routes that goes all the way round the globe, reachable from home | — |
 
@@ -1684,8 +1694,8 @@ The Network view's Goals row says the tier and how many of its
 milestones are met, and opens the view; the ticker announces each
 milestone and each new tier. Thresholds were set from headless runs: a
 full plane shows about 76% load (the 75% load-factor ceiling), a careful
-airline from Montréal connects about 150 a day by day 60, and lifetime
-NPS ends a careful first year at 14–17.
+airline from Montréal connects about 150 a day by day 60, and its
+trailing NPS sits at 12–17 from its fourth month.
 
 **Shocks** (`src/sim/shocks.ts`): announced events that make the world
 less steady for a while, so growth at any cost is dangerous and a thin
@@ -2028,28 +2038,12 @@ cash rises 5–65% by home (WEEK-TEN.md, thread 2).
 
 ---
 
-## Service targets (`src/sim/targets.ts`) — week six
-
-The authored missions that used to sit beside targets were replaced by
-the ladder (see "The ladder"; WEEK-TEN.md thread 2). Whether targets
-stay is thread 3's call, since they pay Reputation.
-
-**Targets** are the player's half of the goal system. You commit to an on-time percentage
-and average NPS; the promise runs 30 days against its own scoped
-counters. Reward scales with ambition above an 80% / 0 NPS baseline, and
-**missing costs half what hitting pays** — without a downside the
-dominant play is to promise the maximum every time, so staking Reputation
-is what makes the choice real. Windows with under 20 departures expire
-unjudged.
-
----
-
 ## The C-suite (`src/sim/executives.ts`) — week six
 
-Four slots — CEO, COO, CFO, CCO — bought with **Reputation**, which makes
-it a second real spender and puts the whole C-suite out of reach until
-the airline has been good at something. Two of the four convert
-Reputation back into cash.
+Four slots — CEO, COO, CFO, CCO — each for a cash signing fee
+($250,000–$500,000). Hidden from the player until WEEK-TEN.md's thread 8
+reworks it: no CEO, salaries, and candidate pools that widen as NPS
+rises, all in the Head office view.
 
 Each attaches to a system that already existed rather than a stat
 invented for them: the COO's three backgrounds hit the delay roll, the

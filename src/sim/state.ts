@@ -12,7 +12,7 @@ import type { AogEvent } from './aog';
 import { createMarket, ensureRivalFleets, type MarketState } from './market';
 import { FUEL_PRICE_BASELINE } from './fuel';
 import type { FuelHedge } from './fuelPrice';
-import type { TargetCommitment, TargetResult } from './targets';
+import { STARTING_NPS } from './nps';
 import { createCrewPools, type CrewPools, type PendingHire, type PendingTraining, type TrainingLine } from './crew';
 import { createExecutiveSlots, type ExecutiveSlots } from './executives';
 
@@ -229,20 +229,16 @@ export type SimState = {
   todayCost: number;
   todayMargin: number;
   /**
-   * Week five's Reputation mechanic (sim/reputation.ts): today's own
-   * departed/on-time/NPS-point counts, reset to zero at day-rollover same
-   * as `todayRevenue` and friends above — *not* the lifetime totals below,
-   * which barely move day to day once a game has run a while. Read (and
-   * only then reset) by `applyDailyReputationChange()` at the *start* of
-   * the next day's rollover, so Reputation reacts to how yesterday
-   * actually went rather than a slow-moving lifetime average.
+   * Today's own departed/on-time/NPS-point counts, reset to zero at
+   * day-rollover same as `todayRevenue` and friends above, after the
+   * trailing NPS (sim/nps.ts) and the day's histories have read them.
    */
   todayFlightsDeparted: number;
   /**
    * On-Time is judged at arrival (sim/delays.ts's isOnTimeArrival), so
    * its denominator is arrivals, not departures: a flight that departs
    * late in the evening and lands after midnight counts toward the day it
-   * lands. `todayFlightsDeparted` above stays as Reputation's sample size.
+   * lands.
    */
   todayFlightsArrived: number;
   todayFlightsOnTime: number;
@@ -300,26 +296,21 @@ export type SimState = {
   /** The shock running now, or the last one until another starts (sim/shocks.ts's activeShock() says which). Optional: older saves have none. */
   shock?: Shock | null;
   /**
-   * Week five's second HUD quality signal (see sim/nps.ts and
-   * WEEK-FIVE.md's "Reputation" design): the running sum of every revenue
-   * flight's `flightSatisfactionScore()` at the moment it departs.
-   * Divided by `npsScoredFlightsTotal` (departures plus cancellations)
-   * to get the lifetime average NPS shown in the sidebar. A lifetime average rather
-   * than a trailing window, same "simplest first pass" shape the On-Time
-   * stat already has; a more reactive trailing-window version is a real
-   * future refinement, not this one.
+   * The running sum of every scored flight's NPS (sim/nps.ts), over
+   * `npsScoredFlightsTotal` (departures plus cancellations): the lifetime
+   * average. What passengers respond to is the trailing score below.
    */
   npsPointsTotal: number;
   /**
-   * Week five's second resource besides Cash (sim/reputation.ts): an
-   * unbounded running score, moved up or down once per simulated day by
-   * `applyDailyReputationChange()` based on that day's On-Time percentage
-   * and average NPS (see `todayFlightsDeparted`/`todayFlightsOnTime`/
-   * `todayNpsPoints` above). Starts at 0 — a brand-new airline with no
-   * track record yet, not already "good" or "bad." Executives spend
-   * it until thread 3 of WEEK-TEN.md replaces it with NPS.
+   * The airline's trailing NPS (sim/nps.ts): a daily moving average over
+   * roughly the last month, starting level with a typical rival.
+   * Optional: absent in an older save, read as that starting value.
    */
-  reputation: number;
+  trailingNps?: number;
+  /** Each market's trailing NPS, keyed by marketKey(); a market not yet flown reads the network's. */
+  trailingNpsByMarket?: Record<string, number>;
+  /** Today's NPS points and scored flights per market, folded into the trailing scores at rollover. */
+  todayNpsByMarket?: Record<string, { points: number; flights: number }>;
   /**
    * Lifetime minutes of arrival delay attributed to each of step.ts's
    * three delay causes (age, weather, knock-on) — the On-Time panel's
@@ -464,8 +455,7 @@ export type SimState = {
   farePolicyMultiplier: number;
   /**
    * Week six's C-suite (sim/executives.ts): four slots, each holding at
-   * most one appointment. Paid for in Reputation, which makes the C-suite
-   * unreachable until the airline has been good at something.
+   * most one appointment, each paid a signing fee in cash.
    */
   executives: ExecutiveSlots;
   /**
@@ -552,19 +542,6 @@ export type SimState = {
    */
   npsScoredFlightsTotal: number;
   todayNpsScoredFlights: number;
-  /**
-   * Week six's targets (sim/targets.ts): the service standard the player
-   * has publicly committed to, or null when none is running. Carries its
-   * own window-scoped departure/on-time/NPS counters, which step.ts
-   * increments alongside the today- and lifetime-scoped ones.
-   */
-  activeTarget: TargetCommitment | null;
-  /**
-   * How the last commitment turned out, kept after it resolves so the UI
-   * can report it rather than having a promise silently disappear. Null
-   * until one has ever run to completion.
-   */
-  lastTargetResult: TargetResult | null;
   todayCostByCategory: {
     /** Fuel, after the price index and winglet retrofits. */
     fuel: number;
@@ -654,7 +631,9 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     todayOnTimeByMarket: {},
     onTimeHistoryByMarket: {},
     npsPointsTotal: 0,
-    reputation: 0,
+    trailingNps: STARTING_NPS,
+    trailingNpsByMarket: {},
+    todayNpsByMarket: {},
     delayMinutesByCause: { age: 0, weather: 0, knockOn: 0, congestion: 0 },
     spilloverByMarket: {},
     rngSeed,
@@ -692,8 +671,6 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     todayFlightsCancelled: 0,
     npsScoredFlightsTotal: 0,
     todayNpsScoredFlights: 0,
-    activeTarget: null,
-    lastTargetResult: null,
     todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, lease: 0, crew: 0, training: 0, slots: 0, maintenance: 0, overhead: 0, innovations: 0 },
   };
   revealReach(state);

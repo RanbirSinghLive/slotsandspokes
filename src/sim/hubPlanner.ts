@@ -1,4 +1,5 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
+import { brandEdge } from './nps';
 import { airlineFuelPrice } from './fuelPrice';
 import { connectingPriceResponse, legCost, LOAD_FACTOR, type EconomyAircraftType } from './economy';
 import { connectingDemandOnMarket, connectingPassengersThrough, connectingFlowsAt, spokesOf, suggestSpokes, planHubStyleChange } from './hubs';
@@ -111,7 +112,7 @@ function connectionRevenueGain(state: SimState, after: SimState, hub: string, ex
     // Priced the same way the economy prices them (sim/economy.ts): an
     // over-priced route wins fewer of its connections.
     const response = settings
-      ? connectingPriceResponse(settings.fare, legsServingMarket(hub, spoke, after.schedule), hub, spoke, state.competitorRoutes)
+      ? connectingPriceResponse(settings.fare, legsServingMarket(hub, spoke, after.schedule), hub, spoke, state.competitorRoutes, brandEdge(state, hub, spoke))
       : 1;
     const gained = (connectingDemandOnMarket(after, hub, spoke) - connectingDemandOnMarket(state, hub, spoke)) * response;
     if (gained <= 0) continue;

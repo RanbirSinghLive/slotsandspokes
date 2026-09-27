@@ -1,4 +1,5 @@
 import { removeRotation as removeRotationFromSchedule } from '../sim/playerActions';
+import { formatNps, networkNps } from '../sim/nps';
 import { validateSchedule } from '../sim/schedule';
 import { allRotations, utilisationProblems, type Rotation } from '../sim/utilisation';
 import { select } from './selection';
@@ -21,6 +22,7 @@ const cashEl = document.querySelector<HTMLSpanElement>('#panel-cash')!;
 const otpEl = document.querySelector<HTMLSpanElement>('#panel-otp')!;
 const completionEl = document.querySelector<HTMLSpanElement>('#panel-completion')!;
 const loadEl = document.querySelector<HTMLSpanElement>('#panel-load')!;
+const npsEl = document.querySelector<HTMLElement>('#panel-nps')!;
 const goalsEl = document.querySelector<HTMLButtonElement>('#panel-goals')!;
 // Opens Network › Goals (ui/inspector/goals.ts).
 goalsEl.addEventListener('click', () => select({ kind: 'goals' }));
@@ -78,6 +80,8 @@ export function updatePanel(state: SimState): void {
       : `${Math.round(((state.flightsScheduledTotal - state.flightsCancelledTotal) / state.flightsScheduledTotal) * 100)}%`;
   // Load factor (sim/loadFactor.ts): how full the airline flies, last 7 days.
   loadEl.textContent = formatLoadFactor(networkLoadFactor(state));
+  // NPS (sim/nps.ts): the airline's name, about the last month.
+  npsEl.textContent = state.npsScoredFlightsTotal === 0 ? '—' : formatNps(networkNps(state));
   // Where the airline stands on the ladder (sim/ladder.ts).
   goalsEl.textContent = `${goalsSummary(state)} ›`;
   headOfficeEl.textContent = `${headOfficeSummary(state)} ›`;

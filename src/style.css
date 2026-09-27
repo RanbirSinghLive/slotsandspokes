@@ -540,7 +540,7 @@ body {
 
 /* The one part of the sidebar that actually scrolls — a tab's content can
    run long (a big fleet, a busy schedule), but the tab bar and the Cash/
-   On-time/NPS/Reputation header above it should never scroll out of
+   summary header above it should never scroll out of
    reach because of it. `min-height: 0` is required here: a flex child
    defaults to never shrinking below its own content's natural height,
    which would otherwise make this div (and #panel around it) grow
@@ -1964,113 +1964,6 @@ body {
   border-color: rgba(255, 255, 255, 0.5);
 }
 
-/* The Missions tab (ui/missions.ts): the player's own service targets. */
-#missions-panel section {
-  margin-bottom: 28px;
-}
-
-#missions-panel h2 {
-  margin: 0 0 6px;
-  font-size: 11px;
-  font-weight: 400;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #6b7694;
-}
-
-.target-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-
-.target-label {
-  width: 70px;
-  color: #9aa3b8;
-  font-size: 12px;
-}
-
-#target-stake {
-  margin: 10px 0;
-  font-size: 13px;
-}
-
-.target-reward {
-  color: #7fd88f;
-}
-
-.target-penalty {
-  color: #ff8080;
-}
-
-#target-commit {
-  font-family: inherit;
-  font-size: 13px;
-  color: #9aa3b8;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  padding: 4px 10px;
-  cursor: pointer;
-}
-
-#target-commit:hover:not(:disabled) {
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.5);
-}
-
-#target-commit:disabled {
-  color: #4a5266;
-  border-color: rgba(255, 255, 255, 0.08);
-  cursor: default;
-}
-
-.target-committed {
-  margin-bottom: 8px;
-  font-size: 13px;
-}
-
-.target-progress-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 3px 0;
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-}
-
-.target-ahead {
-  color: #7fd88f;
-}
-
-.target-behind {
-  color: #ffb37a;
-}
-
-.target-progress-note {
-  margin-top: 6px;
-  color: #6b7694;
-  font-size: 11px;
-}
-
-.target-result {
-  margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  color: #6b7694;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.target-result--met {
-  color: #7fd88f;
-}
-
-.target-result--missed {
-  color: #ff8080;
-}
-
 /* Week six's Crew tab (ui/crew.ts): pools rather than named individuals,
    with bulk recruitment and the reserve-depth lever. */
 #crew-panel section {
@@ -2261,7 +2154,7 @@ body {
 }
 
 /* Week six's C-suite (sim/executives.ts, ui/executives.ts) — four slots
-   at the top of the Executive tab, bought with Reputation. */
+   at the top of the Executive tab, each for a signing fee. */
 #executive-suite-section {
   margin-bottom: 32px;
   max-width: 520px;

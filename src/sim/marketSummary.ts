@@ -84,7 +84,7 @@ export function summarizeMarket(origin: string, dest: string, state: SimState, r
     }
     return connecting;
   };
-  const perks = bookingPerks(state);
+  const perks = bookingPerks(state, origin, dest);
   for (const leg of legs) {
     const type = aircraftTypeForLeg(leg, state);
     const result = flightResult(
@@ -127,7 +127,7 @@ export function summarizeMarket(origin: string, dest: string, state: SimState, r
   // connecting itineraries aren't modeled (WEEK-TWO.md decision 1), so a
   // rival reachable only by connecting through a third city can't yet
   // pull share away here.
-  const share = freq > 0 ? trafficShare(routeSettings.fare, freq, origin, dest, state.competitorRoutes) : 1;
+  const share = freq > 0 ? trafficShare(routeSettings.fare, freq, origin, dest, state.competitorRoutes, perks.brandEdge) : 1;
 
   return { freq, pax, revenue, cost, margin, seatCapped, share, totalSeats, seatCeiling: totalSeatCeiling };
 }

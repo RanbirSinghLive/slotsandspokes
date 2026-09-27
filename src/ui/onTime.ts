@@ -1,4 +1,5 @@
 import { formatLoadFactor, marketLoadFactor } from '../sim/loadFactor';
+import { formatNps, marketNps } from '../sim/nps';
 import type { SimState } from '../sim/state';
 import { selectRoute } from './selection';
 
@@ -121,7 +122,10 @@ export function updateOnTimePanel(state: SimState): void {
     const loadCell = document.createElement('td');
     loadCell.textContent = formatLoadFactor(marketLoadFactor(state, origin, dest));
 
-    row.append(marketCell, arrivedCell, onTimeCell, pctCell, loadCell);
+    const npsCell = document.createElement('td');
+    npsCell.textContent = formatNps(marketNps(state, origin, dest));
+
+    row.append(marketCell, arrivedCell, onTimeCell, pctCell, loadCell, npsCell);
     marketRowsBody.appendChild(row);
   }
 

@@ -83,10 +83,10 @@ function candidateCard(state: SimState, candidate: ExecutiveCandidate, isIncumbe
     action.textContent = 'Appointed';
     action.disabled = true;
   } else {
-    action.textContent = `Appoint — ${candidate.reputationCost} Reputation`;
-    action.disabled = state.reputation < candidate.reputationCost;
+    action.textContent = `Appoint — $${candidate.signingFee.toLocaleString()}`;
+    action.disabled = state.cash < candidate.signingFee;
     action.addEventListener('click', () => {
-      if (state.reputation < candidate.reputationCost) return; // disabled; stale-click guard
+      if (state.cash < candidate.signingFee) return; // disabled; stale-click guard
       appointExecutive(state, candidate);
       updateExecutivesPanel(state);
     });
@@ -94,10 +94,10 @@ function candidateCard(state: SimState, candidate: ExecutiveCandidate, isIncumbe
 
   card.append(header, flavor, effect, action);
 
-  if (!isIncumbent && state.reputation < candidate.reputationCost) {
+  if (!isIncumbent && state.cash < candidate.signingFee) {
     const shortfall = document.createElement('div');
     shortfall.className = 'exec-candidate-shortfall';
-    shortfall.textContent = `Need ${Math.ceil(candidate.reputationCost - state.reputation)} more Reputation.`;
+    shortfall.textContent = `Needs $${candidate.signingFee.toLocaleString()} on hand.`;
     card.appendChild(shortfall);
   }
 
@@ -155,6 +155,6 @@ export function updateExecutivesPanel(state: SimState): void {
   const filled = EXECUTIVE_ROLES.filter((role) => state.executives[role] !== null).length;
   effectsEl.textContent =
     filled === 0
-      ? 'No appointments yet. Reputation is what buys them, so the C-suite stays out of reach until the airline has been good at something.'
+      ? 'No appointments yet.'
       : `${filled} of ${EXECUTIVE_ROLES.length} slots filled.`;
 }

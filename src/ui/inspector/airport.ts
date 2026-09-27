@@ -1,4 +1,5 @@
 import { airportLoad, dailyMovementsAt, slotCapacityPerDay } from '../../sim/airports';
+import { formatNps, marketNps } from '../../sim/nps';
 import { daysUntilReturn, expediteCost, expediteRepair } from '../../sim/aog';
 import { congestionParameters } from '../../sim/delays';
 import { connectingPassengersThrough } from '../../sim/hubs';
@@ -234,7 +235,7 @@ function marketRows(state: SimState, iata: string): HTMLElement {
     detail.className = 'inspector-row-detail';
     const load = marketLoadFactor(state, iata, other);
     detail.textContent =
-      `${flights} flight${flights === 1 ? '' : 's'}/day · ${formatLoadFactor(load)} full` + (lastMargin === null ? '' : ` · ${pnlMoney(lastMargin)} yesterday`);
+      `${flights} flight${flights === 1 ? '' : 's'}/day · ${formatLoadFactor(load)} full · NPS ${formatNps(marketNps(state, iata, other))}` + (lastMargin === null ? '' : ` · ${pnlMoney(lastMargin)} yesterday`);
     if (lastMargin !== null && lastMargin < 0) detail.classList.add('is-over');
     row.append(name, detail);
     row.addEventListener('click', () => select({ kind: 'route', a: iata, b: other }));

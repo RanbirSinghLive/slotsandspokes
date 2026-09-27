@@ -1,4 +1,5 @@
 import { formatLoadFactor, marketLoadFactor } from '../sim/loadFactor';
+import { formatNps, marketNps } from '../sim/nps';
 import { minuteOfDay } from '../sim/clock';
 import { classByCode } from '../sim/aircraftClasses';
 import type { ProjectedLeg } from '../sim/cascade';
@@ -74,6 +75,7 @@ export function showFlightTooltip(
     // Its passengers are only settled when it lands, so the route's recent
     // load factor stands in (sim/loadFactor.ts).
     line(`Route load factor: ${formatLoadFactor(marketLoadFactor(state, flight.origin, flight.dest))} (last 7 days)`),
+    line(`Route NPS: ${formatNps(marketNps(state, flight.origin, flight.dest))} (last month)`),
   ];
 
   if (lateOnArrival <= 0) {

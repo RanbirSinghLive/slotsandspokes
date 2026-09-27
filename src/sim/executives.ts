@@ -2,16 +2,10 @@ import executivesData from '../../data/executives.json';
 import type { SimState } from './state';
 
 /**
- * Week six's C-suite: four slots — CEO, COO, CFO, CCO — each holding at
- * most one appointment, paid for in **Reputation** rather than cash.
- *
- * That currency choice is the design. Reputation is earned slowly by
- * running a good airline (on-time, completion factor, NPS) and until now
- * had exactly one spender, the tech tree. Executives make it a genuine
- * second: two of the four convert Reputation into *cash*, so a
- * well-regarded airline can borrow against its own standing rather than
- * a bank's. It also means the C-suite is unreachable early — you have to
- * have been good at something first.
+ * The C-suite: four slots — CEO, COO, CFO, CCO — each holding at most one
+ * appointment, paid a one-off signing fee in cash. Hidden from the player
+ * until WEEK-TEN.md's thread 8 reworks it (no CEO, salaries, candidate
+ * pools that widen as NPS rises).
  *
  * WEEK-SIX.md carried an open question for weeks: "what do a COO's,
  * CFO's, CCO's and CEO's bonuses actually *modify*?" — and flagged that
@@ -55,7 +49,8 @@ export type ExecutiveCandidate = {
   name: string;
   background: string;
   flavor: string;
-  reputationCost: number;
+  /** Paid once, in cash, on appointment. */
+  signingFee: number;
   effect: ExecutiveEffect;
 };
 
@@ -114,8 +109,8 @@ function payoutIntervalMinutes(effect: ExecutiveEffect): number | null {
 }
 
 /**
- * Appoint `candidate`, replacing whoever held the slot. Charged in
- * Reputation; the UI checks affordability first.
+ * Appoint `candidate`, replacing whoever held the slot, for its signing
+ * fee; the UI checks affordability first.
  *
  * Replacing costs the new appointment's full price — there's no refund
  * for the outgoing executive, which is what stops slot-shopping being
@@ -124,7 +119,7 @@ function payoutIntervalMinutes(effect: ExecutiveEffect): number | null {
  * not the chair's.
  */
 export function appointExecutive(state: SimState, candidate: ExecutiveCandidate): void {
-  state.reputation -= candidate.reputationCost;
+  state.cash -= candidate.signingFee;
   const interval = payoutIntervalMinutes(candidate.effect);
   state.executives[candidate.role] = {
     candidateId: candidate.id,

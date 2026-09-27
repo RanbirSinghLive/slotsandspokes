@@ -262,7 +262,7 @@ function computeFunnel(state: SimState): FunnelTotals {
         settings.fare,
         state.competitorRoutes,
         previewSpillover,
-        bookingPerks(state),
+        bookingPerks(state, leg.origin, leg.dest),
       );
       previewSpillover += result.spilloverDelta;
 

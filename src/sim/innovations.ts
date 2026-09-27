@@ -1,5 +1,6 @@
 import { RECAPTURE_RATE } from './economy';
 import { airlineCalled, LADDER, tiersClimbed } from './ladder';
+import { brandEdge } from './nps';
 import type { SimState } from './state';
 
 /**
@@ -136,18 +137,22 @@ export function adoptInnovation(state: SimState, id: InnovationId): { ok: true; 
 }
 
 /**
- * The adopted programmes' effects on how a flight books, as plain
- * numbers: what flightResult() (sim/economy.ts) takes.
+ * What the airline brings to booking on one market beyond fare and
+ * frequency, as plain numbers: what flightResult() (sim/economy.ts)
+ * takes. Its name there (sim/nps.ts), and the adopted programmes' effects.
  */
 export type BookingPerks = {
+  /** How far its NPS here pulls passengers from a typical rival, in booking utility. */
+  brandEdge: number;
   /** Multiplies every ticket's revenue. */
   yieldMultiplier: number;
   /** Share of turned-away passengers who wait for a later flight. */
   recaptureRate: number;
 };
 
-export function bookingPerks(state: SimState): BookingPerks {
+export function bookingPerks(state: SimState, origin: string, dest: string): BookingPerks {
   return {
+    brandEdge: brandEdge(state, origin, dest),
     yieldMultiplier: isAdopted(state, 'online-booking') ? DIRECT_BOOKING_YIELD : 1,
     recaptureRate: isAdopted(state, 'loyalty-scheme') ? LOYALTY_RECAPTURE_RATE : RECAPTURE_RATE,
   };

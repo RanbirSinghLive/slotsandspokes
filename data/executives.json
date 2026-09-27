@@ -5,7 +5,7 @@
     "name": "Diane Hargrave",
     "background": "Turnaround chief executive",
     "flavor": "Took two regional carriers off the brink and sold one of them. Opens doors that don't open for operators, and knows exactly which quarter to open them in.",
-    "reputationCost": 500,
+    "signingFee": 500000,
     "effect": { "kind": "annual-bonus", "amount": 200000, "escalation": 1.4 }
   },
   {
@@ -14,7 +14,7 @@
     "name": "Marcus Oyelaran",
     "background": "Flight operations",
     "flavor": "Twenty years running control centres. Believes most delays are decisions, not weather, and reschedules a rotation faster than anyone can explain why it broke.",
-    "reputationCost": 300,
+    "signingFee": 300000,
     "effect": { "kind": "flight-ops", "delayMultiplier": 0.85 }
   },
   {
@@ -23,7 +23,7 @@
     "name": "Priya Raghunathan",
     "background": "Inflight service",
     "flavor": "Came up through the cabin and never stopped thinking like it. Rewrote a legacy carrier's onboard standards and made the crew like the new ones better.",
-    "reputationCost": 300,
+    "signingFee": 300000,
     "effect": { "kind": "inflight", "npsBonus": 8 }
   },
   {
@@ -32,7 +32,7 @@
     "name": "Errol Vance",
     "background": "Maintenance and engineering",
     "flavor": "A licensed engineer who still reads the defect log himself. Reckons a well-kept airframe owes you nothing and a neglected one takes it out of your schedule.",
-    "reputationCost": 300,
+    "signingFee": 300000,
     "effect": { "kind": "maintenance", "ageFactorMultiplier": 0.85 }
   },
   {
@@ -41,7 +41,7 @@
     "name": "Simone Adeyemi",
     "background": "Airline finance",
     "flavor": "Structured aircraft debt for a decade before deciding she would rather spend it than arrange it. Finds money in the working capital nobody else was looking at.",
-    "reputationCost": 350,
+    "signingFee": 350000,
     "effect": { "kind": "monthly-bonus", "amount": 18000, "escalation": 1.08 }
   },
   {
@@ -50,7 +50,7 @@
     "name": "Tomas Lindqvist",
     "background": "Commercial and distribution",
     "flavor": "Built a low-cost carrier's network one town at a time: the travel agents, the local papers, the chamber of commerce. New routes fill faster when he's already told the town they're coming.",
-    "reputationCost": 250,
+    "signingFee": 250000,
     "effect": { "kind": "market-building", "growthMultiplier": 1.25 }
   }
 ]

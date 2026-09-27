@@ -3,6 +3,7 @@ import { airportLoad, dailyMovementsAt } from './airports';
 import { dayIndex } from './clock';
 import { connectingPassengersThrough } from './hubs';
 import { marketLoadFactor } from './loadFactor';
+import { networkNps } from './nps';
 import { networkAirports } from './reach';
 import { routeFixedCosts } from './routeCosts';
 import { marketKey } from './schedule';
@@ -153,11 +154,12 @@ const NEARLY_FULL = 0.72;
 const HUB_PASSENGERS = 150;
 const BIG_HUB_PASSENGERS = 750;
 /**
- * The lifetime NPS, and the flights it's judged over, that count as a good
- * name. A careful airline on old airframes ends its first year at 14–17,
- * dragged down by its early days, so this asks for better than that.
+ * The trailing NPS (sim/nps.ts, about the last month), and the flights
+ * scored in all, that count as a good name. A careful airline on old
+ * airframes sits at 12–17 from its fourth month, so this asks for its
+ * better months, and for a thousand flights so it can't be met early.
  */
-const GOOD_NPS = 18;
+const GOOD_NPS = 15;
 const GOOD_NPS_MIN_FLIGHTS = 1000;
 /** Days a route has to be flown to count as holding a city (the P&L history's length, sim/pnlHistory.ts). */
 const HOLD_DAYS = 30;
@@ -282,9 +284,9 @@ export const LADDER: Tier[] = [
       {
         id: 'good-name',
         name: 'A good name',
-        description: `Keep an NPS of ${GOOD_NPS} or better over at least ${GOOD_NPS_MIN_FLIGHTS.toLocaleString()} flights.`,
-        met: (state) => state.npsScoredFlightsTotal >= GOOD_NPS_MIN_FLIGHTS && lifetimeNps(state) >= GOOD_NPS,
-        progress: (state) => ({ current: Math.round(lifetimeNps(state)), target: GOOD_NPS, unit: 'NPS' }),
+        description: `Reach an NPS of ${GOOD_NPS} over the last month, with ${GOOD_NPS_MIN_FLIGHTS.toLocaleString()} flights flown in all.`,
+        met: (state) => state.npsScoredFlightsTotal >= GOOD_NPS_MIN_FLIGHTS && networkNps(state) >= GOOD_NPS,
+        progress: (state) => ({ current: Math.round(networkNps(state)), target: GOOD_NPS, unit: 'NPS' }),
       },
       {
         id: 'second-base',
@@ -364,9 +366,6 @@ function dominantRoutes(state: SimState): number {
   return [...legs.values()].filter((count) => count >= 8).length;
 }
 
-function lifetimeNps(state: SimState): number {
-  return state.npsScoredFlightsTotal > 0 ? state.npsPointsTotal / state.npsScoredFlightsTotal : 0;
-}
 
 // --- Where the airline stands ------------------------------------------------
 

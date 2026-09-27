@@ -1,4 +1,5 @@
 import { forecastStance, type StanceForecast } from '../../sim/fareForecast';
+import { brandInWords, formatNps, marketNps, networkNps } from '../../sim/nps';
 import { rivalYieldFactor } from '../../sim/pressure';
 import { policyFare, setFareStance, setHandFare } from '../../sim/pricing';
 import { demandAgainstSeats, marketSize } from '../../sim/marketSize';
@@ -90,6 +91,11 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   );
   presence.classList.toggle('is-over', short);
   root.append(presence);
+
+  // NPS (sim/nps.ts): how passengers rate the airline here, about the last
+  // month, and what that does against a rival.
+  const brand = brandInWords(state, a, b, state.competitorRoutes);
+  root.append(line(`NPS ${formatNps(marketNps(state, a, b))} here (your airline ${formatNps(networkNps(state))}).${brand ? ` ${brand}` : ''}`));
 
   // The market in words (sim/marketSize.ts): how big the city pair is, and
   // how full a flight is today. A route you have only just opened has

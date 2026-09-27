@@ -21,10 +21,7 @@ import {
   executiveNpsBonus,
   executiveMaintenanceMultiplier,
 } from './executives';
-import { CANCELLATION_NPS_SCORE } from './nps';
-import { resolveTargetIfDue } from './targets';
-import { flightSatisfactionScore } from './nps';
-import { applyDailyReputationChange, REPUTATION_FLOOR } from './reputation';
+import { CANCELLATION_NPS_SCORE, flightSatisfactionScore, recordFlightNps, rollTrailingNps } from './nps';
 import { recordDailyCashHistory } from './forecast';
 import { recordDailyPnlHistory } from './pnlHistory';
 import { recordDailyOnTimeHistory } from './routeOtp';
@@ -101,10 +98,7 @@ function recordCancellation(state: SimState, leg: ScheduleLeg, cause: keyof SimS
   state.cancellationsByCause[cause] = (state.cancellationsByCause[cause] ?? 0) + 1;
   state.todayFlightsCancelled += 1;
   state.flightsCancelledTotal += 1;
-  state.npsPointsTotal += CANCELLATION_NPS_SCORE;
-  state.todayNpsPoints += CANCELLATION_NPS_SCORE;
-  state.npsScoredFlightsTotal += 1;
-  state.todayNpsScoredFlights += 1;
+  recordFlightNps(state, leg.origin, leg.dest, CANCELLATION_NPS_SCORE);
   const market = (state.todayOnTimeByMarket[marketKey(leg.origin, leg.dest)] ??= { arrived: 0, onTime: 0, cancelled: 0 });
   market.cancelled += 1;
 }
@@ -151,27 +145,12 @@ export function step(state: SimState): void {
   const dayStart = state.simMinute - minuteOfDay;
 
   if (minuteOfDay === 0) {
-    // Week five's Reputation mechanic: read *yesterday's* On-Time/NPS
-    // performance before todayFlightsDeparted and friends get reset just
-    // below — same "read the just-finished day's real totals before
-    // they're cleared" ordering this block already relies on for
-    // todayRevenue/todayCost/todayMargin elsewhere in main.ts/step.ts.
-    applyDailyReputationChange(state);
-    // Week six's targets (sim/targets.ts): a commitment whose window has
-    // elapsed is judged here, immediately after the reputation change
-    // above — both move the same currency, and settling the promise on
-    // the same rollover keeps the two from being read in a half-applied
-    // state by anything downstream.
-    resolveTargetIfDue(state);
-    // Both of the above can push Reputation down — the daily quality
-    // delta and a missed service target — and they're the only two
-    // things that ever do unprompted (spending it is UI-gated to what
-    // you can afford). Clamping once here covers both without threading
-    // a helper through every module that touches the number.
-    state.reputation = Math.max(REPUTATION_FLOOR, state.reputation);
-    // Week five's runway forecast (sim/forecast.ts): same "read it before
-    // today's own charges touch Cash" timing as the reputation call just
-    // above — this is what makes each entry "yesterday's closing balance."
+    // The trailing NPS (sim/nps.ts) takes in the day just flown, before
+    // today's counts reset below.
+    rollTrailingNps(state);
+    // Week five's runway forecast (sim/forecast.ts): read before today's
+    // own charges touch Cash — this is what makes each entry "yesterday's
+    // closing balance."
     recordDailyCashHistory(state);
     // Same timing, same reason: state.todayRevenue/todayCost/todayMargin
     // still hold the day that just ended, one line above where they reset.
@@ -394,10 +373,7 @@ export function step(state: SimState): void {
     // Whether the flight counts as *on time* is decided later, when it
     // lands (see the arrival loop below).
     const lateAtDepartureMinutes = state.simMinute - (dayStart + leg.departMinute);
-    // Departures still count: Reputation and service targets use them as
-    // their sample size, and targets average NPS over them.
     state.todayFlightsDeparted += 1;
-    if (state.activeTarget) state.activeTarget.flightsDeparted += 1;
     const marketOnTimeKey = marketKey(leg.origin, leg.dest);
 
     const weatherAtOrigin = !!state.weatherByAirport[leg.origin];
@@ -443,11 +419,7 @@ export function step(state: SimState): void {
       state.competitorRoutes,
       cabinServiceShare(state.crew),
     ) + executiveNpsBonus(state);
-    state.npsPointsTotal += satisfactionScore;
-    state.todayNpsPoints += satisfactionScore;
-    state.npsScoredFlightsTotal += 1;
-    state.todayNpsScoredFlights += 1;
-    if (state.activeTarget) state.activeTarget.npsPoints += satisfactionScore;
+    recordFlightNps(state, leg.origin, leg.dest, satisfactionScore);
 
     const activeFlight: ActiveFlight = {
       legId: leg.legId,
@@ -509,7 +481,7 @@ export function step(state: SimState): void {
             flight.fare,
             state.competitorRoutes,
             spilloverAvailable,
-            bookingPerks(state),
+            bookingPerks(state, flight.origin, flight.dest),
           );
           state.spilloverByMarket[key] = spilloverAvailable + result.spilloverDelta;
           flightPassengers = result.pax;
@@ -534,11 +506,9 @@ export function step(state: SimState): void {
 
     // On-time performance (HUD stat next to Cash), judged now that the
     // flight has actually landed: on time if it's within the grace window
-    // of its scheduled arrival (sim/delays.ts). Counted into three scopes
-    // at once — today (for Reputation), lifetime (the HUD), a running
-    // service target's window (sim/targets.ts) — plus per market for the
-    // On-Time panel (ui/onTime.ts), created on first use the way
-    // routeSettings is.
+    // of its scheduled arrival (sim/delays.ts). Counted for today and the
+    // lifetime (the HUD), plus per market for the On-Time panel
+    // (ui/onTime.ts), created on first use the way routeSettings is.
     const onTime = isOnTimeArrival(flight.arriveMinute, flight.scheduledArriveMinute);
     const arrivedMarketKey = marketKey(flight.origin, flight.dest);
     const marketOnTime = (state.onTimeByMarket[arrivedMarketKey] ??= { arrived: 0, onTime: 0 });
@@ -549,13 +519,11 @@ export function step(state: SimState): void {
     state.todayFlightsArrived += 1;
     marketOnTime.arrived += 1;
     marketOnTimeToday.arrived += 1;
-    if (state.activeTarget) state.activeTarget.flightsArrived += 1;
     if (onTime) {
       state.flightsOnTimeTotal += 1;
       state.todayFlightsOnTime += 1;
       marketOnTime.onTime += 1;
       marketOnTimeToday.onTime += 1;
-      if (state.activeTarget) state.activeTarget.flightsOnTime += 1;
     }
 
     // How this leg went, for the aircraft view: the flight record itself

@@ -9,7 +9,7 @@ import { drawHubView, hasHubView } from './render/hubs';
 import { drawFog } from './render/fog';
 import { drawWeatherEffects } from './render/weather';
 import { drawAircraft, findFlightAt, flightScreenPoint } from './render/aircraft';
-import { OTP_BASELINE } from './sim/reputation';
+import { OTP_BASELINE } from './sim/routeOtp';
 import { updateMarket } from './ui/market';
 import { drawDelayCascade } from './render/cascade';
 import { projectRestOfDay } from './sim/cascade';
@@ -42,7 +42,6 @@ import { setupOnTimePanel, updateOnTimePanel } from './ui/onTime';
 import { setupExecutivePanel, updateExecutivePanel } from './ui/executive';
 import { setupExecutivesPanel, updateExecutivesPanel } from './ui/executives';
 import { setupDevPanel, updateDevPanel } from './ui/devTools';
-import { setupMissionsPanel, updateMissionsPanel } from './ui/missions';
 import { setupCrewPanel, updateCrewPanel } from './ui/crew';
 import { setupInfoTooltips } from './ui/infoTooltip';
 import { updateTicker } from './ui/ticker';
@@ -79,7 +78,6 @@ setupOnTimePanel();
 setupExecutivePanel();
 setupExecutivesPanel();
 setupDevPanel();
-setupMissionsPanel(state);
 setupCrewPanel(state);
 setupInfoTooltips();
 setupGameOver();
@@ -178,7 +176,6 @@ const fleetTabEl = document.querySelector<HTMLDivElement>('#fleet-tab')!;
 const onTimePanelEl = document.querySelector<HTMLDivElement>('#ontime-panel')!;
 const executivePanelEl = document.querySelector<HTMLDivElement>('#executive-panel')!;
 const crewPanelEl = document.querySelector<HTMLDivElement>('#crew-panel')!;
-const missionsPanelEl = document.querySelector<HTMLDivElement>('#missions-panel')!;
 const devPanelEl = document.querySelector<HTMLDivElement>('#dev-panel')!;
 const gameTabEl = document.querySelector<HTMLDivElement>('#game-tab')!;
 const sidebarTabButtons = document.querySelectorAll<HTMLButtonElement>('#sidebar-tabs button');
@@ -269,7 +266,6 @@ type SidebarTab =
   | 'ontime'
   | 'executive'
   | 'crew'
-  | 'missions'
   | 'dev'
   | 'game';
 let sidebarTab: SidebarTab = 'fleet';
@@ -319,10 +315,6 @@ function render(nowMs: number = performance.now()): void {
   // be useless. Gated on it actually being visible so it costs nothing
   // the rest of the time.
   if (sidebarTab === 'dev') updateDevPanel(state);
-  // Same every-frame treatment as the Dev tab, for the same reason: a
-  // commitment's progress moves with every departure, and one can
-  // complete on any tick.
-  if (sidebarTab === 'missions') updateMissionsPanel(state);
   if (sidebarTab === 'crew') updateCrewPanel(state);
 
   const cssWidth = window.innerWidth - currentPanelWidthPx;
@@ -634,7 +626,6 @@ function switchToSidebarTab(tab: SidebarTab): void {
   onTimePanelEl.hidden = tab !== 'ontime';
   executivePanelEl.hidden = tab !== 'executive';
   crewPanelEl.hidden = tab !== 'crew';
-  missionsPanelEl.hidden = tab !== 'missions';
   devPanelEl.hidden = tab !== 'dev';
   gameTabEl.hidden = tab !== 'game';
 
@@ -804,7 +795,7 @@ function updateMapModeLegend(): void {
     mapModeLegendTitle.textContent = 'On-time performance';
     mapModeLegendScale.innerHTML =
       swatch(MAP_MODE_COLORS.loss, '0% on-time') +
-      swatch(MAP_MODE_COLORS.breakeven, `${Math.round(OTP_BASELINE * 100)}% (Reputation baseline)`) +
+      swatch(MAP_MODE_COLORS.breakeven, `${Math.round(OTP_BASELINE * 100)}% (the on-time baseline)`) +
       swatch(MAP_MODE_COLORS.profit, '100% on-time');
   }
 }

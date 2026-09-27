@@ -6,7 +6,7 @@ moats, shocks, real costs, Europe, home difficulty) lives in
 with playtest findings as they come (see "Playtest notes"), and the
 order changes with them.
 
-**State at handoff:** save key `airgame-save-v46`. **Threads 1 and 2 are done.** The game pushes back
+**State at handoff:** save key `airgame-save-v46`. **Threads 1, 2, 3 and 10 are done.** The game pushes back
 the way CLAUDE.md's philosophy asks: over a year a careful airline makes
 $6.5M–$19M, a sitter $2M–$5M and eroding, an unattended one-plane start
 survives the Standard homes, a reckless one always busts
@@ -208,6 +208,32 @@ unlocks replace debut days (done); (3) innovations (done).
 - **Measured:** the balance report before and after; steady should gain a
   little over sitter (older fleets, later flights), and it must not
   swamp price and frequency.
+
+**Status: done.** As built:
+- **Trailing NPS** (`sim/nps.ts`): a daily moving average weighted 1/30
+  for the network and each market; a new market starts from the
+  network's score. **A new airline starts at 10, level with a typical
+  rival**: starting at 0 cost the steady player about 10% of its first
+  year's cash in three homes and added an early bust, a penalty for
+  being new rather than bad.
+- **Booking share against rivals only**: 0.008 utility per point ahead
+  of a typical rival's 10, taken off every rival's option, so it moves
+  passengers between airlines and leaves a rival-free route alone. A
+  careful airline's network sits at 12–20, so network-wide it's a
+  tie-breaker; routes range about −27 to +26, so a badly run route
+  really loses to its rival. (The owner's open question: tie-breaker or
+  real lever? This answers "tie-breaker for the airline, lever for a
+  route"; strengthen `NPS_UTILITY_PER_POINT` if play says it's unfelt.)
+- **Reputation is gone**, with the hidden service targets (their tab,
+  module and state) it paid. The hidden executives cost a cash signing
+  fee ($1,000 per old Reputation point) until thread 8.
+- **Shown** on the Network panel, the route view (with what it does
+  against a rival), airport routes, the flight tooltip and the On-Time
+  table. "A good name" is now a trailing NPS of 15 with 1,000 flights.
+- **Measured** (steady median cash, thread 10 → thread 3): YUL $13.9M →
+  $10.2M, YYZ $31.2M → $32.5M, BOS $33.0M → $28.2M, PHL $31.2M → $30.3M,
+  YHZ $223k → $192k, LHR $73.9M → $76.5M; busts 2 → 3 of 36. Sitter
+  within noise. The aggregate effect is small, as intended.
 
 ## Thread 4: the map as interface
 

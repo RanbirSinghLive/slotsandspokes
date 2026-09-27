@@ -158,13 +158,6 @@
             <path d="M16 3.13a4 4 0 0 1 0 7.75" />
           </svg>
         </button>
-        <button type="button" data-tab="missions" aria-label="Missions" title="Missions — service targets" hidden>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="9" />
-            <circle cx="12" cy="12" r="4.5" />
-            <circle cx="12" cy="12" r="0.6" />
-          </svg>
-        </button>
         <button type="button" data-tab="dev" aria-label="Dev" title="Dev — live cost breakdown (development tool)" hidden>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z" />
@@ -188,6 +181,7 @@
         <div class="econ-row"><span class="econ-label">On-time</span><span id="panel-otp" class="econ-value"></span></div>
         <div class="econ-row"><span class="econ-label">Completion</span><span id="panel-completion" class="econ-value"></span></div>
         <div class="econ-row" title="Passengers carried over seats flown, last 7 days"><span class="econ-label">Load factor</span><span id="panel-load" class="econ-value"></span></div>
+        <div class="econ-row" title="How passengers rate your airline, about the last month. A better name than a rival's wins bookings from it."><span class="econ-label">NPS</span><span id="panel-nps" class="econ-value"></span></div>
         <div class="econ-row"><span class="econ-label">Goals</span><button type="button" id="panel-goals" class="econ-value inspector-link" title="Your tier on the ladder: open Goals"></button></div>
         <div class="econ-row"><span class="econ-label">Head office</span><button type="button" id="panel-head-office" class="econ-value inspector-link" title="Fuel, hedging and innovations: open Head office"></button></div>
         <h2>Today</h2>
@@ -239,6 +233,7 @@
                 <th>On-time</th>
                 <th>On-time %</th>
                 <th title="Passengers carried over seats flown, last 7 days">Load</th>
+                <th title="How passengers rate you on this route, about the last month">NPS</th>
               </tr>
             </thead>
             <tbody id="ontime-rows"></tbody>
@@ -269,7 +264,7 @@
         </div>
         <div id="executive-panel" hidden>
           <section id="executive-suite-section" hidden>
-                    <h2>The C-suite <button type="button" class="info-mark" aria-label="What this means" data-info="Four chairs, paid for in Reputation rather than cash. Replacing an incumbent costs the new appointment&#x27;s full price and resets any bonus escalation they&#x27;d built up.">i</button></h2>
+                    <h2>The C-suite <button type="button" class="info-mark" aria-label="What this means" data-info="Four chairs, each for a signing fee. Replacing an incumbent costs the new appointment&#x27;s full price and resets any bonus escalation they&#x27;d built up.">i</button></h2>
             <div id="executive-effects"></div>
             <div id="executive-slots"></div>
           </section>
@@ -360,27 +355,6 @@
           <section id="crew-pending-section">
             <h2>Pipeline</h2>
             <div id="crew-pending"></div>
-          </section>
-        </div>
-        <div id="missions-panel" hidden>
-          <section id="targets-section">
-                    <h2>Service target <button type="button" class="info-mark" aria-label="What this means" data-info="Commit publicly to a standard and be held to it over 30 days. The more ambitious the promise, the more Reputation it pays — and the more missing it costs.">i</button></h2>
-            <div id="target-setup">
-              <label class="target-row">
-                <span class="target-label">On-time</span>
-                <input type="range" id="target-otp-slider" min="80" max="99" step="1" value="85" />
-                <span class="lever-value" id="target-otp-value"></span>
-              </label>
-              <label class="target-row">
-                <span class="target-label">Avg NPS</span>
-                <input type="range" id="target-nps-slider" min="0" max="60" step="1" value="10" />
-                <span class="lever-value" id="target-nps-value"></span>
-              </label>
-              <div id="target-stake"></div>
-              <button type="button" id="target-commit">Commit to this</button>
-            </div>
-            <div id="target-active" hidden></div>
-            <div id="target-last-result"></div>
           </section>
         </div>
         <div id="dev-panel" hidden>

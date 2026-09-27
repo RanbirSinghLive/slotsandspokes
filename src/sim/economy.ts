@@ -225,9 +225,10 @@ export function connectingPriceResponse(
   origin: string,
   dest: string,
   competitorRoutes: CompetitorOffering[],
+  brandEdge: number,
 ): number {
-  const atFare = bookingShare(fare, legsServingMarket, origin, dest, competitorRoutes);
-  const atGoingRate = bookingShare(recommendedFare(origin, dest), legsServingMarket, origin, dest, competitorRoutes);
+  const atFare = bookingShare(fare, legsServingMarket, origin, dest, competitorRoutes, brandEdge);
+  const atGoingRate = bookingShare(recommendedFare(origin, dest), legsServingMarket, origin, dest, competitorRoutes, brandEdge);
   return atGoingRate > 0 ? Math.min(MAX_CONNECTING_PRICE_GAIN, atFare / atGoingRate) : 1;
 }
 
@@ -251,14 +252,15 @@ export function flightResult(
   fare: number,
   competitorRoutes: CompetitorOffering[],
   spilloverAvailable: number,
-  // What the airline's adopted innovations change about booking
-  // (sim/innovations.ts): the ticket's yield and how many turned-away
-  // passengers wait for a later flight.
+  // What the airline brings to booking on this market beyond fare and
+  // frequency (sim/innovations.ts's bookingPerks()): its name, the
+  // ticket's yield, and how many turned-away passengers wait for a later
+  // flight.
   perks: BookingPerks,
 ): FlightResult {
   const demandPerFlight = marketDailyDemand / legsServingMarket;
-  const share = bookingShare(fare, legsServingMarket, leg.origin, leg.dest, competitorRoutes);
-  const connecting = connectingDailyDemand * connectingPriceResponse(fare, legsServingMarket, leg.origin, leg.dest, competitorRoutes);
+  const share = bookingShare(fare, legsServingMarket, leg.origin, leg.dest, competitorRoutes, perks.brandEdge);
+  const connecting = connectingDailyDemand * connectingPriceResponse(fare, legsServingMarket, leg.origin, leg.dest, competitorRoutes, perks.brandEdge);
   const bookedDemand = demandPerFlight * share + connecting / legsServingMarket;
   const seatCeiling = Math.round(type.seats * LOAD_FACTOR);
   const roundedBooked = Math.round(bookedDemand);

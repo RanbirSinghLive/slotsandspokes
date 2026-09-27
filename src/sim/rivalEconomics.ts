@@ -1,5 +1,6 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { rivalBookingShare } from './choiceModel';
+import { brandEdge } from './nps';
 import type { CompetitorOffering } from './competitors';
 import { LOAD_FACTOR, legCost, type EconomyAircraftType } from './economy';
 import { leaseRateFor } from './leasing';
@@ -63,6 +64,7 @@ export function rivalRouteDailyResult(state: SimState, route: CompetitorOffering
     settings?.fare ?? 0,
     playerLegs,
     state.competitorRoutes,
+    brandEdge(state, route.origin, route.dest),
   );
   const seats = route.dailyFrequency * Math.round(average((type) => type.seats) * LOAD_FACTOR);
   const passengers = Math.min(actualDailyDemand(state, route.origin, route.dest) * share, seats);
