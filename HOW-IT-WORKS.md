@@ -1424,9 +1424,11 @@ keep a date (`rivalDay`) before which they may not take that class:
 A player who climbs fast gets a bigger class before rivals may touch it,
 and a shelf nobody has picked over: an early edge, like any other, that
 lasts until the rivals' date arrives. A locked class says why in the
-lease fan and the Fleet tab's lessor strip ("Regionals open when you
-become a start-up airline: see Goals"), and a pop-up announces each
-class the moment it opens.
+lease fan ("Regionals open when you become a regional carrier: see
+Goals") and shows as locked in the Fleet tab's lessor strip; the ticker
+announces new listings only of classes the player can lease, so a locked
+class's listings (there for rivals) never read as on sale to the player.
+A pop-up announces each class the moment it opens.
 
 An arrival that finds the shelf full is lost, not queued. When a rival
 grows (`rivalSecuresCapacity()`, three daily flights per airframe) it

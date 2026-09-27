@@ -34,12 +34,13 @@ function renderStrip(state: SimState): void {
     const next = daysUntilNextListing(state, cls.code);
     const when = `${next} day${next === 1 ? '' : 's'}`;
     const opener = tierThatOpens(cls.code);
+    // A locked class is just locked: its listings are for rivals until the ladder opens it.
     const status = !classOpen(state, cls.code)
-      ? `opens when you're ${opener ? airlineCalled(opener) : 'a bigger airline'} · ${listings.length} listed`
+      ? `locked: opens when you're ${opener ? airlineCalled(opener) : 'a bigger airline'} (see Goals)`
       : listings.length === 0
         ? `none listed · next in ${when}`
         : `${listings.length} listed (${listings.map((l) => `${l.ageYears} yrs`).join(', ')}) · next in ${when}`;
-    return { name: cls.name, status, empty: listings.length === 0 };
+    return { name: cls.name, status, empty: !classOpen(state, cls.code) || listings.length === 0 };
   });
   const signature = rows.map((row) => `${row.name}:${row.status}`).join('|');
   if (signature === stripSignature) return;

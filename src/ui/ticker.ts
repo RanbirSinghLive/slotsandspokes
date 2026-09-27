@@ -1,4 +1,4 @@
-import { airlineCalled, LADDER, milestoneById, tiersClimbed } from '../sim/ladder';
+import { airlineCalled, classOpen, LADDER, milestoneById, tiersClimbed } from '../sim/ladder';
 import { classByCode } from '../sim/aircraftClasses';
 import { money } from './format';
 import { RIVAL_CLOSE_AFTER_LOSING_DAYS, RIVAL_SQUEEZED_RESPITE_DAYS } from '../sim/pressure';
@@ -380,6 +380,10 @@ function pollMarketEvents(state: SimState): void {
 
   for (const listing of state.market.listings) {
     if (listing.id <= lastListingId) continue;
+    // Only classes the player can lease (sim/ladder.ts): a locked class's
+    // listings are for rivals, and announcing them reads as if it were
+    // on sale to the player on a timer.
+    if (!classOpen(state, listing.typeCode)) continue;
     const name = AIRCRAFT_CLASSES.find((c) => c.code === listing.typeCode)?.name ?? listing.typeCode;
     pushEvent(state.simMinute, `Lessor: ${name} listed (${listing.ageYears} yrs, $${listing.leasePricePerDay.toLocaleString()}/day)`);
   }
