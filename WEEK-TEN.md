@@ -137,6 +137,11 @@ days 60 and 87 (Boston and London about day 29), and a regional carrier
 once it flies a Regional. Timing gets tuned properly in slice 2, once
 unlocks are real and the headless player pursues them.
 
+The old missions (`sim/missions.ts`, `data/missions.json`, their switch,
+state field, ticker line and cards) are removed; they were switched off,
+so headless output is identical. The Missions tab keeps only service
+targets, for thread 3 to decide.
+
 Slices: (1) the ladder model and the Goals view, with unlocks still
 cosmetic (done); (2) class unlocks replace debut days, with the headless player
 pursuing them; (3) the other unlocks (younger airframes, second base).

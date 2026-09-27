@@ -22,8 +22,7 @@ import type { SimState } from './state';
  * there rather than needing a stat invented for them to modify.
  *
  * Effects are a discriminated union on `kind`, so adding a new one is a
- * JSON entry plus a case — the same split between authored data and real
- * code that sim/missions.ts uses, and for the same reason.
+ * JSON entry plus a case: authored data in JSON, the rules in real code.
  */
 
 export type ExecutiveRole = 'ceo' | 'coo' | 'cfo' | 'cco';

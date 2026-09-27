@@ -15,10 +15,3 @@
  * block-hour cost stays inside block-hour cost (see sim/economy.ts).
  */
 export const CREWS_ENABLED = false;
-
-/**
- * Authored missions: one-off objectives that pay Reputation. Off means none
- * ever complete, so nothing announces one and Reputation never moves from
- * this source.
- */
-export const MISSIONS_ENABLED = false;

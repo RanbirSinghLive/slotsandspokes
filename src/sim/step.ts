@@ -11,7 +11,6 @@ import { rollCompetitorRouteOpenings, rollCompetitorFrequencyGrowth, rollRivalEn
 import { networkOverheadPerDay } from './overhead';
 import { rollDailyMarketDemand, actualDailyDemand } from './marketDemand';
 import { revealReach } from './reach';
-import { checkMissions } from './missions';
 import { rollDailyCrew, maintenanceAgeFactor, cabinServiceShare } from './crew';
 import { isAog, rollDailyAogs } from './aog';
 import {
@@ -558,11 +557,6 @@ export function step(state: SimState): void {
     state.completedToday.push(flight.legId);
     state.activeFlights.splice(i, 1);
   }
-
-  // Week six's missions (sim/missions.ts): cheap pure reads of `state`,
-  // checked every tick rather than once a day so "you bought your first
-  // aircraft" lands immediately instead of up to a simulated day later.
-  checkMissions(state);
 
   state.simMinute += 1;
 }

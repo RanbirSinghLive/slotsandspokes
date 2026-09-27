@@ -1,4 +1,3 @@
-import { loadMissions } from '../sim/missions';
 import {
   commitTarget,
   targetReward,
@@ -9,20 +8,15 @@ import {
 import type { SimState } from '../sim/state';
 
 /**
- * The Missions tab: authored objectives (sim/missions.ts) and
- * player-set service targets (sim/targets.ts), together in one place
- * because they answer the same question — what should I be trying to do.
- *
- * WEEK-SIX.md's original sketch put these in the Executive ledger as a
- * fourth section. That predates the sidebar tab system existing; now that
- * adding a tab is cheap, they get their own. Burying the game's only
- * statement of purpose underneath a cash chart would undercut
- * the exact complaint this feature exists to answer.
+ * The Missions tab's service targets (sim/targets.ts): a standard the
+ * player commits to publicly and is held to over 30 days. Authored
+ * missions were replaced by the ladder (sim/ladder.ts, the Goals view);
+ * whether targets stay is WEEK-TEN.md thread 3's call, since they pay
+ * Reputation.
  */
 
 const MINUTES_PER_DAY = 1440;
 
-const missionsListEl = document.querySelector<HTMLDivElement>('#missions-list')!;
 
 const targetSetupEl = document.querySelector<HTMLDivElement>('#target-setup')!;
 const targetOtpSlider = document.querySelector<HTMLInputElement>('#target-otp-slider')!;
@@ -33,63 +27,6 @@ const targetStakeEl = document.querySelector<HTMLDivElement>('#target-stake')!;
 const targetCommitButton = document.querySelector<HTMLButtonElement>('#target-commit')!;
 const targetActiveEl = document.querySelector<HTMLDivElement>('#target-active')!;
 const targetLastResultEl = document.querySelector<HTMLDivElement>('#target-last-result')!;
-
-const missions = loadMissions();
-const missionCards = new Map<string, HTMLDivElement>();
-
-function buildMissionCard(id: string, name: string, objective: string, flavor: string, reward: number): HTMLDivElement {
-  const card = document.createElement('div');
-  card.className = 'mission-card';
-
-  // Flavour is collapsed by default (week six phase two). It's real
-  // content — the history is the reason these are worth reading — but a
-  // returning player scanning for what's left to do doesn't want eight
-  // paragraphs in the way. Click the header to expand.
-  const header = document.createElement('button');
-  header.type = 'button';
-  header.className = 'mission-header expandable-header';
-  const nameEl = document.createElement('span');
-  nameEl.className = 'mission-name';
-  nameEl.textContent = name;
-  const rewardEl = document.createElement('span');
-  rewardEl.className = 'mission-reward';
-  rewardEl.textContent = `+${reward} Reputation`;
-  const chevron = document.createElement('span');
-  chevron.className = 'expand-chevron';
-  header.append(nameEl, chevron, rewardEl);
-
-  const objectiveEl = document.createElement('div');
-  objectiveEl.className = 'mission-objective';
-  objectiveEl.textContent = objective;
-
-  // Shown whether or not it's complete: the history is the reason the
-  // mission is interesting, not a reward for finishing it.
-  const flavorEl = document.createElement('p');
-  flavorEl.className = 'mission-flavor';
-  flavorEl.textContent = flavor;
-  flavorEl.hidden = true;
-  header.addEventListener('click', () => {
-    flavorEl.hidden = !flavorEl.hidden;
-    header.classList.toggle('expanded', !flavorEl.hidden);
-  });
-
-  const statusEl = document.createElement('div');
-  statusEl.className = 'mission-status';
-
-  card.append(header, objectiveEl, flavorEl, statusEl);
-  missionCards.set(id, card);
-  return card;
-}
-
-function renderMissions(state: SimState): void {
-  for (const mission of missions) {
-    const card = missionCards.get(mission.id);
-    if (!card) continue;
-    const done = state.completedMissionIds.includes(mission.id);
-    card.classList.toggle('mission-card--complete', done);
-    card.querySelector<HTMLDivElement>('.mission-status')!.textContent = done ? 'Complete' : 'In progress';
-  }
-}
 
 function formatPct(fraction: number): string {
   return `${Math.round(fraction * 100)}%`;
@@ -178,12 +115,6 @@ function renderLastResult(state: SimState): void {
 
 /** Wire the target controls once at startup, same as every other panel's setup function. */
 export function setupMissionsPanel(state: SimState): void {
-  for (const mission of missions) {
-    missionsListEl.appendChild(
-      buildMissionCard(mission.id, mission.name, mission.objective, mission.flavor, mission.reputationReward),
-    );
-  }
-
   targetOtpSlider.addEventListener('input', renderStake);
   targetNpsSlider.addEventListener('input', renderStake);
   targetCommitButton.addEventListener('click', () => {
@@ -199,10 +130,9 @@ export function setupMissionsPanel(state: SimState): void {
 /**
  * Refresh from `state` — called when the tab becomes visible and again
  * every frame while it's showing, since a running commitment's progress
- * moves with every departure and a mission can complete at any tick.
+ * moves with every departure.
  */
 export function updateMissionsPanel(state: SimState): void {
-  renderMissions(state);
   renderStake();
   renderActiveTarget(state);
   renderLastResult(state);

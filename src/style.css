@@ -2065,9 +2065,7 @@ body {
   border-color: rgba(255, 255, 255, 0.5);
 }
 
-/* Week six's Missions tab (ui/missions.ts): authored objectives plus the
-   player's own service targets, together because they answer the same
-   question — what should I be trying to do. */
+/* The Missions tab (ui/missions.ts): the player's own service targets. */
 #missions-panel section {
   margin-bottom: 28px;
 }
@@ -2079,70 +2077,6 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: #6b7694;
-}
-
-.missions-note {
-  margin: 0 0 12px;
-  color: #9aa3b8;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.mission-card {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 6px;
-  padding: 12px 14px;
-  margin-bottom: 10px;
-  background: rgba(255, 255, 255, 0.02);
-}
-
-/* Same green the rest of the app already uses for "this went well". */
-.mission-card--complete {
-  border-color: rgba(127, 216, 143, 0.5);
-  background: rgba(127, 216, 143, 0.06);
-}
-
-.mission-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-
-.mission-name {
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.mission-reward {
-  color: #7fd88f;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.mission-objective {
-  margin-bottom: 8px;
-  font-size: 13px;
-}
-
-.mission-flavor {
-  margin: 0 0 8px;
-  color: #9aa3b8;
-  font-size: 12px;
-  font-style: italic;
-  line-height: 1.5;
-}
-
-.mission-status {
-  color: #6b7694;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.mission-card--complete .mission-status {
-  color: #7fd88f;
 }
 
 .target-row {
@@ -2483,7 +2417,7 @@ body {
   background: rgba(255, 255, 255, 0.02);
 }
 
-/* Same green the tech tree and missions already use for "this is yours". */
+/* Same green the tech tree already uses for "this is yours". */
 .exec-candidate--appointed {
   border-color: rgba(127, 216, 143, 0.5);
   background: rgba(127, 216, 143, 0.06);
@@ -2702,22 +2636,19 @@ body {
 }
 
 /* Cards get tighter now that the prose inside them is optional. */
-.mission-card,
 .exec-candidate,
 .tech-node {
   padding: 9px 11px;
   margin-bottom: 7px;
 }
 
-.mission-flavor[hidden],
 .exec-candidate-flavor[hidden],
 .tech-node-flavor[hidden] {
   display: none;
 }
 
-/* The mission reward sat at the right of a flex header; the chevron now
-   takes the flexible middle, so the reward just needs to stop shrinking. */
-.mission-reward,
+/* The chevron takes a flex header's flexible middle, so what sits at its
+   right just needs to stop shrinking. */
 .exec-candidate-background {
   flex: none;
 }

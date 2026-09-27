@@ -2,8 +2,8 @@ import type { SimState } from './state';
 import { OTP_BASELINE } from './reputation';
 
 /**
- * Week six's targets: the player's half of the goal system. Where a
- * mission (sim/missions.ts) is the game telling you what's worth doing, a
+ * Week six's targets: the player's half of the goal system. Where the
+ * ladder (sim/ladder.ts) is the game telling you what's worth doing, a
  * target is you publicly committing to a standard and being held to it.
  *
  * You name an on-time percentage and an average NPS you intend to hit,

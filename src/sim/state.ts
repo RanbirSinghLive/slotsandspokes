@@ -556,14 +556,6 @@ export type SimState = {
   npsScoredFlightsTotal: number;
   todayNpsScoredFlights: number;
   /**
-   * Week six's missions (sim/missions.ts): ids of every mission whose
-   * condition has been met and whose Reputation has been paid out. A
-   * plain string array, same JSON-round-trip reasoning as
-   * `unlockedTechNodeIds`, and the thing ui/ticker.ts diffs to announce a
-   * completion the moment it happens.
-   */
-  completedMissionIds: string[];
-  /**
    * Week six's targets (sim/targets.ts): the service standard the player
    * has publicly committed to, or null when none is running. Carries its
    * own window-scoped departure/on-time/NPS counters, which step.ts
@@ -701,7 +693,6 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     todayFlightsCancelled: 0,
     npsScoredFlightsTotal: 0,
     todayNpsScoredFlights: 0,
-    completedMissionIds: [],
     activeTarget: null,
     lastTargetResult: null,
     todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, lease: 0, crew: 0, training: 0, slots: 0, maintenance: 0, overhead: 0 },

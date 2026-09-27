@@ -1,6 +1,5 @@
 import { LADDER, milestoneById, tiersClimbed } from '../sim/ladder';
 import { activeShock, describeShock, shockEndedLine, type Shock } from '../sim/shocks';
-import { loadMissions } from '../sim/missions';
 import { moneyOnTable, RIVAL_MARGIN_SHARE } from '../sim/attractiveness';
 import { networkAirports } from '../sim/reach';
 import { legsServingMarket, recommendedFare } from '../sim/schedule';
@@ -86,40 +85,6 @@ function pollWeatherEvents(state: SimState): void {
     pushEvent(state.simMinute, `${kindLabel} forms at ${iata}`);
   }
   previousWeatherAirports = currentAirports;
-}
-
-/**
- * The bottom-of-screen ticker for events nobody clicked to cause — new
- * weather forming, new airports in reach, and rivals moving in on your
- * network (see pollRivalEvents()). Called every frame
- * from main.ts's render(), *before* its `panelView !== 'map'` early
- * return, so an event happening while you're deep in the Commercial
- * panel still gets announced rather than silently missed.
- */
-let hasSeenInitialMissions = false;
-const seenMissionIds = new Set<string>();
-
-/**
- * Week six's missions: same "diff against what I already announced"
- * shape as weather and competitor routes above, each with its own local
- * bookkeeping. The first call establishes a baseline so a resumed save
- * doesn't replay every mission ever completed as fresh news.
- */
-function pollMissionEvents(state: SimState): void {
-  if (!hasSeenInitialMissions) {
-    for (const id of state.completedMissionIds) seenMissionIds.add(id);
-    hasSeenInitialMissions = true;
-    return;
-  }
-
-  for (const id of state.completedMissionIds) {
-    if (seenMissionIds.has(id)) continue;
-    seenMissionIds.add(id);
-    const mission = loadMissions().find((m) => m.id === id);
-    if (mission) {
-      pushEvent(state.simMinute, `Mission complete: ${mission.name} (+${mission.reputationReward} Reputation)`);
-    }
-  }
 }
 
 /**
@@ -417,6 +382,12 @@ function pollPositionEvents(state: SimState): void {
   previousCancelled = cancelled;
 }
 
+/**
+ * The bottom-of-screen ticker for events nobody clicked to cause: the
+ * ladder, shocks, new weather, new airports in reach, rivals moving in on
+ * your network, and the rest below. Called every frame from main.ts's
+ * render(), so an event is announced whichever panel is open.
+ */
 export function updateTicker(state: SimState): void {
   pollLadderEvents(state);
   pollShockEvents(state);
@@ -427,5 +398,4 @@ export function updateTicker(state: SimState): void {
   pollReachEvents(state);
   pollRivalEvents(state);
   pollWeatherEvents(state);
-  pollMissionEvents(state);
 }

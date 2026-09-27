@@ -324,7 +324,7 @@ function render(nowMs: number = performance.now()): void {
   // the rest of the time.
   if (sidebarTab === 'dev') updateDevPanel(state);
   // Same every-frame treatment as the Dev tab, for the same reason: a
-  // commitment's progress moves with every departure, and a mission can
+  // commitment's progress moves with every departure, and one can
   // complete on any tick.
   if (sidebarTab === 'missions') updateMissionsPanel(state);
   if (sidebarTab === 'crew') updateCrewPanel(state);
