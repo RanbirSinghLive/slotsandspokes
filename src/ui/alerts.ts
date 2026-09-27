@@ -1,19 +1,17 @@
 import { describeShock } from '../sim/shocks';
+import { select, type Selection } from './selection';
 import { scheduleProblems } from './panels';
 import { runwayAlertMessage } from './runway';
 import type { SimState } from '../sim/state';
 
 /**
  * The Paradox "outliner" idea: real problems shouldn't only be visible to
- * whoever happens to have the right sidebar tab open. `scheduleProblems()`
- * (schedule/utilisation) has existed since week seven but only ever
- * rendered inside the Fleet tab's own warnings list; crew-caused grounding
- * (`state.groundedTails`) only ever showed as a bare count in the Crew
- * tab. Both are exactly the kind of thing a player misses for days at a
- * time — an aircraft quietly grounded, a rotation quietly over 100%.
+ * whoever happens to have the right sidebar tab open. Schedule problems
+ * (`scheduleProblems()`), planes grounded for want of crews, a shock and
+ * a shrinking runway are exactly what a player misses for days at a time.
  *
  * This strip is always visible regardless of which tab is open, and each
- * row is clickable: it jumps straight to the tab that explains it, the
+ * row is clickable: it jumps straight to the view or tab that explains it, the
  * same "click the alert, go to the problem" flow EU4/HoI4's own outliner
  * uses. `tab` is a plain string rather than main.ts's SidebarTab type —
  * this module is imported by main.ts, never the other way around, so it
@@ -27,7 +25,10 @@ export type Alert = {
    */
   key: string;
   message: string;
+  /** The sidebar tab that explains it, when a tab does. */
   tab: string;
+  /** The inspector view that explains it, when one does: opened instead of the tab. */
+  view?: Selection;
 };
 
 /** How many rows show before collapsing into "+N more" — a handful of aircraft shouldn't need scrolling to read. */
@@ -36,13 +37,16 @@ const MAX_VISIBLE_ALERTS = 4;
 function collectAlerts(state: SimState): Alert[] {
   const alerts: Alert[] = scheduleProblems(state).map((message) => ({ key: `schedule:${message}`, message, tab: 'fleet' }));
 
-  // Crew-grounded tails: real, and previously visible only as a bare
-  // count on the Crew tab ("N aircraft with no base — assign one before
-  // they can be worked" is the schedule-side version of this same idea;
-  // this is the crew-side one). One row per tail, named, so a click
-  // doesn't just say "something's wrong" — it says what.
+  // Planes grounded for want of crews (sim/crews.ts), one row per tail,
+  // named, opening its base: the airport view's crew bar and Hire buttons.
   for (const tail of state.groundedTails) {
-    alerts.push({ key: `grounded:${tail}`, message: `${tail} is grounded — not enough crew to fly it today`, tab: 'crew' });
+    const base = state.aircraft.find((aircraft) => aircraft.tail === tail)?.baseAirport;
+    alerts.push({
+      key: `grounded:${tail}`,
+      message: `${tail} is grounded — not enough crews at ${base ?? 'its base'} to fly it today`,
+      tab: 'fleet',
+      view: base ? { kind: 'airport', iata: base } : undefined,
+    });
   }
 
   // A shock running now (sim/shocks.ts): a condition of the whole world
@@ -53,7 +57,7 @@ function collectAlerts(state: SimState): Alert[] {
   // Cash running out ends the game, so it goes first: of everything in
   // this strip, it's the one problem that can't be fixed after the fact.
   const runway = runwayAlertMessage(state);
-  if (runway) alerts.unshift({ key: 'runway', message: runway, tab: 'fleet' });
+  if (runway) alerts.unshift({ key: 'runway', message: runway, tab: 'fleet', view: { kind: 'money' } });
 
   return alerts;
 }
@@ -106,7 +110,7 @@ export function updateAlerts(state: SimState, onNavigate: (tab: string) => void)
     row.type = 'button';
     row.className = 'alert-row';
     row.textContent = alert.message;
-    row.addEventListener('click', () => onNavigate(alert.tab));
+    row.addEventListener('click', () => (alert.view ? select(alert.view) : onNavigate(alert.tab)));
 
     const close = document.createElement('button');
     close.type = 'button';

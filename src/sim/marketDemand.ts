@@ -7,16 +7,10 @@ import { recessionFactor } from './shocks';
 import type { SimState } from './state';
 
 /**
- * Week six's market stimulation model. Before this, every market carried
- * its full gravity-model demand from the moment the game started, whether
- * anyone flew it or not — so the map opened as a field of large,
- * uncontested, instantly-profitable markets, and route choice collapsed
- * into "pick the biggest number." The balance sweep (src/headless/sweep.ts)
- * found the symptom: the trunk markets were seat-capped even at 5x the
- * recommended fare, so raising price cost literally no passengers and
- * there was no optimum to find.
- *
- * The fix separates two different quantities that used to be one:
+ * Market stimulation model. A market doesn't carry its full demand from
+ * the start: it's built by flying it, so route choice is about which
+ * potential is worth building, not "pick the biggest number". Two
+ * quantities:
  *
  *   - **Potential** (`potentialDailyDemand()`, sim/demand.ts) — how big
  *     this city pair could get if fully served. Static geography and
@@ -26,10 +20,9 @@ import type { SimState } from './state';
  *     nobody serves, grows toward potential as airlines actually fly it,
  *     and decays back toward the floor when service stops.
  *
- * Every airline in this world starts from scratch — there are no legacy
- * incumbents sitting on mature trunk routes — so *every* market opens
- * unstimulated, and the strategic question becomes which potential is
- * worth the investment of building rather than which market is already
+ * *Every* market opens unstimulated, even one an incumbent rival
+ * already flies, so the strategic question is which potential is worth
+ * the investment of building rather than which market is already
  * biggest.
  *
  * Note that actual demand is a property of the **market**, not of any one
@@ -89,8 +82,8 @@ const DECAY_RATE = 0.015;
  * sim/pressure.ts). 0.3% a day, applied as a single global multiplier on
  * top of the gravity model rather than per market, since nothing here
  * varies growth by geography yet. That is about 1.4x after 4 months and 3x
- * after a year: it used to be 2% a year, too small to notice, so the
- * market a plane filled last month is now short of seats this month.
+ * after a year: fast enough that the market a plane filled last month is
+ * short of seats this month.
  */
 const DAILY_DEMAND_GROWTH = 0.003;
 

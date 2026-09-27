@@ -1,6 +1,6 @@
 :root {
   color-scheme: dark;
-  /* Week six: must match PANEL_WIDTH_PX in ui/panels.ts. main.ts's
+  /* Must match PANEL_WIDTH_PX in ui/panels.ts. main.ts's
      applyPanelWidth() overwrites this at runtime with the same number,
      clamped so the map never disappears on a narrow window — both #map
      and #panel read this one variable, so the canvas and the sidebar can
@@ -17,10 +17,8 @@ body {
   overflow: hidden;
 }
 
-/* Week six: the map is no longer one of several exclusive "panels" that
-   take turns occupying this slot — it renders unconditionally now (see
-   main.ts's render()), so it just needs to fill whatever room the
-   sidebar (--panel-width, above) leaves it. */
+/* The map renders every frame (see main.ts's render()), so it just fills
+   whatever room the sidebar (--panel-width, above) leaves it. */
 #map {
   display: block;
   width: calc(100vw - var(--panel-width));
@@ -54,8 +52,7 @@ body {
   font-family: ui-monospace, Consolas, monospace;
   font-size: 13px;
   color: #cdd3e0;
-  /* Week six: the sidebar grew from 280px to --panel-width (420px) —
-     without this, the HUD bar's natural
+  /* Without this, the HUD bar's natural
      width could extend into the sidebar's own space on a narrower
      window, and #panel (later in the DOM, so it wins the overlap)
      would silently eat clicks meant for whatever HUD button sat under
@@ -137,9 +134,7 @@ body {
   border-left: 1px solid rgba(255, 255, 255, 0.15);
 }
 
-/* Week six: New Game, Save, and Load all moved from a lone HUD button
-   into their own sidebar tab (ui/gameControls.ts) — Save and Load didn't
-   exist as manual actions at all before this. */
+/* The Game tab: New Game, Save and Load (ui/gameControls.ts). */
 #game-tab section {
   margin-bottom: 24px;
 }
@@ -302,14 +297,14 @@ body {
   width: 100%;
 }
 
-/* Week six: the map-layers picker (Demand/Competition) is a deliberate
-   on/off control now, not a nav menu — Google Maps' own layers button is
+/* The map-layers picker (Demand/Competition) is a deliberate on/off
+   control, not a nav menu — Google Maps' own layers button is
    the reference point, so it gets more visual weight than the plain
    hover dropdowns: a small gap and its own shadow so it reads as a
    floating card that popped up, not a menu flush against its trigger
    (which only mattered for the hover-to-open groups — see main.ts's
-   isLayersPicker). Week eight's mapmode picker is the same deliberate-
-   choice shape, just single-select, so it shares the treatment. */
+   isLayersPicker). The mapmode picker is the same deliberate-choice
+   shape, just single-select, so it shares the treatment. */
 [data-group='maps'] .view-dropdown,
 [data-group='mapmode'] .view-dropdown {
   top: calc(100% + 6px);
@@ -325,7 +320,7 @@ body {
   padding: 5px 8px;
 }
 
-/* Week eight: the mapmode legend — what the current recolouring means.
+/* The mapmode legend — what the current recolouring means.
    Floats bottom-left of the map, same "real DOM over the canvas" pattern
    the HUD clock and speed controls already use, not drawn into the
    canvas itself (CLAUDE.md's panel rule). Hidden whenever mapMode is
@@ -371,9 +366,8 @@ body {
   border-radius: 2px;
 }
 
-/* Week eight: the alert strip — real problems (scheduleProblems(), crew
-   grounding) that used to only be visible inside whichever sidebar tab
-   happened to be open. Always on screen, unlike everything else here
+/* The alert strip (ui/alerts.ts): real problems, whatever sidebar tab
+   is open. Always on screen, unlike everything else here
    that's conditional on a toggle or a mode, because a problem you didn't
    go looking for is the whole reason this exists. Positioned below #hud
    rather than beside it — a fixed offset, same approach every other
@@ -479,13 +473,8 @@ body {
   display: none;
 }
 
-/* Week six: the tab bar that replaced the old "Reports" HUD dropdown, now
-   sitting above Cash/On-time/etc. rather than below — the first thing in
-   the sidebar, not a divider partway down it. Fleet, Rotation, Commercial,
-   Fleet Market, On-Time, and Executive all live here — clicking one swaps
-   which pane shows inside #sidebar-tab-content, instead of hiding the map
-   to show a separate full-screen panel the way each of these used to.
-   Icon-only, same "aria-label plus a real `title` for the hover
+/* The sidebar's tab bar, the first thing in it: clicking a tab swaps
+   which pane shows inside #sidebar-tab-content. Icon-only, same "aria-label plus a real `title` for the hover
    description" shape #view-toggle's Maps/Reports icon buttons already
    used — a native title tooltip is a fine amount of ceremony for a single
    short line, not worth a custom tooltip component the way the rotation
@@ -830,12 +819,9 @@ body {
   box-sizing: border-box;
 }
 
-/* Week seven, phase C: the rotations list replaces the schedule table.
-   The remove button drops a whole rotation, not a single leg — a rotation
-   is the unit the player builds, and deleting one leg out of the middle
-   of one would strand the rest of it away from base. Narrow enough not to
-   repeat the table-overflow bug the schedule table's short-lived Fare
-   column caused (a slider needed real width; this doesn't). */
+/* The rotations list. The remove button drops a whole rotation, not a
+   single leg: a rotation is the unit the player builds, and deleting one
+   leg out of the middle would strand the rest of it away from base. */
 #rotations-table td:last-child,
 #rotations-table th:last-child {
   width: 24px;
@@ -885,7 +871,7 @@ body {
   border-color: #ff8080;
 }
 
-/* M10: cursor feedback while a route is armed (see ui/routeBuilder.ts) */
+/* Cursor feedback while a route is armed (see ui/routeBuilder.ts) */
 #map.armed {
   cursor: crosshair;
 }
@@ -903,9 +889,7 @@ body {
   color: #ff8080;
 }
 
-/* Week eight's second deep dive: acting on an airport used to always mean
-   switching tabs (see ui/mapMenu.ts's own comment for why it stayed
-   read-only up to now). This ring of circular buttons is anchored to the
+/* The map menu (ui/mapMenu.ts): a ring of circular buttons anchored to the
    airport's own screen point rather than tucked in the info card, so
    "click a place, act on that place" reads the same way a real map app's
    pin actions do. The container itself has no size — it's just an anchor
@@ -1121,7 +1105,7 @@ body {
   margin-bottom: 10px;
 }
 
-/* PDEW/CAP (week four) — the un-minmaxed demand-vs-capacity read for
+/* PDEW/CAP — the un-minmaxed demand-vs-capacity read for
    this market, before fare/yield/competition trim it down. Same muted
    tone as block time normally, but flips to amber when demand can't
    fill the plane, so a thin market reads as a caution at a glance. */
@@ -1143,17 +1127,16 @@ body {
   color: #9aa3b8;
 }
 
-/* Week three: the tail is chosen before the form opens (Fleet panel), so
-   it's shown here read-only rather than as an editable control. */
+/* The plane is picked for the player (sim/rotations.ts's autoPickTail()),
+   so the form shows it read-only rather than as an editable control. */
 #new-route-tail-label {
   color: #ffd166;
   font-weight: 600;
 }
 
-/* Week seven: the live utilisation read for the rotation being built —
-   what share of an aircraft it spends, and what the base pool has left
-   after it. Amber because this is now the number the decision turns on,
-   the same weight the return-leg preview used to carry here. */
+/* The live utilisation read for the rotation being built: what share of
+   an aircraft it spends, and what the base pool has left after it. Amber
+   because this is the number the decision turns on. */
 #new-route-utilisation,
 #new-route-slots {
   color: #ffd166;
@@ -1188,7 +1171,7 @@ body {
   color: #fff;
 }
 
-/* Week seven: "Add stop" extends the chain instead of confirming it, so
+/* "Add stop" extends the chain instead of confirming it, so
    it reads as a secondary action next to Add Rotation — outlined in the
    builder's own amber rather than filled like the confirm button. */
 #new-route-add-stop {
@@ -1257,9 +1240,7 @@ body {
 /* The On-Time panel (ui/onTime.ts) — two tables stacked under their own
    headings instead of one, since per-route performance and top delay
    codes are two different questions with two different shapes of
-   answer. Week six: lives in the sidebar's tab system now; the old
-   640px max-width cap is gone since the sidebar itself is already
-   narrower than that. */
+   answer. */
 #ontime-panel {
   overflow-x: auto;
 }
@@ -1438,7 +1419,7 @@ body {
   border-radius: 2px;
 }
 
-/* Week four's route-hover tooltip — PDEW/CAP for whichever airport is
+/* Route-hover tooltip — PDEW/CAP for whichever airport is
    currently snapped to as a candidate destination while a route is
    armed, so the reading is visible before the second click, not only
    after. Same "real DOM, positioned via mousemove" shape as
@@ -1842,7 +1823,7 @@ body {
   color: #fff;
 }
 
-/* Week six's Dev tab (ui/devTools.ts) — a live cost decomposition, built
+/* Dev tab (ui/devTools.ts) — a live cost decomposition, built
    to make the economy legible while it's being tuned. Every number here
    is read from state rather than described, so nothing can go stale. */
 #dev-panel section {
@@ -2058,7 +2039,7 @@ body {
   border-color: rgba(255, 255, 255, 0.5);
 }
 
-/* Week six: the cancellations half of the On-Time panel, sharing the
+/* The cancellations half of the On-Time panel, sharing the
    delay-codes table's own styling. */
 #ontime-cancel-table {
   border-collapse: collapse;
@@ -2093,7 +2074,7 @@ body {
   font-size: 13px;
 }
 
-/* Week six phase one: the airline's own presence at a hovered airport,
+/* The airline's own presence at a hovered airport,
    below the operator legend. The map dots encode the same numbers
    visually; this is the exact reading of them. */
 #competition-tooltip-presence {
@@ -2165,7 +2146,7 @@ body {
   display: none;
 }
 
-/* Week six phase two: flavour text is real content but a returning player
+/* Flavour text is real content but a returning player
    scanning a list doesn't want eight paragraphs in the way, so every
    flavour block collapses behind its own header. A <button> rather than a
    <div> so it's keyboard-reachable and announces itself as interactive —

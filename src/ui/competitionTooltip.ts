@@ -71,12 +71,10 @@ function renderOperators(title: string, operators: Operator[]): void {
 }
 
 /**
- * Week six: the airline's own presence at this airport — level,
- * departures, the connectivity uplift that concentration earns, and slot
- * holdings where the field is controlled. This is the data the Airports
- * tab used to show as a table of IATA codes; it belongs on the map,
- * where the places actually are, and the dots already encode the same
- * numbers visually (render/airports.ts).
+ * The airline's own presence at this airport: level, departures,
+ * connecting passengers, and slot holdings. It belongs on the map, where
+ * the places are, and the dots already encode the same numbers visually
+ * (render/airports.ts).
  */
 function renderPresence(iata: string, state: SimState): void {
   const p = airportPresence(state, iata);
@@ -99,8 +97,7 @@ function renderPresence(iata: string, state: SimState): void {
  * Show the tooltip for whatever findCompetitionHover() (render/
  * competition.ts) currently reports under the cursor, positioned just
  * off the pointer. Called from main.ts's mousemove handler whenever the
- * map is showing (week four — this used to be gated to an exclusive
- * Competition mode; now it's live on the Ops map at all times).
+ * map is showing.
  *
  * `includeCompetitors` mirrors the Competition overlay's own on/off state
  * — revealing competitor operators on hover is exactly what turning that

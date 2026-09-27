@@ -71,14 +71,10 @@ function ownRoutesFrom(state: SimState): Map<string, { origin: string; dest: str
   return routes;
 }
 
-// Week four (M14): competitor routes used to never change at runtime, so
-// these were built once at import time from the static data. The
-// competitor AI (sim/competitors.ts) can now grow state.competitorRoutes
-// mid-game, so these are recomputed fresh from `state` on every call
-// instead — the same fix ownRoutesFrom() above already got (see its own
-// comment) for the exact same reason: anything built once from a
-// snapshot silently stops reflecting reality the moment that snapshot
-// changes.
+// Rivals open and close routes mid-game (sim/competitors.ts), so these
+// are rebuilt from `state` on every call, like ownRoutesFrom() above:
+// anything built once from a snapshot stops reflecting the game the
+// moment it changes.
 function competitorRoutesByAirlineFrom(state: SimState): Map<string, Map<string, { origin: string; dest: string }>> {
   const byAirline = new Map<string, Map<string, { origin: string; dest: string }>>();
   for (const c of state.competitorRoutes) {
@@ -190,9 +186,9 @@ function drawLine(
 }
 
 /**
- * The Competition overlay (week four — was an exclusive "mode," now a
- * toggle that *replaces* the Ops base layer's plain route coloring rather
- * than drawing alongside it — see main.ts's render()). `selectedAirline`
+ * The Competition overlay: a toggle that *replaces* the base layer's
+ * plain route colouring rather than drawing alongside it (see main.ts's
+ * render()). `selectedAirline`
  * picks which competitor set is being compared against your own network:
  * `null` means "any competitor" (the aggregate view); a specific airline
  * name means just that one carrier's routes. Either way, every market
@@ -342,12 +338,11 @@ export type CompetitionHover = { type: 'airport'; iata: string } | { type: 'mark
  * not "airport checked first" (see ui/mapMenu.ts's handleMapMenuMouseDown
  * for the fuller reasoning; this is the same fix for the same bug). A
  * click genuinely on an airport still always wins, since its ratio is
- * near 0; a click actually on a market's line no longer loses just
- * because it also happens to be within the airport's more forgiving 8px.
+ * near 0, and a click on a market's line isn't lost just because it
+ * also happens to be within the airport's more forgiving 8px.
  * `null` if neither is close enough.
  *
- * `includeCompetitors` (week four — was implicitly always true back when
- * this only ran in an exclusive Competition mode) restricts which market
+ * `includeCompetitors` restricts which market
  * arcs count as hoverable to just `ownRoutes` when the Competition
  * overlay is off: competitor-only arcs aren't drawn on screen at all in
  * that case (`main.ts`'s render() draws plain `drawRoutes()` instead of
@@ -411,7 +406,7 @@ export function findCompetitionHover(
   return null;
 }
 
-// --- "A competitor just opened a route" flash (week four, M14) ---
+// --- "A competitor just opened a route" flash ---
 //
 // The competitor AI (sim/competitors.ts) stamps every route it opens with
 // `openedAtMinute`, but *when* that flash should actually play on screen

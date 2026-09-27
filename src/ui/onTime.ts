@@ -9,11 +9,11 @@ const cancelRowsBody = document.querySelector<HTMLTableSectionElement>('#ontime-
 const completionEl = document.querySelector<HTMLDivElement>('#ontime-completion')!;
 
 /**
- * Week six: cancellations, broken out the same way delay minutes are.
- * Each cause has a different answer available — reserve depth for crew,
- * maintenance staffing and younger airframes for mechanical, and nothing
- * at all for weather — so which one dominates is the whole point of
- * showing them apart rather than as one number.
+ * Cancellations, broken out the same way delay minutes are. Each cause
+ * has a different answer — hiring crews ahead for crew, younger airframes
+ * and a maintenance COO for mechanical, and nothing at all for weather —
+ * so which one dominates is the whole point of showing them apart rather
+ * than as one number.
  */
 const CANCEL_CAUSE_LABELS: [keyof SimState['cancellationsByCause'], string][] = [
   ['crew', 'Crew shortage'],

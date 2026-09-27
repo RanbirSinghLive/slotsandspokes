@@ -23,7 +23,7 @@ const AIRCRAFT_SIZE_BY_RANK: { length: number; width: number }[] = [
 ];
 const DEFAULT_AIRCRAFT_SIZE = { length: 7, width: 5 };
 const AIRCRAFT_FILL = '#ffd166';
-// A flight running late (M9) is tinted red instead of the usual yellow —
+// A flight running late is tinted red instead of the usual yellow —
 // this is what makes a cascading delay actually watchable on the map
 // itself, not just readable in the fleet panel's text.
 const AIRCRAFT_FILL_LATE = '#ff5c5c';

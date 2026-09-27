@@ -2,21 +2,13 @@ import { recommendedFare, marketKey } from './schedule';
 import type { FareStance, SimState } from './state';
 
 /**
- * Week six's fare policy. Raised directly, and the complaint was exact:
- * a per-market fare slider is busy work rather than a decision. Three
- * things made it so — nothing in the world reacts to your price, so a
- * static optimum exists permanently; the Commercial panel previews margin
- * as you drag, so finding it isn't even a search; and worst, it is the
- * *same* puzzle repeated once per market, so the chore grows with your
- * network. The mechanic got more tedious the better you played.
- *
- * The fix here addresses the third and worst of those: fare becomes one
- * airline-wide **policy** — a multiplier on `recommendedFare()`, which is
- * already distance-aware, so a single number prices an entire network
- * sensibly. Per-market override stays available for the cases that
- * genuinely differ (a contested market, a route you want to defend), but
- * it is no longer *required* to play well. One decision instead of N
- * identical ones.
+ * Fare policy. A per-market fare slider is busy work rather than a
+ * decision: the same puzzle repeated once per market, growing with the
+ * network. So fare is one airline-wide **policy**, a multiplier on
+ * `recommendedFare()`, which is already distance-aware, so a single
+ * number prices an entire network sensibly. A per-market fare stays
+ * available for the cases that genuinely differ, but isn't required to
+ * play well.
  *
  * On a market a rival also flies, the fare can instead follow a
  * **stance** (see stanceFare()): a named way of pricing against the rival

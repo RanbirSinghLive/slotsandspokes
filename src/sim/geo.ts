@@ -42,7 +42,7 @@ export function greatCircleDistanceNm(a: LatLon, b: LatLon): number {
  * Initial compass bearing from `a` to `b`, in degrees, where 0 = due north
  * and 90 = due east. This is the bearing *at the start* of the great-circle
  * path — on a long flight the true compass heading slowly changes over the
- * course of the trip, but for sprite-rotation purposes (M4) we only ever
+ * course of the trip, but for turning a plane's sprite we only ever
  * need the bearing between two nearby points a fraction of a second apart,
  * where that distinction doesn't matter.
  */

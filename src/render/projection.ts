@@ -8,11 +8,10 @@ import type { Polygon } from 'geojson';
  * everyone up the first time because it's the opposite of the "lat, lon"
  * order most maps quote in.
  *
- * It used to be a fixed box over eastern Canada. Now the game starts from
- * a chosen city anywhere in the world (sim/homes.ts), so the box moves
- * with it: HOME_VIEW_HALF_WIDTH_DEG either side in longitude and
- * HOME_VIEW_HALF_HEIGHT_DEG above and below, the same 30 by 15 degrees the
- * old box covered.
+ * The game starts from a chosen city anywhere in the world
+ * (sim/homes.ts), so the fitted box is centred on it:
+ * HOME_VIEW_HALF_WIDTH_DEG either side in longitude and
+ * HOME_VIEW_HALF_HEIGHT_DEG above and below, 30 by 15 degrees.
  *
  * The ring is listed clockwise (as seen on an ordinary lon-x/lat-y plot):
  * bottom-left, top-left, top-right, bottom-right, back to start. d3-geo

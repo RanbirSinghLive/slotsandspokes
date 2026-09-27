@@ -438,10 +438,9 @@ const AIRPORT_SURE_WIN_RATIO = 0.5;
  * nearestAirportCandidate()'s comment in render/airports.ts), not by
  * "airport checked first." A route's line only gets an 8px tolerance
  * against an airport's 14px, so on a short route (or the map zoomed out)
- * most of the line used to sit inside both endpoints' airport radii and
- * could never win at all — checking the ratio instead means a click
- * genuinely close to the line, but not close enough to either airport to
- * count as "on" it, now correctly goes to the route.
+ * most of the line sits inside both endpoints' airport radii; comparing
+ * ratios means a click genuinely close to the line, but not close enough
+ * to either airport to count as "on" it, goes to the route.
  */
 export function handleMapMenuMouseDown(event: MouseEvent, state: SimState): boolean {
   const airport = nearestAirportCandidate(event.clientX, event.clientY);

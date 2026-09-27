@@ -2,11 +2,9 @@ import { saveState, clearSavedState, hasSavedState } from './save';
 import type { SimState } from '../sim/state';
 
 /**
- * Week six: New Game, Save, and Load, all moved into their own sidebar
- * tab — New Game used to be a standalone HUD button; there was no manual
- * Save or Load at all before this (saving already happened automatically
- * once per simulated day, per ui/save.ts, but nothing let the player
- * force one, or deliberately step back to the last one).
+ * The Game tab: New Game, Save, and Load. Saving also happens
+ * automatically once per simulated day (ui/save.ts); these let the player
+ * force one, or step back to the last one.
  */
 
 const saveGameButton = document.querySelector<HTMLButtonElement>('#save-game-button')!;

@@ -13,23 +13,21 @@ const MAX_ARC_WIDTH = 6;
 const MIN_ARC_ALPHA = 0.25;
 const MAX_ARC_ALPHA = 0.9;
 
-// Week six: potential is drawn as a wide, faint arc and actual demand as
-// a solid one on top of it, so the gap between them *is* the headroom —
-// a fat ghost with a thin bright core is a big market nobody has built
-// yet, and the two converging means a market near maturity. That gap is
-// the single most useful thing this layer can show now that demand grows
-// (sim/marketDemand.ts), and it's exactly the kind of thing CLAUDE.md
-// asks the map to teach that a table wouldn't.
+// Potential is drawn as a wide, faint arc and actual demand as a solid
+// one on top of it, so the gap between them *is* the headroom: a fat
+// ghost with a thin bright core is a big market nobody has built yet, and
+// the two converging means a market near maturity. Demand grows
+// (sim/marketDemand.ts), and this gap is what the map can teach that a
+// table wouldn't.
 const POTENTIAL_ALPHA = 0.22;
 
 function pairKey(a: string, b: string): string {
   return [a, b].sort().join('-');
 }
 
-// Every distinct pair among the map's airports (171 for 19 airports).
-// Only the pair list is static now — the demand figures themselves move
-// day to day, so they're read per frame inside drawDemandLayer() rather
-// than baked in here at module load the way they used to be.
+// Every distinct pair among the map's airports. Only the pair list is
+// static: the demand figures move day to day, so drawDemandLayer() reads
+// them per frame.
 const pairs: { origin: string; dest: string }[] = [];
 for (let i = 0; i < airports.length; i++) {
   for (let j = i + 1; j < airports.length; j++) {
@@ -61,20 +59,16 @@ function servedPairsFrom(state: SimState): Set<string> {
 }
 
 /**
- * The Demand overlay (week four — was an exclusive "mode," now a toggle
- * layered on top of the Ops base map, see main.ts's render()): every one
- * of the 45 city pairs drawn as a geodesic arc, width and opacity scaled
+ * The Demand overlay, a toggle layered on the base map (see main.ts's
+ * render()): every city pair drawn as a geodesic arc, width and opacity scaled
  * to that pair's estimated daily demand (sim/demand.ts) — the busiest
  * markets stand out as the thickest, brightest lines. A pair that already
  * has scheduled service (same "served" definition render/routes.ts uses)
  * gets an amber halo behind its arc, so it's visible at a glance which
  * big markets are already flown and which are still white space.
  *
- * Doesn't draw airports any more — main.ts's base Ops layer already draws
- * them once, and this used to double them up (its own population-sized
- * circles, drawn on top of or under the base layer's plain dots) back
- * when Demand was a full-screen exclusive view with nothing else on
- * screen to share airports with.
+ * Doesn't draw airports: the base layer draws them once, and drawing
+ * them here too would double every dot.
  */
 export function drawDemandLayer(ctx: CanvasRenderingContext2D, state: SimState): void {
   const path = geoPath(projection, ctx);

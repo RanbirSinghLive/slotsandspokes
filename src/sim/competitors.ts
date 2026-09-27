@@ -90,11 +90,8 @@ export function loadCompetitorRoutes(): CompetitorOffering[] {
 
 /**
  * The fare an incumbent charges: a little under the going rate for the
- * market. These used to be typed into data/competitors.json ($170 to $210)
- * and were left behind when fares were recalibrated upward, so by the time
- * the player arrived every incumbent undercut the going rate by 23% to 51%,
- * and a player charged that rate lost most bookings on those four markets
- * for no reason anyone chose. Computed now, so it cannot drift again.
+ * market. Computed from the going rate rather than typed into the data,
+ * so it can't drift when fares are recalibrated.
  */
 const INCUMBENT_FARE_FACTOR = 0.9;
 
@@ -418,9 +415,7 @@ export function addRivalFlight(state: SimState, route: CompetitorOffering): bool
 
 /**
  * Rivals respond to the player's fares, once a day, on every market both
- * fly. Before this, a rival's fare was fixed the day its route opened, so
- * the player could price however they liked and the only competitive
- * pressure was frequency.
+ * fly, so competition is on price as well as frequency.
  *
  * The behaviour is a simple, readable one:
  *   - The player is cheaper: the rival cuts toward the player's fare —

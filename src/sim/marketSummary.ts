@@ -8,9 +8,8 @@ import { bookingPerks } from './innovations';
 import type { RouteSettings, SimState } from './state';
 import type { ScheduleLeg } from './schedule';
 
-// A market can be served by more than one gauge at once (week four's
-// aircraft ladder, plus M13's ability to drag a leg onto a different
-// tail), so a summary can't assume one type for a whole market. Looked up
+// A market can be served by more than one gauge at once, so a summary
+// can't assume one type for a whole market. Looked up
 // per leg instead, same "small local map, keyed by code" pattern step.ts
 // already uses; `defaultAircraftType` only covers the defensive case of a
 // leg whose tail somehow isn't in the fleet (shouldn't happen —

@@ -2,10 +2,9 @@ import { nextRandom } from './rng';
 import { WEATHER_ON_TIME_PROBABILITY, WEATHER_MAX_DELAY_MINUTES } from './weather';
 
 /**
- * The four causes a departing flight's arrival delay is built from.
- * Moved out of sim/step.ts unchanged (week six) — step() was carrying
- * both the tick loop and the whole delay model, and these are two
- * separate concerns. Splitting them also lets the delay distributions be
+ * The four causes a departing flight's arrival delay is built from, kept
+ * apart from the tick loop (sim/step.ts). That also lets the delay
+ * distributions be
  * *sampled* from outside the simulation (ui/devTools.ts histograms them
  * to show what the model actually produces) without exporting the
  * internals of the tick function to do it.
@@ -13,14 +12,11 @@ import { WEATHER_ON_TIME_PROBABILITY, WEATHER_MAX_DELAY_MINUTES } from './weathe
  * Each cause addresses a different question:
  *
  *   1. Age (rollAgeDelay) — this aircraft's own baseline mechanical/
- *      operational unreliability, worse the older the airframe. A
- *      brand-new (age 0) aircraft reproduces this model's old flat
- *      65%-on-time/45-minute-max numbers almost exactly, on purpose —
- *      age is a genuine widening of the old model, not a silent re-tune
- *      of the game's whole balance in the same pass.
+ *      operational unreliability, worse the older the airframe: a
+ *      brand-new (age 0) aircraft is about 65% on time, with delays of
+ *      up to 45 minutes.
  *   2. Weather (rollWeatherDelay) — an airport with active weather
- *      (sim/weather.ts) rolls against far worse odds. Unchanged in
- *      spirit from before this rework.
+ *      (sim/weather.ts) rolls against far worse odds.
  *   3. Knock-on (knockOnDelayMinutes) — *not* a fresh random event: a
  *      deterministic fraction of however late this flight is already
  *      departing, because an earlier leg on this same tail ate into its
@@ -92,13 +88,11 @@ export function rollAgeDelay(
   ageYears: number,
   maintenanceFactor = 1,
 ): [delayMinutes: number, nextSeed: number] {
-  // Week six: mechanics scale *effective* age rather than adding a fourth
-  // delay cause. A well-maintained airframe genuinely behaves younger
-  // than its years and a neglected one older, so folding maintenance into
-  // the age term says what's actually happening — and it gives mechanics
-  // a real job without waiting for a full maintenance system.
-  // Defaults to 1 so anything not passing a factor (tests, the histogram
-  // sampler in ui/devTools.ts) reproduces the pre-crew numbers exactly.
+  // Maintenance scales *effective* age rather than adding a fourth delay
+  // cause (sim/aog.ts's MAINTENANCE_AGE_FACTOR, a maintenance COO): a
+  // well-kept airframe behaves younger than its years. Defaults to 1, the
+  // raw age, for callers that don't pass one (the histogram sampler in
+  // ui/devTools.ts).
   const { onTimeProbability, maxDelayMinutes } = ageDelayParameters(ageYears * maintenanceFactor);
   return rollCauseDelay(seed, onTimeProbability, maxDelayMinutes);
 }

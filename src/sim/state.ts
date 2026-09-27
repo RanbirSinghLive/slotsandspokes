@@ -29,7 +29,7 @@ export type Aircraft = {
   activeLegId: string | null;
   /**
    * The simMinute this aircraft last became grounded — 0 at the start of the
-   * world, updated every time it lands. step() (M9) won't let it depart on
+   * world, updated every time it lands. step() won't let it depart on
    * its next leg until MIN_TURN_MINUTES after this, even if that leg's
    * scheduled departure time has already passed: a late arrival still needs
    * a real turnaround, not an instant one, which is what lets one delay
@@ -55,7 +55,7 @@ export type Aircraft = {
    */
   ageYears: number;
   /**
-   * Week six's utilisation pivot: the airport this aircraft is based at,
+   * Utilisation pivot: the airport this aircraft is based at,
    * assigned explicitly rather than inferred from wherever its first
    * route happened to start. A rotation begins and ends at its base, so
    * this is what makes continuity automatic — and it lets an airline fly
@@ -185,7 +185,7 @@ export type SimState = {
    */
   routeSettings: Record<string, RouteSettings>;
   /**
-   * Week four's competitor AI (sim/competitors.ts): every competitor
+   * Competitor AI (sim/competitors.ts): every competitor
    * route currently in service, seeded from `data/competitors.json` and
    * grown over time by `rollCompetitorRouteOpenings()` (called once per
    * simulated day from step.ts's day-rollover, alongside the weather
@@ -319,7 +319,7 @@ export type SimState = {
    */
   delayMinutesByCause: { age: number; weather: number; knockOn: number; congestion: number };
   /**
-   * Week four's spill-and-recapture (sim/economy.ts's `flightResult()`):
+   * Spill-and-recapture (sim/economy.ts's `flightResult()`):
    * how many recoverable passengers are currently waiting, per market,
    * for a later flight on that same market today to pick up — deposited
    * by an earlier, seat-capped flight's overflow, drawn down by a later
@@ -332,17 +332,15 @@ export type SimState = {
    */
   spilloverByMarket: Record<string, number>;
   /**
-   * The entire state of sim/rng.ts's seeded random number generator. Not
-   * used yet — nothing under sim/ calls nextRandom() until the M9 delay
-   * mechanic exists — but it lives here, in `state`, from the start rather
-   * than as a module-level variable, so that whenever step() does start
-   * asking "how late is this flight," the answer stays deterministic and
-   * reproducible: same state in, same state out, same as every other field
-   * here.
+   * The entire state of sim/rng.ts's seeded random number generator.
+   * It lives in `state`, not in a module-level variable, so every random
+   * draw (delays, weather, shocks, rivals) stays deterministic and
+   * reproducible: same state in, same state out, and a save resumes the
+   * same stream.
    */
   rngSeed: number;
   /**
-   * Week five's runway forecast (sim/forecast.ts): the last
+   * Runway forecast (sim/forecast.ts): the last
    * CASH_HISTORY_MAX_DAYS days' worth of closing Cash balances, oldest
    * first, recorded once per simulated day at the top of step.ts's
    * day-rollover — before that day's own charges apply, so each entry is
@@ -417,7 +415,7 @@ export type SimState = {
    */
   adoptedInnovations?: string[];
   /**
-   * Week six's market stimulation model (sim/marketDemand.ts): how many
+   * Market stimulation model (sim/marketDemand.ts): how many
    * people actually fly each market on an average day right now, keyed by
    * `marketKey(origin, dest)` — a plain object, not a Map, same
    * JSON-round-trip reasoning as `routeSettings`. This is the number that
@@ -437,13 +435,13 @@ export type SimState = {
    */
   demandGrowthMultiplier: number;
   /**
-   * Week six's cost attribution: the same dollars `todayCost` already
+   * Cost attribution: the same dollars `todayCost` already
    * totals, split by where they went. Reset to zero at day-rollover
    * alongside `todayCost` itself, and **guaranteed to sum to it** — every
    * place that adds to `todayCost` adds to exactly one category here too.
    */
   /**
-   * Week six's airline-wide fare policy (sim/pricing.ts): a multiplier on
+   * Airline-wide fare policy (sim/pricing.ts): a multiplier on
    * `recommendedFare()` applied to every market not individually
    * overridden. 1 means "charge exactly what's recommended." One number
    * prices the whole network, which is what stops fare-setting from being
@@ -503,7 +501,7 @@ export type SimState = {
    */
   cancellationsByCause: { crew: number; mechanical: number; weather: number; curfew: number; position?: number };
   /**
-   * Week six's cancellations: legs that should have operated today and
+   * Cancellations: legs that should have operated today and
    * didn't. `flightsScheduled*` counts what was on the books, so
    * Completion Factor is `completed / scheduled` — the separate reliability
    * axis from On-Time, which only ever describes flights that did operate.

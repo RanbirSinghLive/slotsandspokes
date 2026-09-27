@@ -32,7 +32,7 @@ const aircraftTypesByCode = new Map<string, AircraftTypeSpec>(
   (aircraftTypesData as AircraftTypeSpec[]).map((type) => [type.code, type]),
 );
 
-// --- The armed-state hover tooltip (week four) ---
+// --- The armed-state hover tooltip ---
 //
 // PDEW/CAP for whichever airport the cursor is currently snapped to as a
 // candidate destination, shown *before* the second click confirms
@@ -159,15 +159,13 @@ export function hideRouteHoverTooltip(): void {
  * simulated-world state. Nobody names a plane: autoPickTail() chooses one
  * once the destination is known, so the player never sees a tail.
  *
- * Week seven (the utilisation pivot, WEEK-SEVEN.md): what gets built is
- * no longer a single leg but a **rotation** — an ordered chain of
+ * What gets built is a **rotation**, not a single leg: an ordered chain of
  * airports starting and ending at the aircraft's base. `chain` holds the
  * airports agreed so far, base first; the last entry is whatever the next
  * leg departs from. "Add stop" appends the pending destination to it and
  * re-arms from there instead of confirming, so `YUL-YFC-YQM-YFC-YQM-YUL`
  * is buildable in one gesture. A plain out-and-back is just the
- * two-airport case, which is why there's no "add return leg" checkbox any
- * more — the rotation always closes back to the base.
+ * two-airport case: the rotation always closes back to the base.
  */
 type BuilderState =
   | { mode: 'idle' }
@@ -286,7 +284,7 @@ export function handleRouteBuilderMouseDown(event: MouseEvent, state: SimState):
  * whether anything changed, so main.ts only pays for an extra render() on
  * mouse moves that actually matter (armed), not on every idle move over
  * the map the way an unconditional call would. Also shows/hides the
- * PDEW/CAP hover tooltip (week four) for whichever airport `candidate`
+ * PDEW/CAP hover tooltip for whichever airport `candidate`
  * snaps to, so that reading is visible before the second click confirms
  * anything.
  */
@@ -316,7 +314,7 @@ export function handleRouteBuilderKeyDown(event: KeyboardEvent): void {
 
 /**
  * Draw the chain agreed so far, the live preview arc, base/origin/candidate
- * highlight rings, and (week three) the selected plane's range ring.
+ * highlight rings, and the selected plane's range ring.
  * Called from main.ts's render(), same as every other canvas layer — reads
  * this module's own transient state plus `state.aircraft` (to look up the
  * armed tail's aircraft type), drawn above everything else so it's never
@@ -353,7 +351,7 @@ export function drawRoutePreview(ctx: CanvasRenderingContext2D, state: SimState)
     ctx.restore();
   }
 
-  // Week seven: the legs already agreed, drawn solid so a multi-stop
+  // The legs already agreed, drawn solid so a multi-stop
   // rotation is visible as a shape on the map while it's being built —
   // the dashed arc below is only ever the one leg still being chosen.
   // While confirming, the pending destination counts as agreed for
@@ -414,7 +412,7 @@ export function drawRoutePreview(ctx: CanvasRenderingContext2D, state: SimState)
   }
 }
 
-// --- Packing a rotation into the day (week seven) ---
+// --- Packing a rotation into the day ---
 
 /**
  * One leg of a packed rotation, before it becomes a real ScheduleLeg.
@@ -444,11 +442,9 @@ function formatDuration(minutes: number): string {
   return hours > 0 ? `${hours}h ${String(remainder).padStart(2, '0')}m` : `${remainder}m`;
 }
 
-// Week six: the form used to be a fixed section in the sidebar, always in
-// the same place regardless of where on the map the route actually was.
-// Now it's a small floating popover, Google-Maps-info-window-style,
-// anchored to the destination airport that was just clicked — appearing
-// right where you're actively working instead of off in a side panel.
+// The form is a small floating popover, Google-Maps-info-window-style,
+// anchored to the destination airport just clicked, so it appears right
+// where you're working rather than off in a side panel.
 const POPOVER_OFFSET_PX = 16;
 
 /**
@@ -617,17 +613,14 @@ export function commitRotation(state: SimState, tail: string, plan: RotationPlan
 }
 
 /**
- * Wire up the confirmation form. Called once at startup, alongside
- * setupScheduleEditor() — same "build once, mutate only via events" rule,
- * for the same reason: an `<input>` the player is mid-interaction with
- * shouldn't get torn out by a periodic re-render. There's no Tail
- * dropdown to populate (week three — the plane is chosen before the form
- * ever opens, via the Fleet panel), and as of week seven no depart-time
- * input either: the rotation is packed into the day automatically, so
- * there is no time left for the player to author.
+ * Wire up the confirmation form. Called once at startup: build once,
+ * mutate only via events, since an `<input>` the player is
+ * mid-interaction with shouldn't get torn out by a periodic re-render.
+ * There's no tail picker (autoPickTail() chooses the plane) and no
+ * depart-time input: the rotation is packed into the day automatically.
  */
 export function setupRouteBuilder(state: SimState, onRouteConfirmed: (legIds: string[]) => void): void {
-  // "Add stop" (WEEK-SEVEN.md, decision 6): take the pending destination
+  // "Add stop": take the pending destination
   // into the chain and re-arm from it, rather than confirming. The form
   // closes and the gesture goes back to armed, so the next click picks the
   // stop after this one — repeat as many times as the day has room for.

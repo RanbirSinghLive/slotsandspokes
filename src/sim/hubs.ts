@@ -16,7 +16,7 @@ const typesByCode = new Map(
 /**
  * Connecting passengers: people travelling between two of your spokes, A
  * and B, by changing planes at a hub H you fly both of them to. This
- * replaces week six's flat "connectivity multiplier", which paid a hub
+ * replaces the flat "connectivity multiplier", which paid a hub
  * for its size whether or not anything connected through it.
  *
  * Worked out from how often routes fly, never from times — the player

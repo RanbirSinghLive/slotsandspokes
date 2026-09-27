@@ -14,8 +14,8 @@ const airportsByIata = new Map<string, AirportDemandInput>(
 // comes from. `DISTANCE_EXPONENT` controls how sharply demand falls off with
 // distance (1 = linear falloff); `SCALING_CONSTANT` just converts the
 // resulting ratio into a number of people per day. Both are deliberately
-// crude, tunable knobs in the same spirit as economy.ts's LOAD_FACTOR/
-// AVG_FARE, not calibrated against any real O-D survey — the populations
+// crude, tunable knobs in the same spirit as economy.ts's LOAD_FACTOR,
+// not calibrated against any real O-D survey — the populations
 // and distances feeding into them are real (GeoNames places summed into
 // each airport's catchment by src/headless/buildAirports.ts, real
 // coordinates), but nothing converts "these two cities are this big and
@@ -24,19 +24,12 @@ const airportsByIata = new Map<string, AirportDemandInput>(
 // "Scaling strategy" note for why `population` lives as a plain field on
 // each airport rather than anything StatsCan-specific.
 //
-// `SCALING_CONSTANT` was tripled in week four (was 1.6e-8): with only the
-// Beechcraft 1900D (19 seats) available and the original constant, 31 of
-// this map's 45 city pairs worked out to under 10 passengers each way —
-// barely playable, since almost every market was a trap. Tripling it
-// (checked against all 45 pairs before picking this number, not guessed)
-// gets 10 pairs into the "one full 1900D flight" zone (10-19 each way), 19
-// more workable with a second frequency or a bigger gauge, and leaves 16
-// genuinely thin — still a real pitfall zone, just not swallowing the
-// whole map. `DISTANCE_EXPONENT` was left alone on purpose: softening it
-// instead was tried and rejected, since it blows up the biggest pairs (the
-// golden triangle) far more than it helps the small ones, being a
-// distance-shaped adjustment applied to what's fundamentally a
-// population-size problem at the thin end.
+// `SCALING_CONSTANT` is set so that small city pairs are thin but not all
+// traps: some fill a small plane, more need a second frequency or a
+// bigger gauge, and the thinnest stay a real pitfall. `DISTANCE_EXPONENT`
+// is 1 on purpose: softening it blows up the biggest pairs far more than
+// it helps the small ones, since thinness at the small end is a
+// population problem, not a distance one.
 const DISTANCE_EXPONENT = 1;
 const SCALING_CONSTANT = 4.8e-8;
 
@@ -88,8 +81,7 @@ export function suppressedMarketReason(originIata: string, destIata: string): st
  * market were fully mature and well served, in either direction combined.
  * A property of the city pair, not of any airline.
  *
- * Week six renamed this from `dailyDemand()` to make an important
- * distinction explicit: this is **latent** demand, not the traffic
+ * This is **latent** demand, not the traffic
  * actually flying today. A market nobody serves doesn't carry this many
  * passengers — it carries almost none, and grows toward this figure only
  * as airlines actually fly it (see sim/marketDemand.ts). Everything that

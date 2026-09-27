@@ -14,7 +14,7 @@ const SAVE_KEY = 'airgame-save-v46';
  *
  * This works at all only because `SimState` is already required to
  * survive `JSON.parse(JSON.stringify(state))` unchanged (CLAUDE.md's
- * rule, true since M1) — a save is *exactly* that round trip, persisted
+ * rule) — a save is *exactly* that round trip, persisted
  * across page loads instead of happening in the same tick.
  */
 export function loadSavedState(): SimState | null {

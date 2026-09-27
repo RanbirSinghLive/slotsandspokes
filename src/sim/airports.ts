@@ -3,14 +3,13 @@ import type { SimState } from './state';
 import { HUB_STYLES, hubStyleAt } from './hubStyle';
 
 /**
- * Week six's airport layer: how much of an airline you are *at each
+ * Airport layer: how much of an airline you are *at each
  * airport*, what that concentration is worth, and how much room the
  * airport has (capacity and load). Slots, priced from that same load,
  * live in sim/slots.ts.
  *
- * What a hub is worth — connecting passengers — lives in sim/hubs.ts; it
- * replaced a flat revenue multiplier that used to live here and paid a
- * hub for its size whether or not anything connected through it.
+ * What a hub is worth — connecting passengers — lives in sim/hubs.ts: a
+ * hub earns from what actually connects through it, not from its size.
  */
 
 type AirportSpec = { iata: string; name: string; population: number; capacityPerDay?: number };

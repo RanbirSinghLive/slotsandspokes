@@ -4,22 +4,14 @@ import type { SimState } from './state';
 import { AIRCRAFT_CLASSES } from './aircraftClasses';
 
 /**
- * Week six's pivot away from timeline scheduling: an aircraft's day is a
- * **budget**, and every rotation spends a share of it.
- *
- * The Gantt board asked the player to place legs at times and keep a
- * rotation physically continuous. That is fiddly at three aircraft and
- * unmanageable at thirty, and it made adding a frequency an exercise in
- * finding a gap rather than a commercial decision. Expressed as a
- * percentage of an aircraft instead, the same information answers the
- * questions that actually matter: how much unused aeroplane am I paying
- * for, and is 5% spare worth another airframe?
- *
- * It also expresses something the timeline model simply couldn't. A
- * rotation longer than one usable day — a genuine long-haul turn — comes
- * out above 100%, meaning it needs more than one aircraft to sustain
- * daily. On a Gantt that was an impossible schedule; here it's just a
- * number greater than one.
+ * An aircraft's day is a **budget**, and every rotation spends a share of
+ * it. Placing legs at times on a timeline is fiddly at three aircraft and
+ * unmanageable at thirty, and makes adding a frequency an exercise in
+ * finding a gap rather than a commercial decision. As a percentage of an
+ * aircraft, the same information answers the questions that matter: how
+ * much unused aeroplane am I paying for, and is 5% spare worth another
+ * airframe? A rotation longer than one usable day (a long-haul turn)
+ * comes out above 100%: it needs more than one aircraft to fly daily.
  *
  * **This is a planning layer, not a replacement for the simulation.**
  * step() still flies real legs at real times and still cascades delays
@@ -228,8 +220,7 @@ export function worstPoolShareByBase(state: SimState, effects: PoolEffect[] = []
 /**
  * One rotation: a run of an aircraft's legs that leaves its base and comes
  * back to it. This is the unit the player actually builds (see
- * ui/routeBuilder.ts) and, since week seven's phase C, the unit they
- * remove — but it is deliberately *not* stored on SimState. A rotation is
+ * ui/routeBuilder.ts) and removes — but it is deliberately *not* stored on SimState. A rotation is
  * fully recoverable from the legs themselves, and inventing a stored
  * `Rotation[]` alongside `schedule` would mean two representations of the
  * same fact that could drift apart. Derived, not persisted.
@@ -302,11 +293,10 @@ export function allRotations(state: SimState): Rotation[] {
 }
 
 /**
- * The failure mode that replaces the Gantt's broken-chain errors (week
- * seven, phase C). Continuity and turn time can no longer go wrong — a
- * rotation starts and ends at its base and is packed with turns built in —
- * so the only way to over-commit an aircraft now is to ask it to fly more
- * than a day's worth, which is a number rather than a shape.
+ * How a schedule over-commits an aircraft. Continuity and turn time
+ * can't go wrong (a rotation starts and ends at its base and is packed
+ * with turns built in), so the only way is to ask it to fly more than a
+ * day's worth, which is a number rather than a shape.
  *
  * Lives here rather than in validateSchedule() because the utilisation
  * model is what defines "too much", and because schedule.ts importing this

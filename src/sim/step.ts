@@ -49,7 +49,7 @@ const aircraftTypesByCode = new Map<string, EconomyAircraftType>(
  *   1. Day rollover: if this is minute 0 of a new day, today's tallies
  *      (completedToday, todayRevenue, todayCost, todayMargin) reset to zero
  *      before anything else happens.
- *   2. Depart: any scheduled leg whose departure time has arrived (M9: *at
+ *   2. Depart: any scheduled leg whose departure time has arrived (*at
  *      or after* `departMinute`, not only the exact minute — see below),
  *      not already flown or in the air today, flown by an aircraft that's
  *      on the ground at the correct airport and past its minimum turn time
@@ -67,19 +67,18 @@ const aircraftTypesByCode = new Map<string, EconomyAircraftType>(
  * the old one deliberately: it means that right up until the moment the
  * next day's first minute is processed, `state.todayRevenue` etc. still
  * hold the just-finished day's real totals — which is what lets something
- * outside step() (the M7 headless runner, for instance) read "yesterday's
+ * outside step() (the headless runner, for instance) read "yesterday's
  * numbers" cleanly between calls, instead of catching them already zeroed.
  *
  * `state.schedule` is "the daily repeating schedule" (CLAUDE.md), so
  * matching against the home-local minute of the day (sim/clock.ts) makes
  * every leg fire again at the same local time on day 1, day 2, and so on.
- * It's read from `state` rather than a shared module-level constant so
- * that the M8 schedule editor's edits — mutating a leg's `departMinute`
- * directly — take effect on the very next tick that reaches this loop.
+ * It's read from `state` rather than a module-level constant, so a
+ * schedule change takes effect on the very next tick.
  *
- * Why "at or after" instead of "exactly at" departMinute (M9): once delays
- * exist, an aircraft can still be airborne or mid-turnaround at the exact
- * minute its next leg was supposed to leave. An exact-match check would
+ * Why "at or after" instead of "exactly at" departMinute: an aircraft
+ * can still be airborne or mid-turnaround at the exact minute its next
+ * leg was supposed to leave. An exact-match check would
  * just silently skip that leg for the rest of the day the moment it missed
  * its slot. Checking "has the scheduled time passed, and are we still
  * waiting to fly this specific leg today" instead means a late aircraft
@@ -149,7 +148,7 @@ export function step(state: SimState): void {
     // The trailing NPS (sim/nps.ts) takes in the day just flown, before
     // today's counts reset below.
     rollTrailingNps(state);
-    // Week five's runway forecast (sim/forecast.ts): read before today's
+    // Runway forecast (sim/forecast.ts): read before today's
     // own charges touch Cash — this is what makes each entry "yesterday's
     // closing balance."
     recordDailyCashHistory(state);
@@ -172,7 +171,7 @@ export function step(state: SimState): void {
     state.todayRevenue = 0;
     state.todayCost = 0;
     state.todayMargin = 0;
-    // Week six's cost attribution — reset in lockstep with todayCost
+    // Cost attribution — reset in lockstep with todayCost
     // above, since these five are exactly that number split up.
     state.todayCostByCategory = { fuel: 0, blockNonFuel: 0, departure: 0, lease: 0, crew: 0, slots: 0, maintenance: 0, overhead: 0, innovations: 0, executives: 0 };
     // Per-market breakdown of todayRevenue/todayCost, reset in lockstep
@@ -279,7 +278,7 @@ export function step(state: SimState): void {
     rollDailyFuelPrice(state);
     rollDailyWeather(state, state.simMinute);
 
-    // Week four's competitor AI (sim/competitors.ts): once a day, each
+    // Competitor AI (sim/competitors.ts): once a day, each
     // competitor airline has a small independent chance to open one new
     // route. Same daily cadence as weather, for the same reason — this
     // is a day-scale event, not something worth re-checking every minute.
@@ -304,7 +303,7 @@ export function step(state: SimState): void {
     // gets the first chance. First come, first served, fairly.
     rollDailyMarket(state, dayIndex(state));
 
-    // Week six's market stimulation (sim/marketDemand.ts): markets grow
+    // Market stimulation (sim/marketDemand.ts): markets grow
     // toward their potential where they're actually flown and decay back
     // toward the floor where they aren't. Same daily cadence as the rolls
     // above, but unlike them entirely deterministic — no random draws.
@@ -417,7 +416,7 @@ export function step(state: SimState): void {
     // this market shares the same entry.
     const routeSettings = state.routeSettings[marketOnTimeKey];
 
-    // Week five's NPS quality signal (sim/nps.ts): every input this needs —
+    // NPS quality signal (sim/nps.ts): every input this needs —
     // this flight's just-rolled delay, its fare, and its aircraft's age —
     // is already known by this point in the loop, so it's scored the same
     // moment the on-time counters above are.

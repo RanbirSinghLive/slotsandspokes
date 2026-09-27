@@ -8,15 +8,10 @@ import type { SimState } from './state';
 export type WeatherKind = 'thunderstorm' | 'snowstorm';
 
 /**
- * Week six: weather gained a severity tier. Moderate weather does what
- * weather always did — worsens the departure delay roll. **Severe**
- * weather closes the airport outright: nothing departs from it, and
- * everything scheduled to is cancelled.
- *
- * That's the smallest possible new machinery for a second cancellation
- * cause, which is exactly why WEEK-SIX.md's original cancellation design
- * named it as a candidate: real airports really do close above some storm
- * severity, and the delay path was already here to extend.
+ * Weather has two severities. Moderate weather worsens the departure
+ * delay roll. **Severe** weather closes the airport outright: nothing
+ * departs from it, and everything scheduled to is cancelled, as real
+ * airports close above some storm severity.
  */
 export type WeatherSeverity = 'moderate' | 'severe';
 
@@ -51,9 +46,8 @@ const DAILY_SPREAD_PROBABILITY = 0.25;
 const MIN_DURATION_MINUTES = 120;
 const MAX_DURATION_MINUTES = 360;
 
-// Bare-bones effect, per WEEK-THREE.md: weather doesn't ground aircraft or
-// force diversions, it just makes sim/step.ts's existing delay roll (M9)
-// worse at the *origin* airport — reusing the mechanism rather than
+// Moderate weather doesn't ground aircraft or force diversions: it makes
+// the delay roll (sim/delays.ts) worse at the *origin* airport — reusing the mechanism rather than
 // inventing a new aircraft state.
 export const WEATHER_ON_TIME_PROBABILITY = 0.2;
 export const WEATHER_MAX_DELAY_MINUTES = 90;
@@ -120,8 +114,7 @@ function seasonalKind(dayOfYear: number): WeatherKind | null {
  *
  * Every roll goes through the same seeded PRNG (`state.rngSeed`) as every
  * other random draw in sim/, so a given seed always produces the
- * identical weather history — same requirement CLAUDE.md's determinism
- * rule already holds M9's delay rolls to.
+ * identical weather history, as CLAUDE.md's determinism rule requires.
  */
 export function rollDailyWeather(state: SimState, dayStartMinute: number): void {
   for (const iata of Object.keys(state.weatherByAirport)) {

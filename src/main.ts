@@ -82,12 +82,10 @@ const canvas = document.querySelector<HTMLCanvasElement>('#map')!;
 const ctx = canvas.getContext('2d')!;
 const clockEl = document.querySelector<HTMLDivElement>('#clock')!;
 const speedButtons = document.querySelectorAll<HTMLButtonElement>('#speed-controls button');
-// Demand/Competition (week four): independent on/off toggles layered on
-// top of the map, not exclusive views — see the overlay-toggle wiring
-// below. Week six: the ledgers that used to be exclusive "views" replacing
-// the map (Rotation/Commercial/Fleet Market/On-Time/Executive) moved into
-// sidebar tabs instead (see switchToSidebarTab() below) — the map is no
-// longer something you ever navigate away from.
+// Demand/Competition: independent on/off toggles layered on top of the
+// map, not exclusive views (see the overlay-toggle wiring below). The
+// ledgers live in sidebar tabs (switchToSidebarTab()), so the map is
+// never something you navigate away from.
 const overlayToggleButtons = document.querySelectorAll<HTMLButtonElement>('#view-toggle .view-dropdown button[data-overlay]');
 // Both hover-dropdown groups share one wiring pass below — the Maps
 // (Demand/Competition) group and the Competition map's airline filter,
@@ -186,10 +184,8 @@ if (new URLSearchParams(window.location.search).has('dev')) {
 // never gets squeezed away to nothing on a narrow window, and recomputed
 // on every resize() rather than only when first set.
 //
-// Week seven, phase C removed the Rotation tab's old expand-to-900px
-// affordance, and for a while nothing else made this vary. The panel-hide
-// toggle below (#panel-toggle) gives it a reason to again: hidden means 0,
-// otherwise the full width.
+// The panel-hide toggle below (#panel-toggle) is what varies it: hidden
+// means 0, otherwise the full width.
 const MIN_MAP_WIDTH_PX = 200;
 let panelHidden = false;
 let currentPanelWidthPx = PANEL_WIDTH_PX;
@@ -247,13 +243,11 @@ function resize(): void {
 // time it is.
 let latestFractionalMinute = state.simMinute;
 
-// Week six: which sidebar tab is showing. The map itself is no longer part
-// of this switch at all — it renders unconditionally now, every frame,
-// regardless of which tab is open (see render(), below) — only the
-// sidebar's own content pane changes. Demand and Competition stay
-// independent on/off toggles layered on top of the map (unchanged from
-// week four), since they were already built the right way for this: a
-// layer you toggle, not a destination you navigate to.
+// Which sidebar tab is showing. The map isn't part of this switch: it
+// renders every frame whatever tab is open (see render(), below), and
+// only the sidebar's content pane changes. Demand and Competition are
+// on/off toggles layered on the map: a layer you toggle, not a
+// destination you navigate to.
 type SidebarTab =
   | 'fleet'
   | 'ontime'
@@ -262,7 +256,7 @@ type SidebarTab =
 let sidebarTab: SidebarTab = 'fleet';
 let demandOverlayOn = false;
 let competitionOverlayOn = false;
-// Week eight: which mapmode is recolouring the route network (render/
+// Which mapmode is recolouring the route network (render/
 // mapmodes.ts) — mutually exclusive with itself (there's only one map
 // underneath) but layered the same way Demand/Competition are: an
 // independent thing turned on over the map, not a sidebar destination.
@@ -406,8 +400,8 @@ function render(nowMs: number = performance.now()): void {
 
 const MINUTES_PER_DAY = 1440;
 
-// simMinute 0 is fixed at January 1, 2027 — requested directly, replacing
-// the old "Day N" counter with a real calendar. `Date` only ever appears
+// simMinute 0 is fixed at January 1, 2027, so the clock shows a real
+// calendar date. `Date` only ever appears
 // here, in display code, never in sim/: this is exactly the same "local
 // time exists only for display" rule CLAUDE.md already applies to each
 // airport's UTC offset, just for calendar dates instead of clock time —
@@ -498,8 +492,7 @@ let accumulator = 0;
 let speedMultiplier = 1;
 let lastFrameTimeMs: number | null = null;
 
-// Week three's persistence fix: save once per simulated day crossed, not
-// every minute — a day-old save is a perfectly fine worst case to resume
+// Save once per simulated day crossed, not every minute: a day-old save is a perfectly fine worst case to resume
 // from, and this is 1440x fewer localStorage writes than saving every
 // tick would be. Initialized from whatever day the game actually starts
 // on (loaded or fresh) so resuming a save doesn't immediately re-save
@@ -589,20 +582,12 @@ window.addEventListener('keydown', (event) => {
   togglePause();
 });
 
-// --- Sidebar tabs (Fleet / Commercial / Fleet Market /
-// --- On-Time / Executive) and overlay toggles (Demand / Competition) —
-// --- week six
+// --- Sidebar tabs (Fleet / On-Time / Game / Dev) and overlay toggles
+// --- (Demand / Competition)
 //
-// Week four made Demand/Competition independent layers on top of the map
-// instead of exclusive "modes." Week six extends that same idea to every
-// other Report: they used to be exclusive views that hid the canvas
-// entirely (`canvas.hidden = true`) and showed a different full-screen DOM
-// panel instead; now they're tabs *inside the sidebar*, and the map just
-// renders unconditionally, every frame, regardless of which tab is
-// showing (see render(), above) — there's no "switching away" from it to
-// undo anymore, so a route gesture in progress on the map is never
-// force-cancelled by picking a different tab the way it used to be by
-// picking a different panel.
+// The tabs live inside the sidebar and the map renders every frame
+// whatever is showing (see render(), above), so a route gesture in
+// progress on the map is never cancelled by picking a tab.
 
 /**
  * Switch which sidebar tab is showing — refreshes whichever one just
@@ -676,15 +661,12 @@ viewGroups.forEach((group) => {
     trigger.setAttribute('aria-expanded', 'false');
   }
 
-  // Week six: the map-layers group (Demand/Competition) is a deliberate
-  // on/off picker now — Google Maps' own layers button works this way —
-  // so it opens and closes strictly on click, never on hover. The
-  // Competition airline filter keeps the original hover-opens-on-mouse
-  // behavior below, since it's a plain single-select list you're just
-  // browsing, not a set of toggles worth a deliberate open/close. Week
-  // eight's mapmode picker is the same deliberate-choice shape as the
-  // layers group, just single-select instead of independent toggles, so
-  // it gets the same click-only treatment.
+  // The map-layers group (Demand/Competition) is a deliberate on/off
+  // picker, as Google Maps' layers button is, so it opens and closes
+  // strictly on click, never on hover. The Competition airline filter
+  // opens on hover, since it's a plain single-select list you're just
+  // browsing. The mapmode and airports pickers are deliberate choices
+  // like the layers group, so they're click-only too.
   const isLayersPicker = group.dataset.group === 'maps' || group.dataset.group === 'mapmode' || group.dataset.group === 'airports';
 
   trigger.addEventListener('click', (event) => {
@@ -831,11 +813,9 @@ canvas.addEventListener('mousedown', (event) => {
   // clean state.
   hideMapMenu();
 
-  // M10's route-creation gesture (ui/routeBuilder.ts) gets first refusal
+  // The route-creation gesture (ui/routeBuilder.ts) gets first refusal
   // on any click on the map. Only once it says "not mine" does an
-  // ordinary click-and-drag start panning, exactly as before. The map is
-  // always live now (week six), so there's no "different panel" case to
-  // exempt this from anymore — every click on the canvas reaches here.
+  // ordinary click-and-drag start panning.
   if (handleRouteBuilderMouseDown(event, state)) {
     render();
     return;
@@ -850,7 +830,7 @@ canvas.addEventListener('mousedown', (event) => {
     return;
   }
 
-  // Week eight: second refusal — a click the route builder didn't want
+  // Second refusal: a click the route builder didn't want
   // (no plane selected) might still be "show me this airport" rather
   // than the start of a pan. See ui/mapMenu.ts's own comment for
   // why a selected tail always means the route builder owns the click.
@@ -866,10 +846,7 @@ canvas.addEventListener('mousedown', (event) => {
 });
 
 /**
- * One hover system for the whole map (week four — this used to be two:
- * the route builder's own PDEW tooltip, active only while armed, and a
- * separate Competition-mode-only operator tooltip that didn't exist
- * anywhere else). Priority order: if a route is currently armed,
+ * One hover system for the whole map. Priority order: if a route is currently armed,
  * handleRouteBuilderMouseMove() already shows its own PDEW/CAP/range
  * tooltip for the candidate destination — showing a second, competing
  * tooltip on top of that would just be clutter, so the general operator

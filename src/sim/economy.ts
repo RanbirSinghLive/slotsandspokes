@@ -63,23 +63,22 @@ export type DemandBreakdown = {
   recaptured: number;
 };
 
-// Deliberately crude for now, per WEEK-ONE.md: every flight pays the same
-// fraction of its seats regardless of day. Fare itself is no longer flat —
-// see `fare` below, week two's "Pricing" loop, set at the
-// market level rather than per leg (sim/state.ts's RouteSettings).
+// Deliberately crude: no flight sells more than this fraction of its
+// seats, whatever the day. (Fare is set per market, sim/state.ts's
+// RouteSettings.)
 // Exported so sim/marketSummary.ts can tell whether a market's `pax` figure is
 // pinned at this ceiling (seat-capped — more demand exists than the plane
 // can hold) or below it (demand-capped — raising fare will cost real pax).
 export const LOAD_FACTOR = 0.75;
 
 /**
- * Spill and recapture (week four, requested directly): a seat-capped
+ * Spill and recapture: a seat-capped
  * flight's overflow demand doesn't just vanish. Real airline revenue
  * management distinguishes "spill" (total overflow) from "recapture"
  * (the fraction of it the *same* airline gets back on one of its own
  * other flights, rather than losing it to a competitor or a traveler
  * giving up) — this is that fraction. Deliberately crude, same spirit
- * as `LOAD_FACTOR`/`AVG_FARE`: a flat rate, not fit to any real study,
+ * as `LOAD_FACTOR`: a flat rate, not fit to any real study,
  * picked to make recapture a real but partial rescue rather than either
  * "spill is always fully recovered" (too generous) or "recapture
  * doesn't exist". A loyalty scheme (sim/innovations.ts) raises it.
@@ -114,7 +113,7 @@ export function legCost(
 
 /**
  * The same three components of a leg's cost, itemized rather than summed —
- * week six's cost attribution (`SimState.todayCostByCategory`). `legCost()`
+ * the cost attribution (`SimState.todayCostByCategory`). `legCost()`
  * above is literally the sum of these three, so the total and the
  * breakdown can never disagree about what a flight cost: there's only one
  * formula, and the total is derived from the parts rather than computed
@@ -153,7 +152,7 @@ export function legCostBreakdown(
  * anything yet as far as the books are concerned.
  *
  * `marketDailyDemand` is how many people *actually* fly this market on an
- * average day right now — week six's stimulated figure from
+ * average day right now — the stimulated figure from
  * `sim/marketDemand.ts`'s `actualDailyDemand()`, not the gravity model's
  * potential. Passed in rather than looked up here so this stays a pure
  * function of its inputs, and so the caller decides whether it's reading
@@ -166,7 +165,7 @@ export function legCostBreakdown(
  * passengers, it just splits the same ones two ways. (Adding frequency
  * does grow the market, but over days, through stimulation — not
  * instantly within one flight's economics.) Of that per-flight slice, only
- * `bookingShare()` (`sim/choiceModel.ts`, week two's "connective piece")
+ * `bookingShare()` (`sim/choiceModel.ts`, the "connective piece")
  * actually books — some people, given `fare` and this market's
  * frequency, choose a competitor or not to travel at all rather than fly
  * you. `fare` feeds both the choice model's price term *and* revenue
@@ -195,9 +194,8 @@ const MAX_CONNECTING_PRICE_GAIN = 1.5;
  * How a route's fare scales the connecting passengers it gets
  * (sim/hubs.ts): its booking share at this fare over its share at the
  * going rate (sim/choiceModel.ts), so connecting passengers react to
- * price exactly as local ones do. Before this they ignored fares
- * entirely, and measured, at double the going rate they were what kept a
- * hub's planes full after local passengers had mostly gone to rivals.
+ * price exactly as local ones do; otherwise an over-priced hub's planes
+ * stayed full on connections after local passengers had gone to rivals.
  * Shared with the Plan hub planner (sim/hubPlanner.ts) so its estimates
  * see the same thing.
  */

@@ -30,8 +30,8 @@ import {
  * Planning and adding a rotation: the rules for what a new route may be,
  * and the one function that writes it into the schedule.
  *
- * This used to live in ui/routeBuilder.ts, next to the map gesture that
- * draws a route. It moved here because none of it needs the page, and the
+ * It lives in the sim rather than beside the map gesture that draws a
+ * route (ui/routeBuilder.ts) because none of it needs the page, and the
  * headless runner (src/headless/newGame.ts) has to open routes by exactly
  * the same rules a player does, or balance numbers from it would describe
  * a different game. The UI keeps only what is about the page: the gesture,
@@ -109,7 +109,7 @@ function rotationStartMinute(tail: string, state: SimState): number {
  * (findExactTimeCollision()). Auto-packing makes that collision likely
  * rather than rare — two aircraft based at the same airport, both opening
  * their day at 06:00 on the same market, would hit it every time — and
- * the player no longer authors departure times, so there is no "pick a
+ * the player doesn't author departure times, so there is no "pick a
  * different time" for them to do. Nudging resolves it quietly instead.
  * Gives up after MAX_COLLISION_NUDGES and returns the last attempt; the
  * fit and collision checks in planRotation() then report whatever is
@@ -257,7 +257,7 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
   }
 
   if (type) {
-    // Week three: a route beyond the selected plane's real range (see the
+    // A route beyond the selected plane's real range (see the
     // ring drawn in drawRoutePreview()) is flatly impossible, not just
     // inadvisable. Every leg of the chain gets checked, including the
     // closing one back to base — which is the leg a long final stop
@@ -270,12 +270,9 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
       if (distanceNm <= type.rangeNm) continue;
       const isClosingLeg = leg === lastLeg && leg.dest === base.iata;
       // Both messages name the leg as `origin → dest`, the direction it is
-      // actually flown. The closing leg used to read "${dest} is N nm from
-      // ${origin}", which put the *base* first for a leg flying toward it
-      // — and since that distance is symmetric, it looked exactly like the
-      // range was being measured from the base against a leg that never
-      // touches it. It wasn't; every leg is checked on its own. But the
-      // message was the only evidence the player had, so it was the bug.
+      // actually flown: naming the base first for a leg flying toward it
+      // reads as if range were measured from the base, when every leg is
+      // checked on its own.
       return fail(
         isClosingLeg
           ? `This rotation can't close: ${leg.origin} → ${base.iata} is ${Math.round(distanceNm)} nm, beyond the ${type.name}'s ${type.rangeNm} nm range. Add a stop on the way back to ${base.iata}.`
@@ -284,7 +281,7 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
       );
     }
 
-    // Week four: airport size constraints (RotationStop.maxAircraftType) are
+    // Airport size constraints (RotationStop.maxAircraftType) are
     // just as much a hard "no" as range — a real runway or gate limit,
     // not a matter of degree — so this gets the same block-and-explain
     // treatment. Checked at every airport the rotation touches.
@@ -294,7 +291,7 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
     }
   }
 
-  // Week seven: the fit check that replaces the Gantt. The rotation has to
+  // The fit check. The rotation has to
   // land back at base inside the usable day (06:00–22:00). When it doesn't,
   // the useful thing to say is whether the *base* has room even though this
   // tail doesn't — the pooled figure is what decides "another aircraft, or
@@ -399,14 +396,14 @@ export function applyRotation(
 ): { legIds: string[]; newMarkets: { origin: string; dest: string }[] } {
   const aircraft = state.aircraft.find((a) => a.tail === tail);
 
-  // Week seven, decision 2: an aircraft's base is explicit state, not
+  // An aircraft's base is explicit state, not
   // something inferred from its legs. An unbased airframe gets based
   // here by flying its first rotation from here — the closest thing the
   // game has to a "pick a home airport" step, and the only place a base
   // is set other than leasing a plane at an airport.
   if (aircraft && !aircraft.baseAirport) aircraft.baseAirport = plan.base.iata;
 
-  // Phase C removed positioning legs. A rotation ends where it began, so
+  // There are no positioning legs: a rotation ends where it began, so
   // a tail is always already at its base by the time it could fly
   // another one — the only tail that isn't is one taking its *first*
   // rotation, which is a plane left parked away from its base after its

@@ -13,13 +13,9 @@ import { recommendedFare } from './schedule';
 // data existed, so adding competitors changes nothing for a market that
 // doesn't have one.
 //
-// Week four (M14): competitor service used to be static, non-reactive
-// data (fixed schedules and fares, authored once, never adapting to
-// anything). `bookingShare()`/`trafficShare()` below now take a live
-// `competitorRoutes` list instead of reading a fixed import directly, so
-// they reflect `state.competitorRoutes` — which the competitor AI
-// (`sim/competitors.ts`) can grow over time — rather than only ever
-// seeing `data/competitors.json`'s seed routes.
+// `bookingShare()`/`trafficShare()` below take the live
+// `state.competitorRoutes`, since rivals open, grow, reprice and close
+// routes over time (sim/competitors.ts).
 
 function competitorsServingMarket(
   origin: string,
@@ -48,7 +44,7 @@ type Segment = {
 };
 
 // Weights and intercepts are hand-picked, crude constants in the same
-// spirit as `economy.ts`'s `LOAD_FACTOR`/`AVG_FARE` — not fit to any real
+// spirit as `economy.ts`'s `LOAD_FACTOR` — not fit to any real
 // survey, just picked to make each segment behave the way its real-world
 // counterpart is known to: business travel is price-insensitive but
 // frequency-hungry (a business traveler picks the airline with the most
@@ -85,10 +81,9 @@ const SEGMENTS: Segment[] = [
  * normal price and a $1,200 ticket to Ottawa is absurd, so what a traveler
  * reacts to is the fare *relative to the going rate for that trip*
  * (`recommendedFare()`, sim/schedule.ts), rescaled to this reference so
- * the segment weights below mean what they always did. Before this, the
- * price term used raw dollars, which was fine while every market was a
- * short hop (fares of $200 to $350) and wiped out nearly all bookings on
- * anything long: at $1,577 the leisure segment's utility was -21.
+ * the segment weights below keep their meaning at any distance. In raw
+ * dollars, a long route's fare would wipe out nearly all bookings: at
+ * $1,577 the leisure segment's utility would be -21.
  */
 const REFERENCE_FARE = 280;
 

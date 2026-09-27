@@ -17,7 +17,7 @@ export type Airport = {
   utcOffsetMinutes: number;
   population: number;
   /**
-   * Week four: the largest aircraft type (by `data/aircraft-types.json`'s
+   * The largest aircraft type (by `data/aircraft-types.json`'s
    * own code, e.g. `"REGIONAL"`) allowed to operate here — a real runway/
    * gate constraint some airports have (LaGuardia's perimeter/gate
    * rules), modeled the same crude "hard limit" way range
@@ -84,25 +84,16 @@ const LABEL_FILL = '#9aa3b8';
 const SERVED_LABEL_FILL = '#cdd3e0';
 const LABEL_FONT = '12px system-ui, sans-serif';
 
-// Week six, phase one of moving read-only spatial data out of the menus:
-// the Airports tab was a table of IATA codes describing *places*, which
-// is about as anti-map as data gets. Presence now reads straight off the
-// dots.
-//
-// Radius grows with daily departures on a log curve — the same
+// Presence reads straight off the dots: radius grows with daily departures on a log curve — the same
 // diminishing-returns shape the connectivity multiplier itself uses, so
 // what you see matches what you earn — and is capped so a mega-hub can't
 // swallow its neighbours.
 const MAX_PRESENCE_RADIUS_BONUS = 3.5;
 const PRESENCE_RADIUS_SCALE = 1.3;
 
-// The capacity ring (replaces the old slot ring, week eight deep-dive):
-// utilisation was the whole point of the week-seven pivot but had zero
-// presence on the map itself — a base's spare capacity only ever showed
-// up as a bar in the Fleet tab or text in the route-builder popover, both
-// of which need a click to reach. This puts the same number on the one
-// spot on the map where the decision it drives ("does this base need
-// another aircraft") actually lives: the base itself.
+// The capacity ring: a base's utilisation, on the one spot on the map
+// where the decision it drives ("does this base need another aircraft")
+// lives, the base itself, rather than behind a click.
 //
 // Same three-colour language as render/mapmodes.ts's route recolouring
 // (small local copy, not a shared import — ten lines isn't worth a new
@@ -427,7 +418,7 @@ function placeLabels(ctx: CanvasRenderingContext2D, labels: PendingLabel[], name
 // How close a click/hover needs to land to an airport's projected point
 // to count as hitting it — shared by every consumer that needs to hit-test
 // a screen point against the airport list (the route builder's arm/aim
-// gesture, week eight's click-for-detail), so the two can never disagree
+// gesture, the click-for-detail), so the two can never disagree
 // about how forgiving the target is.
 const HIT_RADIUS_PX = 14;
 
@@ -463,7 +454,7 @@ export function nearestAirportCandidate(screenX: number, screenY: number): Airpo
 /**
  * Which airport (if any) is under a screen point, within HIT_RADIUS_PX.
  * Originally lived in ui/routeBuilder.ts as a private helper; moved here
- * (week eight) once a second consumer needed the identical hit-test —
+ * once a second consumer needed the identical hit-test —
  * this is where "given a point, which airport" actually belongs, not in
  * the module that happens to have used it first. A thin wrapper around
  * nearestAirportCandidate() above, for the callers (the route builder's

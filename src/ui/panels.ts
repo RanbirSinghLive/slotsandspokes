@@ -14,9 +14,8 @@ import type { SimState } from '../sim/state';
 import { minuteOfDayToTimeString } from '../sim/clock';
 
 // Must match the --panel-width custom property's default value in
-// style.css — see the comment there. Week six: widened from 280 to fit a
-// tab bar and ledger-style content (Commercial, etc.) that used to get
-// the full canvas-width area to themselves.
+// style.css — see the comment there. Wide enough for the tab bar, the
+// cards and the inspector's tables.
 export const PANEL_WIDTH_PX = 420;
 
 const cashEl = document.querySelector<HTMLSpanElement>('#panel-cash')!;
@@ -163,14 +162,11 @@ export function updatePanel(state: SimState): void {
 export { minuteOfDayToTimeString };
 
 /**
- * Week seven, phase C: the schedule table is gone and this replaces it.
- *
- * The old table listed individual legs with an editable depart time and a
- * per-leg delete — which made sense while the player authored the
- * timeline. They no longer do: rotations are packed into the day
- * automatically, so a per-leg time field would be a control that lies, and
- * deleting one leg out of a rotation would strand the rest of it away from
- * base. The unit the player builds is the unit they remove.
+ * The rotations list: one row per rotation, never per leg. Rotations are
+ * packed into the day automatically, so a per-leg time field would be a
+ * control that lies, and deleting one leg out of a rotation would strand
+ * the rest of it away from base. The unit the player builds is the unit
+ * they remove.
  *
  * Rebuilt **only when the rotations actually change** — a per-frame
  * rebuild once broke the remove buttons outright (a click only fires if
@@ -259,8 +255,7 @@ export function removeRotation(rotation: Rotation, state: SimState): void {
  * somewhere its legs never depart from, an aircraft too large for an
  * airport it's booked into) and `utilisationProblems()` for what the
  * *budget* says (a tail asked to fly more than a day). One function so
- * every call site gets both — the two used to be one list, and phase C
- * splitting them made it easy to accidentally render only half.
+ * every call site gets both, never only half.
  */
 export function scheduleProblems(state: SimState): string[] {
   return [...validateSchedule(state.schedule, state.aircraft), ...utilisationProblems(state)];
