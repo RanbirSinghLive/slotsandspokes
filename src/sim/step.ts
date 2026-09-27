@@ -8,6 +8,7 @@ import { connectingDemandOnMarket } from './hubs';
 import { rollTotalDelayMinutes, isOnTimeArrival } from './delays';
 import { rollCompetitorRouteOpenings, rollCompetitorFrequencyGrowth, rollRivalEntry, rollDailyRivalFares } from './competitors';
 import { rollDailyFuelPrice } from './fuel';
+import { networkOverheadPerDay } from './overhead';
 import { rollDailyMarketDemand, actualDailyDemand } from './marketDemand';
 import { revealReach } from './reach';
 import { checkMissions } from './missions';
@@ -184,7 +185,7 @@ export function step(state: SimState): void {
     state.todayMargin = 0;
     // Week six's cost attribution — reset in lockstep with todayCost
     // above, since these five are exactly that number split up.
-    state.todayCostByCategory = { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0, training: 0, slots: 0, maintenance: 0 };
+    state.todayCostByCategory = { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0, training: 0, slots: 0, maintenance: 0, overhead: 0 };
     // Per-market breakdown of todayRevenue/todayCost, reset in lockstep
     // with them for the same reason as todayCostByCategory above.
     state.todayRevenueByMarket = {};
@@ -228,6 +229,13 @@ export function step(state: SimState): void {
     state.todayCost += totalLeaseCost;
     state.todayCostByCategory.lease += totalLeaseCost;
     state.todayMargin -= totalLeaseCost;
+
+    // Network overhead (sim/overhead.ts): grows with the square of the fleet.
+    const overhead = networkOverheadPerDay(state);
+    state.cash -= overhead;
+    state.todayCost += overhead;
+    state.todayCostByCategory.overhead += overhead;
+    state.todayMargin -= overhead;
 
     // Slot fees (sim/slots.ts): the same flat-per-day shape as the lease.
     // Anything the schedule needs and doesn't hold is taken first (a

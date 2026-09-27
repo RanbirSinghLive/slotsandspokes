@@ -73,7 +73,7 @@ export function moneyOnTable(state: SimState, a: string, b: string): MoneyOnTabl
   const cost = (state.costHistoryByMarket[key] ?? []).slice(-7);
   const ownMargin = revenue.length > 0 ? revenue.reduce((sum, r, i) => sum + r - cost[i], 0) / revenue.length : 0;
   const fixed = routeFixedCosts(state, a, b);
-  const fullyCostedMargin = ownMargin - fixed.slotsPerDay - fixed.leasePerDay;
+  const fullyCostedMargin = ownMargin - fixed.slotsPerDay - fixed.leasePerDay - fixed.overheadPerDay;
 
   // Legs count both directions; frequency here is flights each way.
   const flightsEachWay = legs.length / 2;

@@ -210,7 +210,7 @@ function describeEconomics(state: SimState, a: string, b: string): { text: strin
   const summary = summarizeMarket(a, b, state, settings);
   const load = summary.totalSeats > 0 ? summary.pax / summary.totalSeats : 0;
   const costs = routeFixedCosts(state, a, b);
-  const fullMargin = summary.margin - costs.slotsPerDay - costs.leasePerDay;
+  const fullMargin = summary.margin - costs.slotsPerDay - costs.leasePerDay - costs.overheadPerDay;
   const slotParts = costs.slots.filter((slot) => slot.perDay >= 0.5).map((slot) => `${slot.iata} ${money(slot.perDay)}`);
   const leaseParts = costs.lease.map(
     (entry) => `${entry.className} ${money(entry.perDay)} (${Math.round(entry.share * 100)}% of the class's flying, which uses ${Math.round(entry.poolUse * 100)}% of its day)`,
@@ -224,7 +224,8 @@ function describeEconomics(state: SimState, a: string, b: string): { text: strin
     fixed:
       `After its share of fixed costs: ${signedMoney(fullMargin)}/day. ` +
       `Slots ${money(costs.slotsPerDay)}${slotParts.length > 0 ? ` (${slotParts.join(', ')})` : ''} · ` +
-      `lease ${money(costs.leasePerDay)}${leaseParts.length > 0 ? `: ${leaseParts.join('; ')}` : ''}.`,
+      `lease ${money(costs.leasePerDay)}${leaseParts.length > 0 ? `: ${leaseParts.join('; ')}` : ''} · ` +
+      `network overhead ${money(costs.overheadPerDay)}.`,
     fullyLosing: fullMargin < 0,
   };
 }
@@ -246,8 +247,9 @@ function buildFareAndMarketing(state: SimState, a: string, b: string, changed: (
   const economics = line('');
   const fixedCosts = line('');
   fixedCosts.title =
-    'Slot fees and leases are paid airline-wide each midnight. Slot fees are shared by each airport\'s movements; ' +
-    'a class\'s leases by the minutes its planes fly, so flying a class less puts more of its lease on each route.';
+    'Slot fees, leases and network overhead are paid airline-wide each midnight. Slot fees are shared by each airport\'s movements; ' +
+    'a class\'s leases by the minutes its planes fly, so flying a class less puts more of its lease on each route; ' +
+    'overhead, which grows with the square of the fleet, by each route\'s share of all flying.';
   const redrawEconomics = () => {
     const { text, losing, fixed, fullyLosing } = describeEconomics(state, a, b);
     economics.textContent = text;

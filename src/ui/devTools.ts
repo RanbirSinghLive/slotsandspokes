@@ -80,7 +80,9 @@ const COST_ROWS: CostRowSpec[] = [
       s.todayCostByCategory.crew +
       s.todayCostByCategory.training +
       s.todayCostByCategory.slots +
-      s.todayCostByCategory.maintenance,
+      s.todayCostByCategory.maintenance +
+      // Absent in a save made before overhead existed, until its first rollover.
+      (s.todayCostByCategory.overhead ?? 0),
   },
   {
     label: 'Expedited repairs',
@@ -105,6 +107,12 @@ const COST_ROWS: CostRowSpec[] = [
     depth: 1,
     hint: 'Daily cost of every leased airframe. Owned aircraft contribute nothing here.',
     value: (s) => s.todayCostByCategory.lease,
+  },
+  {
+    label: 'Network overhead',
+    depth: 1,
+    hint: 'Head office, systems and crew bases: grows with the square of the fleet (sim/overhead.ts).',
+    value: (s) => s.todayCostByCategory.overhead ?? 0,
   },
   // Both of these were missing from the tree — crew salaries since week
   // six, and training since week eight — so "Fixed" was quietly reporting

@@ -1,12 +1,13 @@
 import { classByCode } from './aircraftClasses';
 import { marketKey } from './schedule';
+import { networkOverheadPerDay } from './overhead';
 import { slotFeesPerDayAt } from './slots';
 import type { SimState } from './state';
 import { scheduledLegMinutes, USABLE_DAY_MINUTES } from './utilisation';
 
 /**
- * The costs a route causes that aren't charged to it: slot fees and plane
- * leases. Both are paid airline-wide at midnight (sim/step.ts), so a
+ * The costs a route causes that aren't charged to it: slot fees, plane
+ * leases and network overhead. All are paid airline-wide at midnight (sim/step.ts), so a
  * route's own margin (its P&L history, sim/marketSummary.ts's day) never
  * includes them, and a route at a slot-controlled airport, or one flown by
  * half-idle planes, can look healthy while it loses money. This spreads
@@ -21,6 +22,8 @@ import { scheduledLegMinutes, USABLE_DAY_MINUTES } from './utilisation';
  *   flies (block plus turn), and a route carries its minutes' share. So
  *   flying a class less puts more of its lease on each route still
  *   flying it, and a spare plane shows up as a heavier burden on the rest.
+ * - **Network overhead** (sim/overhead.ts) is shared by every route's
+ *   share of all the airline's flying minutes.
  */
 
 export type SlotShare = { iata: string; share: number; perDay: number };
@@ -41,6 +44,8 @@ export type RouteFixedCosts = {
   slotsPerDay: number;
   lease: LeaseShare[];
   leasePerDay: number;
+  /** This route's share of the airline's network overhead. */
+  overheadPerDay: number;
 };
 
 export function routeFixedCosts(state: SimState, a: string, b: string): RouteFixedCosts {
@@ -73,10 +78,14 @@ export function routeFixedCosts(state: SimState, a: string, b: string): RouteFix
     };
   });
 
+  const routeMinutes = onRoute.reduce((sum, leg) => sum + scheduledLegMinutes(state, leg), 0);
+  const allMinutes = state.schedule.reduce((sum, leg) => sum + scheduledLegMinutes(state, leg), 0);
+
   return {
     slots,
     slotsPerDay: slots.reduce((sum, slot) => sum + slot.perDay, 0),
     lease,
     leasePerDay: lease.reduce((sum, entry) => sum + entry.perDay, 0),
+    overheadPerDay: allMinutes > 0 ? (routeMinutes / allMinutes) * networkOverheadPerDay(state) : 0,
   };
 }

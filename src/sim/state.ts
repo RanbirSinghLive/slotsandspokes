@@ -612,6 +612,8 @@ export type SimState = {
     slots: number;
     /** Paying to expedite AOG repairs (sim/aog.ts). */
     maintenance: number;
+    /** Network overhead (sim/overhead.ts), which grows with the square of the fleet. */
+    overhead: number;
   };
 };
 
@@ -723,7 +725,7 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     completedMissionIds: [],
     activeTarget: null,
     lastTargetResult: null,
-    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0, training: 0, slots: 0, maintenance: 0 },
+    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, marketing: 0, lease: 0, crew: 0, training: 0, slots: 0, maintenance: 0, overhead: 0 },
   };
   revealReach(state);
   openMarket(state);

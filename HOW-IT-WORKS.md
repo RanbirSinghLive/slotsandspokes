@@ -341,6 +341,15 @@ to real all-in costs: at the old level a single Propeller ran at a
 40–50% margin and a careful airline made $58M–$104M in a year. Rivals
 are costed from the same numbers.
 
+**Network overhead** (`sim/overhead.ts`): $75 × planes² a day, charged
+at rollover (`todayCostByCategory.overhead`). One plane pays $75, five
+$1,875, eighteen $24,300, so each plane adds more than the last: it
+barely touches a small start and bites a big airline, which a uniform
+cost couldn't do without hurting a one-plane start more. The ring's
+lease hint says what the next plane adds; the route view shares it
+across routes by their flying minutes (`sim/routeCosts.ts`). Rivals
+don't pay it.
+
 `fare` and `marketingSpend` come from `state.routeSettings[marketKey(origin, dest)]`
 (sim/state.ts's `RouteSettings`), not from the leg — see "Pricing" and
 "The Commercial panel," below, for why fare lives at the market level.
@@ -1327,7 +1336,8 @@ marketing**:
 - **A day at these settings**: passengers, how full, share, revenue,
   cost, margin, and whether **seats or demand is the limit**.
 - **After its share of fixed costs** (`sim/routeCosts.ts`): that margin
-  less the route's share of slot fees and plane leases. Both are paid
+  less the route's share of slot fees, plane leases and network overhead
+  (shared by the route's share of all flying minutes). Both are paid
   airline-wide at midnight, so the route's own margin and 7-day bars
   never include them. Slot fees at each end are shared by the route's
   share of the player's movements at that airport. Leases are pooled by

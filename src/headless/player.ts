@@ -4,6 +4,7 @@ import { dayIndex } from '../sim/clock';
 import { potentialDailyDemand } from '../sim/demand';
 import { greatCircleDistanceNm } from '../sim/geo';
 import { cashNeededToLease } from '../sim/leasing';
+import { overheadAddedByNextPlane } from '../sim/overhead';
 import * as actions from '../sim/playerActions';
 import { forecastStance } from '../sim/fareForecast';
 import { setFareStance } from '../sim/pricing';
@@ -609,8 +610,9 @@ function leaseWhenFull(state: SimState, memory: Memory): string[] {
     const option = options.find((o) => o.code === cls.code);
     if (!option?.listing || option.disabledReason) continue;
     const price = option.listing.leasePricePerDay;
-    // What the airline already makes a day has to carry the new lease on its own.
-    if (averageMargin < price) continue;
+    // What the airline already makes a day has to carry the new lease, and
+    // the network overhead it adds (sim/overhead.ts), on its own.
+    if (averageMargin < price + overheadAddedByNextPlane(state)) continue;
     if (state.cash < cashNeededToLease(price) + LEASE_SAFETY_DAYS * price) continue;
     const market = bestMarketFor(state, home, cls.code, memory);
     if (!market || market.score < worthFlying(cls.code)) continue;

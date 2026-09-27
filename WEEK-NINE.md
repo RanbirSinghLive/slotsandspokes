@@ -576,6 +576,60 @@ seeds:
 
 ---
 
+## Thread 9: network overhead (the owner's call after thread 8)
+
+The owner chose scale-dependent costs over pent-up demand. What's left
+of the mid-game's richness comes from size, and a uniform cost can't
+reach it without hurting a one-plane start more.
+
+**Status: done** at $75 × planes² a day (`sim/overhead.ts`): $75 for one
+plane, $1,875 for five, $24,300 for eighteen. Charged at rollover as its
+own cost category (`todayCostByCategory.overhead`, a Dev tab row).
+Tried first at $150 × planes²: careful airlines in the core went bust
+late in the year (YUL 2/6, YYZ 3/6) as overhead outgrew what rivals
+left them, and the headless player has no habit for shedding planes
+when overhead, rather than idleness, makes them unprofitable.
+
+Measured (six seeds, day 365):
+
+| Persona | After thread 8 | With overhead |
+|---|---|---|
+| steady median, core | $22M–$40M | $10M–$27M, no busts (YUL $11.5M, YYZ $10.1M, BOS $25.1M, PHL $26.6M) |
+| steady, LHR | $37.5M | $21.2M |
+| steady, YHZ | 2 busts in 6 | 4 busts in 6 (the hard home, thread 10) |
+| sitter median | $3M–$7M | $2.4M–$6.9M (YUL: 2 busts, both on day 350) |
+| starter | core survives | unchanged ($75 a day for one plane) |
+| reckless | all bust | all bust |
+
+Steady is now in or near the $5M–$20M band, and about 3–5× the sitter.
+
+- **Overhead grows with the square of the fleet:** head office, systems,
+  crew bases, and coordination that gets harder as the network grows
+  (every plane and route has to be planned against every other), so the
+  marginal plane costs more the bigger the airline.
+- **Legible:** the route view's fixed costs include each route's share
+  (by minutes flown, like leases), and leasing a plane says what it adds
+  to overhead.
+- Rivals don't pay it: they're small start-ups, capped at 20 routes.
+- The headless player counts the added overhead in its lease decision.
+
+Measured with `npm run balance`: steady's median should come down into
+the $5M–$20M band, the sitter less, and single-plane starts barely at
+all.
+
+## Thread 10: home difficulty (the owner's call after thread 8)
+
+Halifax can't cross the early valley at realistic costs, and the owner
+wants harder starts for veteran players rather than a fix. So homes get
+a difficulty in the home picker, worked out from what the sim can see
+(chiefly how much demand lies within a Propeller's reach of home) and
+calibrated against the balance report's starter results: Montréal,
+Toronto, Boston and London standard; Philadelphia harder; Halifax
+hardest. Drafted after thread 9, since overhead moves the results it's
+calibrated against.
+
+---
+
 ## Carried forward from week eight
 
 Still live, and still named by this plan:

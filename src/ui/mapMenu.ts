@@ -13,6 +13,7 @@ import { armRouteBuilderAt, describeSlotQuotes } from './routeBuilder';
 import { hideCompetitionTooltip } from './competitionTooltip';
 import { hideRadial, showRadial, updateRadial, type RadialAction } from './radial';
 import { demandAgainstSeats } from '../sim/marketSize';
+import { overheadAddedByNextPlane } from '../sim/overhead';
 import * as ops from './routeActions';
 import { planeIconInner } from './planeIcons';
 import { AIRCRAFT_CLASSES } from '../sim/aircraftClasses';
@@ -156,6 +157,8 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
     label: option.listing
       ? `Lease a ${option.name} (${option.seats} seats, ${option.listing.ageYears} yrs old, ` +
         `${Math.max(0, USEFUL_LIFE_YEARS - option.listing.ageYears)} yrs of life left) for ${money(option.listing.leasePricePerDay)}/day` +
+        // Network overhead grows with the square of the fleet (sim/overhead.ts), so say what this plane adds.
+        `, plus ${money(overheadAddedByNextPlane(state))}/day in network overhead` +
         (option.listed > 1 ? ` · ${option.listed - 1} more listed` : ' · the last one listed')
       : `Lease a ${option.name}`,
     // Each class has its own silhouette (ui/planeIcons.ts), so the four
