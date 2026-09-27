@@ -756,10 +756,9 @@ so a route can be drawn while either is showing.
 6. `airports.ts` — a dot + label per airport, **drawn exactly once,
    always**, regardless of which overlays are on. Labels are placed
    greedily without overlap, most important first (home, then busiest
-   for you, then biggest city). Home and the airports the airline flies
-   to try the code and name ("DUS Düsseldorf"), as does every airport
-   zoomed in past 1.8× the fit; where a name doesn't fit, the code alone;
-   where nothing fits, no label at that zoom. So the map thins itself by
+   for you, then biggest city). A label is the three-letter code only,
+   to keep the map clear; the name is in the inspector's airport view.
+   Where a code doesn't fit, no label at that zoom. So the map thins itself by
    importance as it zooms out. The overlays never draw airports
    themselves, so layering them never doubles a dot.
 7. `weather.ts`'s `drawWeatherEffects()` — flash/particle effects at
