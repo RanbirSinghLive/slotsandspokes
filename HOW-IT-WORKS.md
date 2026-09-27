@@ -1625,6 +1625,32 @@ Actual demand is a property of the **market**, not of any airline —
 everyone flying it grows it, everyone serving it draws from the same
 pool. Stimulation is a public good.
 
+**The ladder** (`src/sim/ladder.ts`, the Goals view in
+`src/ui/inspector/goals.ts`): tiers of milestones, each naming an edge or
+moat. A tier is climbed when enough of its milestones are met, and only
+after the one below it. Checked once a day at rollover; a milestone met
+stays met.
+
+| Tier | Needed | Milestones | Opens |
+|---|---|---|---|
+| Start-up | 4 of 4 | fly your first route; a route that makes money for a week after its share of fixed costs; a route 72% full over a week; hold a starved city no rival flies to, on a route flown 30 days | Regional aircraft |
+| Regional carrier | 3 of 4 | serve 8 airports; connect 150 a day through one airport; put a Regional into service; make money every day for a week of a shock | Narrowbody; online booking |
+| Network airline | 3 of 5 | fly 60% of the movements at a busy airport; four routes 4+ a day each way; lifetime NPS 18 over 1,000 flights; planes based at two airports; put a Narrowbody into service | Widebody; loyalty scheme, winglet retrofits |
+| International | 2 of 2 | a route to another continent; connect 750 a day through one airport | codeshare-style feed |
+| Global | 1 of 1 | round the world: a loop of your routes that goes all the way round the globe, reachable from home | — |
+
+What each tier opens is shown but not yet in force: the lessor still
+lists bigger classes by date, and innovations don't exist yet (WEEK-TEN.md,
+thread 2's slices 2 and 3). Round the world is judged by walking the
+network from home and giving each airport an unwrapped longitude; an
+airport reached again a whole turn away closes a loop round the globe.
+The Network view's Goals row says the tier and how many of its
+milestones are met, and opens the view; the ticker announces each
+milestone and each new tier. Thresholds were set from headless runs: a
+full plane shows about 76% load (the 75% load-factor ceiling), a careful
+airline from Montréal connects about 150 a day by day 60, and lifetime
+NPS ends a careful first year at 14–17.
+
 **Shocks** (`src/sim/shocks.ts`): announced events that make the world
 less steady for a while, so growth at any cost is dangerous and a thin
 cash cushion gets punished. At most one at a time, none before day 60,

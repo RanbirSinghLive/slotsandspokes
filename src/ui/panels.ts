@@ -6,6 +6,7 @@ import { classByCode } from '../sim/aircraftClasses';
 import { planeIconElement } from './planeIcons';
 import { updatePnlHistoryPanel } from './pnlHistory';
 import { formatLoadFactor, networkLoadFactor } from '../sim/loadFactor';
+import { goalsSummary } from './inspector/goals';
 import type { SimState } from '../sim/state';
 import { minuteOfDayToTimeString } from '../sim/clock';
 
@@ -19,6 +20,9 @@ const cashEl = document.querySelector<HTMLSpanElement>('#panel-cash')!;
 const otpEl = document.querySelector<HTMLSpanElement>('#panel-otp')!;
 const completionEl = document.querySelector<HTMLSpanElement>('#panel-completion')!;
 const loadEl = document.querySelector<HTMLSpanElement>('#panel-load')!;
+const goalsEl = document.querySelector<HTMLButtonElement>('#panel-goals')!;
+// Opens Network › Goals (ui/inspector/goals.ts).
+goalsEl.addEventListener('click', () => select({ kind: 'goals' }));
 const revenueEl = document.querySelector<HTMLSpanElement>('#panel-revenue')!;
 const costEl = document.querySelector<HTMLSpanElement>('#panel-cost')!;
 const marginEl = document.querySelector<HTMLSpanElement>('#panel-margin')!;
@@ -70,6 +74,8 @@ export function updatePanel(state: SimState): void {
       : `${Math.round(((state.flightsScheduledTotal - state.flightsCancelledTotal) / state.flightsScheduledTotal) * 100)}%`;
   // Load factor (sim/loadFactor.ts): how full the airline flies, last 7 days.
   loadEl.textContent = formatLoadFactor(networkLoadFactor(state));
+  // Where the airline stands on the ladder (sim/ladder.ts).
+  goalsEl.textContent = `${goalsSummary(state)} ›`;
   revenueEl.textContent = formatMoney(state.todayRevenue);
   costEl.textContent = formatMoney(state.todayCost);
   marginEl.textContent = formatMoney(state.todayMargin);

@@ -114,8 +114,31 @@ The spine of the week.
 - **Headless:** the steady player must pursue milestones, or it never
   leases a Regional and every balance number changes (thread 5).
 
+**Slice 1 as built:** `sim/ladder.ts` (five tiers, 17 milestones,
+checked daily at rollover, `SimState.milestonesMet`, optional in the
+save), the Goals view (Network › Goals) and a Goals row in the Network
+view, and ticker lines for each milestone and new tier. Calibrated from
+headless runs:
+- **80% full was impossible:** planes sell at most 75% of seats, so a
+  full route shows about 76%. "Standing room only" is 72%.
+- **Connecting passengers run large:** 25 and 100 a day were met in the
+  first days (London 155 on day 1). The hubs are 150 and 750.
+- **Lifetime NPS ends a careful first year at 14–17,** so "a good name"
+  is 18 over 1,000 flights, until thread 3 gives NPS a trailing window.
+- **"First in" was met on day 0** (every city starts starved): it now
+  needs the route held for 30 days.
+- **The first tiers came too fast** (Start-up by day 8, which would open
+  Regionals far earlier than today's day 40): Start-up now needs all
+  four milestones, and the next two tiers each ask for putting the class
+  just opened into service.
+
+With that, a steady airline from Montréal reaches Start-up's end between
+days 60 and 87 (Boston and London about day 29), and a regional carrier
+once it flies a Regional. Timing gets tuned properly in slice 2, once
+unlocks are real and the headless player pursues them.
+
 Slices: (1) the ladder model and the Goals view, with unlocks still
-cosmetic; (2) class unlocks replace debut days, with the headless player
+cosmetic (done); (2) class unlocks replace debut days, with the headless player
 pursuing them; (3) the other unlocks (younger airframes, second base).
 
 ## Thread 3: quality as NPS

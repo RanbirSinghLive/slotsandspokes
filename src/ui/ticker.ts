@@ -1,3 +1,4 @@
+import { LADDER, milestoneById, tiersClimbed } from '../sim/ladder';
 import { activeShock, describeShock, shockEndedLine, type Shock } from '../sim/shocks';
 import { loadMissions } from '../sim/missions';
 import { moneyOnTable, RIVAL_MARGIN_SHARE } from '../sim/attractiveness';
@@ -139,6 +140,39 @@ function entryReason(state: SimState, a: string, b: string): string {
 
 function money(amount: number): string {
   return `$${Math.round(amount).toLocaleString()}`;
+}
+
+/** Milestones met, and tiers climbed, as of the last poll (sim/ladder.ts). */
+let seenMilestones: Set<string> | null = null;
+let seenTiers = 0;
+
+/**
+ * The ladder: each milestone as it's met, and each new tier with what it
+ * opens. The first poll only records where the airline stands, so loading
+ * a save doesn't announce it all again.
+ */
+function pollLadderEvents(state: SimState): void {
+  const met = Object.keys(state.milestonesMet ?? {});
+  const climbed = tiersClimbed(state);
+  if (seenMilestones === null) {
+    seenMilestones = new Set(met);
+    seenTiers = climbed;
+    return;
+  }
+  for (const id of met) {
+    if (seenMilestones.has(id)) continue;
+    seenMilestones.add(id);
+    const milestone = milestoneById(id);
+    if (milestone) pushEvent(state.simMinute, `Milestone: ${milestone.name}. ${milestone.description}`);
+  }
+  for (; seenTiers < climbed; seenTiers++) {
+    const next = LADDER[seenTiers + 1];
+    const opened = LADDER[seenTiers].opens;
+    pushEvent(
+      state.simMinute,
+      (next ? `You're a ${next.name.toLowerCase()} airline now.` : 'Every tier climbed.') + (opened.length > 0 ? ` Opened: ${opened.join('; ')}.` : ''),
+    );
+  }
 }
 
 /** The shock running at the last poll, by its start day and kind, or null. */
@@ -384,6 +418,7 @@ function pollPositionEvents(state: SimState): void {
 }
 
 export function updateTicker(state: SimState): void {
+  pollLadderEvents(state);
   pollShockEvents(state);
   pollPositionEvents(state);
   pollAogEvents(state);

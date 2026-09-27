@@ -294,6 +294,8 @@ export type SimState = {
   loadHistoryByMarket?: Record<string, { passengers: number[]; seats: number[] }>;
   /** The same for the whole network, so a route since closed still counts for the days it flew. */
   loadHistory?: { passengers: number[]; seats: number[] };
+  /** The day each milestone on the ladder was met, by id (sim/ladder.ts). Optional: older saves have met none. */
+  milestonesMet?: Record<string, number>;
   /** The shock running now, or the last one until another starts (sim/shocks.ts's activeShock() says which). Optional: older saves have none. */
   shock?: Shock | null;
   /**

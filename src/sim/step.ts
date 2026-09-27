@@ -28,6 +28,7 @@ import { recordDailyCashHistory } from './forecast';
 import { recordDailyPnlHistory } from './pnlHistory';
 import { recordDailyOnTimeHistory } from './routeOtp';
 import { recordDailyLoadHistory, recordFlightLoad } from './loadFactor';
+import { checkMilestones } from './ladder';
 import { acquireNeededSlots, settleSlotsForDay } from './slots';
 import { ensureRivalFleets, rollDailyMarket } from './market';
 import { dayIndex, minuteOfDay as homeMinuteOfDay } from './clock';
@@ -177,6 +178,8 @@ export function step(state: SimState): void {
     recordDailyOnTimeHistory(state);
     recordDailyLoadHistory(state);
     state.todayLoadByMarket = {};
+    // The ladder (sim/ladder.ts), judged on the histories just recorded.
+    checkMilestones(state);
 
     state.completedToday = [];
     state.cancelledToday = [];

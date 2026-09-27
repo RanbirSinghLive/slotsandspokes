@@ -19,6 +19,7 @@ export type Selection =
   | { kind: 'route'; a: string; b: string }
   | { kind: 'rivals' }
   | { kind: 'fleet' }
+  | { kind: 'goals' }
   /** One of the player's aircraft, by tail. */
   | { kind: 'aircraft'; tail: string }
   /** A rival airline, by its two-letter code. */

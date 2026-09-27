@@ -1,3 +1,4 @@
+import { buildGoalsView } from './goals';
 import type { SimState } from '../../sim/state';
 import * as ops from '../routeActions';
 import { back, getSelection, NETWORK, replaceSelection, select, type Selection } from '../selection';
@@ -68,6 +69,10 @@ function stillExists(state: SimState, selection: Selection): boolean {
 function trail(state: SimState, selection: Selection): { label: string; target: Selection }[] {
   const steps: { label: string; target: Selection }[] = [{ label: 'Network', target: NETWORK }];
   if (selection.kind === 'network') return steps;
+  if (selection.kind === 'goals') {
+    steps.push({ label: 'Goals', target: selection });
+    return steps;
+  }
   if (selection.kind === 'fleet' || selection.kind === 'aircraft') {
     steps.push({ label: 'Fleet', target: { kind: 'fleet' } });
     if (selection.kind === 'aircraft') steps.push({ label: selection.tail, target: selection });
@@ -163,6 +168,8 @@ export function renderInspector(state: SimState): void {
     bodyEl.replaceChildren(buildAircraftView(state, selection.tail, rebuild));
   } else if (selection.kind === 'fleet') {
     bodyEl.replaceChildren(buildFleetView(state));
+  } else if (selection.kind === 'goals') {
+    bodyEl.replaceChildren(buildGoalsView(state));
   } else if (selection.kind === 'rival') {
     bodyEl.replaceChildren(buildRivalView(state, selection.code));
   } else if (selection.kind === 'rivals') {

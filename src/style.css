@@ -2846,6 +2846,20 @@ button.inspector-crumb:hover {
   color: #ffb347;
 }
 
+.inspector-line.is-good {
+  color: #7ed6a8;
+}
+
+/* The Goals view (ui/inspector/goals.ts): a met milestone reads as done,
+   and tiers still ahead sit back so the current one stands out. */
+.goal-row.is-met {
+  color: #7ed6a8;
+}
+
+.goal-ahead {
+  color: #6b7694;
+}
+
 .inspector-pools {
   margin-bottom: 10px;
 }
