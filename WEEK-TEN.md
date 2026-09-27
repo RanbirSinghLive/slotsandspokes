@@ -105,7 +105,7 @@ The spine of the week.
 
 - **Unlocks replace debut days** (`sim/market.ts`'s `ClassRhythm`): a
   class's listings start arriving when its milestone is met, not on a
-  date. Open question: do rivals still get bigger classes by date?
+  date. Rivals still get bigger classes by date (decided in slice 2).
 - **Legible:** a Goals view in the side panel (Network › Goals) showing
   the current tier, each milestone's progress in words and numbers, and
   what the tier unlocks; the ticker announces each milestone and unlock;
@@ -142,9 +142,30 @@ state field, ticker line and cards) are removed; they were switched off,
 so headless output is identical. The Missions tab keeps only service
 targets, for thread 3 to decide.
 
+**Slice 2 as built:** every class is stocked on day 0; the player may
+lease one only once its tier is climbed (`classOpen()`), rivals only
+from its old debut day (`rivalDay`). The lease fan and lessor strip say
+why a class is locked, and a pop-up announces each class as it opens.
+The steady player needed no new policy: it leases the biggest class it
+may, so it climbs as a side effect. Balance, steady player, median cash
+at day 365 (before → after):
+
+| | YUL | YYZ | BOS | PHL | YHZ | LHR |
+|---|---|---|---|---|---|---|
+| Before | $6.5M | $10.4M | $17.3M | $18.4M | $81k | $19.4M |
+| After | $9.6M | $18.1M | $10.7M | $27.6M | $218k | $64.2M |
+| Busts | 1/6 (was 0) | 0/6 (was 1) | 1/6 (was 0) | 0/6 | 3/6 (was 2) | 0/6 |
+
+Fast climbers are paid for it: Regionals open between days 30 and 66 in
+the core (the old date was 40), and London flies Widebodies from about
+day 65 rather than 180, so its best seed makes $120M. The new busts are
+the steady player over-expanding on props with thin cash (Boston seed 3
+goes from 6 to 10 props at $400k on day 48), not the ladder: thread 5.
+Halifax still reaches Start-up's end only near day 191.
+
 Slices: (1) the ladder model and the Goals view, with unlocks still
-cosmetic (done); (2) class unlocks replace debut days, with the headless player
-pursuing them; (3) the other unlocks (younger airframes, second base).
+cosmetic (done); (2) class unlocks replace debut days (done); (3) the
+other unlocks (innovations, younger airframes, second base).
 
 ## Thread 3: quality as NPS
 

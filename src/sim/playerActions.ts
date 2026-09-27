@@ -3,7 +3,8 @@ import { AIRCRAFT_CLASSES, classByCode, classRank, pluralClassName } from './air
 import { applyHubStyleChange, planHubStyleChange } from './hubs';
 import { HUB_STYLES, type HubStyle } from './hubStyle';
 import { cashNeededToLease, LEASE_RESERVE_DAYS, leaseAircraft, loadLeaseRates } from './leasing';
-import { daysUntilNextListing, hasDebuted, listingsOf, returnBlockedReason, returnFee, returnLease, takeListing, type MarketListing } from './market';
+import { daysUntilNextListing, listingsOf, returnBlockedReason, returnFee, returnLease, takeListing, type MarketListing } from './market';
+import { classOpen, tierThatOpens } from './ladder';
 import { actualDailyDemand, currentPotentialDemand } from './marketDemand';
 import { revealReach } from './reach';
 import { applyRotation, candidateTailsAt, planRotation, type RotationPlan, type RotationStop } from './rotations';
@@ -414,8 +415,10 @@ export function planeOptions(state: SimState, iata: string): PlaneOption[] {
     let disabledReason: string | undefined;
     if (!isAircraftTypeAllowedAt(iata, rate.typeCode)) {
       disabledReason = `Too large to operate at ${iata}.`;
-    } else if (!hasDebuted(state, rate.typeCode)) {
-      disabledReason = `No ${pluralClassName(cls.name)} on the market yet: the first arrives in ${days(daysUntilNextListing(state, rate.typeCode))}.`;
+    } else if (!classOpen(state, rate.typeCode)) {
+      // Earned on the ladder (sim/ladder.ts), not on a date.
+      const opener = tierThatOpens(rate.typeCode);
+      disabledReason = `${pluralClassName(cls.name)} open when you become a ${opener?.name.toLowerCase() ?? 'bigger'} airline: see Goals.`;
     } else if (!listing) {
       disabledReason = `No ${cls.name} on the market. The next arrives in ${days(daysUntilNextListing(state, rate.typeCode))}, first come first served.`;
     } else if (state.cash < cashNeededToLease(listing.leasePricePerDay)) {

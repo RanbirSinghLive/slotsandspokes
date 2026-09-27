@@ -8,8 +8,7 @@ import type { Aircraft, SimState } from './state';
  * first served. It's the game's main pacing gate — how fast any airline,
  * the player or a rival, can grow is how fast airframes come to market.
  *
- * Each class has its own rhythm:
- *   - a debut day, before which none exist at all (bigger classes later);
+ * Every class is stocked from the start, each with its own rhythm:
  *   - a refill interval: one new airframe arrives every so many days;
  *   - a cap on how many can sit listed at once. An arrival that finds the
  *     shelf full is lost, not queued, so leaving planes on the market
@@ -21,6 +20,11 @@ import type { Aircraft, SimState } from './state';
  *
  * Rivals draw from the same shelf when they grow (see rivalSecuresCapacity()),
  * so leasing the last Regional before Trillium Air does is a real move.
+ *
+ * Who may take a class differs. The player earns each bigger class on the
+ * ladder (sim/ladder.ts's classOpen(): Regionals as a regional carrier and
+ * so on), not on a date. Rivals take a class from its `rivalDay`, as the
+ * world moving on its own, whatever the player has done.
  */
 
 export type MarketListing = {
@@ -38,17 +42,16 @@ export type MarketState = {
   nextListingId: number;
 };
 
-type ClassRhythm = { debutDay: number; initial: number; intervalDays: number; cap: number };
+type ClassRhythm = { rivalDay: number; initial: number; intervalDays: number; cap: number };
 
 export const MARKET_RHYTHM: Record<string, ClassRhythm> = {
-  PROP: { debutDay: 0, initial: 3, intervalDays: 4, cap: 3 },
-  // Every airline starts on Propellers: the first Regional reaches the
-  // market on day 40, and the bigger classes months after, so each step
-  // up in size is something the player works toward (and races rivals
-  // for) rather than an early buy.
-  REGIONAL: { debutDay: 40, initial: 1, intervalDays: 10, cap: 2 },
-  NARROWBODY: { debutDay: 80, initial: 1, intervalDays: 20, cap: 2 },
-  WIDEBODY: { debutDay: 180, initial: 1, intervalDays: 35, cap: 1 },
+  PROP: { rivalDay: 0, initial: 3, intervalDays: 4, cap: 3 },
+  // Every airline starts on Propellers. Rivals move up to Regionals from
+  // day 40 and the bigger classes months after; the player moves up by
+  // climbing the ladder instead.
+  REGIONAL: { rivalDay: 40, initial: 1, intervalDays: 10, cap: 2 },
+  NARROWBODY: { rivalDay: 80, initial: 1, intervalDays: 20, cap: 2 },
+  WIDEBODY: { rivalDay: 180, initial: 1, intervalDays: 35, cap: 1 },
 };
 
 /** Listed airframes are this many years old, give or take: 15 to 24. */
@@ -65,12 +68,14 @@ const RIVAL_WIDEBODY_FLIGHTS = 14;
 const RIVAL_CLASS_LADDER = ['WIDEBODY', 'NARROWBODY', 'REGIONAL', 'PROP'];
 
 /**
- * Whether a rival may take this class's next listing. Never the last
- * Propeller: it is the class every airline starts and first grows with,
- * and rivals act before the player each day, so without this they could
- * empty the only shelf the player can grow from.
+ * Whether a rival may take this class's next listing: only from the
+ * class's `rivalDay`, and never the last Propeller. That is the class
+ * every airline starts and first grows with, and rivals act before the
+ * player each day, so without this they could empty the only shelf the
+ * player can grow from.
  */
 function rivalMayTake(state: SimState, typeCode: string): boolean {
+  if (dayIndex(state) < (MARKET_RHYTHM[typeCode]?.rivalDay ?? 0)) return false;
   return typeCode !== 'PROP' || listingsOf(state, typeCode).length > 1;
 }
 
@@ -86,28 +91,22 @@ export function createMarket(seed: number): [MarketState, number] {
   const market: MarketState = { listings: [], nextArrivalDay: {}, nextListingId: 1 };
   let next = seed;
   for (const [code, rhythm] of Object.entries(MARKET_RHYTHM)) {
-    if (rhythm.debutDay === 0) for (let i = 0; i < rhythm.initial; i++) next = addListing(market, code, 0, next);
-    market.nextArrivalDay[code] = rhythm.debutDay === 0 ? rhythm.intervalDays : rhythm.debutDay;
+    for (let i = 0; i < rhythm.initial; i++) next = addListing(market, code, 0, next);
+    market.nextArrivalDay[code] = rhythm.intervalDays;
   }
   return [market, next];
 }
 
 /**
  * The daily delivery, from step.ts's rollover (after the rivals have
- * grown, so a new airframe sits listed for a full day): a class debuts with its
- * first listings on its debut day, then one airframe arrives each
- * interval — lost if the shelf is already full.
+ * grown, so a new airframe sits listed for a full day): one airframe of a
+ * class arrives each interval — lost if the shelf is already full.
  */
 export function rollDailyMarket(state: SimState, day: number): void {
   const market = state.market;
   for (const [code, rhythm] of Object.entries(MARKET_RHYTHM)) {
     if (day < market.nextArrivalDay[code]) continue;
-    const debut = day === rhythm.debutDay && rhythm.debutDay > 0;
-    const arrivals = debut ? rhythm.initial : 1;
-    for (let i = 0; i < arrivals; i++) {
-      if (listingsOf(state, code).length >= rhythm.cap) break;
-      state.rngSeed = addListing(market, code, day, state.rngSeed);
-    }
+    if (listingsOf(state, code).length < rhythm.cap) state.rngSeed = addListing(market, code, day, state.rngSeed);
     market.nextArrivalDay[code] = day + rhythm.intervalDays;
   }
 }
@@ -121,11 +120,6 @@ export function listingsOf(state: SimState, typeCode: string): MarketListing[] {
 export function daysUntilNextListing(state: SimState, typeCode: string): number {
   const today = dayIndex(state);
   return Math.max(1, state.market.nextArrivalDay[typeCode] - today);
-}
-
-/** Whether this class has reached the market yet. */
-export function hasDebuted(state: SimState, typeCode: string): boolean {
-  return dayIndex(state) >= (MARKET_RHYTHM[typeCode]?.debutDay ?? 0);
 }
 
 /** Take the first listing of this class off the market, or null when there isn't one. */

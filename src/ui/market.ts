@@ -1,5 +1,6 @@
 import { AIRCRAFT_CLASSES, pluralClassName } from '../sim/aircraftClasses';
-import { daysUntilNextListing, hasDebuted, listingsOf, MARKET_RHYTHM } from '../sim/market';
+import { classOpen, tierThatOpens } from '../sim/ladder';
+import { daysUntilNextListing, listingsOf } from '../sim/market';
 import type { SimState } from '../sim/state';
 
 /**
@@ -9,9 +10,10 @@ import type { SimState } from '../sim/state';
  *   - The Lessor strip in the Fleet tab: per class, what's listed and when
  *     the next one arrives, so a player can plan around the timers
  *     instead of checking the lease fan over and over.
- *   - A pop-up the first time a class reaches the market — the moment a
- *     whole new kind of airline becomes possible. Everyday arrivals and
- *     rival leases go in the ticker (ui/ticker.ts) instead.
+ *   - A pop-up the moment the ladder opens a class to the player
+ *     (sim/ladder.ts) — a whole new kind of airline becomes possible.
+ *     Everyday arrivals and rival leases go in the ticker (ui/ticker.ts)
+ *     instead.
  */
 
 const stripEl = document.querySelector<HTMLElement>('#market-strip')!;
@@ -31,8 +33,9 @@ function renderStrip(state: SimState): void {
     const listings = listingsOf(state, cls.code);
     const next = daysUntilNextListing(state, cls.code);
     const when = `${next} day${next === 1 ? '' : 's'}`;
-    const status = !hasDebuted(state, cls.code)
-      ? `first arrives in ${when}`
+    const opener = tierThatOpens(cls.code);
+    const status = !classOpen(state, cls.code)
+      ? `opens when you're a ${opener?.name.toLowerCase() ?? 'bigger'} airline · ${listings.length} listed`
       : listings.length === 0
         ? `none listed · next in ${when}`
         : `${listings.length} listed (${listings.map((l) => `${l.ageYears} yrs`).join(', ')}) · next in ${when}`;
@@ -56,37 +59,34 @@ function renderStrip(state: SimState): void {
   );
 }
 
-// Classes already on the market when this page loaded aren't announced —
-// only a debut that happens while the player is watching. A class counts
-// as debuted once its first airframe is actually listed, not merely once
-// its debut day has begun: the day starts a moment before that morning's
-// delivery is made, and announcing in that gap described an empty shelf.
+// Classes already open when this page loaded aren't announced, only one
+// the ladder opens while the player is watching.
 let announced: Set<string> | null = null;
 
-function pollDebuts(state: SimState): void {
-  const debuted = Object.keys(MARKET_RHYTHM).filter(
-    (code) => hasDebuted(state, code) && (MARKET_RHYTHM[code].debutDay === 0 || listingsOf(state, code).length > 0),
-  );
+function pollUnlocks(state: SimState): void {
+  const open = AIRCRAFT_CLASSES.filter((cls) => classOpen(state, cls.code)).map((cls) => cls.code);
   if (announced === null) {
-    announced = new Set(debuted);
+    announced = new Set(open);
     return;
   }
-  for (const code of debuted) {
+  for (const code of open) {
     if (announced.has(code)) continue;
     announced.add(code);
     const cls = AIRCRAFT_CLASSES.find((c) => c.code === code);
     if (!cls) continue;
     const listed = listingsOf(state, code);
-    debutTitle.textContent = `${pluralClassName(cls.name)} are now on the market`;
+    debutTitle.textContent = `${pluralClassName(cls.name)} are yours to lease`;
     debutBody.textContent =
-      `The lessor has its first ${listed.length === 1 ? cls.name : pluralClassName(cls.name)} (${cls.seats} seats) listed` +
-      (listed[0] ? `, from $${listed[0].leasePricePerDay.toLocaleString()}/day` : '') +
-      `. First come, first served: rivals lease from the same shelf. Tap an airport, then Plane, to lease one.`;
+      `Your airline has grown into ${pluralClassName(cls.name)} (${cls.seats} seats). ` +
+      (listed.length > 0
+        ? `The lessor has ${listed.length} listed, from $${listed[0].leasePricePerDay.toLocaleString()}/day.`
+        : 'None is listed right now; the next arrives soon.') +
+      ' First come, first served: rivals lease from the same shelf. Tap an airport, then Plane, to lease one.';
     debutModal.hidden = false;
   }
 }
 
 export function updateMarket(state: SimState): void {
   renderStrip(state);
-  pollDebuts(state);
+  pollUnlocks(state);
 }

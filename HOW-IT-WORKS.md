@@ -1484,14 +1484,26 @@ costs. It arrives immediately, parked and based where it was leased.
 
 **One shared lessor.** The player and every rival lease from the same
 market, first come first served — it is the game's main pacing gate.
-Each class has a rhythm (`MARKET_RHYTHM`):
+Each class has a rhythm (`MARKET_RHYTHM`). Every class is on the shelf
+from day 0, but **the player may lease a bigger class only once the
+ladder opens it** (`classOpen()` in `sim/ladder.ts`): Regionals on
+finishing Start-up, Narrowbodies on finishing Regional carrier,
+Widebodies on finishing Network airline. Rivals have no ladder, so they
+keep a date (`rivalDay`) before which they may not take that class:
 
-| Class | Debuts | Then one every | Max listed |
-|---|---|---|---|
-| Propeller | day 0 (3 listed) | 4 days | 3 |
-| Regional | day 40 | 10 days | 2 |
-| Narrowbody | day 80 | 20 days | 2 |
-| Widebody | day 180 | 35 days | 1 |
+| Class | Stocked at day 0 | Rivals from | Then one every | Max listed |
+|---|---|---|---|---|
+| Propeller | 3 | day 0 | 4 days | 3 |
+| Regional | 1 | day 40 | 10 days | 2 |
+| Narrowbody | 1 | day 80 | 20 days | 2 |
+| Widebody | 1 | day 180 | 35 days | 1 |
+
+A player who climbs fast gets a bigger class before rivals may touch it,
+and a shelf nobody has picked over: an early edge, like any other, that
+lasts until the rivals' date arrives. A locked class says why in the
+lease fan and the Fleet tab's lessor strip ("Regionals open when you
+become a start-up airline: see Goals"), and a pop-up announces each
+class the moment it opens.
 
 An arrival that finds the shelf full is lost, not queued. When a rival
 grows (`rivalSecuresCapacity()`, three daily flights per airframe) it
@@ -1639,9 +1651,9 @@ stays met.
 | International | 2 of 2 | a route to another continent; connect 750 a day through one airport | codeshare-style feed |
 | Global | 1 of 1 | round the world: a loop of your routes that goes all the way round the globe, reachable from home | — |
 
-What each tier opens is shown but not yet in force: the lessor still
-lists bigger classes by date, and innovations don't exist yet (WEEK-TEN.md,
-thread 2's slices 2 and 3). Round the world is judged by walking the
+The aircraft classes a tier opens are in force (see the aircraft market
+above); innovations and the second base don't exist yet (WEEK-TEN.md,
+thread 2's slice 3). Round the world is judged by walking the
 network from home and giving each airport an unwrapped longitude; an
 airport reached again a whole turn away closes a loop round the globe.
 The Network view's Goals row says the tier and how many of its

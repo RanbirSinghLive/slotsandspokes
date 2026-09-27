@@ -46,8 +46,10 @@ export type Tier = {
   /** How many of this tier's milestones reach the next tier. */
   needed: number;
   milestones: Milestone[];
-  /** What reaching the next tier opens, in words (WEEK-TEN.md, thread 2's slices 2 and 3 make these real). */
+  /** What climbing this tier opens, in words. */
   opens: string[];
+  /** Aircraft classes climbing this tier lets the player lease (sim/market.ts). */
+  opensClasses?: string[];
 };
 
 type Located = { iata: string; lat: number; lon: number };
@@ -166,6 +168,7 @@ export const LADDER: Tier[] = [
     name: 'Start-up',
     needed: 4,
     opens: ['Regional aircraft on the lessor'],
+    opensClasses: ['REGIONAL'],
     milestones: [
       {
         id: 'first-route',
@@ -219,6 +222,7 @@ export const LADDER: Tier[] = [
     name: 'Regional carrier',
     needed: 3,
     opens: ['Narrowbody aircraft on the lessor', 'Innovation: online booking'],
+    opensClasses: ['NARROWBODY'],
     milestones: [
       {
         id: 'eight-airports',
@@ -254,6 +258,7 @@ export const LADDER: Tier[] = [
     name: 'Network airline',
     needed: 3,
     opens: ['Widebody aircraft on the lessor', 'Innovations: loyalty scheme, winglet retrofits'],
+    opensClasses: ['WIDEBODY'],
     milestones: [
       {
         id: 'slot-control',
@@ -394,6 +399,21 @@ export function tiersClimbed(state: SimState): number {
 /** The tier the airline is working on, or null once it has climbed them all. */
 export function currentTier(state: SimState): Tier | null {
   return LADDER[tiersClimbed(state)] ?? null;
+}
+
+/**
+ * Whether the player may lease this class: the Propeller always, each
+ * bigger class once the tier that opens it is climbed.
+ */
+export function classOpen(state: SimState, typeCode: string): boolean {
+  const opener = LADDER.findIndex((tier) => tier.opensClasses?.includes(typeCode));
+  return opener === -1 || tiersClimbed(state) > opener;
+}
+
+/** The tier the player becomes on climbing the one that opens this class ("Regional carrier" for Regionals), or null. */
+export function tierThatOpens(typeCode: string): Tier | null {
+  const opener = LADDER.findIndex((tier) => tier.opensClasses?.includes(typeCode));
+  return opener === -1 ? null : (LADDER[opener + 1] ?? null);
 }
 
 /** Everything the climbed tiers have opened, in order. */
