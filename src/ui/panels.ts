@@ -5,6 +5,7 @@ import { select } from './selection';
 import { classByCode } from '../sim/aircraftClasses';
 import { planeIconElement } from './planeIcons';
 import { updatePnlHistoryPanel } from './pnlHistory';
+import { formatLoadFactor, networkLoadFactor } from '../sim/loadFactor';
 import type { SimState } from '../sim/state';
 import { minuteOfDayToTimeString } from '../sim/clock';
 
@@ -17,6 +18,7 @@ export const PANEL_WIDTH_PX = 420;
 const cashEl = document.querySelector<HTMLSpanElement>('#panel-cash')!;
 const otpEl = document.querySelector<HTMLSpanElement>('#panel-otp')!;
 const completionEl = document.querySelector<HTMLSpanElement>('#panel-completion')!;
+const loadEl = document.querySelector<HTMLSpanElement>('#panel-load')!;
 const revenueEl = document.querySelector<HTMLSpanElement>('#panel-revenue')!;
 const costEl = document.querySelector<HTMLSpanElement>('#panel-cost')!;
 const marginEl = document.querySelector<HTMLSpanElement>('#panel-margin')!;
@@ -66,6 +68,8 @@ export function updatePanel(state: SimState): void {
     state.flightsScheduledTotal === 0
       ? '—'
       : `${Math.round(((state.flightsScheduledTotal - state.flightsCancelledTotal) / state.flightsScheduledTotal) * 100)}%`;
+  // Load factor (sim/loadFactor.ts): how full the airline flies, last 7 days.
+  loadEl.textContent = formatLoadFactor(networkLoadFactor(state));
   revenueEl.textContent = formatMoney(state.todayRevenue);
   costEl.textContent = formatMoney(state.todayCost);
   marginEl.textContent = formatMoney(state.todayMargin);

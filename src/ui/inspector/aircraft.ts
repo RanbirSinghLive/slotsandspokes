@@ -2,6 +2,7 @@ import { classByCode } from '../../sim/aircraftClasses';
 import { aogFor, daysUntilReturn } from '../../sim/aog';
 import { projectRestOfDay } from '../../sim/cascade';
 import { minuteOfDay, minuteOfDayToTimeString } from '../../sim/clock';
+import { formatLoadFactor, marketLoadFactor } from '../../sim/loadFactor';
 import { ageDelayParameters, type DelayBreakdown } from '../../sim/delays';
 import type { SimState } from '../../sim/state';
 import { aircraftUtilisation, rotationsForTail } from '../../sim/utilisation';
@@ -73,11 +74,17 @@ function whereNow(state: SimState, tail: string): string {
   return aircraft.atAirport ? `On the ground at ${aircraft.atAirport}` : 'Not yet delivered';
 }
 
-/** Today's flown legs for a plane: how many, and how many on time. */
-function todayOnTime(state: SimState, tail: string): { flown: number; onTime: number } {
+/** Today's flown legs for a plane: how many, how many on time, and how full they flew. */
+function todayOnTime(state: SimState, tail: string): { flown: number; onTime: number; loadFactor: number | null } {
   const results = state.todayLegResults ?? {};
   const legs = state.schedule.filter((leg) => leg.tail === tail && results[leg.legId]);
-  return { flown: legs.length, onTime: legs.filter((leg) => results[leg.legId].onTime).length };
+  const passengers = legs.reduce((sum, leg) => sum + results[leg.legId].passengers, 0);
+  const seats = legs.reduce((sum, leg) => sum + (results[leg.legId].seats ?? 0), 0);
+  return {
+    flown: legs.length,
+    onTime: legs.filter((leg) => results[leg.legId].onTime).length,
+    loadFactor: seats > 0 ? passengers / seats : null,
+  };
 }
 
 /** A button that opens a plane's view: every tail in the panel is one. */
@@ -107,7 +114,7 @@ export function buildFleetView(state: SimState): HTMLElement {
   list.className = 'inspector-rows';
   for (const aircraft of state.aircraft) {
     const use = aircraftUtilisation(state, aircraft.tail);
-    const { flown, onTime } = todayOnTime(state, aircraft.tail);
+    const { flown, onTime, loadFactor } = todayOnTime(state, aircraft.tail);
     const row = document.createElement('button');
     row.type = 'button';
     row.className = 'inspector-row';
@@ -118,6 +125,7 @@ export function buildFleetView(state: SimState): HTMLElement {
     detail.textContent =
       `${aircraft.baseAirport ?? 'no base'} · ${Math.round(use.share * 100)}% of day` +
       (flown > 0 ? ` · ${onTime}/${flown} on time today` : '') +
+      (loadFactor !== null ? ` · ${Math.round(loadFactor * 100)}% full` : '') +
       (aogFor(state, aircraft.tail) ? ' · AOG' : '');
     if (aogFor(state, aircraft.tail) || use.share > 1) detail.classList.add('is-over');
     row.append(name, detail);
@@ -180,7 +188,9 @@ export function buildAircraftView(state: SimState, tail: string, changed: () => 
       name.textContent = rotation.airports.join(' → ');
       const detail = document.createElement('span');
       detail.className = 'inspector-row-detail';
-      detail.textContent = `${minuteOfDayToTimeString(rotation.departMinute)}–${minuteOfDayToTimeString(rotation.arriveMinute)}`;
+      const load = marketLoadFactor(state, rotation.airports[0], rotation.airports[1]);
+      detail.textContent =
+        `${minuteOfDayToTimeString(rotation.departMinute)}–${minuteOfDayToTimeString(rotation.arriveMinute)} · route ${formatLoadFactor(load)} full`;
       row.append(name, detail);
       // A rotation's first leg is its route: open that route's view.
       row.addEventListener('click', () => selectRoute(state, rotation.airports[0], rotation.airports[1]));
@@ -224,9 +234,10 @@ function buildDay(state: SimState, tail: string): HTMLElement {
     const plan = projected.get(leg.legId);
     if (result) {
       const causes = describeCauses(result.delayByCause);
+      const full = result.seats ? ` (${Math.round((result.passengers / result.seats) * 100)}% full)` : '';
       detail.textContent =
         (result.onTime ? 'on time' : `${result.arriveLateMinutes} min late${causes ? ` (${causes})` : ''}`) +
-        ` · ${result.passengers} pax, ${money(result.margin)}`;
+        ` · ${result.passengers} pax${full}, ${money(result.margin)}`;
       if (!result.onTime) detail.classList.add('is-warn');
     } else if (flight?.legId === leg.legId) {
       const late = flight.arriveMinute - flight.scheduledArriveMinute;

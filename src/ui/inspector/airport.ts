@@ -3,6 +3,7 @@ import { daysUntilReturn, expediteCost, expediteRepair } from '../../sim/aog';
 import { congestionParameters } from '../../sim/delays';
 import { connectingPassengersThrough } from '../../sim/hubs';
 import { planHub } from '../../sim/hubPlanner';
+import { formatLoadFactor, marketLoadFactor } from '../../sim/loadFactor';
 import { airportDemandSize } from '../../sim/marketSize';
 import { describeServiceLevel, hungerAt } from '../../sim/serviceLevel';
 import { HUB_STYLES, hubStyleAt } from '../../sim/hubStyle';
@@ -231,7 +232,9 @@ function marketRows(state: SimState, iata: string): HTMLElement {
     name.textContent = `${iata} – ${other}`;
     const detail = document.createElement('span');
     detail.className = 'inspector-row-detail';
-    detail.textContent = `${flights} flight${flights === 1 ? '' : 's'}/day` + (lastMargin === null ? '' : ` · ${pnlMoney(lastMargin)} yesterday`);
+    const load = marketLoadFactor(state, iata, other);
+    detail.textContent =
+      `${flights} flight${flights === 1 ? '' : 's'}/day · ${formatLoadFactor(load)} full` + (lastMargin === null ? '' : ` · ${pnlMoney(lastMargin)} yesterday`);
     if (lastMargin !== null && lastMargin < 0) detail.classList.add('is-over');
     row.append(name, detail);
     row.addEventListener('click', () => select({ kind: 'route', a: iata, b: other }));

@@ -3,6 +3,7 @@ import { rivalYieldFactor } from '../../sim/pressure';
 import { policyFare, setFareStance, setHandFare, setMarketingSpend } from '../../sim/pricing';
 import { demandAgainstSeats, marketSize } from '../../sim/marketSize';
 import { summarizeMarket } from '../../sim/marketSummary';
+import { formatLoadFactor, marketLoadFactor } from '../../sim/loadFactor';
 import { moneyOnTable } from '../../sim/attractiveness';
 import { rivalResponseChance } from '../../sim/rivalResponse';
 import { routeFixedCosts } from '../../sim/routeCosts';
@@ -78,8 +79,13 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
 
   const fill = demandAgainstSeats(state, a, b, readout.legs, readout.seatsPerFlight);
   const short = fill.short;
+  // Load factor (sim/loadFactor.ts), the route's headline number: how full
+  // its planes flew over the last week, from its own landings.
+  const load = marketLoadFactor(state, a, b);
   const presence = line(
-    `${summary.rotations.length} flight${summary.rotations.length === 1 ? '' : 's'}/day · ${summary.byClass.map((c) => `${c.name} x${c.count}`).join(', ')}`,
+    `${summary.rotations.length} flight${summary.rotations.length === 1 ? '' : 's'}/day · ${summary.byClass.map((c) => `${c.name} x${c.count}`).join(', ')}` +
+      ` · load factor ${formatLoadFactor(load)}` +
+      (load.factor === null ? '' : ` (${load.passengers.toLocaleString()} passengers in ${load.seats.toLocaleString()} seats, last 7 days)`),
   );
   presence.classList.toggle('is-over', short);
   root.append(presence);
@@ -89,10 +95,13 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   // almost no demand, however big the city pair is: demand is built by
   // flying it, over weeks (sim/marketDemand.ts). Saying so is what stops a
   // Huge market from reading as "add ten flights".
+  // Once the route has flown, its load factor above says how full it is;
+  // the forecast in words is only for a route with no record yet.
+  const fillWords = load.factor === null ? `, ${fill.words}` : '';
   root.append(
     line(
-      `${marketSize(state, a, b)} market · ${readout.seatsPerFlight} seats a flight, ${fill.words}.` +
-        (short ? ' Add a flight or a bigger plane.' : '') +
+      `${marketSize(state, a, b)} market · ${readout.seatsPerFlight} seats a flight${fillWords}.` +
+        (short ? ' More people want it than the seats hold: add a flight or a bigger plane.' : '') +
         (fill.thin ? ' It grows as you fly it: extra flights fly emptier for now.' : ''),
     ),
   );

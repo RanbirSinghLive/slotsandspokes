@@ -645,6 +645,36 @@ when the script ran: re-run it after a change to costs, fares or demand.
 
 ---
 
+## Thread 11: load factor everywhere (asked for after thread 10)
+
+Load factor (passengers carried over seats flown) as a top-line number:
+the Network view's headline stats, each route's view, every list that
+groups routes (an airport's markets, a plane's rotations and its day's
+flights), and the flight hover. Recorded like on-time performance:
+each landing adds its passengers and seats to its market's day, and each
+finished day goes into a 30-day history per market; shown over the last
+7 days. A flight's passengers are only known once it lands, so the
+hover shows its route's recent load factor. Optional in the save.
+
+**Status: done.** `sim/loadFactor.ts`; the Network view's headline row,
+the route view's first line, an airport's markets, a plane's rotations,
+day and the Fleet list, the On-time table's Load column, and the flight
+hover. Checked in the preview after running two days: the headline read
+41%, then 68%; a route "load factor 68% (204 passengers in 300 seats,
+last 7 days)"; a plane's flights "16 pax (64% full)". Once a route has a
+load factor its view drops the forecast fill words ("about half full
+for now"), which contradicted it: they're from local demand, while the
+load factor counts connecting passengers too.
+
+## Thread 12: which airports the map shows (asked for after thread 10)
+
+A toggle beside the map's existing ones: All airports you know, only
+yours, or yours and your rivals'. What's clickable matches what's drawn
+(CLAUDE.md), so the filter is applied to the list handed to the
+renderers and the hit-testing alike. Home is always shown.
+
+---
+
 ## Carried forward from week eight
 
 Still live, and still named by this plan:

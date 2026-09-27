@@ -29,6 +29,7 @@ import { applyDailyReputationChange, REPUTATION_FLOOR } from './reputation';
 import { recordDailyCashHistory } from './forecast';
 import { recordDailyPnlHistory } from './pnlHistory';
 import { recordDailyOnTimeHistory } from './routeOtp';
+import { recordDailyLoadHistory, recordFlightLoad } from './loadFactor';
 import { acquireNeededSlots, settleSlotsForDay } from './slots';
 import { ensureRivalFleets, rollDailyMarket } from './market';
 import { dayIndex, minuteOfDay as homeMinuteOfDay } from './clock';
@@ -176,6 +177,8 @@ export function step(state: SimState): void {
     // still hold the day that just ended, one line above where they reset.
     recordDailyPnlHistory(state);
     recordDailyOnTimeHistory(state);
+    recordDailyLoadHistory(state);
+    state.todayLoadByMarket = {};
 
     state.completedToday = [];
     state.cancelledToday = [];
@@ -491,6 +494,7 @@ export function step(state: SimState): void {
     const aircraft = state.aircraft.find((a) => a.tail === flight.tail);
     // What this flight carried and made, kept for today's leg results below.
     let flightPassengers = 0;
+    let flightSeats = 0;
     let flightMargin = 0;
     if (aircraft) {
       aircraft.status = 'ground';
@@ -523,7 +527,9 @@ export function step(state: SimState): void {
           );
           state.spilloverByMarket[key] = spilloverAvailable + result.spilloverDelta;
           flightPassengers = result.pax;
+          flightSeats = type.seats;
           flightMargin = result.margin;
+          recordFlightLoad(state, key, result.pax, type.seats);
           state.cash += result.margin;
           state.todayRevenue += result.revenue;
           state.todayCost += result.cost;
@@ -573,6 +579,7 @@ export function step(state: SimState): void {
       onTime,
       delayByCause: flight.delayByCause,
       passengers: flightPassengers,
+      seats: flightSeats,
       margin: flightMargin,
     };
 

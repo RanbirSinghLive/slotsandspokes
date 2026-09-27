@@ -1621,6 +1621,19 @@ Actual demand is a property of the **market**, not of any airline —
 everyone flying it grows it, everyone serving it draws from the same
 pool. Stimulation is a public good.
 
+**Load factor** (`src/sim/loadFactor.ts`): passengers carried over
+seats flown, over the last 7 finished days. Each landing adds its
+passengers and seats to its market's day (`todayLoadByMarket`), and each
+rollover copies the day into a 30-day history per market and for the
+whole network (so a route since closed still counts for the days it
+flew). It's the headline under Completion in the Network view, and it
+shows in each route's view ("load factor 68% (204 passengers in 300
+seats, last 7 days)"), an airport's market list, a plane's rotations
+(its route's) and its day (each flight's own), the Fleet list (today's),
+the On-time table, and the flight hover (the route's, since a flight's
+passengers are settled when it lands). Once a route has a load factor,
+its view drops the forecast "about half full for now" words.
+
 **Markets in words** (`src/sim/marketSize.ts`). The game never prints a
 market's potential or today's demand as a number. A city pair is Tiny,
 Small, Medium, Large or Huge by its potential riders a day both ways

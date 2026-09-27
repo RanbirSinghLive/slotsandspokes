@@ -1,3 +1,4 @@
+import { formatLoadFactor, marketLoadFactor } from '../sim/loadFactor';
 import type { SimState } from '../sim/state';
 import { selectRoute } from './selection';
 
@@ -117,7 +118,10 @@ export function updateOnTimePanel(state: SimState): void {
     const cls = onTimePctClass(pct);
     if (cls) pctCell.classList.add(cls);
 
-    row.append(marketCell, arrivedCell, onTimeCell, pctCell);
+    const loadCell = document.createElement('td');
+    loadCell.textContent = formatLoadFactor(marketLoadFactor(state, origin, dest));
+
+    row.append(marketCell, arrivedCell, onTimeCell, pctCell, loadCell);
     marketRowsBody.appendChild(row);
   }
 

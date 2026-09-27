@@ -77,6 +77,8 @@ export type LegResult = {
   /** The delay rolled for it, by cause (sim/delays.ts). */
   delayByCause: DelayBreakdown;
   passengers: number;
+  /** Seats the plane had, for the flight's load factor. Optional: results from before it was kept have none. */
+  seats?: number;
   margin: number;
 };
 
@@ -290,6 +292,16 @@ export type SimState = {
    * judged on.
    */
   onTimeHistoryByMarket: Record<string, { arrived: number[]; onTime: number[]; cancelled: number[] }>;
+  /**
+   * Today's passengers and seats flown per market (sim/loadFactor.ts),
+   * reset at rollover once copied into the histories below. Optional:
+   * saves from before load factor was kept start empty.
+   */
+  todayLoadByMarket?: Record<string, { passengers: number; seats: number }>;
+  /** Each finished day's passengers and seats flown per market, oldest first, capped at PNL_HISTORY_MAX_DAYS. */
+  loadHistoryByMarket?: Record<string, { passengers: number[]; seats: number[] }>;
+  /** The same for the whole network, so a route since closed still counts for the days it flew. */
+  loadHistory?: { passengers: number[]; seats: number[] };
   /**
    * Week five's second HUD quality signal (see sim/nps.ts and
    * WEEK-FIVE.md's "Reputation" design): the running sum of every revenue
