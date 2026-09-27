@@ -133,8 +133,8 @@ export type ShockDescription = {
   onRoute: (a: string, b: string) => string | null;
 };
 
-function days(count: number): string {
-  return `${count} day${count === 1 ? '' : 's'}`;
+function moreDays(count: number): string {
+  return `${count} more day${count === 1 ? '' : 's'}`;
 }
 
 /**
@@ -144,7 +144,7 @@ function days(count: number): string {
 export function describeShock(state: SimState): ShockDescription | null {
   const shock = activeShock(state);
   if (!shock) return null;
-  const left = `for about ${days(shock.endDay - dayIndex(state))} more`;
+  const left = `for about ${moreDays(shock.endDay - dayIndex(state))}`;
   const key = `shock:${shock.kind}:${shock.startDay}`;
   const percent = Math.round(shock.magnitude * 100);
   if (shock.kind === 'fuel') {
