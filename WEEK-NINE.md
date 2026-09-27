@@ -673,6 +673,13 @@ yours, or yours and your rivals'. What's clickable matches what's drawn
 (CLAUDE.md), so the filter is applied to the list handed to the
 renderers and the hit-testing alike. Home is always shown.
 
+**Status: done.** A pin-shaped menu beside the map's layers and mapmode
+buttons: All airports, Only yours, Yours and rivals' (`ui/airportFilter.ts`).
+`main.ts` hands `visibleAirports()` to `setKnownAirports()`, so drawing,
+clicking and the route builder all follow it (with Only yours, a route
+to a new airport needs All first). On a 60-day steady YUL game: 52, 18
+and 20 airports. It's a view preference, not saved.
+
 ---
 
 ## Carried forward from week eight

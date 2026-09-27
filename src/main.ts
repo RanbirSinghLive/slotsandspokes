@@ -21,6 +21,7 @@ import { showCompetitionTooltip, hideCompetitionTooltip } from './ui/competition
 import { createNewGameState, type SimState } from './sim/state';
 import { chooseHome, homeOptions } from './sim/homes';
 import { showHomePicker } from './ui/homePicker';
+import { setAirportFilter, visibleAirports, type AirportFilter } from './ui/airportFilter';
 import { step } from './sim/step';
 import { updatePanel, renderScheduleWarnings, scheduleProblems, PANEL_WIDTH_PX } from './ui/panels';
 import {
@@ -334,7 +335,8 @@ function render(nowMs: number = performance.now()): void {
   const cssWidth = window.innerWidth - currentPanelWidthPx;
   const cssHeight = window.innerHeight;
 
-  setKnownAirports(state.knownAirports);
+  // The known airports, less any the map's airport filter hides (ui/airportFilter.ts).
+  setKnownAirports(visibleAirports(state));
   syncCompetitorAirlineDropdown();
   ctx.clearRect(0, 0, cssWidth, cssHeight);
   drawBasemap(ctx);
@@ -716,7 +718,7 @@ viewGroups.forEach((group) => {
   // eight's mapmode picker is the same deliberate-choice shape as the
   // layers group, just single-select instead of independent toggles, so
   // it gets the same click-only treatment.
-  const isLayersPicker = group.dataset.group === 'maps' || group.dataset.group === 'mapmode';
+  const isLayersPicker = group.dataset.group === 'maps' || group.dataset.group === 'mapmode' || group.dataset.group === 'airports';
 
   trigger.addEventListener('click', (event) => {
     event.stopPropagation(); // don't immediately re-close via the document listener below
@@ -773,6 +775,18 @@ overlayToggleButtons.forEach((button) => {
     }
 
     competitionAirlineGroup.hidden = !competitionOverlayOn;
+    render();
+  });
+});
+
+// Which airports the map shows (ui/airportFilter.ts): a single choice, like
+// the mapmode picker.
+const airportFilterButtons = document.querySelectorAll<HTMLButtonElement>('#view-toggle button[data-airports]');
+airportFilterButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    closeAllDropdowns();
+    setAirportFilter(button.dataset.airports as AirportFilter);
+    airportFilterButtons.forEach((other) => other.classList.toggle('active', other === button));
     render();
   });
 });

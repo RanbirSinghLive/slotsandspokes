@@ -1621,6 +1621,12 @@ Actual demand is a property of the **market**, not of any airline —
 everyone flying it grows it, everyone serving it draws from the same
 pool. Stimulation is a public good.
 
+**Which airports the map shows** (`src/ui/airportFilter.ts`): the pin
+menu beside the map's layers offers All airports, Only yours, or Yours
+and rivals'. It filters the known list handed to the renderers, so what
+is clickable stays what is drawn; home always shows. A view preference,
+not saved.
+
 **Load factor** (`src/sim/loadFactor.ts`): passengers carried over
 seats flown, over the last 7 finished days. Each landing adds its
 passengers and seats to its market's day (`todayLoadByMarket`), and each
