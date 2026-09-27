@@ -79,7 +79,6 @@ const COST_ROWS: CostRowSpec[] = [
     value: (s) =>
       s.todayCostByCategory.lease +
       s.todayCostByCategory.crew +
-      s.todayCostByCategory.training +
       s.todayCostByCategory.slots +
       s.todayCostByCategory.maintenance +
       // Absent in an older save, until its first rollover.
@@ -123,21 +122,11 @@ const COST_ROWS: CostRowSpec[] = [
     hint: 'Salaries of the appointed executives (sim/executives.ts).',
     value: (s) => s.todayCostByCategory.executives ?? 0,
   },
-  // Both of these were missing from the tree — crew salaries since week
-  // six, and training since week eight — so "Fixed" was quietly reporting
-  // less than it charged. The categories must sum to todayCost, and this
-  // is the panel whose whole job is showing that they do.
   {
-    label: 'Crew salaries',
+    label: 'Crews on standby',
     depth: 1,
-    hint: 'Every head on the books, whether or not they flew. Crew away in training are already out of the pools, so they stop being paid.',
+    hint: 'Crews a base has beyond what its planes need today (sim/crews.ts). Flying crews are paid inside block-hour cost.',
     value: (s) => s.todayCostByCategory.crew,
-  },
-  {
-    label: 'Training lines',
-    depth: 1,
-    hint: 'Funding of every training line. Charged in full even while a line is immature or retooling — efficiency scales what you get out, never what you pay in.',
-    value: (s) => s.todayCostByCategory.training,
   },
 ];
 

@@ -13,7 +13,8 @@ import { bookingPerks, runningCostForDay } from './innovations';
 import { networkOverheadPerDay } from './overhead';
 import { rollDailyMarketDemand, actualDailyDemand } from './marketDemand';
 import { revealReach } from './reach';
-import { rollDailyCrew, maintenanceAgeFactor, cabinServiceShare } from './crew';
+import { FATIGUE_DELAY_MULTIPLIER, legFatigue, rollDailyCrews } from './crews';
+import { MAINTENANCE_AGE_FACTOR } from './aog';
 import { isAog, rollDailyAogs } from './aog';
 import {
   executiveSalariesPerDay,
@@ -173,7 +174,7 @@ export function step(state: SimState): void {
     state.todayMargin = 0;
     // Week six's cost attribution — reset in lockstep with todayCost
     // above, since these five are exactly that number split up.
-    state.todayCostByCategory = { fuel: 0, blockNonFuel: 0, departure: 0, lease: 0, crew: 0, training: 0, slots: 0, maintenance: 0, overhead: 0, innovations: 0, executives: 0 };
+    state.todayCostByCategory = { fuel: 0, blockNonFuel: 0, departure: 0, lease: 0, crew: 0, slots: 0, maintenance: 0, overhead: 0, innovations: 0, executives: 0 };
     // Per-market breakdown of todayRevenue/todayCost, reset in lockstep
     // with them for the same reason as todayCostByCategory above.
     state.todayRevenueByMarket = {};
@@ -230,12 +231,14 @@ export function step(state: SimState): void {
     state.todayCostByCategory.slots += slotFees;
     state.todayMargin -= slotFees;
 
-    // Week six's crew model (sim/crew.ts): deliver recruitment and
-    // training that has come due, pay every head on the books, then roll
-    // today's disruption and work out which aircraft can actually be
-    // crewed. Must run after the todayCost reset above, since it charges
-    // salary into it.
-    rollDailyCrew(state);
+    // Crews (sim/crews.ts): hires that have come due join, each base
+    // shares its crews among its planes, planes it can't crew are
+    // grounded, and crews left standing by are paid for.
+    const standby = rollDailyCrews(state);
+    state.cash -= standby;
+    state.todayCost += standby;
+    state.todayCostByCategory.crew += standby;
+    state.todayMargin -= standby;
     // AOGs (sim/aog.ts): repairs finishing, new breakdowns, and moving a
     // grounded plane's flying onto the rest of its pool. After the crew
     // pass so a tail already grounded for crew isn't grounded twice and
@@ -390,7 +393,7 @@ export function step(state: SimState): void {
       // Congestion is judged at the busier of the two ends: a full
       // airport queues its departures and holds its arrivals alike.
       Math.max(airportLoad(state, leg.origin), airportLoad(state, leg.dest)),
-      maintenanceAgeFactor(state) * executiveMaintenanceMultiplier(state),
+      MAINTENANCE_AGE_FACTOR * executiveMaintenanceMultiplier(state),
     );
     state.rngSeed = nextSeed;
     state.delayMinutesByCause.age += delayBreakdown.age;
@@ -402,9 +405,12 @@ export function step(state: SimState): void {
     // attribution the On-Time panel reports stays the raw picture of
     // *why* flights run late, with the executive's effect visible as the
     // gap between that and what actually happened.
+    // A tired crew (sim/crews.ts) runs later still.
+    const fatigue = legFatigue(state, leg);
     const delayMinutes = Math.round(
       (delayBreakdown.age + delayBreakdown.weather + delayBreakdown.knockOn + delayBreakdown.congestion) *
-        executiveDelayMultiplier(state),
+        executiveDelayMultiplier(state) *
+        (1 + (FATIGUE_DELAY_MULTIPLIER - 1) * fatigue),
     );
 
     // The fare is market-level (RouteSettings), not per-leg: every leg on
@@ -422,7 +428,8 @@ export function step(state: SimState): void {
       leg.origin,
       leg.dest,
       state.competitorRoutes,
-      cabinServiceShare(state.crew),
+      // A fresh crew gives full service; a tired one less (sim/crews.ts).
+      1 - fatigue,
     ) + executiveNpsBonus(state);
     recordFlightNps(state, leg.origin, leg.dest, satisfactionScore);
 

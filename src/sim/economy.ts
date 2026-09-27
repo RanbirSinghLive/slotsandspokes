@@ -1,25 +1,9 @@
 import { bookingShare } from './choiceModel';
 import { recommendedFare } from './schedule';
 import { FUEL_SHARE_OF_BLOCK_HOUR_COST } from './fuel';
-import { CREWS_ENABLED } from './features';
 import type { CompetitorOffering } from './competitors';
 import type { BookingPerks } from './innovations';
 import { rivalYieldFactor } from './pressure';
-
-/**
- * The slice of `costPerBlockHour` that used to represent crew, now
- * carved out because crew are charged explicitly as daily salaries
- * (sim/crew.ts). Without this the game would double-charge them: that
- * flat per-type figure has always bundled crew in with maintenance and
- * overhead, as the Dev tab's cost tree says in as many words.
- *
- * Carving it out rather than adding on top also improves the model. Crew
- * are a *fixed* daily cost you pay whether or not an aircraft flies,
- * while block-hour cost is variable with flying — folding the two
- * together hid that distinction, and separating them is what makes
- * utilisation matter.
- */
-export const CREW_SHARE_OF_BLOCK_HOUR_COST = 0.3;
 
 export type EconomyLeg = {
   origin: string;
@@ -158,9 +142,10 @@ export function legCostBreakdown(
   const baseFuelPortion = blockHourCost * FUEL_SHARE_OF_BLOCK_HOUR_COST;
   return {
     fuel: baseFuelPortion * fuelPriceIndex * fuelEfficiencyMultiplier,
-    // Whatever is left once fuel and the crew carve-out are removed:
-    // maintenance, overhead, and everything else still bundled together.
-    blockNonFuel: blockHourCost * (1 - FUEL_SHARE_OF_BLOCK_HOUR_COST - (CREWS_ENABLED ? CREW_SHARE_OF_BLOCK_HOUR_COST : 0)),
+    // Whatever is left once fuel is removed: the flying crews' pay,
+    // maintenance, and everything else bundled together (sim/crews.ts
+    // charges only crews standing by).
+    blockNonFuel: blockHourCost * (1 - FUEL_SHARE_OF_BLOCK_HOUR_COST),
     departure: type.costPerDeparture,
   };
 }

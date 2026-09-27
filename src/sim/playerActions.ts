@@ -1,4 +1,16 @@
 import { dayIndex } from './clock';
+import {
+  CREW_BASE_FEE,
+  crewBases,
+  crewHours,
+  crewNeed,
+  hireCrews,
+  HIRE_FEE_PER_CREW,
+  HIRE_LEAD_DAYS,
+  openCrewBase,
+  releaseCrews,
+  STANDBY_COST_PER_DAY,
+} from './crews';
 import airportsData from '../../data/airports.json';
 import {
   appointBlockedReason,
@@ -459,8 +471,9 @@ export function planeOptions(state: SimState, iata: string): PlaneOption[] {
       disabledReason = `${pluralClassName(cls.name)} open when you become ${opener ? airlineCalled(opener) : 'a bigger airline'}: see Goals.`;
     } else if (!listing) {
       disabledReason = `No ${cls.name} on the market. The next arrives in ${days(daysUntilNextListing(state, rate.typeCode))}, first come first served.`;
-    } else if (state.cash < cashNeededToLease(listing.leasePricePerDay)) {
-      disabledReason = `Needs $${cashNeededToLease(listing.leasePricePerDay).toLocaleString()} on hand (${LEASE_RESERVE_DAYS} days of lease) to lease this ${cls.name}.`;
+    } else if (state.cash < cashNeededToLease(listing.leasePricePerDay) + crewBaseFeeAt(state, iata)) {
+      const baseNote = crewBaseFeeAt(state, iata) > 0 ? `, plus $${CREW_BASE_FEE.toLocaleString()} to open a crew base here` : '';
+      disabledReason = `Needs $${(cashNeededToLease(listing.leasePricePerDay) + crewBaseFeeAt(state, iata)).toLocaleString()} on hand (${LEASE_RESERVE_DAYS} days of lease${baseNote}) to lease this ${cls.name}.`;
     }
     return {
       code: cls.code,
@@ -483,12 +496,22 @@ export function leasePlane(state: SimState, iata: string, typeCode: string): Out
   if (!listing) return { ok: false, reason: `No ${option.name} on the market.` };
 
   const leased = asLeased(state, listing);
+  // Basing a plane where the airline has no crews opens a crew base (sim/crews.ts).
+  const baseFee = crewBaseFeeAt(state, iata);
+  if (baseFee > 0) {
+    state.cash -= baseFee;
+    openCrewBase(state, iata);
+  }
   const aircraft = leaseAircraft(state, typeCode, iata, leased.ageYears, leased.leasePricePerDay);
   revealReach(state);
+  const crewNote = crewAdvice(state, iata);
   const refurbished = leased.ageYears === listing.ageYears ? '' : `, refurbished from ${listing.ageYears}`;
   return {
     ok: true,
-    message: `${option.name} leased at ${iata}: ${leased.ageYears} yrs old${refurbished}, $${leased.leasePricePerDay.toLocaleString()}/day (${aircraft.tail}).`,
+    message:
+      `${option.name} leased at ${iata}: ${leased.ageYears} yrs old${refurbished}, $${leased.leasePricePerDay.toLocaleString()}/day (${aircraft.tail}).` +
+      (baseFee > 0 ? ` Crew base opened at ${iata} for $${baseFee.toLocaleString()}.` : '') +
+      (crewNote ? ` ${crewNote}` : ''),
   };
 }
 
@@ -583,4 +606,63 @@ export function appointExecutiveById(state: SimState, candidateId: string): Outc
 
 export function letExecutiveGo(state: SimState, role: ExecutiveRole): Outcome<{ message: string }> {
   return dismissExecutive(state, role);
+}
+
+// --- Crews -----------------------------------------------------------------------
+
+/** What opening a crew base here would cost: nothing where there is one. */
+function crewBaseFeeAt(state: SimState, iata: string): number {
+  return crewBases(state)[iata] ? 0 : CREW_BASE_FEE;
+}
+
+/** A nudge when a base has fewer crews (hired or on their way) than its planes need. */
+function crewAdvice(state: SimState, iata: string): string | null {
+  const need = crewNeed(state, iata);
+  const base = crewBases(state)[iata];
+  const have = (base?.crews ?? 0) + (base?.hiring.reduce((sum, batch) => sum + batch.count, 0) ?? 0);
+  if (have >= need.minimum + LEASE_CREW_ALLOWANCE) return null;
+  return `${iata} needs more crews for it to fly: hire them at the airport (${HIRE_LEAD_DAYS} days to join).`;
+}
+
+/** Crews a newly leased plane's full day needs at the legal shift: what crewAdvice() leaves room for. */
+const LEASE_CREW_ALLOWANCE = 2;
+
+export type CrewReadout = {
+  crews: number;
+  arriving: number;
+  /** Crews its planes need at ideal shifts, and at the legal minimum. */
+  ideal: number;
+  minimum: number;
+  bookedHours: number;
+  availableHours: number;
+  hireFee: number;
+  leadDays: number;
+  standbyPerDay: number;
+};
+
+/** A base's crews, for the airport view's crew bar, or null where there is no base. */
+export function crewReadout(state: SimState, iata: string): CrewReadout | null {
+  const base = crewBases(state)[iata];
+  if (!base) return null;
+  const need = crewNeed(state, iata);
+  const hours = crewHours(state, iata);
+  return {
+    crews: base.crews,
+    arriving: base.hiring.reduce((sum, batch) => sum + batch.count, 0),
+    ideal: need.ideal,
+    minimum: need.minimum,
+    bookedHours: hours.booked,
+    availableHours: hours.available,
+    hireFee: HIRE_FEE_PER_CREW,
+    leadDays: HIRE_LEAD_DAYS,
+    standbyPerDay: STANDBY_COST_PER_DAY,
+  };
+}
+
+export function hireCrewsAt(state: SimState, iata: string, count: number): Outcome<{ message: string }> {
+  return hireCrews(state, iata, count);
+}
+
+export function releaseCrewsAt(state: SimState, iata: string, count: number): Outcome<{ message: string }> {
+  return releaseCrews(state, iata, count);
 }

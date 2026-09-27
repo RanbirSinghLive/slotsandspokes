@@ -12,6 +12,7 @@ import { renderScheduleWarnings, scheduleProblems } from './panels';
 
 export {
   adoptInnovation,
+  crewReadout,
   appointExecutiveById,
   executiveOptions,
   letExecutiveGo,
@@ -35,6 +36,7 @@ export {
   leasePlane,
   type MarketPnlHistory,
   type MarketSummary,
+  type CrewReadout,
   type ExecutiveOption,
   type InnovationOption,
   type Outcome,
@@ -45,6 +47,14 @@ export {
 function afterChange<T extends actions.Outcome>(state: SimState, outcome: T): T {
   if (outcome.ok) renderScheduleWarnings(scheduleProblems(state));
   return outcome;
+}
+
+export function hireCrewsAt(state: SimState, iata: string, count: number) {
+  return afterChange(state, actions.hireCrewsAt(state, iata, count));
+}
+
+export function releaseCrewsAt(state: SimState, iata: string, count: number) {
+  return afterChange(state, actions.releaseCrewsAt(state, iata, count));
 }
 
 export function clearPlane(state: SimState, tail: string) {

@@ -13,7 +13,7 @@ import { createMarket, ensureRivalFleets, type MarketState } from './market';
 import { FUEL_PRICE_BASELINE } from './fuel';
 import type { FuelHedge } from './fuelPrice';
 import { STARTING_NPS } from './nps';
-import { createCrewPools, type CrewPools, type PendingHire, type PendingTraining, type TrainingLine } from './crew';
+import type { CrewBase, CrewDay } from './crews';
 import { createExecutiveSlots, type ExecutiveSlots } from './executives';
 
 export type AircraftStatus = 'ground' | 'airborne';
@@ -458,31 +458,13 @@ export type SimState = {
    * by one appointment.
    */
   executives: ExecutiveSlots;
-  /**
-   * Week six's crew model (sim/crew.ts): headcount pools, never named
-   * individuals. Pilots are tiered because type ratings gate the fleet
-   * ladder; cabin crew and mechanics are untiered.
-   */
-  crew: CrewPools;
-  /** Recruitment ordered and paid for, not yet turned up — the lead time is the mechanic. */
-  pendingHires: PendingHire[];
-  /** Pilots currently away upgrading a tier. Already removed from `crew`, since losing their capacity is the real cost. */
-  pendingTraining: PendingTraining[];
-  /**
-   * Week eight: funded training pipelines — see sim/crew.ts's
-   * TrainingLine. Run once per day inside rollDailyCrew().
-   */
-  trainingLines: TrainingLine[];
-  /**
-   * How much crew the player chooses to carry above the bare operating
-   * minimum, 1 meaning none at all. Cost is linear in this; protection
-   * against a bad disruption day is a threshold — which is what makes it
-   * a real decision rather than a slider with an obvious best setting.
-   */
-  reserveDepth: number;
+  /** Crew bases and their crews, by IATA (sim/crews.ts). Optional: an older save gets bases made at its first rollover. */
+  crewBases?: Record<string, CrewBase>;
+  /** Today's crewing (sim/crews.ts's rollDailyCrews()): crews per plane and when each duty day starts. */
+  crewDay?: CrewDay;
   /**
    * Tails that couldn't be crewed today, recomputed each day-rollover by
-   * `rollDailyCrew()`. step.ts refuses to depart their legs, and every
+   * `rollDailyCrews()` (sim/crews.ts). step.ts refuses to depart their legs, and every
    * leg they were scheduled to fly counts as a cancellation.
    */
   groundedTails: string[];
@@ -551,10 +533,8 @@ export type SimState = {
     departure: number;
     /** Daily lease cost, summed across every leased airframe. */
     lease: number;
-    /** Daily crew salaries, everyone on the books whether or not they flew. */
+    /** Crews standing by unused (sim/crews.ts); flying crews' pay is in block-hour cost. */
     crew: number;
-    /** Daily funding of every training line, spent whether or not the line is efficient yet. */
-    training: number;
     /** Daily fees on every slot pair held (sim/slots.ts). */
     slots: number;
     /** Paying to expedite AOG repairs (sim/aog.ts). */
@@ -654,11 +634,7 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     demandGrowthMultiplier: 1,
     farePolicyMultiplier: 1,
     executives: createExecutiveSlots(),
-    crew: createCrewPools(),
-    pendingHires: [],
-    trainingLines: [],
-    pendingTraining: [],
-    reserveDepth: 1.15,
+    crewBases: {},
     groundedTails: [],
     slotsHeld: {},
     hubStyles: {},
@@ -673,7 +649,7 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     todayFlightsCancelled: 0,
     npsScoredFlightsTotal: 0,
     todayNpsScoredFlights: 0,
-    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, lease: 0, crew: 0, training: 0, slots: 0, maintenance: 0, overhead: 0, innovations: 0, executives: 0 },
+    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, lease: 0, crew: 0, slots: 0, maintenance: 0, overhead: 0, innovations: 0, executives: 0 },
   };
   revealReach(state);
   openMarket(state);

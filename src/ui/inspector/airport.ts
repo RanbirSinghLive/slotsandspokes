@@ -19,7 +19,7 @@ import { hasHubView } from '../../render/hubs';
 import { getMapPreview } from '../../render/preview';
 import { openHubPlanner } from '../hubPlanner';
 import { money as pnlMoney } from '../pnlBars';
-import { buildPoolRows } from '../poolBars';
+import { buildCrewRow, buildPoolRows } from '../poolBars';
 import * as ops from '../routeActions';
 import { select } from '../selection';
 import { aircraftLink } from './aircraft';
@@ -122,6 +122,7 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
   } else {
     root.append(line('No aircraft based here.'));
   }
+  root.append(...crewSection(state, iata, changed));
 
   root.append(heading('Markets'), marketRows(state, iata));
   root.append(...whereToFlyNext(state, iata));
@@ -275,4 +276,56 @@ function whereToFlyNext(state: SimState, iata: string): HTMLElement[] {
     line('The biggest markets from here you don\'t fly yet, raised where the far end is starved for service and lowered where rivals already fly. Click one to plan it.'),
     list,
   ];
+}
+
+/**
+ * The crew base here (sim/crews.ts): its crew bar under the plane pools,
+ * what its planes need, and buttons to hire or let crews go. Nothing
+ * where there's no base.
+ */
+function crewSection(state: SimState, iata: string, changed: () => void): HTMLElement[] {
+  const crew = ops.crewReadout(state, iata);
+  if (!crew) return [];
+  const nodes: HTMLElement[] = [heading('Crews'), buildCrewRow(crew)];
+  const spare = crew.crews - crew.ideal;
+  const joining = crew.arriving > 0 ? ` ${crew.arriving} more join within ${crew.leadDays} days.` : '';
+  const status =
+    (crew.crews < crew.minimum
+      ? `Short: its planes need at least ${crew.minimum} crews to fly, so some are grounded today.`
+      : crew.crews < crew.ideal
+        ? `Stretched: ${crew.ideal} crews would keep shifts to 8 hours; with ${crew.crews}, late legs are flown tired (later, and rated lower).`
+        : spare > 0
+          ? `${spare} spare, standing by at $${crew.standbyPerDay.toLocaleString()} a day each: ready for the next plane.`
+          : 'Just enough for fresh crews. A new plane here will wait for hires.') + joining;
+  nodes.push(
+    line(status, crew.crews < crew.minimum ? 'inspector-line is-over' : 'inspector-line'),
+    line(`Hiring takes ${crew.leadDays} days and costs $${crew.hireFee.toLocaleString()} a crew.`, 'inspector-line goal-ahead'),
+  );
+  const buttons = document.createElement('div');
+  buttons.className = 'crew-buttons';
+  for (const count of [1, 2]) {
+    const hire = document.createElement('button');
+    hire.type = 'button';
+    hire.className = 'inspector-plan-hub';
+    hire.textContent = `Hire ${count}: $${(count * crew.hireFee).toLocaleString()}`;
+    hire.disabled = state.cash < count * crew.hireFee;
+    hire.addEventListener('click', () => {
+      ops.hireCrewsAt(state, iata, count);
+      changed();
+    });
+    buttons.append(hire);
+  }
+  if (crew.crews > crew.ideal) {
+    const release = document.createElement('button');
+    release.type = 'button';
+    release.className = 'inspector-plan-hub';
+    release.textContent = 'Let 1 go';
+    release.addEventListener('click', () => {
+      ops.releaseCrewsAt(state, iata, 1);
+      changed();
+    });
+    buttons.append(release);
+  }
+  nodes.push(buttons);
+  return nodes;
 }

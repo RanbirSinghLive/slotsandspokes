@@ -1,4 +1,5 @@
 import airportsData from '../../data/airports.json';
+import { crewNeed, IDEAL_SHIFT_MINUTES } from '../sim/crews';
 import { projection, baselineScale } from './projection';
 import { dailyDeparturesAt, airportLevel, airportLoad } from '../sim/airports';
 import { slotFeesPerDayAt, slotsHeld } from '../sim/slots';
@@ -70,6 +71,10 @@ const HUNGER_RING_OFFSET = PIP_ORBIT_OFFSET + 5;
 const HUNGER_RING_MIN = 0.25;
 
 const MARKER_RADIUS = 3;
+const CREW_MARK_WIDTH = 12;
+const CREW_MARK_HEIGHT = 2;
+const CREW_MARK_GAP = 3;
+const CREW_MARK_TRACK = 'rgba(255, 255, 255, 0.2)';
 // The load at which congestion delays start (sim/delays.ts), and so the
 // congestion glow with them.
 const CONGESTION_GLOW_ONSET = 0.5;
@@ -113,7 +118,7 @@ const PRESENCE_RADIUS_SCALE = 1.3;
 // number against the same threshold.
 const CAPACITY_RING_GREEN: [number, number, number] = [127, 216, 143];
 const CAPACITY_RING_AMBER: [number, number, number] = [255, 209, 102];
-const CAPACITY_RING_RED = '#ff8080';
+export const CAPACITY_RING_RED = '#ff8080';
 // Strictly over 100%, the same test the alert strip uses (sim/utilisation.ts):
 // a plane booked for exactly its whole day, like a long-haul round trip, is
 // full, not over-booked. The small margin absorbs floating-point noise.
@@ -306,6 +311,21 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState, sho
     ctx.arc(x, y, radius, 0, 2 * Math.PI);
     ctx.fillStyle = served ? MARKER_FILL : UNSERVED_FILL;
     ctx.fill();
+
+    // A crew base (sim/crews.ts): a short bar under the dot, filling with
+    // the duty hours its crews are booked for; red when its planes are
+    // grounded for want of crews.
+    const crewBase = state.crewBases?.[airport.iata];
+    if (crewBase) {
+      const need = crewNeed(state, airport.iata);
+      const available = crewBase.crews * (IDEAL_SHIFT_MINUTES / 60);
+      const share = available > 0 ? need.dutyHours / available : need.dutyHours > 0 ? 2 : 0;
+      const barY = y + radius + CREW_MARK_GAP;
+      ctx.fillStyle = CREW_MARK_TRACK;
+      ctx.fillRect(x - CREW_MARK_WIDTH / 2, barY, CREW_MARK_WIDTH, CREW_MARK_HEIGHT);
+      ctx.fillStyle = crewBase.crews < need.minimum ? CAPACITY_RING_RED : capacityColor(share);
+      ctx.fillRect(x - CREW_MARK_WIDTH / 2, barY, CREW_MARK_WIDTH * Math.min(1, share), CREW_MARK_HEIGHT);
+    }
 
     pendingLabels.push({
       iata: airport.iata,

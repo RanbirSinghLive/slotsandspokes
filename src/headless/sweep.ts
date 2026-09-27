@@ -3,7 +3,6 @@ import { WINGLET_FUEL_FACTOR } from '../sim/innovations';
 import { fileURLToPath } from 'node:url';
 import { DEFAULT_HOME_AIRPORT, type FareStance, type SimState } from '../sim/state';
 import { setFareStance } from '../sim/pricing';
-import { crewRequirement } from '../sim/crew';
 import { step } from '../sim/step';
 import { startHeadlessGame } from './newGame';
 import { createPlayer, playerFromArgs, type PlayerKind } from './player';
@@ -63,22 +62,6 @@ type Lever = {
 const STANCES: FareStance[] = ['undercut', 'match', 'premium'];
 
 const LEVERS: Lever[] = [
-  {
-    // The one lever that changes headcount as well as a number: staffing
-    // has to be re-derived after setting the depth, or every row would
-    // run the same crew against different targets and measure nothing.
-    name: 'reserve',
-    description: 'Crew carried above the bare operating minimum',
-    values: [1, 1.05, 1.15, 1.25, 1.4],
-    apply: (state, depth) => {
-      state.reserveDepth = depth;
-      const requirement = crewRequirement(state);
-      state.crew.pilotsByTier = [...requirement.targetPilotsByTier] as [number, number, number];
-      state.crew.cabinCrew = requirement.targetCabinCrew;
-      state.crew.mechanics = requirement.targetMechanics;
-    },
-    format: (v) => `${v.toFixed(2)}x`,
-  },
   {
     name: 'fare',
     description: "Multiplier on every market's recommended fare",

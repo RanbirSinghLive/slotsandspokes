@@ -1,5 +1,4 @@
 import { nextRandom } from './rng';
-import { maintenanceAgeFactor } from './crew';
 import { executiveMaintenanceMultiplier } from './executives';
 import { airportLoad } from './airports';
 import { summarizeMarket } from './marketSummary';
@@ -7,6 +6,13 @@ import { marketKey } from './schedule';
 import { aircraftUtilisation, rotationsForTail, type Rotation } from './utilisation';
 import { coverRotations } from './turnBuffer';
 import type { Aircraft, SimState } from './state';
+
+/**
+ * How old an airframe behaves, for breakdowns and age delays, per year of
+ * its real age: a well-maintained fleet behaves younger than its years.
+ * A maintenance COO (sim/executives.ts) lowers it further.
+ */
+export const MAINTENANCE_AGE_FACTOR = 0.6;
 
 /**
  * AOG — "aircraft on ground": an unscheduled maintenance event that takes
@@ -73,7 +79,7 @@ export function aogFor(state: SimState, tail: string): AogEvent | undefined {
 }
 
 function effectiveAge(state: SimState, aircraft: Aircraft): number {
-  return aircraft.ageYears * maintenanceAgeFactor(state) * executiveMaintenanceMultiplier(state);
+  return aircraft.ageYears * MAINTENANCE_AGE_FACTOR * executiveMaintenanceMultiplier(state);
 }
 
 /** Today's chance this plane goes AOG. Exported for the dev tools and any readout that wants to explain it. */

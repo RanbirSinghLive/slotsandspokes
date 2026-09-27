@@ -1,4 +1,5 @@
-import { capacityColor } from '../render/airports';
+import { CAPACITY_RING_RED, capacityColor } from '../render/airports';
+import { crewReadout, type CrewReadout } from '../sim/playerActions';
 import { USABLE_DAY_MINUTES, utilisationPools, type ClassPool, type PoolEffect } from '../sim/utilisation';
 import { getMapPreview } from '../render/preview';
 import { planeIconElement } from './planeIcons';
@@ -99,6 +100,39 @@ export function buildPoolRows(pools: ClassPool[], effects: PoolEffect[] = [], ba
     });
 }
 
+/**
+ * A crew base's crews as a pool row (sim/crews.ts): duty hours its planes
+ * need against what its crews fly at ideal shifts. Past full, shifts run
+ * long and crews tire; red when there are fewer crews than the legal
+ * minimum, so planes are grounded.
+ */
+export function buildCrewRow(crew: CrewReadout): HTMLElement {
+  const share = crew.availableHours > 0 ? crew.bookedHours / crew.availableHours : crew.bookedHours > 0 ? 2 : 0;
+  const short = crew.crews < crew.minimum;
+  const row = document.createElement('div');
+  row.className = 'pool-row';
+  row.title =
+    `${crew.crews} crew${crew.crews === 1 ? '' : 's'}${crew.arriving > 0 ? ` (+${crew.arriving} joining)` : ''}: ` +
+    `${Math.round(crew.bookedHours)} of ${Math.round(crew.availableHours)} duty hours booked at 8-hour shifts. ` +
+    `Its planes need ${crew.ideal} for fresh crews, ${crew.minimum} at the least.`;
+  const name = document.createElement('span');
+  name.className = 'pool-name';
+  name.textContent = `Crews x${crew.crews}${crew.arriving > 0 ? ` +${crew.arriving}` : ''}`;
+  const bar = document.createElement('span');
+  bar.className = 'pool-bar';
+  const fill = document.createElement('span');
+  fill.className = 'pool-fill';
+  fill.style.width = `${Math.min(share, 1) * 100}%`;
+  fill.style.background = short ? CAPACITY_RING_RED : capacityColor(share);
+  bar.appendChild(fill);
+  const value = document.createElement('span');
+  value.className = 'pool-value';
+  value.textContent = `${Math.round(share * 100)}%`;
+  if (share > 1.0001 || short) value.classList.add('is-over');
+  row.append(name, bar, value);
+  return row;
+}
+
 let signature: string | null = null;
 
 /**
@@ -108,12 +142,15 @@ let signature: string | null = null;
 export function updatePoolBars(state: SimState): void {
   const pools = utilisationPools(state);
   const effects = getMapPreview()?.effects ?? [];
+  // Home's crews (sim/crews.ts) under its planes.
+  const crew = crewReadout(state, state.homeAirport);
   const next =
     pools.map((pool) => `${pool.code}:${pool.planes}:${pool.grounded}:${Math.round(pool.share * 100)}:${Math.round(pool.usedMinutes)}`).join('|') +
-    `#${effects.map((e) => `${e.base}${e.classCode}${Math.round(e.minutes)}:${e.planes ?? 0}`).join(',')}`;
+    `#${effects.map((e) => `${e.base}${e.classCode}${Math.round(e.minutes)}:${e.planes ?? 0}`).join(',')}` +
+    `#${crew ? `${crew.crews}:${crew.arriving}:${Math.round(crew.bookedHours)}:${crew.minimum}` : ''}`;
   if (next === signature) return;
   signature = next;
 
   overlayEl.hidden = pools.every((pool) => pool.planes === 0);
-  overlayEl.replaceChildren(...buildPoolRows(pools, effects));
+  overlayEl.replaceChildren(...buildPoolRows(pools, effects), ...(crew ? [buildCrewRow(crew)] : []));
 }

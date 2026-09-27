@@ -1853,61 +1853,61 @@ passengers of any style and earned the least.
 
 ---
 
-## Crew (`src/sim/crew.ts`)
+## Crews (`src/sim/crews.ts`)
 
-Pools of headcount, never named individuals — a real roster means duty
-times, rest rules and pairing, which is a second scheduling problem
-beside the one this project just deleted.
+Crews live at **crew bases**, the airports where the airline bases
+planes. Home starts with 2, enough for the starting plane. Basing a
+plane at a new airport opens a base there for $100,000
+(`CREW_BASE_FEE`, charged by the lease), with no crews: it waits for
+hires.
 
-Three disciplines, deliberately modelled differently:
+**Each day, at rollover** (`rollDailyCrews()`), hires that have come due
+join, then each base shares its crews out. A plane's duty day runs from
+an hour before its first departure to its last landing, flown by the
+crews it gets, one after another in equal shifts. Every plane first gets
+the fewest crews that fly its duty within a 13-hour legal shift; a plane
+that can't is grounded for the day (its flights cancel, cause "crew").
+Spare crews then go to the longest shifts, down to 8 hours. Crews left
+over stand by at $250 a day each (cost category `crew`). Flying crews'
+pay stays inside each flight's block-hour cost.
 
-- **Pilots** are a *threshold* and tiered (light turboprop / regional /
-  mainline jet), because type ratings are the real progression gate.
-  Below complement, the aircraft doesn't fly.
-- **Cabin crew** are a threshold too but untiered, at one per fifty seats
-  — a real FAA and Transport Canada standard.
-- **Mechanics** are a *continuum*: shared capacity, no hard cliff.
-  Running thin makes airframes behave older than they are, feeding the
-  existing age-delay cause.
+**Hiring** is at the airport (the airport view's Crews section): $10,000
+a crew, flying 7 days later. Crews can be let go. So the trade is
+hiring ahead of growth (idle crews cost) against hiring after (a new
+plane sits grounded, and every flight it misses cancels).
 
-Hiring is **bulk** with a 10-day lead time — that gap is the mechanic.
-Lease an aircraft before you have crew and it sits idle; hire ahead and you
-pay idle salaries. Training moves pilots up a tier over 21 days, and
-takes cabin crew off the line for 7, raising NPS once they're back.
-Recurrent training **lapses** over roughly 180 days.
+**Fatigue** (`legFatigue()`). A crew is fresh for a whole 8-hour shift;
+beyond it, it tires, fully 4 hours later. Every turn under 40 minutes
+earlier in the shift (a turn with no buffer) counts as 20 minutes more
+duty. A tired crew's leg runs up to 10% later and loses up to all 15 of
+NPS's service points. Measured: tiring from 7 hours with an hour per
+tight turn and 50% more delay cut a careful Toronto year by
+three-quarters, as the delays knocked on into curfew cancellations.
 
-**Standing orders (week eight)** are the alternative to clicking batches:
-set a rate per role — `perMonth` — and `runStandingOrders()` hires toward
-the fleet's target every day until it's met, then stops. There is
-deliberately no target input; the stop condition is `crewRequirement()`'s
-own target (operating need times reserve depth), which bounds the order to
-the fleet you actually own and makes it self-resume when the fleet grows.
-Counting is against *projected* headcount (pool + in transit + due back
-from training), or the ten-day lead time would have it re-order the same
-people daily. It runs after payroll, skips days it can't afford a head,
-and caps its fractional carry at one month so a pause can't bank a
-backlog.
+**On screen:** a crew bar under each base's plane pools (duty hours
+booked against what its crews fly at 8-hour shifts, red when planes are
+grounded), in the airport view with hire and let-go buttons, in the
+map's pool overlay for home, and as a short bar under the base's dot on
+the map.
 
-**Reserve depth** is the player's lever: 1.0 is exactly enough crew with
-no slack, 1.4 is 40% more. Each day a disruption fraction is drawn and
-reserve depth absorbs it. Cost is linear in depth; protection is a
-threshold — which is what gives it a real interior optimum rather than an
-obvious best setting.
-
-Crew salaries were **carved out of** `costPerBlockHour`, not added on
-top. That figure always bundled crew in, so adding salaries would have
-double-charged.
+**The headless players** keep crews at their planes' need plus one
+plane's worth (2), twice that when a plane pool is nearly full at a
+profitable airline, and lease only with 2 spare crews at home; crews
+spare for 30 days go, never while growing. Reckless hires whatever its
+planes need. Measured (steady median cash, thread 6 → crews): YUL $11.3M
+→ $7.7M, YYZ $25.4M → $17.0M, BOS $21.5M → $15.9M, PHL $46.6M → $55.2M,
+LHR $69.4M → $78.5M.
 
 ---
 
-## Cancellations (`src/sim/step.ts`, `src/sim/weather.ts`, `src/sim/crew.ts`)
+## Cancellations (`src/sim/step.ts`, `src/sim/weather.ts`, `src/sim/crews.ts`)
 
 The second axis of reliability. On-Time only describes flights that
 operated; **Completion Factor** is `completed / scheduled`.
 
 Each cause has a different answer available:
 
-- **Crew shortage** — answered by reserve depth.
+- **Crew shortage** — a plane its base can't crew within the legal shift is grounded for the day; answered by hiring ahead.
 - **Unscheduled maintenance** (AOG) — a daily per-aircraft roll scaling
   with *effective* age, so answered by maintenance staffing and younger
   metal.

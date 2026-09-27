@@ -6,7 +6,7 @@ moats, shocks, real costs, Europe, home difficulty) lives in
 with playtest findings as they come (see "Playtest notes"), and the
 order changes with them.
 
-**State at handoff:** save key `airgame-save-v46`. **Threads 1–8 and 10 are done.** The game pushes back
+**State at handoff:** save key `airgame-save-v46`. **All ten threads are done.** The game pushes back
 the way CLAUDE.md's philosophy asks: over a year a careful airline makes
 $6.5M–$19M, a sitter $2M–$5M and eroding, an unattended one-plane start
 survives the Standard homes, a reckless one always busts
@@ -391,6 +391,30 @@ leave slack) using bars and levers already on the map, with no new
 screen. 1 is the richer idea but changes how rotations work, and fits
 with the "second base" milestone. For the owner to choose before any of
 it is built.
+
+**Status: done, all three.** As built (`sim/crews.ts`, replacing the
+parked `sim/crew.ts` and its hidden tab, about 1,200 lines):
+- **Crew hours:** crews at each base; each day every plane gets the
+  crews for its duty within a 13-hour legal shift or is grounded, spares
+  shorten shifts toward 8 hours, idle crews stand by at $250 a day. A bar
+  beside the plane pools, in the airport view (with Hire 1 / Hire 2 /
+  Let 1 go), the map's pool overlay, and under the base's dot. Hiring
+  $10,000 a crew, 7 days' lead.
+- **Fatigue:** fresh for an 8-hour shift, tiring over the next 4, with
+  each no-buffer turn counting 20 minutes; up to 10% later and the NPS
+  service points lost. (The parked system's service component was always
+  full; fresh crews now earn it.) First tuning (tiring from 7 hours, an
+  hour per tight turn, 50% more delay) cut a careful Toronto year by
+  three-quarters; retuned over twelve seeds.
+- **Crew bases:** a lease at a new airport opens one for $100,000, empty.
+- **Headless:** keeps need plus one plane's crews (two planes' when
+  growing), leases only with spare crews at home (leasing in bursts left
+  new planes grounded: 88 cancellations in 60 days), releases crews
+  spare for 30 days but never while growing. Steady median cash: YUL
+  $11.3M → $7.7M, YYZ $25.4M → $17.0M, BOS $21.5M → $15.9M, PHL $46.6M →
+  $55.2M, LHR $69.4M → $78.5M. Home ratings: 70 Standard, 26 Hard, 73
+  Brutal.
+- An old save gets crew bases with the crews its planes need.
 
 ## Thread 10: fuel price and hedging
 

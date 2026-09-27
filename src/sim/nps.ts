@@ -7,7 +7,7 @@ import type { SimState } from './state';
  * a survey; this game has no passengers to survey, so each flight gets a
  * stand-in score from what step.ts knows as it departs: how late it is,
  * how its fare compares to rivals on the market, how old the airframe is,
- * and cabin service. A cancellation scores worst of all.
+ * and how fresh its crew is. A cancellation scores worst of all.
  *
  * Scores add up into a trailing NPS per market and for the network (the
  * second half of this file), and that is what passengers respond to: a
@@ -43,16 +43,11 @@ const AGE_PENALTY_PER_YEAR = 1;
 const AGE_FLOOR_POINTS = -15;
 
 /**
- * Week six's fourth component: cabin service. Worth up to this many
- * points when every cabin crew member on the books has been through
- * recurrent service training, and nothing at all when none have (see
- * sim/crew.ts's `cabinServiceBonus()`).
- *
- * Sized deliberately between the age nudge and the delay component:
+ * The fourth component: cabin service, worth up to this many points from
+ * a fresh crew and nothing from a fully tired one (sim/crews.ts's
+ * legFatigue()). Sized between the age nudge and the delay component:
  * service is worth more than a fresh airframe and less than getting
- * people there on time, which is the right ordering. It's also the only
- * NPS input the player can improve directly rather than by buying
- * something — the others all follow from fleet, fare and schedule.
+ * people there on time.
  */
 const CABIN_SERVICE_MAX_POINTS = 15;
 
@@ -94,8 +89,8 @@ export function flightSatisfactionScore(
   origin: string,
   dest: string,
   competitorRoutes: CompetitorOffering[],
-  /** 0-1: the share of cabin crew currently carrying recurrent service training. */
-  cabinServiceShare = 0,
+  /** 0-1: how fresh the crew is (1 − its fatigue, sim/crews.ts). */
+  crewFreshness = 1,
 ): number {
   const delayComponent = clamp(
     DELAY_BASELINE_POINTS - delayMinutes * DELAY_PENALTY_PER_MINUTE,
@@ -113,9 +108,7 @@ export function flightSatisfactionScore(
 
   const ageComponent = clamp(AGE_BASELINE_POINTS - ageYears * AGE_PENALTY_PER_YEAR, AGE_FLOOR_POINTS, AGE_BASELINE_POINTS);
 
-  // Purely a bonus, never a penalty: untrained cabin crew are the
-  // baseline the other components were tuned against, not a failing.
-  const serviceComponent = clamp(cabinServiceShare, 0, 1) * CABIN_SERVICE_MAX_POINTS;
+  const serviceComponent = clamp(crewFreshness, 0, 1) * CABIN_SERVICE_MAX_POINTS;
 
   // Real NPS is bounded to [-100, 100] by definition (100% detractors to
   // 100% promoters) — the components above rarely sum past that on their

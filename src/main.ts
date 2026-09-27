@@ -42,7 +42,6 @@ import { setupFarePolicy, updateFarePolicy } from './ui/farePolicy';
 import { setupOnTimePanel, updateOnTimePanel } from './ui/onTime';
 import { setupExecutivePanel, updateExecutivePanel } from './ui/executive';
 import { setupDevPanel, updateDevPanel } from './ui/devTools';
-import { setupCrewPanel, updateCrewPanel } from './ui/crew';
 import { setupInfoTooltips } from './ui/infoTooltip';
 import { updateTicker } from './ui/ticker';
 import { updateAlerts } from './ui/alerts';
@@ -77,7 +76,6 @@ setupFarePolicy(state);
 setupOnTimePanel();
 setupExecutivePanel();
 setupDevPanel();
-setupCrewPanel(state);
 setupInfoTooltips();
 setupGameOver();
 setupGameControls(state);
@@ -174,7 +172,6 @@ function syncCompetitorAirlineDropdown(): void {
 const fleetTabEl = document.querySelector<HTMLDivElement>('#fleet-tab')!;
 const onTimePanelEl = document.querySelector<HTMLDivElement>('#ontime-panel')!;
 const executivePanelEl = document.querySelector<HTMLDivElement>('#executive-panel')!;
-const crewPanelEl = document.querySelector<HTMLDivElement>('#crew-panel')!;
 const devPanelEl = document.querySelector<HTMLDivElement>('#dev-panel')!;
 const gameTabEl = document.querySelector<HTMLDivElement>('#game-tab')!;
 const sidebarTabButtons = document.querySelectorAll<HTMLButtonElement>('#sidebar-tabs button');
@@ -264,7 +261,6 @@ type SidebarTab =
   | 'fleet'
   | 'ontime'
   | 'executive'
-  | 'crew'
   | 'dev'
   | 'game';
 let sidebarTab: SidebarTab = 'fleet';
@@ -314,7 +310,6 @@ function render(nowMs: number = performance.now()): void {
   // be useless. Gated on it actually being visible so it costs nothing
   // the rest of the time.
   if (sidebarTab === 'dev') updateDevPanel(state);
-  if (sidebarTab === 'crew') updateCrewPanel(state);
 
   const cssWidth = window.innerWidth - currentPanelWidthPx;
   const cssHeight = window.innerHeight;
@@ -627,7 +622,6 @@ function switchToSidebarTab(tab: SidebarTab): void {
   fleetTabEl.hidden = tab !== 'fleet';
   onTimePanelEl.hidden = tab !== 'ontime';
   executivePanelEl.hidden = tab !== 'executive';
-  crewPanelEl.hidden = tab !== 'crew';
   devPanelEl.hidden = tab !== 'dev';
   gameTabEl.hidden = tab !== 'game';
 
