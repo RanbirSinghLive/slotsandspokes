@@ -82,8 +82,10 @@ const COST_ROWS: CostRowSpec[] = [
       s.todayCostByCategory.training +
       s.todayCostByCategory.slots +
       s.todayCostByCategory.maintenance +
-      // Absent in a save made before overhead existed, until its first rollover.
-      (s.todayCostByCategory.overhead ?? 0),
+      // Absent in an older save, until its first rollover.
+      (s.todayCostByCategory.overhead ?? 0) +
+      (s.todayCostByCategory.innovations ?? 0) +
+      (s.todayCostByCategory.executives ?? 0),
   },
   {
     label: 'Expedited repairs',
@@ -108,6 +110,18 @@ const COST_ROWS: CostRowSpec[] = [
     depth: 1,
     hint: 'Head office, systems and crew bases: grows with the square of the fleet (sim/overhead.ts).',
     value: (s) => s.todayCostByCategory.overhead ?? 0,
+  },
+  {
+    label: 'Innovations',
+    depth: 1,
+    hint: 'Running costs of adopted innovations: the loyalty scheme and the codeshare feed (sim/innovations.ts).',
+    value: (s) => s.todayCostByCategory.innovations ?? 0,
+  },
+  {
+    label: 'Executives',
+    depth: 1,
+    hint: 'Salaries of the appointed executives (sim/executives.ts).',
+    value: (s) => s.todayCostByCategory.executives ?? 0,
   },
   // Both of these were missing from the tree — crew salaries since week
   // six, and training since week eight — so "Fixed" was quietly reporting

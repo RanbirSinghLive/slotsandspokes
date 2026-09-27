@@ -12,6 +12,9 @@ import { renderScheduleWarnings, scheduleProblems } from './panels';
 
 export {
   adoptInnovation,
+  appointExecutiveById,
+  executiveOptions,
+  letExecutiveGo,
   currentTurnBuffer,
   hedgeFuel,
   hedgeOptions,
@@ -32,6 +35,7 @@ export {
   leasePlane,
   type MarketPnlHistory,
   type MarketSummary,
+  type ExecutiveOption,
   type InnovationOption,
   type Outcome,
   type PlaneOption,

@@ -1,20 +1,24 @@
 [
   {
-    "id": "ceo-hargrave",
-    "role": "ceo",
-    "name": "Diane Hargrave",
-    "background": "Turnaround chief executive",
-    "flavor": "Took two regional carriers off the brink and sold one of them. Opens doors that don't open for operators, and knows exactly which quarter to open them in.",
-    "signingFee": 500000,
-    "effect": { "kind": "annual-bonus", "amount": 200000, "escalation": 1.4 }
+    "id": "coo-maintenance",
+    "role": "coo",
+    "name": "Errol Vance",
+    "background": "Maintenance and engineering",
+    "flavor": "A licensed engineer who still reads the defect log himself. Reckons a well-kept airframe owes you nothing and a neglected one takes it out of your schedule.",
+    "npsNeeded": null,
+    "signingFee": 150000,
+    "salaryPerDay": 1500,
+    "effect": { "kind": "maintenance", "ageFactorMultiplier": 0.85 }
   },
   {
     "id": "coo-flightops",
     "role": "coo",
     "name": "Marcus Oyelaran",
     "background": "Flight operations",
-    "flavor": "Twenty years running control centres. Believes most delays are decisions, not weather, and reschedules a rotation faster than anyone can explain why it broke.",
+    "flavor": "Twenty years running control centres. Believes most delays are decisions, not weather, and reschedules a rotation faster than anyone can explain why it was late.",
+    "npsNeeded": 15,
     "signingFee": 300000,
+    "salaryPerDay": 3000,
     "effect": { "kind": "flight-ops", "delayMultiplier": 0.85 }
   },
   {
@@ -23,34 +27,75 @@
     "name": "Priya Raghunathan",
     "background": "Inflight service",
     "flavor": "Came up through the cabin and never stopped thinking like it. Rewrote a legacy carrier's onboard standards and made the crew like the new ones better.",
-    "signingFee": 300000,
+    "npsNeeded": 20,
+    "signingFee": 400000,
+    "salaryPerDay": 4000,
     "effect": { "kind": "inflight", "npsBonus": 8 }
   },
   {
-    "id": "coo-maintenance",
-    "role": "coo",
-    "name": "Errol Vance",
-    "background": "Maintenance and engineering",
-    "flavor": "A licensed engineer who still reads the defect log himself. Reckons a well-kept airframe owes you nothing and a neglected one takes it out of your schedule.",
-    "signingFee": 300000,
-    "effect": { "kind": "maintenance", "ageFactorMultiplier": 0.85 }
+    "id": "cfo-mercer",
+    "role": "cfo",
+    "name": "Dale Mercer",
+    "background": "Cost control",
+    "flavor": "Spent a career in the back offices of charter airlines, where a head-office cost nobody can name is a cost that gets cut. Brings a red pen and uses it.",
+    "npsNeeded": null,
+    "signingFee": 150000,
+    "salaryPerDay": 1500,
+    "effect": { "kind": "overhead", "overheadMultiplier": 0.85 }
+  },
+  {
+    "id": "cfo-okafor",
+    "role": "cfo",
+    "name": "Hana Okafor",
+    "background": "Treasury",
+    "flavor": "Ran fuel purchasing for a flag carrier through two price spikes. Knows the banks by first name and pays half what anyone else does to lock a price.",
+    "npsNeeded": 15,
+    "signingFee": 250000,
+    "salaryPerDay": 2500,
+    "effect": { "kind": "treasury", "hedgePremiumMultiplier": 0.5, "overheadMultiplier": 0.95 }
   },
   {
     "id": "cfo-adeyemi",
     "role": "cfo",
     "name": "Simone Adeyemi",
-    "background": "Airline finance",
-    "flavor": "Structured aircraft debt for a decade before deciding she would rather spend it than arrange it. Finds money in the working capital nobody else was looking at.",
+    "background": "Aircraft finance",
+    "flavor": "Structured aircraft debt for a decade before deciding she would rather spend it than arrange it. Lessors return her calls first, and quote her lower.",
+    "npsNeeded": 20,
     "signingFee": 350000,
-    "effect": { "kind": "monthly-bonus", "amount": 18000, "escalation": 1.08 }
+    "salaryPerDay": 3500,
+    "effect": { "kind": "leasing", "leaseMultiplier": 0.88 }
   },
   {
     "id": "cco-lindqvist",
     "role": "cco",
     "name": "Tomas Lindqvist",
     "background": "Commercial and distribution",
-    "flavor": "Built a low-cost carrier's network one town at a time: the travel agents, the local papers, the chamber of commerce. New routes fill faster when he's already told the town they're coming.",
-    "signingFee": 250000,
+    "flavor": "Built a low-cost carrier's network one town at a time: the travel agents, the local papers, the chamber of commerce. New routes fill faster when he's been there first.",
+    "npsNeeded": null,
+    "signingFee": 150000,
+    "salaryPerDay": 1500,
     "effect": { "kind": "market-building", "growthMultiplier": 1.25 }
+  },
+  {
+    "id": "cco-carvalho",
+    "role": "cco",
+    "name": "Inês Carvalho",
+    "background": "Network and alliances",
+    "flavor": "Planned a hub carrier's banks for years and can tell you which two cities a connection is really for. Sells the itinerary, not the flight.",
+    "npsNeeded": 15,
+    "signingFee": 250000,
+    "salaryPerDay": 2500,
+    "effect": { "kind": "connections", "connectingMultiplier": 1.15 }
+  },
+  {
+    "id": "cco-mensah",
+    "role": "cco",
+    "name": "Kofi Mensah",
+    "background": "Revenue management",
+    "flavor": "Built the fare systems at two airlines that everyone else then copied. Sells the last seat for what it's worth and the first one for more than you'd think.",
+    "npsNeeded": 20,
+    "signingFee": 350000,
+    "salaryPerDay": 3500,
+    "effect": { "kind": "revenue", "yieldMultiplier": 1.03 }
   }
 ]

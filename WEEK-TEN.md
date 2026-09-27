@@ -6,7 +6,7 @@ moats, shocks, real costs, Europe, home difficulty) lives in
 with playtest findings as they come (see "Playtest notes"), and the
 order changes with them.
 
-**State at handoff:** save key `airgame-save-v46`. **Threads 1, 2, 3 and 10 are done.** The game pushes back
+**State at handoff:** save key `airgame-save-v46`. **Threads 1, 2, 3, 8 and 10 are done.** The game pushes back
 the way CLAUDE.md's philosophy asks: over a year a careful airline makes
 $6.5M–$19M, a sitter $2M–$5M and eroding, an unattended one-plane start
 survives the Standard homes, a reckless one always busts
@@ -293,6 +293,18 @@ a game that is otherwise all numbers.
   record attracts journeymen; a well-regarded one can hire the stars. The
   candidates on offer are grouped by the NPS they need.
 - Shown in the side panel (Network › Executives), not a separate tab.
+
+**Status: done.** As built: three chairs, nine candidates (a journeyman,
+an NPS 15 hire and an NPS 20 star per chair, each helping differently),
+signing fee plus salary, "Let go", in the Head office view. The old
+cash-bonus effects (a CEO's and CFO's bonuses) are gone, since paying an
+executive to be paid was money for money; the CFOs now cut overhead,
+hedge premiums or lease rates. The Executive tab (hidden) keeps only
+its runway chart. With nobody hired, headless output is unchanged. The
+steady player hires on a margin-covers-10×-salary rule; steady median
+cash (thread 3 → thread 8): YUL $10.2M → $12.0M, YYZ $32.5M → $23.7M,
+BOS $28.2M → $27.3M, PHL $30.3M → $45.4M, YHZ $192k → $192k, LHR $76.5M
+→ $87.7M; busts unchanged at 3. Mostly seed noise; no chair dominates.
 
 ## Thread 9: crew, woven into the map (an exploration)
 

@@ -1,4 +1,17 @@
+import { dayIndex } from './clock';
 import airportsData from '../../data/airports.json';
+import {
+  appointBlockedReason,
+  appointedCandidate,
+  appointExecutive,
+  candidatesForRole,
+  dismissExecutive,
+  EXECUTIVE_ROLES,
+  executiveLeaseMultiplier,
+  ROLE_LABELS,
+  type ExecutiveCandidate,
+  type ExecutiveRole,
+} from './executives';
 import { AIRCRAFT_CLASSES, classByCode, classRank, pluralClassName } from './aircraftClasses';
 import { applyHubStyleChange, planHubStyleChange } from './hubs';
 import { HUB_STYLES, type HubStyle } from './hubStyle';
@@ -416,12 +429,15 @@ function days(count: number): string {
 /**
  * The airframe a listing becomes once leased: the same one, unless the
  * airline has younger airframes (sim/innovations.ts), which refurbish it
- * on the way out at the younger airframe's rate.
+ * on the way out at the younger airframe's rate, or an aircraft-finance
+ * CFO (sim/executives.ts), who gets the rate down.
  */
 function asLeased(state: SimState, listing: MarketListing): MarketListing {
   const ageYears = leasedAge(state, listing.ageYears);
-  if (ageYears === listing.ageYears) return listing;
-  return { ...listing, ageYears, leasePricePerDay: leaseRateFor(listing.typeCode, ageYears) };
+  const rate = ageYears === listing.ageYears ? listing.leasePricePerDay : leaseRateFor(listing.typeCode, ageYears);
+  const leasePricePerDay = Math.round(rate * executiveLeaseMultiplier(state));
+  if (ageYears === listing.ageYears && leasePricePerDay === listing.leasePricePerDay) return listing;
+  return { ...listing, ageYears, leasePricePerDay };
 }
 
 /**
@@ -524,4 +540,39 @@ export function hedgeOptions(state: SimState): HedgeQuote[] {
 
 export function hedgeFuel(state: SimState, days: number): Outcome<{ message: string }> {
   return buyHedge(state, days);
+}
+
+// --- Executives ------------------------------------------------------------------
+
+export type ExecutiveOption = ExecutiveCandidate & {
+  appointed: boolean;
+  /** Why they can't be appointed now, or null if they can. */
+  blocked: string | null;
+};
+
+/** Each chair (sim/executives.ts): who holds it, and every candidate with why they can't be hired yet. */
+export function executiveOptions(state: SimState): { role: ExecutiveRole; label: string; holder: ExecutiveCandidate | null; hiredDay: number | null; candidates: ExecutiveOption[] }[] {
+  return EXECUTIVE_ROLES.map((role) => {
+    const holder = appointedCandidate(state, role) ?? null;
+    const appointment = state.executives[role];
+    return {
+      role,
+      label: ROLE_LABELS[role],
+      holder,
+      hiredDay: appointment ? dayIndex(state, appointment.hiredAtMinute) : null,
+      candidates: candidatesForRole(role).map((candidate) => ({
+        ...candidate,
+        appointed: holder?.id === candidate.id,
+        blocked: holder?.id === candidate.id ? null : appointBlockedReason(state, candidate),
+      })),
+    };
+  });
+}
+
+export function appointExecutiveById(state: SimState, candidateId: string): Outcome<{ message: string }> {
+  return appointExecutive(state, candidateId);
+}
+
+export function letExecutiveGo(state: SimState, role: ExecutiveRole): Outcome<{ message: string }> {
+  return dismissExecutive(state, role);
 }

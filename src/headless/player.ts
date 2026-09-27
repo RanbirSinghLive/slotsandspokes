@@ -155,6 +155,15 @@ const INNOVATION_RESERVE_DAYS = 60;
  */
 export const HEDGE_BELOW_PRICE = 0.95;
 
+/**
+ * The steady player hires an executive (sim/executives.ts) when last
+ * week's average margin is at least this many times their salary, and the
+ * signing fee leaves the same cash reserve as an innovation. It fills an
+ * empty chair, or replaces the holder with a candidate who needs a higher
+ * NPS, since those are the stronger hires.
+ */
+export const EXECUTIVE_MARGIN_TIMES_SALARY = 10;
+
 /** Planes the sitter grows to before it stops growing. */
 export const SITTER_FLEET_SIZE = 5;
 /** How much of its day a plane can already fly before the reckless player stops looking for more to give it. */
@@ -280,6 +289,7 @@ function steadyPlayer(kind: 'steady' | 'sitter'): Player {
         ...pickStances(state, memory),
         ...adoptInnovations(state),
         ...(kind === 'steady' ? hedgeWhenCheap(state) : []),
+        ...(kind === 'steady' ? hireExecutives(state) : []),
       ];
     },
   };
@@ -718,4 +728,27 @@ function hedgeWhenCheap(state: SimState): string[] {
   if (state.cash < quote.premium + INNOVATION_RESERVE_DAYS * leases) return [];
   const hedged = actions.hedgeFuel(state, quote.days);
   return hedged.ok ? [hedged.message] : [];
+}
+
+// --- Executives --------------------------------------------------------------------
+
+/** Fill or upgrade each chair with the strongest candidate the airline can get and afford. */
+function hireExecutives(state: SimState): string[] {
+  const lastWeek = state.marginHistory.slice(-7);
+  if (lastWeek.length < 7) return [];
+  const averageMargin = lastWeek.reduce((sum, margin) => sum + margin, 0) / 7;
+  const leases = state.aircraft.reduce((sum, aircraft) => sum + aircraft.leaseCostPerDay, 0);
+  const done: string[] = [];
+  for (const chair of actions.executiveOptions(state)) {
+    const holderRank = chair.holder ? (chair.holder.npsNeeded ?? 0) : -1;
+    const best = chair.candidates
+      .filter((candidate) => !candidate.blocked && (candidate.npsNeeded ?? 0) > holderRank)
+      .filter((candidate) => averageMargin >= EXECUTIVE_MARGIN_TIMES_SALARY * candidate.salaryPerDay)
+      .filter((candidate) => state.cash >= candidate.signingFee + INNOVATION_RESERVE_DAYS * leases)
+      .sort((a, b) => (b.npsNeeded ?? 0) - (a.npsNeeded ?? 0))[0];
+    if (!best) continue;
+    const hired = actions.appointExecutiveById(state, best.id);
+    if (hired.ok) done.push(hired.message);
+  }
+  return done;
 }

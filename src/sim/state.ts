@@ -454,8 +454,8 @@ export type SimState = {
    */
   farePolicyMultiplier: number;
   /**
-   * Week six's C-suite (sim/executives.ts): four slots, each holding at
-   * most one appointment, each paid a signing fee in cash.
+   * The executives (sim/executives.ts): three chairs, each empty or held
+   * by one appointment.
    */
   executives: ExecutiveSlots;
   /**
@@ -563,6 +563,8 @@ export type SimState = {
     overhead: number;
     /** Running costs of adopted innovations (sim/innovations.ts). Absent in an older save until its first rollover. */
     innovations?: number;
+    /** Executives' salaries (sim/executives.ts). Absent in an older save until its first rollover. */
+    executives?: number;
   };
 };
 
@@ -671,7 +673,7 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     todayFlightsCancelled: 0,
     npsScoredFlightsTotal: 0,
     todayNpsScoredFlights: 0,
-    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, lease: 0, crew: 0, training: 0, slots: 0, maintenance: 0, overhead: 0, innovations: 0 },
+    todayCostByCategory: { fuel: 0, blockNonFuel: 0, departure: 0, lease: 0, crew: 0, training: 0, slots: 0, maintenance: 0, overhead: 0, innovations: 0, executives: 0 },
   };
   revealReach(state);
   openMarket(state);

@@ -40,7 +40,6 @@ import { isHubPlannerOpen } from './ui/hubPlanner';
 import { setupFarePolicy, updateFarePolicy } from './ui/farePolicy';
 import { setupOnTimePanel, updateOnTimePanel } from './ui/onTime';
 import { setupExecutivePanel, updateExecutivePanel } from './ui/executive';
-import { setupExecutivesPanel, updateExecutivesPanel } from './ui/executives';
 import { setupDevPanel, updateDevPanel } from './ui/devTools';
 import { setupCrewPanel, updateCrewPanel } from './ui/crew';
 import { setupInfoTooltips } from './ui/infoTooltip';
@@ -76,7 +75,6 @@ setupRouteBuilder(state, () => switchToSidebarTab('fleet'));
 setupFarePolicy(state);
 setupOnTimePanel();
 setupExecutivePanel();
-setupExecutivesPanel();
 setupDevPanel();
 setupCrewPanel(state);
 setupInfoTooltips();
@@ -632,10 +630,7 @@ function switchToSidebarTab(tab: SidebarTab): void {
   syncSidebarTabButtons();
 
   if (tab === 'ontime') updateOnTimePanel(state);
-  if (tab === 'executive') {
-    updateExecutivesPanel(state);
-    updateExecutivePanel(state);
-  }
+  if (tab === 'executive') updateExecutivePanel(state);
   if (tab === 'game') updateGameControls();
 
   render();

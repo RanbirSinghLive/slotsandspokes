@@ -2038,21 +2038,38 @@ cash rises 5–65% by home (WEEK-TEN.md, thread 2).
 
 ---
 
-## The C-suite (`src/sim/executives.ts`) — week six
+## Executives (`src/sim/executives.ts`)
 
-Four slots — CEO, COO, CFO, CCO — each for a cash signing fee
-($250,000–$500,000). Hidden from the player until WEEK-TEN.md's thread 8
-reworks it: no CEO, salaries, and candidate pools that widen as NPS
-rises, all in the Head office view.
+The player is the chief executive; three chairs are theirs to fill, at
+Head office (Network › Head office): **COO**, **CFO** and **CCO**. Each
+candidate (`data/executives.json`) is a named person with a background,
+hired for a **signing fee** (not refunded) and a **daily salary**
+(charged at rollover, cost category `executives`), for one lasting
+effect on a system already in the game. "Let go" stops the salary.
+Replacing a holder costs the new candidate's full fee.
 
-Each attaches to a system that already existed rather than a stat
-invented for them: the COO's three backgrounds hit the delay roll, the
-NPS scorer and the maintenance age factor respectively; the CCO makes
-every market grow into your service 25% faster; the
-CEO and CFO pay escalating bonuses. Escalation resets when an incumbent
-is replaced — seniority belongs to the person, not the chair.
+**The pool widens as NPS rises**: each chair has a journeyman open to
+anyone, a hire who needs a trailing network NPS of 15, and a star who
+needs 20 (judged at hiring; they stay if NPS falls later).
 
-Effects are placeholders pending real numbers.
+| Chair | Anyone | NPS 15 | NPS 20 |
+|---|---|---|---|
+| COO | Errol Vance: breakdowns as if 15% younger | Marcus Oyelaran: delays 15% shorter | Priya Raghunathan: +8 NPS a flight |
+| CFO | Dale Mercer: overhead −15% | Hana Okafor: hedge premiums halved, overhead −5% | Simone Adeyemi: new leases −12% |
+| CCO | Tomas Lindqvist: markets grow 25% faster | Inês Carvalho: +15% connecting passengers | Kofi Mensah: +3% yield |
+
+Fees run $150,000 (journeymen) to $400,000, salaries $1,500 to $4,000 a
+day. The effects are read where they apply: delays (sim/cascade.ts,
+step.ts), NPS, AOG age (sim/aog.ts), overhead (sim/overhead.ts), hedge
+quotes (sim/fuelPrice.ts), lease rates (`asLeased()` in
+sim/playerActions.ts), market growth, hub flows (sim/hubs.ts, in the
+cache key) and yield (`bookingPerks()`).
+
+The steady headless player hires when last week's margin covers ten
+times the salary and the fee leaves its cash reserve, filling empty
+chairs and upgrading to stronger candidates. Measured: journeymen around
+days 80–170, the NPS 15 hires from day 109, the stars rarely (once in
+five sample games, day 314).
 
 ---
 

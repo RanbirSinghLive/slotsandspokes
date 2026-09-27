@@ -1,4 +1,5 @@
 import { RECAPTURE_RATE } from './economy';
+import { executiveYieldMultiplier } from './executives';
 import { airlineCalled, LADDER, tiersClimbed } from './ladder';
 import { brandEdge } from './nps';
 import type { SimState } from './state';
@@ -153,7 +154,8 @@ export type BookingPerks = {
 export function bookingPerks(state: SimState, origin: string, dest: string): BookingPerks {
   return {
     brandEdge: brandEdge(state, origin, dest),
-    yieldMultiplier: isAdopted(state, 'online-booking') ? DIRECT_BOOKING_YIELD : 1,
+    // Online booking, and a revenue-management CCO (sim/executives.ts).
+    yieldMultiplier: (isAdopted(state, 'online-booking') ? DIRECT_BOOKING_YIELD : 1) * executiveYieldMultiplier(state),
     recaptureRate: isAdopted(state, 'loyalty-scheme') ? LOYALTY_RECAPTURE_RATE : RECAPTURE_RATE,
   };
 }

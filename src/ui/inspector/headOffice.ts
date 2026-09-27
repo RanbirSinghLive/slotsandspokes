@@ -3,13 +3,15 @@ import { FUEL_PRICE_BASELINE } from '../../sim/fuel';
 import { activeHedge, describeFuelPrice } from '../../sim/fuelPrice';
 import type { SimState } from '../../sim/state';
 import * as ops from '../routeActions';
-import type { InnovationOption } from '../routeActions';
+import type { ExecutiveOption, InnovationOption } from '../routeActions';
+import { describeEffect, type ExecutiveRole } from '../../sim/executives';
+import { formatNps, networkNps } from '../../sim/nps';
 
 /**
  * The Head office view (Network › Head office): the airline's decisions
  * that aren't made on the map. Fuel, with its price chart and the hedge
  * (sim/fuelPrice.ts), and the innovations the ladder opens
- * (sim/innovations.ts). Executives join them in WEEK-TEN.md's thread 8.
+ * (sim/innovations.ts), and the executives (sim/executives.ts).
  */
 
 function line(text: string, className = 'inspector-line'): HTMLElement {
@@ -32,17 +34,17 @@ function money(amount: number): string {
 /** One innovation: what it does and costs, and a button to adopt it, or why it can't be yet. */
 function innovationCard(state: SimState, option: InnovationOption, changed: () => void): HTMLElement {
   const card = document.createElement('div');
-  card.className = 'innovation-card';
+  card.className = 'office-card';
   card.classList.toggle('is-adopted', option.adopted);
   card.classList.toggle('is-locked', !option.adopted && option.blocked !== null);
   const name = document.createElement('div');
-  name.className = 'innovation-name';
+  name.className = 'office-card-name';
   name.textContent = option.adopted ? `✓ ${option.name}` : option.name;
   const price = [option.oneOffPrice > 0 ? `${money(option.oneOffPrice)} once` : null, option.runningCost]
     .filter(Boolean)
     .join(', then ');
   const status = option.adopted ? (option.runningCost ? `Running: ${option.runningCost}.` : 'Adopted.') : `Costs ${price}.`;
-  card.append(name, line(option.description), line(status, 'inspector-line innovation-price'));
+  card.append(name, line(option.description), line(status, 'inspector-line office-card-price'));
   if (option.adopted) return card;
 
   if (option.blocked) {
@@ -69,6 +71,92 @@ function innovationCard(state: SimState, option: InnovationOption, changed: () =
   });
   card.append(button);
   return card;
+}
+
+/** A two-click button: the first click says what it will do, the second does it. */
+function confirmButton(label: string, confirmLabel: string, act: () => void): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'inspector-plan-hub';
+  button.textContent = label;
+  let armed = false;
+  button.addEventListener('click', () => {
+    if (!armed) {
+      armed = true;
+      button.textContent = confirmLabel;
+      button.classList.add('is-act');
+      return;
+    }
+    act();
+  });
+  return button;
+}
+
+/** One candidate: who they are, what they'd do and cost, and a button to hire them, or why not yet. */
+function candidateCard(state: SimState, candidate: ExecutiveOption, holder: string | null, changed: () => void): HTMLElement {
+  const card = document.createElement('div');
+  card.className = 'office-card';
+  card.classList.toggle('is-locked', candidate.blocked !== null);
+  const name = document.createElement('div');
+  name.className = 'office-card-name';
+  name.textContent = `${candidate.name} · ${candidate.background}`;
+  card.append(
+    name,
+    line(candidate.flavor, 'inspector-line office-card-flavor'),
+    line(describeEffect(candidate.effect)),
+    line(`${money(candidate.signingFee)} to sign, then ${money(candidate.salaryPerDay)} a day.`, 'inspector-line office-card-price'),
+  );
+  if (candidate.blocked) {
+    card.append(line(candidate.blocked, 'inspector-line goal-ahead'));
+    return card;
+  }
+  card.append(
+    confirmButton(
+      holder ? `Replace ${holder} with ${candidate.name}` : `Appoint ${candidate.name}`,
+      `Click again to pay ${money(candidate.signingFee)}.${holder ? ` ${holder} leaves with no refund.` : ''}`,
+      () => {
+        ops.appointExecutiveById(state, candidate.id);
+        changed();
+      },
+    ),
+  );
+  return card;
+}
+
+function executivesSection(state: SimState, changed: () => void): HTMLElement[] {
+  const nodes: HTMLElement[] = [
+    heading('Executives'),
+    line(
+      `You're the chief executive; these three chairs are yours to fill. The strongest candidates only talk to an airline passengers rate well (yours: NPS ${formatNps(networkNps(state))}).`,
+    ),
+  ];
+  for (const chair of ops.executiveOptions(state)) {
+    const title = document.createElement('h4');
+    title.className = 'office-chair';
+    title.textContent = chair.label;
+    nodes.push(title);
+    if (chair.holder) {
+      const card = document.createElement('div');
+      card.className = 'office-card is-adopted';
+      const name = document.createElement('div');
+      name.className = 'office-card-name';
+      name.textContent = `✓ ${chair.holder.name} · ${chair.holder.background}`;
+      card.append(
+        name,
+        line(describeEffect(chair.holder.effect)),
+        line(`Since day ${chair.hiredDay}, at ${money(chair.holder.salaryPerDay)} a day.`, 'inspector-line office-card-price'),
+        confirmButton('Let go', `Click again to let ${chair.holder.name} go. The salary stops; the fee isn't refunded.`, () => {
+          ops.letExecutiveGo(state, chair.role as ExecutiveRole);
+          changed();
+        }),
+      );
+      nodes.push(card);
+    }
+    for (const candidate of chair.candidates) {
+      if (!candidate.appointed) nodes.push(candidateCard(state, candidate, chair.holder?.name ?? null, changed));
+    }
+  }
+  return nodes;
 }
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -189,6 +277,8 @@ export function buildHeadOfficeView(state: SimState, changed: () => void): HTMLE
     line("A hedge locks today's price on all your fuel. If fuel rises, you pay less than the market; if it falls, you still pay today's price. The premium is spent either way, so hedging at random loses money: it's a bet on where the price goes."),
     ...hedgeButtons(state, changed),
   );
+
+  root.append(...executivesSection(state, changed));
 
   root.append(
     heading('Innovations'),

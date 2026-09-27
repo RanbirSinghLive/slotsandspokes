@@ -1,4 +1,5 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
+import { executiveHedgePremiumMultiplier } from './executives';
 import { dayIndex } from './clock';
 import { legCostBreakdown, type EconomyAircraftType } from './economy';
 import { FUEL_PRICE_BASELINE, FUEL_PRICE_MAX } from './fuel';
@@ -122,7 +123,8 @@ export type HedgeQuote = {
 export function hedgeQuote(state: SimState, days: number): HedgeQuote {
   const lockedPrice = state.fuelPriceIndex;
   const covers = dailyFuelBillAtBaseline(state) * lockedPrice * days;
-  const premium = Math.round(covers * (HEDGE_BASE_PREMIUM + HEDGE_PREMIUM_PER_DAY * days));
+  // A treasury CFO gets a better price from the banks (sim/executives.ts).
+  const premium = Math.round(covers * (HEDGE_BASE_PREMIUM + HEDGE_PREMIUM_PER_DAY * days) * executiveHedgePremiumMultiplier(state));
   let blocked: string | null = null;
   const current = activeHedge(state);
   if (current) blocked = `Your hedge runs until day ${current.endDay}.`;

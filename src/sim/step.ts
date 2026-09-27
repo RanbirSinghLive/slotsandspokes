@@ -16,7 +16,7 @@ import { revealReach } from './reach';
 import { rollDailyCrew, maintenanceAgeFactor, cabinServiceShare } from './crew';
 import { isAog, rollDailyAogs } from './aog';
 import {
-  payExecutiveBonuses,
+  executiveSalariesPerDay,
   executiveDelayMultiplier,
   executiveNpsBonus,
   executiveMaintenanceMultiplier,
@@ -173,7 +173,7 @@ export function step(state: SimState): void {
     state.todayMargin = 0;
     // Week six's cost attribution — reset in lockstep with todayCost
     // above, since these five are exactly that number split up.
-    state.todayCostByCategory = { fuel: 0, blockNonFuel: 0, departure: 0, lease: 0, crew: 0, training: 0, slots: 0, maintenance: 0, overhead: 0, innovations: 0 };
+    state.todayCostByCategory = { fuel: 0, blockNonFuel: 0, departure: 0, lease: 0, crew: 0, training: 0, slots: 0, maintenance: 0, overhead: 0, innovations: 0, executives: 0 };
     // Per-market breakdown of todayRevenue/todayCost, reset in lockstep
     // with them for the same reason as todayCostByCategory above.
     state.todayRevenueByMarket = {};
@@ -212,6 +212,13 @@ export function step(state: SimState): void {
     state.todayCostByCategory.innovations = innovationCost;
     state.todayMargin -= innovationCost;
 
+    // Executives' salaries (sim/executives.ts).
+    const salaries = executiveSalariesPerDay(state);
+    state.cash -= salaries;
+    state.todayCost += salaries;
+    state.todayCostByCategory.executives = salaries;
+    state.todayMargin -= salaries;
+
     // Slot fees (sim/slots.ts): the same flat-per-day shape as the lease.
     // Anything the schedule needs and doesn't hold is taken first (a
     // backstop — the route builder already takes them), then slots nothing
@@ -236,8 +243,6 @@ export function step(state: SimState): void {
     // whatever couldn't be covered is counted as cancelled today.
     rollDailyAogs(state, state.simMinute);
 
-    // Week six's C-suite: any executive bonus that has come due.
-    payExecutiveBonuses(state);
 
     // Cancellations. Everything on the schedule that has an aircraft is a
     // scheduled departure; the ones whose aircraft couldn't be crewed
