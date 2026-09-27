@@ -293,5 +293,24 @@ function buildReturn(state: SimState, tail: string, changed: () => void): HTMLEl
   });
   block.append(button);
   if (option.blocked) block.append(line(option.blocked));
+  // The usual reason it can't go back: it still flies. Offer to clear its day.
+  if (state.schedule.some((leg) => leg.tail === tail)) {
+    const clear = document.createElement('button');
+    clear.type = 'button';
+    clear.className = 'inspector-plan-hub';
+    clear.textContent = `Remove all of ${tail}'s flights`;
+    let clearArmed = false;
+    clear.addEventListener('click', () => {
+      if (!clearArmed) {
+        clearArmed = true;
+        clear.textContent = `Click again to remove every flight ${tail} flies.`;
+        clear.classList.add('is-act');
+        return;
+      }
+      ops.clearPlane(state, tail);
+      changed();
+    });
+    block.append(clear);
+  }
   return block;
 }

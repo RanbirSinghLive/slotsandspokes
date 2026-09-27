@@ -621,9 +621,14 @@ planner the route builder uses, and the ring's actions in
 
 - **steady** (the default) plays like a careful player checking in once
   a day. Its opening fills the plane's day with out-and-backs from home,
-  each time to the known airport with the most potential demand per
+  each time to the known airport that ranks best in the airport view's
+  "Where to fly next" order (`marketAppeal()`: potential demand) per
   flight already on that market, and never takes a rotation that lands
-  after 21:00. Then, every day, in order:
+  after 21:00. (Ranked by the market's words alone, size and service,
+  it picked blind among "Huge, starved" markets and its year fell two-
+  to four-fold; ranked up for hunger or down for rivals, it fell by
+  two-thirds in Montréal. So the list ranks by potential and says the
+  rest in words.) Then, every day, in order:
   1. **Leave slack.** A market with cancellations on 2–3 of the last 7
      days gets 15 more minutes of turn buffer, or loses a flight if the
      plane has no room. On 4 or more days it loses a flight: the plane
@@ -647,14 +652,25 @@ planner the route builder uses, and the ring's actions in
      could pay on its own, if cash covers the lessor's reserve plus 30
      more days of that lease. Then it fills
      that plane's day at once.
-  6. **Return idle planes.** A plane that flew nothing for 7 days goes
-     back to the lessor, if the fee can be paid.
-  7. **Pick stances.** Every 7 days, on each market a rival also flies,
+  6. **Shed planes when overhead bites.** A plane whose share of last
+     week's market margins (a market's margin per flight, times its
+     flights there) has been below its lease plus the overhead one
+     fewer plane would save (`overheadSavedByOneFewer()`) for 14 days
+     in a row has its flights cleared (`clearPlane()`, the aircraft
+     view's "Remove all of its flights") and goes back. Newest first,
+     one a day, once its markets are past their 21-day ramp.
+  7. **Return idle planes.** A plane that flew nothing for 7 days goes
+     back to the lessor, if the fee can be paid, but never the last one.
+  8. **Pick stances.** Every 7 days, on each market a rival also flies,
      it takes the stance whose forecast (`sim/fareForecast.ts`) makes
      the most once fares settle, ties to Match. It rules out a stance
      with a 5% or higher daily chance of a rival adding a flight: the
      forecast holds rival flights fixed, so on a full market it
      overrates Premium, which rivals answer with capacity.
+  9. **Head office.** It adopts innovations on a 90-day payback, hedges
+     fuel 90 days when it's 5% or more below usual, and hires executives
+     when last week's margin covers ten times the salary (see those
+     sections).
 
   It skips a rotation whose new slot fees are more than a quarter of
   what a full plane would take in fares on it. It never adds flights at
@@ -665,9 +681,14 @@ planner the route builder uses, and the ring's actions in
   change, gets no flight back for 30 days after one is dropped, and is
   judged only on the days since it was last opened.
 - **sitter** plays steady until it has 5 planes, then only harvests:
-  slack, cutting losers, stances and returning idle planes, but no more
-  leasing, opening or adding. It measures whether sitting on profit
-  costs anything (today it doesn't: its margin plateaus).
+  slack, cutting losers, stances, shedding and returning planes, but no
+  more leasing, opening or adding. It measures whether sitting on profit
+  costs anything. Shedding leaves it one or two planes by the year's end.
+- **bold** plays steady's habits but grows fast: it leases once a pool
+  is 60% booked, as soon as the airline makes money at all (not once
+  the margin covers the lease), keeping 7 days of the lease in cash
+  over the lessor's reserve. It still cuts and sheds. High variance: the
+  best Toronto year made $73M; 13 of 36 games bust, mostly days 48–100.
 - **reckless** leases the biggest plane the lessor allows every day it
   can and fills every plane's day to 22:00 wherever the riders are,
   never cutting and ignoring congestion, slot fees and rivals. Today it
@@ -684,12 +705,14 @@ that was flown, and prints `GAME OVER on day N`.
 
 **`npm run balance`** (`src/headless/balance.ts`) is the report to read
 before and after a balance change: six homes (YUL, YYZ, BOS, PHL, YHZ,
-LHR) × six seeds, a year each, played by all four players (144 games,
-about 8 minutes). Per home it prints busts and the average day they happened,
-median, mean, worst and best cash, and the planes, markets and flights a
-day of the airlines still flying, and writes every game to
-`balance-output.csv` (git-ignored). `-- 180` changes the horizon;
-`--player steady` runs one player. One seed can mislead badly: London's
+LHR) × six seeds, a year each, played by all five players (180 games,
+about 6 minutes). Per home it prints busts and the average day they happened,
+median, mean, worst and best cash, the planes, markets and flights a
+day of the airlines still flying, and the median ladder tiers climbed,
+and writes every game to `balance-output.csv` (git-ignored). The full
+report then re-rates every home (`npm run homes`), so the ratings can't
+go stale after a tuning change. `-- 180` changes the horizon;
+`--player steady` runs one player and skips the re-rating. One seed can mislead badly: London's
 steady runs end anywhere from $325k to $90M.
 
 Balance work that needs a better player should add a habit to

@@ -31,6 +31,13 @@ export function networkOverheadPerDay(state: SimState): number {
   return networkOverheadFor(state.aircraft.length) * executiveOverheadMultiplier(state);
 }
 
+/** How much the daily overhead would fall with one plane fewer. */
+export function overheadSavedByOneFewer(state: SimState): number {
+  const planes = state.aircraft.length;
+  if (planes === 0) return 0;
+  return (networkOverheadFor(planes) - networkOverheadFor(planes - 1)) * executiveOverheadMultiplier(state);
+}
+
 /** How much one more plane would add to the daily overhead. */
 export function overheadAddedByNextPlane(state: SimState): number {
   return (networkOverheadFor(state.aircraft.length + 1) - networkOverheadFor(state.aircraft.length)) * executiveOverheadMultiplier(state);

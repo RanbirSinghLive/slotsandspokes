@@ -5,7 +5,7 @@ import { marketDistanceNm } from './demand';
 import { currentPotentialDemand } from './marketDemand';
 import { marketSize, type Size } from './marketSize';
 import { isAircraftTypeAllowedAt, marketKey, recommendedFare } from './schedule';
-import { describeServiceLevel, hungerBoost, hungerByAirport } from './serviceLevel';
+import { describeServiceLevel, hungerByAirport } from './serviceLevel';
 import type { SimState } from './state';
 
 /**
@@ -18,10 +18,7 @@ import type { SimState } from './state';
  *
  * Only markets the airline could fly now: to an airport it can see, within
  * the range of a plane based here (or, with none based here, any plane in
- * the fleet), at airports that plane can use. Ranked by potential demand,
- * raised by the hunger that makes a new route grow faster
- * (sim/serviceLevel.ts) and cut by each rival flight already there, since
- * booking share follows frequency.
+ * the fleet), at airports that plane can use. Ranked by marketAppeal().
  */
 
 type TypeSpec = { code: string; rangeNm: number };
@@ -43,8 +40,31 @@ export type FlySuggestion = {
   className: string;
 };
 
-/** How much each rival flight a day already on a market lowers its rank. */
-const RIVAL_FLIGHT_PENALTY = 0.5;
+/**
+ * How a market ranks in the list: its potential demand, roughly riders a
+ * day. Hunger and rivals are shown in words for the player to weigh, but
+ * don't rank, measured with the headless player: ranking up starved ends
+ * steered it to small towns (hunger speeds a market's growth, not its
+ * ceiling), and ranking down rivals' markets steered it off the biggest
+ * ones, which rivals fly because they're the best. Either cut a careful
+ * airline's year from Montréal by more than two-thirds. The headless
+ * player (src/headless/player.ts) ranks by this too, since the list's
+ * order is what a player sees; the words alone are too coarse (in a dense
+ * region nearly every market reads "Huge, starved").
+ */
+export function marketAppeal(state: SimState, a: string, b: string): number {
+  return currentPotentialDemand(state, a, b);
+}
+
+/** Rival flights a day on each market, by marketKey(). */
+export function rivalFlightsByMarket(state: SimState): Map<string, number> {
+  const byMarket = new Map<string, number>();
+  for (const route of state.competitorRoutes) {
+    const key = marketKey(route.origin, route.dest);
+    byMarket.set(key, (byMarket.get(key) ?? 0) + route.dailyFrequency);
+  }
+  return byMarket;
+}
 
 export function whereToFlyFrom(state: SimState, iata: string, limit = 5): FlySuggestion[] {
   const based = state.aircraft.filter((aircraft) => aircraft.baseAirport === iata);
@@ -56,11 +76,7 @@ export function whereToFlyFrom(state: SimState, iata: string, limit = 5): FlySug
   if (types.length === 0) return [];
 
   const flown = new Set(state.schedule.map((leg) => marketKey(leg.origin, leg.dest)));
-  const rivalFlightsByMarket = new Map<string, number>();
-  for (const route of state.competitorRoutes) {
-    const key = marketKey(route.origin, route.dest);
-    rivalFlightsByMarket.set(key, (rivalFlightsByMarket.get(key) ?? 0) + route.dailyFrequency);
-  }
+  const rivals = rivalFlightsByMarket(state);
   const hunger = hungerByAirport(state);
 
   const suggestions: (FlySuggestion & { score: number })[] = [];
@@ -71,7 +87,7 @@ export function whereToFlyFrom(state: SimState, iata: string, limit = 5): FlySug
     const distanceNm = marketDistanceNm(iata, dest);
     const type = types.find((t) => t.rangeNm >= distanceNm && isAircraftTypeAllowedAt(iata, t.code) && isAircraftTypeAllowedAt(dest, t.code));
     if (!type) continue;
-    const rivalFlights = rivalFlightsByMarket.get(marketKey(iata, dest)) ?? 0;
+    const rivalFlights = rivals.get(marketKey(iata, dest)) ?? 0;
     suggestions.push({
       dest,
       destName: nameByIata.get(dest) ?? dest,
@@ -81,7 +97,7 @@ export function whereToFlyFrom(state: SimState, iata: string, limit = 5): FlySug
       distanceNm: Math.round(distanceNm),
       fare: recommendedFare(iata, dest),
       className: classByCode(type.code)?.name ?? type.code,
-      score: (potential * hungerBoost(hunger, iata, dest)) / (1 + RIVAL_FLIGHT_PENALTY * rivalFlights),
+      score: marketAppeal(state, iata, dest),
     });
   }
   return suggestions

@@ -2,6 +2,7 @@ import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { isInsolvent } from '../sim/insolvency';
 import { marketKey } from '../sim/schedule';
+import { tiersClimbed } from '../sim/ladder';
 import { step } from '../sim/step';
 import { startHeadlessGame } from './newGame';
 import { createPlayer, PLAYER_KINDS, playerFromArgs, type PlayerKind } from './player';
@@ -12,7 +13,7 @@ import { createPlayer, PLAYER_KINDS, playerFromArgs, type PlayerKind } from './p
  *
  *   npm run balance                   # every player, a year
  *   npm run balance -- 180            # a different horizon, in days
- *   npm run balance -- --player steady
+ *   npm run balance -- --player steady   # one player, and no re-rating of homes
  *
  * One seed can mislead: rival openings, weather and breakdowns differ
  * from seed to seed, and one run from London survived by $325k where
@@ -38,6 +39,8 @@ type RunResult = {
   planes: number;
   markets: number;
   flightsPerDay: number;
+  /** Ladder tiers climbed by the end (sim/ladder.ts): 0 is still a start-up. */
+  tiers: number;
 };
 
 /** One game, the same way run.ts plays it: stop at $0, checked every minute, as the browser does. */
@@ -64,6 +67,7 @@ function playOne(home: string, seed: number, kind: PlayerKind, days: number): Ru
     planes: state.aircraft.length,
     markets: new Set(state.schedule.map((leg) => marketKey(leg.origin, leg.dest))).size,
     flightsPerDay: state.schedule.length,
+    tiers: tiersClimbed(state),
   };
 }
 
@@ -87,7 +91,7 @@ function median(values: number[]): number {
 
 /** One row per home: the six seeds summed up. Planes and markets are averaged over the airlines still flying. */
 function printTable(kind: PlayerKind, results: RunResult[], days: number): void {
-  const header = ['Home', 'Busts', 'Median cash', 'Mean cash', 'Worst', 'Best', 'Planes', 'Markets', 'Flights/day'];
+  const header = ['Home', 'Busts', 'Median cash', 'Mean cash', 'Worst', 'Best', 'Planes', 'Markets', 'Flights/day', 'Tiers'];
   const body = HOMES.map((home) => {
     const runs = results.filter((r) => r.home === home);
     const survivors = runs.filter((r) => r.bustDay === null);
@@ -104,6 +108,8 @@ function printTable(kind: PlayerKind, results: RunResult[], days: number): void 
       average((r) => r.planes),
       average((r) => r.markets),
       average((r) => r.flightsPerDay),
+      // Busts included: how far up the ladder airlines from here get.
+      String(median(runs.map((r) => r.tiers))),
     ];
   });
 
@@ -139,11 +145,20 @@ for (const player of players) printTable(player, results.filter((r) => r.player 
 console.log('');
 console.log(`  ${results.length} games in ${Math.round((Date.now() - started) / 1000)} s.`);
 
+
 const csv = [
-  'player,home,seed,cash,bustDay,planes,markets,flightsPerDay',
-  ...results.map((r) => [r.player, r.home, r.seed, Math.round(r.cash), r.bustDay ?? '', r.planes, r.markets, r.flightsPerDay].join(',')),
+  'player,home,seed,cash,bustDay,planes,markets,flightsPerDay,tiers',
+  ...results.map((r) => [r.player, r.home, r.seed, Math.round(r.cash), r.bustDay ?? '', r.planes, r.markets, r.flightsPerDay, r.tiers].join(',')),
 ].join('\n');
 const outputPath = fileURLToPath(new URL('../../balance-output.csv', import.meta.url));
 writeFileSync(outputPath, csv + '\n');
 console.log(`  Wrote ${outputPath}`);
 console.log('');
+
+// The full report also re-rates every home (npm run homes), so the
+// ratings the home picker shows can't go stale after a tuning change.
+if (!passedPlayer) {
+  console.log('');
+  console.log('  Re-rating the homes (npm run homes):');
+  await import('./buildHomeDifficulty');
+}

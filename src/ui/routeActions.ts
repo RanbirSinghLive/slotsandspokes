@@ -47,6 +47,10 @@ function afterChange<T extends actions.Outcome>(state: SimState, outcome: T): T 
   return outcome;
 }
 
+export function clearPlane(state: SimState, tail: string) {
+  return afterChange(state, actions.clearPlane(state, tail));
+}
+
 export function addFlight(state: SimState, a: string, b: string) {
   return afterChange(state, actions.addFlight(state, a, b));
 }

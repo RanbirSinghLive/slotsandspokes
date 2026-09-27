@@ -1,4 +1,5 @@
 import airportsData from '../../data/airports.json';
+import { marketAppeal } from '../sim/whereToFly';
 import { AIRCRAFT_CLASSES, classByCode } from '../sim/aircraftClasses';
 import { dayIndex } from '../sim/clock';
 import { RECAPTURE_RATE } from '../sim/economy';
@@ -11,10 +12,9 @@ import {
   WINGLET_FUEL_FACTOR,
   type InnovationId,
 } from '../sim/innovations';
-import { potentialDailyDemand } from '../sim/demand';
 import { greatCircleDistanceNm } from '../sim/geo';
 import { cashNeededToLease } from '../sim/leasing';
-import { overheadAddedByNextPlane } from '../sim/overhead';
+import { overheadAddedByNextPlane, overheadSavedByOneFewer } from '../sim/overhead';
 import * as actions from '../sim/playerActions';
 import { forecastStance } from '../sim/fareForecast';
 import { setFareStance } from '../sim/pricing';
@@ -47,14 +47,21 @@ import { congestionParameters } from '../sim/delays';
  *   stances, returning idle planes) but never leases, opens or adds a
  *   flight again. It is the player the game should punish slowly
  *   (WEEK-NINE.md, thread 1).
+ * - **bold** plays steady's habits but grows fast: it leases once a
+ *   class's pool is BOLD_LEASE_WHEN_POOL_SHARE booked, as soon as the
+ *   airline makes money at all rather than once its margin covers the
+ *   new lease, and keeps only BOLD_SAFETY_DAYS of
+ *   cash on top of the lessor's reserve. It still cuts losers and sheds
+ *   planes, so it measures how an ambitious but sane airline weathers a
+ *   shock.
  * - **reckless** grows at any cost: it leases the biggest plane the lessor
  *   allows every day it can, fills every plane's day to the curfew
  *   wherever the riders are, and never cuts, buffers or looks at
  *   congestion, slot fees or rivals. The game should punish it quickly.
  */
 
-export type PlayerKind = 'starter' | 'steady' | 'sitter' | 'reckless';
-export const PLAYER_KINDS: PlayerKind[] = ['starter', 'steady', 'sitter', 'reckless'];
+export type PlayerKind = 'starter' | 'steady' | 'sitter' | 'bold' | 'reckless';
+export const PLAYER_KINDS: PlayerKind[] = ['starter', 'steady', 'sitter', 'bold', 'reckless'];
 
 export type Player = {
   kind: PlayerKind;
@@ -71,7 +78,7 @@ export function createPlayer(kind: PlayerKind): Player {
 }
 
 /**
- * The command line's `--player starter|steady|sitter|reckless` (steady when left out),
+ * The command line's `--player starter|steady|sitter|bold|reckless` (steady when left out),
  * and the other arguments in order without it, so each runner keeps its
  * own positional arguments.
  */
@@ -108,6 +115,16 @@ export const LEASE_SAFETY_DAYS = 30;
 export const REOPEN_COOLDOWN_DAYS = 30;
 /** Days a plane flies nothing before it goes back to the lessor. */
 export const IDLE_DAYS_TO_RETURN = 7;
+/**
+ * Days in a row a plane's flying must earn less than it costs to keep
+ * (its lease and the network overhead it adds, sim/overhead.ts) before it
+ * is cleared and returned. Two weeks, so one bad week doesn't cost a plane.
+ */
+export const SHED_AFTER_DAYS = 14;
+/** The bold player leases once a class's pool is this booked... */
+export const BOLD_LEASE_WHEN_POOL_SHARE = 0.6;
+/** ...keeping only this many days of the new lease in cash on top of the lessor's reserve. */
+export const BOLD_SAFETY_DAYS = 7;
 /**
  * The share of flights congestion delays (sim/delays.ts, the airport
  * view's load line) at which an airport is too busy to add flights to.
@@ -237,6 +254,8 @@ export type Memory = {
   tightUntil: Map<string, number>;
   /** Day the player last weighed each contested market's fare stance, by market key. */
   stanceReviewed: Map<string, number>;
+  /** Days in a row each plane's flying hasn't paid for keeping it, by tail. */
+  shortDays: Map<string, number>;
 };
 
 /** Days since this market was last opened: its record before that belongs to an earlier stint. */
@@ -263,10 +282,10 @@ function coolingDown(state: SimState, memory: Memory, key: string): boolean {
   return dayIndex(state) - (memory.lastDropped.get(key) ?? -Infinity) < REOPEN_COOLDOWN_DAYS;
 }
 
-function steadyPlayer(kind: 'steady' | 'sitter'): Player {
+function steadyPlayer(kind: 'steady' | 'sitter' | 'bold'): Player {
   // Set once the sitter reaches its size, and never cleared: from then on it only harvests.
   let harvesting = false;
-  const memory: Memory = { lastTouched: new Map(), lastDropped: new Map(), idleDays: new Map(), openedOn: new Map(), tightUntil: new Map(), stanceReviewed: new Map() };
+  const memory: Memory = { lastTouched: new Map(), lastDropped: new Map(), idleDays: new Map(), openedOn: new Map(), tightUntil: new Map(), stanceReviewed: new Map(), shortDays: new Map() };
   return {
     kind,
     open: (state) => {
@@ -284,7 +303,8 @@ function steadyPlayer(kind: 'steady' | 'sitter'): Player {
       return [
         ...leaveSlack(state, memory),
         ...cutLosers(state, memory),
-        ...(harvesting ? [] : [...feedSpill(state, memory), ...openMarkets(state, memory), ...leaseWhenFull(state, memory)]),
+        ...(harvesting ? [] : [...feedSpill(state, memory), ...openMarkets(state, memory), ...leaseWhenFull(state, memory, kind === 'bold')]),
+        ...shedWhenOverheadBites(state, memory),
         ...returnIdle(state, memory),
         ...pickStances(state, memory),
         ...adoptInnovations(state),
@@ -293,6 +313,20 @@ function steadyPlayer(kind: 'steady' | 'sitter'): Player {
       ];
     },
   };
+}
+
+// --- Reading a market -----------------------------------------------------------
+
+/**
+ * A market as the screen ranks it: the airport view's "Where to fly next"
+ * order (sim/whereToFly.ts's marketAppeal()). Read in words alone, "Huge"
+ * spans 3,000 to 14,000 riders, and in a dense region nearly every market
+ * is "Huge, starved": the steady player then picked blind, and its median
+ * year fell two- to four-fold. Roughly riders a day, so the thresholds
+ * below keep their units.
+ */
+function marketScore(state: SimState, from: string, to: string): number {
+  return marketAppeal(state, from, to);
 }
 
 // --- Filling a plane's day ------------------------------------------------
@@ -314,8 +348,8 @@ type FillOptions = {
 
 /**
  * Keep adding out-and-back rotations from the plane's base until its day
- * is full, each time choosing the known airport with the most potential
- * demand per flight already on that market. Dividing by existing flights
+ * is full, each time choosing the known airport whose market ranks best
+ * (marketScore()) per flight already on it. Dividing by existing flights
  * spreads planes over several markets instead of stacking every rotation
  * on the single biggest one. Every market opened is priced on the Match
  * stance (sim/pricing.ts), the neutral choice.
@@ -335,7 +369,7 @@ function fillPlane(state: SimState, tail: string, options: FillOptions): string[
     const candidates: { dest: RotationStop; score: number }[] = [];
     for (const dest of airports) {
       if (dest.iata === home.iata || !state.knownAirports.includes(dest.iata)) continue;
-      const demand = potentialDailyDemand(home.iata, dest.iata);
+      const demand = marketScore(state, home.iata, dest.iata);
       if (demand <= 0) continue;
       if (options.avoid?.(marketKey(home.iata, dest.iata))) continue;
       const flights = legsServingMarket(home.iata, dest.iata, state.schedule);
@@ -561,9 +595,56 @@ function openMarkets(state: SimState, memory: Memory): string[] {
  * IDLE_DAYS_TO_RETURN days in a row goes back to the lessor, if the fee
  * can be paid: an idle plane is only its lease.
  */
+/**
+ * Shed a plane when overhead bites. Network overhead grows with the square
+ * of the fleet (sim/overhead.ts), so a plane that paid its way at five
+ * planes may not at fifteen. Each plane's flying is valued as its share
+ * of last week's margin on every market it flies (a market's margin per
+ * flight, times its flights there); a plane whose share has been below
+ * its lease plus the overhead one fewer plane would save for
+ * SHED_AFTER_DAYS days in a row has its flights removed and goes back to
+ * the lessor. Newest first, one a day, never the last plane, and only
+ * once its markets have been flown past RAMP_UP_DAYS.
+ */
+function shedWhenOverheadBites(state: SimState, memory: Memory): string[] {
+  if (state.aircraft.length <= 1) return [];
+  const saved = overheadSavedByOneFewer(state);
+  const legsByMarket = new Map<string, number>();
+  for (const leg of state.schedule) legsByMarket.set(marketKey(leg.origin, leg.dest), (legsByMarket.get(marketKey(leg.origin, leg.dest)) ?? 0) + 1);
+  let toShed: string | null = null;
+  for (const aircraft of [...state.aircraft].reverse()) {
+    const legs = state.schedule.filter((leg) => leg.tail === aircraft.tail);
+    const keys = [...new Set(legs.map((leg) => marketKey(leg.origin, leg.dest)))];
+    const ready = legs.length > 0 && keys.every((key) => daysFlown(state, memory, key) >= RAMP_UP_DAYS && lastWeekMargin(state, key) !== null);
+    if (!ready) {
+      memory.shortDays.delete(aircraft.tail);
+      continue;
+    }
+    const earns = legs.reduce((sum, leg) => {
+      const key = marketKey(leg.origin, leg.dest);
+      return sum + (lastWeekMargin(state, key) ?? 0) / (legsByMarket.get(key) ?? 1);
+    }, 0);
+    const short = earns < aircraft.leaseCostPerDay + saved ? (memory.shortDays.get(aircraft.tail) ?? 0) + 1 : 0;
+    memory.shortDays.set(aircraft.tail, short);
+    if (short >= SHED_AFTER_DAYS && toShed === null) toShed = aircraft.tail;
+  }
+  if (toShed === null) return [];
+  const shedTail = toShed;
+  const itsMarkets = new Set(state.schedule.filter((leg) => leg.tail === shedTail).map((leg) => marketKey(leg.origin, leg.dest)));
+  const cleared = actions.clearPlane(state, toShed);
+  if (!cleared.ok) return [];
+  // Its markets changed today; let the change show before judging them again.
+  for (const key of itsMarkets) memory.lastTouched.set(key, dayIndex(state));
+  memory.shortDays.delete(toShed);
+  const returned = actions.returnPlane(state, toShed);
+  return [`${toShed} hasn't paid its lease and overhead for ${SHED_AFTER_DAYS} days: ${cleared.message}${returned.ok ? ` ${returned.message}` : ''}`];
+}
+
 function returnIdle(state: SimState, memory: Memory): string[] {
   const log: string[] = [];
   for (const aircraft of [...state.aircraft]) {
+    // Never the last plane: an airline with none can't start again.
+    if (state.aircraft.length <= 1) break;
     const flies = state.schedule.some((leg) => leg.tail === aircraft.tail);
     const idle = flies ? 0 : (memory.idleDays.get(aircraft.tail) ?? 0) + 1;
     memory.idleDays.set(aircraft.tail, idle);
@@ -621,7 +702,7 @@ function bestMarketFor(state: SimState, home: string, typeCode: string, memory: 
     if (!isAircraftTypeAllowedAt(dest.iata, typeCode)) continue;
     if (greatCircleDistanceNm(from, dest) > spec.rangeNm) continue;
     if (coolingDown(state, memory, marketKey(home, dest.iata))) continue;
-    const score = potentialDailyDemand(home, dest.iata) / (1 + legsServingMarket(home, dest.iata, state.schedule));
+    const score = marketScore(state, home, dest.iata) / (1 + legsServingMarket(home, dest.iata, state.schedule));
     if (!best || score > best.score) best = { dest: dest.iata, score };
   }
   return best;
@@ -636,11 +717,11 @@ function bestMarketFor(state: SimState, home: string, typeCode: string, memory: 
  * home is too busy. Then give it a day at once, since an idle
  * plane is only cost. One lease a day at most.
  */
-function leaseWhenFull(state: SimState, memory: Memory): string[] {
+function leaseWhenFull(state: SimState, memory: Memory, bold: boolean): string[] {
   const home = state.homeAirport;
   if (tooBusy(state, home)) return [];
   const pools = utilisationPools(state, home).filter((pool) => pool.planes > 0);
-  if (!pools.some((pool) => pool.share >= LEASE_WHEN_POOL_SHARE)) return [];
+  if (!pools.some((pool) => pool.share >= (bold ? BOLD_LEASE_WHEN_POOL_SHARE : LEASE_WHEN_POOL_SHARE))) return [];
   const lastWeek = state.marginHistory.slice(-7);
   if (lastWeek.length < 7) return [];
   const averageMargin = lastWeek.reduce((sum, margin) => sum + margin, 0) / 7;
@@ -652,8 +733,9 @@ function leaseWhenFull(state: SimState, memory: Memory): string[] {
     const price = option.listing.leasePricePerDay;
     // What the airline already makes a day has to carry the new lease, and
     // the network overhead it adds (sim/overhead.ts), on its own.
-    if (averageMargin < price + overheadAddedByNextPlane(state)) continue;
-    if (state.cash < cashNeededToLease(price) + LEASE_SAFETY_DAYS * price) continue;
+    // The bold player only waits for the airline to make money at all.
+    if (averageMargin < (bold ? 0 : price + overheadAddedByNextPlane(state))) continue;
+    if (state.cash < cashNeededToLease(price) + (bold ? BOLD_SAFETY_DAYS : LEASE_SAFETY_DAYS) * price) continue;
     const market = bestMarketFor(state, home, cls.code, memory);
     if (!market || market.score < worthFlying(cls.code)) continue;
 

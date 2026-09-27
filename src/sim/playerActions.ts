@@ -492,6 +492,14 @@ export function leasePlane(state: SimState, iata: string, typeCode: string): Out
   };
 }
 
+/** Remove every flight one plane flies, so it can go back to the lessor (or fly something else). */
+export function clearPlane(state: SimState, tail: string): Outcome<{ message: string }> {
+  const rotations = allRotations(state).filter((rotation) => rotation.tail === tail);
+  if (rotations.length === 0) return { ok: false, reason: `${tail} has no flights.` };
+  for (const rotation of rotations) removeRotation(state, rotation);
+  return { ok: true, message: `Removed ${tail}'s ${rotations.length} flight${rotations.length === 1 ? '' : 's'}.` };
+}
+
 /** Planes based here that could go back to the lessor now, and the ones that can't with why. */
 export function returnOptions(state: SimState, iata: string): { tail: string; name: string; fee: number; saves: number; ageYears: number; blocked: string | null }[] {
   return state.aircraft

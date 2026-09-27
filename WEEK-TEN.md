@@ -6,7 +6,7 @@ moats, shocks, real costs, Europe, home difficulty) lives in
 with playtest findings as they come (see "Playtest notes"), and the
 order changes with them.
 
-**State at handoff:** save key `airgame-save-v46`. **Threads 1, 2, 3, 4, 8 and 10 are done.** The game pushes back
+**State at handoff:** save key `airgame-save-v46`. **Threads 1, 2, 3, 4, 5, 8 and 10 are done.** The game pushes back
 the way CLAUDE.md's philosophy asks: over a year a careful airline makes
 $6.5M–$19M, a sitter $2M–$5M and eroding, an unattended one-plane start
 survives the Standard homes, a reckless one always busts
@@ -262,6 +262,30 @@ The balance numbers are only as honest as the player producing them.
   "busts through shocks" can be measured; the extreme one stays.
 - **Home ratings re-run with the balance report**, so they can't go
   stale after a tuning change.
+
+**Status: done.** As built:
+- **Pursue milestones:** no habit needed; the steady player leases the
+  biggest class it may, so it climbs as it grows. The balance report
+  now prints the median tiers climbed (steady: 2–3 in the core, 0 at
+  Halifax), so the ladder's pace is measured every run.
+- **Shed planes when overhead bites:** a plane whose share of its
+  markets' margin is below its lease plus the overhead it adds for 14
+  days is cleared and returned (new `clearPlane()` action, also a button
+  in the aircraft view). Steady fleets are leaner (London 22 → 14
+  planes); cash within noise except London ($80M → $61M).
+- **Read markets as the screen does:** words alone (size, service) were
+  too coarse, and the steady player's year fell two- to four-fold. It
+  now ranks by the airport view's "Where to fly next" order, which was
+  itself retuned: ranking up hunger or down rivals each cost two-thirds
+  of a Montréal year, so the list ranks by potential and shows the rest
+  in words.
+- **Bold persona:** steady's habits, leasing at 60% booked once the
+  airline makes money at all. 13 of 36 busts, mostly days 48–100, and
+  the biggest single years. Reckless stays as the extreme.
+- **Home ratings** re-run at the end of the full report; unchanged this
+  time (69 Standard, 27 Hard, 73 Brutal).
+- The last plane is never returned; Halifax's steady player now busts
+  every game rather than ending with no planes.
 
 ## Thread 6: finish fare stances
 
