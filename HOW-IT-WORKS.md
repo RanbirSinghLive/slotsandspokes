@@ -1045,8 +1045,28 @@ frame the previous animation was already on instead of starting over.
 
 ## Panel (`src/ui/panels.ts`)
 
-A real HTML sidebar, 280px wide (canvas width = `window.innerWidth - 280`,
-kept in sync via `PANEL_WIDTH_PX`). Shows cash, today's revenue/cost/margin,
+A real HTML sidebar, 420px wide (canvas width = `window.innerWidth - 420`,
+kept in sync via `PANEL_WIDTH_PX`).
+
+**The Network summary is a grid of cards**: Cash, Runway, On-time,
+Completion, Load factor, NPS, Goals and Head office. Each shows its
+figure and, where it has one, its trend (`sim/trends.ts`): the last 7
+finished days against the 7 before, green and ▲ getting better, amber
+■ holding (inside a small dead band: a point of on-time, a point of NPS,
+1% of cash), red ▼ getting worse, with a stripe down the card's edge in
+the same colour. On-time and Completion show the last 7 days once there
+are 7 (the lifetime share before), so the figure and its colour agree.
+Each card opens the view that explains it: Cash and Runway open
+**Money** (`ui/inspector/money.ts`: closing cash over the last month,
+the runway, a week's average day, today's costs by kind); On-time,
+Completion, Load factor and NPS open **Routes** (`ui/inspector/routes.ts`:
+every route in one table with flights a day, load, on-time, flown, NPS
+and yesterday's margin, sorted by that card's measure, worst first, each
+cell coloured good/fair/poor; a heading re-sorts, a row opens the
+route); Goals and Head office open theirs. The network's trailing NPS is
+kept for 30 days (`state.npsHistory`) for its trend.
+
+Below the cards: today's revenue/cost/margin,
 a fleet table (tail, type, status, and either the current airport or
 `origin → dest (N min)` while airborne — with `, N min late` appended when
 `arriveMinute > scheduledArriveMinute`, M9), and the schedule table below.

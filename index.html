@@ -168,14 +168,16 @@
         <div id="inspector-body"></div>
       </section>
       <section id="econ-summary">
-        <div class="econ-row"><span class="econ-label">Cash</span><span id="panel-cash" class="econ-value"></span></div>
-        <div class="econ-row"><span class="econ-label">Runway</span><span id="panel-runway" class="econ-value"></span></div>
-        <div class="econ-row"><span class="econ-label">On-time</span><span id="panel-otp" class="econ-value"></span></div>
-        <div class="econ-row"><span class="econ-label">Completion</span><span id="panel-completion" class="econ-value"></span></div>
-        <div class="econ-row" title="Passengers carried over seats flown, last 7 days"><span class="econ-label">Load factor</span><span id="panel-load" class="econ-value"></span></div>
-        <div class="econ-row" title="How passengers rate your airline, about the last month. A better name than a rival's wins bookings from it."><span class="econ-label">NPS</span><span id="panel-nps" class="econ-value"></span></div>
-        <div class="econ-row"><span class="econ-label">Goals</span><button type="button" id="panel-goals" class="econ-value inspector-link" title="Your tier on the ladder: open Goals"></button></div>
-        <div class="econ-row"><span class="econ-label">Head office</span><button type="button" id="panel-head-office" class="econ-value inspector-link" title="Fuel, hedging and innovations: open Head office"></button></div>
+        <div id="stat-cards">
+          <button type="button" class="stat-card" id="card-cash" title="Cash on hand. Open Money."><span class="stat-label">Cash</span><span id="panel-cash" class="stat-value"></span><span class="stat-trend"></span></button>
+          <button type="button" class="stat-card" id="card-runway"><span class="stat-label">Runway</span><span id="panel-runway" class="stat-value"></span><span class="stat-trend"></span></button>
+          <button type="button" class="stat-card" id="card-otp" title="Share of arrivals on time, last 7 days. Open Routes, least punctual first."><span class="stat-label">On-time</span><span id="panel-otp" class="stat-value"></span><span class="stat-trend"></span></button>
+          <button type="button" class="stat-card" id="card-completion" title="Share of scheduled flights that operated, last 7 days. Open Routes, most cancelled first."><span class="stat-label">Completion</span><span id="panel-completion" class="stat-value"></span><span class="stat-trend"></span></button>
+          <button type="button" class="stat-card" id="card-load" title="Passengers carried over seats flown, last 7 days. Open Routes, emptiest first."><span class="stat-label">Load factor</span><span id="panel-load" class="stat-value"></span><span class="stat-trend"></span></button>
+          <button type="button" class="stat-card" id="card-nps" title="How passengers rate your airline, about the last month. A better name than a rival's wins bookings from it. Open Routes, lowest rated first."><span class="stat-label">NPS</span><span id="panel-nps" class="stat-value"></span><span class="stat-trend"></span></button>
+          <button type="button" class="stat-card" id="panel-goals" title="Your tier on the ladder: open Goals"></button>
+          <button type="button" class="stat-card" id="panel-head-office" title="Fuel, hedging, executives and innovations: open Head office"></button>
+        </div>
         <h2>Today</h2>
         <div class="econ-row"><span class="econ-label">Revenue</span><span id="panel-revenue" class="econ-value"></span></div>
         <div class="econ-row"><span class="econ-label">Cost</span><span id="panel-cost" class="econ-value"></span></div>

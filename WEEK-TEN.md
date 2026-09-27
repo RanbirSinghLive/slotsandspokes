@@ -464,6 +464,22 @@ buy as a bet on where the price goes.
   lower (it never hedges), starter slightly safer (the price is below
   usual as often as above), reckless unchanged.
 
+## Thread 11: the Network panel as cards
+
+Asked for by the owner after thread 9: the headline figures as cards
+that click into the inspector view that explains them, coloured by
+whether they're getting better or worse.
+
+**Status: done.** Cash, Runway, On-time, Completion, Load factor, NPS,
+Goals and Head office as a two-column grid of cards (`ui/panels.ts`),
+each with its trend over the last 7 days against the 7 before
+(`sim/trends.ts`): green ▲ better, amber ■ holding, red ▼ worse. Cash
+and Runway open a new Money view (cash chart, runway, a week's average
+day, today's costs by kind); the four route measures open a new Routes
+view (every route in a table, sorted worst first by that measure, cells
+coloured, headings re-sort). On-time and Completion now show the last
+week, not the lifetime share. UI only: headless output unchanged.
+
 ## Carried forward from week nine
 
 - **Thread 5 (goal ladder)** becomes this plan's thread 2.

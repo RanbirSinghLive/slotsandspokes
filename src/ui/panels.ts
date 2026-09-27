@@ -2,7 +2,8 @@ import { removeRotation as removeRotationFromSchedule } from '../sim/playerActio
 import { formatNps, networkNps } from '../sim/nps';
 import { validateSchedule } from '../sim/schedule';
 import { allRotations, utilisationProblems, type Rotation } from '../sim/utilisation';
-import { select } from './selection';
+import { select, type Selection } from './selection';
+import { networkTrends, type Measure } from '../sim/trends';
 import { classByCode } from '../sim/aircraftClasses';
 import { planeIconElement } from './planeIcons';
 import { updatePnlHistoryPanel } from './pnlHistory';
@@ -24,11 +25,62 @@ const completionEl = document.querySelector<HTMLSpanElement>('#panel-completion'
 const loadEl = document.querySelector<HTMLSpanElement>('#panel-load')!;
 const npsEl = document.querySelector<HTMLElement>('#panel-nps')!;
 const goalsEl = document.querySelector<HTMLButtonElement>('#panel-goals')!;
-// Opens Network › Goals (ui/inspector/goals.ts).
-goalsEl.addEventListener('click', () => select({ kind: 'goals' }));
 const headOfficeEl = document.querySelector<HTMLButtonElement>('#panel-head-office')!;
-// Opens Network › Head office (ui/inspector/headOffice.ts).
-headOfficeEl.addEventListener('click', () => select({ kind: 'headOffice' }));
+
+/**
+ * The Network panel's cards: each headline number opens the view that
+ * explains it. Cash and Runway open Money; the four route measures open
+ * Routes sorted by that measure, worst first; Goals and Head office open
+ * their own views.
+ */
+const cardTargets: [string, Selection][] = [
+  ['#card-cash', { kind: 'money' }],
+  ['#card-runway', { kind: 'money' }],
+  ['#card-otp', { kind: 'routes', sort: 'onTime' }],
+  ['#card-completion', { kind: 'routes', sort: 'completion' }],
+  ['#card-load', { kind: 'routes', sort: 'loadFactor' }],
+  ['#card-nps', { kind: 'routes', sort: 'nps' }],
+  ['#panel-goals', { kind: 'goals' }],
+  ['#panel-head-office', { kind: 'headOffice' }],
+];
+for (const [selector, target] of cardTargets) {
+  document.querySelector<HTMLButtonElement>(selector)!.addEventListener('click', () => select(target));
+}
+
+/**
+ * A card's trend (sim/trends.ts), as its colour and a line under the
+ * value: green getting better, amber holding, red getting worse, against
+ * the week before. `change` says by how much, in the card's own units.
+ */
+function showTrend(card: HTMLElement, measure: Measure, change: (now: number, before: number) => string): void {
+  const trendEl = card.querySelector<HTMLElement>('.stat-trend')!;
+  card.dataset.trend = measure.direction ?? '';
+  if (measure.direction === null || measure.now === null || measure.before === null) {
+    trendEl.textContent = '';
+    return;
+  }
+  const arrow = measure.direction === 'better' ? '▲' : measure.direction === 'worse' ? '▼' : '■';
+  trendEl.textContent = measure.direction === 'steady' ? `${arrow} holding` : `${arrow} ${change(measure.now, measure.before)} on last week`;
+}
+
+function points(now: number, before: number): string {
+  const change = Math.round((now - before) * 100);
+  return `${change > 0 ? '+' : '−'}${Math.abs(change)} pts`;
+}
+
+/** The label-and-value body of the Goals and Head office cards. */
+function linkCard(card: HTMLElement, label: string, value: string): void {
+  const text = `${label}|${value}`;
+  if (card.dataset.text === text) return;
+  card.dataset.text = text;
+  const labelEl = document.createElement('span');
+  labelEl.className = 'stat-label';
+  labelEl.textContent = label;
+  const valueEl = document.createElement('span');
+  valueEl.className = 'stat-value stat-value-small';
+  valueEl.textContent = `${value} ›`;
+  card.replaceChildren(labelEl, valueEl);
+}
 const revenueEl = document.querySelector<HTMLSpanElement>('#panel-revenue')!;
 const costEl = document.querySelector<HTMLSpanElement>('#panel-cost')!;
 const marginEl = document.querySelector<HTMLSpanElement>('#panel-margin')!;
@@ -66,25 +118,38 @@ function formatMoney(amount: number): string {
  * everything under render/: it never writes back to it.
  */
 export function updatePanel(state: SimState): void {
+  const trends = networkTrends(state);
   cashEl.textContent = formatMoney(state.cash);
+  showTrend(cashEl.closest<HTMLElement>('.stat-card')!, trends.cash, (now, before) => `${now >= before ? '+' : '−'}${formatMoney(Math.abs(now - before))}`);
+  // On-time and Completion over the last week once there is one (sim/trends.ts),
+  // so the figure and its colour agree; the lifetime share until then.
+  const percent = (share: number) => `${Math.round(share * 100)}%`;
   otpEl.textContent =
-    state.flightsArrivedTotal === 0
-      ? '—'
-      : `${Math.round((state.flightsOnTimeTotal / state.flightsArrivedTotal) * 100)}%`;
+    trends.onTime.now !== null
+      ? percent(trends.onTime.now)
+      : state.flightsArrivedTotal === 0
+        ? '—'
+        : percent(state.flightsOnTimeTotal / state.flightsArrivedTotal);
+  showTrend(otpEl.closest<HTMLElement>('.stat-card')!, trends.onTime, points);
   // Completion Factor — the second reliability axis. On-time says how
   // punctual the flights that operated were; this says how many operated
   // at all, and a carrier can be excellent at one and dreadful at the other.
   completionEl.textContent =
-    state.flightsScheduledTotal === 0
-      ? '—'
-      : `${Math.round(((state.flightsScheduledTotal - state.flightsCancelledTotal) / state.flightsScheduledTotal) * 100)}%`;
+    trends.completion.now !== null
+      ? percent(trends.completion.now)
+      : state.flightsScheduledTotal === 0
+        ? '—'
+        : percent((state.flightsScheduledTotal - state.flightsCancelledTotal) / state.flightsScheduledTotal);
+  showTrend(completionEl.closest<HTMLElement>('.stat-card')!, trends.completion, points);
   // Load factor (sim/loadFactor.ts): how full the airline flies, last 7 days.
   loadEl.textContent = formatLoadFactor(networkLoadFactor(state));
+  showTrend(loadEl.closest<HTMLElement>('.stat-card')!, trends.loadFactor, points);
   // NPS (sim/nps.ts): the airline's name, about the last month.
   npsEl.textContent = state.npsScoredFlightsTotal === 0 ? '—' : formatNps(networkNps(state));
-  // Where the airline stands on the ladder (sim/ladder.ts).
-  goalsEl.textContent = `${goalsSummary(state)} ›`;
-  headOfficeEl.textContent = `${headOfficeSummary(state)} ›`;
+  showTrend(npsEl.closest<HTMLElement>('.stat-card')!, trends.nps, (now, before) => `${now >= before ? '+' : '−'}${Math.abs(Math.round(now - before))}`);
+  // Where the airline stands on the ladder (sim/ladder.ts), and head office.
+  linkCard(goalsEl, 'Goals', goalsSummary(state));
+  linkCard(headOfficeEl, 'Head office', headOfficeSummary(state));
   revenueEl.textContent = formatMoney(state.todayRevenue);
   costEl.textContent = formatMoney(state.todayCost);
   marginEl.textContent = formatMoney(state.todayMargin);

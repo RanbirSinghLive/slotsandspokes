@@ -309,6 +309,8 @@ export type SimState = {
   trailingNps?: number;
   /** Each market's trailing NPS, keyed by marketKey(); a market not yet flown reads the network's. */
   trailingNpsByMarket?: Record<string, number>;
+  /** The network's trailing NPS at each rollover, oldest first, for its trend (sim/trends.ts). */
+  npsHistory?: number[];
   /** Today's NPS points and scored flights per market, folded into the trailing scores at rollover. */
   todayNpsByMarket?: Record<string, { points: number; flights: number }>;
   /**

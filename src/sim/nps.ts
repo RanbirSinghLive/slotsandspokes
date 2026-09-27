@@ -125,6 +125,8 @@ export function flightSatisfactionScore(
  * moat that takes a long time).
  */
 export const TRAILING_NPS_WEIGHT = 1 / 30;
+/** Days of the network's trailing NPS kept for its trend. */
+const NPS_HISTORY_DAYS = 30;
 
 /**
  * The NPS a typical rival earns, which yours is judged against. Rivals
@@ -172,6 +174,7 @@ export function rollTrailingNps(state: SimState): void {
     const dayAverage = state.todayNpsPoints / state.todayNpsScoredFlights;
     state.trailingNps = network + (dayAverage - network) * TRAILING_NPS_WEIGHT;
   }
+  state.npsHistory = [...(state.npsHistory ?? []), networkNps(state)].slice(-NPS_HISTORY_DAYS);
   const byMarket = (state.trailingNpsByMarket ??= {});
   for (const [key, day] of Object.entries(state.todayNpsByMarket ?? {})) {
     const before = byMarket[key] ?? network;

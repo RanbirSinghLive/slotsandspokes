@@ -22,7 +22,7 @@ export const RUNWAY_WARN_DAYS = 30;
 export const RUNWAY_CRITICAL_DAYS = 14;
 
 const rowValueEl = document.querySelector<HTMLSpanElement>('#panel-runway')!;
-const rowEl = rowValueEl.closest<HTMLElement>('.econ-row')!;
+const rowEl = rowValueEl.closest<HTMLElement>('.stat-card')!;
 const modalEl = document.querySelector<HTMLElement>('#runway-modal')!;
 const modalDaysEl = document.querySelector<HTMLElement>('#runway-modal-days')!;
 const modalRateEl = document.querySelector<HTMLElement>('#runway-modal-rate')!;

@@ -21,10 +21,17 @@ export type Selection =
   | { kind: 'fleet' }
   | { kind: 'goals' }
   | { kind: 'headOffice' }
+  /** Cash over time, the runway and today's costs (ui/inspector/money.ts). */
+  | { kind: 'money' }
+  /** Every route in one table, sorted by one measure, worst first (ui/inspector/routes.ts). */
+  | { kind: 'routes'; sort: RouteSort }
   /** One of the player's aircraft, by tail. */
   | { kind: 'aircraft'; tail: string }
   /** A rival airline, by its two-letter code. */
   | { kind: 'rival'; code: string };
+
+/** What the Routes view sorts by. */
+export type RouteSort = 'loadFactor' | 'onTime' | 'completion' | 'nps' | 'margin';
 
 export const NETWORK: Selection = { kind: 'network' };
 
