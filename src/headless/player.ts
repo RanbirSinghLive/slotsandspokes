@@ -132,13 +132,6 @@ export const BOLD_SAFETY_DAYS = 7;
  */
 export const BUSY_DELAY_CHANCE = 0.1;
 /**
- * The daily chance of a rival answering with more flights (the route
- * view's "X% a day they add a flight") above which a stance is ruled out.
- * The forecast holds rival flights where they are, so it can't price that
- * answer in; at 5% a day a new rival flight is likely within a month.
- */
-export const RIVAL_RESPONSE_LIMIT = 0.05;
-/**
  * The most a rotation's new slot fees (the route form's "New slots" line)
  * may be, as a share of what a full plane would take in fares on it. Past
  * this, a slot-controlled airport's fees eat what the flight could earn.
@@ -659,13 +652,12 @@ function returnIdle(state: SimState, memory: Memory): string[] {
 }
 
 /**
- * Habit 7, pick a stance. Every STANCE_REVIEW_DAYS, on each market a rival
+ * Habit 8, pick a stance. Every STANCE_REVIEW_DAYS, on each market a rival
  * also flies, it reads the route view's forecast (sim/fareForecast.ts)
  * for all three stances and takes the one that makes the most a day once
- * fares settle, among those a rival isn't likely to answer with more
- * flights (RIVAL_RESPONSE_LIMIT). Ties go to Match. It doesn't try to win
- * a price war for its own sake: a rival leaving shows up only as what the
- * market makes.
+ * fares and the rivals' capacity have settled. Ties go to Match. It
+ * doesn't try to win a price war for its own sake: a rival leaving shows
+ * up only as what the market makes.
  */
 function pickStances(state: SimState, memory: Memory): string[] {
   const log: string[] = [];
@@ -676,9 +668,7 @@ function pickStances(state: SimState, memory: Memory): string[] {
     if (dayIndex(state) - (memory.stanceReviewed.get(key) ?? -Infinity) < STANCE_REVIEW_DAYS) continue;
     memory.stanceReviewed.set(key, dayIndex(state));
 
-    const forecasts = STANCE_PREFERENCE.map((stance) => forecastStance(state, a, b, stance)).filter(
-      (forecast) => forecast.stance === 'match' || forecast.responseChance < RIVAL_RESPONSE_LIMIT,
-    );
+    const forecasts = STANCE_PREFERENCE.map((stance) => forecastStance(state, a, b, stance));
     const best = forecasts.reduce((top, forecast) => (forecast.margin > top.margin ? forecast : top));
     const current = state.routeSettings[key].fareStance ?? null;
     if (best.stance === current) continue;

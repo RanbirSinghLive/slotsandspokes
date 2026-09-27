@@ -6,7 +6,7 @@ moats, shocks, real costs, Europe, home difficulty) lives in
 with playtest findings as they come (see "Playtest notes"), and the
 order changes with them.
 
-**State at handoff:** save key `airgame-save-v46`. **Threads 1, 2, 3, 4, 5, 8 and 10 are done.** The game pushes back
+**State at handoff:** save key `airgame-save-v46`. **Threads 1–6, 8 and 10 are done.** The game pushes back
 the way CLAUDE.md's philosophy asks: over a year a careful airline makes
 $6.5M–$19M, a sitter $2M–$5M and eroding, an unattended one-plane start
 survives the Standard homes, a reckless one always busts
@@ -295,6 +295,17 @@ From week eight's fare-stance thread and week nine's findings:
 - **Undercut's payoff**: whether a rival closing protects the market for
   a while (today another airline walks straight in);
 - the map gauge and ticker lines (the thread's slice 3).
+
+**Status: done.** As built: the forecast adds the expected capacity
+response (each day's chance as a fraction of a flight on the busiest
+rival with room), so the headless player no longer needs its rule
+against Premium; after any rival closes a market no rival opens it for
+90 days (new entrants, openings and capacity responses alike); the pain
+gauge (red, filling with a rival's losing run; green, emptying through
+the respite) and three ticker lines. Steady median cash (thread 5 →
+thread 6): YUL $9.4M → $11.3M, YYZ $32.9M → $25.4M, BOS $18.3M → $21.5M,
+PHL $41.0M → $46.6M, LHR $61.4M → $69.4M; busts unchanged. The fuller
+forecast doubled the steady report's time (to about 3m47s); thread 7.
 
 ## Thread 7: hygiene
 

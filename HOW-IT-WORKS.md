@@ -663,10 +663,7 @@ planner the route builder uses, and the ring's actions in
      back to the lessor, if the fee can be paid, but never the last one.
   8. **Pick stances.** Every 7 days, on each market a rival also flies,
      it takes the stance whose forecast (`sim/fareForecast.ts`) makes
-     the most once fares settle, ties to Match. It rules out a stance
-     with a 5% or higher daily chance of a rival adding a flight: the
-     forecast holds rival flights fixed, so on a full market it
-     overrates Premium, which rivals answer with capacity.
+     the most once fares and rivals' capacity settle, ties to Match.
   9. **Head office.** It adopts innovations on a 90-day payback, hedges
      fuel 90 days when it's 5% or more below usual, and hires executives
      when last week's margin covers ten times the salary (see those
@@ -1851,18 +1848,37 @@ stance can stay set while rivals come and go. Setting a fare by hand, or
 
 **The forecast** (`forecastStance()`) runs the game's own daily rules
 forward on a copy of the market: rivals judged on their result, your
-stance re-priced, rivals answering your fare. Demand, schedule, fuel and
-frequencies are held where they are. The route view shows, per stance:
+stance re-priced, rivals answering your fare, and rivals answering a
+full, expensive market with flights. That last is a daily chance in the
+game (sim/rivalResponse.ts), so the forecast adds its expected value:
+each day's chance, as a fraction of a flight, on the busiest rival with
+room, until the market is no longer full or the rival reaches its cap.
+Demand, schedule and fuel are held where they are. The route view
+shows, per stance:
 - where your fare and each rival's settle;
 - what each side makes a day there;
-- whether a rival would close the route, and in about how many days;
-- for a premium, the daily chance a rival adds a flight.
+- how many flights a day a rival is expected to add;
+- whether a rival would close the route, in about how many days, and
+  the respite after;
+- the daily chance a rival adds a flight at the settled fares.
 
-Undercut chases a rival down to its floor (65% of the going rate), so
-it costs you margin for as long as the war lasts.
+**Undercut's payoff.** Undercut chases a rival down to its floor (65% of
+the going rate), so it costs you margin for as long as the war lasts.
+What it buys: after **any** rival closes a market, no rival opens it for
+90 days (`RIVAL_SQUEEZED_RESPITE_DAYS`, `inRespite()` in
+sim/pressure.ts), in route openings, new entrants and capacity
+responses alike. Before, another airline walked straight in.
 
-The headless players price every market they open on Match, and
-`npm run sweep -- stance` compares the three across a run.
+**On the map** (`render/pain.ts`), a small ring at the middle of each
+market you fly: red and filling while a rival there is on a losing run
+(toward the 30 days that close it), green and emptying through the
+respite after one pulls out. The ticker says when a rival starts losing
+on your market, when it reaches 20 of 30 days, and, when it pulls out,
+that the market is yours for 90 days.
+
+The headless players open markets on Match and then pick the stance
+whose forecast makes the most; `npm run sweep -- stance` compares the
+three across a run.
 
 ---
 

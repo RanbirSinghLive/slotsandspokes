@@ -1,4 +1,5 @@
 import { forecastStance, type StanceForecast } from '../../sim/fareForecast';
+import { RIVAL_SQUEEZED_RESPITE_DAYS } from '../../sim/pressure';
 import { brandInWords, formatNps, marketNps, networkNps } from '../../sim/nps';
 import { rivalYieldFactor } from '../../sim/pressure';
 import { policyFare, setFareStance, setHandFare } from '../../sim/pricing';
@@ -332,11 +333,11 @@ const STANCES: { stance: FareStance; name: string }[] = [
 
 /** One stance's forecast in a line: your fare and margin, then each rival's. */
 function describeForecast(forecast: StanceForecast): string {
-  const rivals = forecast.rivals.map((rival) =>
-    rival.closesInDays !== null
-      ? `${rival.airline} $${rival.fare}, ${signedMoney(rival.margin)}/day, gone in about ${rival.closesInDays} days`
-      : `${rival.airline} $${rival.fare}, ${signedMoney(rival.margin)}/day`,
-  );
+  const rivals = forecast.rivals.map((rival) => {
+    const adds = rival.flightsAdded >= 0.5 ? `, adds about ${Math.round(rival.flightsAdded)} flight${Math.round(rival.flightsAdded) === 1 ? '' : 's'}/day` : '';
+    const gone = rival.closesInDays !== null ? `, gone in about ${rival.closesInDays} days, then no rival for ${RIVAL_SQUEEZED_RESPITE_DAYS}` : '';
+    return `${rival.airline} $${rival.fare}, ${signedMoney(rival.margin)}/day${adds}${gone}`;
+  });
   const response = forecast.responseChance > 0 ? ` · ${Math.round(forecast.responseChance * 100)}% a day they add a flight` : '';
   return `You $${forecast.fare}, ${signedMoney(forecast.margin)}/day · ${rivals.join('; ')}${response}`;
 }

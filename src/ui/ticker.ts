@@ -1,9 +1,10 @@
 import { airlineCalled, LADDER, milestoneById, tiersClimbed } from '../sim/ladder';
+import { RIVAL_CLOSE_AFTER_LOSING_DAYS, RIVAL_SQUEEZED_RESPITE_DAYS } from '../sim/pressure';
 import { activeHedge } from '../sim/fuelPrice';
 import { activeShock, describeShock, shockEndedLine, type Shock } from '../sim/shocks';
 import { moneyOnTable, RIVAL_MARGIN_SHARE } from '../sim/attractiveness';
 import { networkAirports } from '../sim/reach';
-import { legsServingMarket, recommendedFare } from '../sim/schedule';
+import { legsServingMarket, marketKey, recommendedFare } from '../sim/schedule';
 import { AIRCRAFT_CLASSES } from '../sim/aircraftClasses';
 import type { SimState } from '../sim/state';
 
@@ -222,9 +223,45 @@ function pollRivalEvents(state: SimState): void {
   for (const [id, route] of seenRoutes) {
     if (stillFlying.has(id)) continue;
     seenRoutes.delete(id);
-    if (touchesNetwork(route)) pushEvent(state.simMinute, `${route.airline} pulls out of ${route.origin}–${route.dest}`);
+    if (!touchesNetwork(route)) continue;
+    const yours = state.schedule.some((leg) => marketKey(leg.origin, leg.dest) === marketKey(route.origin, route.dest));
+    pushEvent(
+      state.simMinute,
+      `${route.airline} pulls out of ${route.origin}–${route.dest}` + (yours ? `: no rival will open it for ${RIVAL_SQUEEZED_RESPITE_DAYS} days` : ''),
+    );
   }
 }
+
+/** Each rival route's losing run at the last poll, so a squeeze is announced as it starts and nears its end. */
+const seenLosingDays = new Map<string, number>();
+
+/**
+ * A rival losing money on one of your markets (sim/rivalEconomics.ts),
+ * at the moments that matter: when its losing run starts, and at
+ * PAIN_WARNING_DAYS, when pulling out is close. Its closing is
+ * pollRivalEvents()'s line.
+ */
+function pollRivalPainEvents(state: SimState): void {
+  const flown = new Set(state.schedule.map((leg) => marketKey(leg.origin, leg.dest)));
+  for (const route of state.competitorRoutes) {
+    const key = marketKey(route.origin, route.dest);
+    const id = `${route.code}:${key}`;
+    const losing = route.losingDays ?? 0;
+    const before = seenLosingDays.get(id);
+    seenLosingDays.set(id, losing);
+    if (before === undefined || !flown.has(key)) continue;
+    if (before === 0 && losing > 0) pushEvent(state.simMinute, `${route.airline} is losing money on ${route.origin}–${route.dest}`);
+    if (before < PAIN_WARNING_DAYS && losing >= PAIN_WARNING_DAYS) {
+      pushEvent(
+        state.simMinute,
+        `${route.airline} has lost money on ${route.origin}–${route.dest} for ${losing} days: ${RIVAL_CLOSE_AFTER_LOSING_DAYS - losing} more and it pulls out`,
+      );
+    }
+  }
+}
+
+/** The losing run at which the ticker warns a rival is close to pulling out. */
+const PAIN_WARNING_DAYS = 20;
 
 let previousKnownCount: number | null = null;
 let previousKnown = new Set<string>();
@@ -417,5 +454,6 @@ export function updateTicker(state: SimState): void {
   pollMarketEvents(state);
   pollReachEvents(state);
   pollRivalEvents(state);
+  pollRivalPainEvents(state);
   pollWeatherEvents(state);
 }

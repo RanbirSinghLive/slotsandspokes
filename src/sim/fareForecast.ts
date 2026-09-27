@@ -3,7 +3,7 @@ import { summarizeMarket } from './marketSummary';
 import { RIVAL_CLOSE_AFTER_LOSING_DAYS, RIVAL_CLOSE_GRACE_DAYS } from './pressure';
 import { stanceFare } from './pricing';
 import { rivalRouteDailyResult } from './rivalEconomics';
-import { rivalResponseChance } from './rivalResponse';
+import { RESPONSE_FREQUENCY_CAP, rivalResponseChance } from './rivalResponse';
 import { marketKey } from './schedule';
 import type { FareStance, SimState } from './state';
 
@@ -18,14 +18,21 @@ import type { FareStance, SimState } from './state';
  * the market, in the order the rollover runs them (sim/step.ts): rivals
  * judged on yesterday's result (sim/rivalEconomics.ts), your stance
  * re-priced (stanceFare()), rivals answering your fare
- * (sim/competitors.ts's rivalFareTarget()). Demand, schedule, fuel and
- * rival frequencies are held where they are today, so it is a forecast
- * of the price war alone. A pure read of `state`, with no random draws.
+ * (sim/competitors.ts's rivalFareTarget()), and rivals answering a full,
+ * expensive market with capacity (sim/rivalResponse.ts). That answer is a
+ * daily chance in the game, so the forecast adds its expected value: each
+ * day, the day's chance of a flight goes onto the busiest rival with room,
+ * as a fraction of a flight, until the market is no longer full or the
+ * rival reaches its cap. Without it, Premium looked better than it plays,
+ * since rivals answer it with flights. Demand, schedule and fuel are held
+ * where they are today. A pure read of `state`, with no random draws.
  */
 
 /** How far ahead the forecast runs. Past this, a rival still losing money is reported as holding on. */
 const FORECAST_DAYS = 180;
 const MINUTES_PER_DAY = 1440;
+/** A daily response chance below this is too small to keep the forecast running for. */
+const MIN_RESPONSE_CHANCE = 0.001;
 
 export type RivalOutlook = {
   airline: string;
@@ -35,6 +42,8 @@ export type RivalOutlook = {
   margin: number;
   /** Days until it closes the route, or null if it wouldn't within the forecast. */
   closesInDays: number | null;
+  /** Flights a day it's expected to add in answer to a full, expensive market. */
+  flightsAdded: number;
 };
 
 export type StanceForecast = {
@@ -62,6 +71,7 @@ export function forecastStance(state: SimState, origin: string, dest: string, st
   const workSettings = work.routeSettings[key];
   const onMarket = work.competitorRoutes.filter((route) => marketKey(route.origin, route.dest) === key);
   const losingDays = new Map<CompetitorOffering, number>(onMarket.map((route) => [route, route.losingDays ?? 0]));
+  const flightsBefore = new Map<CompetitorOffering, number>(onMarket.map((route) => [route, route.dailyFrequency]));
   const closesIn = new Map<CompetitorOffering, number>();
 
   for (let day = 1; day <= FORECAST_DAYS; day++) {
@@ -84,9 +94,19 @@ export function forecastStance(state: SimState, origin: string, dest: string, st
       route.fare = next;
     }
 
-    // Nothing left to happen: fares have stopped and no open rival is on a losing run.
+    // Rivals answer a full, expensive market with flights: today's chance
+    // of one, as a fraction, on the busiest rival still open with room.
+    const response = rivalResponseChance(work, origin, dest);
+    const answering = onMarket
+      .filter((route) => !closesIn.has(route) && route.dailyFrequency < RESPONSE_FREQUENCY_CAP)
+      .sort((x, y) => y.dailyFrequency - x.dailyFrequency)[0];
+    if (answering && response > 0) answering.dailyFrequency = Math.min(RESPONSE_FREQUENCY_CAP, answering.dailyFrequency + response);
+
+    // Nothing left to happen: fares have stopped, no open rival is on a
+    // losing run, and none is still adding capacity.
     const stillLosing = onMarket.some((route) => !closesIn.has(route) && losingDays.get(route)! > 0);
-    if (!moved && !stillLosing) break;
+    const stillAnswering = answering !== undefined && response >= MIN_RESPONSE_CHANCE;
+    if (!moved && !stillLosing && !stillAnswering) break;
   }
 
   return {
@@ -98,6 +118,7 @@ export function forecastStance(state: SimState, origin: string, dest: string, st
       fare: route.fare,
       margin: rivalRouteDailyResult(work, route).margin,
       closesInDays: closesIn.get(route) ?? null,
+      flightsAdded: Math.round((route.dailyFrequency - flightsBefore.get(route)!) * 10) / 10,
     })),
     responseChance: rivalResponseChance(work, origin, dest),
   };

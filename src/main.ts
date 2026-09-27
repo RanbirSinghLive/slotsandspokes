@@ -4,6 +4,7 @@ import { projection, fitProjection, baselineScale } from './render/projection';
 import { drawBasemap } from './render/basemap';
 import { drawTerminator } from './render/terminator';
 import { drawRoutes, drawSelectedRoute } from './render/routes';
+import { drawPainGauges } from './render/pain';
 import { drawAirports, drawSelectedAirport, airports, setKnownAirports, nearestAirportCandidate } from './render/airports';
 import { drawHubView, hasHubView } from './render/hubs';
 import { drawFog } from './render/fog';
@@ -344,6 +345,9 @@ function render(nowMs: number = performance.now()): void {
   } else {
     drawRoutes(ctx, state);
   }
+  // A rival being squeezed out of one of your markets, or the respite
+  // after one left (render/pain.ts): on whichever layer drew the routes.
+  drawPainGauges(ctx, state);
   // The route the side panel is showing, on top of whichever layer drew routes.
   const selection = getSelection();
   if (selection.kind === 'route') drawSelectedRoute(ctx, selection.a, selection.b);

@@ -2,7 +2,7 @@ import { recommendedFare, marketKey } from './schedule';
 import { summarizeMarket } from './marketSummary';
 import { addRivalFlight } from './competitors';
 import { rivalSecuresCapacity } from './market';
-import { pressureFactor, recentlyClosedByRival, rivalNetworkRoom } from './pressure';
+import { inRespite, pressureFactor, recentlyClosedByRival, rivalNetworkRoom } from './pressure';
 import { nextRandom } from './rng';
 import { rivalSlotQuote } from './slots';
 import type { SimState } from './state';
@@ -41,7 +41,7 @@ const RESPONSE_CHANCE_MAX = 0.3;
  * rivals topped out on the player's routes and pricing 60% over the going
  * rate paid again.
  */
-const RESPONSE_FREQUENCY_CAP = 8;
+export const RESPONSE_FREQUENCY_CAP = 8;
 
 /** Whether this market is one rivals want to move in on, and how badly (the day's response chance; 0 when not). */
 export function rivalResponseChance(state: SimState, a: string, b: string): number {
@@ -80,7 +80,9 @@ export function rollRivalCapacityResponse(state: SimState, dayStartMinute: numbe
     }
 
     // Nobody flies it, or everyone who does is at the cap: another airline
-    // already at either end opens the route.
+    // already at either end opens the route, unless a rival was just
+    // squeezed out of it (sim/pressure.ts's respite).
+    if (inRespite(state, a, b)) continue;
     const alreadyThere = new Set(onMarket.map((route) => route.code));
     const neighbour = state.competitorRoutes.find(
       (route) =>

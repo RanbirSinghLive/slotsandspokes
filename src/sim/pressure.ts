@@ -95,6 +95,30 @@ export function rivalNetworkRoom(state: SimState, code: string): number {
   return Math.max(0, 1 - routes / RIVAL_MAX_ROUTES_PER_AIRLINE);
 }
 
+/**
+ * After any rival closes a market, no rival opens it for this long: word
+ * gets round that it's a losing market. It is what Undercut buys (sim/pricing.ts):
+ * squeezing a rival out costs money for a month or more, and this is the
+ * stretch of the market to yourself that pays for it. Without it, another
+ * airline walked straight in (WEEK-NINE.md's finding).
+ */
+export const RIVAL_SQUEEZED_RESPITE_DAYS = 90;
+
+/** Whether any rival closed the a–b market within RIVAL_SQUEEZED_RESPITE_DAYS, so none opens it yet. */
+export function inRespite(state: SimState, a: string, b: string): boolean {
+  const market = [a, b].sort().join('-');
+  const since = state.simMinute - RIVAL_SQUEEZED_RESPITE_DAYS * 1440;
+  return (state.rivalClosures ?? []).some((closure) => closure.market === market && closure.closedAtMinute >= since);
+}
+
+/** Days left of a market's respite, or 0 when none is running. */
+export function respiteDaysLeft(state: SimState, a: string, b: string): number {
+  const market = [a, b].sort().join('-');
+  const latest = Math.max(-Infinity, ...(state.rivalClosures ?? []).filter((closure) => closure.market === market).map((closure) => closure.closedAtMinute));
+  if (!Number.isFinite(latest)) return 0;
+  return Math.max(0, Math.ceil((latest + RIVAL_SQUEEZED_RESPITE_DAYS * 1440 - state.simMinute) / 1440));
+}
+
 /** Whether airline `code` closed the a–b market within RIVAL_REOPEN_COOLDOWN_DAYS. */
 export function recentlyClosedByRival(state: SimState, code: string, a: string, b: string): boolean {
   const market = [a, b].sort().join('-');

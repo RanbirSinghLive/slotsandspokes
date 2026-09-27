@@ -15,6 +15,7 @@ import {
   RIVAL_TARGETS_PLAYER,
   RIVAL_FIRST_ENTRY_DAY,
   RIVAL_FREQUENCY_CAP,
+  inRespite,
   recentlyClosedByRival,
   rivalNetworkRoom,
 } from './pressure';
@@ -194,6 +195,7 @@ export function rollCompetitorRouteOpenings(state: SimState, dayStartMinute: num
       return (
         !servedKeys.has(key) &&
         !recentlyClosedByRival(state, code, a, b) &&
+        !inRespite(state, a, b) &&
         (airlineAirports.has(a) || airlineAirports.has(b)) &&
         marketDistanceNm(a, b) <= COMPETITOR_MAX_ROUTE_NM
       );
@@ -212,7 +214,8 @@ export function rollCompetitorRouteOpenings(state: SimState, dayStartMinute: num
         (airlineAirports.has(a) || airlineAirports.has(b)) &&
         marketDistanceNm(a, b) <= COMPETITOR_MAX_ROUTE_NM &&
         !servedKeys.has(marketKey(a, b)) &&
-        !recentlyClosedByRival(state, code, a, b),
+        !recentlyClosedByRival(state, code, a, b) &&
+        !inRespite(state, a, b),
     );
     if (candidates.length === 0) continue; // nothing left within reach of its network
 
@@ -287,7 +290,8 @@ export function rollRivalEntry(state: SimState, dayStartMinute: number): void {
       known.has(b) &&
       (network.has(a) || network.has(b)) &&
       marketDistanceNm(a, b) <= COMPETITOR_MAX_ROUTE_NM &&
-      potentialDailyDemand(a, b) > 0,
+      potentialDailyDemand(a, b) > 0 &&
+      !inRespite(state, a, b),
   );
   if (candidates.length === 0) return;
 
