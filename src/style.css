@@ -1766,8 +1766,7 @@ body {
   max-width: 520px;
 }
 
-#executive-chart,
-#fuel-price-chart {
+#executive-chart {
   display: block;
   width: 520px;
   height: 200px;
@@ -1776,12 +1775,7 @@ body {
   border-radius: 6px;
 }
 
-#fuel-price-chart {
-  height: 150px;
-}
-
-#executive-summary,
-#fuel-price-summary {
+#executive-summary {
   margin-top: 12px;
   font-size: 14px;
 }
@@ -1792,18 +1786,10 @@ body {
   color: #ff8080;
 }
 
-#executive-delta,
-#fuel-price-delta {
+#executive-delta {
   margin-top: 4px;
   color: #6b7694;
   font-size: 12px;
-}
-
-/* Week six's fuel price mechanic — same spacing shape #loans-section
-   already uses to separate itself from the section above it. */
-#fuel-price-section {
-  margin-top: 32px;
-  max-width: 520px;
 }
 
 /* Week six's Tech Tree tab (ui/techTree.ts) — one branch (Fuel

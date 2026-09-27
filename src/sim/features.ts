@@ -17,13 +17,6 @@
 export const CREWS_ENABLED = false;
 
 /**
- * Fuel price swings: a mean-reverting random walk on the fuel share of
- * block-hour cost. Off pins the index at its baseline of 1, so fuel is a
- * steady cost rather than noise the player can't act on.
- */
-export const FUEL_PRICE_MOVES = false;
-
-/**
  * Authored missions: one-off objectives that pay Reputation. Off means none
  * ever complete, so nothing announces one and Reputation never moves from
  * this source.

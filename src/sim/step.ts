@@ -8,7 +8,6 @@ import { airportLoad } from './airports';
 import { connectingDemandOnMarket } from './hubs';
 import { rollTotalDelayMinutes, isOnTimeArrival } from './delays';
 import { rollCompetitorRouteOpenings, rollCompetitorFrequencyGrowth, rollRivalEntry, rollDailyRivalFares } from './competitors';
-import { rollDailyFuelPrice } from './fuel';
 import { networkOverheadPerDay } from './overhead';
 import { rollDailyMarketDemand, actualDailyDemand } from './marketDemand';
 import { revealReach } from './reach';
@@ -323,11 +322,6 @@ export function step(state: SimState): void {
     // see it; delivered after, it sits on the shelf all day and the player
     // gets the first chance. First come, first served, fairly.
     rollDailyMarket(state, dayIndex(state));
-
-    // Week six's fuel price mechanic (sim/fuel.ts): same daily cadence as
-    // weather and the competitor AI above — fuel prices move day to day
-    // in this model, not minute to minute.
-    rollDailyFuelPrice(state);
 
     // Week six's market stimulation (sim/marketDemand.ts): markets grow
     // toward their potential where they're actually flown and decay back

@@ -1580,14 +1580,14 @@ pause exists.
 
 ---
 
-## Fuel prices (`src/sim/fuel.ts`) — week six
+## Fuel prices (`src/sim/fuel.ts`)
 
-`fuelPriceIndex` is unitless, 1.0 being baseline, moved once a day by a
-mean-reverting random walk: a ±1.5% step pulled back toward baseline by
-2% of however far it has drifted, clamped to [0.5, 2.0]. The reversion is
-the point — a pure random walk would be unguessable, but a price far from
-baseline is more likely than not heading back, so watching the 60-day
-history in the Executive tab is a real if noisy signal.
+`fuelPriceIndex` is unitless, 1.0 being baseline. It stays at baseline
+except during a fuel spike (see Shocks), which sets it for its length,
+up to 2.0. There used to be a daily random walk and a fuel-history chart
+in the Executive tab; it was switched off as noise the player couldn't
+act on, and removed once shocks became the fuel story (WEEK-TEN.md,
+thread 1).
 
 `legCostBreakdown()` splits each type's flat `costPerBlockHour` into
 slices rather than touching the hand-authored data: 35% fuel-sensitive,

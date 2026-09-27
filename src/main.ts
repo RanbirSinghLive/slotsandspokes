@@ -41,7 +41,6 @@ import { setupFarePolicy, updateFarePolicy } from './ui/farePolicy';
 import { setupOnTimePanel, updateOnTimePanel } from './ui/onTime';
 import { setupExecutivePanel, updateExecutivePanel } from './ui/executive';
 import { setupExecutivesPanel, updateExecutivesPanel } from './ui/executives';
-import { setupFuelPricePanel, updateFuelPricePanel } from './ui/fuelPrice';
 import { setupTechTreePanel, updateTechTreePanel } from './ui/techTree';
 import { setupDevPanel, updateDevPanel } from './ui/devTools';
 import { setupMissionsPanel, updateMissionsPanel } from './ui/missions';
@@ -80,7 +79,6 @@ setupFarePolicy(state);
 setupOnTimePanel();
 setupExecutivePanel();
 setupExecutivesPanel();
-setupFuelPricePanel();
 setupTechTreePanel(state);
 setupDevPanel();
 setupMissionsPanel(state);
@@ -653,7 +651,6 @@ function switchToSidebarTab(tab: SidebarTab): void {
   if (tab === 'executive') {
     updateExecutivesPanel(state);
     updateExecutivePanel(state);
-    updateFuelPricePanel(state);
   }
   if (tab === 'techtree') updateTechTreePanel(state);
   if (tab === 'game') updateGameControls();

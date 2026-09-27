@@ -421,22 +421,12 @@ export type SimState = {
   revenueHistoryByMarket: Record<string, number[]>;
   costHistoryByMarket: Record<string, number[]>;
   /**
-   * Week six's fuel price mechanic (sim/fuel.ts): a unitless index where
-   * 1.0 is baseline — a flight's fuel-sensitive cost slice (see
-   * legCost()) scales directly with this. Moved by a slow random walk,
-   * rolled once per simulated day (rollDailyFuelPrice(), called from
-   * step.ts's day-rollover), not read or written anywhere else.
+   * The fuel price index (sim/fuel.ts): 1.0 is baseline, and a flight's
+   * fuel-sensitive cost slice scales with it. Baseline except during a
+   * fuel spike, which sets it (sim/shocks.ts). Saves from before carry a
+   * `fuelPriceHistory` too, which nothing reads any more.
    */
   fuelPriceIndex: number;
-  /**
-   * Recent daily closing fuelPriceIndex values, oldest first — same
-   * rolling-window shape as cashHistory above, just a longer window (see
-   * FUEL_PRICE_HISTORY_MAX_DAYS). This is the "anyone looking to guess
-   * direction" history the Executive panel's fuel chart reads directly,
-   * with no smoothing or forecasting applied on top — the point is to
-   * show the real, noisy signal and let the player do the guessing.
-   */
-  fuelPriceHistory: number[];
   /**
    * A multiplier on the fuel-sensitive slice of every flight's cost, 1.0
    * meaning "no mitigation adopted yet" — lower is better (less fuel
@@ -711,7 +701,6 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     revenueHistoryByMarket: {},
     costHistoryByMarket: {},
     fuelPriceIndex: FUEL_PRICE_BASELINE,
-    fuelPriceHistory: [],
     fuelEfficiencyMultiplier: 1,
     unlockedTechNodeIds: [],
     marketDemand: {},

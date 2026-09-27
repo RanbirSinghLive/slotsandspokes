@@ -1,7 +1,6 @@
 import airportsData from '../../data/airports.json';
 import { dayIndex } from './clock';
 import { FUEL_PRICE_BASELINE, FUEL_PRICE_MAX, FUEL_SHARE_OF_BLOCK_HOUR_COST } from './fuel';
-import { FUEL_PRICE_MOVES } from './features';
 import { greatCircleDistanceNm } from './geo';
 import { nextRandom } from './rng';
 import type { SimState } from './state';
@@ -114,12 +113,10 @@ export function rollDailyShocks(state: SimState): void {
     }
   }
 
-  // Fuel prices don't otherwise move (FUEL_PRICE_MOVES is off), so a spike
-  // sets the index for its length and it's back to baseline after.
-  if (!FUEL_PRICE_MOVES) {
-    const shock = activeShock(state);
-    state.fuelPriceIndex = shock?.kind === 'fuel' ? Math.min(FUEL_PRICE_MAX, FUEL_PRICE_BASELINE * (1 + shock.magnitude)) : FUEL_PRICE_BASELINE;
-  }
+  // Fuel doesn't otherwise move (sim/fuel.ts), so a spike sets the index
+  // for its length and it's back to baseline after.
+  const shock = activeShock(state);
+  state.fuelPriceIndex = shock?.kind === 'fuel' ? Math.min(FUEL_PRICE_MAX, FUEL_PRICE_BASELINE * (1 + shock.magnitude)) : FUEL_PRICE_BASELINE;
 }
 
 const namesByIata = new Map(airports.map((airport) => [airport.iata, airport.name]));
