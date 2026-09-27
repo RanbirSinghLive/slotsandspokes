@@ -1,4 +1,5 @@
 import { nearestAirportCandidate, type Airport } from '../render/airports';
+import { deliveryDays } from '../sim/fleetTiming';
 import { money } from './format';
 import { findNearestOwnRoute } from '../render/routes';
 import { projection } from '../render/projection';
@@ -156,7 +157,9 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
         `${Math.max(0, USEFUL_LIFE_YEARS - option.listing.ageYears)} yrs of life left) for ${money(option.listing.leasePricePerDay)}/day` +
         // Network overhead grows with the square of the fleet (sim/overhead.ts), so say what this plane adds.
         `, plus ${money(overheadAddedByNextPlane(state))}/day in network overhead` +
-        (option.listed > 1 ? ` · ${option.listed - 1} more listed` : ' · the last one listed')
+        (option.listed > 1 ? ` · ${option.listed - 1} more listed` : ' · the last one listed') +
+        // Every lease takes time to arrive (sim/fleetTiming.ts).
+        ` · delivered in ${deliveryDays(state)} days`
       : `Lease a ${option.name}`,
     // Each class has its own silhouette (ui/planeIcons.ts), so the four
     // choices are told apart by shape rather than by guessing at size.

@@ -1,4 +1,5 @@
 import airportsData from '../../data/airports.json';
+import { inboundAt } from '../sim/fleetTiming';
 import { lastWeekMargin } from '../sim/pnlHistory';
 import { marketAppeal } from '../sim/whereToFly';
 import { AIRCRAFT_CLASSES, classByCode } from '../sim/aircraftClasses';
@@ -123,12 +124,12 @@ export const IDLE_DAYS_TO_RETURN = 7;
  */
 export const SHED_AFTER_DAYS = 14;
 /**
- * Crews (sim/crews.ts) kept beyond what today's planes need at ideal
- * shifts, hired or on their way: one plane's full day, so a newly leased
- * plane flies at once rather than waiting out the hiring lead time.
+ * Crews (sim/crews.ts) a plane on its way is expected to need: one full
+ * day at ideal shifts. Hired the day it's leased, so they join about when
+ * it's delivered (sim/fleetTiming.ts).
  */
-export const CREW_BUFFER = 2;
-/** Days a base's crews must sit above need plus the buffer before the extra are let go. */
+export const CREWS_PER_NEW_PLANE = 2;
+/** Days a base's crews must sit above need before the extra are let go. */
 export const CREW_RELEASE_AFTER_DAYS = 30;
 
 /** The bold player leases once a class's pool is this booked... */
@@ -223,10 +224,11 @@ function recklessPlayer(): Player {
           break;
         }
       }
-      // Whatever crews each class of its planes needs, every day (sim/crews.ts).
+      // Whatever crews each class of its planes needs, those on their way
+      // included, every day (sim/crews.ts, sim/fleetTiming.ts).
       for (const iata of Object.keys(state.crewBases ?? {})) {
         for (const crew of actions.crewReadout(state, iata)?.classes ?? []) {
-          const short = crew.ideal - crew.crews - crew.arriving;
+          const short = crew.ideal + CREWS_PER_NEW_PLANE * inboundAt(state, iata, crew.classCode).length - crew.crews - crew.arriving;
           if (short <= 0) continue;
           const hired = actions.hireCrewsAt(state, iata, crew.classCode, short);
           if (hired.ok) log.push(hired.message);
@@ -317,6 +319,7 @@ function steadyPlayer(kind: 'steady' | 'sitter' | 'bold'): Player {
       return [
         ...leaveSlack(state, memory),
         ...cutLosers(state, memory),
+        ...fillDelivered(state, memory),
         ...(harvesting ? [] : [...feedSpill(state, memory), ...openMarkets(state, memory), ...leaseWhenFull(state, memory, kind === 'bold')]),
         ...shedWhenOverheadBites(state, memory),
         ...returnIdle(state, memory),
@@ -713,14 +716,36 @@ function bestMarketFor(state: SimState, home: string, typeCode: string, memory: 
 }
 
 /**
+ * A plane with nothing to fly (just delivered, sim/fleetTiming.ts, or
+ * emptied by cuts) gets a whole day at once, from the best markets from
+ * its base, since an idle plane is only cost. Not one going back to the
+ * lessor. Runs for the sitter too, so a plane it has leases isn't wasted.
+ */
+function fillDelivered(state: SimState, memory: Memory): string[] {
+  const log: string[] = [];
+  for (const aircraft of state.aircraft) {
+    if (aircraft.returningOnDay !== undefined || state.schedule.some((leg) => leg.tail === aircraft.tail)) continue;
+    const opened = fillPlane(state, aircraft.tail, {
+      latestLanding: LATEST_LANDING_MINUTE,
+      avoid: (key) => coolingDown(state, memory, key),
+      checkSlotFees: true,
+      onOpen: (key) => memory.openedOn.set(key, dayIndex(state)),
+    });
+    if (opened.length > 0) log.push(`${aircraft.tail} flies ${opened.join(', ')}.`);
+  }
+  return log;
+}
+
+/**
  * Habit 5, lease when full. Once a class's pool at home is
- * LEASE_WHEN_POOL_SHARE booked, and home has CREW_BUFFER spare crews to
- * fly another plane, lease one more: the largest class
- * on offer whose best market has the riders to fill a round trip, whose
+ * LEASE_WHEN_POOL_SHARE booked, lease one more: the largest class on
+ * offer whose best market has the riders to fill a round trip, whose
  * lease last week's average daily margin could pay on its own, with cash
- * to cover the lessor's reserve plus LEASE_SAFETY_DAYS more. Not while
- * home is too busy. Then give it a day at once, since an idle
- * plane is only cost. One lease a day at most.
+ * to cover the lessor's reserve plus LEASE_SAFETY_DAYS more, and with no
+ * plane of that class already on its way (the pools don't count a plane
+ * until it's delivered). Not while home is too busy. Its crews are hired
+ * the same day (keepCrews()), so they join about when it's delivered;
+ * once it's delivered, openMarkets() gives it a day. One lease a day.
  */
 function leaseWhenFull(state: SimState, memory: Memory, bold: boolean): string[] {
   const home = state.homeAirport;
@@ -730,7 +755,6 @@ function leaseWhenFull(state: SimState, memory: Memory, bold: boolean): string[]
   const lastWeek = state.marginHistory.slice(-7);
   if (lastWeek.length < 7) return [];
   const averageMargin = lastWeek.reduce((sum, margin) => sum + margin, 0) / 7;
-  const crews = actions.crewReadout(state, home)?.classes ?? [];
 
   const options = actions.planeOptions(state, home);
   for (const cls of [...AIRCRAFT_CLASSES].reverse()) {
@@ -744,28 +768,12 @@ function leaseWhenFull(state: SimState, memory: Memory, bold: boolean): string[]
     if (state.cash < cashNeededToLease(price) + (bold ? BOLD_SAFETY_DAYS : LEASE_SAFETY_DAYS) * price) continue;
     const market = bestMarketFor(state, home, cls.code, memory);
     if (!market || market.score < worthFlying(cls.code)) continue;
-    // Only with crews rated for it (sim/crews.ts): a plane leased without
-    // them sits grounded and every flight it misses cancels. Without them,
-    // hire them now and lease this class once they've joined.
-    const crew = crews.find((c) => c.classCode === cls.code);
-    const spare = (crew?.crews ?? 0) - (crew?.ideal ?? 0);
-    if (spare < CREW_BUFFER) {
-      const coming = spare + (crew?.arriving ?? 0);
-      if (coming >= CREW_BUFFER) return [];
-      const hired = actions.hireCrewsAt(state, home, cls.code, CREW_BUFFER - coming);
-      return hired.ok ? [`Waiting for crews to lease a ${cls.name}: ${hired.message}`] : [];
-    }
+    // One of this class on its way already: wait for it to show up.
+    if (inboundAt(state, home, cls.code).length > 0) return [];
 
     const leased = actions.leasePlane(state, home, cls.code);
     if (!leased.ok) continue;
-    const tail = state.aircraft[state.aircraft.length - 1].tail;
-    const opened = fillPlane(state, tail, {
-      latestLanding: LATEST_LANDING_MINUTE,
-      avoid: (key) => coolingDown(state, memory, key),
-      checkSlotFees: true,
-      onOpen: (key) => memory.openedOn.set(key, dayIndex(state)),
-    });
-    return [`${leased.message} Flying ${opened.length > 0 ? opened.join(', ') : 'nothing yet'}.`];
+    return [leased.message, ...keepCrews(state, memory)];
   }
   return [];
 }
@@ -856,29 +864,20 @@ function hireExecutives(state: SimState): string[] {
 
 /**
  * Keep each crew base's crews of each class at what that class's planes
- * need at ideal shifts plus CREW_BUFFER (twice that when its pool is
- * nearly full at a profitable airline, since the next lease is near),
- * counting crews already on their way. A shortfall is met by retraining
- * spare crews of another class first (cheaper), then hiring; crews above
- * target are let go once they've sat spare for CREW_RELEASE_AFTER_DAYS.
+ * need at ideal shifts, plus CREWS_PER_NEW_PLANE for each plane of the
+ * class on its way, counting crews already joining. A shortfall is met by
+ * retraining spare crews of another class first (cheaper), then hiring;
+ * crews above target are let go once they've sat spare for
+ * CREW_RELEASE_AFTER_DAYS.
  */
 function keepCrews(state: SimState, memory: Memory): string[] {
   const log: string[] = [];
-  const lastWeek = state.marginHistory.slice(-7);
-  const profitable = lastWeek.length === 7 && lastWeek.reduce((sum, margin) => sum + margin, 0) > 0;
   for (const iata of Object.keys(state.crewBases ?? {})) {
     const classes = actions.crewReadout(state, iata)?.classes ?? [];
-    const pools = utilisationPools(state, iata);
-    // Each class's target: its planes' need plus the buffer (twice it when
-    // that class's pool is nearly full at a profitable airline, since the
-    // next lease is near). A class with no planes here keeps none.
-    const targets = classes.map((crew) => {
-      const pool = pools.find((p) => p.code === crew.classCode);
-      const growing = profitable && !!pool && pool.planes > 0 && pool.share >= LEASE_WHEN_POOL_SHARE;
-      const target = pool && pool.planes > 0 ? crew.ideal + CREW_BUFFER * (growing ? 2 : 1) : 0;
-      return { crew, target, growing };
-    });
-    for (const { crew, target, growing } of targets) {
+    // Each class's target: its planes' need at ideal shifts, plus a full
+    // day's crews for each plane of the class on its way.
+    const targets = classes.map((crew) => ({ crew, target: crew.ideal + CREWS_PER_NEW_PLANE * inboundAt(state, iata, crew.classCode).length }));
+    for (const { crew, target } of targets) {
       const key = `${iata}:${crew.classCode}`;
       let short = target - crew.crews - crew.arriving;
       if (short > 0) {
@@ -887,7 +886,7 @@ function keepCrews(state: SimState, memory: Memory): string[] {
         for (const other of targets) {
           if (short <= 0 || other.crew.classCode === crew.classCode) continue;
           const otherSpare = other.crew.crews - other.target;
-          if (otherSpare <= 0 || other.growing) continue;
+          if (otherSpare <= 0) continue;
           const moved = Math.min(short, otherSpare);
           const retrained = actions.retrainCrewsAt(state, iata, other.crew.classCode, crew.classCode, moved);
           if (!retrained.ok) continue;
@@ -902,8 +901,7 @@ function keepCrews(state: SimState, memory: Memory): string[] {
         continue;
       }
       const spare = crew.crews - target;
-      // Never while growing: those crews are about to be needed.
-      if (spare <= 0 || crew.arriving > 0 || growing) {
+      if (spare <= 0 || crew.arriving > 0) {
         memory.spareCrewDays.delete(key);
         continue;
       }

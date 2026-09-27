@@ -14,6 +14,7 @@ import { FUEL_PRICE_BASELINE } from './fuel';
 import type { FuelHedge } from './fuelPrice';
 import { STARTING_NPS } from './nps';
 import type { CrewBase, CrewDay } from './crews';
+import type { InboundLease } from './fleetTiming';
 import { createExecutiveSlots, type ExecutiveSlots } from './executives';
 
 export type AircraftStatus = 'ground' | 'airborne';
@@ -66,6 +67,8 @@ export type Aircraft = {
    * can't be worked until it has.
    */
   baseAirport: string | null;
+  /** Set while it's on its way back to the lessor (sim/fleetTiming.ts): the day it goes. It flies nothing meanwhile. */
+  returningOnDay?: number;
 };
 
 /** How one leg went, once it has landed. */
@@ -453,6 +456,8 @@ export type SimState = {
    * by one appointment.
    */
   executives: ExecutiveSlots;
+  /** Leases signed and not yet delivered (sim/fleetTiming.ts). Optional: absent in an older save. */
+  inboundLeases?: InboundLease[];
   /** Crew bases and their crews, by IATA (sim/crews.ts). Optional: an older save gets bases made at its first rollover. */
   crewBases?: Record<string, CrewBase>;
   /** Today's crewing (sim/crews.ts's rollDailyCrews()): crews per plane and when each duty day starts. */

@@ -1,4 +1,5 @@
 import { airlineCalled, LADDER, milestoneById, tiersClimbed } from '../sim/ladder';
+import { classByCode } from '../sim/aircraftClasses';
 import { money } from './format';
 import { RIVAL_CLOSE_AFTER_LOSING_DAYS, RIVAL_SQUEEZED_RESPITE_DAYS } from '../sim/pressure';
 import { activeHedge } from '../sim/fuelPrice';
@@ -176,6 +177,39 @@ function pollHedgeEvents(state: SimState): void {
     );
   }
   seenHedgeStart = running;
+}
+
+// The fleet and crews at the last poll, so arrivals and departures are
+// said once (sim/fleetTiming.ts, sim/crews.ts). Undefined until the first
+// poll, which only records: loading a game isn't news.
+let seenTails: Map<string, { typeCode: string; base: string | null }> | undefined;
+let seenCrews: Map<string, number> | undefined;
+
+/** A plane delivered, a plane gone back to the lessor, crews joining a base. */
+function pollFleetEvents(state: SimState): void {
+  const tails = new Map(state.aircraft.map((aircraft) => [aircraft.tail, { typeCode: aircraft.typeCode, base: aircraft.baseAirport }]));
+  const crews = new Map<string, number>();
+  for (const [iata, base] of Object.entries(state.crewBases ?? {})) {
+    for (const [classCode, count] of Object.entries(base.crewsByClass ?? {})) crews.set(`${iata}:${classCode}`, count);
+  }
+  if (seenTails && seenCrews) {
+    const className = (code: string) => classByCode(code)?.name ?? code;
+    for (const [tail, plane] of tails) {
+      if (!seenTails.has(tail)) pushEvent(state.simMinute, `${className(plane.typeCode)} ${tail} delivered at ${plane.base ?? 'base'}`);
+    }
+    for (const [tail, plane] of seenTails) {
+      if (!tails.has(tail)) pushEvent(state.simMinute, `${className(plane.typeCode)} ${tail} has gone back to the lessor`);
+    }
+    for (const [key, count] of crews) {
+      const joined = count - (seenCrews.get(key) ?? 0);
+      if (joined <= 0) continue;
+      // A count only rises when hired or retrained crews join (at rollover).
+      const [iata, classCode] = key.split(':');
+      pushEvent(state.simMinute, `${joined} ${className(classCode)} crew${joined === 1 ? '' : 's'} joined at ${iata}`);
+    }
+  }
+  seenTails = tails;
+  seenCrews = crews;
 }
 
 let hasSeenInitialRivals = false;
@@ -445,6 +479,7 @@ export function updateTicker(state: SimState): void {
   pollLadderEvents(state);
   pollShockEvents(state);
   pollHedgeEvents(state);
+  pollFleetEvents(state);
   pollPositionEvents(state);
   pollAogEvents(state);
   pollRivalFareEvents(state);

@@ -1033,6 +1033,11 @@ body {
 }
 
 /* A plane grounded by an AOG: a red "−1" beside the class name. */
+.pool-inbound {
+  color: #ffd166;
+  font-weight: 600;
+}
+
 .pool-grounded {
   color: #ff8080;
   font-weight: 600;

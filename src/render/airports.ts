@@ -1,4 +1,5 @@
 import airportsData from '../../data/airports.json';
+import { pendingByAirport } from '../sim/fleetTiming';
 import { projection, baselineScale } from './projection';
 import { dailyDeparturesAt, airportLevel, airportLoad } from '../sim/airports';
 import { slotFeesPerDayAt, slotsHeld } from '../sim/slots';
@@ -78,6 +79,12 @@ const UNSERVED_FILL = '#5b6480';
 const LABEL_FILL = '#9aa3b8';
 const SERVED_LABEL_FILL = '#cdd3e0';
 const LABEL_FONT = '12px system-ui, sans-serif';
+/** The line under an airport with planes or crews on their way, or planes going back. */
+const PENDING_FONT = '10px system-ui, sans-serif';
+const PENDING_FILL = '#ffd166';
+const PENDING_BACKGROUND = 'rgba(10, 14, 24, 0.75)';
+const PENDING_HEIGHT_PX = 11;
+const PENDING_GAP_PX = 4;
 
 // Presence reads straight off the dots: radius grows with daily departures on a log curve — the same
 // diminishing-returns shape the connectivity multiplier itself uses, so
@@ -192,6 +199,9 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState, sho
   const hungerByIata = showUnmetDemand ? cachedHunger(state) : new Map<string, number>();
   const previewEffects = getMapPreview()?.effects ?? [];
   const previewShareByIata = previewEffects.length > 0 ? worstPoolShareByBase(state, previewEffects) : null;
+  // Planes and crews on their way, and planes going back (sim/fleetTiming.ts).
+  const pendingByIata = pendingByAirport(state);
+  const badges: Box[] = [];
 
   for (const airport of airports) {
     if (!isAirportKnown(airport.iata)) continue;
@@ -299,6 +309,30 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState, sho
     ctx.fill();
 
 
+    // What's under way here, as one amber line under the dot: planes and
+    // crews on their way and planes going back, each with the days until
+    // the first of them happens.
+    const pending = pendingByIata.get(airport.iata);
+    if (pending) {
+      const parts: string[] = [];
+      const days = (n: number) => (n === 0 ? 'today' : `${n}d`);
+      if (pending.planesIn) parts.push(`+${pending.planesIn.count} plane${pending.planesIn.count === 1 ? '' : 's'} ${days(pending.planesIn.days)}`);
+      if (pending.crewsIn) parts.push(`+${pending.crewsIn.count} crew${pending.crewsIn.count === 1 ? '' : 's'} ${days(pending.crewsIn.days)}`);
+      if (pending.planesOut) parts.push(`−${pending.planesOut.count} plane${pending.planesOut.count === 1 ? '' : 's'} ${days(pending.planesOut.days)}`);
+      const text = parts.join(' · ');
+      ctx.save();
+      ctx.font = PENDING_FONT;
+      const width = ctx.measureText(text).width;
+      const top = y + radius + PENDING_GAP_PX;
+      ctx.fillStyle = PENDING_BACKGROUND;
+      ctx.fillRect(x - width / 2 - 3, top - 1, width + 6, PENDING_HEIGHT_PX + 2);
+      ctx.fillStyle = PENDING_FILL;
+      ctx.textBaseline = 'top';
+      ctx.fillText(text, x - width / 2, top);
+      ctx.restore();
+      badges.push({ left: x - width / 2 - 3, top: top - 1, right: x + width / 2 + 3, bottom: top + PENDING_HEIGHT_PX + 1 });
+    }
+
     pendingLabels.push({
       iata: airport.iata,
       name: airport.name,
@@ -312,7 +346,7 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState, sho
     });
   }
 
-  placeLabels(ctx, pendingLabels, projection.scale() >= baselineScale * NAMES_FOR_ALL_ZOOM);
+  placeLabels(ctx, pendingLabels, projection.scale() >= baselineScale * NAMES_FOR_ALL_ZOOM, badges);
 }
 
 type PendingLabel = {
@@ -360,16 +394,20 @@ function boxesOverlap(a: Box, b: Box): boolean {
  * by importance as it zooms out. Greedy placement isn't optimal, but it's
  * predictable and cheap, which is what a per-frame renderer needs.
  */
-function placeLabels(ctx: CanvasRenderingContext2D, labels: PendingLabel[], namesForAll: boolean): void {
+function placeLabels(ctx: CanvasRenderingContext2D, labels: PendingLabel[], namesForAll: boolean, obstacles: Box[] = []): void {
   labels.sort((a, b) => Number(b.home) - Number(a.home) || b.departures - a.departures || b.population - a.population);
 
   // Every dot is an obstacle too, so a label never sits on a neighbour's marker.
-  const taken: Box[] = labels.map((l) => ({
-    left: l.x - l.radius,
-    top: l.y - l.radius,
-    right: l.x + l.radius,
-    bottom: l.y + l.radius,
-  }));
+  // So is every pending-changes line (see drawAirports()).
+  const taken: Box[] = [
+    ...labels.map((l) => ({
+      left: l.x - l.radius,
+      top: l.y - l.radius,
+      right: l.x + l.radius,
+      bottom: l.y + l.radius,
+    })),
+    ...obstacles,
+  ];
 
   const half = LABEL_HEIGHT_PX / 2;
   for (const label of labels) {

@@ -357,7 +357,7 @@ function findExactTimeCollision(
  */
 export function candidateTailsAt(state: SimState, baseIata: string): string[] {
   return state.aircraft
-    .filter((a) => a.baseAirport === baseIata || a.baseAirport === null)
+    .filter((a) => (a.baseAirport === baseIata || a.baseAirport === null) && a.returningOnDay === undefined)
     .map((a, index) => ({ tail: a.tail, rank: classRank(a.typeCode), index }))
     .sort((a, b) => a.rank - b.rank || a.index - b.index)
     .map((a) => a.tail);

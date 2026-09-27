@@ -42,7 +42,8 @@ import {
   type Innovation,
   type InnovationId,
 } from './innovations';
-import { cashNeededToLease, LEASE_RESERVE_DAYS, leaseAircraft, leaseRateFor, loadLeaseRates } from './leasing';
+import { cashNeededToLease, LEASE_RESERVE_DAYS, leaseRateFor, loadLeaseRates } from './leasing';
+import { inboundAt, orderLease } from './fleetTiming';
 import { daysUntilNextListing, listingsOf, returnBlockedReason, returnFee, returnLease, takeListing, type MarketListing } from './market';
 import { airlineCalled, classOpen, tierThatOpens } from './ladder';
 import { actualDailyDemand, currentPotentialDemand } from './marketDemand';
@@ -507,14 +508,14 @@ export function leasePlane(state: SimState, iata: string, typeCode: string): Out
     state.cash -= baseFee;
     openCrewBase(state, iata);
   }
-  const aircraft = leaseAircraft(state, typeCode, iata, leased.ageYears, leased.leasePricePerDay);
+  const arrivesDay = orderLease(state, leased, iata);
   revealReach(state);
   const crewNote = crewAdvice(state, iata, typeCode);
   const refurbished = leased.ageYears === listing.ageYears ? '' : `, refurbished from ${listing.ageYears}`;
   return {
     ok: true,
     message:
-      `${option.name} leased at ${iata}: ${leased.ageYears} yrs old${refurbished}, $${leased.leasePricePerDay.toLocaleString()}/day (${aircraft.tail}).` +
+      `${option.name} leased at ${iata}: ${leased.ageYears} yrs old${refurbished}, $${leased.leasePricePerDay.toLocaleString()}/day from its delivery on day ${arrivesDay}.` +
       (baseFee > 0 ? ` Crew base opened at ${iata} for $${baseFee.toLocaleString()}.` : '') +
       (crewNote ? ` ${crewNote}` : ''),
   };
@@ -531,7 +532,7 @@ export function clearPlane(state: SimState, tail: string): Outcome<{ message: st
 /** Planes based here that could go back to the lessor now, and the ones that can't with why. */
 export function returnOptions(state: SimState, iata: string): { tail: string; name: string; fee: number; saves: number; ageYears: number; blocked: string | null }[] {
   return state.aircraft
-    .filter((aircraft) => aircraft.baseAirport === iata)
+    .filter((aircraft) => aircraft.baseAirport === iata && aircraft.returningOnDay === undefined)
     .map((aircraft) => ({
       tail: aircraft.tail,
       name: classByCode(aircraft.typeCode)?.name ?? aircraft.typeCode,
@@ -625,9 +626,11 @@ function crewAdvice(state: SimState, iata: string, classCode: string): string | 
   const need = crewNeed(state, iata, classCode);
   const base = crewBases(state)[iata];
   const have = crewsOf(base, classCode) + crewsArriving(base, classCode);
-  if (have >= need.minimum + LEASE_CREW_ALLOWANCE) return null;
+  // Every plane of this class on its way needs its own crews.
+  const inbound = inboundAt(state, iata, classCode).length * LEASE_CREW_ALLOWANCE;
+  if (have >= need.minimum + inbound) return null;
   const name = classByCode(classCode)?.name ?? classCode;
-  return `${iata} needs more ${name} crews for it to fly: hire or retrain them at the airport.`;
+  return `${iata} needs more ${name} crews for it to fly: hire or retrain them now, so they join when it's delivered.`;
 }
 
 /** Crews a newly leased plane's full day needs at the legal shift: what crewAdvice() leaves room for. */

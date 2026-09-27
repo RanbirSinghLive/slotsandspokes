@@ -1,4 +1,5 @@
 import { forecastStance, type StanceForecast } from '../../sim/fareForecast';
+import { inboundAt } from '../../sim/fleetTiming';
 import { crewShare } from '../../sim/crews';
 import { line } from './dom';
 import { money } from '../format';
@@ -154,7 +155,7 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   const pools = document.createElement('div');
   pools.className = 'inspector-pools';
   const redrawPools = () => {
-    pools.replaceChildren(...(base ? buildPoolRows(utilisationPools(state, base), getMapPreview()?.effects, base, (code) => crewShare(state, code, base)) : []));
+    pools.replaceChildren(...(base ? buildPoolRows(utilisationPools(state, base), getMapPreview()?.effects, base, (code) => crewShare(state, code, base), (code) => inboundAt(state, base, code).length) : []));
   };
   redrawPools();
   if (base) root.append(poolsHeading, pools);

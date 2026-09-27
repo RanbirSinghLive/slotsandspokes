@@ -164,7 +164,8 @@ function isGrounded(state: SimState, tail: string): boolean {
 
 export function utilisationPools(state: SimState, base?: string): ClassPool[] {
   return AIRCRAFT_CLASSES.map((cls) => {
-    const planes = state.aircraft.filter((a) => a.typeCode === cls.code && (base === undefined || a.baseAirport === base));
+    // A plane going back to the lessor (sim/fleetTiming.ts) is no longer part of the pool.
+    const planes = state.aircraft.filter((a) => a.typeCode === cls.code && (base === undefined || a.baseAirport === base) && a.returningOnDay === undefined);
     // A grounded plane's flying still counts (it's still on the schedule,
     // waiting to be covered), but its day doesn't: that's what pushes a pool
     // past 100% while an AOG lasts.

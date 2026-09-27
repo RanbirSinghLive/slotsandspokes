@@ -10,6 +10,7 @@ import { connectingDemandOnMarket } from './hubs';
 import { rollTotalDelayMinutes, isOnTimeArrival } from './delays';
 import { rollCompetitorRouteOpenings, rollCompetitorFrequencyGrowth, rollRivalEntry, rollDailyRivalFares } from './competitors';
 import { bookingPerks, runningCostForDay } from './innovations';
+import { rollDailyFleet } from './fleetTiming';
 import { networkOverheadPerDay } from './overhead';
 import { rollDailyMarketDemand, actualDailyDemand } from './marketDemand';
 import { revealReach } from './reach';
@@ -190,6 +191,11 @@ export function step(state: SimState): void {
     // is scoped to one day: unclaimed spill doesn't carry into tomorrow,
     // since nobody's actually holding a seat for anyone.
     state.spilloverByMarket = {};
+
+    // Deliveries and returns due today (sim/fleetTiming.ts), before the
+    // day's leases are charged: a plane delivered today pays from today,
+    // one gone back today pays nothing more.
+    rollDailyFleet(state);
 
     // Lease cost: a flat per-day charge, not tied to whether the aircraft
     // actually flew that day. Every aircraft is leased (sim/leasing.ts).

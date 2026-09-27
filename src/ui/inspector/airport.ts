@@ -1,4 +1,5 @@
 import { airportLoad, dailyMovementsAt, slotCapacityPerDay } from '../../sim/airports';
+import { inboundAt } from '../../sim/fleetTiming';
 import { money } from '../format';
 import { crewShare } from '../../sim/crews';
 import { line, heading } from './dom';
@@ -93,7 +94,7 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
   const pools = document.createElement('div');
   pools.className = 'inspector-pools';
   const redrawPools = () => {
-    pools.replaceChildren(...buildPoolRows(utilisationPools(state, iata), getMapPreview()?.effects, iata, (code) => crewShare(state, code, iata)));
+    pools.replaceChildren(...buildPoolRows(utilisationPools(state, iata), getMapPreview()?.effects, iata, (code) => crewShare(state, code, iata), (code) => inboundAt(state, iata, code).length));
   };
   redrawPools();
   const basedHere = utilisationPools(state, iata).some((pool) => pool.planes > 0);

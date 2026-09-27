@@ -1,6 +1,7 @@
 import { dayIndex } from './clock';
+import { isReturning, startReturn } from './fleetTiming';
 import { nextRandom } from './rng';
-import { leaseRateFor, USEFUL_LIFE_YEARS } from './leasing';
+import { leaseRateFor } from './leasing';
 import type { Aircraft, SimState } from './state';
 
 /**
@@ -134,6 +135,7 @@ export function takeListing(state: SimState, typeCode: string): MarketListing | 
 
 /** Why this plane can't go back to the lessor right now, or null when it can. */
 export function returnBlockedReason(state: SimState, aircraft: Aircraft): string | null {
+  if (isReturning(aircraft)) return `${aircraft.tail} is already going back, on day ${aircraft.returningOnDay}.`;
   if (state.schedule.some((leg) => leg.tail === aircraft.tail)) return `${aircraft.tail} still has flights. Remove them first.`;
   if (state.aogs.some((event) => event.tail === aircraft.tail)) return `${aircraft.tail} is grounded with an AOG.`;
   if (aircraft.status !== 'ground') return `${aircraft.tail} is in the air.`;
@@ -144,7 +146,11 @@ export function returnFee(aircraft: Aircraft): number {
   return RETURN_FEE_LEASE_DAYS * aircraft.leaseCostPerDay;
 }
 
-/** Hand a plane back to the lessor for a fee; it goes back on the market for anyone to lease. */
+/**
+ * Hand a plane back to the lessor for a fee. It goes back over the return
+ * time (sim/fleetTiming.ts), costing its lease until it's gone, then back
+ * on the market for anyone to lease.
+ */
 export function returnLease(state: SimState, tail: string): { ok: true; message: string } | { ok: false; reason: string } {
   const aircraft = state.aircraft.find((a) => a.tail === tail);
   if (!aircraft) return { ok: false, reason: 'No such plane.' };
@@ -155,18 +161,10 @@ export function returnLease(state: SimState, tail: string): { ok: true; message:
   state.todayCost += fee;
   state.todayCostByCategory.lease += fee;
   state.todayMargin -= fee;
-  state.aircraft = state.aircraft.filter((a) => a !== aircraft);
-  state.market.listings.push({
-    id: state.market.nextListingId++,
-    typeCode: aircraft.typeCode,
-    ageYears: aircraft.ageYears,
-    leasePricePerDay: aircraft.leaseCostPerDay,
-    listedDay: dayIndex(state),
-  });
-  const lifeLeft = Math.max(0, USEFUL_LIFE_YEARS - aircraft.ageYears);
+  const goesOnDay = startReturn(state, aircraft);
   return {
     ok: true,
-    message: `${tail} returned to the lessor for $${fee.toLocaleString()}. It's back on the market (${aircraft.ageYears} yrs, ${lifeLeft} left).`,
+    message: `${tail} is going back to the lessor ($${fee.toLocaleString()}): it leaves on day ${goesOnDay}, costing its lease of $${aircraft.leaseCostPerDay.toLocaleString()} a day until then.`,
   };
 }
 

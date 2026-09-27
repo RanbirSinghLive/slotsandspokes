@@ -1,4 +1,5 @@
 import { classByCode } from '../../sim/aircraftClasses';
+import { dayIndex } from '../../sim/clock';
 import { line, heading } from './dom';
 import { money } from '../format';
 import { aogFor, daysUntilReturn } from '../../sim/aog';
@@ -145,6 +146,12 @@ export function buildAircraftView(state: SimState, tail: string, changed: () => 
   );
 
   const now = line(whereNow(state, tail));
+  const plane = state.aircraft.find((a) => a.tail === tail);
+  if (plane?.returningOnDay !== undefined) {
+    const days = plane.returningOnDay - dayIndex(state);
+    now.textContent = `Going back to the lessor: gone on day ${plane.returningOnDay} (${days} day${days === 1 ? '' : 's'}), still costing its lease until then.`;
+    now.classList.add('is-over');
+  }
   const aog = aogFor(state, tail);
   if (aog) {
     const days = daysUntilReturn(state, aog);
