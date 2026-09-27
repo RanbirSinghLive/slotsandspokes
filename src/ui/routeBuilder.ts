@@ -2,7 +2,7 @@ import { geoCircle, geoPath } from 'd3-geo';
 import type { LineString } from 'geojson';
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { projection } from '../render/projection';
-import { findNearestAirport, type Airport } from '../render/airports';
+import { airports, findNearestAirport, type Airport } from '../render/airports';
 import { greatCircleDistanceNm } from '../sim/geo';
 import { demandAgainstSeats, marketSize, neverFills } from '../sim/marketSize';
 import { suppressedMarketReason } from '../sim/demand';
@@ -233,6 +233,19 @@ export function isRouteBuilderActive(): boolean {
 export function armRouteBuilderAt(airport: Airport): void {
   builderState = { mode: 'armed', chain: [airport] };
   setArmedCursor(true);
+}
+
+/**
+ * Open the route form for `origin` to `dest` as if the player had drawn
+ * it on the map: the panel's "where to fly next" links (ui/inspector/airport.ts).
+ */
+export function openRouteForm(state: SimState, origin: string, dest: string): void {
+  const from = airports.find((airport) => airport.iata === origin);
+  const to = airports.find((airport) => airport.iata === dest);
+  if (!from || !to) return;
+  reset();
+  builderState = { mode: 'confirming', chain: [from], dest: to };
+  showForm([from], to, state);
 }
 
 /**

@@ -1,4 +1,6 @@
 import { airportLoad, dailyMovementsAt, slotCapacityPerDay } from '../../sim/airports';
+import { whereToFlyFrom } from '../../sim/whereToFly';
+import { openRouteForm } from '../routeBuilder';
 import { formatNps, marketNps } from '../../sim/nps';
 import { daysUntilReturn, expediteCost, expediteRepair } from '../../sim/aog';
 import { congestionParameters } from '../../sim/delays';
@@ -122,6 +124,7 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
   }
 
   root.append(heading('Markets'), marketRows(state, iata));
+  root.append(...whereToFlyNext(state, iata));
   return { root, redrawPools };
 }
 
@@ -242,4 +245,34 @@ function marketRows(state: SimState, iata: string): HTMLElement {
     list.append(row);
   }
   return list;
+}
+
+/**
+ * The best markets from here the airline doesn't fly yet (sim/whereToFly.ts),
+ * in words; each opens the route form for it, as if drawn on the map.
+ */
+function whereToFlyNext(state: SimState, iata: string): HTMLElement[] {
+  const suggestions = whereToFlyFrom(state, iata);
+  if (suggestions.length === 0) return [];
+  const list = document.createElement('div');
+  list.className = 'inspector-rows';
+  for (const suggestion of suggestions) {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'inspector-row';
+    const name = document.createElement('span');
+    name.textContent = `${suggestion.dest} ${suggestion.destName}`;
+    const detail = document.createElement('span');
+    detail.className = 'inspector-row-detail';
+    const rivals = suggestion.rivalFlights === 0 ? 'no rivals' : `rivals fly ${suggestion.rivalFlights}/day`;
+    detail.textContent = `${suggestion.size} market · ${suggestion.service.toLowerCase()} · ${rivals} · $${suggestion.fare} fare · ${suggestion.distanceNm.toLocaleString()} nm, by ${suggestion.className}`;
+    row.append(name, detail);
+    row.addEventListener('click', () => openRouteForm(state, iata, suggestion.dest));
+    list.append(row);
+  }
+  return [
+    heading('Where to fly next'),
+    line('The biggest markets from here you don\'t fly yet, raised where the far end is starved for service and lowered where rivals already fly. Click one to plan it.'),
+    list,
+  ];
 }

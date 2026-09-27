@@ -6,7 +6,7 @@ moats, shocks, real costs, Europe, home difficulty) lives in
 with playtest findings as they come (see "Playtest notes"), and the
 order changes with them.
 
-**State at handoff:** save key `airgame-save-v46`. **Threads 1, 2, 3, 8 and 10 are done.** The game pushes back
+**State at handoff:** save key `airgame-save-v46`. **Threads 1, 2, 3, 4, 8 and 10 are done.** The game pushes back
 the way CLAUDE.md's philosophy asks: over a year a careful airline makes
 $6.5M–$19M, a sitter $2M–$5M and eroding, an unattended one-plane start
 survives the Standard homes, a reckless one always busts
@@ -242,6 +242,14 @@ unlocks replace debut days (done); (3) innovations (done).
 - **Where to fly next**: the airport view lists its best unserved markets
   in words (size, hunger, distance, rivals), each a link to draw it;
   `suggestSpokes()` already does part of this for hubs.
+
+**Status: done.** Labels already thinned by importance (the greedy
+placer drops the least important where they'd overlap); what was
+missing was legibility, so home and network airports, and every airport
+zoomed in, show their name beside the code where it fits. Where to fly
+next lists five markets in words (the going fare added, since at a
+European start every one read "Huge, starved, no rivals"), each opening
+the route form. UI only: headless output unchanged.
 
 ## Thread 5: headless player fidelity
 

@@ -772,8 +772,14 @@ replacing it.
    Since M9, a flight running late (`arriveMinute > scheduledArriveMinute`)
    is tinted red instead of the usual yellow — the point being to make a
    cascading delay watchable on the map itself, not just readable as text.
-6. `airports.ts` — a dot + IATA label per airport, **drawn exactly once,
-   always**, regardless of which overlays are on. Both `demand.ts` and
+6. `airports.ts` — a dot + label per airport, **drawn exactly once,
+   always**, regardless of which overlays are on. Labels are placed
+   greedily without overlap, most important first (home, then busiest
+   for you, then biggest city). Home and the airports the airline flies
+   to try the code and name ("DUS Düsseldorf"), as does every airport
+   zoomed in past 1.8× the fit; where a name doesn't fit, the code alone;
+   where nothing fits, no label at that zoom. So the map thins itself by
+   importance as it zooms out. Both `demand.ts` and
    `competition.ts` used to draw their own airports (population-sized
    circles for Demand, a plain call to the same `drawAirports()` for
    Competition) back when each was a full-screen exclusive view with
@@ -1933,7 +1939,17 @@ curves show its own passengers who connect onward somewhere else
 Trips are one stop at most: a passenger changes planes once or not at
 all. Dashed lines also go to the best new spokes (`suggestSpokes()`: known airports in range
 of a plane based there, valued once their route is established and
-capped at what one daily round trip could carry). The map menu's **Plan
+capped at what one daily round trip could carry).
+
+**Where to fly next** (`sim/whereToFly.ts`, the airport view): the five
+best markets from an airport the airline doesn't fly yet, in words
+(size, how the far end is served, rival flights, the going fare,
+distance, the smallest class that reaches). Only markets a plane based
+there (or, with none, any plane in the fleet) can fly, to airports the
+player can see. Ranked by potential demand, times the hunger boost of
+the two ends (sim/serviceLevel.ts), over 1 + half the rival flights a
+day. Each opens the route form (`openRouteForm()` in
+ui/routeBuilder.ts) as if drawn on the map. The map menu's **Plan
 hub** (`sim/hubPlanner.ts`) lists moves — another daily round trip to a
 spoke, a different style, a new spoke — each valued in dollars a day
 with these same formulas. Extra connections count only up to the seats
