@@ -1523,6 +1523,23 @@ body {
   font-size: 12px;
 }
 
+/* A difficulty group's heading in the home picker (ui/homePicker.ts). */
+.home-group-title {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: #e8ecf5;
+}
+
+.home-group-title:first-child {
+  margin-top: 0;
+}
+
+.home-group-note {
+  margin: 0 0 2px;
+  font-size: 12px;
+  color: #6b7694;
+}
+
 /* The Plan hub window (ui/hubPlanner.ts): wider than the other modals,
    since it carries a grid, and scrolls if a big hub outgrows the screen. */
 .modal-box--hub {

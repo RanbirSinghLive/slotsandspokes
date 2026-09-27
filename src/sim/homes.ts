@@ -1,4 +1,5 @@
 import airportsData from '../../data/airports.json';
+import homeDifficultyData from '../../data/home-difficulty.json';
 import { AIRCRAFT_CLASSES } from './aircraftClasses';
 import { marketDistanceNm, potentialDailyDemand } from './demand';
 import { startingSimMinute } from './clock';
@@ -22,12 +23,26 @@ const MIN_NEIGHBOURS = 3;
 type AirportSpec = { iata: string; name: string; population: number };
 const airports = airportsData as AirportSpec[];
 
+export type HomeDifficulty = 'Standard' | 'Hard' | 'Brutal';
+
+/**
+ * How hard each city is to start from, measured by playing the airline
+ * left to itself from there (`npm run homes`, headless/buildHomeDifficulty.ts):
+ * Standard if it lasts, Hard if it goes under slowly or only sometimes,
+ * Brutal if it goes under fast every time. A city missing from the file
+ * (measured before it was added) has no rating.
+ */
+const difficultyByIata = new Map(
+  (homeDifficultyData as { iata: string; difficulty: HomeDifficulty }[]).map((entry) => [entry.iata, entry.difficulty]),
+);
+
 export type HomeOption = {
   iata: string;
   name: string;
   population: number;
   /** Airports a propeller can reach from here and fly a market to. */
   neighbours: number;
+  difficulty: HomeDifficulty | null;
 };
 
 /** Every city the player may start from, biggest first. */
@@ -43,6 +58,7 @@ export function homeOptions(): HomeOption[] {
           marketDistanceNm(airport.iata, other.iata) <= PROPELLER_RANGE_NM &&
           potentialDailyDemand(airport.iata, other.iata) > 0,
       ).length,
+      difficulty: difficultyByIata.get(airport.iata) ?? null,
     }))
     .filter((option) => option.neighbours >= MIN_NEIGHBOURS)
     .sort((a, b) => b.population - a.population);

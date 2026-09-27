@@ -628,6 +628,21 @@ Toronto, Boston and London standard; Philadelphia harder; Halifax
 hardest. Drafted after thread 9, since overhead moves the results it's
 calibrated against.
 
+**Status: done, measured rather than derived.** Nothing on the map
+predicted which starts fail: Philadelphia's LaGuardia market is 31,700
+riders a day and its starter still goes under by day 77, because its
+best routes are short hops where a fare barely covers a departure. So
+`npm run homes` (`headless/buildHomeDifficulty.ts`) plays the unattended
+starter from every home city for 180 days on two seeds and writes
+`data/home-difficulty.json`: Standard (lasted every game), Hard (went
+under in some, or not until day 60 on average), Brutal (went under in
+every game before that). 169 cities: 54 Standard, 44 Hard, 71 Brutal; it
+takes about 2½ minutes. It agrees with the balance report (YUL, YYZ, BOS,
+LHR Standard; PHL Hard; YHZ Brutal). The home picker groups cities by
+rating, easiest first, with a line on what each means ("Brutal starts:
+for experienced players …"). The ratings describe the game as balanced
+when the script ran: re-run it after a change to costs, fares or demand.
+
 ---
 
 ## Carried forward from week eight
