@@ -1896,6 +1896,11 @@ Spare crews then go to the longest shifts, down to 8 hours. Crews left
 over stand by at $250 a day each (cost category `crew`). Flying crews'
 pay stays inside each flight's block-hour cost.
 
+Crewing is decided once a day, at rollover: a plane leased or a
+rotation added during the day flies that day on the morning's crewing
+(a new plane uncrewed for its first day), and is crewed properly from
+the next rollover.
+
 **Hiring** is at the airport (the airport view's Crews section): $10,000
 a crew, flying 7 days later. Crews can be let go. So the trade is
 hiring ahead of growth (idle crews cost) against hiring after (a new
@@ -2027,17 +2032,19 @@ five sample games, day 314).
 `npm run sweep -- <lever> [days] [home]` runs the same headless game
 (see Headless runner) once per value of one lever and prints revenue,
 cost and margin per day, profit over the run, and where margin peaks.
-Levers: `reserve` (crew depth), `fare` (a multiplier on every market's
-fare, marked as a player override so the price policy leaves it alone),
-and `fuel-efficiency` (without and with winglet retrofits).
+Levers: `fare` (a multiplier on every market's fare, marked as a player
+override so the price policy leaves it alone), `stance` (every market
+on one fare stance), and `fuel-efficiency` (without and with winglet
+retrofits). An unknown lever prints the list.
 
 **Every row uses the same seed**, so the lever is the only difference.
 The flip side: one seed can mislead, because outcomes vary a lot between
 seeds (see Rival pressure). Confirm a result on a few seeds before
 acting on it.
-That also needs the *number* of random draws per day to stay constant,
-which was broken once by a roll that skipped already-grounded aircraft;
-see `rollDailyMechanicalGroundings()`.
+That also needs the *number* of random draws per day to stay constant
+whatever happens, which is why the daily rolls (breakdowns in
+`rollDailyAogs()`, rival responses, shocks) draw the same numbers every
+day.
 
 The lever is applied to the markets the player opens on the first
 morning, so the fare lever has markets to act on; markets it

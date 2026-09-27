@@ -62,11 +62,14 @@ export function playGames(specs: GameSpec[], workers: number): Promise<RunResult
         { eval: true },
       );
       pool.push(worker);
+      // Set once this worker has no more games and is being stopped on purpose.
+      let finished = false;
       const handOut = () => {
         if (next < order.length) {
           const index = order[next++];
           worker.postMessage({ index, spec: specs[index] });
         } else {
+          finished = true;
           void worker.terminate();
           if (--running === 0) resolve(results);
         }
@@ -77,6 +80,11 @@ export function playGames(specs: GameSpec[], workers: number): Promise<RunResult
         handOut();
       });
       worker.on('error', fail);
+      // A worker that stops without an error (it crashed, or exited) would
+      // otherwise leave its game unanswered and the run waiting for ever.
+      worker.on('exit', (code) => {
+        if (!finished) fail(new Error(`A balance worker stopped (exit code ${code}).`));
+      });
       handOut();
     }
   });
