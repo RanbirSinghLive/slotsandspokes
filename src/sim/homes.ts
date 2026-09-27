@@ -1,5 +1,5 @@
 import airportsData from '../../data/airports.json';
-import { STARTING_CREWS } from './crews';
+import { STARTING_CREW_CLASS, STARTING_CREWS } from './crews';
 import { placeHomeRival } from './competitors';
 import { ensureRivalFleets } from './market';
 import homeDifficultyData from '../../data/home-difficulty.json';
@@ -78,7 +78,7 @@ export function chooseHome(state: SimState, iata: string): void {
   state.simMinute = startingSimMinute(iata);
   state.aircraft = createStartingFleet(iata);
   // Home is the first crew base, crewed for the starting plane (sim/crews.ts).
-  state.crewBases = { [iata]: { crews: STARTING_CREWS, hiring: [] } };
+  state.crewBases = { [iata]: { crewsByClass: { [STARTING_CREW_CLASS]: STARTING_CREWS }, hiring: [], retraining: [] } };
   // Whatever the placeholder home revealed is forgotten: the map opens up
   // around the city actually chosen.
   state.knownAirports = [];

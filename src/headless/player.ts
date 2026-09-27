@@ -223,12 +223,12 @@ function recklessPlayer(): Player {
           break;
         }
       }
-      // Whatever crews its planes need, every day (sim/crews.ts).
+      // Whatever crews each class of its planes needs, every day (sim/crews.ts).
       for (const iata of Object.keys(state.crewBases ?? {})) {
-        const crew = actions.crewReadout(state, iata);
-        const short = crew ? crew.ideal - crew.crews - crew.arriving : 0;
-        if (short > 0) {
-          const hired = actions.hireCrewsAt(state, iata, short);
+        for (const crew of actions.crewReadout(state, iata)?.classes ?? []) {
+          const short = crew.ideal - crew.crews - crew.arriving;
+          if (short <= 0) continue;
+          const hired = actions.hireCrewsAt(state, iata, crew.classCode, short);
           if (hired.ok) log.push(hired.message);
         }
       }
@@ -268,7 +268,7 @@ export type Memory = {
   stanceReviewed: Map<string, number>;
   /** Days in a row each plane's flying hasn't paid for keeping it, by tail. */
   shortDays: Map<string, number>;
-  /** Days in a row each crew base has carried more crews than it needs, by IATA. */
+  /** Days in a row each base has carried more crews of a class than it needs, by "IATA:CLASS". */
   spareCrewDays: Map<string, number>;
 };
 
@@ -730,10 +730,7 @@ function leaseWhenFull(state: SimState, memory: Memory, bold: boolean): string[]
   const lastWeek = state.marginHistory.slice(-7);
   if (lastWeek.length < 7) return [];
   const averageMargin = lastWeek.reduce((sum, margin) => sum + margin, 0) / 7;
-  // Only with crews to fly it (sim/crews.ts): a plane leased without them
-  // sits grounded until hires arrive, and every flight it misses cancels.
-  const crew = actions.crewReadout(state, home);
-  if (!crew || crew.crews - crew.ideal < CREW_BUFFER) return [];
+  const crews = actions.crewReadout(state, home)?.classes ?? [];
 
   const options = actions.planeOptions(state, home);
   for (const cls of [...AIRCRAFT_CLASSES].reverse()) {
@@ -747,6 +744,17 @@ function leaseWhenFull(state: SimState, memory: Memory, bold: boolean): string[]
     if (state.cash < cashNeededToLease(price) + (bold ? BOLD_SAFETY_DAYS : LEASE_SAFETY_DAYS) * price) continue;
     const market = bestMarketFor(state, home, cls.code, memory);
     if (!market || market.score < worthFlying(cls.code)) continue;
+    // Only with crews rated for it (sim/crews.ts): a plane leased without
+    // them sits grounded and every flight it misses cancels. Without them,
+    // hire them now and lease this class once they've joined.
+    const crew = crews.find((c) => c.classCode === cls.code);
+    const spare = (crew?.crews ?? 0) - (crew?.ideal ?? 0);
+    if (spare < CREW_BUFFER) {
+      const coming = spare + (crew?.arriving ?? 0);
+      if (coming >= CREW_BUFFER) return [];
+      const hired = actions.hireCrewsAt(state, home, cls.code, CREW_BUFFER - coming);
+      return hired.ok ? [`Waiting for crews to lease a ${cls.name}: ${hired.message}`] : [];
+    }
 
     const leased = actions.leasePlane(state, home, cls.code);
     if (!leased.ok) continue;
@@ -847,42 +855,65 @@ function hireExecutives(state: SimState): string[] {
 // --- Crews ----------------------------------------------------------------------------
 
 /**
- * Keep each crew base's crews at what its planes need at ideal shifts
- * plus CREW_BUFFER (twice that when a plane pool there is nearly full at
- * a profitable airline, since the next lease is near), counting crews
- * already on their way: hire the difference, and let go of crews above
- * that once they've sat spare for CREW_RELEASE_AFTER_DAYS days.
+ * Keep each crew base's crews of each class at what that class's planes
+ * need at ideal shifts plus CREW_BUFFER (twice that when its pool is
+ * nearly full at a profitable airline, since the next lease is near),
+ * counting crews already on their way. A shortfall is met by retraining
+ * spare crews of another class first (cheaper), then hiring; crews above
+ * target are let go once they've sat spare for CREW_RELEASE_AFTER_DAYS.
  */
 function keepCrews(state: SimState, memory: Memory): string[] {
   const log: string[] = [];
   const lastWeek = state.marginHistory.slice(-7);
   const profitable = lastWeek.length === 7 && lastWeek.reduce((sum, margin) => sum + margin, 0) > 0;
   for (const iata of Object.keys(state.crewBases ?? {})) {
-    const crew = actions.crewReadout(state, iata);
-    if (!crew) continue;
-    // Growth coming: a pool nearly full at a profitable airline means the
-    // next lease is near, so a second plane's crews are hired ahead.
-    const growing = profitable && utilisationPools(state, iata).some((pool) => pool.planes > 0 && pool.share >= LEASE_WHEN_POOL_SHARE);
-    const target = crew.ideal + CREW_BUFFER * (growing ? 2 : 1);
-    const have = crew.crews + crew.arriving;
-    if (have < target) {
-      memory.spareCrewDays.delete(iata);
-      const hired = actions.hireCrewsAt(state, iata, target - have);
-      if (hired.ok) log.push(hired.message);
-      continue;
+    const classes = actions.crewReadout(state, iata)?.classes ?? [];
+    const pools = utilisationPools(state, iata);
+    // Each class's target: its planes' need plus the buffer (twice it when
+    // that class's pool is nearly full at a profitable airline, since the
+    // next lease is near). A class with no planes here keeps none.
+    const targets = classes.map((crew) => {
+      const pool = pools.find((p) => p.code === crew.classCode);
+      const growing = profitable && !!pool && pool.planes > 0 && pool.share >= LEASE_WHEN_POOL_SHARE;
+      const target = pool && pool.planes > 0 ? crew.ideal + CREW_BUFFER * (growing ? 2 : 1) : 0;
+      return { crew, target, growing };
+    });
+    for (const { crew, target, growing } of targets) {
+      const key = `${iata}:${crew.classCode}`;
+      let short = target - crew.crews - crew.arriving;
+      if (short > 0) {
+        memory.spareCrewDays.delete(key);
+        // Spare crews of another class retrain for less than a hire costs.
+        for (const other of targets) {
+          if (short <= 0 || other.crew.classCode === crew.classCode) continue;
+          const otherSpare = other.crew.crews - other.target;
+          if (otherSpare <= 0 || other.growing) continue;
+          const moved = Math.min(short, otherSpare);
+          const retrained = actions.retrainCrewsAt(state, iata, other.crew.classCode, crew.classCode, moved);
+          if (!retrained.ok) continue;
+          log.push(retrained.message);
+          other.crew.crews -= moved;
+          short -= moved;
+        }
+        if (short > 0) {
+          const hired = actions.hireCrewsAt(state, iata, crew.classCode, short);
+          if (hired.ok) log.push(hired.message);
+        }
+        continue;
+      }
+      const spare = crew.crews - target;
+      // Never while growing: those crews are about to be needed.
+      if (spare <= 0 || crew.arriving > 0 || growing) {
+        memory.spareCrewDays.delete(key);
+        continue;
+      }
+      const days = (memory.spareCrewDays.get(key) ?? 0) + 1;
+      memory.spareCrewDays.set(key, days);
+      if (days < CREW_RELEASE_AFTER_DAYS) continue;
+      memory.spareCrewDays.delete(key);
+      const released = actions.releaseCrewsAt(state, iata, crew.classCode, spare);
+      if (released.ok) log.push(released.message);
     }
-    const spare = crew.crews - target;
-    // Never while growing: those crews are about to be needed.
-    if (spare <= 0 || crew.arriving > 0 || growing) {
-      memory.spareCrewDays.delete(iata);
-      continue;
-    }
-    const days = (memory.spareCrewDays.get(iata) ?? 0) + 1;
-    memory.spareCrewDays.set(iata, days);
-    if (days < CREW_RELEASE_AFTER_DAYS) continue;
-    memory.spareCrewDays.delete(iata);
-    const released = actions.releaseCrewsAt(state, iata, spare);
-    if (released.ok) log.push(released.message);
   }
   return log;
 }

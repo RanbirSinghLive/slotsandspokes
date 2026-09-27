@@ -1,4 +1,5 @@
 import { forecastStance, type StanceForecast } from '../../sim/fareForecast';
+import { crewShare } from '../../sim/crews';
 import { line } from './dom';
 import { money } from '../format';
 import { RIVAL_SQUEEZED_RESPITE_DAYS } from '../../sim/pressure';
@@ -153,7 +154,7 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   const pools = document.createElement('div');
   pools.className = 'inspector-pools';
   const redrawPools = () => {
-    pools.replaceChildren(...(base ? buildPoolRows(utilisationPools(state, base), getMapPreview()?.effects, base) : []));
+    pools.replaceChildren(...(base ? buildPoolRows(utilisationPools(state, base), getMapPreview()?.effects, base, (code) => crewShare(state, code, base)) : []));
   };
   redrawPools();
   if (base) root.append(poolsHeading, pools);

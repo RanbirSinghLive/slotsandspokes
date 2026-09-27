@@ -998,6 +998,22 @@ body {
   height: 100%;
 }
 
+/* Each class's plane bar with its crews' thin bar underneath
+   (ui/poolBars.ts), so the two can be seen to line up. */
+.pool-bars-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pool-crew-bar {
+  display: block;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 1px;
+  overflow: hidden;
+}
+
 .pool-value {
   text-align: right;
   white-space: nowrap;

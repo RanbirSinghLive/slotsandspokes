@@ -1,4 +1,6 @@
 import { airportLoad, dailyMovementsAt, slotCapacityPerDay } from '../../sim/airports';
+import { money } from '../format';
+import { crewShare } from '../../sim/crews';
 import { line, heading } from './dom';
 import { whereToFlyFrom } from '../../sim/whereToFly';
 import { openRouteForm } from '../routeBuilder';
@@ -20,7 +22,7 @@ import { hasHubView } from '../../render/hubs';
 import { getMapPreview } from '../../render/preview';
 import { openHubPlanner } from '../hubPlanner';
 import { money as pnlMoney } from '../pnlBars';
-import { buildCrewRow, buildPoolRows } from '../poolBars';
+import { buildPoolRows } from '../poolBars';
 import * as ops from '../routeActions';
 import { select } from '../selection';
 import { aircraftLink } from './aircraft';
@@ -91,7 +93,7 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
   const pools = document.createElement('div');
   pools.className = 'inspector-pools';
   const redrawPools = () => {
-    pools.replaceChildren(...buildPoolRows(utilisationPools(state, iata), getMapPreview()?.effects, iata));
+    pools.replaceChildren(...buildPoolRows(utilisationPools(state, iata), getMapPreview()?.effects, iata, (code) => crewShare(state, code, iata)));
   };
   redrawPools();
   const basedHere = utilisationPools(state, iata).some((pool) => pool.planes > 0);
@@ -267,53 +269,59 @@ function whereToFlyNext(state: SimState, iata: string): HTMLElement[] {
 }
 
 /**
- * The crew base here (sim/crews.ts): its crew bar under the plane pools,
- * what its planes need, and buttons to hire or let crews go. Nothing
- * where there's no base.
+ * The crew base here (sim/crews.ts), class by class: how its crews stand
+ * against its planes (their bars are the thin ones under the plane pools
+ * above), and buttons to hire, retrain from another class, or let crews
+ * go. Nothing where there's no base.
  */
 function crewSection(state: SimState, iata: string, changed: () => void): HTMLElement[] {
-  const crew = ops.crewReadout(state, iata);
-  if (!crew) return [];
-  const nodes: HTMLElement[] = [heading('Crews'), buildCrewRow(crew)];
-  const spare = crew.crews - crew.ideal;
-  const joining = crew.arriving > 0 ? ` ${crew.arriving} more join within ${crew.leadDays} days.` : '';
-  const status =
-    (crew.crews < crew.minimum
-      ? `Short: its planes need at least ${crew.minimum} crews to fly, so some are grounded today.`
-      : crew.crews < crew.ideal
-        ? `Stretched: ${crew.ideal} crews would keep shifts to 8 hours; with ${crew.crews}, late legs are flown tired (later, and rated lower).`
-        : spare > 0
-          ? `${spare} spare, standing by at $${crew.standbyPerDay.toLocaleString()} a day each: ready for the next plane.`
-          : 'Just enough for fresh crews. A new plane here will wait for hires.') + joining;
-  nodes.push(
-    line(status, crew.crews < crew.minimum ? 'inspector-line is-over' : 'inspector-line'),
-    line(`Hiring takes ${crew.leadDays} days and costs $${crew.hireFee.toLocaleString()} a crew.`, 'inspector-line goal-ahead'),
-  );
-  const buttons = document.createElement('div');
-  buttons.className = 'crew-buttons';
-  for (const count of [1, 2]) {
-    const hire = document.createElement('button');
-    hire.type = 'button';
-    hire.className = 'inspector-plan-hub';
-    hire.textContent = `Hire ${count}: $${(count * crew.hireFee).toLocaleString()}`;
-    hire.disabled = state.cash < count * crew.hireFee;
-    hire.addEventListener('click', () => {
-      ops.hireCrewsAt(state, iata, count);
+  const readout = ops.crewReadout(state, iata);
+  if (!readout) return [];
+  const nodes: HTMLElement[] = [
+    heading('Crews'),
+    line(
+      `Crews are rated for one class. Hiring takes ${readout.leadDays} days; retraining from another class takes ${readout.retrainDays} and costs half a hire.`,
+      'inspector-line goal-ahead',
+    ),
+  ];
+  const button = (label: string, disabled: boolean, act: () => void) => {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'inspector-plan-hub';
+    el.textContent = label;
+    el.disabled = disabled;
+    el.addEventListener('click', () => {
+      act();
       changed();
     });
-    buttons.append(hire);
+    return el;
+  };
+  for (const crew of readout.classes) {
+    const spare = crew.crews - crew.ideal;
+    const joining = crew.arriving > 0 ? ` +${crew.arriving} joining.` : '';
+    const status =
+      crew.crews < crew.minimum
+        ? `short: its planes need at least ${crew.minimum}, so some are grounded.`
+        : crew.crews < crew.ideal
+          ? `stretched: ${crew.ideal} would keep shifts to 8 hours, so late legs are flown tired.`
+          : spare > 0
+            ? `${spare} spare, standing by at $${crew.standbyPerDay.toLocaleString()} a day each.`
+            : crew.ideal > 0
+              ? 'just enough for fresh crews.'
+              : 'no planes of this class here.';
+    nodes.push(line(`${crew.name} crews x${crew.crews}: ${status}${joining}`, crew.crews < crew.minimum ? 'inspector-line is-over' : 'inspector-line'));
+    const row = document.createElement('div');
+    row.className = 'crew-buttons';
+    row.append(button(`Hire 1: ${money(crew.hireFee)}`, !crew.open || state.cash < crew.hireFee, () => ops.hireCrewsAt(state, iata, crew.classCode, 1)));
+    // Retrain one from whichever other class has the most spare.
+    const donor = readout.classes
+      .filter((other) => other.classCode !== crew.classCode && other.crews - other.ideal > 0)
+      .sort((x, y) => y.crews - y.ideal - (x.crews - x.ideal))[0];
+    if (donor && crew.open) {
+      row.append(button(`Retrain 1 from ${donor.name}: ${money(crew.retrainFee)}`, state.cash < crew.retrainFee, () => ops.retrainCrewsAt(state, iata, donor.classCode, crew.classCode, 1)));
+    }
+    if (spare > 0) row.append(button('Let 1 go', false, () => ops.releaseCrewsAt(state, iata, crew.classCode, 1)));
+    nodes.push(row);
   }
-  if (crew.crews > crew.ideal) {
-    const release = document.createElement('button');
-    release.type = 'button';
-    release.className = 'inspector-plan-hub';
-    release.textContent = 'Let 1 go';
-    release.addEventListener('click', () => {
-      ops.releaseCrewsAt(state, iata, 1);
-      changed();
-    });
-    buttons.append(release);
-  }
-  nodes.push(buttons);
   return nodes;
 }

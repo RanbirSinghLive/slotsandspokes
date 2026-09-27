@@ -1,4 +1,5 @@
 import { describeShock } from '../sim/shocks';
+import { classByCode } from '../sim/aircraftClasses';
 import { select, type Selection } from './selection';
 import { scheduleProblems } from './panels';
 import { runwayAlertMessage } from './runway';
@@ -40,10 +41,12 @@ function collectAlerts(state: SimState): Alert[] {
   // Planes grounded for want of crews (sim/crews.ts), one row per tail,
   // named, opening its base: the airport view's crew bar and Hire buttons.
   for (const tail of state.groundedTails) {
-    const base = state.aircraft.find((aircraft) => aircraft.tail === tail)?.baseAirport;
+    const plane = state.aircraft.find((aircraft) => aircraft.tail === tail);
+    const base = plane?.baseAirport;
+    const className = classByCode(plane?.typeCode ?? '')?.name ?? '';
     alerts.push({
       key: `grounded:${tail}`,
-      message: `${tail} is grounded — not enough crews at ${base ?? 'its base'} to fly it today`,
+      message: `${tail} is grounded — not enough ${className} crews at ${base ?? 'its base'} to fly it today`,
       tab: 'fleet',
       view: base ? { kind: 'airport', iata: base } : undefined,
     });

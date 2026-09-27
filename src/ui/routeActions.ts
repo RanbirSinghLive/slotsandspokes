@@ -49,12 +49,16 @@ function afterChange<T extends actions.Outcome>(state: SimState, outcome: T): T 
   return outcome;
 }
 
-export function hireCrewsAt(state: SimState, iata: string, count: number) {
-  return afterChange(state, actions.hireCrewsAt(state, iata, count));
+export function hireCrewsAt(state: SimState, iata: string, classCode: string, count: number) {
+  return afterChange(state, actions.hireCrewsAt(state, iata, classCode, count));
 }
 
-export function releaseCrewsAt(state: SimState, iata: string, count: number) {
-  return afterChange(state, actions.releaseCrewsAt(state, iata, count));
+export function retrainCrewsAt(state: SimState, iata: string, from: string, to: string, count: number) {
+  return afterChange(state, actions.retrainCrewsAt(state, iata, from, to, count));
+}
+
+export function releaseCrewsAt(state: SimState, iata: string, classCode: string, count: number) {
+  return afterChange(state, actions.releaseCrewsAt(state, iata, classCode, count));
 }
 
 export function clearPlane(state: SimState, tail: string) {

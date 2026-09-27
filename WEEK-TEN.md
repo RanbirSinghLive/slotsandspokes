@@ -481,6 +481,35 @@ view (every route in a table, sorted worst first by that measure, cells
 coloured, headings re-sort). On-time and Completion now show the last
 week, not the lifetime share. UI only: headless output unchanged.
 
+## Thread 12: timing the fleet (crews by type, deliveries, returns)
+
+Asked for by the owner after thread 11: crews are rated for a type, and
+every change to the fleet takes time, so the game becomes a dance of
+timing, with executives and innovations to speed parts of it up.
+
+- **Crews by aircraft class** at each base, costing more for bigger
+  planes (hire and standby: 1× Propeller, 1.5× Regional, 2× Narrowbody,
+  3× Widebody). **Retrain** moves crews to another class for less than a
+  hire, taking time. Returning planes stays allowed, so gauging up and
+  down is a real move.
+- **Display:** each class's pool row shows its planes and utilisation,
+  with a thin unlabelled crew bar under it for that class's crew hours,
+  so the two can be seen to line up. No separate crew row.
+- **Everything takes time, shown on the map at the airport:** a leased
+  plane is delivered days later; hired and retrained crews join days
+  later; a returned plane takes days to go back, its lease still charged
+  meanwhile, which hurts an airline that swaps planes all the time.
+- **Speed-ups:** a fleet programmes executive (deliveries and returns
+  faster) and a crew academy innovation (hiring and retraining faster),
+  so hiring the right people and adopting the right programme at the
+  right moment matters.
+- **Headless:** the players lease, hire, retrain and return with the
+  delays, and adopt and hire the speed-ups on the usual rules.
+
+Slices: (A) crews by class, retraining, the pool display; (B) delivery,
+hiring and return times with map signals; (C) the executive and
+innovation speed-ups, then balance.
+
 ## Carried forward from week nine
 
 - **Thread 5 (goal ladder)** becomes this plan's thread 2.
