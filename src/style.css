@@ -2688,7 +2688,35 @@ button.inspector-crumb:hover {
   color: #6b7694;
 }
 
-/* An innovation in the Goals view: a card per programme, green once
+/* The fuel chart in the Head office view (ui/inspector/headOffice.ts). */
+.fuel-chart {
+  display: block;
+  width: 100%;
+  height: 90px;
+  margin: 6px 0 2px;
+  overflow: visible;
+}
+
+.fuel-chart-price {
+  fill: none;
+  stroke: #f0b35a;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.fuel-chart-usual {
+  stroke: #6b7694;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.fuel-chart-hedge {
+  stroke: #7ed6a8;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+/* An innovation in the Head office view: a card per programme, green once
    running, dim while the ladder hasn't opened it. */
 .innovation-card {
   border: 1px solid rgba(255, 255, 255, 0.08);

@@ -7,6 +7,7 @@ import { planeIconElement } from './planeIcons';
 import { updatePnlHistoryPanel } from './pnlHistory';
 import { formatLoadFactor, networkLoadFactor } from '../sim/loadFactor';
 import { goalsSummary } from './inspector/goals';
+import { headOfficeSummary } from './inspector/headOffice';
 import type { SimState } from '../sim/state';
 import { minuteOfDayToTimeString } from '../sim/clock';
 
@@ -23,6 +24,9 @@ const loadEl = document.querySelector<HTMLSpanElement>('#panel-load')!;
 const goalsEl = document.querySelector<HTMLButtonElement>('#panel-goals')!;
 // Opens Network › Goals (ui/inspector/goals.ts).
 goalsEl.addEventListener('click', () => select({ kind: 'goals' }));
+const headOfficeEl = document.querySelector<HTMLButtonElement>('#panel-head-office')!;
+// Opens Network › Head office (ui/inspector/headOffice.ts).
+headOfficeEl.addEventListener('click', () => select({ kind: 'headOffice' }));
 const revenueEl = document.querySelector<HTMLSpanElement>('#panel-revenue')!;
 const costEl = document.querySelector<HTMLSpanElement>('#panel-cost')!;
 const marginEl = document.querySelector<HTMLSpanElement>('#panel-margin')!;
@@ -76,6 +80,7 @@ export function updatePanel(state: SimState): void {
   loadEl.textContent = formatLoadFactor(networkLoadFactor(state));
   // Where the airline stands on the ladder (sim/ladder.ts).
   goalsEl.textContent = `${goalsSummary(state)} ›`;
+  headOfficeEl.textContent = `${headOfficeSummary(state)} ›`;
   revenueEl.textContent = formatMoney(state.todayRevenue);
   costEl.textContent = formatMoney(state.todayCost);
   marginEl.textContent = formatMoney(state.todayMargin);

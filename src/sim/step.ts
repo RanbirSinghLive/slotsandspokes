@@ -4,6 +4,7 @@ import { MIN_TURN_MINUTES, legsServingMarket, marketKey, type ScheduleLeg } from
 import { breaksCurfew, rotationStartingWith } from './curfew';
 import { rollDailyWeather, isAirportClosed } from './weather';
 import { rollDailyShocks } from './shocks';
+import { airlineFuelPrice, recordHedgedFuel, rollDailyFuelPrice } from './fuelPrice';
 import { airportLoad } from './airports';
 import { connectingDemandOnMarket } from './hubs';
 import { rollTotalDelayMinutes, isOnTimeArrival } from './delays';
@@ -288,6 +289,7 @@ export function step(state: SimState): void {
     // than being checked on every tick.
     // Shocks first (sim/shocks.ts): the weather, fuel and demand rolls below read them.
     rollDailyShocks(state);
+    rollDailyFuelPrice(state);
     rollDailyWeather(state, state.simMinute);
 
     // Week four's competitor AI (sim/competitors.ts): once a day, each
@@ -498,7 +500,8 @@ export function step(state: SimState): void {
           const result = flightResult(
             { origin: flight.origin, dest: flight.dest, blockMinutes },
             type,
-            state.fuelPriceIndex,
+            // The locked price under a hedge (sim/fuelPrice.ts).
+            airlineFuelPrice(state),
             state.fuelEfficiencyMultiplier,
             actualDailyDemand(state, flight.origin, flight.dest),
             connectingDemandOnMarket(state, flight.origin, flight.dest),
@@ -517,6 +520,7 @@ export function step(state: SimState): void {
           state.todayRevenue += result.revenue;
           state.todayCost += result.cost;
           state.todayCostByCategory.fuel += result.costBreakdown.fuel;
+          recordHedgedFuel(state, result.costBreakdown.fuel);
           state.todayCostByCategory.blockNonFuel += result.costBreakdown.blockNonFuel;
           state.todayCostByCategory.departure += result.costBreakdown.departure;
           state.todayMargin += result.margin;

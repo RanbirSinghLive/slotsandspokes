@@ -4,9 +4,8 @@
  * fuel-sensitive slice of every flight's cost (FUEL_SHARE_OF_BLOCK_HOUR_COST,
  * sim/economy.ts's legCost()), so no aircraft needs a burn rate of its own.
  *
- * Fuel is steady at baseline except during a fuel spike (sim/shocks.ts),
- * which sets the index for its length. There is no daily drift: a random
- * walk the player can't act on was noise, and shocks are the fuel story.
+ * The index moves every day and spikes with a fuel shock; the player can
+ * hedge against it. Both live in sim/fuelPrice.ts.
  */
 export const FUEL_PRICE_BASELINE = 1;
 export const FUEL_PRICE_MAX = 2;

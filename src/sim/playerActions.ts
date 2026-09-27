@@ -2,6 +2,7 @@ import airportsData from '../../data/airports.json';
 import { AIRCRAFT_CLASSES, classByCode, classRank, pluralClassName } from './aircraftClasses';
 import { applyHubStyleChange, planHubStyleChange } from './hubs';
 import { HUB_STYLES, type HubStyle } from './hubStyle';
+import { buyHedge, HEDGE_TERMS, hedgeQuote, type HedgeQuote } from './fuelPrice';
 import {
   adoptBlockedReason,
   adoptInnovation as adoptInnovationRule,
@@ -13,7 +14,7 @@ import {
 } from './innovations';
 import { cashNeededToLease, LEASE_RESERVE_DAYS, leaseAircraft, leaseRateFor, loadLeaseRates } from './leasing';
 import { daysUntilNextListing, listingsOf, returnBlockedReason, returnFee, returnLease, takeListing, type MarketListing } from './market';
-import { classOpen, tierThatOpens } from './ladder';
+import { airlineCalled, classOpen, tierThatOpens } from './ladder';
 import { actualDailyDemand, currentPotentialDemand } from './marketDemand';
 import { revealReach } from './reach';
 import { applyRotation, candidateTailsAt, planRotation, type RotationPlan, type RotationStop } from './rotations';
@@ -439,7 +440,7 @@ export function planeOptions(state: SimState, iata: string): PlaneOption[] {
     } else if (!classOpen(state, rate.typeCode)) {
       // Earned on the ladder (sim/ladder.ts), not on a date.
       const opener = tierThatOpens(rate.typeCode);
-      disabledReason = `${pluralClassName(cls.name)} open when you become a ${opener?.name.toLowerCase() ?? 'bigger'} airline: see Goals.`;
+      disabledReason = `${pluralClassName(cls.name)} open when you become ${opener ? airlineCalled(opener) : 'a bigger airline'}: see Goals.`;
     } else if (!listing) {
       disabledReason = `No ${cls.name} on the market. The next arrives in ${days(daysUntilNextListing(state, rate.typeCode))}, first come first served.`;
     } else if (state.cash < cashNeededToLease(listing.leasePricePerDay)) {
@@ -512,4 +513,15 @@ export function innovationOptions(state: SimState): InnovationOption[] {
 
 export function adoptInnovation(state: SimState, id: InnovationId): Outcome<{ message: string }> {
   return adoptInnovationRule(state, id);
+}
+
+// --- Fuel hedging --------------------------------------------------------------
+
+/** A quote for each hedge length on offer (sim/fuelPrice.ts). */
+export function hedgeOptions(state: SimState): HedgeQuote[] {
+  return HEDGE_TERMS.map((days) => hedgeQuote(state, days));
+}
+
+export function hedgeFuel(state: SimState, days: number): Outcome<{ message: string }> {
+  return buyHedge(state, days);
 }

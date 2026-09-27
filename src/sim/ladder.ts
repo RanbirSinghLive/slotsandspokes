@@ -410,6 +410,16 @@ export function classOpen(state: SimState, typeCode: string): boolean {
   return opener === -1 || tiersClimbed(state) > opener;
 }
 
+/**
+ * A tier as the airline it makes you, for a sentence: "a start-up
+ * airline", "a regional carrier", "an international airline".
+ */
+export function airlineCalled(tier: Tier): string {
+  const name = tier.name.toLowerCase();
+  const noun = /(airline|carrier)$/.test(name) ? name : `${name} airline`;
+  return `${/^[aeiou]/.test(noun) ? 'an' : 'a'} ${noun}`;
+}
+
 /** The tier the player becomes on climbing the one that opens this class ("Regional carrier" for Regionals), or null. */
 export function tierThatOpens(typeCode: string): Tier | null {
   const opener = LADDER.findIndex((tier) => tier.opensClasses?.includes(typeCode));

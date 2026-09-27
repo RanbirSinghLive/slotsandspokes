@@ -83,7 +83,8 @@ move, since everything cut is switched off).
 
 ## Thread 2: the milestone ladder and unlocks
 
-**Status: done** (three slices, below).
+**Status: done** (three slices, below). Innovations have since moved to
+the Head office view (thread 10).
 
 The spine of the week.
 
@@ -251,6 +252,9 @@ From week eight's fare-stance thread and week nine's findings:
 
 ## Thread 8: executives (reworked)
 
+They live in the Head office view (Network › Head office) beside fuel
+and the innovations (the owner's call, thread 10), not a tab of their own.
+
 The owner wants them kept for flavour: named people with backgrounds, in
 a game that is otherwise all numbers.
 
@@ -305,8 +309,7 @@ buy as a bet on where the price goes.
   back; a fuel shock jumps it on top and fades as today. Deterministic,
   in `state`, so saves and headless runs repeat.
 - **A running chart**: the last 90 days of price, with today's price and
-  the baseline marked, in a Fuel view (Network › Fuel, beside Goals), and
-  a small sparkline in the Network view's fuel row that opens it.
+  the baseline marked, in the Head office view (see below).
 - **Hedging, a bet**: "Hedge" locks today's price on the airline's fuel
   for 30, 60 or 90 days, for an up-front premium. If fuel rises, the
   airline pays the locked price and wins; if it falls, it still pays the
@@ -321,9 +324,26 @@ buy as a bet on where the price goes.
   the walk alone doesn't bust careful airlines, and that always-hedging
   loses a little on average.
 
-Open for the owner: how wild the walk is (today's shock moves fuel by
-up to about 60%; the walk should be smaller, say ±15% over a month),
-and whether the premium is a flat fee or a slightly worse locked price.
+**Status: done.** As built:
+- `sim/fuelPrice.ts`: the walk keeps 95% of yesterday's deviation plus a
+  step of up to ±5% (about ±10–15% typically), clamped 0.6–2.0; a spike
+  multiplies on top. Rivals pay the market price; the player the locked
+  one while hedged.
+- **The premium is a flat fee**, 1% plus 0.02% a day of term of the fuel
+  covered. First tried at 3% plus 0.05%: hedging at random then lost
+  77–99% of the premium and even a good hedge rarely beat it. Now, over
+  36 sitter games: at random, −38% (30 days) and −99% (90 days); 90 days
+  when fuel is 5% or more below usual, +380%.
+- **Head office** (Network › Head office), as the owner suggested:
+  fuel, hedging and the innovations (moved from Goals) in one view, with
+  executives to join in thread 8. Not a separate Fuel view. The Network
+  view's Head office row shows the price and any hedge; the ticker says
+  how a hedge went when it ends.
+- Balance (full report): steady median cash YUL $13.9M, YYZ $31.2M, BOS
+  $33.0M, PHL $31.2M, YHZ $223k, LHR $73.9M, busts 2 of 36 (from 5); the
+  walk on its own, before hedging, left busts at 4. Sitter a little
+  lower (it never hedges), starter slightly safer (the price is below
+  usual as often as above), reckless unchanged.
 
 ## Carried forward from week nine
 

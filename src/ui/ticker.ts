@@ -1,4 +1,5 @@
-import { LADDER, milestoneById, tiersClimbed } from '../sim/ladder';
+import { airlineCalled, LADDER, milestoneById, tiersClimbed } from '../sim/ladder';
+import { activeHedge } from '../sim/fuelPrice';
 import { activeShock, describeShock, shockEndedLine, type Shock } from '../sim/shocks';
 import { moneyOnTable, RIVAL_MARGIN_SHARE } from '../sim/attractiveness';
 import { networkAirports } from '../sim/reach';
@@ -135,7 +136,7 @@ function pollLadderEvents(state: SimState): void {
     const opened = LADDER[seenTiers].opens;
     pushEvent(
       state.simMinute,
-      (next ? `You're a ${next.name.toLowerCase()} airline now.` : 'Every tier climbed.') + (opened.length > 0 ? ` Opened: ${opened.join('; ')}.` : ''),
+      (next ? `You're ${airlineCalled(next)} now.` : 'Every tier climbed.') + (opened.length > 0 ? ` Opened: ${opened.join('; ')}.` : ''),
     );
   }
 }
@@ -159,6 +160,24 @@ function pollShockEvents(state: SimState): void {
   if (seenShock) pushEvent(state.simMinute, shockEndedLine(seenShock));
   if (running) pushEvent(state.simMinute, describeShock(state)!.headline);
   seenShock = running;
+}
+
+// The running hedge's start day at the last poll, so its end is said once.
+let seenHedgeStart: number | null | undefined;
+
+/** How a hedge went, the day it runs out (sim/fuelPrice.ts). */
+function pollHedgeEvents(state: SimState): void {
+  const running = activeHedge(state)?.startDay ?? null;
+  if (seenHedgeStart !== undefined && seenHedgeStart !== null && running !== seenHedgeStart && state.fuelHedge?.startDay === seenHedgeStart) {
+    const hedge = state.fuelHedge;
+    const net = hedge.saved - hedge.premium;
+    pushEvent(
+      state.simMinute,
+      `Your fuel hedge ended: it ${hedge.saved >= 0 ? 'saved' : 'cost'} $${Math.round(Math.abs(hedge.saved)).toLocaleString()} against the market, ` +
+        `${net >= 0 ? 'up' : 'down'} $${Math.round(Math.abs(net)).toLocaleString()} after its premium.`,
+    );
+  }
+  seenHedgeStart = running;
 }
 
 let hasSeenInitialRivals = false;
@@ -391,6 +410,7 @@ function pollPositionEvents(state: SimState): void {
 export function updateTicker(state: SimState): void {
   pollLadderEvents(state);
   pollShockEvents(state);
+  pollHedgeEvents(state);
   pollPositionEvents(state);
   pollAogEvents(state);
   pollRivalFareEvents(state);

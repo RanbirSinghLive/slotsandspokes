@@ -3,6 +3,7 @@ import { flightResult, LOAD_FACTOR, type EconomyAircraftType } from './economy';
 import { trafficShare } from './choiceModel';
 import { actualDailyDemand } from './marketDemand';
 import { connectingDemandOnMarket } from './hubs';
+import { airlineFuelPrice } from './fuelPrice';
 import { bookingPerks } from './innovations';
 import type { RouteSettings, SimState } from './state';
 import type { ScheduleLeg } from './schedule';
@@ -89,7 +90,7 @@ export function summarizeMarket(origin: string, dest: string, state: SimState, r
     const result = flightResult(
       { origin: leg.origin, dest: leg.dest, blockMinutes: leg.blockMinutes },
       type,
-      state.fuelPriceIndex,
+      airlineFuelPrice(state),
       state.fuelEfficiencyMultiplier,
       actualDailyDemand(state, leg.origin, leg.dest),
       connectingFor(leg.origin, leg.dest),

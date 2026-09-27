@@ -11,6 +11,7 @@ import type { HubStyle } from './hubStyle';
 import type { AogEvent } from './aog';
 import { createMarket, ensureRivalFleets, type MarketState } from './market';
 import { FUEL_PRICE_BASELINE } from './fuel';
+import type { FuelHedge } from './fuelPrice';
 import type { TargetCommitment, TargetResult } from './targets';
 import { createCrewPools, type CrewPools, type PendingHire, type PendingTraining, type TrainingLine } from './crew';
 import { createExecutiveSlots, type ExecutiveSlots } from './executives';
@@ -404,12 +405,18 @@ export type SimState = {
   revenueHistoryByMarket: Record<string, number[]>;
   costHistoryByMarket: Record<string, number[]>;
   /**
-   * The fuel price index (sim/fuel.ts): 1.0 is baseline, and a flight's
-   * fuel-sensitive cost slice scales with it. Baseline except during a
-   * fuel spike, which sets it (sim/shocks.ts). Saves from before carry a
-   * `fuelPriceHistory` too, which nothing reads any more.
+   * The market's fuel price index (sim/fuel.ts, sim/fuelPrice.ts): 1.0
+   * is baseline, and a flight's fuel-sensitive cost slice scales with it.
+   * Moves daily, spikes with a fuel shock (sim/shocks.ts). Rivals pay it;
+   * the player pays it unless hedged (`airlineFuelPrice()`).
    */
   fuelPriceIndex: number;
+  /** The fuel price's random walk, as a log-deviation from the baseline (sim/fuelPrice.ts). Absent in an older save: read as 0. */
+  fuelWalk?: number;
+  /** The market fuel price at each of the last 90 rollovers, oldest first, for the chart. */
+  fuelPriceHistory?: number[];
+  /** The latest fuel hedge bought, running or ended (sim/fuelPrice.ts), or absent if none ever was. */
+  fuelHedge?: FuelHedge;
   /**
    * A multiplier on the fuel-sensitive slice of every flight's cost, 1.0
    * meaning no mitigation — lower is better (less fuel burned for the

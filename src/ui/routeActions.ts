@@ -13,6 +13,8 @@ import { renderScheduleWarnings, scheduleProblems } from './panels';
 export {
   adoptInnovation,
   currentTurnBuffer,
+  hedgeFuel,
+  hedgeOptions,
   innovationOptions,
   marketPnlHistory,
   marketReadout,

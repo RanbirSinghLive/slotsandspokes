@@ -1,6 +1,6 @@
 import airportsData from '../../data/airports.json';
 import { dayIndex } from './clock';
-import { FUEL_PRICE_BASELINE, FUEL_PRICE_MAX, FUEL_SHARE_OF_BLOCK_HOUR_COST } from './fuel';
+import { FUEL_SHARE_OF_BLOCK_HOUR_COST } from './fuel';
 import { greatCircleDistanceNm } from './geo';
 import { nextRandom } from './rng';
 import type { SimState } from './state';
@@ -11,7 +11,8 @@ import type { SimState } from './state';
  * what punishes it is a shock arriving when the cash cushion is thin and
  * the fleet over-extended; a careful airline should come through bruised.
  *
- * - **Fuel spike**: fuel up by `magnitude` (40–80%) for its length.
+ * - **Fuel spike**: fuel up by `magnitude` (40–80%) for its length, on
+ *   top of wherever the daily price is (sim/fuelPrice.ts).
  *   Fuel is FUEL_SHARE_OF_BLOCK_HOUR_COST of the block-hour cost, so every
  *   flight costs about 15–30% more.
  * - **Recession**: every market's potential down by `magnitude` (15–25%);
@@ -85,8 +86,8 @@ export function inStormSeason(state: SimState, iata: string): boolean {
 
 /**
  * Once a day at rollover, before the weather, fuel and demand rolls read
- * it: end a shock that's run its course, maybe start one, and set the
- * fuel price for today. Draws five numbers every day, whatever happens.
+ * it: end a shock that's run its course, and maybe start one. Draws five
+ * numbers every day, whatever happens.
  */
 export function rollDailyShocks(state: SimState): void {
   const draws: number[] = [];
@@ -112,11 +113,6 @@ export function rollDailyShocks(state: SimState): void {
       state.shock.centre = known[Math.min(known.length - 1, Math.floor(centreRoll * known.length))];
     }
   }
-
-  // Fuel doesn't otherwise move (sim/fuel.ts), so a spike sets the index
-  // for its length and it's back to baseline after.
-  const shock = activeShock(state);
-  state.fuelPriceIndex = shock?.kind === 'fuel' ? Math.min(FUEL_PRICE_MAX, FUEL_PRICE_BASELINE * (1 + shock.magnitude)) : FUEL_PRICE_BASELINE;
 }
 
 const namesByIata = new Map(airports.map((airport) => [airport.iata, airport.name]));

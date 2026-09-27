@@ -1,4 +1,5 @@
 import { buildGoalsView } from './goals';
+import { buildHeadOfficeView } from './headOffice';
 import type { SimState } from '../../sim/state';
 import * as ops from '../routeActions';
 import { back, getSelection, NETWORK, replaceSelection, select, type Selection } from '../selection';
@@ -71,6 +72,10 @@ function trail(state: SimState, selection: Selection): { label: string; target: 
   if (selection.kind === 'network') return steps;
   if (selection.kind === 'goals') {
     steps.push({ label: 'Goals', target: selection });
+    return steps;
+  }
+  if (selection.kind === 'headOffice') {
+    steps.push({ label: 'Head office', target: selection });
     return steps;
   }
   if (selection.kind === 'fleet' || selection.kind === 'aircraft') {
@@ -169,7 +174,9 @@ export function renderInspector(state: SimState): void {
   } else if (selection.kind === 'fleet') {
     bodyEl.replaceChildren(buildFleetView(state));
   } else if (selection.kind === 'goals') {
-    bodyEl.replaceChildren(buildGoalsView(state, rebuild));
+    bodyEl.replaceChildren(buildGoalsView(state));
+  } else if (selection.kind === 'headOffice') {
+    bodyEl.replaceChildren(buildHeadOfficeView(state, rebuild));
   } else if (selection.kind === 'rival') {
     bodyEl.replaceChildren(buildRivalView(state, selection.code));
   } else if (selection.kind === 'rivals') {

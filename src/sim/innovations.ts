@@ -1,5 +1,5 @@
 import { RECAPTURE_RATE } from './economy';
-import { LADDER, tiersClimbed } from './ladder';
+import { airlineCalled, LADDER, tiersClimbed } from './ladder';
 import type { SimState } from './state';
 
 /**
@@ -115,7 +115,7 @@ export function adoptBlockedReason(state: SimState, innovation: Innovation): str
   if (!innovationOpen(state, innovation)) {
     const tierIndex = LADDER.findIndex((tier) => tier.id === innovation.openedBy);
     const becomes = LADDER[tierIndex + 1];
-    return `Opens when you become a${/^[aeiou]/i.test(becomes?.name ?? '') ? 'n' : ''} ${becomes?.name.toLowerCase() ?? 'bigger'} airline.`;
+    return `Opens when you become ${becomes ? airlineCalled(becomes) : 'a bigger airline'}.`;
   }
   if (state.cash < innovation.oneOffPrice) return `Needs $${innovation.oneOffPrice.toLocaleString()} on hand.`;
   return null;

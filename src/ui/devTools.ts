@@ -1,4 +1,5 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
+import { airlineFuelPrice } from '../sim/fuelPrice';
 import { bookingPerks } from '../sim/innovations';
 import { flightResult, type EconomyAircraftType } from '../sim/economy';
 import { actualDailyDemand, currentPotentialDemand } from '../sim/marketDemand';
@@ -253,7 +254,7 @@ function computeFunnel(state: SimState): FunnelTotals {
       const result = flightResult(
         { origin: leg.origin, dest: leg.dest, blockMinutes: leg.blockMinutes },
         type,
-        state.fuelPriceIndex,
+        airlineFuelPrice(state),
         state.fuelEfficiencyMultiplier,
         actualDailyDemand(state, leg.origin, leg.dest),
         connectingDemandOnMarket(state, leg.origin, leg.dest),

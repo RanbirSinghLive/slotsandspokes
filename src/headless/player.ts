@@ -148,6 +148,13 @@ export const INNOVATION_RUNNING_MARGIN = 1.5;
 /** Cash an adoption must leave behind, as days of the airline's leases, so it never starves the fleet. */
 const INNOVATION_RESERVE_DAYS = 60;
 
+/**
+ * The steady player hedges fuel (sim/fuelPrice.ts) for the longest term
+ * when the price is at least this far below usual, betting on the walk's
+ * drift back up; never when it's above. The sitter never hedges.
+ */
+export const HEDGE_BELOW_PRICE = 0.95;
+
 /** Planes the sitter grows to before it stops growing. */
 export const SITTER_FLEET_SIZE = 5;
 /** How much of its day a plane can already fly before the reckless player stops looking for more to give it. */
@@ -272,6 +279,7 @@ function steadyPlayer(kind: 'steady' | 'sitter'): Player {
         ...returnIdle(state, memory),
         ...pickStances(state, memory),
         ...adoptInnovations(state),
+        ...(kind === 'steady' ? hedgeWhenCheap(state) : []),
       ];
     },
   };
@@ -697,4 +705,17 @@ function adoptInnovations(state: SimState): string[] {
     if (adopted.ok) done.push(adopted.message);
   }
   return done;
+}
+
+// --- Fuel ----------------------------------------------------------------------------
+
+/** Buy the longest hedge when fuel is cheap and no hedge runs, leaving the same cash reserve as innovations. */
+function hedgeWhenCheap(state: SimState): string[] {
+  if (state.fuelPriceIndex > HEDGE_BELOW_PRICE) return [];
+  const quote = actions.hedgeOptions(state).at(-1);
+  if (!quote || quote.blocked) return [];
+  const leases = state.aircraft.reduce((sum, aircraft) => sum + aircraft.leaseCostPerDay, 0);
+  if (state.cash < quote.premium + INNOVATION_RESERVE_DAYS * leases) return [];
+  const hedged = actions.hedgeFuel(state, quote.days);
+  return hedged.ok ? [hedged.message] : [];
 }

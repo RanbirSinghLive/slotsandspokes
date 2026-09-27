@@ -1593,21 +1593,45 @@ pause exists.
 
 ---
 
-## Fuel prices (`src/sim/fuel.ts`)
+## Fuel prices and hedging (`src/sim/fuel.ts`, `src/sim/fuelPrice.ts`)
 
-`fuelPriceIndex` is unitless, 1.0 being baseline. It stays at baseline
-except during a fuel spike (see Shocks), which sets it for its length,
-up to 2.0. There used to be a daily random walk and a fuel-history chart
-in the Executive tab; it was switched off as noise the player couldn't
-act on, and removed once shocks became the fuel story (WEEK-TEN.md,
-thread 1).
+`fuelPriceIndex` is the market price, unitless, 1.0 being baseline.
+It moves every rollover (`rollDailyFuelPrice()`, right after the shocks
+roll): a mean-reverting walk, `fuelWalk`, keeps 95% of yesterday's
+log-deviation and adds a step of up to ±5%, so it wanders about ±10–15%
+and drifts back. A fuel spike (see Shocks) multiplies on top. The index
+is clamped to 0.6–2.0, and the last 90 days are kept in
+`fuelPriceHistory` for the chart. Rivals pay the market price.
+
+**A hedge** (`buyHedge()`) locks today's price on all the airline's fuel
+for 30, 60 or 90 days. The player's flights then pay the locked price
+(`airlineFuelPrice()`), and each arrival books what that saved or cost
+against the market into `fuelHedge.saved`. The premium, paid up front,
+is 1% plus 0.02% per day of term of the fuel it covers (the schedule's
+daily fuel bill at the locked price, times the days). One hedge at a
+time; the last one stays on record for the view and the ticker, which
+says how it went when it ends. The premium is a cash outlay, not part of
+the day's P&L, like an innovation's price.
+
+Measured over 36 sitter games (hedging bolted on): hedging whenever
+nothing is hedged loses 38% of the premiums on 30-day terms and 99% on
+90-day ones; hedging 90 days only when fuel is 5% or more below usual
+returns about 4 times the premium. Timing is the skill; always hedging
+is a slow leak. The steady headless player uses the second rule; the
+sitter never hedges.
+
+**Head office** (Network › Head office, `ui/inspector/headOffice.ts`)
+shows today's price against usual, a 90-day chart (dashed: usual; green:
+the locked price), the hedge and its running result, one button per
+term with its premium (two clicks), and the innovations. The Network
+view's Head office row shows the price and whether it's hedged.
 
 `legCostBreakdown()` splits each type's flat `costPerBlockHour` into
 slices rather than touching the hand-authored data: 35% fuel-sensitive,
 30% carved out for crew (see below), the rest bundled maintenance and
 overhead. The index multiplies the fuel slice, and
-`fuelEfficiencyMultiplier` multiplies on top of that — the hook the tech
-tree turns down.
+`fuelEfficiencyMultiplier` multiplies on top of that, which winglet
+retrofits turn down (see Innovations).
 
 ---
 
@@ -1669,8 +1693,8 @@ cash cushion gets punished. At most one at a time, none before day 60,
 and 30 calm days after each; otherwise a 1-in-90 daily chance, about
 three a year, all from the seeded stream:
 - **Fuel spike**: fuel 40–80% dearer for 30–75 days (fuel is 35% of the
-  block-hour cost, so flights cost about 15–30% more). Fuel prices don't
-  otherwise move, so the spike sets the index and it returns to baseline.
+  block-hour cost, so flights cost about 15–30% more), on top of
+  wherever the daily price is (see Fuel prices and hedging).
 - **Recession**: every market's potential 15–25% lower for 60–120 days
   (`potentialMultiplier()` in `sim/marketDemand.ts`); demand already
   above the new ceiling falls to it at the next rollover.
@@ -1975,8 +1999,8 @@ a different failure. NPS therefore divides by its own denominator
 
 ## Innovations (`src/sim/innovations.ts`)
 
-Airline programmes the ladder opens and the player chooses to adopt, in
-the Goals view (Network › Goals), each for good. Climbing a tier doesn't
+Airline programmes the ladder opens and the player chooses to adopt, at
+Head office (Network › Head office), each for good. Climbing a tier doesn't
 hand them out; it lets the player buy them, and each pays back only on
 an airline big enough to use it.
 

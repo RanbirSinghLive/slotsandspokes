@@ -1,5 +1,5 @@
 import { AIRCRAFT_CLASSES, pluralClassName } from '../sim/aircraftClasses';
-import { classOpen, tierThatOpens } from '../sim/ladder';
+import { airlineCalled, classOpen, tierThatOpens } from '../sim/ladder';
 import { daysUntilNextListing, listingsOf } from '../sim/market';
 import type { SimState } from '../sim/state';
 
@@ -35,7 +35,7 @@ function renderStrip(state: SimState): void {
     const when = `${next} day${next === 1 ? '' : 's'}`;
     const opener = tierThatOpens(cls.code);
     const status = !classOpen(state, cls.code)
-      ? `opens when you're a ${opener?.name.toLowerCase() ?? 'bigger'} airline · ${listings.length} listed`
+      ? `opens when you're ${opener ? airlineCalled(opener) : 'a bigger airline'} · ${listings.length} listed`
       : listings.length === 0
         ? `none listed · next in ${when}`
         : `${listings.length} listed (${listings.map((l) => `${l.ageYears} yrs`).join(', ')}) · next in ${when}`;

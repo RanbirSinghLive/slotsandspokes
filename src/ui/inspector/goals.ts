@@ -1,15 +1,13 @@
-import { currentTier, isMilestoneMet, LADDER, openedSoFar, tiersClimbed, type Milestone } from '../../sim/ladder';
+import { airlineCalled, currentTier, isMilestoneMet, LADDER, openedSoFar, tiersClimbed, type Milestone } from '../../sim/ladder';
 import type { SimState } from '../../sim/state';
-import * as ops from '../routeActions';
-import type { InnovationOption } from '../routeActions';
+import { select } from '../selection';
 
 /**
  * The Goals view (Network › Goals): the ladder (sim/ladder.ts), the tier
  * the airline is working on with each milestone's progress, what reaching
  * the next tier opens, the tiers already climbed, and the ones still
- * ahead. It's the game's answer to "what should I be doing?". Below the
- * ladder, the innovations it opens (sim/innovations.ts), each adopted
- * here.
+ * ahead. It's the game's answer to "what should I be doing?". The
+ * innovations it opens are adopted at Head office (ui/inspector/headOffice.ts).
  */
 
 function line(text: string, className = 'inspector-line'): HTMLElement {
@@ -45,52 +43,6 @@ function milestoneRow(state: SimState, milestone: Milestone): HTMLElement {
   return row;
 }
 
-function money(amount: number): string {
-  return `$${Math.round(amount).toLocaleString()}`;
-}
-
-/** One innovation: what it does and costs, and a button to adopt it, or why it can't be yet. */
-function innovationCard(state: SimState, option: InnovationOption, changed: () => void): HTMLElement {
-  const card = document.createElement('div');
-  card.className = 'innovation-card';
-  card.classList.toggle('is-adopted', option.adopted);
-  card.classList.toggle('is-locked', !option.adopted && option.blocked !== null);
-  const name = document.createElement('div');
-  name.className = 'innovation-name';
-  name.textContent = option.adopted ? `✓ ${option.name}` : option.name;
-  const price = [option.oneOffPrice > 0 ? `${money(option.oneOffPrice)} once` : null, option.runningCost]
-    .filter(Boolean)
-    .join(', then ');
-  const status = option.adopted ? (option.runningCost ? `Running: ${option.runningCost}.` : 'Adopted.') : `Costs ${price}.`;
-  card.append(name, line(option.description), line(status, 'inspector-line innovation-price'));
-  if (option.adopted) return card;
-
-  if (option.blocked) {
-    card.append(line(option.blocked, 'inspector-line goal-ahead'));
-    return card;
-  }
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'inspector-plan-hub';
-  button.textContent = `Adopt ${option.name.toLowerCase()}`;
-  // Two clicks, since it can't be undone and a running cost runs for good.
-  let armed = false;
-  button.addEventListener('click', () => {
-    if (!armed) {
-      armed = true;
-      button.textContent = option.runningCost
-        ? `Click again to adopt. It can't be dropped: ${option.runningCost} from now on.`
-        : `Click again to pay ${money(option.oneOffPrice)}. It can't be undone.`;
-      button.classList.add('is-act');
-      return;
-    }
-    ops.adoptInnovation(state, option.id);
-    changed();
-  });
-  card.append(button);
-  return card;
-}
-
 /** One line saying where the airline stands, for the Network view's Goals row. */
 export function goalsSummary(state: SimState): string {
   const tier = currentTier(state);
@@ -99,7 +51,7 @@ export function goalsSummary(state: SimState): string {
   return `${tier.name} · ${Math.min(met, tier.needed)} of ${tier.needed}`;
 }
 
-export function buildGoalsView(state: SimState, changed: () => void): HTMLElement {
+export function buildGoalsView(state: SimState): HTMLElement {
   const root = document.createElement('div');
   root.className = 'inspector-view';
   const title = document.createElement('h3');
@@ -114,8 +66,8 @@ export function buildGoalsView(state: SimState, changed: () => void): HTMLElemen
     const next = LADDER[climbed + 1];
     root.append(
       line(
-        `You're a ${tier.name.toLowerCase()} airline. Meet ${tier.needed} of these ${tier.milestones.length} to ` +
-          (next ? `become a ${next.name.toLowerCase()} one` : 'climb the last tier') +
+        `You're ${airlineCalled(tier)}. Meet ${tier.needed} of these ${tier.milestones.length} to ` +
+          (next ? `become ${airlineCalled(next)}` : 'climb the last tier') +
           ` (${met} so far).`,
       ),
     );
@@ -140,10 +92,12 @@ export function buildGoalsView(state: SimState, changed: () => void): HTMLElemen
     root.append(row);
   });
 
-  root.append(
-    heading('Innovations'),
-    line('Programmes the ladder opens. Each is yours to adopt, for good, if it pays for your airline.'),
-    ...ops.innovationOptions(state).map((option) => innovationCard(state, option, changed)),
-  );
+  // Innovations the ladder opens are adopted at Head office.
+  const link = document.createElement('button');
+  link.type = 'button';
+  link.className = 'inspector-link';
+  link.textContent = 'Adopt the innovations it opens at Head office ›';
+  link.addEventListener('click', () => select({ kind: 'headOffice' }));
+  root.append(heading('Innovations'), link);
   return root;
 }
