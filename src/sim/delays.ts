@@ -3,11 +3,7 @@ import { WEATHER_ON_TIME_PROBABILITY, WEATHER_MAX_DELAY_MINUTES } from './weathe
 
 /**
  * The four causes a departing flight's arrival delay is built from, kept
- * apart from the tick loop (sim/step.ts). That also lets the delay
- * distributions be
- * *sampled* from outside the simulation (ui/devTools.ts histograms them
- * to show what the model actually produces) without exporting the
- * internals of the tick function to do it.
+ * apart from the tick loop (sim/step.ts).
  *
  * Each cause addresses a different question:
  *
@@ -66,7 +62,7 @@ function rollCauseDelay(
   return [delayMinutes, seedAfterSecond];
 }
 
-/** The odds and worst case an aircraft of this age departs against — exported so ui/devTools.ts can label its histograms with the real figures rather than restating them by hand. */
+/** The odds and worst case an aircraft of this age departs against: the aircraft view states them (ui/inspector/aircraft.ts). */
 export function ageDelayParameters(ageYears: number): { onTimeProbability: number; maxDelayMinutes: number } {
   return {
     onTimeProbability: Math.max(
@@ -83,7 +79,7 @@ export function ageDelayParameters(ageYears: number): { onTimeProbability: numbe
  * almost exactly), floored so a genuinely ancient airframe still isn't a
  * coin flip on every single departure.
  */
-export function rollAgeDelay(
+function rollAgeDelay(
   seed: number,
   ageYears: number,
   maintenanceFactor = 1,
@@ -91,14 +87,13 @@ export function rollAgeDelay(
   // Maintenance scales *effective* age rather than adding a fourth delay
   // cause (sim/aog.ts's MAINTENANCE_AGE_FACTOR, a maintenance COO): a
   // well-kept airframe behaves younger than its years. Defaults to 1, the
-  // raw age, for callers that don't pass one (the histogram sampler in
-  // ui/devTools.ts).
+  // raw age.
   const { onTimeProbability, maxDelayMinutes } = ageDelayParameters(ageYears * maintenanceFactor);
   return rollCauseDelay(seed, onTimeProbability, maxDelayMinutes);
 }
 
 /** Cause 2: weather. Clear skies at the origin contribute nothing. */
-export function rollWeatherDelay(seed: number, hasWeatherAtOrigin: boolean): [delayMinutes: number, nextSeed: number] {
+function rollWeatherDelay(seed: number, hasWeatherAtOrigin: boolean): [delayMinutes: number, nextSeed: number] {
   if (!hasWeatherAtOrigin) return [0, seed];
   return rollCauseDelay(seed, WEATHER_ON_TIME_PROBABILITY, WEATHER_MAX_DELAY_MINUTES);
 }
@@ -133,7 +128,7 @@ export function congestionParameters(load: number): { delayChance: number; maxDe
   };
 }
 
-export function rollCongestionDelay(seed: number, load: number): [delayMinutes: number, nextSeed: number] {
+function rollCongestionDelay(seed: number, load: number): [delayMinutes: number, nextSeed: number] {
   const { delayChance, maxDelayMinutes } = congestionParameters(load);
   if (delayChance === 0) return [0, seed];
   return rollCauseDelay(seed, 1 - delayChance, maxDelayMinutes);

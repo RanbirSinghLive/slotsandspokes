@@ -39,28 +39,6 @@ export type FlightResult = {
    * without recomputing the formula itself.
    */
   costBreakdown: CostBreakdown;
-  /**
-   * The intermediate passenger counts this flight's `pax` was arrived at
-   * through, in order. Exposed for the same reason `costBreakdown` is:
-   * the Dev tab's revenue funnel (ui/devTools.ts) needs to show *where*
-   * passengers are lost, and recomputing these outside this function
-   * would be a second copy of the formula free to drift from the real
-   * one.
-   */
-  demandBreakdown: DemandBreakdown;
-};
-
-export type DemandBreakdown = {
-  /** This flight's share of the market's actual daily demand, after splitting across frequencies. */
-  allocatedDemand: number;
-  /** How many of those actually book *you*, after the choice model weighs fare, frequency and competitors. */
-  bookedDemand: number;
-  /** The most this aircraft will carry — seats times LOAD_FACTOR. */
-  seatCeiling: number;
-  /** Booked passengers turned away because the aircraft was full. Zero when there was spare room. */
-  spilled: number;
-  /** Passengers picked up from the market's shared recapture pool. Zero when this flight was itself full. */
-  recaptured: number;
 };
 
 // Deliberately crude: no flight sells more than this fraction of its
@@ -271,12 +249,5 @@ export function flightResult(
     margin: revenue - cost,
     spilloverDelta,
     costBreakdown,
-    demandBreakdown: {
-      allocatedDemand: demandPerFlight,
-      bookedDemand: roundedBooked,
-      seatCeiling,
-      spilled,
-      recaptured,
-    },
   };
 }

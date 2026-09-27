@@ -144,11 +144,6 @@
             <path d="M7 22h10" />
           </svg>
         </button>
-        <button type="button" data-tab="dev" aria-label="Dev" title="Dev — live cost breakdown (development tool)" hidden>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z" />
-          </svg>
-        </button>
         <button type="button" data-tab="game" aria-label="Game" title="Game — new, save, and load">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
@@ -249,30 +244,6 @@
             </thead>
             <tbody id="ontime-cancel-rows"></tbody>
           </table>
-        </div>
-        <div id="dev-panel" hidden>
-          <section id="dev-today-section">
-            <h2>Today so far</h2>
-            <div class="dev-totals">
-              <div class="dev-total"><span class="dev-total-label">Revenue</span><span id="dev-revenue" class="dev-total-value"></span></div>
-              <div class="dev-total"><span class="dev-total-label">Cost</span><span id="dev-cost" class="dev-total-value"></span></div>
-              <div class="dev-total"><span class="dev-total-label">Margin</span><span id="dev-margin" class="dev-total-value"></span></div>
-            </div>
-          </section>
-          <section id="dev-cost-section">
-                    <h2>Where the money went <button type="button" class="info-mark" aria-label="What this means" data-info="Live, from state — hover any row for what it is. Resets each simulated day.">i</button></h2>
-            <div id="dev-cost-tree"></div>
-            <div id="dev-fuel-drivers"></div>
-          </section>
-          <section id="dev-revenue-section">
-                    <h2>Where the passengers went <button type="button" class="info-mark" aria-label="What this means" data-info="A full day at the current schedule and fares, across every market you serve. Each row is a share of market potential.">i</button></h2>
-            <div id="dev-revenue-funnel"></div>
-            <div id="dev-revenue-note"></div>
-          </section>
-          <section id="dev-delay-section">
-                    <h2>Delay rolls <button type="button" class="info-mark" aria-label="What this means" data-info="Sampled from the real functions, not described — 40,000 draws each. Hover a bar for its range.">i</button></h2>
-            <div id="dev-delay-histograms"></div>
-          </section>
         </div>
         <div id="game-tab" hidden>
           <section id="save-game-section">

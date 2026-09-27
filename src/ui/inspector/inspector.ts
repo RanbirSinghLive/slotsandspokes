@@ -27,7 +27,9 @@ import { buildRouteView } from './route';
 const inspectorEl = document.querySelector<HTMLElement>('#inspector')!;
 const breadcrumbEl = document.querySelector<HTMLElement>('#inspector-breadcrumb')!;
 const bodyEl = document.querySelector<HTMLElement>('#inspector-body')!;
-const networkEls = [document.querySelector<HTMLElement>('#econ-summary')!, document.querySelector<HTMLElement>('#sidebar-tab-content')!];
+// The Network summary's own visibility (the cards, Today, Last 7 Days) is
+// main.ts's: it shows only at Network on the Fleet tab.
+const networkEls = [document.querySelector<HTMLElement>('#sidebar-tab-content')!];
 
 let redrawPools: (() => void) | null = null;
 /** What the view was last built for, so a rebuild of the same thing keeps its scroll position. */

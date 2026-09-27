@@ -40,7 +40,6 @@ import { refreshInspectorForNewDay, renderInspector } from './ui/inspector/inspe
 import { isHubPlannerOpen } from './ui/hubPlanner';
 import { setupFarePolicy, updateFarePolicy } from './ui/farePolicy';
 import { setupOnTimePanel, updateOnTimePanel } from './ui/onTime';
-import { setupDevPanel, updateDevPanel } from './ui/devTools';
 import { setupInfoTooltips } from './ui/infoTooltip';
 import { updateTicker } from './ui/ticker';
 import { updateAlerts } from './ui/alerts';
@@ -73,7 +72,6 @@ renderScheduleWarnings(scheduleProblems(state));
 setupRouteBuilder(state, () => switchToSidebarTab('fleet'));
 setupFarePolicy(state);
 setupOnTimePanel();
-setupDevPanel();
 setupInfoTooltips();
 setupGameOver();
 setupGameControls(state);
@@ -167,15 +165,9 @@ function syncCompetitorAirlineDropdown(): void {
 // inspector instead (ui/inspector/).
 const fleetTabEl = document.querySelector<HTMLDivElement>('#fleet-tab')!;
 const onTimePanelEl = document.querySelector<HTMLDivElement>('#ontime-panel')!;
-const devPanelEl = document.querySelector<HTMLDivElement>('#dev-panel')!;
 const gameTabEl = document.querySelector<HTMLDivElement>('#game-tab')!;
+const econSummaryEl = document.querySelector<HTMLElement>('#econ-summary')!;
 const sidebarTabButtons = document.querySelectorAll<HTMLButtonElement>('#sidebar-tabs button');
-
-// The Dev tab is a debugging tool, not part of the game: hidden unless the
-// page is opened with ?dev in the URL.
-if (new URLSearchParams(window.location.search).has('dev')) {
-  document.querySelector<HTMLButtonElement>('#sidebar-tabs [data-tab="dev"]')!.hidden = false;
-}
 
 // Both resize()'s canvas sizing and the CSS `--panel-width` custom
 // property (style.css's #map/#panel both read it) come from this one
@@ -251,7 +243,6 @@ let latestFractionalMinute = state.simMinute;
 type SidebarTab =
   | 'fleet'
   | 'ontime'
-  | 'dev'
   | 'game';
 let sidebarTab: SidebarTab = 'fleet';
 let demandOverlayOn = false;
@@ -294,12 +285,10 @@ function render(nowMs: number = performance.now()): void {
   updateGameOver(state);
   if (updateRunway(state)) runwayPauseRequested = true;
 
-  // The Dev tab is the one panel that refreshes every frame rather than
-  // on tab-select — watching cost accumulate across a simulated day is
-  // the whole point of it, so a snapshot taken when the tab opened would
-  // be useless. Gated on it actually being visible so it costs nothing
-  // the rest of the time.
-  if (sidebarTab === 'dev') updateDevPanel(state);
+  // The Network summary (cards, Today, Last 7 Days) belongs to the main
+  // page: shown only at Network on the Fleet tab, not over the On-Time or
+  // Game tabs or behind an inspector view.
+  econSummaryEl.hidden = getSelection().kind !== 'network' || sidebarTab !== 'fleet';
 
   const cssWidth = window.innerWidth - currentPanelWidthPx;
   const cssHeight = window.innerHeight;
@@ -602,7 +591,6 @@ function switchToSidebarTab(tab: SidebarTab): void {
   sidebarTab = tab;
   fleetTabEl.hidden = tab !== 'fleet';
   onTimePanelEl.hidden = tab !== 'ontime';
-  devPanelEl.hidden = tab !== 'dev';
   gameTabEl.hidden = tab !== 'game';
 
   syncSidebarTabButtons();

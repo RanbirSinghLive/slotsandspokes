@@ -1668,7 +1668,7 @@ They appear in the draw-a-route tooltip and form, the route view, the
 ring's Add flight hint, the airport view and the Airports list (sorted by
 size). What the player observes on their own flights stays in numbers:
 passengers turned away, the fare slider's day at these settings, the hub
-planner's connecting passengers. The Dev tab keeps its numbers.
+planner's connecting passengers.
 
 **Hunger for service** (`src/sim/serviceLevel.ts`) speeds growth up
 where nobody flies yet. Each morning every airport's seats, from every
@@ -2085,26 +2085,10 @@ with the do-nothing player, which keeps the network fixed. On the current start 
 
 ---
 
-## The Dev tab (`src/ui/devTools.ts`)
-
-A development tool, and deliberately *not* a hand-drawn diagram of the
-model: every leaf reads a real number out of `state`, so it can't drift
-out of date the way documentation describing the same formulas would.
-
-Three parts: a live cost tree (the categories are guaranteed to sum to
-`todayCost`), a revenue funnel showing where passengers are lost
-(potential → actual → booked → carried → recaptured → flown), and
-histograms of the delay distributions **sampled from the real functions**
-40,000 times rather than described. Seeing the squaring skew is much
-easier than reading about it.
-
----
-
 ## What isn't built yet
 
 The current plan is the newest `WEEK-*.md`. As of September 2026:
 
-- **The Grow tab as one pipeline view** (WEEK-EIGHT.md) — next up.
 - **Ancillary revenue** (bag fees), designed twice and never built.
 - **Per-base time zones** — every plane flies on the home clock.
 
