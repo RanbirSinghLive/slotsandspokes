@@ -51,7 +51,9 @@ export type ExecutiveEffect =
   /** Multiplies connecting passengers at every hub (sim/hubs.ts). */
   | { kind: 'connections'; connectingMultiplier: number }
   /** Multiplies every ticket's revenue (sim/innovations.ts's bookingPerks()). */
-  | { kind: 'revenue'; yieldMultiplier: number };
+  | { kind: 'revenue'; yieldMultiplier: number }
+  /** Multiplies how long leased planes take to arrive and returned ones to go (sim/fleetTiming.ts). */
+  | { kind: 'fleet-programmes'; deliveryMultiplier: number; returnMultiplier: number };
 
 export type ExecutiveCandidate = {
   id: string;
@@ -180,6 +182,14 @@ export function executiveConnectingMultiplier(state: SimState): number {
   return effectOf(state, 'connections')?.connectingMultiplier ?? 1;
 }
 
+export function executiveDeliveryMultiplier(state: SimState): number {
+  return effectOf(state, 'fleet-programmes')?.deliveryMultiplier ?? 1;
+}
+
+export function executiveReturnMultiplier(state: SimState): number {
+  return effectOf(state, 'fleet-programmes')?.returnMultiplier ?? 1;
+}
+
 export function executiveYieldMultiplier(state: SimState): number {
   return effectOf(state, 'revenue')?.yieldMultiplier ?? 1;
 }
@@ -206,5 +216,7 @@ export function describeEffect(effect: ExecutiveEffect): string {
       return `${percent(effect.connectingMultiplier)} more connecting passengers at every hub.`;
     case 'revenue':
       return `Every ticket earns ${percent(effect.yieldMultiplier)} more.`;
+    case 'fleet-programmes':
+      return `Leased planes arrive ${percent(effect.deliveryMultiplier)} sooner, and returned ones go ${percent(effect.returnMultiplier)} sooner.`;
   }
 }

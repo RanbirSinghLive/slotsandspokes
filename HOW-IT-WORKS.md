@@ -1881,30 +1881,32 @@ passengers of any style and earned the least.
 ## Crews (`src/sim/crews.ts`)
 
 Crews live at **crew bases**, the airports where the airline bases
-planes. Home starts with 2, enough for the starting plane. Basing a
-plane at a new airport opens a base there for $100,000
-(`CREW_BASE_FEE`, charged by the lease), with no crews: it waits for
-hires.
+planes, and each is **rated for one aircraft class**: Propeller crews fly
+only Propellers. Home starts with 2 Propeller crews, enough for the
+starting plane. Basing a plane at a new airport opens a base there for
+$100,000 (`CREW_BASE_FEE`, charged by the lease), with no crews.
 
-**Each day, at rollover** (`rollDailyCrews()`), hires that have come due
-join, then each base shares its crews out. A plane's duty day runs from
-an hour before its first departure to its last landing, flown by the
-crews it gets, one after another in equal shifts. Every plane first gets
-the fewest crews that fly its duty within a 13-hour legal shift; a plane
-that can't is grounded for the day (its flights cancel, cause "crew").
-Spare crews then go to the longest shifts, down to 8 hours. Crews left
-over stand by at $250 a day each (cost category `crew`). Flying crews'
-pay stays inside each flight's block-hour cost.
+**Each day, at rollover** (`rollDailyCrews()`), hires and retraining
+that have come due join their class, then each base shares each class's
+crews among that class's planes. A plane's duty day runs from an hour
+before its first departure to its last landing, flown by the crews it
+gets in equal shifts. Every plane first gets the fewest crews that fly
+its duty within a 13-hour legal shift; a plane that can't is grounded
+for the day (its flights cancel, cause "crew"). Spare crews then go to
+the longest shifts, down to 8 hours. Crews left over stand by (cost
+category `crew`). Flying crews' pay stays inside block-hour cost.
 
-Crewing is decided once a day, at rollover: a plane leased or a
-rotation added during the day flies that day on the morning's crewing
-(a new plane uncrewed for its first day), and is crewed properly from
-the next rollover.
+**Costs scale with the class** (`CREW_CLASS_SCALE`): hiring $10,000 and
+standby $250 a day for a Propeller crew, 1.5× for Regional, 2× for
+Narrowbody, 3× for Widebody. **Hiring** takes 7 days. **Retraining**
+moves crews to another class for half a hire there, taking 10 days, out
+of their old class at once: gauging up (or down) costs less than hiring
+fresh but takes longer. Crews can be let go. A crew academy (see
+Innovations) halves hiring and retraining times. All of it is at the
+airport view's Crews section, a row per class.
 
-**Hiring** is at the airport (the airport view's Crews section): $10,000
-a crew, flying 7 days later. Crews can be let go. So the trade is
-hiring ahead of growth (idle crews cost) against hiring after (a new
-plane sits grounded, and every flight it misses cancels).
+Crewing is decided once a day, at rollover: a rotation added during the
+day flies that day on the morning's crewing.
 
 **Fatigue** (`legFatigue()`). A crew is fresh for a whole 8-hour shift;
 beyond it, it tires, fully 4 hours later. Every turn under 40 minutes
@@ -1914,19 +1916,46 @@ NPS's service points. Measured: tiring from 7 hours with an hour per
 tight turn and 50% more delay cut a careful Toronto year by
 three-quarters, as the delays knocked on into curfew cancellations.
 
-**On screen:** a crew bar under each base's plane pools (duty hours
-booked against what its crews fly at 8-hour shifts, red when planes are
-grounded), in the airport view with hire and let-go buttons, in the
-map's pool overlay for home, and as a short bar under the base's dot on
-the map.
+**On screen:** each class's plane pool row (the map overlay, the airport
+and route views) has a thin unlabelled crew bar under its plane bar:
+duty hours booked against what that class's crews fly at 8-hour shifts,
+red when planes are grounded for want of crews. The two bars lining up
+is balance; the crew bar past the plane bar, or red, is short.
 
-**The headless players** keep crews at their planes' need plus one
-plane's worth (2), twice that when a plane pool is nearly full at a
-profitable airline, and lease only with 2 spare crews at home; crews
-spare for 30 days go, never while growing. Reckless hires whatever its
-planes need. Measured (steady median cash, thread 6 → crews): YUL $11.3M
-→ $7.7M, YYZ $25.4M → $17.0M, BOS $21.5M → $15.9M, PHL $46.6M → $55.2M,
-LHR $69.4M → $78.5M.
+**The headless players** keep each class's crews at its planes' need
+plus 2 for each plane of the class on its way, hiring them the day the
+plane is leased; a shortfall is met by retraining another class's spare
+crews first. Crews spare for 30 days go.
+
+## Fleet timing (`src/sim/fleetTiming.ts`)
+
+Every change to the fleet takes time, so planes and crews are planned
+ahead rather than reacted with:
+
+- **Deliveries.** A lease takes the listing off the shelf at once (no
+  rival can have it), but the plane is delivered 7 days later, based at
+  the airport it was leased at (`state.inboundLeases`); its lease starts
+  on delivery. A pool row shows it as "+1" meanwhile.
+- **Returns.** A plane handed back (with no flights) goes over 10 days
+  (`Aircraft.returningOnDay`): it flies nothing, isn't in the pools or
+  the planner's choice of plane, and still costs its lease and overhead,
+  so swapping planes all the time costs twice. The return fee is paid up
+  front.
+- **Crews** join 7 days after hiring, 10 after retraining (above).
+
+A fleet programmes COO (Lena Fischer) halves delivery and return times,
+a crew academy hiring and retraining times.
+
+**On the map**, an airport with anything under way shows one amber line
+under its dot (`pendingByAirport()`): "+1 plane 3d · +2 crews 5d ·
+−1 plane 8d", each with the days until the first of them happens. It
+counts as an obstacle for the labels. The ticker says when a plane is
+delivered, when one has gone back, and when crews join.
+
+The headless player leases a class only with none of it already on its
+way (pools don't count a plane until it's delivered), hires its crews
+the same day, and fills any plane with nothing to fly (a delivery, or
+one emptied by cuts) with a whole day at once.
 
 ---
 
@@ -1972,6 +2001,7 @@ an airline big enough to use it.
 |---|---|---|---|
 | Online booking | Network airline | $400,000 once | every ticket earns 4% more (no agent's cut) |
 | Younger airframes | Network airline | $300,000 once | every plane leased from then on is refurbished 8 years younger (not below 5), at the younger airframe's rate |
+| Crew academy | Regional carrier | $150,000 once | hiring and retraining crews take half the time |
 | Loyalty scheme | International | $500,000 once, then 2% of revenue a day | 60% of turned-away passengers rebook with you, not 40%; rivals see 25% less money on the table on your routes (sim/attractiveness.ts) |
 | Winglet retrofits | International | $800,000 once | 10% less fuel burned (`fuelEfficiencyMultiplier`) |
 | Codeshare feed | Global | $6,000 a day | 30% more connecting passengers at every hub (sim/hubs.ts) |
@@ -2008,7 +2038,7 @@ needs 20 (judged at hiring; they stay if NPS falls later).
 
 | Chair | Anyone | NPS 15 | NPS 20 |
 |---|---|---|---|
-| COO | Errol Vance: breakdowns as if 15% younger | Marcus Oyelaran: delays 15% shorter | Priya Raghunathan: +8 NPS a flight |
+| COO | Errol Vance: breakdowns as if 15% younger; Lena Fischer (NPS 10): deliveries and returns in half the time | Marcus Oyelaran: delays 15% shorter | Priya Raghunathan: +8 NPS a flight |
 | CFO | Dale Mercer: overhead −15% | Hana Okafor: hedge premiums halved, overhead −5% | Simone Adeyemi: new leases −12% |
 | CCO | Tomas Lindqvist: markets grow 25% faster | Inês Carvalho: +15% connecting passengers | Kofi Mensah: +3% yield |
 

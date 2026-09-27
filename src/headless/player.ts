@@ -803,9 +803,13 @@ function innovationGainPerDay(state: SimState, id: InnovationId): number {
     const averageFare = markets.length > 0 ? markets.reduce((sum, [a, b]) => sum + recommendedFare(a, b), 0) / markets.length : 0;
     return connecting * (CODESHARE_FEED_FACTOR - 1) * 2 * averageFare;
   }
+  const leaseBill = state.aircraft.reduce((sum, aircraft) => sum + aircraft.leaseCostPerDay, 0);
+  // Crew academy: crews in half the time matter once the airline grows or
+  // changes type often, so valued as a twentieth of the lease bill.
+  if (id === 'crew-academy') return leaseBill * 0.05;
   // Younger airframes: worth it once the airline leases often, so valued
   // as a tenth of the fleet's daily lease bill.
-  return state.aircraft.reduce((sum, aircraft) => sum + aircraft.leaseCostPerDay, 0) * 0.1;
+  return leaseBill * 0.1;
 }
 
 /** Adopt whichever open innovations pay for themselves soon enough and leave cash to spare. */

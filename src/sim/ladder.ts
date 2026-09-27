@@ -162,7 +162,7 @@ export const LADDER: Tier[] = [
     id: 'start-up',
     name: 'Start-up',
     needed: 4,
-    opens: ['Regional aircraft on the lessor'],
+    opens: ['Regional aircraft on the lessor', 'Innovation: crew academy'],
     opensClasses: ['REGIONAL'],
     milestones: [
       {

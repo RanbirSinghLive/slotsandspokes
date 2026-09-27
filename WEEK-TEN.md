@@ -6,7 +6,7 @@ moats, shocks, real costs, Europe, home difficulty) lives in
 with playtest findings as they come (see "Playtest notes"), and the
 order changes with them.
 
-**State at handoff:** save key `airgame-save-v46`. **All ten threads are done.** The game pushes back
+**State at handoff:** save key `airgame-save-v46`. **All threads through 12 are done.** The game pushes back
 the way CLAUDE.md's philosophy asks: over a year a careful airline makes
 $6.5M–$19M, a sitter $2M–$5M and eroding, an unattended one-plane start
 survives the Standard homes, a reckless one always busts
@@ -509,6 +509,26 @@ timing, with executives and innovations to speed parts of it up.
 Slices: (A) crews by class, retraining, the pool display; (B) delivery,
 hiring and return times with map signals; (C) the executive and
 innovation speed-ups, then balance.
+
+**Status: done.** As built: crews by class (hire and standby scaled 1×,
+1.5×, 2×, 3×), retraining at half a hire over 10 days, a thin crew bar
+per class; deliveries 7 days, returns 10 (lease still charged), crews 7;
+an amber line under the airport on the map, "+N" on pool rows, ticker
+lines; Lena Fischer (COO, NPS 10) halves deliveries and returns, a crew
+academy (opens on becoming a regional carrier, $150,000) halves hiring
+and retraining. The headless player hires a new plane's crews the day it
+leases it, retrains before hiring, waits for one delivery per class, and
+fills any plane with nothing to fly; it adopts the academy and hires
+Fischer around days 100–130, and a Philadelphia year retrains a dozen
+times. Balance (steady median cash): YUL $11.3M, YYZ $34.1M, BOS $38.5M,
+PHL $64.4M, LHR $66.6M, Halifax busts every game for every player;
+sitter $3.5–10.8M; bold $27–87M with 1 bust in 30 core games. Steady is
+up on thread 9 mostly because filling idle planes at once is a better
+habit, and the crew buffers went (hiring with the lease replaced them).
+
+**For the owner:** the game may now be easier for a careful or bold
+player than the philosophy wants (bold rarely busts), and Halifax is
+unwinnable for every player. Both are for the next plan.
 
 ## Carried forward from week nine
 

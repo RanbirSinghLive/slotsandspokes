@@ -1,4 +1,5 @@
 import { AIRCRAFT_CLASSES, classByCode } from './aircraftClasses';
+import { crewTrainingTimeFactor } from './innovations';
 import { dayIndex } from './clock';
 import type { ScheduleLeg } from './schedule';
 import type { SimState } from './state';
@@ -130,14 +131,14 @@ export function retrainFee(classCode: string): number {
   return Math.round(hireFee(classCode) * RETRAIN_COST_SHARE);
 }
 
-/** Days until a crew hired today flies. */
-export function hireLeadDays(_state: SimState): number {
-  return HIRE_LEAD_DAYS;
+/** Days until a crew hired today flies: shorter with a crew academy (sim/innovations.ts). */
+export function hireLeadDays(state: SimState): number {
+  return Math.max(1, Math.round(HIRE_LEAD_DAYS * crewTrainingTimeFactor(state)));
 }
 
-/** Days a crew is away retraining. */
-export function retrainDays(_state: SimState): number {
-  return RETRAIN_DAYS;
+/** Days a crew is away retraining: shorter with a crew academy. */
+export function retrainDays(state: SimState): number {
+  return Math.max(1, Math.round(RETRAIN_DAYS * crewTrainingTimeFactor(state)));
 }
 
 /** Every crew base, by IATA. */

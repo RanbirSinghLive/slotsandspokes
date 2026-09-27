@@ -11,6 +11,17 @@
     "effect": { "kind": "maintenance", "ageFactorMultiplier": 0.85 }
   },
   {
+    "id": "coo-fleet",
+    "role": "coo",
+    "name": "Lena Fischer",
+    "background": "Fleet programmes",
+    "flavor": "Ran fleet planning for a charter group that changed its aircraft every season. Knows every lessor's delivery desk and gets planes in, and out, in half the time.",
+    "npsNeeded": 10,
+    "signingFee": 250000,
+    "salaryPerDay": 2500,
+    "effect": { "kind": "fleet-programmes", "deliveryMultiplier": 0.5, "returnMultiplier": 0.5 }
+  },
+  {
     "id": "coo-flightops",
     "role": "coo",
     "name": "Marcus Oyelaran",

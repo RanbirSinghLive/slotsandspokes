@@ -21,7 +21,7 @@ import type { SimState } from './state';
  * every place that books a flight or judges a market sees the same thing.
  */
 
-export type InnovationId = 'online-booking' | 'younger-airframes' | 'loyalty-scheme' | 'winglets' | 'codeshare-feed';
+export type InnovationId = 'online-booking' | 'younger-airframes' | 'crew-academy' | 'loyalty-scheme' | 'winglets' | 'codeshare-feed';
 
 export type Innovation = {
   id: InnovationId;
@@ -41,6 +41,8 @@ export const DIRECT_BOOKING_YIELD = 1.04;
 /** Younger airframes: years a heavy check takes off each plane leased, down to MIN_REFURBISHED_AGE. */
 export const REFURBISHMENT_YEARS = 8;
 export const MIN_REFURBISHED_AGE = 5;
+/** Crew academy: hiring and retraining crews (sim/crews.ts) take this share of the time. */
+export const CREW_ACADEMY_TIME_FACTOR = 0.5;
 /** Loyalty scheme: the share of turned-away passengers who wait for a later flight, instead of RECAPTURE_RATE. */
 export const LOYALTY_RECAPTURE_RATE = 0.6;
 /** Loyalty scheme: how much of the money on the table (sim/attractiveness.ts) members keep from a rival. */
@@ -69,6 +71,14 @@ export const INNOVATIONS: Innovation[] = [
     description: `A heavy-check deal with the lessor: every plane you lease from now on is refurbished ${REFURBISHMENT_YEARS} years younger (not below ${MIN_REFURBISHED_AGE}), so it runs late, breaks down and disappoints less. You pay the younger airframe's rate.`,
     openedBy: 'regional',
     oneOffPrice: 300_000,
+    runningCost: null,
+  },
+  {
+    id: 'crew-academy',
+    name: 'Crew academy',
+    description: `Train your own crews: hiring and retraining them take half the time, so a new plane or a new type is crewed sooner.`,
+    openedBy: 'start-up',
+    oneOffPrice: 150_000,
     runningCost: null,
   },
   {
@@ -187,4 +197,9 @@ export function runningCostOf(id: InnovationId, dayRevenue: number): number {
 /** What the adopted programmes cost today, given the day's revenue. Charged at rollover. */
 export function runningCostForDay(state: SimState, dayRevenue: number): number {
   return INNOVATIONS.filter((innovation) => isAdopted(state, innovation.id)).reduce((sum, innovation) => sum + runningCostOf(innovation.id, dayRevenue), 0);
+}
+
+/** Hiring and retraining crews take this share of their usual time (sim/crews.ts). */
+export function crewTrainingTimeFactor(state: SimState): number {
+  return isAdopted(state, 'crew-academy') ? CREW_ACADEMY_TIME_FACTOR : 1;
 }

@@ -1,4 +1,5 @@
 import { dayIndex } from './clock';
+import { executiveDeliveryMultiplier, executiveReturnMultiplier } from './executives';
 import { leaseAircraft } from './leasing';
 import type { MarketListing } from './market';
 import type { Aircraft, SimState } from './state';
@@ -33,14 +34,14 @@ export type InboundLease = {
   arrivesDay: number;
 };
 
-/** Days from signing a lease to the plane's delivery. */
-export function deliveryDays(_state: SimState): number {
-  return LEASE_DELIVERY_DAYS;
+/** Days from signing a lease to the plane's delivery: shorter with a fleet programmes COO (sim/executives.ts). */
+export function deliveryDays(state: SimState): number {
+  return Math.max(1, Math.round(LEASE_DELIVERY_DAYS * executiveDeliveryMultiplier(state)));
 }
 
-/** Days a returned plane takes to go back to the lessor. */
-export function returnDays(_state: SimState): number {
-  return RETURN_DAYS;
+/** Days a returned plane takes to go back to the lessor: shorter with a fleet programmes COO. */
+export function returnDays(state: SimState): number {
+  return Math.max(1, Math.round(RETURN_DAYS * executiveReturnMultiplier(state)));
 }
 
 /** Sign a lease on this listing, already taken off the shelf: the plane is delivered later. Returns its delivery day. */
