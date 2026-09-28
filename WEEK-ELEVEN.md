@@ -273,6 +273,12 @@ half fleet screen. Rework, settled with the owner:
 
 UI only: headless output must stay byte-identical.
 
+**Slice 1 done:** the rail, and the screens rearranged. Sections that
+update themselves wait in a hidden `#panel-parts` and are adopted by
+the screen that shows them. Along the way: the Routes table's column
+headings never re-sorted (a Routes selection compared equal whatever
+its sort), now fixed.
+
 ---
 
 ## Carried forward

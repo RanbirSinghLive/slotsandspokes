@@ -53,17 +53,6 @@
         <button type="button" data-speed="20">20×</button>
         <button type="button" data-speed="100">100×</button>
       </div>
-      <button
-        type="button"
-        id="panel-toggle"
-        aria-label="Hide side panel"
-        title="Hide the side panel — the map fills the screen without it"
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="18" height="18" rx="2" />
-          <line x1="15" y1="3" x2="15" y2="21" />
-        </svg>
-      </button>
     </div>
     <!-- The map's own box, for the corners that rearrange with its width (style.css's container queries). -->
     <div id="map-surface">
@@ -99,36 +88,44 @@
     <div id="alert-strip" hidden>
       <div id="alert-strip-list"></div>
     </div>
+    <!-- The panel's rail (ui/rail.ts): every screen one click away, and still there with the panel hidden. -->
+    <nav id="rail" aria-label="Screens">
+      <button type="button" class="rail-item" data-go="network" title="Cards and the last 7 days" aria-label="Overview">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg><span class="rail-label">Overview</span><span class="rail-dot" hidden></span>
+      </button>
+      <button type="button" class="rail-item" data-go="routes" title="Every route, fare policy and reliability" aria-label="Routes">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a4 4 0 0 0 0-8H9a4 4 0 0 1 0-8h7"/></svg><span class="rail-label">Routes</span><span class="rail-dot" hidden></span>
+      </button>
+      <button type="button" class="rail-item" data-go="airports" title="Every airport in reach, sortable" aria-label="Airports">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span class="rail-label">Airports</span><span class="rail-dot" hidden></span>
+      </button>
+      <button type="button" class="rail-item" data-go="fleet" title="Every plane, their days, and the lessor" aria-label="Fleet">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg><span class="rail-label">Fleet</span><span class="rail-dot" hidden></span>
+      </button>
+      <button type="button" class="rail-item" data-go="crews" title="Every base's crews by class" aria-label="Crews">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.1a4 4 0 0 1 0 7.8"/><path d="M21 21v-2a4 4 0 0 0-3-3.9"/></svg><span class="rail-label">Crews</span><span class="rail-dot" hidden></span>
+      </button>
+      <button type="button" class="rail-item" data-go="rivals" title="Every rival airline" aria-label="Rivals">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg><span class="rail-label">Rivals</span><span class="rail-dot" hidden></span>
+      </button>
+      <button type="button" class="rail-item" data-go="money" title="Cash, runway and costs" aria-label="Money">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span class="rail-label">Money</span><span class="rail-dot" hidden></span>
+      </button>
+      <button type="button" class="rail-item" data-go="goals" title="The ladder and its milestones" aria-label="Goals">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M17 5h3v2a3 3 0 0 1-3 3"/><path d="M7 5H4v2a3 3 0 0 0 3 3"/></svg><span class="rail-label">Goals</span><span class="rail-dot" hidden></span>
+      </button>
+      <button type="button" class="rail-item" data-go="headOffice" title="Head office: fuel, hedging, executives, innovations" aria-label="Office">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="1"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01"/></svg><span class="rail-label">Office</span><span class="rail-dot" hidden></span>
+      </button>
+      <div class="rail-spacer"></div>
+      <button type="button" class="rail-item" data-go="game" title="Save, load and new game" aria-label="Game">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg><span class="rail-label">Game</span><span class="rail-dot" hidden></span>
+      </button>
+      <button type="button" class="rail-item" id="rail-hide" title="Hide the side panel (the map fills the screen)" aria-label="Hide panel">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/></svg><span class="rail-label">Hide</span>
+      </button>
+    </nav>
     <aside id="panel">
-      <div id="sidebar-tabs">
-        <button type="button" data-tab="fleet" class="active" aria-label="Fleet" title="Fleet — your rotations">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M22 2 11 13" />
-            <path d="M22 2 15 22 11 13 2 9 22 2Z" />
-          </svg>
-        </button>
-        <button type="button" data-tab="ontime" aria-label="On-Time" title="On-Time — reliability by route">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <polyline points="12 6 12 12 16 14" />
-          </svg>
-        </button>
-        <button type="button" data-tab="airports" aria-label="Airports" title="Airports — every airport you can see, sortable">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2v20" />
-            <path d="M4 8h16" />
-            <circle cx="12" cy="8" r="0.6" />
-            <path d="M7 22h10" />
-          </svg>
-        </button>
-        <button type="button" data-tab="game" aria-label="Game" title="Game — new, save, and load">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
-            <polyline points="17 21 17 13 7 13 7 21" />
-            <polyline points="7 3 7 8 15 8" />
-          </svg>
-        </button>
-      </div>
       <section id="inspector" hidden>
         <nav id="inspector-breadcrumb" aria-label="Where you are"></nav>
         <div id="inspector-body"></div>
@@ -147,8 +144,8 @@
         <h2>Last 7 days</h2>
         <div id="pnl-history"></div>
       </section>
-      <div id="sidebar-tab-content">
-        <div id="fleet-tab">
+      <!-- Sections kept here, hidden, until a screen adopts them (ui/inspector/dom.ts's adopt()). -->
+      <div id="panel-parts" hidden>
           <section id="fare-policy-section">
             <h2>Fare policy <button type="button" class="info-mark" aria-label="What this means" data-info="Prices every market from its recommended fare, so you set this once instead of per route. A market can instead follow a stance against its rivals, or be priced by hand, in its route view: click the route on the map.">i</button></h2>
             <div class="lever-control">
@@ -167,23 +164,8 @@
             <div id="rotations-timeline"></div>
             <div id="rotations-empty">None yet · tap an airport on the map, then Route</div>
           </section>
-        </div>
-        <div id="ontime-panel" hidden>
-          <h2>On-time performance by route</h2>
-          <table id="ontime-table">
-            <thead>
-              <tr>
-                <th>Market</th>
-                <th>Arrived</th>
-                <th>On-time</th>
-                <th>On-time %</th>
-                <th title="Passengers carried over seats flown, last 7 days">Load</th>
-                <th title="How passengers rate you on this route, about the last month">NPS</th>
-              </tr>
-            </thead>
-            <tbody id="ontime-rows"></tbody>
-          </table>
-          <h2>Top delay codes</h2>
+        <section id="reliability-section" hidden>
+          <h2>Delay codes</h2>
           <table id="ontime-causes-table">
             <thead>
               <tr>
@@ -206,7 +188,7 @@
             </thead>
             <tbody id="ontime-cancel-rows"></tbody>
           </table>
-        </div>
+        </section>
         <div id="game-tab" hidden>
           <section id="save-game-section">
                     <h2>Save <button type="button" class="info-mark" aria-label="What this means" data-info="Save happens automatically once a simulated day, but you can force one right now.">i</button></h2>

@@ -36,3 +36,25 @@ export function lineWithInfo(text: string, explanation: string, className = 'ins
   el.append(' ', info(explanation));
   return el;
 }
+
+/**
+ * A section that lives in index.html and is kept up to date by its own
+ * module (the Lessor, the rotations timeline, Fare policy, Reliability,
+ * Game), taken from the hidden #panel-parts to sit in a view. Moving a
+ * node keeps its state (a slider's position, a half-confirmed button), and
+ * its module goes on updating it by id wherever it is.
+ */
+export function adopt(id: string): HTMLElement {
+  // Remembered from the first lookup: once a view that held it is
+  // replaced, the section is detached from the page, where getElementById
+  // can no longer find it.
+  let el = adopted.get(id);
+  if (!el) {
+    el = document.getElementById(id)!;
+    adopted.set(id, el);
+  }
+  el.hidden = false;
+  return el;
+}
+
+const adopted = new Map<string, HTMLElement>();

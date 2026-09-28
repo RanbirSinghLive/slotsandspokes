@@ -1,12 +1,15 @@
 :root {
   color-scheme: dark;
-  /* Must match PANEL_WIDTH_PX in ui/panels.ts. main.ts's
+  /* PANEL_WIDTH_PX (ui/panels.ts) plus the rail. main.ts's
      applyPanelWidth() overwrites this at runtime with the same number,
      clamped so the map never disappears on a narrow window — both #map
      and #panel read this one variable, so the canvas and the sidebar can
      never drift out of sync the way two separately updated numbers
      could. */
-  --panel-width: 420px;
+  --panel-width: 476px;
+  /* Must match RAIL_WIDTH_PX in main.ts. --panel-width covers the rail
+     and the panel beside it; hiding the panel leaves just the rail. */
+  --rail-width: 56px;
 }
 
 html,
@@ -26,14 +29,13 @@ body {
   box-sizing: border-box;
 }
 
-/* #fleet-tab and #ontime-panel are the sidebar's tab-content panes
-   (#sidebar-tab-content, inside <aside id="panel">): siblings that take
-   the same slot, whichever one isn't [hidden]. Without this override, the
-   ID selectors below (specificity 1-0-0) would beat the browser's own
-   default `[hidden] { display: none }` rule (0-1-0), and the [hidden]
-   toggle in main.ts would silently do nothing. */
-#fleet-tab[hidden],
-#ontime-panel[hidden] {
+/* Sections parked until a screen adopts them (ui/inspector/dom.ts's
+   adopt()). Without this override, ID selectors elsewhere (specificity
+   1-0-0) would beat the browser's own default `[hidden] { display: none }`
+   (0-1-0), and [hidden] would silently do nothing. */
+#panel-parts[hidden],
+#reliability-section[hidden],
+#game-tab[hidden] {
   display: none;
 }
 
@@ -67,7 +69,6 @@ body {
 }
 
 #speed-controls button,
-#panel-toggle,
 #lens-bar button,
 #where-corner button {
   font-family: inherit;
@@ -81,14 +82,12 @@ body {
 }
 
 #speed-controls button:hover,
-#panel-toggle:hover,
 #lens-bar button:hover,
 #where-corner button:hover {
   border-color: rgba(255, 255, 255, 0.5);
 }
 
 #speed-controls button.active,
-#panel-toggle.active,
 #lens-bar button.active,
 #where-corner button.active {
   background: #3a4258;
@@ -96,23 +95,6 @@ body {
   color: #fff;
 }
 
-/* Icon-only and centered. It isn't a map choice, it's "does the sidebar
-   exist right now"; .active means the panel is hidden (click to bring it
-   back). */
-#panel-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  margin-left: 8px;
-}
-
-#panel-toggle svg {
-  width: 15px;
-  height: 15px;
-}
 
 /* The Game tab: New Game, Save and Load (ui/gameControls.ts). */
 #game-tab section {
@@ -472,7 +454,7 @@ body {
   position: fixed;
   top: 0;
   right: 0;
-  width: var(--panel-width);
+  width: calc(var(--panel-width) - var(--rail-width));
   height: 100vh;
   box-sizing: border-box;
   padding: 16px;
@@ -483,13 +465,13 @@ body {
   color: #cdd3e0;
   display: flex;
   flex-direction: column;
-  /* Only #sidebar-tab-content scrolls, below — #econ-summary and
-     #sidebar-tabs stay fixed in place above it regardless. */
+  /* Only the screen showing scrolls (#econ-summary or #inspector),
+     never the panel around it. */
   overflow: hidden;
 }
 
-/* #panel-toggle (main.ts) sets this attribute to collapse the sidebar.
-   Same gotcha as #fleet-tab and friends above: the `#panel` ID selector
+/* main.ts's setPanelHidden() sets this attribute to collapse the panel.
+   Same gotcha as the parked sections above: the `#panel` ID selector
    (specificity 1-0-0) would otherwise beat the browser's own default
    `[hidden] { display: none }` rule (0-1-0) and the attribute toggle
    would silently do nothing. */
@@ -497,66 +479,97 @@ body {
   display: none;
 }
 
-/* The sidebar's tab bar, the first thing in it: clicking a tab swaps
-   which pane shows inside #sidebar-tab-content. Icon-only, with an aria-label plus a real `title` for the hover
-   description: a native title tooltip is a fine amount of ceremony for a
-   single short line. */
-#sidebar-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  flex-shrink: 0;
-  padding-bottom: 12px;
-  margin-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-#sidebar-tabs button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  color: #9aa3b8;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-/* Same specificity gotcha as the panes above: the rule just above sets
-   display, which beats the browser's default [hidden] { display: none }. */
-#sidebar-tabs button[hidden] {
-  display: none;
-}
-
-#sidebar-tabs button svg {
-  width: 17px;
-  height: 17px;
-}
-
-#sidebar-tabs button:hover {
-  border-color: rgba(255, 255, 255, 0.5);
-}
-
-#sidebar-tabs button.active {
-  background: #3a4258;
-  border-color: #6b7694;
-  color: #fff;
-}
-
-/* The one part of the sidebar that actually scrolls — a tab's content can
-   run long (a big fleet, a busy schedule), but the tab bar and the Cash/
-   summary header above it should never scroll out of
-   reach because of it. `min-height: 0` is required here: a flex child
-   defaults to never shrinking below its own content's natural height,
-   which would otherwise make this div (and #panel around it) grow
-   instead of scrolling. */
-#sidebar-tab-content {
+/* The Overview screen: the cards and Last 7 days, scrolling on its own
+   like #inspector. */
+#econ-summary {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+}
+
+#econ-summary[hidden] {
+  display: none;
+}
+
+/* The rail (ui/rail.ts): a column of labelled screens on the panel's
+   left edge, top-aligned so it reads as a menu, and still there with the
+   panel hidden. */
+#rail {
+  position: fixed;
+  top: 0;
+  right: calc(var(--panel-width) - var(--rail-width));
+  width: var(--rail-width);
+  height: 100vh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 4px 36px;
+  background: #080a10;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  font-family: ui-monospace, Consolas, monospace;
+  z-index: 15;
+}
+
+.rail-spacer {
+  flex: 1;
+}
+
+.rail-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 0 5px;
+  color: #6b7694;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.rail-item svg {
+  width: 18px;
+  height: 18px;
+}
+
+.rail-label {
+  font-size: 9px;
+  letter-spacing: 0.02em;
+}
+
+.rail-item:hover {
+  color: #cdd3e0;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.rail-item.is-active {
+  color: #fff;
+  background: #3a4258;
+}
+
+/* A status dot: something on that screen wants a look (ui/rail.ts). */
+.rail-dot {
+  position: absolute;
+  top: 4px;
+  right: 9px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ffd166;
+}
+
+.rail-dot[hidden] {
+  display: none;
+}
+
+.rail-dot.is-bad {
+  background: #ff8080;
+}
+
+.rail-dot.is-good {
+  background: #7fd88f;
 }
 
 #panel h2 {
@@ -1392,15 +1405,13 @@ body {
   color: #9aa3b8;
 }
 
-/* The On-Time panel (ui/onTime.ts) — two tables stacked under their own
-   headings instead of one, since per-route performance and top delay
-   codes are two different questions with two different shapes of
-   answer. */
-#ontime-panel {
+/* The Routes screen's Reliability section (ui/onTime.ts): delay codes
+   and cancellations, each its own table. */
+#reliability-section {
   overflow-x: auto;
 }
 
-#ontime-panel h2 {
+#reliability-section h2 {
   margin: 0 0 12px;
   font-size: 11px;
   font-weight: 400;
@@ -1409,43 +1420,32 @@ body {
   color: #6b7694;
 }
 
-#ontime-panel h2:not(:first-child) {
+#reliability-section h2:not(:first-child) {
   margin-top: 32px;
 }
 
-#ontime-table,
-#ontime-causes-table {
+#ontime-causes-table,
+#ontime-cancel-table {
   width: 100%;
   border-collapse: collapse;
 }
 
-#ontime-table th,
-#ontime-table td,
 #ontime-causes-table th,
-#ontime-causes-table td {
+#ontime-causes-table td,
+#ontime-cancel-table th,
+#ontime-cancel-table td {
   text-align: left;
   padding: 8px 10px 8px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-#ontime-table th,
-#ontime-causes-table th {
+#ontime-causes-table th,
+#ontime-cancel-table th {
   color: #6b7694;
   font-weight: 400;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-}
-
-/* Only bad performance gets a color — same "flag problems, leave the
-   good case alone" convention .thin-market/.out-of-range already use
-   elsewhere, rather than a third "this one's fine" color nobody needs. */
-.ontime-pct-bad {
-  color: #ff8080;
-}
-
-.ontime-pct-warn {
-  color: #ffd166;
 }
 
 .ontime-causes-share-bar {
@@ -2103,21 +2103,6 @@ button.ticker-item:hover {
   border-color: rgba(255, 255, 255, 0.5);
 }
 
-/* The cancellations half of the On-Time panel, sharing the
-   delay-codes table's own styling. */
-#ontime-cancel-table {
-  border-collapse: collapse;
-  min-width: 320px;
-}
-
-#ontime-cancel-table th,
-#ontime-cancel-table td {
-  text-align: left;
-  padding: 6px 10px 6px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  white-space: nowrap;
-}
-
 #ontime-cancel-table th {
   color: #6b7694;
   font-weight: 400;
@@ -2245,8 +2230,7 @@ button.ticker-item:hover {
 }
 
 /* The inspector (ui/inspector/inspector.ts): the detail for whatever is
-   selected, in place of the Network view's summary and tabs. Scrolls on
-   its own, like #sidebar-tab-content, with the tab bar staying above it. */
+   selected, in place of the Overview. Scrolls on its own. */
 #inspector {
   flex: 1;
   min-height: 0;

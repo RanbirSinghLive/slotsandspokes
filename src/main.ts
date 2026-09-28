@@ -40,7 +40,6 @@ import { back, getSelection, NETWORK, onSelectionChange, select } from './ui/sel
 import { refreshInspectorForNewDay, renderInspector } from './ui/inspector/inspector';
 import { isHubPlannerOpen } from './ui/hubPlanner';
 import { setupFarePolicy, updateFarePolicy } from './ui/farePolicy';
-import { setupOnTimePanel, updateOnTimePanel } from './ui/onTime';
 import { setupInfoTooltips } from './ui/infoTooltip';
 import { updateTicker } from './ui/ticker';
 import { updateStamps } from './ui/stamp';
@@ -50,7 +49,8 @@ import { updatePoolBars } from './ui/poolBars';
 import { setupGameOver, updateGameOver } from './ui/gameOver';
 import { updateRunway } from './ui/runway';
 import { isInsolvent } from './sim/insolvency';
-import { setupGameControls, updateGameControls } from './ui/gameControls';
+import { setupGameControls } from './ui/gameControls';
+import { setupRail, updateRail } from './ui/rail';
 import { loadSavedState, saveState } from './ui/save';
 
 // Resume a saved game if one exists. A fresh game starts from
@@ -67,14 +67,13 @@ let choosingHome = savedState === null;
 // this same check after every rotation added or removed.
 renderScheduleWarnings(scheduleProblems(state));
 // The callback fires once a rotation's legs are actually in
-// state.schedule. It jumps to the Fleet tab, where the new rotation shows
-// up in the rotations list with its utilisation share — the reading the
-// pivot replaced the Gantt with. switchToSidebarTab is a plain `function`
-// declaration further down this file, so it's hoisted and safely callable
-// here even though this line runs before its own definition.
-setupRouteBuilder(state, () => switchToSidebarTab('fleet'));
+// state.schedule. From the Overview it opens Fleet, where the new rotation
+// shows on its plane's timeline; anywhere else the player is already
+// looking at something, so it stays.
+setupRouteBuilder(state, () => {
+  if (getSelection().kind === 'network' && !panelHidden) select({ kind: 'fleet' });
+});
 setupFarePolicy(state);
-setupOnTimePanel();
 setupInfoTooltips();
 setupGameOver();
 setupGameControls(state);
@@ -133,31 +132,24 @@ function syncCompetitorAirlineChips(): void {
   lensAirlines.replaceChildren(chip('All', null), ...airlines.map((airline) => chip(airline, airline)));
 }
 
-// Sidebar tabs: content panes inside the sidebar (#sidebar-tab-content)
-// that replace each other, while the map stays visible and interactive
-// underneath the whole time. Anything about one route or airport is in the
-// inspector instead (ui/inspector/).
-const fleetTabEl = document.querySelector<HTMLDivElement>('#fleet-tab')!;
-const onTimePanelEl = document.querySelector<HTMLDivElement>('#ontime-panel')!;
-const gameTabEl = document.querySelector<HTMLDivElement>('#game-tab')!;
-const econSummaryEl = document.querySelector<HTMLElement>('#econ-summary')!;
-const sidebarTabButtons = document.querySelectorAll<HTMLButtonElement>('#sidebar-tabs button');
-
 // Both resize()'s canvas sizing and the CSS `--panel-width` custom
-// property (style.css's #map/#panel both read it) come from this one
+// property (style.css's #map/#panel/#rail all read it) come from this one
 // variable, so they can never drift apart the way two separately-updated
-// numbers could. Still clamped against MIN_MAP_WIDTH_PX below so the map
-// never gets squeezed away to nothing on a narrow window, and recomputed
-// on every resize() rather than only when first set.
+// numbers could. It covers the rail plus the panel beside it. Still
+// clamped against MIN_MAP_WIDTH_PX below so the map never gets squeezed
+// away to nothing on a narrow window, and recomputed on every resize()
+// rather than only when first set.
 //
-// The panel-hide toggle below (#panel-toggle) is what varies it: hidden
-// means 0, otherwise the full width.
+// Hiding the panel (the rail's Hide, ui/rail.ts) is what varies it:
+// hidden leaves only the rail.
 const MIN_MAP_WIDTH_PX = 200;
+/** The rail's width, which stays when the panel is hidden; style.css's --rail-width matches it. */
+const RAIL_WIDTH_PX = 56;
 let panelHidden = false;
-let currentPanelWidthPx = PANEL_WIDTH_PX;
+let currentPanelWidthPx = PANEL_WIDTH_PX + RAIL_WIDTH_PX;
 
 function applyPanelWidth(): void {
-  const desiredPanelWidthPx = panelHidden ? 0 : PANEL_WIDTH_PX;
+  const desiredPanelWidthPx = (panelHidden ? 0 : PANEL_WIDTH_PX) + RAIL_WIDTH_PX;
   currentPanelWidthPx = Math.min(desiredPanelWidthPx, window.innerWidth - MIN_MAP_WIDTH_PX);
   document.documentElement.style.setProperty('--panel-width', `${currentPanelWidthPx}px`);
 }
@@ -209,16 +201,8 @@ function resize(): void {
 // time it is.
 let latestFractionalMinute = state.simMinute;
 
-// Which sidebar tab is showing. The map isn't part of this switch: it
-// renders every frame whatever tab is open (see render(), below), and
-// only the sidebar's content pane changes. Demand and Competition are
-// on/off toggles layered on the map: a layer you toggle, not a
-// destination you navigate to.
-type SidebarTab =
-  | 'fleet'
-  | 'ontime'
-  | 'game';
-let sidebarTab: SidebarTab = 'fleet';
+// What the renderer draws on top of the network, set together by the
+// lens (setLens(), below).
 let demandOverlayOn = false;
 let competitionOverlayOn = false;
 // Which mapmode is recolouring the route network (render/
@@ -240,18 +224,17 @@ let runwayPauseRequested = false;
 function render(nowMs: number = performance.now()): void {
   updateClock(state);
   updatePanel(state);
-  if (sidebarTab === 'fleet') updateFarePolicy(state);
+  if (getSelection().kind === 'routes') updateFarePolicy(state);
+  updateRail(state, panelHidden);
   updateTicker(state);
   updateStamps(state, performance.now());
-  updateOpsBoard(state, () => switchToSidebarTab('ontime'));
+  updateOpsBoard(state, () => select({ kind: 'routes', sort: 'completion' }));
   updateMarket(state);
   updatePoolBars(state);
-  // Always-visible regardless of which tab is open — see ui/alerts.ts's
-  // own comment for why that's the point. switchToSidebarTab is a plain
-  // `function` declaration further down this file, hoisted and safely
-  // callable here the same way setupRouteBuilder()'s onRouteConfirmed
-  // callback already relies on.
-  updateAlerts(state, (tab) => switchToSidebarTab(tab as SidebarTab));
+  // Always visible, whatever screen is open: see ui/alerts.ts's own
+  // comment for why that's the point. An alert with no view of its own
+  // (a schedule problem) opens Fleet, where the rotations are.
+  updateAlerts(state, () => select({ kind: 'fleet' }));
 
   // The game-over screen is a global overlay, not part of any one sidebar
   // tab, so it keeps refreshing whichever one is showing. Pausing on
@@ -260,11 +243,6 @@ function render(nowMs: number = performance.now()): void {
   // first call, at startup).
   updateGameOver(state);
   if (updateRunway(state)) runwayPauseRequested = true;
-
-  // The Network summary (cards, Today, Last 7 Days) belongs to the main
-  // page: shown only at Network on the Fleet tab, not over the On-Time or
-  // Game tabs or behind an inspector view.
-  econSummaryEl.hidden = getSelection().kind !== 'network' || sidebarTab !== 'fleet';
 
   const cssWidth = window.innerWidth - currentPanelWidthPx;
   const cssHeight = window.innerHeight;
@@ -416,19 +394,13 @@ resize();
 // above, next to applyPanelWidth()) is the only state; everything else here
 // just reflects it.
 const panelEl = document.querySelector<HTMLElement>('#panel')!;
-const panelToggleButton = document.querySelector<HTMLButtonElement>('#panel-toggle')!;
 function setPanelHidden(hidden: boolean): void {
   panelHidden = hidden;
   panelEl.hidden = panelHidden;
-  panelToggleButton.classList.toggle('active', panelHidden);
-  panelToggleButton.setAttribute('aria-label', panelHidden ? 'Show side panel' : 'Hide side panel');
-  panelToggleButton.title = panelHidden
-    ? 'Show the side panel'
-    : 'Hide the side panel — the map fills the screen without it';
   // The map's available width just changed, same as a real window resize.
   resize();
 }
-panelToggleButton.addEventListener('click', () => setPanelHidden(!panelHidden));
+setupRail({ isHidden: () => panelHidden, setHidden: setPanelHidden });
 
 // The inspector (ui/inspector/) follows the selection: a map click, a link
 // or the breadcrumb changes it, and the panel rebuilds to show it. A hidden
@@ -436,7 +408,6 @@ panelToggleButton.addEventListener('click', () => setPanelHidden(!panelHidden));
 onSelectionChange(() => {
   if (panelHidden && getSelection().kind !== 'network') setPanelHidden(false);
   renderInspector(state);
-  syncSidebarTabButtons();
   render();
 });
 
@@ -551,62 +522,6 @@ window.addEventListener('keydown', (event) => {
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return;
   event.preventDefault(); // stop the page itself from scrolling on Space
   togglePause();
-});
-
-// --- Sidebar tabs (Fleet / On-Time / Game / Dev) and overlay toggles
-// --- (Demand / Competition)
-//
-// The tabs live inside the sidebar and the map renders every frame
-// whatever is showing (see render(), above), so a route gesture in
-// progress on the map is never cancelled by picking a tab.
-
-/**
- * Switch which sidebar tab is showing — refreshes whichever one just
- * became visible, in case its data changed while it was hidden. Called by the
- * sidebar's own tab buttons *and* by ui/routeBuilder.ts's
- * onRouteConfirmed callback, which jumps to Fleet so a newly added
- * rotation is visible in the rotations list straight away.
- */
-function switchToSidebarTab(tab: SidebarTab): void {
-  if (tab === sidebarTab) return;
-
-  sidebarTab = tab;
-  fleetTabEl.hidden = tab !== 'fleet';
-  onTimePanelEl.hidden = tab !== 'ontime';
-  gameTabEl.hidden = tab !== 'game';
-
-  syncSidebarTabButtons();
-
-  if (tab === 'ontime') updateOnTimePanel(state);
-  if (tab === 'game') updateGameControls();
-
-  render();
-}
-
-/**
- * Which tab button reads as active: Airports while the inspector shows
- * the airports list, an airport or a route (all under Airports in its
- * breadcrumb), Fleet while it shows the fleet or a plane, none while it
- * shows rivals, otherwise the Network view's current tab.
- */
-function syncSidebarTabButtons(): void {
-  const kind = getSelection().kind;
-  const active =
-    kind === 'network' ? sidebarTab : kind === 'fleet' || kind === 'aircraft' ? 'fleet' : kind === 'rivals' || kind === 'rival' ? null : 'airports';
-  sidebarTabButtons.forEach((b) => b.classList.toggle('active', b.dataset.tab === active));
-}
-
-sidebarTabButtons.forEach((button) => {
-  button.addEventListener('click', () => {
-    // Airports opens the inspector's list. Every other tab belongs to the
-    // Network view, so it leaves the inspector.
-    if (button.dataset.tab === 'airports') {
-      select({ kind: 'airports' });
-      return;
-    }
-    select(NETWORK);
-    switchToSidebarTab(button.dataset.tab as SidebarTab);
-  });
 });
 
 /**

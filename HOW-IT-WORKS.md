@@ -272,11 +272,11 @@ since a "running" performance stat that blanked out every midnight
 would defeat the point — it sits next to `Cash` in the HUD for exactly
 that reason, both being the sidebar's two lifetime numbers.
 
-## The On-Time panel (`src/ui/onTime.ts`)
+## Reliability (`src/ui/onTime.ts`)
 
-A sidebar tab answering two questions the HUD's single lifetime On-time
-stat can't: which *routes* are actually unreliable, and *why* flights are
-delayed at all, across the whole airline. Each route in its table opens
+The Routes screen's Reliability section answers *why* flights are late
+or cancelled across the whole airline; which *routes* are unreliable is
+the routes table above it, sorted by on-time. Each route there opens
 that route's view, with its day-by-day reliability and turn buffer.
 
 `SimState.onTimeByMarket: Record<marketKey, { departed, onTime }>`
@@ -1111,8 +1111,23 @@ and `cancelledToday`, so it resets at the home midnight.
 
 ## Panel (`src/ui/panels.ts`)
 
-A real HTML sidebar, 420px wide (canvas width = `window.innerWidth - 420`,
-kept in sync via `PANEL_WIDTH_PX`).
+A real HTML sidebar, 420px wide, with a 56px **rail** down its left edge
+(`ui/rail.ts`): every screen one labelled click away, Overview · Routes ·
+Airports · Fleet · Crews · Rivals · Money · Goals · Office, with Game and
+Hide at the foot. The rail stays with the panel hidden, and clicking an
+item then slides the panel open straight to that screen; clicking the
+screen already showing hides the panel. The canvas gets the width left
+over (`--panel-width` covers rail and panel, kept in sync via
+`PANEL_WIDTH_PX` and `RAIL_WIDTH_PX`).
+
+Each screen has one job. Sections that live in index.html and update
+themselves (Fare policy, the Lessor, the rotations timeline, Reliability,
+Game) wait hidden in `#panel-parts` until a screen adopts them
+(`adopt()` in `ui/inspector/dom.ts`): Routes shows Fare policy under its
+title and Reliability (delay codes and cancellations by cause) under
+the table; Fleet shows every plane, then the rotations timeline and the
+Lessor; **Crews** (`ui/inspector/crews.ts`) shows every base's crews by
+class with Hire, Retrain and Release, shortest-handed base first.
 
 **The Network summary is a grid of cards**: Cash, Runway, On-time,
 Completion, Load factor, NPS, Goals and Head office. Each shows its
@@ -1135,24 +1150,22 @@ kept for 30 days (`state.npsHistory`) for its trend.
 Below the cards, **Last 7 days** (`ui/pnlHistory.ts`): Revenue, Cost and
 Margin as bar charts of the six finished days plus today, live, drawn
 lighter as the rightmost bar and growing as flights land; each header
-shows today's figure. Early in the day margin reads as a loss, since
-leases, slots and overhead are charged at midnight. Then the fare policy,
-the lessor, and the rotations list. The summary (cards and charts) shows
-only at Network on the Fleet tab. All of it is a pure read of `state`,
-like the canvas layers.
+shows yesterday's figure. That is the whole Overview. All of it is a
+pure read of `state`, like the canvas layers.
 
 **The inspector** (`src/ui/inspector/`, `src/ui/selection.ts`). The panel
-shows whatever is selected. At **Network** it is the summary and tabs
-above. Everything else sits under **Airports**, **Fleet** or **Rivals**:
+shows whatever is selected. At **Network** it is the Overview above.
+The rail's screens are selections too; the detail views sit under
+**Airports**, **Fleet** or **Rivals**:
 
 | Selection | How you get there | What it shows |
 |---|---|---|
-| Airports list | the Airports tab | every known airport (served, or all known), sortable by departures, load, slots or waiting riders |
+| Airports list | the rail | every known airport (served, or all known), sortable by departures, load, slots or waiting riders |
 | An airport | click its dot, or its row | presence, waiting riders, load, slots, grounded planes with Expedite, Plan hub, planes based there, and every market flown from it |
 | A route | click its line, or a market row | the route view: flights, demand, rivals, fare stances, pools, margin and on-time |
-| Fleet list | the breadcrumb, from a plane | every aircraft: base, how much of its day it uses, on time today, AOG |
-| An aircraft | click it in flight on the map, its row in the rotations table, or its tail in an airport's view | its specs and age (and what the age does to its delays), where it is now, how much of the day it uses, its whole day in order (flown legs with how late and why, passengers and margin; the one in the air; upcoming legs with projected lateness; cancelled ones), its rotations, and Return to lessor |
-| Rivals list | "All" among the Rivals lens's chips, or the breadcrumb | every rival airline, biggest first: routes (and how many against you), estimated margin a day, routes losing money |
+| Fleet list | the rail, the map's fleet bars, or the breadcrumb from a plane | every aircraft: base, how much of its day it uses, on time today, AOG |
+| An aircraft | click it in flight on the map, its row in the Fleet list or timeline, or its tail in an airport's view | its specs and age (and what the age does to its delays), where it is now, how much of the day it uses, its whole day in order (flown legs with how late and why, passengers and margin; the one in the air; upcoming legs with projected lateness; cancelled ones), its rotations, and Return to lessor |
+| Rivals list | the rail, "All" among the Rivals lens's chips, or the breadcrumb | every rival airline, biggest first: routes (and how many against you), estimated margin a day, routes losing money |
 | A rival | its name anywhere in the panel, or its chip under the Rivals lens | its fleet, routes against the 20-route cap, its average seats per flight and any planes beyond what its flying needs, every route worst first (fare against the going rate, margin a day, losing streak, grace left, about when it closes), and markets it closed recently |
 
 The breadcrumb reads Network › Airports › YYZ › YYZ – ORD, or Network ›
@@ -1175,8 +1188,8 @@ hints in a label under it.
 
 Getting back: Esc steps back once nothing else wants it. It listens in
 the capture phase, so the ring, the hub planner and the route builder
-each close first. The ‹ button, a breadcrumb link, another sidebar tab,
-or a click on empty map also work. A selection that stops existing (a
+each close first. The ‹ button, a breadcrumb link, a rail item, or a
+click on empty map also work. A selection that stops existing (a
 route's last flight removed, a rival gone from the map) falls back to the
 step above it in the breadcrumb. A hidden panel reopens when something is selected.
 
@@ -1308,7 +1321,7 @@ spare, 0.86 after this."
 
 ## Rotations timeline (`src/ui/panels.ts`)
 
-The Fleet tab draws each plane's day as a timeline row across the usable
+The Fleet screen draws each plane's day as a timeline row across the usable
 day (06:00–22:00 home time, stretched if a long-haul rotation runs
 outside it): the tail and its share of the day, then each flight as a
 solid block labelled with where it lands, inside a faint span for its
@@ -1331,7 +1344,7 @@ the player built. Any market left with no legs at all loses its
 unaffected — `ActiveFlight` carries its own copied data.
 
 A rotation that never returns to base is outlined red rather than hidden.
-That's only reachable by changing a base in the Fleet tab while legs
+That's only reachable by changing a base while legs
 already exist, which regroups them around the new base — the one remaining
 way to break a rotation from outside, and the red flag plus the remove
 button are the repair path.
@@ -1381,7 +1394,7 @@ A rollover rebuild that arrives mid-drag waits for the release
 (`refreshInspectorForNewDay()`), so a rebuild never takes a slider out
 from under the pointer.
 
-The airline-wide **fare policy** is at the top of the Fleet tab
+The airline-wide **fare policy** is at the top of the Routes screen
 (`ui/farePolicy.ts`), with a count of how many markets follow it, how
 many are on a stance, and how many are priced by hand.
 
@@ -1491,7 +1504,7 @@ A player who climbs before the rivals near it gets a bigger class and a
 shelf nobody has picked over: an early edge, like any other, that lasts
 until they climb too. A locked class says why in the
 lease fan ("Regionals open when you become a regional carrier: see
-Goals") and shows as locked in the Fleet tab's lessor strip; the ticker
+Goals") and shows as locked in the Fleet screen's Lessor; the ticker
 announces new listings only of classes the player can lease, so a locked
 class's listings (there for rivals) never read as on sale to the player.
 A pop-up announces each class the moment it opens.
@@ -1558,7 +1571,7 @@ Rivals' own profit estimates (sim/rivalEconomics.ts) see the same edge.
 
 Shown on the Network panel (NPS row), in the route view (with what it
 does against a rival, `brandInWords()`), on the airport view's routes,
-in the flight tooltip and in the On-Time table. The ladder's "A good
+in the flight tooltip and in the Routes table. The ladder's "A good
 name" asks for a trailing NPS of 15 with 1,000 flights flown.
 
 There is no Reputation stock: it was spent only by the hidden C-suite
@@ -1767,7 +1780,7 @@ and the boost was just a flat 3× everywhere.
 ## Fare policy (`src/sim/pricing.ts`)
 
 One airline-wide multiplier on `recommendedFare()` prices the whole
-network (the slider at the top of the Fleet tab, `setFarePolicy()`). A
+network (the slider at the top of the Routes screen, `setFarePolicy()`). A
 market can leave it two ways, both in its route view: a fare stance
 against its rivals (below), or a fare set by hand
 (`RouteSettings.fareIsOverridden`). A policy change re-prices everything

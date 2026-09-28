@@ -10,6 +10,10 @@ import { buildAirportView } from './airport';
 import { buildAirportsView } from './airports';
 import { buildRivalView, buildRivalsView, rivalName } from './rival';
 import { buildRouteView } from './route';
+import { buildCrewsView } from './crews';
+import { adopt } from './dom';
+import { updateOnTimePanel } from '../onTime';
+import { updateGameControls } from '../gameControls';
 
 /**
  * The side panel as an inspector: the detail for whatever is selected
@@ -27,9 +31,8 @@ import { buildRouteView } from './route';
 const inspectorEl = document.querySelector<HTMLElement>('#inspector')!;
 const breadcrumbEl = document.querySelector<HTMLElement>('#inspector-breadcrumb')!;
 const bodyEl = document.querySelector<HTMLElement>('#inspector-body')!;
-// The Network summary's own visibility (the cards, Today, Last 7 Days) is
-// main.ts's: it shows only at Network on the Fleet tab.
-const networkEls = [document.querySelector<HTMLElement>('#sidebar-tab-content')!];
+// The Network summary (the cards and Last 7 days) shows only at Network.
+const networkEls = [document.querySelector<HTMLElement>('#econ-summary')!];
 
 let redrawPools: (() => void) | null = null;
 /** What the view was last built for, so a rebuild of the same thing keeps its scroll position. */
@@ -90,6 +93,14 @@ function trail(state: SimState, selection: Selection): { label: string; target: 
     steps.push({ label: 'Routes', target: selection });
     return steps;
   }
+  if (selection.kind === 'crews') {
+    steps.push({ label: 'Crews', target: selection });
+    return steps;
+  }
+  if (selection.kind === 'game') {
+    steps.push({ label: 'Game', target: selection });
+    return steps;
+  }
   if (selection.kind === 'fleet' || selection.kind === 'aircraft') {
     steps.push({ label: 'Fleet', target: { kind: 'fleet' } });
     if (selection.kind === 'aircraft') steps.push({ label: selection.tail, target: selection });
@@ -115,6 +126,7 @@ function selectionKey(selection: Selection): string {
   if (selection.kind === 'airport') return `airport:${selection.iata}`;
   if (selection.kind === 'rival') return `rival:${selection.code}`;
   if (selection.kind === 'aircraft') return `aircraft:${selection.tail}`;
+  if (selection.kind === 'routes') return `routes:${selection.sort}`;
   return selection.kind;
 }
 
@@ -184,7 +196,13 @@ export function renderInspector(state: SimState): void {
   } else if (selection.kind === 'aircraft') {
     bodyEl.replaceChildren(buildAircraftView(state, selection.tail, rebuild));
   } else if (selection.kind === 'fleet') {
-    bodyEl.replaceChildren(buildFleetView(state));
+    // Every plane, then their days and the lessor's shelf.
+    bodyEl.replaceChildren(buildFleetView(state), adopt('rotations-section'), adopt('market-section'));
+  } else if (selection.kind === 'crews') {
+    bodyEl.replaceChildren(buildCrewsView(state, rebuild));
+  } else if (selection.kind === 'game') {
+    updateGameControls();
+    bodyEl.replaceChildren(adopt('game-tab'));
   } else if (selection.kind === 'goals') {
     bodyEl.replaceChildren(buildGoalsView(state));
   } else if (selection.kind === 'headOffice') {
@@ -192,7 +210,12 @@ export function renderInspector(state: SimState): void {
   } else if (selection.kind === 'money') {
     bodyEl.replaceChildren(buildMoneyView(state));
   } else if (selection.kind === 'routes') {
-    bodyEl.replaceChildren(buildRoutesView(state, selection.sort));
+    // The airline-wide fare under the title, every route, then what's
+    // going wrong across them: delay codes and cancellations.
+    updateOnTimePanel(state);
+    const view = buildRoutesView(state, selection.sort);
+    view.insertBefore(adopt('fare-policy-section'), view.children[1] ?? null);
+    bodyEl.replaceChildren(view, adopt('reliability-section'));
   } else if (selection.kind === 'rival') {
     bodyEl.replaceChildren(buildRivalView(state, selection.code));
   } else if (selection.kind === 'rivals') {

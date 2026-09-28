@@ -1,9 +1,11 @@
-import { formatLoadFactor, marketLoadFactor } from '../sim/loadFactor';
-import { formatNps, marketNps } from '../sim/nps';
 import type { SimState } from '../sim/state';
-import { selectRoute } from './selection';
 
-const marketRowsBody = document.querySelector<HTMLTableSectionElement>('#ontime-rows')!;
+/**
+ * The Routes screen's Reliability section: delay minutes by cause, and
+ * cancellations by cause. Which route is late is the routes table's job,
+ * sorted by on-time; this is what's making them late.
+ */
+
 const causeRowsBody = document.querySelector<HTMLTableSectionElement>('#ontime-causes-rows')!;
 const cancelRowsBody = document.querySelector<HTMLTableSectionElement>('#ontime-cancel-rows')!;
 const completionEl = document.querySelector<HTMLDivElement>('#ontime-completion')!;
@@ -22,15 +24,6 @@ const CANCEL_CAUSE_LABELS: [keyof SimState['cancellationsByCause'], string][] = 
   ['curfew', 'Delays ran past 22:00'],
   ['position', 'Aircraft out of position'],
 ];
-
-// Below BAD_THRESHOLD: red, matching the app's existing "flag a real
-// problem" color (#ff8080, same as schedule warnings and out-of-range
-// routes). Between BAD_THRESHOLD and WARN_THRESHOLD: amber (#ffd166,
-// same as thin-market). At or above WARN_THRESHOLD: no color at all —
-// only bad and borderline performance gets flagged, same "don't add a
-// third color for the fine case" convention those other spots use.
-const BAD_THRESHOLD = 0.7;
-const WARN_THRESHOLD = 0.9;
 
 // A simple inline bar for the delay-codes table — 90px is this cause's
 // share of total delay minutes at 100%, not tied to any other unit.
@@ -55,80 +48,12 @@ function delayCauseRows(state: SimState): DelayCauseRow[] {
   ];
 }
 
-function onTimePctClass(pct: number): string | null {
-  if (pct < BAD_THRESHOLD) return 'ontime-pct-bad';
-  if (pct < WARN_THRESHOLD) return 'ontime-pct-warn';
-  return null;
-}
-
 /**
- * Nothing to build once at startup — both tables below are fully
- * rebuilt by updateOnTimePanel() every time the panel opens, same
- * "no live inputs to lose focus on" shape ui/panels.ts's fleet and
- * rotations tables use, not the "build once, patch in place" discipline
- * live `<input>`s need.
- * Exported anyway, for symmetry with every other panel's setup function
- * main.ts calls once at startup.
- */
-export function setupOnTimePanel(): void {}
-
-/**
- * Rebuild both tables from `state.onTimeByMarket` and
- * `state.delayMinutesByCause` — called whenever the On-Time panel
- * becomes visible, in case either changed while it wasn't ("refresh on
- * select, not every tick").
- *
- * The per-route table is sorted worst-first: the point of this panel is
- * surfacing which routes are actually unreliable, not an alphabetical
- * ledger the player has to scan themselves.
+ * Rebuild both tables from `state.delayMinutesByCause` and the
+ * cancellation counts: called whenever the Routes screen is built, in
+ * case either changed since ("refresh on show, not every tick").
  */
 export function updateOnTimePanel(state: SimState): void {
-  marketRowsBody.innerHTML = '';
-
-  const marketRows = Object.entries(state.onTimeByMarket)
-    .map(([key, { arrived, onTime }]) => ({
-      key,
-      arrived,
-      onTime,
-      pct: arrived > 0 ? onTime / arrived : 0,
-    }))
-    .sort((a, b) => a.pct - b.pct);
-
-  for (const { key, arrived, onTime, pct } of marketRows) {
-    const [origin, dest] = key.split('-');
-    const row = document.createElement('tr');
-
-    // Each route opens its own view (ui/inspector/route.ts), with its
-    // day-by-day reliability and turn buffer.
-    const marketCell = document.createElement('td');
-    const link = document.createElement('button');
-    link.type = 'button';
-    link.className = 'inspector-link';
-    link.textContent = `${origin} ↔ ${dest}`;
-    link.addEventListener('click', () => selectRoute(state, origin, dest));
-    marketCell.append(link);
-
-    const arrivedCell = document.createElement('td');
-    arrivedCell.textContent = String(arrived);
-
-    const onTimeCell = document.createElement('td');
-    onTimeCell.textContent = String(onTime);
-
-    const pctCell = document.createElement('td');
-    pctCell.textContent = `${Math.round(pct * 100)}%`;
-    const cls = onTimePctClass(pct);
-    if (cls) pctCell.classList.add(cls);
-
-    const loadCell = document.createElement('td');
-    loadCell.textContent = formatLoadFactor(marketLoadFactor(state, origin, dest));
-
-    const npsCell = document.createElement('td');
-    npsCell.textContent = formatNps(marketNps(state, origin, dest));
-
-    row.append(marketCell, arrivedCell, onTimeCell, pctCell, loadCell, npsCell);
-    marketRowsBody.appendChild(row);
-  }
-
   causeRowsBody.innerHTML = '';
 
   const causes = delayCauseRows(state).sort((a, b) => b.minutes - a.minutes);

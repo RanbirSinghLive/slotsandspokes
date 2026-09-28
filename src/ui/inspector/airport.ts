@@ -278,12 +278,23 @@ function whereToFlyNext(state: SimState, iata: string): HTMLElement[] {
 function crewSection(state: SimState, iata: string, changed: () => void): HTMLElement[] {
   const readout = ops.crewReadout(state, iata);
   if (!readout) return [];
-  const nodes: HTMLElement[] = [
-    heading(
-      'Crews',
-      `Crews are rated for one class. Hiring takes ${readout.leadDays} days; retraining from another class takes ${readout.retrainDays} and costs half a hire. Enough crews keep shifts to 8 hours; fewer means late legs flown tired, and too few grounds planes. Spare crews cost standby pay.`,
-    ),
-  ];
+  return [heading('Crews', crewExplanation(readout)), ...crewRows(state, iata, changed)];
+}
+
+/** How crews work, for the (i) beside a Crews heading. */
+export function crewExplanation(readout: { leadDays: number; retrainDays: number }): string {
+  return `Crews are rated for one class. Hiring takes ${readout.leadDays} days; retraining from another class takes ${readout.retrainDays} and costs half a hire. Enough crews keep shifts to 8 hours; fewer means late legs flown tired, and too few grounds planes. Spare crews cost standby pay.`;
+}
+
+/**
+ * A base's crews, class by class: how they stand against its planes, and
+ * buttons to hire, retrain from another class, or release. Shared by the
+ * airport view and the Crews screen (ui/inspector/crews.ts).
+ */
+export function crewRows(state: SimState, iata: string, changed: () => void): HTMLElement[] {
+  const readout = ops.crewReadout(state, iata);
+  if (!readout) return [];
+  const nodes: HTMLElement[] = [];
   const button = (label: string, disabled: boolean, act: () => void) => {
     const el = document.createElement('button');
     el.type = 'button';

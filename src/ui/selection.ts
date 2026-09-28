@@ -19,6 +19,10 @@ export type Selection =
   | { kind: 'route'; a: string; b: string }
   | { kind: 'rivals' }
   | { kind: 'fleet' }
+  /** Every crew base's crews by class (ui/inspector/crews.ts). */
+  | { kind: 'crews' }
+  /** Save, load and new game. */
+  | { kind: 'game' }
   | { kind: 'goals' }
   | { kind: 'headOffice' }
   /** Cash over time, the runway and today's costs (ui/inspector/money.ts). */
@@ -51,6 +55,7 @@ function sameSelection(x: Selection, y: Selection): boolean {
   if (x.kind === 'airport' && y.kind === 'airport') return x.iata === y.iata;
   if (x.kind === 'rival' && y.kind === 'rival') return x.code === y.code;
   if (x.kind === 'aircraft' && y.kind === 'aircraft') return x.tail === y.tail;
+  if (x.kind === 'routes' && y.kind === 'routes') return x.sort === y.sort;
   return x.kind === y.kind;
 }
 
