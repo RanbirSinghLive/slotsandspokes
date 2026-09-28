@@ -81,6 +81,17 @@ form is only used where its tooltip is one hover away.
    (fuel's walk, the Routes view's intro, "Margins are estimated with
    your own economics", "4 of 4 markets follow this", the ladder's
    descriptions) move into (i) tooltips.
+
+   **Status: 2 and 3 done.** Ticker lines carry a tag (kept apart from
+   the text, ready for item 8); alerts, cards, every inspector view, the
+   ring's hints, the route builder, Head office, and the sim's action and
+   refusal messages rewritten. Explanations moved into (i) marks
+   (`info()`, `lineWithInfo()`, `heading(text, explanation)`); the
+   milestone descriptions sit in an (i) beside each name. Innovations
+   gained a one-line `summary`. The executives' flavour text stays, on
+   purpose: it is the game's character. The style is now a rule in
+   CLAUDE.md. Headless output byte-identical.
+
 1. **An airport hover card**: name, level, departures a day, waiting
    to fly. It replaces the names taken off the map.
 7. **Today's bar reads as unfinished.** Ghost or hatch today's bar

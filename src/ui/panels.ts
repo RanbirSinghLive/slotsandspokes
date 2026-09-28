@@ -1,5 +1,5 @@
 import { removeRotation as removeRotationFromSchedule } from '../sim/playerActions';
-import { money } from './format';
+import { money, shortMoney } from './format';
 import { formatNps, networkNps } from '../sim/nps';
 import { validateSchedule } from '../sim/schedule';
 import { allRotations, utilisationProblems, type Rotation } from '../sim/utilisation';
@@ -60,7 +60,8 @@ function showTrend(card: HTMLElement, measure: Measure, change: (now: number, be
     return;
   }
   const arrow = measure.direction === 'better' ? '▲' : measure.direction === 'worse' ? '▼' : '■';
-  trendEl.textContent = measure.direction === 'steady' ? `${arrow} holding` : `${arrow} ${change(measure.now, measure.before)} on last week`;
+  trendEl.textContent = measure.direction === 'steady' ? `${arrow} holding` : `${arrow} ${change(measure.now, measure.before)}`;
+  trendEl.title = 'Against the same point last week';
 }
 
 function points(now: number, before: number): string {
@@ -112,7 +113,7 @@ export function renderScheduleWarnings(problems: string[]): void {
 export function updatePanel(state: SimState): void {
   const trends = networkTrends(state);
   cashEl.textContent = money(state.cash);
-  showTrend(cashEl.closest<HTMLElement>('.stat-card')!, trends.cash, (now, before) => `${now >= before ? '+' : '−'}${money(Math.abs(now - before))}`);
+  showTrend(cashEl.closest<HTMLElement>('.stat-card')!, trends.cash, (now, before) => `${now >= before ? '+' : '−'}${shortMoney(Math.abs(now - before))}`);
   // On-time and Completion over the last week once there is one (sim/trends.ts),
   // so the figure and its colour agree; the lifetime share until then.
   const percent = (share: number) => `${Math.round(share * 100)}%`;

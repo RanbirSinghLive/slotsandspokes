@@ -99,8 +99,7 @@ export function buildAirportsView(state: SimState, changed: () => void): HTMLEle
   const summary = document.createElement('div');
   summary.className = 'inspector-line';
   summary.textContent =
-    `${served.length} served of ${allRows.length} known.` +
-    (totalFees > 0 ? ` Slot fees: $${totalFees.toLocaleString()}/day.` : ' No slots held yet: the first pair at an airport nobody serves is free.');
+    `${served.length} served · ${allRows.length} known` + (totalFees > 0 ? ` · slots $${totalFees.toLocaleString()}/day` : '');
   root.append(summary);
 
   // Served only, or every airport you can see.
@@ -123,7 +122,7 @@ export function buildAirportsView(state: SimState, changed: () => void): HTMLEle
   if (rows.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'inspector-line';
-    empty.textContent = 'You fly from nowhere yet. Tap an airport on the map to add a plane or draw a route.';
+    empty.textContent = 'None served · tap an airport on the map to start';
     root.append(empty);
     return root;
   }

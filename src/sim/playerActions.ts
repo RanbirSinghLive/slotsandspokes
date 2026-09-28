@@ -195,7 +195,7 @@ const MULTI_STOP_REASON = 'Flown as part of a multi-stop rotation. Remove that r
  */
 function explainFailure(error: string, className: string, baseIata: string): string {
   if (/range|too large|no slots left/.test(error)) return error;
-  return `Every ${className} at ${baseIata} is full. Tap ${baseIata}, then Plane, to add another.`;
+  return `Every ${className} at ${baseIata} full · lease another there`;
 }
 
 /**
@@ -240,7 +240,7 @@ export function previewAddFlight(
 
   const tails = candidateTailsAt(state, base.iata).filter((tail) => typeCodeOf(state, tail) === typeCode);
   if (tails.length === 0) {
-    return { ok: false, reason: `No ${className} is based at ${base.iata}. Tap ${base.iata}, then Plane, to add one.` };
+    return { ok: false, reason: `No ${className} based at ${base.iata} · lease one there` };
   }
 
   let firstError = '';
@@ -268,7 +268,7 @@ export function addFlight(state: SimState, a: string, b: string): Outcome<{ mess
 export function previewRemoveFlight(state: SimState, a: string, b: string): Outcome<{ rotation: Rotation; preview: MapPreview }> {
   const { roundTrips } = summariseMarket(state, a, b);
   if (roundTrips.length === 0) return { ok: false, reason: MULTI_STOP_REASON };
-  if (roundTrips.length === 1) return { ok: false, reason: 'This is the last flight. Use Remove route to delete the route.' };
+  if (roundTrips.length === 1) return { ok: false, reason: 'Last flight · use Remove route' };
   const rotation = latest(roundTrips);
   const preview: MapPreview = {
     effects: [{ base: rotation.airports[0], classCode: typeCodeOf(state, rotation.tail), minutes: -rotation.minutes }],
@@ -322,7 +322,7 @@ export function previewGauge(
   const other = airportOf(rotation.airports[1]);
   const tails = candidateTailsAt(state, base.iata).filter((tail) => typeCodeOf(state, tail) === target.code);
   if (tails.length === 0) {
-    return { ok: false, reason: `No ${target.name} is based at ${base.iata}. Tap ${base.iata}, then Plane, to add one.` };
+    return { ok: false, reason: `No ${target.name} based at ${base.iata} · lease one there` };
   }
 
   const withoutIt = { ...state, schedule: state.schedule.filter((leg) => !rotation.legs.includes(leg)) } as SimState;
@@ -630,7 +630,7 @@ function crewAdvice(state: SimState, iata: string, classCode: string): string | 
   const inbound = inboundAt(state, iata, classCode).length * LEASE_CREW_ALLOWANCE;
   if (have >= need.minimum + inbound) return null;
   const name = classByCode(classCode)?.name ?? classCode;
-  return `${iata} needs more ${name} crews for it to fly: hire or retrain them now, so they join when it's delivered.`;
+  return `${iata} short of ${name} crews for it · hire or retrain now to join by delivery`;
 }
 
 /** Crews a newly leased plane's full day needs at the legal shift: what crewAdvice() leaves room for. */

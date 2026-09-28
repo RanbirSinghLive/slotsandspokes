@@ -69,10 +69,10 @@ export type DemandAgainstSeats = {
  */
 export function demandAgainstSeats(state: SimState, a: string, b: string, flights: number, seats: number): DemandAgainstSeats {
   const perFlight = actualDailyDemand(state, a, b) / Math.max(1, flights);
-  if (perFlight > seats) return { words: 'more people want it than the seats hold', short: true, thin: false };
+  if (perFlight > seats) return { words: 'demand exceeds seats', short: true, thin: false };
   if (perFlight >= 0.6 * seats) return { words: 'fills most seats', short: false, thin: false };
-  if (perFlight >= 0.3 * seats) return { words: 'about half full for now', short: false, thin: false };
-  return { words: 'mostly empty for now', short: false, thin: true };
+  if (perFlight >= 0.3 * seats) return { words: 'about half full now', short: false, thin: false };
+  return { words: 'mostly empty now', short: false, thin: true };
 }
 
 /**

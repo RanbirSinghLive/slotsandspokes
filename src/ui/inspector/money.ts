@@ -1,5 +1,5 @@
 import { cashRunway, RUNWAY_WINDOW_DAYS } from '../../sim/forecast';
-import { line, heading } from './dom';
+import { line, heading, lineWithInfo } from './dom';
 import { money } from '../format';
 import type { SimState } from '../../sim/state';
 
@@ -64,15 +64,17 @@ export function buildMoneyView(state: SimState): HTMLElement {
 
   const runway = cashRunway(state);
   const runwayText =
-    runway === null
-      ? 'How long it lasts shows once a full day has been flown.'
-      : runway.daysLeft === null
-        ? `It hasn't fallen over the last ${RUNWAY_WINDOW_DAYS} days, so it isn't running out.`
-        : `At the last ${RUNWAY_WINDOW_DAYS} days' rate (${money(runway.dailyDelta)} a day) it runs out in about ${runway.daysLeft} days, and at $0 the airline is finished.`;
-  root.append(line(`Cash: ${money(state.cash)}. ${runwayText}`, runway?.daysLeft ? 'inspector-line is-over' : 'inspector-line'));
+    runway === null ? '' : runway.daysLeft === null ? ' · runway stable' : ` · ${money(runway.dailyDelta)}/day · $0 in ~${runway.daysLeft}d`;
+  root.append(
+    lineWithInfo(
+      `Cash ${money(state.cash)}${runwayText}`,
+      `Runway: how long cash lasts at the last ${RUNWAY_WINDOW_DAYS} days' rate, shown once a full day has been flown. At $0 the airline is finished.`,
+      runway?.daysLeft ? 'inspector-line is-over' : 'inspector-line',
+    ),
+  );
 
   const history = state.cashHistory;
-  if (history.length > 1) root.append(cashChart(history), line(`Closing cash, the last ${history.length} days. Dashed: $0.`, 'inspector-line goal-ahead'));
+  if (history.length > 1) root.append(cashChart(history), line(`Closing cash · ${history.length}d · dashed $0`, 'inspector-line goal-ahead'));
 
   const week = (values: number[]) => {
     const recent = values.slice(-7);
@@ -82,15 +84,15 @@ export function buildMoneyView(state: SimState): HTMLElement {
   const cost = week(state.costHistory);
   if (revenue !== null && cost !== null) {
     root.append(
-      heading('A day, on average this week'),
-      line(`Revenue ${money(revenue)} · costs ${money(cost)} · margin ${money(revenue - cost)}`, revenue - cost < 0 ? 'inspector-line is-over' : 'inspector-line is-good'),
+      heading('Daily average · 7d'),
+      line(`Rev ${money(revenue)} · cost ${money(cost)} · margin ${money(revenue - cost)}`, revenue - cost < 0 ? 'inspector-line is-over' : 'inspector-line is-good'),
     );
   }
 
   const costs = Object.entries(state.todayCostByCategory)
     .filter(([, amount]) => (amount ?? 0) > 0.5)
     .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0));
-  root.append(heading('Today so far, by kind of cost'));
+  root.append(heading('Costs today'));
   const rows = document.createElement('div');
   rows.className = 'inspector-rows';
   for (const [kind, amount] of costs) {
@@ -104,6 +106,6 @@ export function buildMoneyView(state: SimState): HTMLElement {
     row.append(name, detail);
     rows.append(row);
   }
-  root.append(costs.length > 0 ? rows : line('Nothing spent yet today.'));
+  root.append(costs.length > 0 ? rows : line('None yet'));
   return root;
 }

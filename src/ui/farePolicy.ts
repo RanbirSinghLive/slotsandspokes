@@ -20,13 +20,11 @@ function renderStatus(state: SimState): void {
   const { policy, stance, hand } = pricingSummary(state);
   const total = policy + stance + hand;
   if (total === 0) {
-    statusEl.textContent = 'No markets yet.';
+    statusEl.textContent = 'No markets yet';
     return;
   }
-  const others = [stance > 0 ? `${stance} on a stance` : '', hand > 0 ? `${hand} priced by hand` : ''].filter(Boolean);
-  statusEl.textContent =
-    `${policy} of ${total} market${total === 1 ? '' : 's'} follow${policy === 1 ? 's' : ''} this` +
-    (others.length > 0 ? `; ${others.join(', ')}.` : '.');
+  const others = [stance > 0 ? `${stance} on a stance` : '', hand > 0 ? `${hand} by hand` : ''].filter(Boolean);
+  statusEl.textContent = `${policy}/${total} markets on policy` + (others.length > 0 ? ` · ${others.join(' · ')}` : '');
 }
 
 export function setupFarePolicy(state: SimState): void {

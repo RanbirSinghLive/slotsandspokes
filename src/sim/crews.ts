@@ -262,7 +262,7 @@ export function hireCrews(state: SimState, iata: string, classCode: string, coun
   state.cash -= fee;
   const readyDay = dayIndex(state) + hireLeadDays(state);
   base.hiring.push({ classCode, count, readyDay });
-  return { ok: true, message: `${crewsWord(count, classCode)} hired at ${iata} for $${fee.toLocaleString()}, flying from day ${readyDay}.` };
+  return { ok: true, message: `${crewsWord(count, classCode)} hired · ${iata} · $${fee.toLocaleString()} · ready day ${readyDay}` };
 }
 
 /** Retrain crews for another class: they leave `from` now, and fly `to` once retrained. Cheaper than hiring, slower. */
@@ -278,7 +278,7 @@ export function retrainCrews(state: SimState, iata: string, from: string, to: st
   const readyDay = dayIndex(state) + retrainDays(state);
   base.retraining.push({ from, classCode: to, count, readyDay });
   const toName = classByCode(to)?.name ?? to;
-  return { ok: true, message: `${crewsWord(count, from)} retraining for the ${toName} at ${iata} for $${fee.toLocaleString()}, flying it from day ${readyDay}.` };
+  return { ok: true, message: `${crewsWord(count, from)} retraining to ${toName} · ${iata} · $${fee.toLocaleString()} · ready day ${readyDay}` };
 }
 
 /** Let crews of a class go at a base: they stop costing standby at once. */
@@ -286,7 +286,7 @@ export function releaseCrews(state: SimState, iata: string, classCode: string, c
   const base = crewBases(state)[iata];
   if (!base || crewsOf(base, classCode) < count || count < 1) return { ok: false, reason: 'Not that many crews there.' };
   base.crewsByClass[classCode] -= count;
-  return { ok: true, message: `${crewsWord(count, classCode)} let go at ${iata}.` };
+  return { ok: true, message: `${crewsWord(count, classCode)} released · ${iata}` };
 }
 
 /**

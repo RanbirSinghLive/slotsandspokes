@@ -127,9 +127,9 @@ export function hedgeQuote(state: SimState, days: number): HedgeQuote {
   const premium = Math.round(covers * (HEDGE_BASE_PREMIUM + HEDGE_PREMIUM_PER_DAY * days) * executiveHedgePremiumMultiplier(state));
   let blocked: string | null = null;
   const current = activeHedge(state);
-  if (current) blocked = `Your hedge runs until day ${current.endDay}.`;
-  else if (covers <= 0) blocked = 'Nothing is flying: there is no fuel to hedge.';
-  else if (state.cash < premium) blocked = `Needs $${premium.toLocaleString()} on hand.`;
+  if (current) blocked = `Hedged to day ${current.endDay}`;
+  else if (covers <= 0) blocked = 'Nothing flying · no fuel to hedge';
+  else if (state.cash < premium) blocked = `Needs $${premium.toLocaleString()} cash`;
   return { days, lockedPrice, premium, covers, blocked };
 }
 
@@ -141,7 +141,7 @@ export function buyHedge(state: SimState, days: number): { ok: true; message: st
   const today = dayIndex(state);
   state.cash -= quote.premium;
   state.fuelHedge = { lockedPrice: quote.lockedPrice, startDay: today, endDay: today + days, premium: quote.premium, saved: 0 };
-  return { ok: true, message: `Fuel hedged at today's price for ${days} days, for $${quote.premium.toLocaleString()}.` };
+  return { ok: true, message: `Fuel hedged ${days}d at today's price · $${quote.premium.toLocaleString()}` };
 }
 
 /** The price as the player reads it: "+8%" or "−5%" against the usual price, or "usual". */

@@ -1,6 +1,6 @@
 import { classByCode } from '../../sim/aircraftClasses';
 import { dayIndex } from '../../sim/clock';
-import { line, heading } from './dom';
+import { line, heading, lineWithInfo } from './dom';
 import { money } from '../format';
 import { aogFor, daysUntilReturn } from '../../sim/aog';
 import { projectRestOfDay } from '../../sim/cascade';
@@ -55,9 +55,9 @@ function whereNow(state: SimState, tail: string): string {
   const flight = state.activeFlights.find((f) => f.tail === tail);
   if (flight) {
     const late = flight.arriveMinute - flight.scheduledArriveMinute;
-    return `In the air ${flight.origin} → ${flight.dest}, lands ${clock(state, flight.arriveMinute)}` + (late > 0 ? ` (${late} min late)` : '');
+    return `Airborne ${flight.origin}→${flight.dest} · ETA ${clock(state, flight.arriveMinute)}` + (late > 0 ? ` · +${late} min` : '');
   }
-  return aircraft.atAirport ? `On the ground at ${aircraft.atAirport}` : 'Not yet delivered';
+  return aircraft.atAirport ? `On ground · ${aircraft.atAirport}` : 'Not yet delivered';
 }
 
 /** Today's flown legs for a plane: how many, how many on time, and how full they flew. */
@@ -90,11 +90,11 @@ export function buildFleetView(state: SimState): HTMLElement {
   root.append(title('Fleet'));
 
   if (state.aircraft.length === 0) {
-    root.append(line('No aircraft. Tap an airport on the map and choose Plane to lease one.'));
+    root.append(lineWithInfo('No aircraft', 'Tap an airport on the map and choose Plane to lease one.'));
     return root;
   }
   const leases = state.aircraft.reduce((sum, a) => sum + a.leaseCostPerDay, 0);
-  root.append(line(`${state.aircraft.length} aircraft · ${money(leases)}/day in leases.`));
+  root.append(line(`${state.aircraft.length} aircraft · leases ${money(leases)}/day`));
 
   const list = document.createElement('div');
   list.className = 'inspector-rows';
@@ -110,8 +110,8 @@ export function buildFleetView(state: SimState): HTMLElement {
     detail.className = 'inspector-row-detail';
     detail.textContent =
       `${aircraft.baseAirport ?? 'no base'} · ${Math.round(use.share * 100)}% of day` +
-      (flown > 0 ? ` · ${onTime}/${flown} on time today` : '') +
-      (loadFactor !== null ? ` · ${Math.round(loadFactor * 100)}% full` : '') +
+      (flown > 0 ? ` · OTP ${onTime}/${flown}` : '') +
+      (loadFactor !== null ? ` · LF ${Math.round(loadFactor * 100)}%` : '') +
       (aogFor(state, aircraft.tail) ? ' · AOG' : '');
     if (aogFor(state, aircraft.tail) || use.share > 1) detail.classList.add('is-over');
     row.append(name, detail);
@@ -135,13 +135,12 @@ export function buildAircraftView(state: SimState, tail: string, changed: () => 
 
   const reliability = ageDelayParameters(aircraft.ageYears);
   root.append(
-    line(
-      `${spec?.seats ?? '?'} seats · ${aircraft.ageYears} years old · ${money(aircraft.leaseCostPerDay)}/day lease · based at ${aircraft.baseAirport ?? 'nowhere yet'}`,
-    ),
+    line(`${spec?.seats ?? '?'} seats · ${aircraft.ageYears} yrs · lease ${money(aircraft.leaseCostPerDay)}/day · base ${aircraft.baseAirport ?? 'none yet'}`),
     // The age roll alone (sim/delays.ts), before knock-on, weather and
     // congestion: the part of its lateness that comes with the airframe.
-    line(
-      `At its age, ${Math.round(reliability.onTimeProbability * 100)}% of its flights leave without a mechanical delay; the rest run up to ${reliability.maxDelayMinutes} min late.`,
+    lineWithInfo(
+      `Tech dispatch ${Math.round(reliability.onTimeProbability * 100)}% · ≤${reliability.maxDelayMinutes} min when not`,
+      'The share of its flights that leave without a mechanical delay at this airframe\'s age; older planes have more, and longer ones. Knock-on, weather and congestion delays come on top.',
     ),
   );
 
@@ -149,19 +148,19 @@ export function buildAircraftView(state: SimState, tail: string, changed: () => 
   const plane = state.aircraft.find((a) => a.tail === tail);
   if (plane?.returningOnDay !== undefined) {
     const days = plane.returningOnDay - dayIndex(state);
-    now.textContent = `Going back to the lessor: gone on day ${plane.returningOnDay} (${days} day${days === 1 ? '' : 's'}), still costing its lease until then.`;
+    now.textContent = `Returning · gone day ${plane.returningOnDay} (${days}d) · lease still charged`;
     now.classList.add('is-over');
   }
   const aog = aogFor(state, tail);
   if (aog) {
     const days = daysUntilReturn(state, aog);
-    now.textContent = `AOG at ${aog.base} (${aog.fault}), back in ${days} day${days === 1 ? '' : 's'}. Expedite it from ${aog.base}'s view.`;
+    now.textContent = `AOG · ${aog.base} · ${aog.fault} · back ${days}d · expedite from ${aog.base}`;
     now.classList.add('is-over');
   }
   root.append(now);
 
   const use = aircraftUtilisation(state, tail);
-  const useLine = line(`Uses ${Math.round(use.share * 100)}% of the usable day (06:00–22:00) across ${use.legs} legs.`);
+  const useLine = lineWithInfo(`${Math.round(use.share * 100)}% of day · ${use.legs} legs`, 'The share of the usable day, 06:00–22:00 home time, its flying and turns take up. Over 100% cannot be flown.');
   if (use.share > 1) useLine.classList.add('is-over');
   root.append(useLine);
 
@@ -182,7 +181,7 @@ export function buildAircraftView(state: SimState, tail: string, changed: () => 
       detail.className = 'inspector-row-detail';
       const load = marketLoadFactor(state, rotation.airports[0], rotation.airports[1]);
       detail.textContent =
-        `${minuteOfDayToTimeString(rotation.departMinute)}–${minuteOfDayToTimeString(rotation.arriveMinute)} · route ${formatLoadFactor(load)} full`;
+        `${minuteOfDayToTimeString(rotation.departMinute)}–${minuteOfDayToTimeString(rotation.arriveMinute)} · LF ${formatLoadFactor(load)}`;
       row.append(name, detail);
       // A rotation's first leg is its route: open that route's view.
       row.addEventListener('click', () => selectRoute(state, rotation.airports[0], rotation.airports[1]));
@@ -226,24 +225,24 @@ function buildDay(state: SimState, tail: string): HTMLElement {
     const plan = projected.get(leg.legId);
     if (result) {
       const causes = describeCauses(result.delayByCause);
-      const full = result.seats ? ` (${Math.round((result.passengers / result.seats) * 100)}% full)` : '';
+      const full = result.seats ? ` · LF ${Math.round((result.passengers / result.seats) * 100)}%` : '';
       detail.textContent =
-        (result.onTime ? 'on time' : `${result.arriveLateMinutes} min late${causes ? ` (${causes})` : ''}`) +
-        ` · ${result.passengers} pax${full}, ${money(result.margin)}`;
+        (result.onTime ? 'on time' : `+${result.arriveLateMinutes} min${causes ? ` (${causes})` : ''}`) +
+        ` · ${result.passengers} pax${full} · ${money(result.margin)}`;
       if (!result.onTime) detail.classList.add('is-warn');
     } else if (flight?.legId === leg.legId) {
       const late = flight.arriveMinute - flight.scheduledArriveMinute;
       const causes = describeCauses(flight.delayByCause);
-      detail.textContent = `in the air, lands ${clock(state, flight.arriveMinute)}` + (late > 0 ? `, ${late} min late${causes ? ` (${causes})` : ''}` : '');
+      detail.textContent = `airborne · ETA ${clock(state, flight.arriveMinute)}` + (late > 0 ? ` · +${late} min${causes ? ` (${causes})` : ''}` : '');
       if (late > 0) detail.classList.add('is-warn');
     } else if (state.cancelledToday.includes(leg.legId)) {
-      detail.textContent = 'cancelled';
+      detail.textContent = 'CNX';
       detail.classList.add('is-over');
     } else if (plan?.cancelled) {
-      detail.textContent = 'heading for a curfew cancellation';
+      detail.textContent = 'CNX risk · curfew';
       detail.classList.add('is-over');
     } else if (plan && plan.lateMinutes > 0) {
-      detail.textContent = `heading for ${plan.lateMinutes} min late`;
+      detail.textContent = `projected +${plan.lateMinutes} min`;
       detail.classList.add('is-warn');
     } else {
       detail.textContent = 'scheduled';
@@ -270,13 +269,13 @@ function buildReturn(state: SimState, tail: string, changed: () => void): HTMLEl
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'inspector-plan-hub';
-  button.textContent = `Return to lessor: ${money(option.fee)} fee, saves ${money(option.saves)}/day`;
+  button.textContent = `Return to lessor · fee ${money(option.fee)} · saves ${money(option.saves)}/day`;
   button.disabled = option.blocked !== null;
   let armed = false;
   button.addEventListener('click', () => {
     if (!armed) {
       armed = true;
-      button.textContent = `Click again to return ${tail}. It goes back on the market for anyone to lease.`;
+      button.textContent = `Confirm return of ${tail}`;
       button.classList.add('is-act');
       return;
     }
@@ -290,12 +289,12 @@ function buildReturn(state: SimState, tail: string, changed: () => void): HTMLEl
     const clear = document.createElement('button');
     clear.type = 'button';
     clear.className = 'inspector-plan-hub';
-    clear.textContent = `Remove all of ${tail}'s flights`;
+    clear.textContent = `Remove all ${tail} flights`;
     let clearArmed = false;
     clear.addEventListener('click', () => {
       if (!clearArmed) {
         clearArmed = true;
-        clear.textContent = `Click again to remove every flight ${tail} flies.`;
+        clear.textContent = `Confirm: remove all ${tail} flights`;
         clear.classList.add('is-act');
         return;
       }

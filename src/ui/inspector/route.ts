@@ -1,7 +1,8 @@
 import { forecastStance, type StanceForecast } from '../../sim/fareForecast';
 import { inboundAt } from '../../sim/fleetTiming';
 import { crewShare } from '../../sim/crews';
-import { line } from './dom';
+import { info, line, lineWithInfo } from './dom';
+import { ON_TIME_GRACE_MINUTES } from '../../sim/delays';
 import { money } from '../format';
 import { RIVAL_SQUEEZED_RESPITE_DAYS } from '../../sim/pressure';
 import { brandInWords, formatNps, marketNps, networkNps } from '../../sim/nps';
@@ -67,7 +68,7 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   if (days >= 2 && operated === 0) {
     root.append(
       line(
-        `None of this route's flights has operated in the last ${days} days. The numbers below assume they do: see why under On-time.`,
+        `CNX · nothing operated in ${days}d · figures below assume it does · see On-time`,
         'inspector-line is-over',
       ),
     );
@@ -78,10 +79,11 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   // Load factor (sim/loadFactor.ts), the route's headline number: how full
   // its planes flew over the last week, from its own landings.
   const load = marketLoadFactor(state, a, b);
-  const presence = line(
-    `${summary.rotations.length} flight${summary.rotations.length === 1 ? '' : 's'}/day · ${summary.byClass.map((c) => `${c.name} x${c.count}`).join(', ')}` +
-      ` · load factor ${formatLoadFactor(load)}` +
-      (load.factor === null ? '' : ` (${load.passengers.toLocaleString()} passengers in ${load.seats.toLocaleString()} seats, last 7 days)`),
+  const presence = lineWithInfo(
+    `${summary.rotations.length}/day · ${summary.byClass.map((c) => `${c.name} ×${c.count}`).join(', ')} · LF ${formatLoadFactor(load)}`,
+    load.factor === null
+      ? 'Load factor (LF): how full the planes fly, from the last 7 days of landings. None landed yet.'
+      : `Load factor (LF): ${load.passengers.toLocaleString()} passengers in ${load.seats.toLocaleString()} seats over the last 7 days.`,
   );
   presence.classList.toggle('is-over', short);
   root.append(presence);
@@ -89,7 +91,12 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   // NPS (sim/nps.ts): how passengers rate the airline here, about the last
   // month, and what that does against a rival.
   const brand = brandInWords(state, a, b, state.competitorRoutes);
-  root.append(line(`NPS ${formatNps(marketNps(state, a, b))} here (your airline ${formatNps(networkNps(state))}).${brand ? ` ${brand}` : ''}`));
+  root.append(
+    lineWithInfo(
+      `NPS ${formatNps(marketNps(state, a, b))} · airline ${formatNps(networkNps(state))}${brand ? ` · ${brand}` : ''}`,
+      'Net Promoter Score: how passengers rate you here over about the last month. Late flights, old planes and fares above the rivals\' pull it down. Against a rival, the better name wins some of the other\'s passengers.',
+    ),
+  );
 
   // The market in words (sim/marketSize.ts): how big the city pair is, and
   // how full a flight is today. A route you have only just opened has
@@ -98,12 +105,13 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   // Huge market from reading as "add ten flights".
   // Once the route has flown, its load factor above says how full it is;
   // the forecast in words is only for a route with no record yet.
-  const fillWords = load.factor === null ? `, ${fill.words}` : '';
+  const fillWords = load.factor === null ? ` · ${fill.words}` : '';
   root.append(
-    line(
-      `${marketSize(state, a, b)} market · ${readout.seatsPerFlight} seats a flight${fillWords}.` +
-        (short ? ' More people want it than the seats hold: add a flight or a bigger plane.' : '') +
-        (fill.thin ? ' It grows as you fly it: extra flights fly emptier for now.' : ''),
+    lineWithInfo(
+      `${marketSize(state, a, b)} market · ${readout.seatsPerFlight} seats/flight${fillWords}` +
+        (short ? ' · demand exceeds seats' : '') +
+        (fill.thin ? ' · still growing' : ''),
+      'A market\'s demand is built by flying it, over weeks, toward the size of the city pair. When demand exceeds seats, add a flight or a bigger plane; while it is still growing, extra flights fly emptier.',
     ),
   );
 
@@ -117,11 +125,11 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
     // shown next to what you charge. Each name opens that rival's view.
     const rivalsLine = line('', 'inspector-line is-warn');
     rivalsLine.append(
-      'Rivals: ',
+      'Rivals ',
       ...rivalLinksOn(state, a, b),
-      ` (you: $${(state.routeSettings[marketKey(a, b)]?.fare ?? 0).toLocaleString()})` +
-        (cut > 0 ? `. They cut your fares ${cut}%: more flights of your own reduce it.` : ''),
+      ` · you $${(state.routeSettings[marketKey(a, b)]?.fare ?? 0).toLocaleString()}` + (cut > 0 ? ` · your fares −${cut}%` : ''),
     );
+    if (cut > 0) rivalsLine.append(' ', info('Rival flights on a market pull your fares down. More flights of your own reduce the cut.'));
     root.append(rivalsLine);
   }
 
@@ -132,7 +140,7 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   if (response > 0) {
     root.append(
       line(
-        `Full and priced ${Math.round((state.routeSettings[marketKey(a, b)].fare / recommendedFare(a, b) - 1) * 100)}% above the going rate: rivals are adding flights to take the passengers you turn away (${Math.round(response * 100)}% chance a day).`,
+        `Full at +${Math.round((state.routeSettings[marketKey(a, b)].fare / recommendedFare(a, b) - 1) * 100)}% over the going rate · rivals adding flights · ${Math.round(response * 100)}%/day`,
         'inspector-line is-warn',
       ),
     );
@@ -151,7 +159,7 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
 
   // The planes this route draws on, pooled at its base.
   const base = ops.routeBase(state, a, b);
-  const poolsHeading = line(base ? `Planes based at ${base}:` : '');
+  const poolsHeading = line(base ? `Planes at ${base}` : '');
   const pools = document.createElement('div');
   pools.className = 'inspector-pools';
   const redrawPools = () => {
@@ -178,7 +186,7 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
 function describeRivalsView(state: SimState, a: string, b: string): HTMLElement | null {
   const table = moneyOnTable(state, a, b);
   const draws: string[] = [];
-  if (table.turnedAway >= 1) draws.push(`you turn away about ${Math.round(table.turnedAway)} a day`);
+  if (table.turnedAway >= 1) draws.push(`you turn away about ${Math.round(table.turnedAway)} passengers a day`);
   if (table.fullyCostedMargin > 0) draws.push(`you make ${money(table.fullyCostedMargin)} a day after costs`);
   if (draws.length === 0) return null;
 
@@ -189,11 +197,12 @@ function describeRivalsView(state: SimState, a: string, b: string): HTMLElement 
     table.rivalSlotFees === null
       ? 'and an airport here is full, so no rival can get in'
       : `and a rival would pay ${money(table.rivalSlotFees)} a day in slots`;
-  const text =
+  const text = table.perDay >= 1 ? `Rivals see ~${money(table.perDay)}/day here` : 'Rivals see nothing worth taking';
+  const why =
     table.perDay >= 1
-      ? `Rivals' view: about ${money(table.perDay)} a day to be had here. ${capitalise(draws.join(' and '))}; ${kept.join(', ')}, ${slots}.`
-      : `Rivals' view: nothing worth taking. ${capitalise(draws.join(' and '))}, but ${kept.join(', ')}, ${slots}.`;
-  return line(text, table.perDay >= RIVALS_VIEW_WARN_PER_DAY ? 'inspector-line is-warn' : 'inspector-line');
+      ? `${capitalise(draws.join(' and '))}; ${kept.join(', ')}, ${slots}. Turned-away passengers and a fat margin draw rivals; more flights, a hub feeding the route, and dear or full slots keep them out.`
+      : `${capitalise(draws.join(' and '))}, but ${kept.join(', ')}, ${slots}.`;
+  return lineWithInfo(text, why, table.perDay >= RIVALS_VIEW_WARN_PER_DAY ? 'inspector-line is-warn' : 'inspector-line');
 }
 
 /** Money on the table (a day) at which the rivals' view turns amber: enough to be worth a rival's while. */
@@ -218,7 +227,7 @@ function roundToStep(value: number, step: number): number {
  * share of slot fees at each end and of its planes' class leases
  * (sim/routeCosts.ts), and the margin once they're paid.
  */
-function describeEconomics(state: SimState, a: string, b: string): { text: string; losing: boolean; fixed: string; fullyLosing: boolean } {
+function describeEconomics(state: SimState, a: string, b: string): { text: string; losing: boolean; fixed: string; fixedDetail: string; fullyLosing: boolean } {
   const settings = state.routeSettings[marketKey(a, b)];
   const summary = summarizeMarket(a, b, state, settings);
   const load = summary.totalSeats > 0 ? summary.pax / summary.totalSeats : 0;
@@ -230,15 +239,18 @@ function describeEconomics(state: SimState, a: string, b: string): { text: strin
   );
   return {
     text:
-      `A day at these settings: ${summary.pax} passengers, ${Math.round(load * 100)}% full, ${Math.round(summary.share * 100)}% share · ` +
-      `${money(summary.revenue)} revenue, ${money(summary.cost)} cost, ${signedMoney(summary.margin)} margin · ` +
-      (summary.seatCapped ? 'seats are the limit.' : 'demand is the limit.'),
+      `Per day · ${summary.pax} pax · LF ${Math.round(load * 100)}% · share ${Math.round(summary.share * 100)}% · ` +
+      `rev ${money(summary.revenue)} · cost ${money(summary.cost)} · margin ${signedMoney(summary.margin)} · ` +
+      (summary.seatCapped ? 'seat-capped' : 'demand-capped'),
     losing: summary.margin < 0,
     fixed:
-      `After its share of fixed costs: ${signedMoney(fullMargin)}/day. ` +
-      `Slots ${money(costs.slotsPerDay)}${slotParts.length > 0 ? ` (${slotParts.join(', ')})` : ''} · ` +
-      `lease ${money(costs.leasePerDay)}${leaseParts.length > 0 ? `: ${leaseParts.join('; ')}` : ''} · ` +
-      `network overhead ${money(costs.overheadPerDay)}.`,
+      `Fully costed ${signedMoney(fullMargin)}/day · slots ${money(costs.slotsPerDay)} · lease ${money(costs.leasePerDay)} · overhead ${money(costs.overheadPerDay)}`,
+    fixedDetail:
+      (slotParts.length > 0 ? `Slots: ${slotParts.join(', ')}. ` : '') +
+      (leaseParts.length > 0 ? `Lease: ${leaseParts.join('; ')}. ` : '') +
+      'Slot fees, leases and network overhead are paid airline-wide each midnight. Slot fees are shared by each airport\'s movements; ' +
+      'a class\'s leases by the minutes its planes fly, so flying a class less puts more of its lease on each route; ' +
+      'overhead, which grows with the square of the fleet, by each route\'s share of all flying.',
     fullyLosing: fullMargin < 0,
   };
 }
@@ -257,16 +269,17 @@ function buildFare(state: SimState, a: string, b: string, changed: () => void): 
   heading.textContent = 'Fare';
 
   const economics = line('');
+  // The fully costed line keeps its (i) while the slider redraws its text.
   const fixedCosts = line('');
-  fixedCosts.title =
-    'Slot fees, leases and network overhead are paid airline-wide each midnight. Slot fees are shared by each airport\'s movements; ' +
-    'a class\'s leases by the minutes its planes fly, so flying a class less puts more of its lease on each route; ' +
-    'overhead, which grows with the square of the fleet, by each route\'s share of all flying.';
+  const fixedText = document.createElement('span');
+  const fixedInfo = info('');
+  fixedCosts.append(fixedText, ' ', fixedInfo);
   const redrawEconomics = () => {
-    const { text, losing, fixed, fullyLosing } = describeEconomics(state, a, b);
+    const { text, losing, fixed, fixedDetail, fullyLosing } = describeEconomics(state, a, b);
     economics.textContent = text;
     economics.classList.toggle('is-over', losing);
-    fixedCosts.textContent = fixed;
+    fixedText.textContent = fixed;
+    fixedInfo.dataset.info = fixedDetail;
     fixedCosts.classList.toggle('is-over', fullyLosing);
   };
 
@@ -327,12 +340,12 @@ const STANCES: { stance: FareStance; name: string }[] = [
 /** One stance's forecast in a line: your fare and margin, then each rival's. */
 function describeForecast(forecast: StanceForecast): string {
   const rivals = forecast.rivals.map((rival) => {
-    const adds = rival.flightsAdded >= 0.5 ? `, adds about ${Math.round(rival.flightsAdded)} flight${Math.round(rival.flightsAdded) === 1 ? '' : 's'}/day` : '';
-    const gone = rival.closesInDays !== null ? `, gone in about ${rival.closesInDays} days, then no rival for ${RIVAL_SQUEEZED_RESPITE_DAYS}` : '';
-    return `${rival.airline} $${rival.fare}, ${signedMoney(rival.margin)}/day${adds}${gone}`;
+    const adds = rival.flightsAdded >= 0.5 ? ` · +${Math.round(rival.flightsAdded)}/day` : '';
+    const gone = rival.closesInDays !== null ? ` · exits ~${rival.closesInDays}d, then ${RIVAL_SQUEEZED_RESPITE_DAYS}d clear` : '';
+    return `${rival.airline} $${rival.fare} ${signedMoney(rival.margin)}/day${adds}${gone}`;
   });
-  const response = forecast.responseChance > 0 ? ` · ${Math.round(forecast.responseChance * 100)}% a day they add a flight` : '';
-  return `You $${forecast.fare}, ${signedMoney(forecast.margin)}/day · ${rivals.join('; ')}${response}`;
+  const response = forecast.responseChance > 0 ? ` · ${Math.round(forecast.responseChance * 100)}%/day they add a flight` : '';
+  return `You $${forecast.fare} ${signedMoney(forecast.margin)}/day · ${rivals.join('; ')}${response}`;
 }
 
 /**
@@ -354,7 +367,11 @@ function buildStances(state: SimState, a: string, b: string, changed: () => void
   const current = STANCES.find((s) => s.stance === settings.fareStance);
   const heading = document.createElement('div');
   heading.className = 'stance-heading';
-  heading.textContent = `Pricing against rivals: ${current ? current.name : settings.fareIsOverridden ? 'your own fare' : 'fare policy'} ($${settings.fare}). If nothing else changes:`;
+  heading.textContent = `Vs rivals · ${current ? current.name : settings.fareIsOverridden ? 'by hand' : 'policy'} · $${settings.fare}`;
+  heading.append(
+    ' ',
+    info('A stance re-prices this market against its rivals every day. Each row is where it would settle if nothing else changes: your fare and margin, then each rival\'s, the flights it would add, and whether it would pull out.'),
+  );
   block.append(heading);
 
   for (const { stance, name } of STANCES) {
@@ -408,7 +425,7 @@ function buildRouteHistory(state: SimState, a: string, b: string): HTMLElement |
   const header = document.createElement('div');
   header.className = 'pnl-chart-header';
   const labelEl = document.createElement('span');
-  labelEl.textContent = 'Margin, last 7 days';
+  labelEl.textContent = 'Margin · 7d';
   const statEl = document.createElement('span');
   statEl.className = 'pnl-chart-stat';
   statEl.textContent = pnlMoney(shownMargin[shownMargin.length - 1]);
@@ -442,7 +459,8 @@ function buildRouteOtp(state: SimState, a: string, b: string): HTMLElement {
   const header = document.createElement('div');
   header.className = 'pnl-chart-header';
   const labelEl = document.createElement('span');
-  labelEl.textContent = 'On-time, last 7 days';
+  labelEl.textContent = 'On-time · 7d';
+  labelEl.append(' ', info(`Each bar is a day: the share of scheduled flights that flew and arrived within ${ON_TIME_GRACE_MINUTES} minutes. Cancellations count against it. A reliable route grows its demand faster; a late one slows or shrinks it. A turn buffer adds ground time so one late arrival doesn't make the next flight late.`));
   const statEl = document.createElement('span');
   statEl.className = 'pnl-chart-stat';
   statEl.textContent = trailing.otp === null ? '—' : `${Math.round(trailing.otp * 100)}%`;
@@ -475,24 +493,24 @@ function buildRouteOtp(state: SimState, a: string, b: string): HTMLElement {
   chart.append(
     line(
       buffer === 0
-        ? 'Turn buffer: none. A late arrival here makes the next flight late.'
-        : `Turn buffer: +${buffer} min of extra ground time after each flight.`,
+        ? 'Turn buffer none · delays carry to the next flight'
+        : `Turn buffer +${buffer} min`,
       'route-otp-line',
     ),
   );
   if (trailing.cancelled > 0) {
-    chart.append(line(`${trailing.cancelled} cancelled this week. Cancellations count against reliability.`, 'route-otp-line is-problem'));
+    chart.append(line(`CNX ${trailing.cancelled} this week`, 'route-otp-line is-problem'));
   }
 
   const factor = reliabilityDemandFactor(trailing.otp);
   if (trailing.otp === null) {
-    chart.append(line('Reliability starts to affect demand after a few more flights.', 'route-otp-line'));
+    chart.append(line('Demand growth · too few flights to judge', 'route-otp-line'));
   } else if (factor >= 1) {
-    chart.append(line(`Reliable: demand is growing ${factor.toFixed(1)}x as fast.`, 'route-otp-line'));
+    chart.append(line(`Demand growth ×${factor.toFixed(1)} · reliable`, 'route-otp-line'));
   } else if (factor >= 0) {
-    chart.append(line(`Delays have slowed demand growth to ${Math.round(factor * 100)}% of normal.`, 'route-otp-line is-warning'));
+    chart.append(line(`Demand growth ${Math.round(factor * 100)}% of normal · delays`, 'route-otp-line is-warning'));
   } else {
-    chart.append(line('Delays are driving passengers away: demand is shrinking.', 'route-otp-line is-problem'));
+    chart.append(line('Demand shrinking · delays', 'route-otp-line is-problem'));
   }
   return chart;
 }

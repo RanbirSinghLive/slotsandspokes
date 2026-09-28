@@ -133,8 +133,7 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
   const returnChoices: RadialAction[] = ops.returnOptions(state, airport.iata).map((option) => ({
     id: `return:${option.tail}`,
     label:
-      `Return ${option.tail} (${option.name}, ${option.ageYears} yrs) for a $${option.fee.toLocaleString()} fee, ` +
-      `saving $${option.saves.toLocaleString()}/day. It goes back on the market for anyone to lease.`,
+      `Return ${option.tail} · ${option.name}, ${option.ageYears} yrs · fee $${option.fee.toLocaleString()} · saves $${option.saves.toLocaleString()}/day`,
     icon: planeIconInner(state.aircraft.find((a) => a.tail === option.tail)?.typeCode ?? ''),
     large: true,
     angleDeg: 0,
@@ -153,14 +152,14 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
     // The actual airframe on offer (sim/market.ts): its age is what
     // explains its price and how late it'll run.
     label: option.listing
-      ? `Lease a ${option.name} (${option.seats} seats, ${option.listing.ageYears} yrs old, ` +
-        `${Math.max(0, USEFUL_LIFE_YEARS - option.listing.ageYears)} yrs of life left) for ${money(option.listing.leasePricePerDay)}/day` +
+      ? `Lease ${option.name} · ${option.seats} seats · ${option.listing.ageYears} yrs (${Math.max(0, USEFUL_LIFE_YEARS - option.listing.ageYears)} left) · ` +
+        `${money(option.listing.leasePricePerDay)}/day` +
         // Network overhead grows with the square of the fleet (sim/overhead.ts), so say what this plane adds.
-        `, plus ${money(overheadAddedByNextPlane(state))}/day in network overhead` +
-        (option.listed > 1 ? ` · ${option.listed - 1} more listed` : ' · the last one listed') +
+        ` + ${money(overheadAddedByNextPlane(state))}/day overhead` +
+        (option.listed > 1 ? ` · ${option.listed - 1} more listed` : ' · last one listed') +
         // Every lease takes time to arrive (sim/fleetTiming.ts).
-        ` · delivered in ${deliveryDays(state)} days`
-      : `Lease a ${option.name}`,
+        ` · delivery ${deliveryDays(state)}d`
+      : `Lease ${option.name}`,
     // Each class has its own silhouette (ui/planeIcons.ts), so the four
     // choices are told apart by shape rather than by guessing at size.
     icon: planeIconInner(option.code),
@@ -189,7 +188,7 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
     );
     return {
       id: `hub:${style}`,
-      label: `${spec.name}${isCurrent ? ' (current)' : ''}: ${spec.description} About ${connectingAfter} connecting/day.`,
+      label: `${spec.name}${isCurrent ? ' (current)' : ''} · ~${connectingAfter} connecting/day · ${spec.description}`,
       icon: textIcon(HUB_STYLE_ICON_TEXT[style], 7),
       angleDeg: 0,
       selected: isCurrent,
@@ -208,31 +207,31 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
   return [
     {
       id: 'hub-style',
-      label: `Hub style (now ${HUB_STYLES[current].name}): how flights here are grouped, trading connections against congestion and aircraft time`,
+      label: `Hub style · now ${HUB_STYLES[current].name} · connections vs congestion and aircraft time`,
       icon: ICON.hub,
       angleDeg: -165,
       disabledReason:
-        spokeCount < 2 ? `Fly from ${airport.iata} to at least two airports first: connections need two routes to meet.` : undefined,
+        spokeCount < 2 ? `Needs routes from ${airport.iata} to 2+ airports` : undefined,
       children: styleChoices,
     },
     {
       id: 'route',
-      label: 'Draw a route from here',
+      label: 'Draw route',
       icon: ICON.route,
       angleDeg: -115,
-      disabledReason: hasPlane ? undefined : `No plane is based at ${airport.iata}. Use Plane to add one.`,
+      disabledReason: hasPlane ? undefined : `No plane based at ${airport.iata} · lease one first`,
       onSelect: () => {
         armRouteBuilderAt(airport);
         hideMapMenu();
       },
     },
-    { id: 'plane', label: 'Add a plane based here', icon: ICON.plane, angleDeg: -65, children: planeChoices },
+    { id: 'plane', label: 'Lease a plane here', icon: ICON.plane, angleDeg: -65, children: planeChoices },
     {
       id: 'return',
-      label: 'Return a plane to the lessor',
+      label: 'Return a plane',
       icon: ICON.returnPlane,
       angleDeg: 150,
-      disabledReason: returnChoices.length === 0 ? `No planes are based at ${airport.iata}.` : undefined,
+      disabledReason: returnChoices.length === 0 ? `No planes based at ${airport.iata}` : undefined,
       children: returnChoices,
     },
   ];
@@ -262,7 +261,7 @@ function openAirportMenu(airport: Airport, state: SimState): void {
 function addFlightLabel(state: SimState, a: string, b: string, className: string, readout: ReturnType<typeof ops.marketReadout>): string {
   const seats = AIRCRAFT_CLASSES.find((c) => c.name === className)?.seats ?? 0;
   const fill = demandAgainstSeats(state, a, b, readout.legs + 2, seats);
-  return `Add a ${className} flight (${seats} seats; with it, flights here would be ${fill.short ? 'full' : fill.words})`;
+  return `Add ${className} flight · ${seats} seats · then ${fill.short ? 'full' : fill.words}`;
 }
 
 function routeActions(a: string, b: string, state: SimState): RadialAction[] {
@@ -288,9 +287,9 @@ function routeActions(a: string, b: string, state: SimState): RadialAction[] {
     return {
       id: `buffer:${minutes}`,
       label: isCurrent
-        ? `+${minutes} min after each flight (current)`
-        : `Set the turn buffer to +${minutes} min after each flight on ${a}–${b}` +
-          (plan?.ok && plan.moved > 0 ? `. Moves ${plan.moved} rotation${plan.moved === 1 ? '' : 's'} to another plane to make room` : ''),
+        ? `+${minutes} min (current)`
+        : `Turn buffer +${minutes} min on ${a}–${b}` +
+          (plan?.ok && plan.moved > 0 ? ` · moves ${plan.moved} rotation${plan.moved === 1 ? '' : 's'} to another plane` : ''),
       icon: textIcon(minutes === 0 ? '0' : `+${minutes}`),
       angleDeg: 0,
       selected: isCurrent,
@@ -303,7 +302,7 @@ function routeActions(a: string, b: string, state: SimState): RadialAction[] {
   return [
     {
       id: 'turn-buffer',
-      label: `Turn buffer (now +${buffer} min): extra ground time after each flight soaks up delays, but uses aircraft time`,
+      label: `Turn buffer · now +${buffer} min · absorbs delays, costs aircraft time`,
       icon: ICON.clock,
       angleDeg: 150,
       children: bufferChoices,
@@ -311,8 +310,8 @@ function routeActions(a: string, b: string, state: SimState): RadialAction[] {
     {
       id: 'gauge-down',
       label: gaugeDown.ok
-        ? `Downgauge one flight: ${gaugeDown.fromName} to ${gaugeDown.toName} (hold to downgauge several)`
-        : 'Downgauge one flight',
+        ? `Downgauge 1 flight · ${gaugeDown.fromName}→${gaugeDown.toName} · hold for more`
+        : 'Downgauge 1 flight',
       icon: ICON.gaugeDown,
       angleDeg: -170,
       repeatable: true,
@@ -323,8 +322,8 @@ function routeActions(a: string, b: string, state: SimState): RadialAction[] {
     {
       id: 'gauge-up',
       label: gaugeUp.ok
-        ? `Upgauge one flight: ${gaugeUp.fromName} to ${gaugeUp.toName} (hold to upgauge several)`
-        : 'Upgauge one flight',
+        ? `Upgauge 1 flight · ${gaugeUp.fromName}→${gaugeUp.toName} · hold for more`
+        : 'Upgauge 1 flight',
       icon: ICON.gaugeUp,
       angleDeg: -132,
       repeatable: true,
@@ -334,7 +333,7 @@ function routeActions(a: string, b: string, state: SimState): RadialAction[] {
     },
     {
       id: 'flight-down',
-      label: 'Remove one flight (hold to remove several)',
+      label: 'Remove 1 flight · hold for more',
       icon: ICON.minus,
       angleDeg: -94,
       repeatable: true,
@@ -345,8 +344,8 @@ function routeActions(a: string, b: string, state: SimState): RadialAction[] {
     {
       id: 'flight-up',
       label: addFlight.ok
-        ? `${addFlightLabel(state, a, b, addFlight.className, readout)}. ${describeSlotQuotes(addFlight.plan.slotQuotes)} Hold to add several.`
-        : 'Add a flight',
+        ? `${addFlightLabel(state, a, b, addFlight.className, readout)} · ${describeSlotQuotes(addFlight.plan.slotQuotes)} · hold for more`
+        : 'Add 1 flight',
       icon: ICON.plus,
       angleDeg: -56,
       repeatable: true,
@@ -356,7 +355,7 @@ function routeActions(a: string, b: string, state: SimState): RadialAction[] {
     },
     {
       id: 'remove-route',
-      label: 'Remove this route',
+      label: 'Remove route',
       icon: ICON.remove,
       angleDeg: -18,
       confirm: true,

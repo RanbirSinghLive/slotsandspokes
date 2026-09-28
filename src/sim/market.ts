@@ -133,10 +133,10 @@ export function takeListing(state: SimState, typeCode: string): MarketListing | 
 
 /** Why this plane can't go back to the lessor right now, or null when it can. */
 export function returnBlockedReason(state: SimState, aircraft: Aircraft): string | null {
-  if (isReturning(aircraft)) return `${aircraft.tail} is already going back, on day ${aircraft.returningOnDay}.`;
-  if (state.schedule.some((leg) => leg.tail === aircraft.tail)) return `${aircraft.tail} still has flights. Remove them first.`;
-  if (state.aogs.some((event) => event.tail === aircraft.tail)) return `${aircraft.tail} is grounded with an AOG.`;
-  if (aircraft.status !== 'ground') return `${aircraft.tail} is in the air.`;
+  if (isReturning(aircraft)) return `${aircraft.tail} already returning · gone day ${aircraft.returningOnDay}`;
+  if (state.schedule.some((leg) => leg.tail === aircraft.tail)) return `${aircraft.tail} still has flights · remove them first`;
+  if (state.aogs.some((event) => event.tail === aircraft.tail)) return `${aircraft.tail} AOG`;
+  if (aircraft.status !== 'ground') return `${aircraft.tail} airborne`;
   return null;
 }
 
@@ -162,7 +162,7 @@ export function returnLease(state: SimState, tail: string): { ok: true; message:
   const goesOnDay = startReturn(state, aircraft);
   return {
     ok: true,
-    message: `${tail} is going back to the lessor ($${fee.toLocaleString()}): it leaves on day ${goesOnDay}, costing its lease of $${aircraft.leaseCostPerDay.toLocaleString()} a day until then.`,
+    message: `${tail} returning · fee $${fee.toLocaleString()} · gone day ${goesOnDay} · lease $${aircraft.leaseCostPerDay.toLocaleString()}/day until then`,
   };
 }
 

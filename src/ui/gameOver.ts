@@ -28,6 +28,6 @@ export function setupGameOver(): void {
 export function updateGameOver(state: SimState): boolean {
   const insolvent = isInsolvent(state);
   gameOverModal.hidden = !insolvent;
-  if (insolvent) gameOverReasonEl.textContent = `Cash has run out (${money(state.cash)}). This airline is finished.`;
+  if (insolvent) gameOverReasonEl.textContent = `Cash ${money(state.cash)} · the airline is finished`;
   return insolvent;
 }

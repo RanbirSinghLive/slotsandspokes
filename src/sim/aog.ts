@@ -210,5 +210,5 @@ export function expediteRepair(state: SimState, tail: string): { ok: true; messa
   state.todayCostByCategory.maintenance += cost;
   state.todayMargin -= cost;
   event.returnsAtMinute -= MINUTES_PER_DAY;
-  return { ok: true, message: `${tail}'s repair expedited: back in ${daysUntilReturn(state, event)} day${daysUntilReturn(state, event) === 1 ? '' : 's'}.` };
+  return { ok: true, message: `${tail} expedited · back ${daysUntilReturn(state, event)}d` };
 }

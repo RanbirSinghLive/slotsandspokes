@@ -1,5 +1,5 @@
 import { airlineCalled, currentTier, isMilestoneMet, LADDER, openedSoFar, tiersClimbed, type Milestone } from '../../sim/ladder';
-import { line, heading } from './dom';
+import { info, line, heading } from './dom';
 import type { SimState } from '../../sim/state';
 import { select } from '../selection';
 
@@ -18,14 +18,14 @@ function milestoneRow(state: SimState, milestone: Milestone): HTMLElement {
   const met = isMilestoneMet(state, milestone.id);
   row.classList.toggle('is-met', met);
   const name = document.createElement('span');
-  name.textContent = `${met ? '✓' : '○'} ${milestone.name}`;
+  name.append(`${met ? '✓' : '○'} ${milestone.name} `, info(milestone.description));
   const detail = document.createElement('span');
   detail.className = 'inspector-row-detail';
   if (met) {
-    detail.textContent = `met on day ${state.milestonesMet![milestone.id]}`;
+    detail.textContent = `met day ${state.milestonesMet![milestone.id]}`;
   } else {
     const progress = milestone.progress(state);
-    detail.textContent = progress ? `${milestone.description} Now: ${progress.current.toLocaleString()} of ${progress.target.toLocaleString()} ${progress.unit}.` : milestone.description;
+    detail.textContent = progress ? `${progress.current.toLocaleString()}/${progress.target.toLocaleString()} ${progress.unit}` : milestone.description;
   }
   row.append(name, detail);
   return row;
@@ -53,19 +53,15 @@ export function buildGoalsView(state: SimState): HTMLElement {
     const met = tier.milestones.filter((milestone) => isMilestoneMet(state, milestone.id)).length;
     const next = LADDER[climbed + 1];
     root.append(
-      line(
-        `You're ${airlineCalled(tier)}. Meet ${tier.needed} of these ${tier.milestones.length} to ` +
-          (next ? `become ${airlineCalled(next)}` : 'climb the last tier') +
-          ` (${met} so far).`,
-      ),
+      line(`Now ${airlineCalled(tier)} · ${met}/${tier.needed} to ` + (next ? `become ${airlineCalled(next)}` : 'climb the last tier')),
     );
-    if (tier.opens.length > 0) root.append(line(`It opens: ${tier.opens.join('; ')}.`, 'inspector-line is-good'));
+    if (tier.opens.length > 0) root.append(line(`Opens ${tier.opens.join(' · ')}`, 'inspector-line is-good'));
     const list = document.createElement('div');
     list.className = 'inspector-rows';
     list.append(...tier.milestones.map((milestone) => milestoneRow(state, milestone)));
     root.append(heading(tier.name), list);
   } else {
-    root.append(line('Every tier climbed: your airline can take a passenger round the world.', 'inspector-line is-good'));
+    root.append(line('Top tier reached', 'inspector-line is-good'));
   }
 
   const opened = openedSoFar(state);
@@ -74,8 +70,8 @@ export function buildGoalsView(state: SimState): HTMLElement {
   // The rest of the ladder, climbed and still ahead, so the whole shape is visible.
   root.append(heading('The ladder'));
   LADDER.forEach((each, i) => {
-    const status = i < climbed ? 'climbed' : i === climbed ? 'working on it' : 'ahead';
-    const row = line(`${each.name}: ${status}${each.opens.length > 0 ? ` · opens ${each.opens.join('; ')}` : ''}`);
+    const status = i < climbed ? '✓' : i === climbed ? '▸' : '○';
+    const row = line(`${status} ${each.name}${each.opens.length > 0 ? ` · opens ${each.opens.join(' · ')}` : ''}`);
     if (i > climbed) row.classList.add('goal-ahead');
     root.append(row);
   });
@@ -84,7 +80,7 @@ export function buildGoalsView(state: SimState): HTMLElement {
   const link = document.createElement('button');
   link.type = 'button';
   link.className = 'inspector-link';
-  link.textContent = 'Adopt the innovations it opens at Head office ›';
+  link.textContent = 'Head office ›';
   link.addEventListener('click', () => select({ kind: 'headOffice' }));
   root.append(heading('Innovations'), link);
   return root;

@@ -1,8 +1,8 @@
 import { airportLoad, dailyMovementsAt, slotCapacityPerDay } from '../../sim/airports';
 import { inboundAt } from '../../sim/fleetTiming';
-import { money } from '../format';
+import { money, shortMoney } from '../format';
 import { crewShare } from '../../sim/crews';
-import { line, heading } from './dom';
+import { line, heading, lineWithInfo } from './dom';
 import { whereToFlyFrom } from '../../sim/whereToFly';
 import { openRouteForm } from '../routeBuilder';
 import { formatNps, marketNps } from '../../sim/nps';
@@ -61,8 +61,8 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
   const connecting = Math.round(connectingPassengersThrough(state, iata));
   root.append(
     line(
-      `${presence.level} · ${presence.departures} departure${presence.departures === 1 ? '' : 's'}/day` +
-        (connecting > 0 ? ` · ${connecting} connecting/day (${HUB_STYLES[hubStyleAt(state, iata)].name})` : ''),
+      `${presence.level} · ${presence.departures} dep/day` +
+        (connecting > 0 ? ` · ${connecting} connecting/day · ${HUB_STYLES[hubStyleAt(state, iata)].name}` : ''),
     ),
   );
 
@@ -72,8 +72,8 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
   if (unmet) {
     root.append(
       line(
-        `Waiting to fly: ${airportDemandSize(unmet.latent)}` +
-          (unmet.spilled >= 1 ? ` · you turn away ${Math.round(unmet.spilled).toLocaleString()} a day` : ''),
+        `Demand ${airportDemandSize(unmet.latent).toLowerCase()}` +
+          (unmet.spilled >= 1 ? ` · ${Math.round(unmet.spilled).toLocaleString()} pax/day turned away` : ''),
         unmet.spilled >= 1 ? 'inspector-line is-warn' : 'inspector-line',
       ),
     );
@@ -82,7 +82,7 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
   // How starved the airport is for service (sim/serviceLevel.ts): in
   // words, not numbers, since it's a judgement about where to go next.
   const service = describeServiceLevel(hungerAt(state, iata));
-  root.append(line(`${service.label}: ${service.description}.`));
+  root.append(lineWithInfo(service.label, `How well this airport is served by every airline: ${service.description}.`));
 
   root.append(...loadAndSlots(state, iata));
   root.append(...groundedPlanes(state, iata, changed));
@@ -111,7 +111,7 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
       });
     root.append(pools, tails);
   } else {
-    root.append(line('No aircraft based here.'));
+    root.append(line('None'));
   }
   root.append(...crewSection(state, iata, changed));
 
@@ -129,22 +129,20 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
 function loadAndSlots(state: SimState, iata: string): HTMLElement[] {
   const load = airportLoad(state, iata);
   const { delayChance, maxDelayMinutes } = congestionParameters(load);
-  const loadLine = line(
-    `Airport load: ${Math.round(load * 100)}% at peak (${dailyMovementsAt(state, iata)} movements a day; slots stop at ${slotCapacityPerDay(state, iata)})` +
-      (delayChance > 0
-        ? `. Congestion delays ${Math.round(delayChance * 100)}% of flights here, up to ${maxDelayMinutes} min.`
-        : '. No congestion.'),
+  const loadLine = lineWithInfo(
+    `Load ${Math.round(load * 100)}% at peak · ${dailyMovementsAt(state, iata)}/${slotCapacityPerDay(state, iata)} movements` +
+      (delayChance > 0 ? ` · congestion delays ${Math.round(delayChance * 100)}% of flights, ≤${maxDelayMinutes} min` : ' · no congestion'),
+    'Movements are every airline\'s takeoffs and landings a day. Slots stop at the second number. As the peak hour fills, congestion delays a growing share of flights: the glow around the airport on the map.',
   );
   loadLine.classList.toggle('is-warn', delayChance > 0 && load < 1);
   loadLine.classList.toggle('is-over', load >= 1);
 
   const held = slotsHeld(state, iata);
   const [next] = nextSlotFees(state, iata, 1);
-  const nextText = next === null ? 'no slots left' : next === 0 ? 'next pair free' : `next pair $${next.toLocaleString()}/day`;
-  const slotsLine = line(
-    held > 0
-      ? `Slots: ${held} pair${held === 1 ? '' : 's'} held, $${slotFeesPerDayAt(state, iata).toLocaleString()}/day · ${nextText}.`
-      : `Slots: none held · ${nextText}.`,
+  const nextText = next === null ? 'full' : next === 0 ? 'next pair free' : `next pair ${money(next)}/day`;
+  const slotsLine = lineWithInfo(
+    held > 0 ? `Slots ${held} pair${held === 1 ? '' : 's'} · ${money(slotFeesPerDayAt(state, iata))}/day · ${nextText}` : `Slots none held · ${nextText}`,
+    'Each daily departure needs a slot pair. The first pair at an airport nobody serves is free; after that the fee rises with how busy the field is, and is locked when taken. Unused slots are released at midnight.',
   );
   return [loadLine, slotsLine];
 }
@@ -162,13 +160,13 @@ function groundedPlanes(state: SimState, iata: string, changed: () => void): HTM
       row.className = 'airport-aog-row';
       const days = daysUntilReturn(state, event);
       const text = document.createElement('span');
-      text.textContent = `${event.tail} AOG (${event.fault}), back in ${days} day${days === 1 ? '' : 's'}`;
+      text.textContent = `AOG · ${event.tail} · ${event.fault} · back ${days}d`;
       row.append(text);
       const cost = expediteCost(state, event.tail);
       if (cost !== null) {
         const expedite = document.createElement('button');
         expedite.type = 'button';
-        expedite.textContent = `Expedite: $${cost.toLocaleString()} for a day sooner`;
+        expedite.textContent = `Expedite 1d · ${money(cost)}`;
         expedite.disabled = state.cash < cost;
         if (expedite.disabled) expedite.title = `Needs $${cost.toLocaleString()} on hand.`;
         expedite.addEventListener('click', () => {
@@ -195,7 +193,7 @@ function planHubButton(state: SimState, iata: string, changed: () => void): HTML
   button.className = 'inspector-plan-hub';
   button.classList.toggle('is-warn', plan.urgency === 'warn');
   button.classList.toggle('is-act', plan.urgency === 'act');
-  button.textContent = plan.urgency === 'none' ? 'Plan hub' : `Plan hub · about $${Math.round(plan.missedPerDay).toLocaleString()}/day missed`;
+  button.textContent = plan.urgency === 'none' ? 'Plan hub' : `Plan hub · ~${shortMoney(plan.missedPerDay)}/day missed`;
   button.addEventListener('click', () => openHubPlanner(state, iata, changed));
   return button;
 }
@@ -215,7 +213,7 @@ function marketRows(state: SimState, iata: string): HTMLElement {
   list.className = 'inspector-rows';
   const markets = [...flightsByOther.entries()].sort((a, b) => b[1] - a[1]);
   if (markets.length === 0) {
-    list.append(line('No markets served.'));
+    list.append(line('None'));
     return list;
   }
   for (const [other, flights] of markets) {
@@ -230,7 +228,7 @@ function marketRows(state: SimState, iata: string): HTMLElement {
     detail.className = 'inspector-row-detail';
     const load = marketLoadFactor(state, iata, other);
     detail.textContent =
-      `${flights} flight${flights === 1 ? '' : 's'}/day · ${formatLoadFactor(load)} full · NPS ${formatNps(marketNps(state, iata, other))}` + (lastMargin === null ? '' : ` · ${pnlMoney(lastMargin)} yesterday`);
+      `${flights}/day · LF ${formatLoadFactor(load)} · NPS ${formatNps(marketNps(state, iata, other))}` + (lastMargin === null ? '' : ` · ${pnlMoney(lastMargin)} yday`);
     if (lastMargin !== null && lastMargin < 0) detail.classList.add('is-over');
     row.append(name, detail);
     row.addEventListener('click', () => select({ kind: 'route', a: iata, b: other }));
@@ -257,14 +255,16 @@ function whereToFlyNext(state: SimState, iata: string): HTMLElement[] {
     const detail = document.createElement('span');
     detail.className = 'inspector-row-detail';
     const rivals = suggestion.rivalFlights === 0 ? 'no rivals' : `rivals fly ${suggestion.rivalFlights}/day`;
-    detail.textContent = `${suggestion.size} market · ${suggestion.service.toLowerCase()} · ${rivals} · $${suggestion.fare} fare · ${suggestion.distanceNm.toLocaleString()} nm, by ${suggestion.className}`;
+    detail.textContent = `${suggestion.size} · ${suggestion.service.toLowerCase()} · ${rivals} · $${suggestion.fare} · ${suggestion.distanceNm.toLocaleString()} nm · ${suggestion.className}`;
     row.append(name, detail);
     row.addEventListener('click', () => openRouteForm(state, iata, suggestion.dest));
     list.append(row);
   }
   return [
-    heading('Where to fly next'),
-    line('The biggest markets from here you don\'t fly yet, raised where the far end is starved for service and lowered where rivals already fly. Click one to plan it.'),
+    heading(
+      'Where to fly next',
+      'The biggest markets from here you don\'t fly yet: raised where the far end is starved for service, lowered where rivals already fly. Each shows its size, service, rivals, going fare, distance and the smallest plane that reaches. Click one to plan it.',
+    ),
     list,
   ];
 }
@@ -279,10 +279,9 @@ function crewSection(state: SimState, iata: string, changed: () => void): HTMLEl
   const readout = ops.crewReadout(state, iata);
   if (!readout) return [];
   const nodes: HTMLElement[] = [
-    heading('Crews'),
-    line(
-      `Crews are rated for one class. Hiring takes ${readout.leadDays} days; retraining from another class takes ${readout.retrainDays} and costs half a hire.`,
-      'inspector-line goal-ahead',
+    heading(
+      'Crews',
+      `Crews are rated for one class. Hiring takes ${readout.leadDays} days; retraining from another class takes ${readout.retrainDays} and costs half a hire. Enough crews keep shifts to 8 hours; fewer means late legs flown tired, and too few grounds planes. Spare crews cost standby pay.`,
     ),
   ];
   const button = (label: string, disabled: boolean, act: () => void) => {
@@ -299,29 +298,29 @@ function crewSection(state: SimState, iata: string, changed: () => void): HTMLEl
   };
   for (const crew of readout.classes) {
     const spare = crew.crews - crew.ideal;
-    const joining = crew.arriving > 0 ? ` +${crew.arriving} joining.` : '';
+    const joining = crew.arriving > 0 ? ` · +${crew.arriving} joining` : '';
     const status =
       crew.crews < crew.minimum
-        ? `short: its planes need at least ${crew.minimum}, so some are grounded.`
+        ? `short · need ${crew.minimum} · planes grounded`
         : crew.crews < crew.ideal
-          ? `stretched: ${crew.ideal} would keep shifts to 8 hours, so late legs are flown tired.`
+          ? `stretched · ${crew.ideal} for 8h shifts`
           : spare > 0
-            ? `${spare} spare, standing by at $${crew.standbyPerDay.toLocaleString()} a day each.`
+            ? `${spare} spare · ${money(crew.standbyPerDay)}/day each`
             : crew.ideal > 0
-              ? 'just enough for fresh crews.'
-              : 'no planes of this class here.';
-    nodes.push(line(`${crew.name} crews x${crew.crews}: ${status}${joining}`, crew.crews < crew.minimum ? 'inspector-line is-over' : 'inspector-line'));
+              ? 'right-sized'
+              : 'no planes here';
+    nodes.push(line(`${crew.name} ×${crew.crews} · ${status}${joining}`, crew.crews < crew.minimum ? 'inspector-line is-over' : 'inspector-line'));
     const row = document.createElement('div');
     row.className = 'crew-buttons';
-    row.append(button(`Hire 1: ${money(crew.hireFee)}`, !crew.open || state.cash < crew.hireFee, () => ops.hireCrewsAt(state, iata, crew.classCode, 1)));
+    row.append(button(`Hire 1 · ${money(crew.hireFee)}`, !crew.open || state.cash < crew.hireFee, () => ops.hireCrewsAt(state, iata, crew.classCode, 1)));
     // Retrain one from whichever other class has the most spare.
     const donor = readout.classes
       .filter((other) => other.classCode !== crew.classCode && other.crews - other.ideal > 0)
       .sort((x, y) => y.crews - y.ideal - (x.crews - x.ideal))[0];
     if (donor && crew.open) {
-      row.append(button(`Retrain 1 from ${donor.name}: ${money(crew.retrainFee)}`, state.cash < crew.retrainFee, () => ops.retrainCrewsAt(state, iata, donor.classCode, crew.classCode, 1)));
+      row.append(button(`Retrain 1 from ${donor.name} · ${money(crew.retrainFee)}`, state.cash < crew.retrainFee, () => ops.retrainCrewsAt(state, iata, donor.classCode, crew.classCode, 1)));
     }
-    if (spare > 0) row.append(button('Let 1 go', false, () => ops.releaseCrewsAt(state, iata, crew.classCode, 1)));
+    if (spare > 0) row.append(button('Release 1', false, () => ops.releaseCrewsAt(state, iata, crew.classCode, 1)));
     nodes.push(row);
   }
   return nodes;

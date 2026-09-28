@@ -214,7 +214,7 @@ export function formatNps(value: number): string {
 export function brandInWords(state: SimState, origin: string, dest: string, competitorRoutes: CompetitorOffering[]): string | null {
   if (competitorFaresForMarket(origin, dest, competitorRoutes).length === 0) return null;
   const gap = Math.round(marketNps(state, origin, dest) - RIVAL_NPS);
-  if (Math.abs(gap) < 3) return `About level with a typical rival's ${formatNps(RIVAL_NPS)}: neither name wins passengers from the other.`;
-  if (gap > 0) return `${gap} points ahead of a typical rival's ${formatNps(RIVAL_NPS)}: your name wins you some of their passengers.`;
-  return `${-gap} points behind a typical rival's ${formatNps(RIVAL_NPS)}: they win some of your passengers. Late flights, old planes and fares above theirs cost you here.`;
+  if (Math.abs(gap) < 3) return `level with rivals (${formatNps(RIVAL_NPS)})`;
+  if (gap > 0) return `+${gap} vs rivals · winning their pax`;
+  return `−${-gap} vs rivals · losing pax to them`;
 }

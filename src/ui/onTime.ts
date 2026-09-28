@@ -160,9 +160,9 @@ export function updateOnTimePanel(state: SimState): void {
       : 1;
   completionEl.textContent =
     state.flightsScheduledTotal === 0
-      ? 'Nothing scheduled yet.'
-      : `${Math.round(completion * 100)}% completion factor — ${state.flightsCancelledTotal.toLocaleString()} of ` +
-        `${state.flightsScheduledTotal.toLocaleString()} scheduled departures cancelled.`;
+      ? 'Nothing scheduled yet'
+      : `Completion ${Math.round(completion * 100)}% · CNX ${state.flightsCancelledTotal.toLocaleString()} of ` +
+        `${state.flightsScheduledTotal.toLocaleString()} departures`;
 
   cancelRowsBody.innerHTML = '';
   const totalCancelled = state.flightsCancelledTotal;

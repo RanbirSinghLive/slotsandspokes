@@ -26,7 +26,9 @@ export type InnovationId = 'online-booking' | 'younger-airframes' | 'crew-academ
 export type Innovation = {
   id: InnovationId;
   name: string;
-  /** What it does, in words the player can weigh against the price. */
+  /** What it does, at a glance: "Yield +4%". */
+  summary: string;
+  /** What it does, in full, for the (i) beside it. */
   description: string;
   /** The ladder tier whose climbing opens it (sim/ladder.ts's tier id). */
   openedBy: string;
@@ -60,6 +62,7 @@ export const INNOVATIONS: Innovation[] = [
   {
     id: 'online-booking',
     name: 'Online booking',
+    summary: `Yield +${Math.round((DIRECT_BOOKING_YIELD - 1) * 100)}%`,
     description: `Sell tickets on your own website: no agent's cut, so every ticket earns ${Math.round((DIRECT_BOOKING_YIELD - 1) * 100)}% more.`,
     openedBy: 'regional',
     oneOffPrice: 400_000,
@@ -68,6 +71,7 @@ export const INNOVATIONS: Innovation[] = [
   {
     id: 'younger-airframes',
     name: 'Younger airframes',
+    summary: `New leases ${REFURBISHMENT_YEARS} yrs younger`,
     description: `A heavy-check deal with the lessor: every plane you lease from now on is refurbished ${REFURBISHMENT_YEARS} years younger (not below ${MIN_REFURBISHED_AGE}), so it runs late, breaks down and disappoints less. You pay the younger airframe's rate.`,
     openedBy: 'regional',
     oneOffPrice: 300_000,
@@ -76,6 +80,7 @@ export const INNOVATIONS: Innovation[] = [
   {
     id: 'crew-academy',
     name: 'Crew academy',
+    summary: 'Hiring and retraining 2× faster',
     description: `Train your own crews: hiring and retraining them take half the time, so a new plane or a new type is crewed sooner.`,
     openedBy: 'start-up',
     oneOffPrice: 150_000,
@@ -84,14 +89,16 @@ export const INNOVATIONS: Innovation[] = [
   {
     id: 'loyalty-scheme',
     name: 'Loyalty scheme',
+    summary: `Recapture ${Math.round(LOYALTY_RECAPTURE_RATE * 100)}% · rivals see −${Math.round(LOYALTY_KEEPS * 100)}%`,
     description: `Members wait for your next flight: ${Math.round(LOYALTY_RECAPTURE_RATE * 100)}% of the passengers a full flight turns away rebook with you, not ${Math.round(RECAPTURE_RATE * 100)}%. And they stick: rivals see ${Math.round(LOYALTY_KEEPS * 100)}% less money to be made on your routes.`,
     openedBy: 'network',
     oneOffPrice: 500_000,
-    runningCost: `${Math.round(LOYALTY_COST_SHARE * 100)}% of revenue a day`,
+    runningCost: `${Math.round(LOYALTY_COST_SHARE * 100)}% of revenue`,
   },
   {
     id: 'winglets',
     name: 'Winglet retrofits',
+    summary: `Fuel burn −${Math.round((1 - WINGLET_FUEL_FACTOR) * 100)}%`,
     description: `Retrofit winglets across the fleet: every flight burns ${Math.round((1 - WINGLET_FUEL_FACTOR) * 100)}% less fuel, for good.`,
     openedBy: 'network',
     oneOffPrice: 800_000,
@@ -100,10 +107,11 @@ export const INNOVATIONS: Innovation[] = [
   {
     id: 'codeshare-feed',
     name: 'Codeshare feed',
+    summary: `Connecting pax +${Math.round((CODESHARE_FEED_FACTOR - 1) * 100)}%`,
     description: `A partner airline sells your connections on its own flights: ${Math.round((CODESHARE_FEED_FACTOR - 1) * 100)}% more connecting passengers at every hub.`,
     openedBy: 'international',
     oneOffPrice: 0,
-    runningCost: `$${CODESHARE_COST_PER_DAY.toLocaleString()} a day`,
+    runningCost: `$${CODESHARE_COST_PER_DAY.toLocaleString()}/day`,
   },
 ];
 
@@ -123,13 +131,13 @@ export function innovationOpen(state: SimState, innovation: Innovation): boolean
 
 /** Why it can't be adopted right now, or null if it can. */
 export function adoptBlockedReason(state: SimState, innovation: Innovation): string | null {
-  if (isAdopted(state, innovation.id)) return 'Already running.';
+  if (isAdopted(state, innovation.id)) return 'Running';
   if (!innovationOpen(state, innovation)) {
     const tierIndex = LADDER.findIndex((tier) => tier.id === innovation.openedBy);
     const becomes = LADDER[tierIndex + 1];
-    return `Opens when you become ${becomes ? airlineCalled(becomes) : 'a bigger airline'}.`;
+    return `Opens as ${becomes ? airlineCalled(becomes) : 'a bigger airline'}`;
   }
-  if (state.cash < innovation.oneOffPrice) return `Needs $${innovation.oneOffPrice.toLocaleString()} on hand.`;
+  if (state.cash < innovation.oneOffPrice) return `Needs $${innovation.oneOffPrice.toLocaleString()} cash`;
   return null;
 }
 

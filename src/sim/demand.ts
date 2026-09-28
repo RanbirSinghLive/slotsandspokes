@@ -70,7 +70,7 @@ export function suppressedMarketReason(originIata: string, destIata: string): st
   const origin = airportsByIata.get(originIata);
   const dest = airportsByIata.get(destIata);
   if (origin && dest && originIata !== destIata && greatCircleDistanceNm(origin, dest) < MIN_MARKET_NM) {
-    return `These airports are under ${MIN_MARKET_NM} nm apart and serve the same place, so nobody flies between them.`;
+    return `under ${MIN_MARKET_NM} nm apart, same city`;
   }
   return undefined;
 }

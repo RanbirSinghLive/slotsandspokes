@@ -71,25 +71,24 @@ export function showFlightTooltip(
 
   const nodes: HTMLElement[] = [
     line(`${flight.tail} · ${className}`, 'flight-tooltip-title'),
-    line(`${flight.origin} → ${flight.dest}, lands ${clock(state, flight.arriveMinute)}`),
+    line(`${flight.origin}→${flight.dest} · ETA ${clock(state, flight.arriveMinute)}`),
     // Its passengers are only settled when it lands, so the route's recent
     // load factor stands in (sim/loadFactor.ts).
-    line(`Route load factor: ${formatLoadFactor(marketLoadFactor(state, flight.origin, flight.dest))} (last 7 days)`),
-    line(`Route NPS: ${formatNps(marketNps(state, flight.origin, flight.dest))} (last month)`),
+    line(`Route LF ${formatLoadFactor(marketLoadFactor(state, flight.origin, flight.dest))} · NPS ${formatNps(marketNps(state, flight.origin, flight.dest))}`),
   ];
 
   if (lateOnArrival <= 0) {
     nodes.push(line('On time', 'is-good'));
   } else if (lateOnArrival <= ON_TIME_GRACE_MINUTES) {
-    nodes.push(line(`${lateOnArrival} min late: still counts as on time (${ON_TIME_GRACE_MINUTES} min grace)`, 'is-good'));
+    nodes.push(line(`+${lateOnArrival} min · on time (≤${ON_TIME_GRACE_MINUTES})`, 'is-good'));
   } else {
-    nodes.push(line(`${lateOnArrival} min late`, 'is-late'));
+    nodes.push(line(`+${lateOnArrival} min`, 'is-late'));
   }
 
   const codes: HTMLElement[] = [];
   if (leftLate > 0) codes.push(row('ROT', 'Late inbound aircraft', leftLate));
   if (flight.delayByCause.knockOn > 0) codes.push(row('TURN', 'Rushed turnaround', flight.delayByCause.knockOn));
-  if (flight.delayByCause.age > 0) codes.push(row('ACFT', `Aircraft (${aircraft?.ageYears ?? 0} yrs old)`, flight.delayByCause.age));
+  if (flight.delayByCause.age > 0) codes.push(row('ACFT', `Aircraft, ${aircraft?.ageYears ?? 0} yrs`, flight.delayByCause.age));
   if (flight.delayByCause.weather > 0) codes.push(row('WX', `Weather at ${flight.origin}`, flight.delayByCause.weather));
   if (flight.delayByCause.congestion > 0) {
     const busier = airportLoad(state, flight.origin) >= airportLoad(state, flight.dest) ? flight.origin : flight.dest;
@@ -102,15 +101,15 @@ export function showFlightTooltip(
   }
 
   if (restOfDay.length === 0) {
-    nodes.push(line('Last flight of its day.', 'flight-tooltip-section'));
+    nodes.push(line('Last flight of its day', 'flight-tooltip-section'));
   } else {
-    nodes.push(line('Rest of its day, if nothing else goes wrong', 'flight-tooltip-section'));
+    nodes.push(line('Rest of day · projected', 'flight-tooltip-section'));
     for (const projected of restOfDay.slice(0, MAX_REST_OF_DAY_ROWS)) {
       const status = projected.cancelled
-        ? 'cancelled (22:00 curfew)'
+        ? 'CNX · curfew'
         : projected.onTime
           ? 'on time'
-          : `+${projected.lateMinutes}m late`;
+          : `+${projected.lateMinutes} min`;
       nodes.push(
         line(
           `${projected.leg.origin} → ${projected.leg.dest}  ${clock(state, projected.projectedDepartMinute)}  ${status}`,
@@ -124,8 +123,7 @@ export function showFlightTooltip(
     if (cancellations > 0) {
       nodes.push(
         line(
-          `${cancellations} flight${cancellations === 1 ? '' : 's'} would miss the 22:00 curfew and be cancelled. ` +
-            `A turn buffer on ${flight.origin}–${flight.dest} would absorb the delay.`,
+          `${cancellations} CNX at curfew · a turn buffer on ${flight.origin}–${flight.dest} would absorb it`,
           'flight-tooltip-hint',
         ),
       );
@@ -133,10 +131,10 @@ export function showFlightTooltip(
       // The buffer that helps is the one on the route being flown now: it
       // pads the turn right after this flight (sim/turnBuffer.ts).
       nodes.push(
-        line(`The delay never clears today. A turn buffer on ${flight.origin}–${flight.dest} would absorb it.`, 'flight-tooltip-hint'),
+        line(`Delay carries all day · a turn buffer on ${flight.origin}–${flight.dest} would absorb it`, 'flight-tooltip-hint'),
       );
     } else if (recovers > 0) {
-      nodes.push(line(`Back on time after ${recovers} more late flight${recovers === 1 ? '' : 's'}.`, 'flight-tooltip-hint'));
+      nodes.push(line(`Recovers after ${recovers} more late flight${recovers === 1 ? '' : 's'}`, 'flight-tooltip-hint'));
     }
   }
 

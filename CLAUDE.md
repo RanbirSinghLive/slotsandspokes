@@ -147,6 +147,12 @@ Canvas renders the map. **Everything else is real DOM** — real `<table>`,
 `<button>`, `<input>` — positioned over or beside the canvas with CSS. Never
 draw a control inside the canvas. Saves go in `localStorage`.
 
+**Copy is airline-ops style**: numbers and codes first, noun phrases joined
+by " · ", no narration or hedges ("AOG YUL · C-P002 · back 3d"). A panel
+says what *is*; how a mechanic works goes in an (i) (`info()` in
+`ui/inspector/dom.ts`). Short forms (AOG, CNX, LF, OTP, NPS) only where an
+(i) or tooltip explains them nearby.
+
 ---
 
 ## Data

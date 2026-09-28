@@ -1,5 +1,5 @@
 import { dayIndex } from '../../sim/clock';
-import { line, heading } from './dom';
+import { info, line, heading, lineWithInfo } from './dom';
 import { money } from '../format';
 import { FUEL_PRICE_BASELINE } from '../../sim/fuel';
 import { activeHedge, describeFuelPrice } from '../../sim/fuelPrice';
@@ -24,12 +24,12 @@ function innovationCard(state: SimState, option: InnovationOption, changed: () =
   card.classList.toggle('is-locked', !option.adopted && option.blocked !== null);
   const name = document.createElement('div');
   name.className = 'office-card-name';
-  name.textContent = option.adopted ? `✓ ${option.name}` : option.name;
-  const price = [option.oneOffPrice > 0 ? `${money(option.oneOffPrice)} once` : null, option.runningCost]
+  name.append(option.adopted ? `✓ ${option.name} ` : `${option.name} `, info(option.description));
+  const price = [option.oneOffPrice > 0 ? `${money(option.oneOffPrice)} once` : null, option.runningCost ? `${option.runningCost} ongoing` : null]
     .filter(Boolean)
-    .join(', then ');
-  const status = option.adopted ? (option.runningCost ? `Running: ${option.runningCost}.` : 'Adopted.') : `Costs ${price}.`;
-  card.append(name, line(option.description), line(status, 'inspector-line office-card-price'));
+    .join(' · ');
+  const status = option.adopted ? (option.runningCost ? `Running · ${option.runningCost}` : 'Adopted') : price;
+  card.append(name, line(option.summary), line(status, 'inspector-line office-card-price'));
   if (option.adopted) return card;
 
   if (option.blocked) {
@@ -39,15 +39,15 @@ function innovationCard(state: SimState, option: InnovationOption, changed: () =
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'inspector-plan-hub';
-  button.textContent = `Adopt ${option.name.toLowerCase()}`;
+  button.textContent = 'Adopt';
   // Two clicks, since it can't be undone and a running cost runs for good.
   let armed = false;
   button.addEventListener('click', () => {
     if (!armed) {
       armed = true;
       button.textContent = option.runningCost
-        ? `Click again to adopt. It can't be dropped: ${option.runningCost} from now on.`
-        : `Click again to pay ${money(option.oneOffPrice)}. It can't be undone.`;
+        ? `Confirm · ${option.runningCost} for good`
+        : `Confirm · ${money(option.oneOffPrice)}, permanent`;
       button.classList.add('is-act');
       return;
     }
@@ -89,7 +89,7 @@ function candidateCard(state: SimState, candidate: ExecutiveOption, holder: stri
     name,
     line(candidate.flavor, 'inspector-line office-card-flavor'),
     line(describeEffect(candidate.effect)),
-    line(`${money(candidate.signingFee)} to sign, then ${money(candidate.salaryPerDay)} a day.`, 'inspector-line office-card-price'),
+    line(`Sign ${money(candidate.signingFee)} · ${money(candidate.salaryPerDay)}/day`, 'inspector-line office-card-price'),
   );
   if (candidate.blocked) {
     card.append(line(candidate.blocked, 'inspector-line goal-ahead'));
@@ -97,8 +97,8 @@ function candidateCard(state: SimState, candidate: ExecutiveOption, holder: stri
   }
   card.append(
     confirmButton(
-      holder ? `Replace ${holder} with ${candidate.name}` : `Appoint ${candidate.name}`,
-      `Click again to pay ${money(candidate.signingFee)}.${holder ? ` ${holder} leaves with no refund.` : ''}`,
+      holder ? `Replace ${holder}` : 'Appoint',
+      `Confirm · ${money(candidate.signingFee)}${holder ? ` · ${holder} leaves, no refund` : ''}`,
       () => {
         ops.appointExecutiveById(state, candidate.id);
         changed();
@@ -110,10 +110,8 @@ function candidateCard(state: SimState, candidate: ExecutiveOption, holder: stri
 
 function executivesSection(state: SimState, changed: () => void): HTMLElement[] {
   const nodes: HTMLElement[] = [
-    heading('Executives'),
-    line(
-      `You're the chief executive; these three chairs are yours to fill. The strongest candidates only talk to an airline passengers rate well (yours: NPS ${formatNps(networkNps(state))}).`,
-    ),
+    heading('Executives', 'You are the chief executive; these three chairs are yours to fill. The strongest candidates only talk to an airline passengers rate well. Once hired, they stay if NPS falls.'),
+    line(`Airline NPS ${formatNps(networkNps(state))}`),
   ];
   for (const chair of ops.executiveOptions(state)) {
     const title = document.createElement('h4');
@@ -129,8 +127,8 @@ function executivesSection(state: SimState, changed: () => void): HTMLElement[] 
       card.append(
         name,
         line(describeEffect(chair.holder.effect)),
-        line(`Since day ${chair.hiredDay}, at ${money(chair.holder.salaryPerDay)} a day.`, 'inspector-line office-card-price'),
-        confirmButton('Let go', `Click again to let ${chair.holder.name} go. The salary stops; the fee isn't refunded.`, () => {
+        line(`Since day ${chair.hiredDay} · ${money(chair.holder.salaryPerDay)}/day`, 'inspector-line office-card-price'),
+        confirmButton('Let go', 'Confirm · salary stops, no refund', () => {
           ops.letExecutiveGo(state, chair.role as ExecutiveRole);
           changed();
         }),
@@ -202,11 +200,11 @@ function hedgeStatus(state: SimState): HTMLElement | null {
   const hedge = state.fuelHedge;
   if (!hedge) return null;
   const net = hedge.saved - hedge.premium;
-  const result = `${hedge.saved >= 0 ? 'saved' : 'cost'} ${money(Math.abs(hedge.saved))} against the market, for a ${money(hedge.premium)} premium: ${net >= 0 ? 'up' : 'down'} ${money(Math.abs(net))}`;
+  const result = `vs market ${hedge.saved >= 0 ? '+' : ''}${money(hedge.saved)} · premium ${money(hedge.premium)} · net ${net >= 0 ? '+' : ''}${money(net)}`;
   if (activeHedge(state)) {
-    return line(`Hedged at ${describeFuelPrice(hedge.lockedPrice)} until day ${hedge.endDay}. So far it has ${result}.`, `inspector-line ${net >= 0 ? 'is-good' : ''}`);
+    return line(`Hedged at ${describeFuelPrice(hedge.lockedPrice)} to day ${hedge.endDay} · ${result}`, `inspector-line ${net >= 0 ? 'is-good' : ''}`);
   }
-  return line(`Your last hedge (days ${hedge.startDay} to ${hedge.endDay}) ${result}.`);
+  return line(`Last hedge (days ${hedge.startDay}–${hedge.endDay}) · ${result}`);
 }
 
 /** One button per hedge length, each two clicks since the premium is spent for good. */
@@ -218,13 +216,13 @@ function hedgeButtons(state: SimState, changed: () => void): HTMLElement[] {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'inspector-plan-hub';
-    button.textContent = `Hedge ${option.days} days: ${money(option.premium)}`;
+    button.textContent = `Hedge ${option.days}d · ${money(option.premium)}`;
     button.disabled = option.blocked !== null;
     let armed = false;
     button.addEventListener('click', () => {
       if (!armed) {
         armed = true;
-        button.textContent = `Click again to pay ${money(option.premium)} and lock ${describeFuelPrice(option.lockedPrice)} until day ${dayIndex(state) + option.days}.`;
+        button.textContent = `Confirm · lock ${describeFuelPrice(option.lockedPrice)} to day ${dayIndex(state) + option.days}`;
         button.classList.add('is-act');
         return;
       }
@@ -251,23 +249,25 @@ export function buildHeadOfficeView(state: SimState, changed: () => void): HTMLE
 
   const history = state.fuelPriceHistory ?? [];
   root.append(
-    heading('Fuel'),
-    line(`Fuel today: ${describeFuelPrice(state.fuelPriceIndex)} against the usual price. It wanders from day to day and drifts back, and a fuel spike sends it up for weeks.`),
+    heading('Fuel', 'The price wanders from day to day and drifts back to the usual price; a fuel spike sends it up for weeks.'),
+    line(`Today · ${describeFuelPrice(state.fuelPriceIndex)}`),
     fuelChart(state),
-    line(`The last ${history.length} day${history.length === 1 ? '' : 's'}. Dashed: the usual price.${state.fuelHedge ? ' Green: your locked price.' : ''}`, 'inspector-line goal-ahead'),
+    line(`${history.length}d · dashed usual${state.fuelHedge ? ' · green locked' : ''}`, 'inspector-line goal-ahead'),
   );
   const status = hedgeStatus(state);
   if (status) root.append(status);
   root.append(
-    line("A hedge locks today's price on all your fuel. If fuel rises, you pay less than the market; if it falls, you still pay today's price. The premium is spent either way, so hedging at random loses money: it's a bet on where the price goes."),
+    lineWithInfo(
+      'Hedge',
+      "A hedge locks today's price on all your fuel. If fuel rises, you pay less than the market; if it falls, you still pay today's price. The premium is spent either way, so hedging at random loses money: it's a bet on where the price goes.",
+    ),
     ...hedgeButtons(state, changed),
   );
 
   root.append(...executivesSection(state, changed));
 
   root.append(
-    heading('Innovations'),
-    line('Programmes the ladder opens (see Goals). Each is yours to adopt, for good, if it pays for your airline.'),
+    heading('Innovations', 'Programmes the ladder opens (see Goals). Each is yours to adopt, for good, if it pays for your airline.'),
     ...ops.innovationOptions(state).map((option) => innovationCard(state, option, changed)),
   );
   return root;

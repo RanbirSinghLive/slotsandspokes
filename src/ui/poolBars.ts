@@ -71,7 +71,7 @@ export function buildPoolRows(
 
       const name = document.createElement('span');
       name.className = 'pool-name';
-      name.append(planeIconElement(pool.code), planesDelta !== 0 ? `${pool.name} x${pool.planes}→${nextPlanes}` : `${pool.name} x${pool.planes}`);
+      name.append(planeIconElement(pool.code), planesDelta !== 0 ? `${pool.name} ×${pool.planes}→${nextPlanes}` : `${pool.name} ×${pool.planes}`);
       const inbound = inboundOf?.(pool.code) ?? 0;
       if (inbound > 0) {
         const coming = document.createElement('span');

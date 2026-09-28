@@ -77,8 +77,8 @@ function showRouteHoverTooltip(
     const suppressed = suppressedMarketReason(origin.iata, candidate.iata);
     const fill = demandAgainstSeats(state, origin.iata, candidate.iata, newFrequency, type.seats);
     const pdewText = suppressed
-      ? 'No market — same city'
-      : `${marketSize(state, origin.iata, candidate.iata)} market · ${type.seats} seats, ${fill.words}`;
+      ? 'No market · same city'
+      : `${marketSize(state, origin.iata, candidate.iata)} market · ${type.seats} seats · ${fill.words}`;
 
     // A stop can be comfortably in range from here and still be a dead
     // end, because the rotation has to get *home*: the range ring is drawn
@@ -93,9 +93,9 @@ function showRouteHoverTooltip(
     const cannotGetHome = !outOfRange && candidate.iata !== base.iata && homeNm > type.rangeNm;
 
     routeHoverTooltipBody.textContent = outOfRange
-      ? `${pdewText} — out of range (${Math.round(distanceNm)} nm)`
+      ? `${pdewText} · out of range (${Math.round(distanceNm)} nm)`
       : cannotGetHome
-        ? `${pdewText} — ${base.iata} is ${Math.round(homeNm)} nm back, too far to close directly; needs another stop`
+        ? `${pdewText} · ${base.iata} ${Math.round(homeNm)} nm back, out of range · add a stop`
         : `${pdewText}  ·  ${candidate.iata} ${nextSlotText(state, candidate.iata)}`;
     routeHoverTooltipBody.classList.toggle('out-of-range', outOfRange);
     routeHoverTooltipBody.classList.toggle('needs-another-stop', cannotGetHome);
@@ -121,13 +121,13 @@ function showRouteHoverTooltip(
  */
 export function describeSlotQuotes(quotes: SlotQuote[]): string {
   const priced = quotes.filter((quote) => quote.fees.length > 0);
-  if (priced.length === 0) return 'Slots: already held.';
+  if (priced.length === 0) return 'slots held';
   const parts = priced.map((quote) => {
     const total = quote.fees.reduce((sum, fee) => sum + fee, 0);
     const count = quote.fees.length > 1 ? `${quote.fees.length} pairs ` : '';
     return `${quote.iata} ${count}${total === 0 ? 'free' : `${money(total)}/day`}`;
   });
-  return `New slots: ${parts.join(', ')}.`;
+  return `new slots ${parts.join(', ')}`;
 }
 
 /** What the next slot pair at an airport would cost, for the hover tooltip. */
@@ -518,7 +518,7 @@ function updateFormValidation(chain: Airport[], dest: Airport, state: SimState):
     formLabel.textContent = `${origin.iata} → ${dest.iata}`;
     formBlock.textContent = '';
     formTailLabel.textContent = '';
-    formError.textContent = `No plane is based at ${chainOrigin(chain).iata}. Tap the airport and use Plane to add one.`;
+    formError.textContent = `No plane based at ${chainOrigin(chain).iata} · lease one there first`;
     formConfirmButton.disabled = true;
     formAddStopButton.disabled = true;
     formPdew.textContent = '';
@@ -565,8 +565,8 @@ function updateFormValidation(chain: Airport[], dest: Airport, state: SimState):
     const suppressed = suppressedMarketReason(origin.iata, dest.iata);
     const fill = demandAgainstSeats(state, origin.iata, dest.iata, newFrequency, type.seats);
     formPdew.textContent = suppressed
-      ? `${origin.iata}–${dest.iata}: no market — ${suppressed}`
-      : `${origin.iata}–${dest.iata}: ${marketSize(state, origin.iata, dest.iata)} market · ${type.seats} seats, ${fill.words}`;
+      ? `${origin.iata}–${dest.iata} · no market · ${suppressed}`
+      : `${origin.iata}–${dest.iata} · ${marketSize(state, origin.iata, dest.iata)} market · ${type.seats} seats · ${fill.words}`;
     // See the hover tooltip's own note: thin is judged on the market fully
     // grown, not on what it carries before anyone has built it.
     formPdew.classList.toggle('thin-market', neverFills(state, origin.iata, dest.iata, newFrequency, type.seats));
@@ -581,8 +581,7 @@ function updateFormValidation(chain: Airport[], dest: Airport, state: SimState):
   const spareBefore = plan.spareMinutesBefore / USABLE_DAY_MINUTES;
   const spareAfter = (plan.spareMinutesBefore - plan.rotationMinutes) / USABLE_DAY_MINUTES;
   formUtilisation.textContent =
-    `Uses ${Math.round(plan.rotationShare * 100)}% of an aircraft — ` +
-    `${plan.base.iata} has ${spareBefore.toFixed(2)} spare, ${spareAfter.toFixed(2)} after this.`;
+    `${Math.round(plan.rotationShare * 100)}% of a plane · ${plan.base.iata} spare ${spareBefore.toFixed(2)} → ${spareAfter.toFixed(2)}`;
 
   formSlots.textContent = describeSlotQuotes(plan.slotQuotes);
 
@@ -594,7 +593,7 @@ function updateFormValidation(chain: Airport[], dest: Airport, state: SimState):
   // in that state.
   formPositioningPreview.textContent =
     !plan.error && aircraft && !aircraft.baseAirport
-      ? `${tail} has no base yet — this rotation will make ${plan.base.iata} its base.`
+      ? `${tail} unbased · this makes ${plan.base.iata} its base`
       : '';
 }
 

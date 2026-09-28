@@ -120,7 +120,7 @@ export function rivalLadderInWords(state: SimState, code: string): string {
   const count = current.milestones.filter((milestone) => met[milestone.id] !== undefined).length;
   const next = LADDER[climbed + 1];
   const opens = current.opensClasses.map((typeCode) => pluralClassName(classByCode(typeCode)?.name ?? typeCode)).join(', ');
-  return `${becameName}: ${Math.min(count, current.needed)} of ${current.needed} milestones toward ${next ? airlineCalled(next) : 'the next tier'}, which opens ${opens}`;
+  return `${becameName} · ${Math.min(count, current.needed)}/${current.needed} to ${next ? airlineCalled(next) : 'the next tier'} · opens ${opens}`;
 }
 
 /** Whether a rival may lease this class: the tier that opens it is climbed, as for the player (sim/ladder.ts's classOpen()). */

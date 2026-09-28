@@ -5,6 +5,7 @@ import { marketKey } from '../../sim/schedule';
 import type { SimState } from '../../sim/state';
 import * as ops from '../routeActions';
 import { select, type RouteSort } from '../selection';
+import { info } from './dom';
 
 /**
  * The Routes view (Network › Routes, opened from the On-time, Completion,
@@ -125,7 +126,8 @@ export function buildRoutesView(state: SimState, sort: RouteSort): HTMLElement {
 
   const intro = document.createElement('div');
   intro.className = 'inspector-line';
-  intro.textContent = `Every route, worst ${column.name.toLowerCase()} first. On-time, flown and load are the last 7 days, NPS about the last month. Click a heading to sort by it, or a route to open it.`;
+  intro.textContent = `Worst ${column.name.toLowerCase()} first`;
+  intro.append(' ', info('On-time, flown and load are the last 7 days; NPS about the last month. Click a heading to sort by it, or a route to open it.'));
   root.append(intro);
 
   const table = document.createElement('table');

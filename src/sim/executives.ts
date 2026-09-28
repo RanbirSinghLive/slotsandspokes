@@ -103,9 +103,9 @@ export function appointedCandidate(state: SimState, role: ExecutiveRole): Execut
 export function appointBlockedReason(state: SimState, candidate: ExecutiveCandidate): string | null {
   if (state.executives[candidate.role]?.candidateId === candidate.id) return 'Already appointed.';
   if (candidate.npsNeeded !== null && networkNps(state) < candidate.npsNeeded) {
-    return `Talks only to an airline with an NPS of ${candidate.npsNeeded} or better.`;
+    return `Needs NPS ${candidate.npsNeeded}+`;
   }
-  if (state.cash < candidate.signingFee) return `Needs $${candidate.signingFee.toLocaleString()} on hand for the signing fee.`;
+  if (state.cash < candidate.signingFee) return `Needs $${candidate.signingFee.toLocaleString()} cash`;
   return null;
 }
 
@@ -199,24 +199,24 @@ export function describeEffect(effect: ExecutiveEffect): string {
   const percent = (factor: number) => `${Math.round(Math.abs(1 - factor) * 100)}%`;
   switch (effect.kind) {
     case 'flight-ops':
-      return `Flights run ${percent(effect.delayMultiplier)} less late.`;
+      return `Delays −${percent(effect.delayMultiplier)}`;
     case 'inflight':
-      return `Every flight scores ${effect.npsBonus} more NPS.`;
+      return `NPS +${effect.npsBonus} per flight`;
     case 'maintenance':
-      return `Planes break down as if ${percent(effect.ageFactorMultiplier)} younger.`;
+      return `Tech delays as if ${percent(effect.ageFactorMultiplier)} younger`;
     case 'overhead':
-      return `Network overhead ${percent(effect.overheadMultiplier)} lower.`;
+      return `Overhead −${percent(effect.overheadMultiplier)}`;
     case 'treasury':
-      return `Fuel hedges cost ${percent(effect.hedgePremiumMultiplier)} less, and overhead ${percent(effect.overheadMultiplier)} lower.`;
+      return `Hedge premium −${percent(effect.hedgePremiumMultiplier)} · overhead −${percent(effect.overheadMultiplier)}`;
     case 'leasing':
-      return `Every plane leased from now on costs ${percent(effect.leaseMultiplier)} less a day.`;
+      return `New leases −${percent(effect.leaseMultiplier)}/day`;
     case 'market-building':
-      return `New markets grow ${percent(effect.growthMultiplier)} faster.`;
+      return `New-market growth +${percent(effect.growthMultiplier)}`;
     case 'connections':
-      return `${percent(effect.connectingMultiplier)} more connecting passengers at every hub.`;
+      return `Connecting pax +${percent(effect.connectingMultiplier)}`;
     case 'revenue':
-      return `Every ticket earns ${percent(effect.yieldMultiplier)} more.`;
+      return `Yield +${percent(effect.yieldMultiplier)}`;
     case 'fleet-programmes':
-      return `Leased planes arrive ${percent(effect.deliveryMultiplier)} sooner, and returned ones go ${percent(effect.returnMultiplier)} sooner.`;
+      return `Deliveries −${percent(effect.deliveryMultiplier)} · returns −${percent(effect.returnMultiplier)} time`;
   }
 }

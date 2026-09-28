@@ -1,6 +1,6 @@
 import { classByCode } from '../../sim/aircraftClasses';
 import { rivalLadderInWords } from '../../sim/rivalLadder';
-import { line, heading } from './dom';
+import { line, heading, lineWithInfo } from './dom';
 import { money } from '../format';
 import { dayIndex } from '../../sim/clock';
 import type { CompetitorOffering } from '../../sim/competitors';
@@ -70,10 +70,10 @@ export function buildRivalsView(state: SimState): HTMLElement {
     .sort((x, y) => y.flights - x.flights || x.airline.localeCompare(y.airline));
 
   if (rivals.length === 0) {
-    root.append(line('No rival airlines on the map.'));
+    root.append(line('None on the map'));
     return root;
   }
-  root.append(line(`${rivals.length} airline${rivals.length === 1 ? '' : 's'} on the map. Margins are estimated with your own economics.`));
+  root.append(lineWithInfo(`${rivals.length} airline${rivals.length === 1 ? '' : 's'}`, 'Rival margins are estimated with your own economics.'));
 
   const list = document.createElement('div');
   list.className = 'inspector-rows';
@@ -113,10 +113,10 @@ export function buildRivalView(state: SimState, code: string): HTMLElement {
   const fleetText = [...fleetByClass.entries()].map(([typeCode, count]) => `${classByCode(typeCode)?.name ?? typeCode} x${count}`).join(', ');
   root.append(
     line(
-      `${routes.length} of ${RIVAL_MAX_ROUTES_PER_AIRLINE} routes · ${flights} flights/day · fleet: ${fleetText || 'none'}`,
+      `${routes.length}/${RIVAL_MAX_ROUTES_PER_AIRLINE} routes · ${flights}/day · ${fleetText || 'no fleet'}`,
     ),
     // Rivals earn bigger planes on the same ladder (sim/rivalLadder.ts).
-    line(`On the ladder: ${rivalLadderInWords(state, code)}.`),
+    lineWithInfo(`Ladder · ${rivalLadderInWords(state, code)}`, 'Rivals earn bigger planes on the same ladder as you, judged on their own routes.'),
   );
   // Rivals don't assign planes to routes: every route is flown by the
   // fleet on average (sim/rivalEconomics.ts). Planes beyond what its
@@ -124,9 +124,9 @@ export function buildRivalView(state: SimState, code: string): HTMLElement {
   const seatsPerFlight = fleet.length > 0 ? Math.round(fleet.reduce((sum, typeCode) => sum + (classByCode(typeCode)?.seats ?? 0), 0) / fleet.length) : 0;
   const spare = fleet.length - Math.ceil(flights / FLIGHTS_PER_RIVAL_PLANE);
   root.append(
-    line(
-      `Its routes average ${seatsPerFlight} seats a flight.` +
-        (spare > 0 ? ` ${spare} plane${spare === 1 ? '' : 's'} more than its flying needs, paid for across its routes.` : ''),
+    lineWithInfo(
+      `${seatsPerFlight} seats/flight avg` + (spare > 0 ? ` · ${spare} spare plane${spare === 1 ? '' : 's'}` : ''),
+      'Rivals don\'t assign planes to routes: each route is flown by the fleet on average. Planes beyond what its flying needs are still leased, and paid for across its routes.',
     ),
   );
 
@@ -134,7 +134,7 @@ export function buildRivalView(state: SimState, code: string): HTMLElement {
     .map((route) => ({ route, outlook: rivalRouteOutlook(state, route) }))
     .sort((x, y) => x.outlook.margin - y.outlook.margin);
   const total = outlooks.reduce((sum, { outlook }) => sum + outlook.margin, 0);
-  const totalLine = line(`Estimated margin: ${money(total)}/day across its network.`);
+  const totalLine = line(`Est. margin ${money(total)}/day`);
   if (total < 0) totalLine.classList.add('is-over');
   root.append(totalLine);
 
@@ -157,8 +157,8 @@ export function buildRivalView(state: SimState, code: string): HTMLElement {
     let status = '';
     if (outlook.closesInDays !== null) {
       status = outlook.graceDaysLeft > 0
-        ? ` · losing, protected ${outlook.graceDaysLeft} more days`
-        : ` · losing ${outlook.losingDays}/${RIVAL_CLOSE_AFTER_LOSING_DAYS} days, closes in about ${outlook.closesInDays}`;
+        ? ` · losing · grace ${outlook.graceDaysLeft}d`
+        : ` · losing ${outlook.losingDays}/${RIVAL_CLOSE_AFTER_LOSING_DAYS}d · exits ~${outlook.closesInDays}d`;
       detail.classList.add('is-over');
     }
     detail.textContent = `${route.dailyFrequency}/day at $${route.fare} (${fareShare}%) · ${money(outlook.margin)}/day${status}`;
@@ -171,12 +171,12 @@ export function buildRivalView(state: SimState, code: string): HTMLElement {
   const today = dayIndex(state);
   const closures = (state.rivalClosures ?? []).filter((closure) => closure.code === code);
   if (closures.length > 0) {
-    root.append(heading('Closed recently'));
+    root.append(heading('Closed recently', 'A rival won\'t reopen a market it closed until its cooldown ends.'));
     for (const closure of closures) {
       const daysAgo = today - Math.floor(closure.closedAtMinute / 1440);
       root.append(
         line(
-          `${closure.market.replace('-', ' – ')}: closed ${daysAgo} day${daysAgo === 1 ? '' : 's'} ago, won't reopen for ${Math.max(0, RIVAL_REOPEN_COOLDOWN_DAYS - daysAgo)} more.`,
+          `${closure.market.replace('-', ' – ')} · closed ${daysAgo}d ago · reopens in ${Math.max(0, RIVAL_REOPEN_COOLDOWN_DAYS - daysAgo)}d`,
         ),
       );
     }

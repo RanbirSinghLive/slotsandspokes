@@ -81,14 +81,14 @@ function renderPresence(iata: string, state: SimState): void {
   const parts: string[] = [];
 
   if (p.departures === 0) {
-    parts.push('Not served by you');
+    parts.push('Not served');
   } else {
     const connecting = Math.round(connectingPassengersThrough(state, iata));
-    parts.push(`${p.level} · ${p.departures} departure${p.departures === 1 ? '' : 's'}/day`);
+    parts.push(`${p.level} · ${p.departures} dep/day`);
     if (connecting > 0) parts.push(`${connecting} connecting/day`);
   }
 
-  if (p.slotsHeld > 0) parts.push(`${p.slotsHeld} slot${p.slotsHeld === 1 ? '' : 's'}, $${p.slotFeesPerDay.toLocaleString()}/day`);
+  if (p.slotsHeld > 0) parts.push(`slots ${p.slotsHeld} · $${p.slotFeesPerDay.toLocaleString()}/day`);
 
   presenceEl.textContent = parts.join(' · ');
 }

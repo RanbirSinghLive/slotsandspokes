@@ -2,6 +2,7 @@ import { AIRCRAFT_CLASSES, pluralClassName } from '../sim/aircraftClasses';
 import { airlineCalled, classOpen, tierThatOpens } from '../sim/ladder';
 import { daysUntilNextListing, listingsOf } from '../sim/market';
 import type { SimState } from '../sim/state';
+import { info } from './inspector/dom';
 
 /**
  * The fleet market's readouts (sim/market.ts), apart from the lease
@@ -32,17 +33,19 @@ function renderStrip(state: SimState): void {
   const rows = AIRCRAFT_CLASSES.map((cls) => {
     const listings = listingsOf(state, cls.code);
     const next = daysUntilNextListing(state, cls.code);
-    const when = `${next} day${next === 1 ? '' : 's'}`;
+    const when = `${next}d`;
     const opener = tierThatOpens(cls.code);
     // A locked class is just locked: its listings are for rivals until the ladder opens it.
-    const status = !classOpen(state, cls.code)
-      ? `locked: opens when you're ${opener ? airlineCalled(opener) : 'a bigger airline'} (see Goals)`
+    const locked = !classOpen(state, cls.code);
+    const status = locked
+      ? 'Locked'
       : listings.length === 0
-        ? `none listed · next in ${when}`
-        : `${listings.length} listed (${listings.map((l) => `${l.ageYears} yrs`).join(', ')}) · next in ${when}`;
-    return { name: cls.name, status, empty: !classOpen(state, cls.code) || listings.length === 0 };
+        ? `none · next ${when}`
+        : `${listings.length} · ${listings.map((l) => l.ageYears).join(', ')} yrs · next ${when}`;
+    const why = locked ? `Opens as ${opener ? airlineCalled(opener) : 'a bigger airline'}. See Goals.` : null;
+    return { name: cls.name, status, why, empty: locked || listings.length === 0 };
   });
-  const signature = rows.map((row) => `${row.name}:${row.status}`).join('|');
+  const signature = rows.map((row) => `${row.name}:${row.status}:${row.why}`).join('|');
   if (signature === stripSignature) return;
   stripSignature = signature;
   stripEl.replaceChildren(
@@ -54,6 +57,7 @@ function renderStrip(state: SimState): void {
       name.textContent = row.name;
       const status = document.createElement('span');
       status.textContent = row.status;
+      if (row.why) status.append(' ', info(row.why));
       div.append(name, status);
       return div;
     }),
@@ -76,13 +80,11 @@ function pollUnlocks(state: SimState): void {
     const cls = AIRCRAFT_CLASSES.find((c) => c.code === code);
     if (!cls) continue;
     const listed = listingsOf(state, code);
-    debutTitle.textContent = `${pluralClassName(cls.name)} are yours to lease`;
+    debutTitle.textContent = `${pluralClassName(cls.name)} unlocked`;
     debutBody.textContent =
-      `Your airline has grown into ${pluralClassName(cls.name)} (${cls.seats} seats). ` +
-      (listed.length > 0
-        ? `The lessor has ${listed.length} listed, from $${listed[0].leasePricePerDay.toLocaleString()}/day.`
-        : 'None is listed right now; the next arrives soon.') +
-      ' First come, first served: rivals lease from the same shelf. Tap an airport, then Plane, to lease one.';
+      `${cls.seats} seats · ` +
+      (listed.length > 0 ? `${listed.length} listed from $${listed[0].leasePricePerDay.toLocaleString()}/day` : 'none listed yet') +
+      ' · rivals lease from the same shelf. Tap an airport, then Plane, to lease one.';
     debutModal.hidden = false;
   }
 }
