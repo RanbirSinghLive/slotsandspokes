@@ -120,6 +120,9 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="1"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01"/></svg><span class="rail-label">Office</span><span class="rail-dot" hidden></span>
       </button>
       <div class="rail-spacer"></div>
+      <button type="button" class="rail-item" id="rail-feedback" title="Tell us what broke, confused or bored you (opens a short form)" aria-label="Feedback">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="rail-label">Feedback</span>
+      </button>
       <button type="button" class="rail-badge" id="rail-alpha" title="An early alpha build: things will change and break. The Game screen has the version, your save as a file, and the credits." aria-label="Alpha build: open Game">ALPHA</button>
       <button type="button" class="rail-item" data-go="game" title="Save, load and new game" aria-label="Game">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg><span class="rail-label">Game</span><span class="rail-dot" hidden></span>
@@ -226,6 +229,7 @@
           <section id="about-section">
             <h2>About</h2>
             <div id="about-version"></div>
+            <p class="about-feedback">It's an alpha: what broke, confused or bored you is the most useful thing you can send. <button type="button" id="about-feedback-button">Send feedback</button></p>
             <h2>Credits</h2>
             <ul class="credits">
               <li>Airports: <a href="https://ourairports.com/data/" target="_blank" rel="noopener">OurAirports</a> (public domain)</li>

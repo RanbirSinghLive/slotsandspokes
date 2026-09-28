@@ -56,6 +56,7 @@ import { closeJumpBox, isJumpBoxOpen, openJumpBox, setupJumpBox } from './ui/jum
 import { clearMapHover, getMapHover, setupMapLinks } from './ui/mapLink';
 import { holdSaving, loadSavedState, saveFileText, saveState, storedSaveText } from './ui/save';
 import { setupCrashCatcher, showProblemCard } from './ui/problemCard';
+import { feedbackUrl, openFeedback } from './ui/feedback';
 
 // Resume a saved game if one exists. A fresh game starts from
 // createNewGameState(), seeded from Date.now() so every new playthrough
@@ -436,6 +437,9 @@ function setPanelHidden(hidden: boolean): void {
 }
 setupRail({ isHidden: () => panelHidden, setHidden: setPanelHidden });
 setupJumpBox(state);
+// Feedback, from the rail and the Game screen: the pre-filled form (ui/feedback.ts).
+document.querySelector('#rail-feedback')!.addEventListener('click', () => openFeedback(state));
+document.querySelector('#about-feedback-button')!.addEventListener('click', () => openFeedback(state));
 // The rail's Alpha badge opens the Game screen: the version, the save as a file, the credits.
 document.querySelector('#rail-alpha')!.addEventListener('click', () => {
   if (panelHidden) setPanelHidden(false);
@@ -553,6 +557,7 @@ setupCrashCatcher(
     speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === 0));
   },
   () => saveFileText(state),
+  () => feedbackUrl(state),
 );
 
 // Remembers whatever speed was active before a pause, so unpausing (either

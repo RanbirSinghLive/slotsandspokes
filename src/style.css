@@ -3166,3 +3166,19 @@ button.ops-item:hover {
 #save-file-section button {
   margin-right: 6px;
 }
+
+.problem-feedback {
+  align-self: center;
+  margin-right: auto;
+  color: #5ed6c8;
+}
+
+.about-feedback {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #9aa3b8;
+}
+
+.about-feedback button {
+  margin-left: 4px;
+}

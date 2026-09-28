@@ -16,6 +16,8 @@ type ProblemCard = {
   detail?: string;
   /** The save to offer as a download, when there is one. */
   saveText?: () => string | null;
+  /** The feedback form, opened without closing the card. */
+  feedbackUrl?: string;
   /** The card's buttons besides the download, each closing it. */
   actions: { label: string; run: () => void }[];
 };
@@ -55,6 +57,15 @@ export function showProblemCard(card: ProblemCard): void {
     download.addEventListener('click', () => downloadText(`slotsandspokes-save-${GAME_VERSION}.json`, text));
     actions.append(download);
   }
+  if (card.feedbackUrl) {
+    const link = document.createElement('a');
+    link.className = 'problem-feedback';
+    link.href = card.feedbackUrl;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.textContent = 'Send feedback';
+    actions.append(link);
+  }
   for (const action of card.actions) {
     const button = document.createElement('button');
     button.type = 'button';
@@ -76,16 +87,17 @@ export function showProblemCard(card: ProblemCard): void {
  * happens to the game while the player reads it, and the save offered is
  * the game as it stands.
  */
-export function setupCrashCatcher(pause: () => void, currentSave: () => string | null): void {
+export function setupCrashCatcher(pause: () => void, currentSave: () => string | null, feedbackUrl: () => string): void {
   const report = (error: unknown) => {
     pause();
     const detail = error instanceof Error ? `${error.message}\n${error.stack ?? ''}`.trim() : String(error);
     showProblemCard({
       title: 'Something broke',
       message:
-        'The game hit an error and has paused. Download your save to keep it safe, then reload to carry on from your last save. If you can, send the save and the text below with what you were doing.',
+        'The game hit an error and has paused. Download your save to keep it safe, then reload to carry on from your last save. If you can, send feedback: paste the text below and say what you were doing.',
       detail,
       saveText: currentSave,
+      feedbackUrl: feedbackUrl(),
       actions: [{ label: 'Reload', run: () => window.location.reload() }],
     });
   };

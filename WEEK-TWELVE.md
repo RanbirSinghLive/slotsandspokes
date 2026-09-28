@@ -59,9 +59,14 @@ comes by a link and a save file.
   offered for download; the crash catcher; Credits (with GeoNames' CC BY
   attribution); the desktop-only notice; an Alpha badge on the rail;
   the page titled Slots & Spokes.
+- **Feedback:** a Google Form (no account needed), pre-filled with the
+  build, home and day (`ui/feedback.ts`), from a Feedback item on the
+  rail, the Game screen and the crash card. Its responses are published
+  as a CSV that a daily scheduled scan reads, triages against the code
+  and turns into suggested fixes for the owner to approve; the scan
+  never changes code itself.
 - **Still to do from threads 1–5:** the browser pass, rival codes that
-  are real airlines', the first-run guide, feedback and the year one
-  report.
+  are real airlines', the first-run guide and the year one report.
 
 ## Thread 1: reachable (must)
 
