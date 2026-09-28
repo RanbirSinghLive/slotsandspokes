@@ -1292,12 +1292,21 @@ the real route, snapping onto the nearest airport within
 `HIT_RADIUS_PX`. Escape, re-clicking the origin, or clicking open water
 cancels.
 
+Clicking the second airport opens **the confirm step as the next round
+of the action ring**, at that airport: ✓ adds the rotation (Enter does
+too), a pin with a plus adds a stop there and goes back to choosing the
+next airport, ✕ cancels (Esc, or a click anywhere else on the map). A
+compact card under the ring holds only the numbers: the chain, legs,
+length and window, the market in words, the plane and the share of it
+the rotation uses, new slots, and any block. Its last line says what the
+hovered button does, or why it can't.
+
 **The split.** Everything that decides what a rotation *is* lives in
 `sim/rotations.ts`, with no DOM: packing, `planRotation()`,
 `candidateTailsAt()`, `autoPickTail()`, and `applyRotation()`, which
 writes it into the schedule. `ui/routeBuilder.ts` keeps only the page:
 the gesture's `idle` / `armed` / `confirming` state machine (transient UI
-state, not in `SimState`), the popover, and `commitRotation()`, which
+state, not in `SimState`), the confirm ring and its card, and `commitRotation()`, which
 calls `applyRotation()` and then refreshes the schedule warnings. The
 map menu's actions and the headless runner use the same functions, so
 every rotation is created the same way.
@@ -1338,17 +1347,17 @@ exact minute another plane already flies that market.
 
 ### One place decides everything
 
-`planRotation()` produces the popover's text *and* gates the confirm
-button. It checks, across every leg including the closing one: the base
+`planRotation()` produces the card's text *and* gates the ring's ✓ and
+add-a-stop buttons. It checks, across every leg including the closing one: the base
 is in the network, slots are available (and quotes their fees), range,
 airport size limits, landing back before 22:00
 (`USABLE_DAY_END_MINUTE` — except a single long-haul round trip, which
 counts as one full aircraft), and exact-time collisions. Only an
-out-of-range *closing* leg leaves Add stop enabled, because a nearer stop
-can fix it.
+out-of-range *closing* leg leaves add-a-stop enabled, because a nearer
+stop can fix it.
 
-The popover's headline reading: "Uses 14% of an aircraft — YUL has 1.00
-spare, 0.86 after this."
+The card's headline reading: "Propeller C-P001 · 14% of a plane · YUL
+spare 1.00 → 0.86".
 
 ## Rotations timeline (`src/ui/panels.ts`)
 

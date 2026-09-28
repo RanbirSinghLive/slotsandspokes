@@ -304,6 +304,12 @@ on any view with three or more sections. **Thread 4 done.**
 
 UI only: headless output must stay byte-identical.
 
+**Status: done.** Plus, asked for while building it: the clock bar
+shrinks to what it holds (a content-sized grid, with the alerts under it
+in one `#now-corner` column), since stretching to the map's width it ran
+into the lens; on a map under 880px the lens moves to the bottom left.
+Enter confirms a route as the ring's ✓ does.
+
 ---
 
 ## Carried forward

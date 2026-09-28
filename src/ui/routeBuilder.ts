@@ -1,3 +1,4 @@
+import { hideRadial, showRadial, type RadialAction } from './radial';
 import { geoCircle, geoPath } from 'd3-geo';
 import { money } from './format';
 import type { LineString } from 'geojson';
@@ -263,16 +264,19 @@ export function handleRouteBuilderMouseDown(event: MouseEvent, state: SimState):
       return true;
     }
     if (clicked) {
-      showForm(builderState.chain, clicked, state);
-      builderState = { mode: 'confirming', chain: builderState.chain, dest: clicked };
+      const chain = builderState.chain;
+      builderState = { mode: 'confirming', chain, dest: clicked };
+      showForm(chain, clicked, state);
+      showConfirmRing(chain, clicked, state, confirmRoute);
       return true;
     }
     reset(); // clicked open water while armed: cancel
     return true;
   }
 
-  // Confirming: the form has focus. Swallow map clicks rather than acting
-  // on them until Add/Cancel/Escape resolves the pending route.
+  // Confirming: a click on the map away from the ring cancels, as a click
+  // on open water does while choosing.
+  reset();
   return true;
 }
 
@@ -416,21 +420,24 @@ export function drawRoutePreview(ctx: CanvasRenderingContext2D, state: SimState)
  * Same fields minus the identity ones (legId, tail), which only get
  * assigned once the player actually confirms.
  */
-// --- The confirmation form (real DOM, per CLAUDE.md's panel rule) ---
+// --- The confirm step: a ring of choices and a summary card (real DOM, per CLAUDE.md's panel rule) ---
 
 const formSection = document.querySelector<HTMLElement>('#new-route-popover')!;
-const formHeading = document.querySelector<HTMLElement>('#new-route-heading')!;
+const formHint = document.querySelector<HTMLElement>('#new-route-hint')!;
 const formLabel = document.querySelector<HTMLElement>('#new-route-label')!;
 const formBlock = document.querySelector<HTMLElement>('#new-route-block')!;
 const formPdew = document.querySelector<HTMLElement>('#new-route-pdew')!;
 const formError = document.querySelector<HTMLElement>('#new-route-error')!;
-const formTailLabel = document.querySelector<HTMLElement>('#new-route-tail-label')!;
 const formUtilisation = document.querySelector<HTMLElement>('#new-route-utilisation')!;
 const formPositioningPreview = document.querySelector<HTMLElement>('#new-route-positioning-preview')!;
 const formSlots = document.querySelector<HTMLElement>('#new-route-slots')!;
-const formAddStopButton = document.querySelector<HTMLButtonElement>('#new-route-add-stop')!;
-const formConfirmButton = document.querySelector<HTMLButtonElement>('#new-route-confirm')!;
-const formCancelButton = document.querySelector<HTMLButtonElement>('#new-route-cancel')!;
+
+/** The ring's icons: 24×24 strokes, like the map menu's (ui/mapMenu.ts). */
+const CONFIRM_ICON = {
+  confirm: '<polyline points="20 6 9 17 4 12"/>',
+  addStop: '<path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10Z"/><line x1="12" y1="7.5" x2="12" y2="13.5"/><line x1="9" y1="10.5" x2="15" y2="10.5"/>',
+  cancel: '<line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>',
+};
 
 /** "4h 05m" — rotation lengths read better in hours than in three-digit minutes. */
 function formatDuration(minutes: number): string {
@@ -439,40 +446,114 @@ function formatDuration(minutes: number): string {
   return hours > 0 ? `${hours}h ${String(remainder).padStart(2, '0')}m` : `${remainder}m`;
 }
 
-// The form is a small floating popover, Google-Maps-info-window-style,
-// anchored to the destination airport just clicked, so it appears right
-// where you're working rather than off in a side panel.
-const POPOVER_OFFSET_PX = 16;
+/** How far below the destination the summary card starts: clear of the ring, whose buttons sit on its top arc. */
+const CARD_OFFSET_PX = 36;
 
 /**
- * Position the popover near (screenX, screenY) — the destination
- * airport's own projected point, not the raw click position, so it
- * anchors to the place rather than to wherever the cursor happened to be
- * within the snap radius. Corrected *after* an initial placement, not
- * computed once up front, since the form's own height varies with its
- * content (an error message, the positioning-leg preview) — a route drawn
- * near the right or bottom edge of the screen would otherwise render
- * partly off it.
+ * Centre the summary card under the destination airport's own projected
+ * point (not the raw click, so it anchors to the place), or above the
+ * ring where there's no room below. Placed *after* the card is filled,
+ * since its height varies with what it says (an error, the positioning
+ * note).
  */
 function positionPopover(screenX: number, screenY: number): void {
-  formSection.style.left = `${screenX + POPOVER_OFFSET_PX}px`;
-  formSection.style.top = `${screenY + POPOVER_OFFSET_PX}px`;
-
+  formSection.style.left = `${screenX}px`;
+  formSection.style.top = `${screenY + CARD_OFFSET_PX}px`;
   const rect = formSection.getBoundingClientRect();
-  const overflowX = rect.right - window.innerWidth;
-  const overflowY = rect.bottom - window.innerHeight;
-  if (overflowX > 0) formSection.style.left = `${screenX + POPOVER_OFFSET_PX - overflowX - 8}px`;
-  if (overflowY > 0) formSection.style.top = `${screenY + POPOVER_OFFSET_PX - overflowY - 8}px`;
+  if (rect.bottom > window.innerHeight - 36) formSection.style.top = `${screenY - 96 - rect.height}px`;
+  const overflowLeft = 8 - rect.left;
+  if (overflowLeft > 0) formSection.style.left = `${screenX + overflowLeft}px`;
+}
+
+/** Whether the confirm ring is this module's, so reset() only closes its own. */
+let ringOpen = false;
+
+/**
+ * The confirm step as the next round of the action ring, at the
+ * destination: add the rotation, add a stop (take this airport into the
+ * chain and pick the next one), or cancel. What each does, or why it
+ * can't, shows on the card's last line while hovered.
+ */
+function showConfirmRing(chain: Airport[], dest: Airport, state: SimState, onConfirmed: (legIds: string[]) => void): void {
+  const point = projection([dest.lon, dest.lat]);
+  if (!point) return;
+  const origin = chainOrigin(chain);
+  const tail = activeTail(state, dest);
+  const plan = tail ? planRotation(chain, dest, tail, state) : null;
+  const what = chain.length > 1 ? 'rotation' : isExistingMarket(origin.iata, dest.iata, state.schedule) ? 'frequency' : 'rotation';
+  const noPlane = `No plane based at ${origin.iata} · lease one there first`;
+  const actions: RadialAction[] = [
+    {
+      id: 'route-add-stop',
+      label: `Add a stop at ${dest.iata} · then pick the next airport`,
+      icon: CONFIRM_ICON.addStop,
+      angleDeg: -150,
+      disabledReason: !plan ? noPlane : plan.blocksAddStop ? (plan.error ?? 'No room for another stop') : undefined,
+      onSelect: () => {
+        addStop();
+        return true;
+      },
+    },
+    {
+      id: 'route-confirm',
+      label: `Add ${what} · Enter`,
+      icon: CONFIRM_ICON.confirm,
+      angleDeg: -90,
+      large: true,
+      disabledReason: !plan ? noPlane : plan.error ?? (plan.legs.length === 0 ? 'Nothing to fly' : undefined),
+      onSelect: () => {
+        confirm(state, onConfirmed);
+        return true;
+      },
+    },
+    {
+      id: 'route-cancel',
+      label: 'Cancel · Esc',
+      icon: CONFIRM_ICON.cancel,
+      angleDeg: -30,
+      onSelect: () => {
+        reset();
+        return true;
+      },
+    },
+  ];
+  ringOpen = true;
+  showRadial({
+    x: point[0],
+    y: point[1],
+    actions,
+    onHint: (text, problem) => {
+      formHint.textContent = text ?? '';
+      formHint.classList.toggle('is-problem', problem);
+    },
+  });
+}
+
+/** Take the pending destination into the chain and re-arm from it, rather than confirming. */
+function addStop(): void {
+  if (builderState.mode !== 'confirming') return;
+  builderState = { mode: 'armed', chain: [...builderState.chain, builderState.dest] };
+  previewGeo = null;
+  candidate = null;
+  hideForm();
+  setArmedCursor(true);
+}
+
+/** Add the pending rotation, if its plan allows it: the same rules the ring's button shows, so they can't drift. */
+function confirm(state: SimState, onConfirmed: (legIds: string[]) => void): void {
+  if (builderState.mode !== 'confirming') return;
+  const { chain, dest } = builderState;
+  const tail = activeTail(state, dest);
+  if (!tail) return;
+  const plan = planRotation(chain, dest, tail, state);
+  if (plan.error || plan.legs.length === 0) return;
+  const createdLegIds = commitRotation(state, tail, plan);
+  onConfirmed(createdLegIds);
+  reset();
 }
 
 function showForm(chain: Airport[], dest: Airport, state: SimState): void {
-  const origin = chainOrigin(chain);
-  formHeading.textContent =
-    chain.length > 1
-      ? 'Rotation'
-      : isExistingMarket(origin.iata, dest.iata, state.schedule)
-        ? 'New Frequency'
-        : 'New Rotation';
+  formHint.textContent = '';
   formSection.hidden = false;
   // The armed-state hover tooltip (PDEW/CAP for the candidate) has nothing
   // left to add once the form itself is showing the same numbers, and the
@@ -499,6 +580,10 @@ function showForm(chain: Airport[], dest: Airport, state: SimState): void {
 
 function hideForm(): void {
   formSection.hidden = true;
+  if (ringOpen) {
+    ringOpen = false;
+    hideRadial();
+  }
 }
 
 /**
@@ -517,10 +602,7 @@ function updateFormValidation(chain: Airport[], dest: Airport, state: SimState):
   if (!tail || state.aircraft.length === 0) {
     formLabel.textContent = `${origin.iata} → ${dest.iata}`;
     formBlock.textContent = '';
-    formTailLabel.textContent = '';
     formError.textContent = `No plane based at ${chainOrigin(chain).iata} · lease one there first`;
-    formConfirmButton.disabled = true;
-    formAddStopButton.disabled = true;
     formPdew.textContent = '';
     formUtilisation.textContent = '';
     formPositioningPreview.textContent = '';
@@ -531,7 +613,6 @@ function updateFormValidation(chain: Airport[], dest: Airport, state: SimState):
   const aircraft = state.aircraft.find((a) => a.tail === tail);
   const type = aircraft ? aircraftTypesByCode.get(aircraft.typeCode) : undefined;
   const plan = planRotation(chain, dest, tail, state);
-  formTailLabel.textContent = type ? `${type.name} (${tail})` : tail;
 
   // The chain as the player sees it, always ending back where it started —
   // the closing leg is implicit in the gesture, so showing it here is how
@@ -581,13 +662,11 @@ function updateFormValidation(chain: Airport[], dest: Airport, state: SimState):
   const spareBefore = plan.spareMinutesBefore / USABLE_DAY_MINUTES;
   const spareAfter = (plan.spareMinutesBefore - plan.rotationMinutes) / USABLE_DAY_MINUTES;
   formUtilisation.textContent =
-    `${Math.round(plan.rotationShare * 100)}% of a plane · ${plan.base.iata} spare ${spareBefore.toFixed(2)} → ${spareAfter.toFixed(2)}`;
+    `${type ? `${type.name} ${tail}` : tail} · ${Math.round(plan.rotationShare * 100)}% of a plane · ${plan.base.iata} spare ${spareBefore.toFixed(2)} → ${spareAfter.toFixed(2)}`;
 
   formSlots.textContent = describeSlotQuotes(plan.slotQuotes);
 
   formError.textContent = plan.error ?? '';
-  formConfirmButton.disabled = plan.error !== null;
-  formAddStopButton.disabled = plan.blocksAddStop;
 
   // Suppressed while blocked: the error is the only thing worth reading
   // in that state.
@@ -616,35 +695,12 @@ export function commitRotation(state: SimState, tail: string, plan: RotationPlan
  * depart-time input: the rotation is packed into the day automatically.
  */
 export function setupRouteBuilder(state: SimState, onRouteConfirmed: (legIds: string[]) => void): void {
-  // "Add stop": take the pending destination
-  // into the chain and re-arm from it, rather than confirming. The form
-  // closes and the gesture goes back to armed, so the next click picks the
-  // stop after this one — repeat as many times as the day has room for.
-  formAddStopButton.addEventListener('click', () => {
-    if (builderState.mode !== 'confirming') return;
-    builderState = { mode: 'armed', chain: [...builderState.chain, builderState.dest] };
-    previewGeo = null;
-    candidate = null;
-    hideForm();
-    setArmedCursor(true);
-  });
-
-  formConfirmButton.addEventListener('click', () => {
-    if (builderState.mode !== 'confirming') return;
-    const { chain, dest } = builderState;
-    const tail = activeTail(state, dest);
-    if (!tail) return;
-    const plan = planRotation(chain, dest, tail, state);
-    // The button is already disabled in this case — this is the same
-    // rules, not a second copy of them, so it can't drift.
-    if (plan.error || plan.legs.length === 0) return;
-
-    const createdLegIds = commitRotation(state, tail, plan);
-    onRouteConfirmed(createdLegIds);
-    reset();
-  });
-
-  formCancelButton.addEventListener('click', () => {
-    reset();
+  confirmRoute = (legIds) => onRouteConfirmed(legIds);
+  // Enter adds the pending rotation, as the ring's ✓ does.
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && builderState.mode === 'confirming') confirm(state, confirmRoute);
   });
 }
+
+/** What happens once a rotation is added: main.ts's callback, kept for the ring and the Enter key. */
+let confirmRoute: (legIds: string[]) => void = () => {};

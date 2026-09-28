@@ -1246,126 +1246,66 @@ body {
   cursor: not-allowed;
 }
 
-/* A floating popover anchored to the destination airport that was just
-   clicked (ui/routeBuilder.ts's positionPopover()), info-window style,
-   rather than a fixed section in the sidebar always in the same place
-   regardless of where on the map the route actually is. No dimmed
-   backdrop the way the modals get: it doesn't block anything else,
-   it's a contextual popover on the map itself, not an interruption. */
+/* The route builder's summary card (ui/routeBuilder.ts): centred under
+   the confirm ring at the destination, numbers only, since the ring holds
+   the choices. Lines with nothing to say collapse away. No backdrop: it
+   blocks nothing, it's a note on the map. */
 #new-route-popover {
   position: fixed;
   z-index: 25;
-  max-width: 280px;
-  padding: 10px;
-  background: #0e1016;
+  width: 260px;
+  transform: translateX(-50%);
+  padding: 8px 10px;
+  background: rgba(14, 16, 22, 0.95);
   border: 1px solid rgba(255, 209, 102, 0.3);
   border-radius: 6px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
   font-family: ui-monospace, Consolas, monospace;
-  font-size: 13px;
-  color: #cdd3e0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #9aa3b8;
+  pointer-events: none;
 }
 
 #new-route-popover[hidden] {
   display: none;
 }
 
+#new-route-popover > div:empty {
+  display: none;
+}
+
 #new-route-label {
-  font-size: 14px;
+  font-size: 13px;
   color: #fff;
-  margin-bottom: 2px;
 }
 
-#new-route-block {
-  color: #9aa3b8;
-  margin-bottom: 10px;
-}
-
-/* PDEW/CAP — the un-minmaxed demand-vs-capacity read for
-   this market, before fare/yield/competition trim it down. Same muted
-   tone as block time normally, but flips to amber when demand can't
-   fill the plane, so a thin market reads as a caution at a glance. */
-#new-route-pdew {
-  color: #9aa3b8;
-  margin-bottom: 10px;
-}
-
+/* Amber when demand can't fill the plane: a thin market reads as a
+   caution at a glance. */
 #new-route-pdew.thin-market {
   color: #ffd166;
 }
 
-.new-route-field {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  color: #9aa3b8;
-}
-
-/* The plane is picked for the player (sim/rotations.ts's autoPickTail()),
-   so the form shows it read-only rather than as an editable control. */
-#new-route-tail-label {
-  color: #ffd166;
-  font-weight: 600;
-}
-
-/* The live utilisation read for the rotation being built: what share of
-   an aircraft it spends, and what the base pool has left after it. Amber
-   because this is the number the decision turns on. */
+/* What the rotation costs in aeroplane: the number the decision turns on. */
 #new-route-utilisation,
 #new-route-slots {
   color: #ffd166;
-  margin: -4px 0 8px;
-  min-height: 1.2em;
-}
-
-#new-route-positioning-preview {
-  color: #9aa3b8;
-  margin: -4px 0 8px;
-  min-height: 1.2em;
-}
-
-.new-route-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 4px;
-}
-
-.new-route-actions button {
-  font-family: inherit;
-  font-size: inherit;
-  padding: 4px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-#new-route-confirm {
-  background: #3a4258;
-  border: 1px solid #6b7694;
-  color: #fff;
-}
-
-/* "Add stop" extends the chain instead of confirming it, so
-   it reads as a secondary action next to Add Rotation — outlined in the
-   builder's own amber rather than filled like the confirm button. */
-#new-route-add-stop {
-  background: transparent;
-  border: 1px solid rgba(255, 209, 102, 0.5);
-  color: #ffd166;
-}
-
-#new-route-cancel {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #cdd3e0;
 }
 
 #new-route-error {
   color: #ff8080;
-  margin: -2px 0 8px;
-  min-height: 1.2em;
+}
+
+/* The hovered ring button: what it does, or why it can't. */
+#new-route-hint {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+#new-route-hint.is-problem {
+  color: #ff8080;
 }
 
 #schedule-warnings {
