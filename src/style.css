@@ -1598,6 +1598,76 @@ body {
   padding-left: 100%;
 }
 
+/* The bar lets the map take the pointer (pointer-events: none above);
+   only its lines take it back, and hovering one pauses the scroll, so a
+   line can be read and clicked. */
+#ticker:hover #ticker-track {
+  animation-play-state: paused !important;
+}
+
+/* A line with somewhere to go is a button that reads as text. */
+.ticker-item {
+  pointer-events: auto;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+button.ticker-item {
+  cursor: pointer;
+}
+
+button.ticker-item:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.ticker-separator {
+  white-space: pre;
+}
+
+/* Each tag its category's colour: faults red, rivals amber, the fleet
+   teal, money blue, goals green. */
+.ticker-tag {
+  padding: 0 4px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #0a0c12;
+  background: #9aa3b8;
+}
+
+.ticker-tag--aog,
+.ticker-tag--cnx {
+  background: #ff8080;
+}
+
+.ticker-tag--rival,
+.ticker-tag--fare {
+  background: #ffd166;
+}
+
+.ticker-tag--fleet,
+.ticker-tag--crew {
+  background: #5ed6c8;
+}
+
+.ticker-tag--lessor,
+.ticker-tag--fuel {
+  background: #7fb2ff;
+}
+
+.ticker-tag--shock,
+.ticker-tag--wx {
+  background: #ffa36b;
+}
+
+.ticker-tag--goal {
+  background: #7fd88f;
+}
+
 /* Starts fully off-screen right (the padding-left: 100% above) and
    scrolls fully off-screen left — ui/ticker.ts sets the actual
    `animation` shorthand (name, duration, timing, iteration count) in JS

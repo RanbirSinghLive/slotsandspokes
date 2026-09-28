@@ -1043,13 +1043,18 @@ not one.
 
 The map flash above only reads as news if you're actually looking at
 the map. `ui/ticker.ts` adds a persistent, always-visible strip fixed
-to the bottom of the screen (`#ticker`, `pointer-events: none` so it
-never blocks a click on whatever's underneath), scrolling the same two
-"non-player" event categories — new weather forming, a competitor
-opening a route — regardless of which panel is currently showing.
-`main.ts`'s `render()` calls `updateTicker(state)` *before* its
-`panelView !== 'map'` early return, specifically so an event while
-you're deep in the Commercial panel still gets announced.
+to the bottom of the screen, scrolling the news nobody clicked to cause
+(the ladder, shocks, weather, the fleet and crews, AOGs, the lessor,
+rivals opening, repricing and pulling out) whichever panel is showing.
+
+Each line leads with a coloured tag (AOG, CNX, CREW, FLEET, LESSOR,
+RIVAL, FARE, FUEL, SHOCK, WX, GOAL, REACH), stored apart from the text.
+Most carry a target, the inspector view that explains them (an AOG its
+base, where it can be expedited; a rival's move the rival or your
+market; a milestone Goals), and are buttons that open it. The bar
+itself is `pointer-events: none` so it never blocks the map; only its
+lines take the pointer, and hovering one pauses the scroll so it can
+be clicked.
 
 Deliberately duplicates a small "is this new" diff loop rather than
 sharing `render/competition.ts`'s existing one for the map flash: two

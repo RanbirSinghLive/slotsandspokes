@@ -116,6 +116,8 @@ form is only used where its tooltip is one hover away.
    × on hover (two clicks) to remove.
 8. **Clickable ticker lines**: each tag coloured, and clicking a line
    opens what it names (carried forward from week eight).
+   **Done:** tags coloured by category, lines with a target are buttons
+   opening it, the scroll pauses under the pointer.
 9. **Milestones as stamps**: a short stamp when one is earned
    ("MILESTONE · FIRST IN"), and the Goals view as a ladder of badges.
 6. **Tighter stat cards**: one number and one arrow ("▲ $50k"), the
