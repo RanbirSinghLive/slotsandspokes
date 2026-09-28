@@ -401,6 +401,29 @@ $30k a day; its growth rule was tuned on big homes.
 
 ---
 
+## Thread 7: the Crews screen as a crew planning board (asked for by the owner)
+
+The Crews screen said what each base has today, and nothing about what's
+coming: a plane on its way needs crews that take a week to hire, and the
+player had to work out the timing. Rework it as a crew planner's board:
+
+- **A 30-day horizon** across the top: each inbound plane's entry into
+  service (EIS), each batch of crews joining, each plane going back.
+- **Each inbound plane a line**: its EIS day, the crews it needs, what's
+  joining by then, and if short, the last day a hire still arrives in
+  time ("hire by day 29"), or how late one would be, with conversion
+  offered where it's sooner or there are reserve crews.
+- **Each class a roster bar** per base: crews on hand, joining (hatched),
+  the minimum and comfortable marks, and a status chip (SHORT, TIGHT, OK,
+  RESERVE +N). Airline words: type rating, conversion, reserve.
+- **Planes going back** show the crews they'll free.
+- **The Crews dot** lights amber when an inbound plane will arrive short.
+
+A read-out in the sim (`crewPlan()`, sim/crews.ts) with no rule change,
+so headless output stays byte-identical.
+
+---
+
 ## Carried forward
 
 - **Balance:** past the start, a careful player's year runs $14M–$69M
