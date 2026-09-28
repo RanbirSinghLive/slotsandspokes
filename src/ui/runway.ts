@@ -37,7 +37,7 @@ let warnedThisDip = false;
 export function runwayAlertMessage(state: SimState): string | null {
   const daysLeft = cashRunway(state)?.daysLeft ?? null;
   if (daysLeft === null || daysLeft > RUNWAY_WARN_DAYS) return null;
-  return `Cash runs out in about ${daysLeft} day${daysLeft === 1 ? '' : 's'} at this rate`;
+  return `CASH · $0 in ~${daysLeft}d at this rate`;
 }
 
 /**
@@ -55,10 +55,10 @@ export function updateRunway(state: SimState): boolean {
     text = '—';
     title = 'How long your cash lasts at the current rate. Shows once a full day has been flown.';
   } else if (daysLeft === null) {
-    text = 'Not shrinking';
+    text = 'Stable';
     title = `Cash has not fallen over the last ${RUNWAY_WINDOW_DAYS} days, so it isn't running out.`;
   } else {
-    text = `about ${daysLeft} day${daysLeft === 1 ? '' : 's'}`;
+    text = `~${daysLeft} day${daysLeft === 1 ? '' : 's'}`;
     title =
       `Cash fell by an average of ${money(-runway.dailyDelta)} a day over the last ${RUNWAY_WINDOW_DAYS} days. ` +
       `If that keeps up, it reaches $0 in about ${daysLeft} days — and at $0 the airline is finished.`;

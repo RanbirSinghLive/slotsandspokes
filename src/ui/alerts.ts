@@ -46,7 +46,7 @@ function collectAlerts(state: SimState): Alert[] {
     const className = classByCode(plane?.typeCode ?? '')?.name ?? '';
     alerts.push({
       key: `grounded:${tail}`,
-      message: `${tail} is grounded — not enough ${className} crews at ${base ?? 'its base'} to fly it today`,
+      message: `CREW · ${tail} grounded · short of ${className} crews at ${base ?? 'its base'}`,
       tab: 'fleet',
       view: base ? { kind: 'airport', iata: base } : undefined,
     });

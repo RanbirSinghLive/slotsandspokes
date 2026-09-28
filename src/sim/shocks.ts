@@ -126,9 +126,6 @@ export type ShockDescription = {
   onRoute: (a: string, b: string) => string | null;
 };
 
-function moreDays(count: number): string {
-  return `${count} more day${count === 1 ? '' : 's'}`;
-}
 
 /**
  * The running shock in words, for the ticker, the alert strip and the
@@ -137,39 +134,39 @@ function moreDays(count: number): string {
 export function describeShock(state: SimState): ShockDescription | null {
   const shock = activeShock(state);
   if (!shock) return null;
-  const left = `for about ${moreDays(shock.endDay - dayIndex(state))}`;
+  const left = `~${shock.endDay - dayIndex(state)}d left`;
   const key = `shock:${shock.kind}:${shock.startDay}`;
   const percent = Math.round(shock.magnitude * 100);
   if (shock.kind === 'fuel') {
     const flightCost = Math.round(shock.magnitude * FUEL_SHARE_OF_BLOCK_HOUR_COST * 100);
     return {
       key,
-      headline: `Fuel spike: fuel costs ${percent}% more ${left}.`,
-      onRoute: () => `Fuel spike: flights here cost about ${flightCost}% more ${left}.`,
+      headline: `Fuel spike · fuel +${percent}% · ${left}`,
+      onRoute: () => `Fuel spike · flight cost +${flightCost}% · ${left}`,
     };
   }
   if (shock.kind === 'recession') {
     return {
       key,
-      headline: `Recession: every market's demand is ${percent}% lower ${left}.`,
-      onRoute: () => `Recession: demand here is ${percent}% lower ${left}.`,
+      headline: `Recession · demand −${percent}% everywhere · ${left}`,
+      onRoute: () => `Recession · demand −${percent}% · ${left}`,
     };
   }
   const centre = shock.centre ?? '';
   const place = namesByIata.get(centre) ?? centre;
   return {
     key,
-    headline: `Storm season around ${place}: storms ${STORM_SEASON_MULTIPLIER}× as likely within ${STORM_RADIUS_NM} nm, and more of them close airports, ${left}.`,
+    headline: `Storm season · ${place} · storms ${STORM_SEASON_MULTIPLIER}× within ${STORM_RADIUS_NM} nm · ${left}`,
     onRoute: (a, b) =>
       inStormSeason(state, a) || inStormSeason(state, b)
-        ? `Storm season around ${place}: expect more weather delays and closures here ${left}.`
+        ? `Storm season · ${place} · more delays and closures · ${left}`
         : null,
   };
 }
 
 /** What the last shock was called once it's over, for the ticker's "it's over" line. */
 export function shockEndedLine(shock: Shock): string {
-  if (shock.kind === 'fuel') return 'The fuel spike is over: fuel is back to its usual price.';
-  if (shock.kind === 'recession') return 'The recession is over: demand is back where it was heading.';
-  return `The storm season around ${namesByIata.get(shock.centre ?? '') ?? shock.centre} is over.`;
+  if (shock.kind === 'fuel') return 'Fuel spike over';
+  if (shock.kind === 'recession') return 'Recession over';
+  return `Storm season over · ${namesByIata.get(shock.centre ?? '') ?? shock.centre}`;
 }

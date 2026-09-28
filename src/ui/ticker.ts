@@ -2,7 +2,7 @@ import { airlineCalled, classOpen, LADDER, milestoneById, tiersClimbed } from '.
 import { rivalTiersClimbed } from '../sim/rivalLadder';
 import { pluralClassName } from '../sim/aircraftClasses';
 import { classByCode } from '../sim/aircraftClasses';
-import { money } from './format';
+import { shortMoney } from './format';
 import { RIVAL_CLOSE_AFTER_LOSING_DAYS, RIVAL_SQUEEZED_RESPITE_DAYS } from '../sim/pressure';
 import { activeHedge } from '../sim/fuelPrice';
 import { activeShock, describeShock, shockEndedLine, type Shock } from '../sim/shocks';
@@ -22,12 +22,19 @@ const MAX_EVENTS = 20;
 const EVENT_SEPARATOR = '   •   ';
 const PIXELS_PER_SECOND = 60;
 
-type TickerEvent = { simMinute: number; message: string };
+/**
+ * What kind of news a line is, shown first like an ops board's category
+ * ("AOG YUL · C-P002 · hydraulics · back 3d"). Kept apart from the text so
+ * the ticker can style it on its own.
+ */
+type TickerTag = 'AOG' | 'CNX' | 'CREW' | 'FLEET' | 'LESSOR' | 'RIVAL' | 'FARE' | 'FUEL' | 'SHOCK' | 'WX' | 'GOAL' | 'REACH';
+
+type TickerEvent = { simMinute: number; tag: TickerTag; message: string };
 
 let events: TickerEvent[] = [];
 
-function pushEvent(simMinute: number, message: string): void {
-  events.push({ simMinute, message });
+function pushEvent(simMinute: number, tag: TickerTag, message: string): void {
+  events.push({ simMinute, tag, message });
   if (events.length > MAX_EVENTS) events.shift();
   renderTickerText();
 }
@@ -49,7 +56,7 @@ function renderTickerText(): void {
     return;
   }
 
-  tickerTrack.textContent = events.map((event) => event.message).join(EVENT_SEPARATOR);
+  tickerTrack.textContent = events.map((event) => `${event.tag} ${event.message}`).join(EVENT_SEPARATOR);
   tickerTrack.style.animation = 'none';
   void tickerTrack.offsetWidth; // force a reflow so the animation below actually restarts
   const distancePx = tickerTrack.scrollWidth + window.innerWidth;
@@ -87,8 +94,8 @@ function pollWeatherEvents(state: SimState): void {
 
   for (const iata of currentAirports) {
     if (previousWeatherAirports.has(iata)) continue;
-    const kindLabel = state.weatherByAirport[iata].kind === 'thunderstorm' ? 'Thunderstorm' : 'Snowstorm';
-    pushEvent(state.simMinute, `${kindLabel} forms at ${iata}`);
+    const kindLabel = state.weatherByAirport[iata].kind === 'thunderstorm' ? 'thunderstorm' : 'snowstorm';
+    pushEvent(state.simMinute, 'WX', `${iata} · ${kindLabel}`);
   }
   previousWeatherAirports = currentAirports;
 }
@@ -105,8 +112,8 @@ function entryReason(state: SimState, a: string, b: string): string {
   const marginValue = RIVAL_MARGIN_SHARE * Math.max(0, table.fullyCostedMargin);
   if (spillValue <= 0 && marginValue <= 0) return '';
   return spillValue >= marginValue
-    ? `: you're turning away about ${Math.round(table.turnedAway)} a day there`
-    : `: you make ${money(table.fullyCostedMargin)} a day there after costs`;
+    ? ` · drawn by ${Math.round(table.turnedAway)} pax/day you turn away`
+    : ` · drawn by your ${shortMoney(table.fullyCostedMargin)}/day margin`;
 }
 
 /** Milestones met, and tiers climbed, as of the last poll (sim/ladder.ts). */
@@ -130,14 +137,15 @@ function pollLadderEvents(state: SimState): void {
     if (seenMilestones.has(id)) continue;
     seenMilestones.add(id);
     const milestone = milestoneById(id);
-    if (milestone) pushEvent(state.simMinute, `Milestone: ${milestone.name}. ${milestone.description}`);
+    if (milestone) pushEvent(state.simMinute, 'GOAL', `Milestone · ${milestone.name}`);
   }
   for (; seenTiers < climbed; seenTiers++) {
     const next = LADDER[seenTiers + 1];
     const opened = LADDER[seenTiers].opens;
     pushEvent(
       state.simMinute,
-      (next ? `You're ${airlineCalled(next)} now.` : 'Every tier climbed.') + (opened.length > 0 ? ` Opened: ${opened.join('; ')}.` : ''),
+      'GOAL',
+      (next ? `Now ${airlineCalled(next)}` : 'Top tier reached') + (opened.length > 0 ? ` · opens ${opened.join(', ')}` : ''),
     );
   }
 }
@@ -158,8 +166,8 @@ function pollShockEvents(state: SimState): void {
   }
   // The same shock (or still none) since the last poll: nothing to say.
   if (seenShock?.startDay === running?.startDay && seenShock?.kind === running?.kind) return;
-  if (seenShock) pushEvent(state.simMinute, shockEndedLine(seenShock));
-  if (running) pushEvent(state.simMinute, describeShock(state)!.headline);
+  if (seenShock) pushEvent(state.simMinute, 'SHOCK', shockEndedLine(seenShock));
+  if (running) pushEvent(state.simMinute, 'SHOCK', describeShock(state)!.headline);
   seenShock = running;
 }
 
@@ -172,11 +180,7 @@ function pollHedgeEvents(state: SimState): void {
   if (seenHedgeStart !== undefined && seenHedgeStart !== null && running !== seenHedgeStart && state.fuelHedge?.startDay === seenHedgeStart) {
     const hedge = state.fuelHedge;
     const net = hedge.saved - hedge.premium;
-    pushEvent(
-      state.simMinute,
-      `Your fuel hedge ended: it ${hedge.saved >= 0 ? 'saved' : 'cost'} $${Math.round(Math.abs(hedge.saved)).toLocaleString()} against the market, ` +
-        `${net >= 0 ? 'up' : 'down'} $${Math.round(Math.abs(net)).toLocaleString()} after its premium.`,
-    );
+    pushEvent(state.simMinute, 'FUEL', `Hedge ended · ${net >= 0 ? '+' : ''}${shortMoney(net)} net of premium`);
   }
   seenHedgeStart = running;
 }
@@ -197,17 +201,17 @@ function pollFleetEvents(state: SimState): void {
   if (seenTails && seenCrews) {
     const className = (code: string) => classByCode(code)?.name ?? code;
     for (const [tail, plane] of tails) {
-      if (!seenTails.has(tail)) pushEvent(state.simMinute, `${className(plane.typeCode)} ${tail} delivered at ${plane.base ?? 'base'}`);
+      if (!seenTails.has(tail)) pushEvent(state.simMinute, 'FLEET', `${tail} ${className(plane.typeCode)} delivered · ${plane.base ?? 'base'}`);
     }
     for (const [tail, plane] of seenTails) {
-      if (!tails.has(tail)) pushEvent(state.simMinute, `${className(plane.typeCode)} ${tail} has gone back to the lessor`);
+      if (!tails.has(tail)) pushEvent(state.simMinute, 'FLEET', `${tail} ${className(plane.typeCode)} returned to lessor`);
     }
     for (const [key, count] of crews) {
       const joined = count - (seenCrews.get(key) ?? 0);
       if (joined <= 0) continue;
       // A count only rises when hired or retrained crews join (at rollover).
       const [iata, classCode] = key.split(':');
-      pushEvent(state.simMinute, `${joined} ${className(classCode)} crew${joined === 1 ? '' : 's'} joined at ${iata}`);
+      pushEvent(state.simMinute, 'CREW', `${iata} · +${joined} ${className(classCode)} crew${joined === 1 ? '' : 's'}`);
     }
   }
   seenTails = tails;
@@ -230,7 +234,7 @@ function pollRivalLadderEvents(state: SimState): void {
     const opens = LADDER[tiers - 1]?.opensClasses ?? [];
     if (opens.length === 0) continue;
     const names = opens.map((typeCode) => pluralClassName(AIRCRAFT_CLASSES.find((c) => c.code === typeCode)?.name ?? typeCode)).join(', ');
-    pushEvent(state.simMinute, `${routes[0].airline} has earned ${names}: it's now ${airlineCalled(LADDER[tiers])}`);
+    pushEvent(state.simMinute, 'RIVAL', `${routes[0].airline} · now ${airlineCalled(LADDER[tiers])} · opens ${names}`);
   }
 }
 
@@ -267,9 +271,9 @@ function pollRivalEvents(state: SimState): void {
     if (!touchesNetwork(route)) continue;
 
     if (previous === undefined) {
-      pushEvent(state.simMinute, `${route.airline} opens ${route.origin}–${route.dest}${entryReason(state, route.origin, route.dest)}`);
+      pushEvent(state.simMinute, 'RIVAL', `${route.airline} · opens ${route.origin}–${route.dest}${entryReason(state, route.origin, route.dest)}`);
     } else if (route.dailyFrequency > previous) {
-      pushEvent(state.simMinute, `${route.airline} adds a flight on ${route.origin}–${route.dest} (${route.dailyFrequency}/day)`);
+      pushEvent(state.simMinute, 'RIVAL', `${route.airline} · ${route.origin}–${route.dest} up to ${route.dailyFrequency}/day`);
     }
   }
 
@@ -280,7 +284,8 @@ function pollRivalEvents(state: SimState): void {
     const yours = state.schedule.some((leg) => marketKey(leg.origin, leg.dest) === marketKey(route.origin, route.dest));
     pushEvent(
       state.simMinute,
-      `${route.airline} pulls out of ${route.origin}–${route.dest}` + (yours ? `: no rival will open it for ${RIVAL_SQUEEZED_RESPITE_DAYS} days` : ''),
+      'RIVAL',
+      `${route.airline} · exits ${route.origin}–${route.dest}` + (yours ? ` · no new rival for ${RIVAL_SQUEEZED_RESPITE_DAYS}d` : ''),
     );
   }
 }
@@ -303,11 +308,12 @@ function pollRivalPainEvents(state: SimState): void {
     const before = seenLosingDays.get(id);
     seenLosingDays.set(id, losing);
     if (before === undefined || !flown.has(key)) continue;
-    if (before === 0 && losing > 0) pushEvent(state.simMinute, `${route.airline} is losing money on ${route.origin}–${route.dest}`);
+    if (before === 0 && losing > 0) pushEvent(state.simMinute, 'RIVAL', `${route.airline} · ${route.origin}–${route.dest} losing money`);
     if (before < PAIN_WARNING_DAYS && losing >= PAIN_WARNING_DAYS) {
       pushEvent(
         state.simMinute,
-        `${route.airline} has lost money on ${route.origin}–${route.dest} for ${losing} days: ${RIVAL_CLOSE_AFTER_LOSING_DAYS - losing} more and it pulls out`,
+        'RIVAL',
+        `${route.airline} · ${route.origin}–${route.dest} losing ${losing}/${RIVAL_CLOSE_AFTER_LOSING_DAYS}d · exits in ${RIVAL_CLOSE_AFTER_LOSING_DAYS - losing}d`,
       );
     }
   }
@@ -339,7 +345,7 @@ function pollReachEvents(state: SimState): void {
   previousKnownCount = previousKnown.size;
   if (added.length === 0) return;
   const shown = added.slice(0, 4).join(', ');
-  pushEvent(state.simMinute, `New airports in reach: ${shown}${added.length > 4 ? ` and ${added.length - 4} more` : ''}`);
+  pushEvent(state.simMinute, 'REACH', `${shown}${added.length > 4 ? ` +${added.length - 4} more` : ''} in reach`);
 }
 
 /**
@@ -366,11 +372,11 @@ function pollAogEvents(state: SimState): void {
       const days = Math.max(1, Math.ceil((event.returnsAtMinute - state.simMinute) / 1440));
       pushEvent(
         state.simMinute,
-        `${event.tail} AOG at ${event.base} (${event.fault}), out ~${days} day${days === 1 ? '' : 's'}. ` +
-          (uncovered ? `Cancelled until repaired: ${uncovered}` : 'Its flying moved to other planes'),
+        'AOG',
+        `${event.base} · ${event.tail} · ${event.fault} · back ~${days}d · ` + (uncovered ? `CNX ${uncovered}` : 'flying covered'),
       );
     } else if (uncovered !== previous) {
-      pushEvent(state.simMinute, uncovered ? `While ${event.tail} is repaired, cancelled: ${uncovered}` : `All of ${event.tail}'s flying is now covered`);
+      pushEvent(state.simMinute, 'AOG', `${event.tail} · ` + (uncovered ? `CNX ${uncovered}` : 'all flying now covered'));
     }
     seenAogs.set(event.tail, uncovered);
   }
@@ -379,7 +385,7 @@ function pollAogEvents(state: SimState): void {
     if (current.has(tail)) continue;
     seenAogs.delete(tail);
     const aircraft = state.aircraft.find((a) => a.tail === tail);
-    pushEvent(state.simMinute, `${tail} back in service${aircraft?.baseAirport ? ` at ${aircraft.baseAirport}` : ''}`);
+    pushEvent(state.simMinute, 'AOG', `${tail} back in service${aircraft?.baseAirport ? ` · ${aircraft.baseAirport}` : ''}`);
   }
 }
 
@@ -407,7 +413,7 @@ function pollMarketEvents(state: SimState): void {
     // on sale to the player on a timer.
     if (!classOpen(state, listing.typeCode)) continue;
     const name = AIRCRAFT_CLASSES.find((c) => c.code === listing.typeCode)?.name ?? listing.typeCode;
-    pushEvent(state.simMinute, `Lessor: ${name} listed (${listing.ageYears} yrs, $${listing.leasePricePerDay.toLocaleString()}/day)`);
+    pushEvent(state.simMinute, 'LESSOR', `${name} listed · ${listing.ageYears} yrs · ${shortMoney(listing.leasePricePerDay)}/day`);
   }
   lastListingId = Math.max(lastListingId, state.market.nextListingId - 1);
 
@@ -419,7 +425,7 @@ function pollMarketEvents(state: SimState): void {
     for (const typeCode of fleet.slice(previous)) {
       const name = AIRCRAFT_CLASSES.find((c) => c.code === typeCode)?.name ?? typeCode;
       const left = state.market.listings.filter((l) => l.typeCode === typeCode).length;
-      pushEvent(state.simMinute, `${airline} leased a ${name} from the lessor (${left === 0 ? 'none left' : `${left} left`})`);
+      pushEvent(state.simMinute, 'LESSOR', `${airline} took a ${name} · ${left === 0 ? 'none left' : `${left} left`}`);
     }
   }
 }
@@ -459,8 +465,9 @@ function pollRivalFareEvents(state: SimState): void {
     const yours = state.routeSettings[market]?.fare;
     pushEvent(
       state.simMinute,
-      `${route.airline} ${route.fare < reported ? 'cuts' : 'raises'} ${route.origin}–${route.dest} to $${route.fare.toLocaleString()}` +
-        (yours !== undefined ? ` (you: $${yours.toLocaleString()})` : ''),
+      'FARE',
+      `${route.airline} · ${route.origin}–${route.dest} ${route.fare < reported ? '▼' : '▲'} $${route.fare.toLocaleString()}` +
+        (yours !== undefined ? ` · you $${yours.toLocaleString()}` : ''),
     );
   }
 }
@@ -484,10 +491,7 @@ function pollPositionEvents(state: SimState): void {
       const leg = state.schedule.find((l) => l.legId === legId);
       const aircraft = leg && state.aircraft.find((a) => a.tail === leg.tail);
       if (!leg || !aircraft || aircraft.status !== 'ground' || aircraft.atAirport === leg.origin) continue;
-      pushEvent(
-        state.simMinute,
-        `${leg.tail} is at ${aircraft.atAirport}, not ${leg.origin}: ${leg.origin}→${leg.dest} cancelled. It picks up its day from ${aircraft.atAirport}`,
-      );
+      pushEvent(state.simMinute, 'CNX', `${leg.origin}→${leg.dest} · ${leg.tail} out of position at ${aircraft.atAirport}`);
     }
   }
   hasSeenInitialPositions = true;
