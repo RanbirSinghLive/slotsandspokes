@@ -37,6 +37,7 @@ import { applyFarePolicy } from './pricing';
 import { closeLosingRivalRoutes } from './rivalEconomics';
 import { rollDailyRivalMilestones } from './rivalLadder';
 import type { SimState, ActiveFlight } from './state';
+import { contractRiders, rollDailyContracts } from './contracts';
 
 const aircraftTypesByCode = new Map<string, EconomyAircraftType>(
   (aircraftTypesData as Array<EconomyAircraftType & { code: string }>).map((type) => [type.code, type]),
@@ -317,6 +318,10 @@ export function step(state: SimState): void {
     // toward the floor where they aren't. Same daily cadence as the rolls
     // above, but unlike them entirely deterministic — no random draws.
     rollDailyMarketDemand(state);
+    // Government contracts (sim/contracts.ts): starts, payments, endings
+    // and their snap-back, after the markets have grown for the day so a
+    // snap-back isn't regrown before anyone sees it.
+    rollDailyContracts(state);
     // Backstop for fog by reach (sim/reach.ts): the menu actions that widen
     // reach reveal immediately; this catches anything that slipped past.
     revealReach(state);
@@ -496,7 +501,9 @@ export function step(state: SimState): void {
             airlineFuelPrice(state),
             state.fuelEfficiencyMultiplier,
             actualDailyDemand(state, flight.origin, flight.dest),
-            connectingDemandOnMarket(state, flight.origin, flight.dest),
+            // Contract riders (sim/contracts.ts) are the airline's own
+            // customers too, booked like connecting passengers.
+            connectingDemandOnMarket(state, flight.origin, flight.dest) + contractRiders(state, flight.origin, flight.dest),
             marketFrequency,
             flight.fare,
             state.competitorRoutes,

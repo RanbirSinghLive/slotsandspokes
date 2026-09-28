@@ -8,6 +8,7 @@ import { marketDistanceNm, potentialDailyDemand } from './demand';
 import { startingSimMinute } from './clock';
 import { revealReach } from './reach';
 import { createStartingFleet, type SimState } from './state';
+import { makeOffers } from './contracts';
 
 /**
  * Choosing where the airline starts. A new game begins with one
@@ -87,4 +88,6 @@ export function chooseHome(state: SimState, iata: string): void {
   // its plane from before the game (sim/market.ts).
   placeHomeRival(state);
   ensureRivalFleets(state);
+  // The first government contracts (sim/contracts.ts), more and bigger for a weak home.
+  makeOffers(state, true);
 }

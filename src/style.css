@@ -1662,6 +1662,11 @@ button.ticker-item:hover {
   background: #7fd88f;
 }
 
+/* Government contracts: gold, money that comes with terms. */
+.ticker-tag--gov {
+  background: #e8c170;
+}
+
 /* Starts fully off-screen right (the padding-left: 100% above) and
    scrolls fully off-screen left — ui/ticker.ts sets the actual
    `animation` shorthand (name, duration, timing, iteration count) in JS

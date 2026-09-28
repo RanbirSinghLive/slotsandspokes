@@ -611,7 +611,7 @@ function updateLensLegend(): void {
   } else if (lens === 'demand') {
     lensLegendTitle.textContent = 'People waiting to fly · hover an airport for its biggest markets';
     lensLegendScale.innerHTML =
-      swatch('rgba(94, 214, 196, 0.6)', 'underserved') + swatch('rgba(154, 163, 184, 0.5)', 'well served') + swatch('#ffb347', 'you turn away');
+      swatch('rgba(94, 214, 196, 0.6)', 'underserved') + swatch('rgba(154, 163, 184, 0.5)', 'well served') + swatch('#ffb347', 'you turn away') + swatch('#e8c170', 'gov offer');
   } else if (lens === 'rivals') {
     lensLegendTitle.textContent = 'Rival networks · pick one to narrow';
     lensLegendScale.innerHTML = '';

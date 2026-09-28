@@ -25,6 +25,7 @@ import { WINDOW_DAYS, buildBipolarBars, dayLabel, money as pnlMoney } from '../p
 import { buildPoolRows } from '../poolBars';
 import * as ops from '../routeActions';
 import { rivalLinksOn } from './rival';
+import { contractOn, paymentShare, performanceFactor } from '../../sim/contracts';
 
 /**
  * The inspector's view of one route (ui/inspector/inspector.ts): what
@@ -142,6 +143,22 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
       line(
         `Full at +${Math.round((state.routeSettings[marketKey(a, b)].fare / recommendedFare(a, b) - 1) * 100)}% over the going rate · rivals adding flights · ${Math.round(response * 100)}%/day`,
         'inspector-line is-warn',
+      ),
+    );
+  }
+
+  // A government contract on this market (sim/contracts.ts): the offer's
+  // terms, or how the running one is paying.
+  const contract = contractOn(state, a, b);
+  if (contract) {
+    const performance = performanceFactor(state, contract);
+    root.append(
+      lineWithInfo(
+        contract.status === 'offered'
+          ? `GOV offer · ${money(contract.paymentPerDay)}/day · ${contract.ridersPerDay} riders · ${contract.termDays}d · fly by day ${contract.offerEndsDay}`
+          : `GOV contract · pay ${Math.round(paymentShare(performance) * 100)}% · riders ${Math.round(contract.ridersPerDay * performance)}/${contract.ridersPerDay} · ends day ${contract.endsDay}`,
+        'A government route contract: see Head office for its terms. The riders and half the pay depend on on-time, completion and NPS against stricter bars than ordinary passengers; when it ends without renewal, this market\'s demand drops.',
+        contract.status === 'active' && performance < 0.5 ? 'inspector-line is-warn' : 'inspector-line',
       ),
     );
   }

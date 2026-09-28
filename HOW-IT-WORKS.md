@@ -1648,6 +1648,47 @@ pause exists.
 
 ---
 
+## Government contracts (`src/sim/contracts.ts`)
+
+Route incentives for small, underserved communities, like the US
+Essential Air Service or a province's route-development fund: the game's
+balance lever for a weak home.
+
+- **Offers.** A contract is for one market from your network to a small
+  community (under 800,000 people) at least half starved for service,
+  in reach, unflown and not already offered. Fly it at least once a day
+  each way and the government pays so much a day for a 90–150 day term
+  and sends contract riders. Made when the game starts and every 45 days,
+  picked from the contracts' own random stream (begun from the game's
+  seed, so offers never shift any other roll). Untaken for 30 days, an
+  offer lapses; taken, it starts at the next rollover.
+- **Sized by the home's weakness.** `homeWeakness()`: the median home's
+  five best Propeller markets over this home's, from 0.5 (New York,
+  Toronto, London) to 4 (the thinnest). Payment a day is $2,500 × that ×
+  a seeded ±30%, riders 12 × the same; a weak home gets up to three
+  offers at the start and two every round after, a strong one one. From
+  the data, not from `data/home-difficulty.json`, which contracts move.
+- **Strict terms.** `performanceFactor()`, judged over 14 days: the
+  worst of on-time (full at 80%, nothing at 45%), completion (95%, 80%)
+  and NPS (+10, −10), stricter than ordinary passengers (whose demand
+  only stalls at 40% on-time). Contract riders scale fully with it and
+  book like connecting passengers (no share lost to rivals); the payment
+  is half guaranteed on any day flown both ways and half earned by it
+  (`paymentShare()`). Paid at rollover for the day before, into the
+  market's revenue.
+- **Renewal or the snap-back.** A term averaging 50% performance or more
+  is renewed at 75% of the size, up to three times. Otherwise, or at the
+  end, the payment and riders stop and the market's built-up demand
+  drops 40%.
+- **Where it shows:** GOV lines in the ticker, a Government contracts
+  section in Head office, a line in the route and airport views, the
+  Office dot for a new offer, and a dashed gold line and ring under the
+  Demand lens.
+
+The headless player takes an offer worth at least $3,000 a day that a
+plane based at either end can fit, keeps its last round trip while the
+term runs, and pads its plane's turns when it pays under half.
+
 ## Fuel prices and hedging (`src/sim/fuel.ts`, `src/sim/fuelPrice.ts`)
 
 `fuelPriceIndex` is the market price, unitless, 1.0 being baseline.

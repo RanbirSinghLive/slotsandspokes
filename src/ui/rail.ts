@@ -6,6 +6,7 @@ import { scheduleProblems } from './panels';
 import * as ops from './routeActions';
 import { RUNWAY_WARN_DAYS } from './runway';
 import { getSelection, select, type Selection } from './selection';
+import { contractsOf } from '../sim/contracts';
 
 /**
  * The rail down the side panel's left edge: every screen one click away,
@@ -20,8 +21,8 @@ import { getSelection, select, type Selection } from './selection';
  *     within a month (Money, red);
  *   - something new since the screen was last open, like unread mail: a
  *     milestone met (Goals, green), a rival on one of your markets
- *     (Rivals, amber), an executive or innovation newly on offer (Office,
- *     green). Opening the screen reads it.
+ *     (Rivals, amber), an executive, innovation or government contract
+ *     newly on offer (Office, green). Opening the screen reads it.
  * The first look only records what's there, so loading a game lights no
  * "new" dots.
  */
@@ -80,6 +81,7 @@ function newsIds(state: SimState): Partial<Record<Screen, string[]>> {
   const offers = [
     ...ops.executiveOptions(state).flatMap((chair) => chair.candidates.filter((c) => !c.blocked).map((c) => `exec:${c.id}`)),
     ...ops.innovationOptions(state).filter((option) => !option.adopted && !option.blocked).map((option) => `innovation:${option.id}`),
+    ...contractsOf(state).filter((c) => c.status === 'offered').map((c) => `contract:${c.id}`),
   ];
   return {
     goals: Object.keys(state.milestonesMet ?? {}),

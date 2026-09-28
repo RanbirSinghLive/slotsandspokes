@@ -7,6 +7,7 @@ import { airlineFuelPrice } from './fuelPrice';
 import { bookingPerks } from './innovations';
 import type { RouteSettings, SimState } from './state';
 import type { ScheduleLeg } from './schedule';
+import { contractRiders } from './contracts';
 
 // A market can be served by more than one gauge at once, so a summary
 // can't assume one type for a whole market. Looked up
@@ -89,7 +90,8 @@ export function summarizeMarket(
     const direction = `${from}>${to}`;
     let connecting = connectingByDirection.get(direction);
     if (connecting === undefined) {
-      connecting = connectingDemandOnMarket(state, from, to);
+      // Contract riders (sim/contracts.ts) book like connecting passengers.
+      connecting = connectingDemandOnMarket(state, from, to) + contractRiders(state, from, to);
       connectingByDirection.set(direction, connecting);
     }
     return connecting;

@@ -13,6 +13,7 @@ import { AIRCRAFT_CLASSES } from '../sim/aircraftClasses';
 import type { SimState } from '../sim/state';
 import { select, type Selection } from './selection';
 import { rivalsInSight } from '../sim/reach';
+import { contractsOf, SNAP_BACK_SHARE } from '../sim/contracts';
 
 const tickerTrack = document.querySelector<HTMLDivElement>('#ticker-track')!;
 
@@ -29,7 +30,7 @@ const PIXELS_PER_SECOND = 60;
  * ("AOG YUL · C-P002 · hydraulics · back 3d"). Kept apart from the text so
  * the ticker can style it on its own.
  */
-type TickerTag = 'AOG' | 'CNX' | 'CREW' | 'FLEET' | 'LESSOR' | 'RIVAL' | 'FARE' | 'FUEL' | 'SHOCK' | 'WX' | 'GOAL' | 'REACH';
+type TickerTag = 'AOG' | 'CNX' | 'CREW' | 'FLEET' | 'LESSOR' | 'RIVAL' | 'FARE' | 'FUEL' | 'SHOCK' | 'WX' | 'GOAL' | 'REACH' | 'GOV';
 
 /** A line, and the inspector view that explains it, when one does: clicking the line opens it. */
 type TickerEvent = { simMinute: number; tag: TickerTag; message: string; target?: Selection };
@@ -541,6 +542,36 @@ function pollPositionEvents(state: SimState): void {
   previousCancelled = cancelled;
 }
 
+// Each contract's status and renewals at the last poll (sim/contracts.ts).
+// The first poll only records, so loading a game isn't news.
+let seenContracts: Map<number, string> | undefined;
+
+/** Government contracts: offered, started, renewed, ended (with the snap-back), or lapsed. */
+function pollContractEvents(state: SimState): void {
+  const now = new Map(contractsOf(state).map((c) => [c.id, `${c.status}:${c.renewals ?? 0}`]));
+  if (seenContracts) {
+    for (const c of contractsOf(state)) {
+      const before = seenContracts.get(c.id);
+      const after = now.get(c.id);
+      if (before === after) continue;
+      const route: Selection = { kind: 'route', a: c.a, b: c.b };
+      const market = `${c.a}–${c.b}`;
+      if (before === undefined && c.status === 'offered') {
+        pushEvent(state.simMinute, 'GOV', `${market} offered · ${shortMoney(c.paymentPerDay)}/day · ${c.termDays}d · fly by day ${c.offerEndsDay}`, { kind: 'airport', iata: c.b });
+      } else if (c.status === 'active' && before?.startsWith('offered')) {
+        pushEvent(state.simMinute, 'GOV', `${market} contract started · ends day ${c.endsDay}`, route);
+      } else if (c.status === 'active') {
+        pushEvent(state.simMinute, 'GOV', `${market} renewed · ${shortMoney(c.paymentPerDay)}/day to day ${c.endsDay}`, route);
+      } else if (c.status === 'ended') {
+        pushEvent(state.simMinute, 'GOV', `${market} contract over · demand −${Math.round(SNAP_BACK_SHARE * 100)}%`, route);
+      } else if (c.status === 'lapsed') {
+        pushEvent(state.simMinute, 'GOV', `${market} offer lapsed`);
+      }
+    }
+  }
+  seenContracts = now;
+}
+
 /**
  * The bottom-of-screen ticker for events nobody clicked to cause: the
  * ladder, shocks, new weather, new airports in reach, rivals moving in on
@@ -549,6 +580,7 @@ function pollPositionEvents(state: SimState): void {
  */
 export function updateTicker(state: SimState): void {
   pollLadderEvents(state);
+  pollContractEvents(state);
   pollShockEvents(state);
   pollHedgeEvents(state);
   pollFleetEvents(state);

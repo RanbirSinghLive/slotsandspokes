@@ -8,6 +8,7 @@ import { marketKey } from '../sim/schedule';
 import { hungerByAirport } from '../sim/serviceLevel';
 import type { SimState } from '../sim/state';
 import { unmetDemandByAirport, unmetDemandInputs, type AirportUnmet } from '../sim/unmetDemand';
+import { contractsOf } from '../sim/contracts';
 
 /**
  * The Demand lens: where to fly next, readable at a glance.
@@ -22,6 +23,8 @@ import { unmetDemandByAirport, unmetDemandInputs, type AirportUnmet } from '../s
  *   where it's already well served.
  * - **An amber rim** where you're turning passengers away today: a route
  *   of yours there needs more seats.
+ * - **Government contracts on offer** (sim/contracts.ts): a dashed gold
+ *   line and ring.
  * - **Lines only on request**: hovering (or selecting) an airport draws
  *   its biggest markets from there, teal where nobody of yours flies yet,
  *   amber where you do, thicker the bigger. Every pair at once was
@@ -43,6 +46,7 @@ const FOCUS_MIN_WIDTH = 1;
 const FOCUS_MAX_WIDTH = 6;
 const FOCUS_OPEN = '#5ed6c4';
 const FOCUS_FLOWN = '#ffd166';
+const CONTRACT_GOLD = '#e8c170';
 
 const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]));
 
@@ -67,6 +71,7 @@ function cached(state: SimState): { unmet: Map<string, AirportUnmet>; hunger: Ma
 export function drawDemandLayer(ctx: CanvasRenderingContext2D, state: SimState, focus: string | null): void {
   const { unmet, hunger } = cached(state);
   if (focus) drawFocusMarkets(ctx, state, focus);
+  drawContractOffers(ctx, state);
 
   for (const airport of airports) {
     if (!isAirportKnown(airport.iata)) continue;
@@ -94,6 +99,35 @@ export function drawDemandLayer(ctx: CanvasRenderingContext2D, state: SimState, 
       ctx.lineWidth = 2;
       ctx.stroke();
     }
+  }
+}
+
+/**
+ * Government contracts on offer (sim/contracts.ts): a dashed gold line on
+ * the market and a ring at the community it serves, so an offer can be
+ * found where the opportunities are.
+ */
+function drawContractOffers(ctx: CanvasRenderingContext2D, state: SimState): void {
+  const path = geoPath(projection, ctx);
+  for (const contract of contractsOf(state)) {
+    if (contract.status !== 'offered') continue;
+    const from = airportsByIata.get(contract.a);
+    const to = airportsByIata.get(contract.b);
+    if (!from || !to || !isAirportKnown(contract.a) || !isAirportKnown(contract.b)) continue;
+    ctx.save();
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = CONTRACT_GOLD;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    path({ type: 'LineString', coordinates: [[from.lon, from.lat], [to.lon, to.lat]] });
+    ctx.stroke();
+    const point = projection([to.lon, to.lat]);
+    if (point) {
+      ctx.beginPath();
+      ctx.arc(point[0], point[1], 9, 0, 2 * Math.PI);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 }
 

@@ -1,4 +1,5 @@
 import { currentPotentialDemand } from '../sim/marketDemand';
+import { contractOn, contractsOf, performanceFactor } from '../sim/contracts';
 import airportsData from '../../data/airports.json';
 import { inboundAt } from '../sim/fleetTiming';
 import { lastWeekMargin } from '../sim/pnlHistory';
@@ -305,6 +306,8 @@ function steadyPlayer(kind: 'steady' | 'sitter' | 'bold'): Player {
   return {
     kind,
     open: (state) => {
+      // Contracts first, before the day is filled with anything else.
+      takeContracts(state, memory);
       for (const aircraft of state.aircraft) {
         fillPlane(state, aircraft.tail, {
           latestLanding: LATEST_LANDING_MINUTE,
@@ -320,6 +323,8 @@ function steadyPlayer(kind: 'steady' | 'sitter' | 'bold'): Player {
         ...leaveSlack(state, memory),
         ...cutLosers(state, memory),
         ...fillDelivered(state, memory),
+        ...takeContracts(state, memory),
+        ...keepContractsOnTime(state, memory),
         ...(harvesting ? [] : [...feedSpill(state, memory), ...openMarkets(state, memory), ...leaseWhenFull(state, memory, kind === 'bold')]),
         ...shedWhenOverheadBites(state, memory),
         ...returnIdle(state, memory),
@@ -331,6 +336,74 @@ function steadyPlayer(kind: 'steady' | 'sitter' | 'bold'): Player {
       ];
     },
   };
+}
+
+// --- Government contracts -------------------------------------------------------
+
+/**
+ * Take every offered government contract (sim/contracts.ts) worth at
+ * least CONTRACT_WORTH_PER_DAY that a plane can fit: one out-and-back a day from whichever end has a plane based with
+ * room for it, landing by LATEST_LANDING_MINUTE. That's all a contract
+ * asks, and it starts the next day. Priced on the Match stance like any
+ * market this player opens.
+ */
+function takeContracts(state: SimState, memory: Memory): string[] {
+  const log: string[] = [];
+  for (const contract of contractsOf(state)) {
+    if (contract.status !== 'offered' || legsServingMarket(contract.a, contract.b, state.schedule) > 0) continue;
+    // A small one isn't worth a slot in the plane's day that a real market could fill.
+    if (contract.paymentPerDay < CONTRACT_WORTH_PER_DAY) continue;
+    for (const [base, far] of [
+      [contract.a, contract.b],
+      [contract.b, contract.a],
+    ]) {
+      const from = airportByIata.get(base)!;
+      const to = airportByIata.get(far)!;
+      const fits = (tail: string) => {
+        const plan = planRotation([from], to, tail, state);
+        return plan.error === null && plan.arriveBackMinute <= LATEST_LANDING_MINUTE;
+      };
+      const plane = state.aircraft.find((aircraft) => aircraft.baseAirport === base && aircraft.returningOnDay === undefined && fits(aircraft.tail));
+      if (!plane) continue;
+      applyRotation(state, plane.tail, planRotation([from], to, plane.tail, state));
+      setFareStance(state, base, far, 'match');
+      memory.openedOn.set(marketKey(base, far), dayIndex(state));
+      log.push(`contract ${base}–${far}`);
+      break;
+    }
+  }
+  return log;
+}
+
+/** The smallest contract this player takes, in dollars a day at full pay. */
+const CONTRACT_WORTH_PER_DAY = 3000;
+/** A contract earning less than this share of its pay gets its plane's turns padded. */
+const CONTRACT_PAY_TO_BUFFER = 0.5;
+
+/**
+ * A running contract judged late (sim/contracts.ts's performanceFactor())
+ * loses its pay, and its lateness is mostly knock-on from earlier in its
+ * plane's day. So, once the market has settled, pad every turn that plane
+ * flies by one more step of turn buffer, as a player reading the
+ * contract's terms would.
+ */
+function keepContractsOnTime(state: SimState, memory: Memory): string[] {
+  const log: string[] = [];
+  for (const contract of contractsOf(state)) {
+    const key = marketKey(contract.a, contract.b);
+    if (contract.status !== 'active' || !settled(state, memory, key)) continue;
+    if (performanceFactor(state, contract) >= CONTRACT_PAY_TO_BUFFER) continue;
+    const tails = new Set(state.schedule.filter((leg) => marketKey(leg.origin, leg.dest) === key).map((leg) => leg.tail));
+    const markets = new Map(state.schedule.filter((leg) => tails.has(leg.tail)).map((leg) => [marketKey(leg.origin, leg.dest), leg]));
+    let padded = 0;
+    for (const leg of markets.values()) {
+      const next = TURN_BUFFER_CHOICES.find((minutes) => minutes > actions.currentTurnBuffer(state, leg.origin, leg.dest));
+      if (next !== undefined && actions.setTurnBuffer(state, leg.origin, leg.dest, next).ok) padded++;
+    }
+    memory.lastTouched.set(key, dayIndex(state));
+    if (padded > 0) log.push(`contract ${contract.a}–${contract.b} running late: padded ${padded} market${padded === 1 ? '' : 's'} its plane flies.`);
+  }
+  return log;
 }
 
 // --- Reading a market -----------------------------------------------------------
@@ -446,6 +519,11 @@ function scheduledMarkets(state: SimState): [string, string][] {
  * flights for a while: their day couldn't fit what it had.
  */
 function dropOneFlight(state: SimState, memory: Memory, a: string, b: string, tight = false): actions.Outcome<{ message: string }> {
+  // A running government contract (sim/contracts.ts) needs a flight each
+  // way every day: its last round trip stays until the term is over.
+  if (contractOn(state, a, b)?.status === 'active' && legsServingMarket(a, b, state.schedule) <= 2) {
+    return { ok: false, reason: `${a}–${b} is under contract` };
+  }
   const one = actions.previewRemoveFlight(state, a, b);
   const tails = one.ok ? [one.rotation.tail] : actions.rotationsServing(state, a, b).map((rotation) => rotation.tail);
   const outcome = one.ok ? actions.removeFlight(state, a, b) : actions.removeRoute(state, a, b);

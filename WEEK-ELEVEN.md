@@ -364,6 +364,37 @@ the play-through and by how weak the starting city is.
 Measured with `npm run balance` before and after, and `npm run homes`
 re-run. The sim changes, so headless output moves.
 
+**Status: built.** As planned, with what measuring taught:
+
+- **Half the pay is guaranteed.** Fully performance-paid, a starting
+  fleet of old planes on a packed day (about 20% on-time) earned
+  nothing and Halifax went under as if there were no contracts; now half
+  is guaranteed for flying it both ways, half earned. The riders stay
+  fully strict. Bars loosened to reachable: full at 80% on-time, 95%
+  completion, NPS +10; nothing at 45%, 80%, −10; judged over 14 days.
+- **Renewal.** A term averaging 50% performance renews at 75% size, up
+  to three times, before the snap-back: one term was too short to build
+  anything that survives it.
+- **Small communities only** (under 800,000): at the start every
+  airport is "starved", New York included.
+- **Their own random stream**, so a game that takes no contract plays
+  exactly as before (Montréal seed 1 is still $18,908,006).
+- **The headless player** takes offers worth $3,000 a day or more (a
+  small one at a strong home cost Montréal its opening), keeps the
+  route's last round trip for the term, and pads its plane's turns when
+  it pays under half.
+
+Measured (`npm run balance`), steady medians before → after: YUL $17.2M
+→ $17.2M, YYZ $38.5M → $36.6M, BOS $14.0M → $14.0M, PHL $56.9M →
+$56.9M, LHR $68.3M → $71.0M; Halifax busts 5/6 → 4/6 (mean $1.3M, best
+$5.3M). Halifax sitter 4/6 → 2/6 busts (median $3.6M), bold 6/6 → 4/6
+(best $12.2M). Homes re-rated: 70 Standard, 26 Hard, 73 Brutal (12
+changed; the rating plays the unattended player, which takes none).
+
+**Still open:** the steady player over-expands at a thin home, leasing
+to eight planes on Halifax's markets with contract cash and bleeding
+$30k a day; its growth rule was tuned on big homes.
+
 ---
 
 ## Carried forward

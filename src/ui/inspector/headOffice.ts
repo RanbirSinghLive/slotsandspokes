@@ -8,6 +8,8 @@ import * as ops from '../routeActions';
 import type { ExecutiveOption, InnovationOption } from '../routeActions';
 import { describeEffect, type ExecutiveRole } from '../../sim/executives';
 import { formatNps, networkNps } from '../../sim/nps';
+import { averagePerformance, contractsOf, paymentShare, performanceFactor, RENEW_MIN_PERFORMANCE, SNAP_BACK_SHARE, type Contract } from '../../sim/contracts';
+import { select } from '../selection';
 
 /**
  * The Head office view (Network › Head office): the airline's decisions
@@ -264,6 +266,7 @@ export function buildHeadOfficeView(state: SimState, changed: () => void): HTMLE
     ...hedgeButtons(state, changed),
   );
 
+  root.append(...contractsSection(state));
   root.append(...executivesSection(state, changed));
 
   root.append(
@@ -271,4 +274,58 @@ export function buildHeadOfficeView(state: SimState, changed: () => void): HTMLE
     ...ops.innovationOptions(state).map((option) => innovationCard(state, option, changed)),
   );
   return root;
+}
+
+/**
+ * Government contracts (sim/contracts.ts): offers to take up, running ones
+ * with how they're paying, and the last few finished. Each opens its far
+ * airport, where the market is drawn from.
+ */
+function contractsSection(state: SimState): HTMLElement[] {
+  const contracts = contractsOf(state);
+  const nodes: HTMLElement[] = [
+    heading(
+      'Government contracts',
+      `Route incentives for small, underserved communities. Fly the market at least once a day each way and the government pays so much a day for the term and sends contract riders. The riders, and half the pay, depend on the route's on-time, completion and NPS against stricter bars than ordinary passengers hold it to; the other half is guaranteed. A term kept up to the terms on average is renewed smaller; otherwise, when it ends, the market's built-up demand drops ${Math.round(SNAP_BACK_SHARE * 100)}%.`,
+    ),
+  ];
+  if (contracts.length === 0) {
+    nodes.push(line('None on offer', 'inspector-line goal-ahead'));
+    return nodes;
+  }
+  const today = dayIndex(state);
+  const order: Record<Contract['status'], number> = { active: 0, offered: 1, ended: 2, lapsed: 3 };
+  for (const contract of [...contracts].sort((x, y) => order[x.status] - order[y.status] || x.id - y.id)) {
+    const card = document.createElement('div');
+    card.className = 'office-card';
+    card.classList.toggle('is-adopted', contract.status === 'active');
+    card.classList.toggle('is-locked', contract.status === 'ended' || contract.status === 'lapsed');
+    const name = document.createElement('button');
+    name.type = 'button';
+    name.className = 'inspector-link office-card-name';
+    name.textContent = `${contract.a}–${contract.b}`;
+    name.addEventListener('click', () => select({ kind: 'airport', iata: contract.b }));
+    card.append(name);
+    if (contract.status === 'offered') {
+      card.append(
+        line(`Offer · ${money(contract.paymentPerDay)}/day · ${contract.ridersPerDay} riders/day · ${contract.termDays}d`),
+        line(`Fly both ways daily by day ${contract.offerEndsDay} · ${contract.offerEndsDay - today}d left`, 'inspector-line office-card-price'),
+      );
+    } else if (contract.status === 'active') {
+      const performance = performanceFactor(state, contract);
+      const renewals = contract.renewals ?? 0;
+      card.append(
+        line(`Running · ends day ${contract.endsDay} (${(contract.endsDay ?? today) - today}d)${renewals > 0 ? ` · renewed ${renewals}×` : ''}`),
+        line(
+          `Pay ${Math.round(paymentShare(performance) * 100)}% of ${money(contract.paymentPerDay)} · riders ${Math.round(contract.ridersPerDay * performance)}/${contract.ridersPerDay}`,
+          performance < 0.5 ? 'inspector-line is-over' : 'inspector-line',
+        ),
+        line(`Term average ${Math.round(averagePerformance(contract) * 100)}% · renews at ${Math.round(RENEW_MIN_PERFORMANCE * 100)}% · paid ${money(contract.paidTotal)}`, 'inspector-line office-card-price'),
+      );
+    } else {
+      card.append(line(contract.status === 'ended' ? `Ended · paid ${money(contract.paidTotal)}` : 'Lapsed, not taken up', 'inspector-line goal-ahead'));
+    }
+    nodes.push(card);
+  }
+  return nodes;
 }

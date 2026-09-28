@@ -16,6 +16,7 @@ import { STARTING_NPS } from './nps';
 import type { CrewBase, CrewDay } from './crews';
 import type { InboundLease } from './fleetTiming';
 import { createExecutiveSlots, type ExecutiveSlots } from './executives';
+import type { Contract } from './contracts';
 
 export type AircraftStatus = 'ground' | 'airborne';
 
@@ -404,6 +405,13 @@ export type SimState = {
   fuelWalk?: number;
   /** The market fuel price at each of the last 90 rollovers, oldest first, for the chart. */
   fuelPriceHistory?: number[];
+  /** Government contracts offered, running and lately finished (sim/contracts.ts). Absent in older saves. */
+  contracts?: Contract[];
+  nextContractId?: number;
+  /** The day the next round of contract offers is made. */
+  nextContractOfferDay?: number;
+  /** The contracts' own random stream (sim/contracts.ts), apart from rngSeed so offers don't shift every other roll. */
+  contractSeed?: number;
   /** The latest fuel hedge bought, running or ended (sim/fuelPrice.ts), or absent if none ever was. */
   fuelHedge?: FuelHedge;
   /**
