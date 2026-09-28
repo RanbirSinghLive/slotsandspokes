@@ -245,6 +245,36 @@ is gone.
 
 ---
 
+## Thread 4: the side panel as screens with a rail
+
+Things were buried: the fleet list reachable only from the map's fleet
+bars, the rivals list only from a lens chip, four cryptic tab icons
+fighting the inspector's breadcrumb, and the Network page half overview,
+half fleet screen. Rework, settled with the owner:
+
+- **A rail** down the panel's left edge, top-aligned (it reads as a
+  menu and lines up with the breadcrumb), always visible, even with the
+  panel hidden, where clicking an item slides the panel open to it:
+  Overview · Routes & fares · Airports · Fleet · Crews · Rivals · Money ·
+  Goals · Head office, then Game and hide/show at the foot. Replaces the
+  tab icons and the stray hide-panel button.
+- **Each screen one job:** Overview is the cards, Last 7 days and today;
+  Routes & fares gets Fare policy on top and the On-time tab's
+  cancellations as a Reliability section (the tab goes); Fleet gets
+  every plane, the rotations timeline and the Lessor; **Crews** is new,
+  every base's crews by class with hire and retrain; Game is save/load.
+- **Status dots** on the rail: where to dig before clicking (a plane
+  grounded, a route losing, a milestone met, a new executive or
+  innovation available).
+- **A jump box** (`/` or ⌘K): type an airport, a tail, a rival, a route
+  or a screen and go.
+- **Linking:** hovering a row in a list highlights it on the map; back
+  and forward beside the breadcrumb; jump chips at the top of long views.
+
+UI only: headless output must stay byte-identical.
+
+---
+
 ## Carried forward
 
 - **Balance:** past the start, a careful player's year runs $14M–$69M
