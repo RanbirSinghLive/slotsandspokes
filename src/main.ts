@@ -36,7 +36,7 @@ import {
   isRouteBuilderActive,
 } from './ui/routeBuilder';
 import { handleMapMenuMouseDown, handleMapMenuKeyDown, hideMapMenu, isMapMenuOpen } from './ui/mapMenu';
-import { back, getSelection, NETWORK, onSelectionChange, select } from './ui/selection';
+import { back, getSelection, NETWORK, onSelectionChange, select, type Selection } from './ui/selection';
 import { refreshInspectorForNewDay, renderInspector } from './ui/inspector/inspector';
 import { isHubPlannerOpen } from './ui/hubPlanner';
 import { setupFarePolicy, updateFarePolicy } from './ui/farePolicy';
@@ -52,6 +52,7 @@ import { isInsolvent } from './sim/insolvency';
 import { setupGameControls } from './ui/gameControls';
 import { setupRail, updateRail } from './ui/rail';
 import { closeJumpBox, isJumpBoxOpen, openJumpBox, setupJumpBox } from './ui/jumpBox';
+import { getMapHover, setupMapLinks } from './ui/mapLink';
 import { loadSavedState, saveState } from './ui/save';
 
 // Resume a saved game if one exists. A fresh game starts from
@@ -278,24 +279,12 @@ function render(nowMs: number = performance.now()): void {
   // after one left (render/pain.ts): on whichever layer drew the routes.
   drawPainGauges(ctx, state);
   // The route the side panel is showing, on top of whichever layer drew routes.
+  // The selection, and the panel row under the pointer (ui/mapLink.ts),
+  // marked the same way.
   const selection = getSelection();
-  if (selection.kind === 'route') drawSelectedRoute(ctx, selection.a, selection.b);
-  // A selected plane: every route it flies today.
-  if (selection.kind === 'aircraft') {
-    const drawn = new Set<string>();
-    for (const leg of state.schedule) {
-      const key = [leg.origin, leg.dest].sort().join('-');
-      if (leg.tail !== selection.tail || drawn.has(key)) continue;
-      drawn.add(key);
-      drawSelectedRoute(ctx, leg.origin, leg.dest);
-    }
-  }
-  // A selected rival: its whole network, so its reach reads at a glance.
-  if (selection.kind === 'rival') {
-    for (const route of state.competitorRoutes) {
-      if (route.code === selection.code) drawSelectedRoute(ctx, route.origin, route.dest);
-    }
-  }
+  const mapHover = getMapHover();
+  markRoutesOf(selection);
+  if (mapHover) markRoutesOf(mapHover);
 
   // Hovering a plane (not the route line) shows its own story: why it's
   // late (ui/flightTooltip.ts) and how that lateness spreads through the
@@ -325,6 +314,7 @@ function render(nowMs: number = performance.now()): void {
   drawAirports(ctx, state, demandOverlayOn);
   // The airport the side panel is showing, on top of its dot.
   if (selection.kind === 'airport') drawSelectedAirport(ctx, selection.iata);
+  if (mapHover?.kind === 'airport') drawSelectedAirport(ctx, mapHover.iata);
 
   // Hovering one of your airports (and not a plane) shows who connects
   // through it and where to fly next (render/hubs.ts). Drawn after the
@@ -346,6 +336,29 @@ function render(nowMs: number = performance.now()): void {
   // "a rival just opened a route" is news worth surfacing on the plain
   // map too, not something gated behind a specific layer being on.
   drawNewCompetitorRouteFlashes(ctx, state, nowMs);
+}
+
+/**
+ * Mark what a selection points at along its routes: a route's line, every
+ * route a plane flies today, a rival's whole network (so its reach reads
+ * at a glance). An airport's ring is drawn later, over the dots.
+ */
+function markRoutesOf(target: Selection): void {
+  if (target.kind === 'route') drawSelectedRoute(ctx, target.a, target.b);
+  if (target.kind === 'aircraft') {
+    const drawn = new Set<string>();
+    for (const leg of state.schedule) {
+      const key = [leg.origin, leg.dest].sort().join('-');
+      if (leg.tail !== target.tail || drawn.has(key)) continue;
+      drawn.add(key);
+      drawSelectedRoute(ctx, leg.origin, leg.dest);
+    }
+  }
+  if (target.kind === 'rival') {
+    for (const route of state.competitorRoutes) {
+      if (route.code === target.code) drawSelectedRoute(ctx, route.origin, route.dest);
+    }
+  }
 }
 
 const MINUTES_PER_DAY = 1440;
@@ -403,6 +416,7 @@ function setPanelHidden(hidden: boolean): void {
 }
 setupRail({ isHidden: () => panelHidden, setHidden: setPanelHidden });
 setupJumpBox(state);
+setupMapLinks(() => render());
 document.querySelector('#rail-jump')!.addEventListener('click', () => openJumpBox(state));
 
 // The inspector (ui/inspector/) follows the selection: a map click, a link

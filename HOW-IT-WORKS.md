@@ -1130,7 +1130,15 @@ top of the rail, opens a search at the top of the map over every
 screen, known airport, your planes, rivals on the map and your routes
 ("yyz lga" finds YYZ–LGA). An exact code beats a prefix, which beats a
 word start, which beats anywhere; the arrow keys and Enter pick, Esc
-closes. Keys typed into it never reach the lens or the route builder. The canvas gets the width left
+closes. Keys typed into it never reach the lens or the route builder.
+
+**Linking the panel to the map** (`ui/mapLink.ts`): hovering a row that
+points at something (a route in any list, an airport, a plane, a rival,
+a rotation on the timeline, a where-to-fly suggestion) marks it on the
+map the way a selection is marked. Beside the breadcrumb, ‹ and › step
+back and forward through what you've opened, like a browser. A view
+with three or more sections (an airport, Routes, Head office) gets a
+row of jump chips pinned at its top, one per section. The canvas gets the width left
 over (`--panel-width` covers rail and panel, kept in sync via
 `PANEL_WIDTH_PX` and `RAIL_WIDTH_PX`).
 

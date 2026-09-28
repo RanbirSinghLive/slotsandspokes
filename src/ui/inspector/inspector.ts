@@ -4,7 +4,7 @@ import { buildMoneyView } from './money';
 import { buildRoutesView } from './routes';
 import type { SimState } from '../../sim/state';
 import * as ops from '../routeActions';
-import { back, getSelection, NETWORK, replaceSelection, select, type Selection } from '../selection';
+import { back, canGoForward, forward, getSelection, NETWORK, replaceSelection, select, type Selection } from '../selection';
 import { buildAircraftView, buildFleetView } from './aircraft';
 import { buildAirportView } from './airport';
 import { buildAirportsView } from './airports';
@@ -138,6 +138,14 @@ function renderBreadcrumb(state: SimState, selection: Selection): void {
   backButton.title = 'Back (Esc)';
   backButton.setAttribute('aria-label', 'Back');
   backButton.addEventListener('click', () => back());
+  const forwardButton = document.createElement('button');
+  forwardButton.type = 'button';
+  forwardButton.className = 'inspector-back';
+  forwardButton.textContent = '›';
+  forwardButton.title = 'Forward';
+  forwardButton.setAttribute('aria-label', 'Forward');
+  forwardButton.disabled = !canGoForward();
+  forwardButton.addEventListener('click', () => forward());
 
   const steps = trail(state, selection);
   const crumbs = steps.flatMap((step, i) => {
@@ -153,7 +161,7 @@ function renderBreadcrumb(state: SimState, selection: Selection): void {
     if (!last) nodes.push(document.createTextNode(' › '));
     return nodes;
   });
-  breadcrumbEl.replaceChildren(backButton, ...crumbs);
+  breadcrumbEl.replaceChildren(backButton, forwardButton, ...crumbs);
 }
 
 /** Rebuild the inspector for the current selection. */
@@ -223,7 +231,33 @@ export function renderInspector(state: SimState): void {
   } else {
     bodyEl.replaceChildren(buildAirportsView(state, rebuild));
   }
+  addJumpChips();
   inspectorEl.scrollTop = scroll;
+}
+
+/** Sections a view needs before it gets jump chips: a short view reads fine as it is. */
+const MIN_SECTIONS_FOR_CHIPS = 3;
+
+/**
+ * A row of chips pinned at the top of a long view (an airport, Head
+ * office, Routes), one per section heading: a click scrolls to it, so
+ * digging doesn't mean scrolling past everything above.
+ */
+function addJumpChips(): void {
+  const headings = [...bodyEl.querySelectorAll('h2')];
+  if (headings.length < MIN_SECTIONS_FOR_CHIPS) return;
+  const chips = document.createElement('nav');
+  chips.className = 'inspector-chips';
+  chips.setAttribute('aria-label', 'Sections');
+  for (const h of headings) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    // The heading's own words, without its (i).
+    chip.textContent = (h.firstChild?.textContent ?? h.textContent ?? '').trim();
+    chip.addEventListener('click', () => h.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+    chips.append(chip);
+  }
+  bodyEl.prepend(chips);
 }
 
 /** Redraw just the plane pools, with whatever the hovered radial button would change. */

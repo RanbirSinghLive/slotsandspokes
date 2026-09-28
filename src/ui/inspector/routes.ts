@@ -6,6 +6,7 @@ import type { SimState } from '../../sim/state';
 import * as ops from '../routeActions';
 import { select, type RouteSort } from '../selection';
 import { info } from './dom';
+import { linkToMap } from '../mapLink';
 
 /**
  * The Routes view (Network › Routes, opened from the On-time, Completion,
@@ -153,7 +154,7 @@ export function buildRoutesView(state: SimState, sort: RouteSort): HTMLElement {
   thead.append(head);
   const tbody = document.createElement('tbody');
   for (const row of rows) {
-    const tr = document.createElement('tr');
+    const tr = linkToMap(document.createElement('tr'), { kind: 'route', a: row.a, b: row.b });
     tr.className = 'routes-row';
     tr.addEventListener('click', () => select({ kind: 'route', a: row.a, b: row.b }));
     const route = document.createElement('td');

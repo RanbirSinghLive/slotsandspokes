@@ -5,6 +5,7 @@ import type { SimState } from '../../sim/state';
 import { unmetDemandByAirport } from '../../sim/unmetDemand';
 import { airports } from '../../render/airports';
 import { select } from '../selection';
+import { linkToMap } from '../mapLink';
 
 /**
  * The inspector's list of airports (ui/inspector/inspector.ts): every
@@ -155,7 +156,7 @@ export function buildAirportsView(state: SimState, changed: () => void): HTMLEle
 
   const tbody = document.createElement('tbody');
   for (const row of rows) {
-    const tr = document.createElement('tr');
+    const tr = linkToMap(document.createElement('tr'), { kind: 'airport', iata: row.iata });
     tr.className = 'inspector-table-row';
     tr.title = row.name;
     for (const column of COLUMNS) {

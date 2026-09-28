@@ -44,6 +44,8 @@ const HISTORY_LIMIT = 50;
 
 let current: Selection = NETWORK;
 let history: Selection[] = [];
+/** Selections stepped back from, for Forward; any new selection clears it, as in a browser. */
+let future: Selection[] = [];
 const listeners: (() => void)[] = [];
 
 export function getSelection(): Selection {
@@ -67,6 +69,7 @@ function notify(): void {
 export function select(next: Selection): void {
   if (sameSelection(next, current)) return;
   history = next.kind === 'network' ? [] : [...history, current].slice(-HISTORY_LIMIT);
+  future = [];
   current = next;
   notify();
 }
@@ -81,9 +84,24 @@ export function replaceSelection(next: Selection): void {
 /** Step back to the previous selection, or to Network. False when already at Network with nothing to go back to. */
 export function back(): boolean {
   if (current.kind === 'network' && history.length === 0) return false;
+  future.push(current);
   current = history.pop() ?? NETWORK;
   notify();
   return true;
+}
+
+/** Step forward again after Back. False when there's nothing to go forward to. */
+export function forward(): boolean {
+  const next = future.pop();
+  if (!next) return false;
+  history.push(current);
+  current = next;
+  notify();
+  return true;
+}
+
+export function canGoForward(): boolean {
+  return future.length > 0;
 }
 
 export function onSelectionChange(listener: () => void): void {

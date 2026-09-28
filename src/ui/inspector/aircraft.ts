@@ -12,6 +12,7 @@ import { aircraftUtilisation, rotationsForTail } from '../../sim/utilisation';
 import { planeIconElement } from '../planeIcons';
 import * as ops from '../routeActions';
 import { select, selectRoute } from '../selection';
+import { linkToMap } from '../mapLink';
 
 /**
  * The inspector's views of the player's own aircraft
@@ -101,7 +102,7 @@ export function buildFleetView(state: SimState): HTMLElement {
   for (const aircraft of state.aircraft) {
     const use = aircraftUtilisation(state, aircraft.tail);
     const { flown, onTime, loadFactor } = todayOnTime(state, aircraft.tail);
-    const row = document.createElement('button');
+    const row = linkToMap(document.createElement('button'), { kind: 'aircraft', tail: aircraft.tail });
     row.type = 'button';
     row.className = 'inspector-row';
     const name = document.createElement('span');
@@ -172,7 +173,7 @@ export function buildAircraftView(state: SimState, tail: string, changed: () => 
     const list = document.createElement('div');
     list.className = 'inspector-rows';
     for (const rotation of rotations) {
-      const row = document.createElement('button');
+      const row = linkToMap(document.createElement('button'), { kind: 'route', a: rotation.airports[0], b: rotation.airports[1] });
       row.type = 'button';
       row.className = 'inspector-row';
       const name = document.createElement('span');

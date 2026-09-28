@@ -2857,3 +2857,44 @@ button.ops-item:hover {
   color: #6b7694;
   font-size: 11px;
 }
+
+.inspector-back:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* Jump chips (ui/inspector/inspector.ts): pinned at the top of a long
+   view while it scrolls, one per section. */
+.inspector-chips {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 0 8px;
+  background: #0a0c12;
+}
+
+.inspector-chips button {
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #9aa3b8;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.inspector-chips button:hover {
+  color: #fff;
+  border-color: #5ed6c8;
+}
+
+/* A section scrolled to by a chip stops clear of the pinned chips. */
+#inspector-body h2 {
+  scroll-margin-top: 40px;
+}

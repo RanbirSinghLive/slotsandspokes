@@ -10,6 +10,7 @@ import { rivalRouteOutlook } from '../../sim/rivalEconomics';
 import { legsServingMarket, marketKey, recommendedFare } from '../../sim/schedule';
 import type { SimState } from '../../sim/state';
 import { select, selectRoute } from '../selection';
+import { linkToMap } from '../mapLink';
 
 /**
  * The inspector's views of rival airlines (ui/inspector/inspector.ts):
@@ -78,7 +79,7 @@ export function buildRivalsView(state: SimState): HTMLElement {
   const list = document.createElement('div');
   list.className = 'inspector-rows';
   for (const rival of rivals) {
-    const row = document.createElement('button');
+    const row = linkToMap(document.createElement('button'), { kind: 'rival', code: rival.code });
     row.type = 'button';
     row.className = 'inspector-row';
     const name = document.createElement('span');
@@ -144,7 +145,7 @@ export function buildRivalView(state: SimState, code: string): HTMLElement {
   for (const { route, outlook } of outlooks) {
     const youFly = legsServingMarket(route.origin, route.dest, state.schedule) > 0;
     const fareShare = Math.round((route.fare / recommendedFare(route.origin, route.dest)) * 100);
-    const row = document.createElement(youFly ? 'button' : 'div');
+    const row = linkToMap(document.createElement(youFly ? 'button' : 'div'), { kind: 'route', a: route.origin, b: route.dest });
     row.className = 'inspector-row';
     if (youFly) {
       (row as HTMLButtonElement).type = 'button';

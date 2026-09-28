@@ -5,6 +5,7 @@ import * as ops from '../routeActions';
 import { select } from '../selection';
 import { crewExplanation, crewRows } from './airport';
 import { heading, line } from './dom';
+import { linkToMap } from '../mapLink';
 
 /**
  * The Crews screen: every crew base's crews by class in one place, with
@@ -47,7 +48,7 @@ export function buildCrewsView(state: SimState, changed: () => void): HTMLElemen
   root.append(heading('By base', crewExplanation(bases[0].readout)));
   for (const base of bases) {
     // Each base's name opens its airport view, where its planes are.
-    const link = document.createElement('button');
+    const link = linkToMap(document.createElement('button'), { kind: 'airport', iata: base.iata });
     link.type = 'button';
     link.className = 'inspector-link crews-base';
     link.textContent = base.iata;

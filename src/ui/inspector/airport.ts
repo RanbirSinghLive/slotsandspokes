@@ -27,6 +27,7 @@ import { buildPoolRows } from '../poolBars';
 import * as ops from '../routeActions';
 import { select } from '../selection';
 import { aircraftLink } from './aircraft';
+import { linkToMap } from '../mapLink';
 
 /**
  * The inspector's view of one airport (ui/inspector/inspector.ts): how
@@ -219,7 +220,7 @@ function marketRows(state: SimState, iata: string): HTMLElement {
   for (const [other, flights] of markets) {
     const margins = ops.marketPnlHistory(state, iata, other).margin;
     const lastMargin = margins.length > 0 ? margins[margins.length - 1] : null;
-    const row = document.createElement('button');
+    const row = linkToMap(document.createElement('button'), { kind: 'route', a: iata, b: other });
     row.type = 'button';
     row.className = 'inspector-row';
     const name = document.createElement('span');
@@ -247,7 +248,8 @@ function whereToFlyNext(state: SimState, iata: string): HTMLElement[] {
   const list = document.createElement('div');
   list.className = 'inspector-rows';
   for (const suggestion of suggestions) {
-    const row = document.createElement('button');
+    // Hovering draws the market it would open.
+    const row = linkToMap(document.createElement('button'), { kind: 'route', a: iata, b: suggestion.dest });
     row.type = 'button';
     row.className = 'inspector-row';
     const name = document.createElement('span');

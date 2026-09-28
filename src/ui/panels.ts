@@ -13,6 +13,7 @@ import { goalsSummary } from './inspector/goals';
 import { headOfficeSummary } from './inspector/headOffice';
 import type { SimState } from '../sim/state';
 import { minuteOfDay, minuteOfDayToTimeString } from '../sim/clock';
+import { linkToMap } from './mapLink';
 
 // Must match the --panel-width custom property's default value in
 // style.css — see the comment there. Wide enough for the tab bar, the
@@ -251,7 +252,7 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
     row.className = 'timeline-row';
 
     // The plane opens its own view (ui/inspector/aircraft.ts).
-    const plane = document.createElement('button');
+    const plane = linkToMap(document.createElement('button'), { kind: 'aircraft', tail: aircraft.tail });
     plane.type = 'button';
     plane.className = 'inspector-link timeline-plane';
     plane.append(planeIconElement(aircraft.typeCode), ` ${aircraft.tail}`);
@@ -266,7 +267,7 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
     const track = document.createElement('div');
     track.className = 'timeline-track';
     for (const rotation of own) {
-      const span = document.createElement('div');
+      const span = linkToMap(document.createElement('div'), { kind: 'route', a: rotation.airports[0], b: rotation.airports[1] });
       span.className = 'timeline-rotation';
       span.classList.toggle('is-open', !rotation.closed);
       span.style.left = at(rotation.departMinute);

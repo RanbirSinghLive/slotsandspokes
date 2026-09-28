@@ -284,6 +284,10 @@ its sort), now fixed.
 
 **Slice 3 done:** the jump box, also on the rail as Jump.
 
+**Slice 4 done:** hover-linking (`ui/mapLink.ts`, marks drawn by the same
+`markRoutesOf()` as the selection), Forward beside Back, and jump chips
+on any view with three or more sections. **Thread 4 done.**
+
 ---
 
 ## Carried forward
