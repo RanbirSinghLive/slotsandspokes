@@ -39,8 +39,13 @@ comes by a link and a save file.
 2. **Where it's hosted.** A static host (Cloudflare Pages, Netlify or
    GitHub Pages), deployed from a git remote on push. Recommended:
    Cloudflare Pages, free, with the domain registered alongside.
-3. **Who's in the alpha** and how they're asked in (a short invite
-   note with what to try and how to report).
+3. **A public link, low uptake** (settled with the owner): anyone with
+   the link can play, no invites or gating; expect 5–10 players. So a
+   free static-host tier is plenty, a custom domain can come after a
+   free one (`<name>.pages.dev` works on day one), and since strangers
+   may arrive, the page needs to explain itself: an "alpha" badge, what
+   feedback is wanted and where, and the desktop-only notice. Still no
+   analytics: feedback is what players choose to send.
 
 ---
 
