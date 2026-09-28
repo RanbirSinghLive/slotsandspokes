@@ -127,6 +127,10 @@ form is only used where its tooltip is one hover away.
 6. **Tighter stat cards**: one number and one arrow ("▲ $50k"), the
    comparison in the tooltip; Runway in days or "Stable"; the Head
    office card a fuel sparkline.
+   **Done:** trends read "▲ +$52k" (the comparison in the tooltip),
+   Runway "Stable" or "~12 days", and the Head office card carries the
+   last 30 days of fuel as a sparkline, scaled to at least a fifth of the
+   average so a wobble doesn't read as a spike.
 10. **An ops board strip** under the clock: flown / to go / late /
     cancelled today, the late count a link to the worst route.
 

@@ -69,9 +69,9 @@ function points(now: number, before: number): string {
   return `${change > 0 ? '+' : '−'}${Math.abs(change)} pts`;
 }
 
-/** The label-and-value body of the Goals and Head office cards. */
-function linkCard(card: HTMLElement, label: string, value: string): void {
-  const text = `${label}|${value}`;
+/** The label-and-value body of the Goals and Head office cards, with a sparkline under the value when given one. */
+function linkCard(card: HTMLElement, label: string, value: string, spark?: number[]): void {
+  const text = `${label}|${value}|${spark?.join(',') ?? ''}`;
   if (card.dataset.text === text) return;
   card.dataset.text = text;
   const labelEl = document.createElement('span');
@@ -81,6 +81,32 @@ function linkCard(card: HTMLElement, label: string, value: string): void {
   valueEl.className = 'stat-value stat-value-small';
   valueEl.textContent = `${value} ›`;
   card.replaceChildren(labelEl, valueEl);
+  if (spark && spark.length > 1) card.append(sparkline(spark));
+}
+
+/**
+ * A tiny line of recent values with no axes, for reading a trend at a
+ * glance: fuel on the Head office card. The fuel chart itself is in the
+ * Head office view.
+ */
+function sparkline(values: number[]): SVGSVGElement {
+  const width = 100;
+  const height = 16;
+  // At least a fifth of the average in height, so a 1% wobble stays a
+  // wobble rather than filling the card like a spike.
+  const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+  const middle = (Math.min(...values) + Math.max(...values)) / 2;
+  const span = Math.max(Math.max(...values) - Math.min(...values), 0.2 * Math.abs(mean)) || 1;
+  const low = middle - span / 2;
+  const points = values.map((value, i) => `${((i / (values.length - 1)) * width).toFixed(1)},${(height - 1 - ((value - low) / span) * (height - 2)).toFixed(1)}`);
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'stat-spark');
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+  line.setAttribute('points', points.join(' '));
+  svg.append(line);
+  return svg;
 }
 const rotationsTimelineEl = document.querySelector<HTMLDivElement>('#rotations-timeline')!;
 const rotationsEmptyEl = document.querySelector<HTMLDivElement>('#rotations-empty')!;
@@ -142,7 +168,8 @@ export function updatePanel(state: SimState): void {
   showTrend(npsEl.closest<HTMLElement>('.stat-card')!, trends.nps, (now, before) => `${now >= before ? '+' : '−'}${Math.abs(Math.round(now - before))}`);
   // Where the airline stands on the ladder (sim/ladder.ts), and head office.
   linkCard(goalsEl, 'Goals', goalsSummary(state));
-  linkCard(headOfficeEl, 'Head office', headOfficeSummary(state));
+  // The last 30 days of fuel, the price Head office is mostly about.
+  linkCard(headOfficeEl, 'Head office', headOfficeSummary(state), (state.fuelPriceHistory ?? []).slice(-30));
   updatePnlHistoryPanel(state);
 
   renderRotations(state);
