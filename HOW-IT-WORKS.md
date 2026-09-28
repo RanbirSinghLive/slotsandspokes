@@ -757,7 +757,9 @@ so a route can be drawn while either is showing.
    always**, regardless of which overlays are on. Labels are placed
    greedily without overlap, most important first (home, then busiest
    for you, then biggest city). A label is the three-letter code only,
-   to keep the map clear; the name is in the inspector's airport view.
+   to keep the map clear; the name is in the hover card
+   (`ui/airportTooltip.ts`: level, departures, demand, weather) and the
+   inspector's airport view.
    Where a code doesn't fit, no label at that zoom. So the map thins itself by
    importance as it zooms out. The overlays never draw airports
    themselves, so layering them never doubles a dot.

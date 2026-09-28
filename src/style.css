@@ -1316,7 +1316,8 @@ body {
 /* Hovering a moving plane (ui/flightTooltip.ts): why this flight is late,
    as delay codes, and where the delay goes next. Same look as the
    competition tooltip beside it. */
-#flight-tooltip {
+#flight-tooltip,
+#airport-tooltip {
   position: fixed;
   z-index: 30;
   max-width: 300px;
@@ -1331,7 +1332,8 @@ body {
   pointer-events: none;
 }
 
-#flight-tooltip[hidden] {
+#flight-tooltip[hidden],
+#airport-tooltip[hidden] {
   display: none;
 }
 
@@ -1369,7 +1371,8 @@ body {
   color: #7fd88f;
 }
 
-#flight-tooltip .is-late {
+#flight-tooltip .is-late,
+#airport-tooltip .is-late {
   color: #ff8080;
 }
 

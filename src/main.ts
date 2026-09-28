@@ -15,6 +15,7 @@ import { updateMarket } from './ui/market';
 import { drawDelayCascade } from './render/cascade';
 import { projectRestOfDay } from './sim/cascade';
 import { showFlightTooltip, hideFlightTooltip } from './ui/flightTooltip';
+import { showAirportTooltip, hideAirportTooltip } from './ui/airportTooltip';
 import { drawDemandLayer } from './render/demand';
 import { drawCompetitionLayer, competitorAirlines, findCompetitionHover, drawNewCompetitorRouteFlashes } from './render/competition';
 import { drawRouteMapMode, MAP_MODES, MAP_MODE_COLORS, type MapMode } from './render/mapmodes';
@@ -374,9 +375,15 @@ function render(nowMs: number = performance.now()): void {
   // Hovering one of your airports (and not a plane) shows who connects
   // through it and where to fly next (render/hubs.ts). Drawn after the
   // airports so its labels sit on top.
-  if (hoverPoint && !hoveredFlight && !isRouteBuilderActive() && !isMapMenuOpen()) {
-    const hoveredAirport = nearestAirportCandidate(hoverPoint.x, hoverPoint.y);
-    if (hoveredAirport && hasHubView(state, hoveredAirport.airport.iata)) drawHubView(ctx, state, hoveredAirport.airport.iata);
+  // Its name and headline numbers go in a hover card (ui/airportTooltip.ts),
+  // unless the Competition overlay's own card is covering airports.
+  const hoveredAirport =
+    hoverPoint && !hoveredFlight && !isRouteBuilderActive() && !isMapMenuOpen() ? nearestAirportCandidate(hoverPoint.x, hoverPoint.y) : null;
+  if (hoveredAirport && hasHubView(state, hoveredAirport.airport.iata)) drawHubView(ctx, state, hoveredAirport.airport.iata);
+  if (hoveredAirport && hoverPoint && !competitionOverlayOn) {
+    showAirportTooltip(state, hoveredAirport.airport.iata, hoverPoint.x, hoverPoint.y);
+  } else {
+    hideAirportTooltip();
   }
   drawWeatherEffects(ctx, state);
   drawRoutePreview(ctx, state);
@@ -879,6 +886,7 @@ canvas.addEventListener('mousemove', (event) => {
 canvas.addEventListener('mouseleave', () => {
   hoverPoint = null;
   hideFlightTooltip();
+  hideAirportTooltip();
   hideCompetitionTooltip();
   hideRouteHoverTooltip();
 });

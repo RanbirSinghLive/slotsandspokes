@@ -376,7 +376,7 @@ function boxesOverlap(a: Box, b: Box): boolean {
  * each later label tries right, left, above and below its dot, taking the
  * first spot that doesn't overlap a label — or a dot — already on the
  * map. Labels are the three-letter code only: the map stays uncluttered,
- * and clicking an airport opens its name and detail in the inspector.
+ * and the name is in the hover card (ui/airportTooltip.ts) and the inspector.
  * If nothing fits, the label isn't drawn at this
  * zoom; the dot is still there, still hoverable, and zooming in pulls the
  * airports far enough apart for it to come back. So the map thins itself

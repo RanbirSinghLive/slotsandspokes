@@ -94,6 +94,10 @@ form is only used where its tooltip is one hover away.
 
 1. **An airport hover card**: name, level, departures a day, waiting
    to fly. It replaces the names taken off the map.
+   **Done:** `ui/airportTooltip.ts`, shown from main.ts's render() like
+   the flight card: name, level and departures (and connections), demand
+   and service, passengers turned away, and weather. Off while the
+   Competition overlay is on, whose own card covers airports.
 7. **Today's bar reads as unfinished.** Ghost or hatch today's bar
    until the day closes, and head each chart with yesterday's figure,
    so every morning doesn't open on "Revenue $0, margin −$14,790".
