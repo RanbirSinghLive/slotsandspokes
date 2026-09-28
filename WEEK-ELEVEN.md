@@ -101,6 +101,9 @@ form is only used where its tooltip is one hover away.
 7. **Today's bar reads as unfinished.** Ghost or hatch today's bar
    until the day closes, and head each chart with yesterday's figure,
    so every morning doesn't open on "Revenue $0, margin −$14,790".
+   **Done:** today's bar is hatched (a CSS mask keeps its colour), each
+   header reads yesterday ("$10,787 yday"), and today's running figure is
+   in the header's and the bar's tooltips.
 5. **The Lessor as a grid**: one row per class with a count, the
    next arrival ("2d"), and a lock icon for a locked class, its unlock
    condition in the tooltip.
