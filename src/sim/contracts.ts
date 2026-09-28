@@ -11,7 +11,7 @@ import { hungerByAirport } from './serviceLevel';
 import type { SimState } from './state';
 
 /**
- * Government contracts (WEEK-ELEVEN.md, thread 6): route incentives for
+ * Contracts (WEEK-ELEVEN.md, thread 6): route incentives for
  * underserved airports, like the US Essential Air Service or a province's
  * route-development fund. They are the game's balance lever for a weak
  * home: Halifax, whose markets are thin, gets more and bigger offers than
@@ -19,7 +19,7 @@ import type { SimState } from './state';
  *
  * - **An offer** is for one market from the airline's network to an
  *   underserved small community in reach: fly it at least once a day each way,
- *   and the government pays so much a day for a term, and sends riders
+ *   and the contract pays so much a day for a term, and sends riders
  *   who wouldn't otherwise fly (civil servants, medical travel). Unclaimed
  *   for OFFER_OPEN_DAYS it lapses. It starts the day after the market is
  *   first flown.
@@ -47,7 +47,7 @@ export type Contract = {
   /** The market: `a` is the network end it was offered from, `b` the underserved airport. */
   a: string;
   b: string;
-  /** What the government pays a day at full performance. */
+  /** What the contract pays a day at full performance. */
   paymentPerDay: number;
   /** Extra riders a day at full performance, contracted to you. */
   ridersPerDay: number;

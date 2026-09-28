@@ -338,10 +338,10 @@ function steadyPlayer(kind: 'steady' | 'sitter' | 'bold'): Player {
   };
 }
 
-// --- Government contracts -------------------------------------------------------
+// --- Contracts -------------------------------------------------------
 
 /**
- * Take every offered government contract (sim/contracts.ts) worth at
+ * Take every offered contract (sim/contracts.ts) worth at
  * least CONTRACT_WORTH_PER_DAY that a plane can fit: one out-and-back a day from whichever end has a plane based with
  * room for it, landing by LATEST_LANDING_MINUTE. That's all a contract
  * asks, and it starts the next day. Priced on the Match stance like any
@@ -519,7 +519,7 @@ function scheduledMarkets(state: SimState): [string, string][] {
  * flights for a while: their day couldn't fit what it had.
  */
 function dropOneFlight(state: SimState, memory: Memory, a: string, b: string, tight = false): actions.Outcome<{ message: string }> {
-  // A running government contract (sim/contracts.ts) needs a flight each
+  // A running contract (sim/contracts.ts) needs a flight each
   // way every day: its last round trip stays until the term is over.
   if (contractOn(state, a, b)?.status === 'active' && legsServingMarket(a, b, state.schedule) <= 2) {
     return { ok: false, reason: `${a}–${b} is under contract` };

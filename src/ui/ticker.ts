@@ -30,15 +30,27 @@ const PIXELS_PER_SECOND = 60;
  * ("AOG YUL · C-P002 · hydraulics · back 3d"). Kept apart from the text so
  * the ticker can style it on its own.
  */
-type TickerTag = 'AOG' | 'CNX' | 'CREW' | 'FLEET' | 'LESSOR' | 'RIVAL' | 'FARE' | 'FUEL' | 'SHOCK' | 'WX' | 'GOAL' | 'REACH' | 'GOV';
+type TickerTag = 'AOG' | 'CNX' | 'CREW' | 'FLEET' | 'LESSOR' | 'RIVAL' | 'FARE' | 'FUEL' | 'SHOCK' | 'WX' | 'GOAL' | 'REACH' | 'CONTRACT';
 
-/** A line, and the inspector view that explains it, when one does: clicking the line opens it. */
-type TickerEvent = { simMinute: number; tag: TickerTag; message: string; target?: Selection };
+/**
+ * A line, and the inspector view that explains it, when one does: clicking
+ * the line opens it. A highlighted line (a new contract offer) is news to
+ * act on: it scrolls first, with its tag pulsing, until it has been
+ * clicked or HIGHLIGHT_MS has passed.
+ */
+type TickerEvent = { simMinute: number; tag: TickerTag; message: string; target?: Selection; highlightUntil?: number };
 
 let events: TickerEvent[] = [];
 
-function pushEvent(simMinute: number, tag: TickerTag, message: string, target?: Selection): void {
-  events.push({ simMinute, tag, message, target });
+/** How long a highlighted line stays at the front, pulsing, in real time. */
+const HIGHLIGHT_MS = 90_000;
+
+function isHighlighted(event: TickerEvent): boolean {
+  return event.highlightUntil !== undefined && performance.now() < event.highlightUntil;
+}
+
+function pushEvent(simMinute: number, tag: TickerTag, message: string, target?: Selection, highlight = false): void {
+  events.push({ simMinute, tag, message, target, highlightUntil: highlight ? performance.now() + HIGHLIGHT_MS : undefined });
   if (events.length > MAX_EVENTS) events.shift();
   renderTickerText();
 }
@@ -63,7 +75,8 @@ function renderTickerText(): void {
   // Each line is its coloured tag and its text; one with a target is a
   // button (the track pauses under the pointer, so it can be clicked).
   const nodes: HTMLElement[] = [];
-  events.forEach((event, i) => {
+  const ordered = [...events.filter(isHighlighted), ...events.filter((event) => !isHighlighted(event))];
+  ordered.forEach((event, i) => {
     if (i > 0) {
       const separator = document.createElement('span');
       separator.className = 'ticker-separator';
@@ -72,10 +85,18 @@ function renderTickerText(): void {
     }
     const item = document.createElement(event.target ? 'button' : 'span');
     item.className = 'ticker-item';
+    item.classList.toggle('is-highlighted', isHighlighted(event));
     if (event.target) {
       const target = event.target;
       (item as HTMLButtonElement).type = 'button';
-      item.addEventListener('click', () => select(target));
+      item.addEventListener('click', () => {
+        // Read: it stops standing out.
+        if (event.highlightUntil !== undefined) {
+          event.highlightUntil = undefined;
+          renderTickerText();
+        }
+        select(target);
+      });
     }
     const tag = document.createElement('span');
     tag.className = `ticker-tag ticker-tag--${event.tag.toLowerCase()}`;
@@ -546,7 +567,7 @@ function pollPositionEvents(state: SimState): void {
 // The first poll only records, so loading a game isn't news.
 let seenContracts: Map<number, string> | undefined;
 
-/** Government contracts: offered, started, renewed, ended (with the snap-back), or lapsed. */
+/** Contracts: offered, started, renewed, ended (with the snap-back), or lapsed. */
 function pollContractEvents(state: SimState): void {
   const now = new Map(contractsOf(state).map((c) => [c.id, `${c.status}:${c.renewals ?? 0}`]));
   if (seenContracts) {
@@ -557,15 +578,21 @@ function pollContractEvents(state: SimState): void {
       const route: Selection = { kind: 'route', a: c.a, b: c.b };
       const market = `${c.a}–${c.b}`;
       if (before === undefined && c.status === 'offered') {
-        pushEvent(state.simMinute, 'GOV', `${market} offered · ${shortMoney(c.paymentPerDay)}/day · ${c.termDays}d · fly by day ${c.offerEndsDay}`, { kind: 'airport', iata: c.b });
+        pushEvent(
+          state.simMinute,
+          'CONTRACT',
+          `New contract · ${market} · ${shortMoney(c.paymentPerDay)}/day · ${c.termDays}d · take by day ${c.offerEndsDay}`,
+          { kind: 'headOffice' },
+          true,
+        );
       } else if (c.status === 'active' && before?.startsWith('offered')) {
-        pushEvent(state.simMinute, 'GOV', `${market} contract started · ends day ${c.endsDay}`, route);
+        pushEvent(state.simMinute, 'CONTRACT', `${market} contract started · ends day ${c.endsDay}`, route);
       } else if (c.status === 'active') {
-        pushEvent(state.simMinute, 'GOV', `${market} renewed · ${shortMoney(c.paymentPerDay)}/day to day ${c.endsDay}`, route);
+        pushEvent(state.simMinute, 'CONTRACT', `${market} renewed · ${shortMoney(c.paymentPerDay)}/day to day ${c.endsDay}`, route);
       } else if (c.status === 'ended') {
-        pushEvent(state.simMinute, 'GOV', `${market} contract over · demand −${Math.round(SNAP_BACK_SHARE * 100)}%`, route);
+        pushEvent(state.simMinute, 'CONTRACT', `${market} contract over · demand −${Math.round(SNAP_BACK_SHARE * 100)}%`, route);
       } else if (c.status === 'lapsed') {
-        pushEvent(state.simMinute, 'GOV', `${market} offer lapsed`);
+        pushEvent(state.simMinute, 'CONTRACT', `${market} offer lapsed`);
       }
     }
   }
@@ -578,7 +605,15 @@ function pollContractEvents(state: SimState): void {
  * your network, and the rest below. Called every frame from main.ts's
  * render(), so an event is announced whichever panel is open.
  */
+/** Whether any line was highlighted at the last render, so its running out re-renders the ticker. */
+let highlightedShown = false;
+
 export function updateTicker(state: SimState): void {
+  const anyHighlighted = events.some(isHighlighted);
+  if (highlightedShown !== anyHighlighted) {
+    highlightedShown = anyHighlighted;
+    renderTickerText();
+  }
   pollLadderEvents(state);
   pollContractEvents(state);
   pollShockEvents(state);

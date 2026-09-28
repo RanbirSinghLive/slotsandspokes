@@ -318,7 +318,7 @@ export function step(state: SimState): void {
     // toward the floor where they aren't. Same daily cadence as the rolls
     // above, but unlike them entirely deterministic — no random draws.
     rollDailyMarketDemand(state);
-    // Government contracts (sim/contracts.ts): starts, payments, endings
+    // Contracts (sim/contracts.ts): starts, payments, endings
     // and their snap-back, after the markets have grown for the day so a
     // snap-back isn't regrown before anyone sees it.
     rollDailyContracts(state);

@@ -23,7 +23,7 @@ import { contractsOf } from '../sim/contracts';
  *   where it's already well served.
  * - **An amber rim** where you're turning passengers away today: a route
  *   of yours there needs more seats.
- * - **Government contracts on offer** (sim/contracts.ts): a dashed gold
+ * - **Contracts on offer** (sim/contracts.ts): a dashed gold
  *   line and ring.
  * - **Lines only on request**: hovering (or selecting) an airport draws
  *   its biggest markets from there, teal where nobody of yours flies yet,
@@ -103,7 +103,7 @@ export function drawDemandLayer(ctx: CanvasRenderingContext2D, state: SimState, 
 }
 
 /**
- * Government contracts on offer (sim/contracts.ts): a dashed gold line on
+ * Contracts on offer (sim/contracts.ts): a dashed gold line on
  * the market and a ring at the community it serves, so an offer can be
  * found where the opportunities are.
  */

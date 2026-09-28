@@ -277,7 +277,7 @@ export function buildHeadOfficeView(state: SimState, changed: () => void): HTMLE
 }
 
 /**
- * Government contracts (sim/contracts.ts): offers to take up, running ones
+ * Contracts (sim/contracts.ts): offers to take up, running ones
  * with how they're paying, and the last few finished. Each opens its far
  * airport, where the market is drawn from.
  */
@@ -285,8 +285,8 @@ function contractsSection(state: SimState): HTMLElement[] {
   const contracts = contractsOf(state);
   const nodes: HTMLElement[] = [
     heading(
-      'Government contracts',
-      `Route incentives for small, underserved communities. Fly the market at least once a day each way and the government pays so much a day for the term and sends contract riders. The riders, and half the pay, depend on the route's on-time, completion and NPS against stricter bars than ordinary passengers hold it to; the other half is guaranteed. A term kept up to the terms on average is renewed smaller; otherwise, when it ends, the market's built-up demand drops ${Math.round(SNAP_BACK_SHARE * 100)}%.`,
+      'Contracts',
+      `Route contracts for small, underserved communities, funded to keep them connected. Fly the market at least once a day each way and the contract pays so much a day for the term and sends contract riders. The riders, and half the pay, depend on the route's on-time, completion and NPS against stricter bars than ordinary passengers hold it to; the other half is guaranteed. A term kept up to the terms on average is renewed smaller; otherwise, when it ends, the market's built-up demand drops ${Math.round(SNAP_BACK_SHARE * 100)}%.`,
     ),
   ];
   if (contracts.length === 0) {

@@ -84,15 +84,15 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
   const service = describeServiceLevel(hungerAt(state, iata));
   root.append(lineWithInfo(service.label, `How well this airport is served by every airline: ${service.description}.`));
 
-  // Government contracts touching this airport (sim/contracts.ts).
+  // Contracts touching this airport (sim/contracts.ts).
   for (const contract of contractsOf(state)) {
     if ((contract.a !== iata && contract.b !== iata) || (contract.status !== 'offered' && contract.status !== 'active')) continue;
     root.append(
       lineWithInfo(
         contract.status === 'offered'
-          ? `GOV offer · ${contract.a}–${contract.b} · ${money(contract.paymentPerDay)}/day · fly by day ${contract.offerEndsDay}`
-          : `GOV contract · ${contract.a}–${contract.b} · ends day ${contract.endsDay}`,
-        'A government route contract: its terms are in Head office. Flying the market both ways daily starts an offer.',
+          ? `Contract offer · ${contract.a}–${contract.b} · ${money(contract.paymentPerDay)}/day · fly by day ${contract.offerEndsDay}`
+          : `Contract · ${contract.a}–${contract.b} · ends day ${contract.endsDay}`,
+        'A route contract: its terms are in Head office. Flying the market both ways daily starts an offer.',
         'inspector-line is-good',
       ),
     );

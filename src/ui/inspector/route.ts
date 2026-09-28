@@ -147,7 +147,7 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
     );
   }
 
-  // A government contract on this market (sim/contracts.ts): the offer's
+  // A contract on this market (sim/contracts.ts): the offer's
   // terms, or how the running one is paying.
   const contract = contractOn(state, a, b);
   if (contract) {
@@ -155,9 +155,9 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
     root.append(
       lineWithInfo(
         contract.status === 'offered'
-          ? `GOV offer · ${money(contract.paymentPerDay)}/day · ${contract.ridersPerDay} riders · ${contract.termDays}d · fly by day ${contract.offerEndsDay}`
-          : `GOV contract · pay ${Math.round(paymentShare(performance) * 100)}% · riders ${Math.round(contract.ridersPerDay * performance)}/${contract.ridersPerDay} · ends day ${contract.endsDay}`,
-        'A government route contract: see Head office for its terms. The riders and half the pay depend on on-time, completion and NPS against stricter bars than ordinary passengers; when it ends without renewal, this market\'s demand drops.',
+          ? `Contract offer · ${money(contract.paymentPerDay)}/day · ${contract.ridersPerDay} riders · ${contract.termDays}d · fly by day ${contract.offerEndsDay}`
+          : `Contract · pay ${Math.round(paymentShare(performance) * 100)}% · riders ${Math.round(contract.ridersPerDay * performance)}/${contract.ridersPerDay} · ends day ${contract.endsDay}`,
+        'A route contract: see Head office for its terms. The riders and half the pay depend on on-time, completion and NPS against stricter bars than ordinary passengers; when it ends without renewal, this market\'s demand drops.',
         contract.status === 'active' && performance < 0.5 ? 'inspector-line is-warn' : 'inspector-line',
       ),
     );

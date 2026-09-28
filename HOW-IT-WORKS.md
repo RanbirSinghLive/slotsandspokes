@@ -1062,7 +1062,7 @@ to the bottom of the screen, scrolling the news nobody clicked to cause
 rivals opening, repricing and pulling out) whichever panel is showing.
 
 Each line leads with a coloured tag (AOG, CNX, CREW, FLEET, LESSOR,
-RIVAL, FARE, FUEL, SHOCK, WX, GOAL, REACH), stored apart from the text.
+RIVAL, FARE, FUEL, SHOCK, WX, GOAL, REACH, CONTRACT), stored apart from the text.
 Most carry a target, the inspector view that explains them (an AOG its
 base, where it can be expedited; a rival's move the rival or your
 market; a milestone Goals), and are buttons that open it. The bar
@@ -1648,7 +1648,7 @@ pause exists.
 
 ---
 
-## Government contracts (`src/sim/contracts.ts`)
+## Contracts (`src/sim/contracts.ts`)
 
 Route incentives for small, underserved communities, like the US
 Essential Air Service or a province's route-development fund: the game's
@@ -1657,7 +1657,7 @@ balance lever for a weak home.
 - **Offers.** A contract is for one market from your network to a small
   community (under 800,000 people) at least half starved for service,
   in reach, unflown and not already offered. Fly it at least once a day
-  each way and the government pays so much a day for a 90–150 day term
+  each way and the contract pays so much a day for a 90–150 day term
   and sends contract riders. Made when the game starts and every 45 days,
   picked from the contracts' own random stream (begun from the game's
   seed, so offers never shift any other roll). Untaken for 30 days, an
@@ -1680,10 +1680,13 @@ balance lever for a weak home.
   is renewed at 75% of the size, up to three times. Otherwise, or at the
   end, the payment and riders stop and the market's built-up demand
   drops 40%.
-- **Where it shows:** GOV lines in the ticker, a Government contracts
-  section in Head office, a line in the route and airport views, the
-  Office dot for a new offer, and a dashed gold line and ring under the
-  Demand lens.
+- **Where it shows:** CONTRACT lines in the ticker, a Contracts section
+  in Head office, a line in the route and airport views, the Office dot
+  for a new offer, and a dashed gold line and ring under the Demand lens.
+  A new offer is news to act on, so its ticker line ("New contract ·
+  YHZ–YSJ · $9k/day · 93d · take by day 30") scrolls first, bright, its
+  tag pulsing, for 90 seconds or until clicked; clicking opens Head
+  office.
 
 The headless player takes an offer worth at least $3,000 a day that a
 plane based at either end can fit, keeps its last round trip while the

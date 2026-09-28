@@ -330,7 +330,7 @@ Enter confirms a route as the ring's ✓ does.
 
 ---
 
-## Thread 6: government contracts (the balance lever)
+## Thread 6: contracts (the balance lever)
 
 Asked for by the owner as the balance tool for weak homes (Halifax busts
 5 of 6): route incentives for underserved airports, like the US
@@ -356,7 +356,7 @@ the play-through and by how weak the starting city is.
   and the market's built-up demand drops by 40%: a subsidised route is
   weaker than it looked. Taking one is a bet on building something that
   survives it.
-- **Where it shows:** the ticker (GOV), Head office's contracts list,
+- **Where it shows:** the ticker (CONTRACT), Head office's contracts list,
   the route and airport views, and the Office dot.
 - **The headless player** takes contracts: an offered or running
   contract market scores its riders on top of its demand.
@@ -390,6 +390,10 @@ $56.9M, LHR $68.3M → $71.0M; Halifax busts 5/6 → 4/6 (mean $1.3M, best
 $5.3M). Halifax sitter 4/6 → 2/6 busts (median $3.6M), bold 6/6 → 4/6
 (best $12.2M). Homes re-rated: 70 Standard, 26 Hard, 73 Brutal (12
 changed; the rating plays the unattended player, which takes none).
+
+**Renamed to just "contracts"** (asked for after), and a new offer's
+ticker line stands out: first in the ticker, bright, its tag pulsing,
+until clicked (opening Head office) or 90 seconds pass.
 
 **Still open:** the steady player over-expands at a thin home, leasing
 to eight planes on Halifax's markets with contract cash and bleeding

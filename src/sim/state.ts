@@ -405,7 +405,7 @@ export type SimState = {
   fuelWalk?: number;
   /** The market fuel price at each of the last 90 rollovers, oldest first, for the chart. */
   fuelPriceHistory?: number[];
-  /** Government contracts offered, running and lately finished (sim/contracts.ts). Absent in older saves. */
+  /** Contracts offered, running and lately finished (sim/contracts.ts). Absent in older saves. */
   contracts?: Contract[];
   nextContractId?: number;
   /** The day the next round of contract offers is made. */

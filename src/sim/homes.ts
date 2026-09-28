@@ -88,6 +88,6 @@ export function chooseHome(state: SimState, iata: string): void {
   // its plane from before the game (sim/market.ts).
   placeHomeRival(state);
   ensureRivalFleets(state);
-  // The first government contracts (sim/contracts.ts), more and bigger for a weak home.
+  // The first contracts (sim/contracts.ts), more and bigger for a weak home.
   makeOffers(state, true);
 }

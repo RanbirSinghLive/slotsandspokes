@@ -1662,9 +1662,30 @@ button.ticker-item:hover {
   background: #7fd88f;
 }
 
-/* Government contracts: gold, money that comes with terms. */
-.ticker-tag--gov {
+/* Contracts: gold, money that comes with terms. */
+.ticker-tag--contract {
   background: #e8c170;
+}
+
+/* News to act on (a new contract offer): scrolled first, bright, its tag
+   pulsing, until clicked or it has had its time (ui/ticker.ts). */
+.ticker-item.is-highlighted {
+  color: #fff;
+  font-weight: 600;
+}
+
+.ticker-item.is-highlighted .ticker-tag {
+  animation: ticker-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes ticker-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(232, 193, 112, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(232, 193, 112, 0);
+  }
 }
 
 /* Starts fully off-screen right (the padding-left: 100% above) and

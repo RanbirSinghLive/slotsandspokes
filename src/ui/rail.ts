@@ -21,7 +21,7 @@ import { contractsOf } from '../sim/contracts';
  *     within a month (Money, red);
  *   - something new since the screen was last open, like unread mail: a
  *     milestone met (Goals, green), a rival on one of your markets
- *     (Rivals, amber), an executive, innovation or government contract
+ *     (Rivals, amber), an executive, innovation or contract
  *     newly on offer (Office, green). Opening the screen reads it.
  * The first look only records what's there, so loading a game lights no
  * "new" dots.
