@@ -1,14 +1,13 @@
-import { geoPath } from 'd3-geo';
-import type { LineString } from 'geojson';
 import { projection } from './projection';
 import { airports } from './airports';
-import { connectingFlowsAt, onwardFlowsFrom, suggestSpokes, type ConnectingFlow } from '../sim/hubs';
+import { connectingFlowsAt, onwardFlowsFrom, type ConnectingFlow } from '../sim/hubs';
 import { HUB_STYLES, hubStyleAt } from '../sim/hubStyle';
 import type { SimState } from '../sim/state';
 
 /**
  * What hovering one of your airports shows: the passengers connecting
- * through it, and where to fly next to connect more.
+ * through it. Where to fly to connect more is the player's call, read off
+ * the Demand lens, not suggested here.
  *
  * - Each connecting flow is a curve from one spoke to the other, bent
  *   through the hub — the trip those passengers actually make — and
@@ -16,8 +15,6 @@ import type { SimState } from '../sim/state';
  * - Passengers from this airport who change planes somewhere else
  *   (Toronto–St. Louis via O'Hare, seen from Toronto) are fainter dashed
  *   curves from here, bent through the airport where they connect.
- * - The best new spokes (sim/hubs.ts's suggestSpokes()) are dashed lines
- *   out from the hub, labelled with what they'd earn a day once grown.
  * - The hub itself gets a line saying how many connect and how it's run.
  *
  * A pure read of state, like every renderer.
@@ -28,7 +25,6 @@ const ONWARD_STROKE = 'rgba(94, 214, 200, 0.4)';
 const ONWARD_LABEL = '#9fe3da';
 const LABELLED_ONWARD_FLOWS = 2;
 const FLOW_LABEL = '#5ed6c8';
-const SUGGESTION_STROKE = '#7ab8ff';
 const LABEL_FONT = '11px ui-monospace, Consolas, monospace';
 const LABELLED_FLOWS = 3;
 const MAX_FLOW_WIDTH = 7;
@@ -50,9 +46,6 @@ function label(ctx: CanvasRenderingContext2D, text: string, x: number, y: number
   ctx.fillText(text, x - width / 2, y);
 }
 
-function money(amount: number): string {
-  return amount >= 1000 ? `$${(amount / 1000).toFixed(1)}k` : `$${Math.round(amount)}`;
-}
 
 /**
  * A curve from `a` to `b` that passes through `via` at its midpoint, the
@@ -128,30 +121,6 @@ export function drawHubView(ctx: CanvasRenderingContext2D, state: SimState, hub:
     if (i < LABELLED_FLOWS) label(ctx, `${flow.a}–${flow.b} ${Math.round(flow.passengers)}/day`, x, y, FLOW_LABEL);
   });
   ctx.restore();
-
-  const path = geoPath(projection, ctx);
-  const hubAirport = airportsByIata.get(hub)!;
-  for (const suggestion of suggestSpokes(state, hub)) {
-    const target = airportsByIata.get(suggestion.spoke);
-    const targetPoint = screenPoint(suggestion.spoke);
-    if (!target || !targetPoint) continue;
-    const line: LineString = { type: 'LineString', coordinates: [[hubAirport.lon, hubAirport.lat], [target.lon, target.lat]] };
-    ctx.save();
-    ctx.setLineDash([5, 5]);
-    ctx.strokeStyle = SUGGESTION_STROKE;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    path(line);
-    ctx.stroke();
-    ctx.restore();
-    label(
-      ctx,
-      `+${money(suggestion.revenuePerDay)}/day, ${Math.round(suggestion.passengers)} connecting once grown`,
-      targetPoint[0],
-      targetPoint[1] - 16,
-      SUGGESTION_STROKE,
-    );
-  }
 
   const connecting = flows.reduce((total, flow) => total + flow.passengers, 0);
   label(

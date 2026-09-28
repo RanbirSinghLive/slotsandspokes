@@ -2,16 +2,11 @@ import { marketDistanceNm } from './demand';
 import { executiveConnectingMultiplier } from './executives';
 import { connectingFeedMultiplier } from './innovations';
 import { actualDailyDemand, currentPotentialDemand } from './marketDemand';
-import { legsServingMarket, marketKey, recommendedFare } from './schedule';
+import { marketKey } from './schedule';
 import { HUB_STYLES, hubStyleAt, type HubStyle } from './hubStyle';
 import { planRespace, applyRespace, workingCopy, type TurnBufferPlan } from './turnBuffer';
 import { recessionFactor } from './shocks';
 import type { SimState } from './state';
-import aircraftTypesData from '../../data/aircraft-types.json';
-
-const typesByCode = new Map(
-  (aircraftTypesData as { code: string; rangeNm: number; seats: number }[]).map((t) => [t.code, t]),
-);
 
 /**
  * Connecting passengers: people travelling between two of your spokes, A
@@ -95,11 +90,6 @@ function establishment(state: SimState, a: string, b: string): number {
   return target > 0 ? Math.min(1, actualDailyDemand(state, a, b) / target) : 0;
 }
 
-function flownNonstop(state: SimState, a: string, b: string): boolean {
-  if (legsServingMarket(a, b, state.schedule) > 0) return true;
-  return state.competitorRoutes.some((route) => (route.origin === a && route.dest === b) || (route.origin === b && route.dest === a));
-}
-
 function frequencyChance(flightsPerDay: number): number {
   return 1 - Math.exp(-flightsPerDay / FREQUENCY_SCALE);
 }
@@ -107,8 +97,7 @@ function frequencyChance(flightsPerDay: number): number {
 /**
  * Connecting passengers between spokes `a` and `b` through `hub`, given
  * each spoke route's flights per day and establishment, and whether anyone
- * flies A–B nonstop. Split out so suggested new spokes can be valued with
- * the same formula as real ones.
+ * flies A–B nonstop.
  */
 function flowBetween(
   state: SimState,
@@ -239,52 +228,6 @@ export function connectingDemandOnMarket(state: SimState, origin: string, dest: 
     }
   }
   return total;
-}
-
-export type SpokeSuggestion = {
-  spoke: string;
-  /** Connecting passengers a day it would add once its route has grown. */
-  passengers: number;
-  /** What they'd pay a day, at recommended fares for both legs. */
-  revenuePerDay: number;
-};
-
-/**
- * The airports that would add the most connecting traffic at `hub` if the
- * player flew there once a day, valued once that route is established
- * ("once grown") since a brand-new route feeds only a quarter at first.
- * Only airports the player can see (fog by reach) and that a plane based
- * at the hub can actually reach are considered, and each is capped at
- * what one daily round trip on that plane could carry. Drawn as dashed lines
- * when hovering a hub.
- */
-export function suggestSpokes(state: SimState, hub: string, limit = 3): SpokeSuggestion[] {
-  const spokes = spokesOf(state, hub);
-  if (spokes.size === 0) return [];
-  // The longest-legged plane based here decides what's reachable, and its
-  // seats cap what one daily round trip could carry.
-  const based = state.aircraft
-    .filter((a) => a.baseAirport === hub)
-    .map((a) => typesByCode.get(a.typeCode))
-    .filter((t) => t !== undefined);
-  if (based.length === 0) return [];
-  const plane = based.reduce((best, t) => (t.rangeNm > best.rangeNm ? t : best));
-  const suggestions: SpokeSuggestion[] = [];
-  for (const candidate of state.knownAirports) {
-    if (candidate === hub || spokes.has(candidate)) continue;
-    if (marketDistanceNm(hub, candidate) > plane.rangeNm) continue;
-    let passengers = 0;
-    let revenuePerDay = 0;
-    for (const [spoke, flights] of spokes) {
-      const flow = flowBetween(state, hub, candidate, spoke, 1, flights, 1, establishment(state, hub, spoke), flownNonstop(state, candidate, spoke));
-      passengers += flow;
-      revenuePerDay += flow * (recommendedFare(candidate, hub) + recommendedFare(hub, spoke));
-    }
-    // One daily round trip can't carry more than its seats, both ways.
-    const carried = Math.min(passengers, 2 * plane.seats);
-    if (carried >= 1) suggestions.push({ spoke: candidate, passengers: carried, revenuePerDay: revenuePerDay * (carried / passengers) });
-  }
-  return suggestions.sort((x, y) => y.revenuePerDay - x.revenuePerDay).slice(0, limit);
 }
 
 /**

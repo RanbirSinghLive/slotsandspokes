@@ -136,7 +136,7 @@ function renderGrid(plan: HubPlan): void {
   gridEl.replaceChildren(table);
 }
 
-function describeMove(move: HubMove, hub: string): string {
+function describeMove(move: HubMove): string {
   switch (move.kind) {
     case 'style':
       return (
@@ -147,11 +147,6 @@ function describeMove(move: HubMove, hub: string): string {
       return (
         `Add a daily flight to ${move.spoke}: +${money(move.gainPerDay)}/day from about ` +
         `${Math.round(move.extraConnecting)} more connecting passengers, net of the flights' cost.`
-      );
-    case 'spoke':
-      return (
-        `Fly ${hub}–${move.spoke}: about ${Math.round(move.extraConnecting)} connecting passengers a day once the route has grown, ` +
-        `worth ${money(move.gainPerDay)}/day. Not counted as missed: it's growth, not a fix.`
       );
   }
 }
@@ -166,7 +161,7 @@ function renderMoves(plan: HubPlan, state: SimState): void {
       const row = document.createElement('div');
       row.className = `hub-move hub-move--${move.kind}`;
       const text = document.createElement('div');
-      text.textContent = describeMove(move, plan.hub);
+      text.textContent = describeMove(move);
       row.append(text);
 
       if (move.kind === 'style') {

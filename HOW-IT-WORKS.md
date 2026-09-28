@@ -581,14 +581,13 @@ planner the route builder uses, and the ring's actions in
 
 - **steady** (the default) plays like a careful player checking in once
   a day. Its opening fills the plane's day with out-and-backs from home,
-  each time to the known airport that ranks best in the airport view's
-  "Where to fly next" order (`marketAppeal()`: potential demand) per
-  flight already on that market, and never takes a rotation that lands
-  after 21:00. (Ranked by the market's words alone, size and service,
-  it picked blind among "Huge, starved" markets and its year fell two-
-  to four-fold; ranked up for hunger or down for rivals, it fell by
-  two-thirds in Montréal. So the list ranks by potential and says the
-  rest in words.) Then, every day, in order:
+  each time to the known airport with the most potential demand
+  (`marketScore()`, what a player reads off the Demand lens) per flight
+  already on that market, and never takes a rotation that lands after
+  21:00. (Ranked by the market's words alone, size and service, it
+  picked blind among "Huge, starved" markets and its year fell two- to
+  four-fold; ranked up for hunger or down for rivals, it fell by
+  two-thirds in Montréal.) Then, every day, in order:
   1. **Leave slack.** A market with cancellations on 2–3 of the last 7
      days gets 15 more minutes of turn buffer, or loses a flight if the
      plane has no room. On 4 or more days it loses a flight: the plane
@@ -1982,22 +1981,15 @@ refused only when no plane has room.
 curves show its own passengers who connect onward somewhere else
 (`onwardFlowsFrom()`: Toronto–St. Louis via O'Hare, seen from Toronto).
 Trips are one stop at most: a passenger changes planes once or not at
-all. Dashed lines also go to the best new spokes (`suggestSpokes()`: known airports in range
-of a plane based there, valued once their route is established and
-capped at what one daily round trip could carry).
+all.
 
-**Where to fly next** (`sim/whereToFly.ts`, the airport view): the five
-best markets from an airport the airline doesn't fly yet, in words
-(size, how the far end is served, rival flights, the going fare,
-distance, the smallest class that reaches). Only markets a plane based
-there (or, with none, any plane in the fleet) can fly, to airports the
-player can see. Ranked by potential demand, times the hunger boost of
-the two ends (sim/serviceLevel.ts), over 1 + half the rival flights a
-day. Each opens the route form (`openRouteForm()` in
-ui/routeBuilder.ts) as if drawn on the map. The map menu's **Plan
-hub** (`sim/hubPlanner.ts`) lists moves — another daily round trip to a
-spoke, a different style, a new spoke — each valued in dollars a day
-with these same formulas. Extra connections count only up to the seats
+**The game doesn't suggest where to fly.** The Demand lens shows the
+facts, people waiting and how served each airport is, and choosing a
+market is the player's judgement. So there is no "where to fly next"
+list and no suggested new spokes. The map menu's **Plan hub**
+(`sim/hubPlanner.ts`) improves a hub you already run: another daily
+round trip to one of its spokes, or a different style, each valued in
+dollars a day with these same formulas. Extra connections count only up to the seats
 each route has spare, because a full hub gains nothing from connecting
 more people: measured, a Tight-banks Montréal connected the most
 passengers of any style and earned the least.

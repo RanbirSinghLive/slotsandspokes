@@ -2,7 +2,7 @@ import aircraftTypesData from '../../data/aircraft-types.json';
 import { brandEdge } from './nps';
 import { airlineFuelPrice } from './fuelPrice';
 import { connectingPriceResponse, legCost, LOAD_FACTOR, type EconomyAircraftType } from './economy';
-import { connectingDemandOnMarket, connectingPassengersThrough, connectingFlowsAt, spokesOf, suggestSpokes, planHubStyleChange } from './hubs';
+import { connectingDemandOnMarket, connectingPassengersThrough, connectingFlowsAt, spokesOf, planHubStyleChange } from './hubs';
 import { HUB_STYLES, HUB_STYLE_ORDER, hubStyleAt, type HubStyle } from './hubStyle';
 import { airportLoad } from './airports';
 import { summarizeMarket } from './marketSummary';
@@ -57,8 +57,7 @@ const typesByCode = new Map(
 
 export type HubMove =
   | { kind: 'frequency'; spoke: string; gainPerDay: number; extraConnecting: number }
-  | { kind: 'style'; style: HubStyle; gainPerDay: number; extraConnecting: number }
-  | { kind: 'spoke'; spoke: string; gainPerDay: number; extraConnecting: number };
+  | { kind: 'style'; style: HubStyle; gainPerDay: number; extraConnecting: number };
 
 export type StylePreview = {
   style: HubStyle;
@@ -214,10 +213,6 @@ export function planHub(state: SimState, hub: string): HubPlan {
 
   const missedPerDay = moves.reduce((total, move) => total + move.gainPerDay, 0);
 
-  for (const suggestion of suggestSpokes(state, hub, 2)) {
-    moves.push({ kind: 'spoke', spoke: suggestion.spoke, gainPerDay: suggestion.revenuePerDay, extraConnecting: suggestion.passengers });
-  }
-
   return {
     hub,
     style,
@@ -225,7 +220,7 @@ export function planHub(state: SimState, hub: string): HubPlan {
     spokes,
     grid,
     styles,
-    moves: moves.sort((a, b) => (a.kind === 'spoke' ? 1 : 0) - (b.kind === 'spoke' ? 1 : 0) || b.gainPerDay - a.gainPerDay),
+    moves: moves.sort((a, b) => b.gainPerDay - a.gainPerDay),
     missedPerDay,
     urgency: missedPerDay >= HUB_MISSED_ACT_PER_DAY ? 'act' : missedPerDay >= HUB_MISSED_WARN_PER_DAY ? 'warn' : 'none',
   };

@@ -1,7 +1,7 @@
+import { currentPotentialDemand } from '../sim/marketDemand';
 import airportsData from '../../data/airports.json';
 import { inboundAt } from '../sim/fleetTiming';
 import { lastWeekMargin } from '../sim/pnlHistory';
-import { marketAppeal } from '../sim/whereToFly';
 import { AIRCRAFT_CLASSES, classByCode } from '../sim/aircraftClasses';
 import { dayIndex } from '../sim/clock';
 import { RECAPTURE_RATE } from '../sim/economy';
@@ -336,15 +336,17 @@ function steadyPlayer(kind: 'steady' | 'sitter' | 'bold'): Player {
 // --- Reading a market -----------------------------------------------------------
 
 /**
- * A market as the screen ranks it: the airport view's "Where to fly next"
- * order (sim/whereToFly.ts's marketAppeal()). Read in words alone, "Huge"
- * spans 3,000 to 14,000 riders, and in a dense region nearly every market
- * is "Huge, starved": the steady player then picked blind, and its median
- * year fell two- to four-fold. Roughly riders a day, so the thresholds
- * below keep their units.
+ * How this player ranks a market: its potential demand, roughly riders a
+ * day, which a player reads off the Demand lens's circles and a hovered
+ * airport's market lines. Read in words alone, "Huge" spans 3,000 to
+ * 14,000 riders, and in a dense region nearly every market is "Huge,
+ * starved": the steady player then picked blind, and its median year fell
+ * two- to four-fold. Ranking up starved ends or down rivals' markets both
+ * cut a careful year from Montréal by more than two-thirds, so neither
+ * counts here.
  */
 function marketScore(state: SimState, from: string, to: string): number {
-  return marketAppeal(state, from, to);
+  return currentPotentialDemand(state, from, to);
 }
 
 // --- Filling a plane's day ------------------------------------------------

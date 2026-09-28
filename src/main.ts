@@ -323,8 +323,8 @@ function render(nowMs: number = performance.now()): void {
   if (mapHover?.kind === 'airport') drawSelectedAirport(ctx, mapHover.iata);
 
   // Hovering one of your airports (and not a plane) shows who connects
-  // through it and where to fly next (render/hubs.ts). Drawn after the
-  // airports so its labels sit on top.
+  // through it (render/hubs.ts). Drawn after the airports so its labels
+  // sit on top.
   // Its name and headline numbers go in a hover card (ui/airportTooltip.ts),
   // unless the Competition overlay's own card is covering airports.
   const hoveredAirport =

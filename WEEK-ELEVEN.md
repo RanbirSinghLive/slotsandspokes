@@ -316,6 +316,17 @@ Enter confirms a route as the ring's ✓ does.
   waiting, teal where underserved and grey where well served, an amber
   rim where you turn passengers away; lines only for the hovered or
   selected airport's six biggest markets. **Done.**
+- **Rivals in the fog hidden** (asked for after): a rival whose every
+  route has an end in the fog is left out of the Rivals lens's chips, the
+  Rivals screen, the jump box and the ticker's lessor lines, since the
+  map doesn't draw those routes either (`rivalsInSight()`, sim/reach.ts).
+  **Done.**
+- **No more "where to fly next" hints** (asked for after): with the
+  Demand lens showing the facts, the game stops choosing for the player.
+  Gone: the airport view's list, the suggested new spokes on a hovered
+  hub, and the hub planner's new-spoke moves. The headless player ranks
+  markets itself by potential demand, what a player reads off the lens.
+  **Done**, headless byte-identical.
 
 ---
 
