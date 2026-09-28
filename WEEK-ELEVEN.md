@@ -290,6 +290,22 @@ on any view with three or more sections. **Thread 4 done.**
 
 ---
 
+## Thread 5: the map's own read-outs (asked for by the owner)
+
+- **A P&L strip in the top-left corner**: the last several days as small
+  bars, green for a profitable day and red for a loss, today's running
+  margin as a number at the end; hovering opens the full Revenue, Cost
+  and Margin chart.
+- **The route builder's confirm step in the ring**: instead of the
+  wordy popover with Add stop / Add Rotation / Cancel buttons, the
+  confirm step is the next round of the action ring at the destination,
+  with its own icons (confirm, add a stop, cancel) and a compact summary
+  card under it. Clicking away cancels, as it does while choosing.
+
+UI only: headless output must stay byte-identical.
+
+---
+
 ## Carried forward
 
 - **Balance:** past the start, a careful player's year runs $14M–$69M
