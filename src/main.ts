@@ -52,7 +52,7 @@ import { isInsolvent } from './sim/insolvency';
 import { setupGameControls } from './ui/gameControls';
 import { setupRail, updateRail } from './ui/rail';
 import { closeJumpBox, isJumpBoxOpen, openJumpBox, setupJumpBox } from './ui/jumpBox';
-import { getMapHover, setupMapLinks } from './ui/mapLink';
+import { clearMapHover, getMapHover, setupMapLinks } from './ui/mapLink';
 import { loadSavedState, saveState } from './ui/save';
 
 // Resume a saved game if one exists. A fresh game starts from
@@ -411,6 +411,7 @@ const panelEl = document.querySelector<HTMLElement>('#panel')!;
 function setPanelHidden(hidden: boolean): void {
   panelHidden = hidden;
   panelEl.hidden = panelHidden;
+  clearMapHover();
   // The map's available width just changed, same as a real window resize.
   resize();
 }
@@ -424,6 +425,7 @@ document.querySelector('#rail-jump')!.addEventListener('click', () => openJumpBo
 // panel comes back, since otherwise the click would seem to do nothing.
 onSelectionChange(() => {
   if (panelHidden && getSelection().kind !== 'network') setPanelHidden(false);
+  clearMapHover();
   renderInspector(state);
   render();
 });

@@ -17,6 +17,14 @@ export function linkToMap<T extends HTMLElement>(el: T, target: Selection): T {
   return el;
 }
 
+/**
+ * Forget the hovered row: for when rows go away without the pointer
+ * leaving them (the panel hidden, a view rebuilt under it).
+ */
+export function clearMapHover(): void {
+  hovered = null;
+}
+
 /** What the panel row under the pointer points at, or null. */
 export function getMapHover(): Selection | null {
   return hovered;
