@@ -330,6 +330,42 @@ Enter confirms a route as the ring's ✓ does.
 
 ---
 
+## Thread 6: government contracts (the balance lever)
+
+Asked for by the owner as the balance tool for weak homes (Halifax busts
+5 of 6): route incentives for underserved airports, like the US
+Essential Air Service or a province's route-development fund, sized by
+the play-through and by how weak the starting city is.
+
+- **Offers.** A contract is for one market: fly it at least once a day
+  each way, and the government pays so much a day for a term (90–150
+  days) and sends riders who wouldn't otherwise fly (civil servants,
+  medical travel). Offered at the start and every 45 days, for markets
+  from your network to an underserved airport in reach, by seed. Unclaimed
+  for 30 days, an offer lapses. It starts the day you first fly the
+  market.
+- **Size by weakness.** A home's strength is its best markets within a
+  Propeller's reach, from the data (not the headless-rated difficulty,
+  which would feed back on itself); weaker than the median home, the
+  offers are bigger and more of them. Each also varies by seed.
+- **Strict terms.** Contract riders and the daily payment both scale by
+  the route's performance against higher bars than ordinary passengers:
+  full at 85% on-time, 97% completion and NPS +15, nothing at 65%, 85%
+  and −5. Taxpayers' money buys reliability.
+- **The snap-back.** When the term ends, the riders and the payment stop
+  and the market's built-up demand drops by 40%: a subsidised route is
+  weaker than it looked. Taking one is a bet on building something that
+  survives it.
+- **Where it shows:** the ticker (GOV), Head office's contracts list,
+  the route and airport views, and the Office dot.
+- **The headless player** takes contracts: an offered or running
+  contract market scores its riders on top of its demand.
+
+Measured with `npm run balance` before and after, and `npm run homes`
+re-run. The sim changes, so headless output moves.
+
+---
+
 ## Carried forward
 
 - **Balance:** past the start, a careful player's year runs $14M–$69M
