@@ -2919,3 +2919,186 @@ button.ops-item:hover {
 #hud-pnl-card[hidden] {
   display: none;
 }
+
+/* The Crews screen as a crew planning board (ui/inspector/crews.ts). */
+.crew-horizon {
+  position: relative;
+  height: 34px;
+  /* Room either side for the end ticks' labels, centred on their day. */
+  margin: 4px 18px 14px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  background: linear-gradient(90deg, rgba(94, 214, 200, 0.08), rgba(94, 214, 200, 0));
+}
+
+.crew-horizon-tick {
+  position: absolute;
+  bottom: -14px;
+  transform: translateX(-50%);
+  font-size: 9px;
+  color: #6b7694;
+}
+
+.crew-horizon-mark {
+  position: absolute;
+  top: 6px;
+  transform: translateX(-50%);
+  font-size: 14px;
+  line-height: 1;
+  cursor: default;
+}
+
+.crew-horizon-mark.is-eis {
+  color: #5ed6c8;
+}
+
+.crew-horizon-mark.is-short {
+  color: #ff8080;
+  top: 2px;
+  font-size: 16px;
+}
+
+.crew-horizon-mark.is-joining {
+  top: 20px;
+  font-size: 9px;
+  color: #7fd88f;
+}
+
+.crew-horizon-mark.is-returning {
+  top: 18px;
+  font-size: 11px;
+  color: #9aa3b8;
+}
+
+.crew-todo {
+  margin: 6px 0;
+  padding: 8px;
+  border: 1px solid rgba(255, 128, 128, 0.45);
+  border-left: 3px solid #ff8080;
+  border-radius: 5px;
+  background: rgba(255, 128, 128, 0.06);
+}
+
+.crew-todo-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.crew-base {
+  margin: 8px 0 12px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.crew-base-name {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.crew-row {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.crew-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.crew-row-head > span:first-child {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #e6e9f0;
+}
+
+.crew-chip {
+  padding: 1px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  border-radius: 3px;
+  color: #0a0c12;
+}
+
+.crew-chip--bad {
+  background: #ff8080;
+}
+
+.crew-chip--warn {
+  background: #ffd166;
+}
+
+.crew-chip--good {
+  background: #7fd88f;
+}
+
+.crew-chip--info {
+  background: #7fb2ff;
+}
+
+.crew-chip--idle {
+  background: #3a4258;
+  color: #9aa3b8;
+}
+
+.crew-bar {
+  position: relative;
+  height: 8px;
+  margin: 6px 0 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: visible;
+}
+
+.crew-bar-onhand {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 4px 0 0 4px;
+  background: #5ed6c8;
+}
+
+.crew-bar-joining {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(135deg, rgba(127, 216, 143, 0.9) 0 3px, rgba(127, 216, 143, 0.3) 3px 6px);
+}
+
+.crew-bar-mark {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  transform: translateX(-1px);
+}
+
+.crew-bar-mark.is-minimum {
+  background: #ff8080;
+}
+
+.crew-bar-mark.is-ideal {
+  background: #fff;
+}
+
+.crew-bar-mark.is-eis {
+  background: #ffd166;
+}
+
+.crew-row-detail {
+  font-size: 11px;
+  color: #9aa3b8;
+}
+
+.crew-action {
+  font-size: 11px;
+}

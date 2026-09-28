@@ -81,6 +81,8 @@ export const CREW_CLASS_SCALE: Record<string, number> = { PROP: 1, REGIONAL: 1.5
 export const CREW_BASE_FEE = 100_000;
 /** Propeller crews the home base starts with: enough for the starting plane's full day at ideal shifts. */
 export const STARTING_CREWS = 2;
+/** Crews a newly leased plane's full day needs at the legal shift: what the lease's crew advice and the crew planner (sim/crewPlan.ts) leave room for. */
+export const CREWS_PER_NEW_PLANE = 2;
 /** The starting plane's class, which the home base's first crews are rated for. */
 export const STARTING_CREW_CLASS = 'PROP';
 

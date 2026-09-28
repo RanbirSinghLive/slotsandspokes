@@ -7,6 +7,7 @@ import * as ops from './routeActions';
 import { RUNWAY_WARN_DAYS } from './runway';
 import { getSelection, select, type Selection } from './selection';
 import { contractsOf } from '../sim/contracts';
+import { anyEntryShort } from '../sim/crewPlan';
 
 /**
  * The rail down the side panel's left edge: every screen one click away,
@@ -16,7 +17,8 @@ import { contractsOf } from '../sim/contracts';
  *
  * A dot on an item says where to dig before clicking. Two kinds:
  *   - a condition, lit while it lasts: a plane out or a schedule problem
- *     (Fleet, red), a class short of crews (Crews, red; stretched, amber),
+ *     (Fleet, red), a class short of crews (Crews, red; stretched, or a
+ *     plane on its way that would enter service short, amber),
  *     a route that lost money yesterday (Routes, amber), cash running out
  *     within a month (Money, red);
  *   - something new since the screen was last open, like unread mail: a
@@ -99,6 +101,8 @@ function conditions(state: SimState): Partial<Record<Screen, Dot>> {
       else if (crew.crews < crew.ideal && crews === null) crews = 'warn';
     }
   }
+  // A plane on its way that would enter service short is a job to do now.
+  if (crews === null && anyEntryShort(state)) crews = 'warn';
   const markets = new Map(state.schedule.map((leg) => [marketKey(leg.origin, leg.dest), leg]));
   const losing = [...markets.values()].some((leg) => {
     const margins = ops.marketPnlHistory(state, leg.origin, leg.dest).margin;

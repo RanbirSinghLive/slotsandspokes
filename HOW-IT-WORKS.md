@@ -2089,6 +2089,30 @@ plus 2 for each plane of the class on its way, hiring them the day the
 plane is leased; a shortfall is met by retraining another class's spare
 crews first. Crews spare for 30 days go.
 
+## The crew planning board (`src/ui/inspector/crews.ts`, read-out in `src/sim/crewPlan.ts`)
+
+The Crews screen reads like a crew planner's board. `crewPlan()` counts,
+for each base and type rating, the crews on hand, each batch joining
+(hired or converted, with its day), and each plane on its way: its entry
+into service (EIS) needs `CREWS_PER_NEW_PLANE` crews on top of what the
+base's planes need today, against the crews on hand plus everything
+joining by that day. It's a read-out with no rules of its own.
+
+- **Next 30 days**: a strip with each EIS (✈, red if it would arrive
+  short), each batch joining (●) and each plane going back (↩).
+- **To do**: every type whose next EIS would arrive short, with the last
+  day a hire still joins in time ("Hire by day 29") or how late one would
+  be, a button to hire the shortfall, and one to convert reserve crews of
+  another type at the base.
+- **Roster**: per base, per type, a bar of crews on hand (solid) and
+  joining (hatched) against marks for the legal minimum (red), the
+  comfortable number for 8-hour shifts (white) and the need at EIS
+  (amber), with a chip: SHORT, SHORT AT EIS, TIGHT, OK or RESERVE +N.
+  Hire, Convert and Release beside it.
+
+The Crews dot on the rail lights amber when an inbound plane would enter
+service short, as well as red when a class is short today.
+
 ## Fleet timing (`src/sim/fleetTiming.ts`)
 
 Every change to the fleet takes time, so planes and crews are planned

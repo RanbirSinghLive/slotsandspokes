@@ -419,8 +419,13 @@ player had to work out the timing. Rework it as a crew planner's board:
 - **Planes going back** show the crews they'll free.
 - **The Crews dot** lights amber when an inbound plane will arrive short.
 
-A read-out in the sim (`crewPlan()`, sim/crews.ts) with no rule change,
-so headless output stays byte-identical.
+A read-out in the sim (`crewPlan()`, sim/crewPlan.ts) with no rule
+change, so headless output stays byte-identical.
+
+**Status: done.** Plus a SHORT AT EIS chip, which beats today's roster
+when a plane on its way would arrive short, and an amber mark on the bar
+for the need at EIS. The per-plane allowance is now one constant,
+`CREWS_PER_NEW_PLANE`, shared by the lease's crew advice and the planner.
 
 ---
 

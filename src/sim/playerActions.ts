@@ -2,6 +2,7 @@ import { dayIndex } from './clock';
 import {
   CREW_BASE_FEE,
   crewBases,
+  CREWS_PER_NEW_PLANE,
   crewNeed,
   crewsArriving,
   crewsOf,
@@ -627,14 +628,12 @@ function crewAdvice(state: SimState, iata: string, classCode: string): string | 
   const base = crewBases(state)[iata];
   const have = crewsOf(base, classCode) + crewsArriving(base, classCode);
   // Every plane of this class on its way needs its own crews.
-  const inbound = inboundAt(state, iata, classCode).length * LEASE_CREW_ALLOWANCE;
+  const inbound = inboundAt(state, iata, classCode).length * CREWS_PER_NEW_PLANE;
   if (have >= need.minimum + inbound) return null;
   const name = classByCode(classCode)?.name ?? classCode;
   return `${iata} short of ${name} crews for it · hire or retrain now to join by delivery`;
 }
 
-/** Crews a newly leased plane's full day needs at the legal shift: what crewAdvice() leaves room for. */
-const LEASE_CREW_ALLOWANCE = 2;
 
 export type ClassCrewReadout = {
   classCode: string;
