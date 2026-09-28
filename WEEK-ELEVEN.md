@@ -279,6 +279,9 @@ the screen that shows them. Along the way: the Routes table's column
 headings never re-sorted (a Routes selection compared equal whatever
 its sort), now fixed.
 
+**Slice 2 done:** the status dots, worked out twice a second in
+`ui/rail.ts`.
+
 ---
 
 ## Carried forward

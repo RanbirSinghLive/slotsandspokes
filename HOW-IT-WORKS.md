@@ -1116,7 +1116,14 @@ A real HTML sidebar, 420px wide, with a 56px **rail** down its left edge
 Airports · Fleet · Crews · Rivals · Money · Goals · Office, with Game and
 Hide at the foot. The rail stays with the panel hidden, and clicking an
 item then slides the panel open straight to that screen; clicking the
-screen already showing hides the panel. The canvas gets the width left
+screen already showing hides the panel. A dot on a rail item says where to dig
+before clicking: lit while a condition lasts (Fleet red for a plane out
+or a schedule problem, Crews red for a class short and amber for one
+stretched, Routes amber for a route that lost money yesterday, Money red
+under a month of cash), or for something new since that screen was last
+open, like unread mail (Goals green for a milestone, Rivals amber for a
+rival on one of your markets, Office green for an executive or
+innovation newly on offer). The canvas gets the width left
 over (`--panel-width` covers rail and panel, kept in sync via
 `PANEL_WIDTH_PX` and `RAIL_WIDTH_PX`).
 
