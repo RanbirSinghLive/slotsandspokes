@@ -2271,10 +2271,88 @@ button.inspector-crumb:hover {
   color: #7ed6a8;
 }
 
-/* The Goals view (ui/inspector/goals.ts): a met milestone reads as done,
-   and tiers still ahead sit back so the current one stands out. */
-.goal-row.is-met {
+/* The Goals view (ui/inspector/goals.ts): the current tier's milestones
+   as badges, a bar filling toward each, a met one stamped green; the
+   ladder as a row of rungs. */
+.goal-badges {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 6px 0 10px;
+}
+
+.goal-badge {
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 11px;
+}
+
+.goal-badge.is-met {
+  border-color: #7ed6a8;
+  background: rgba(126, 214, 168, 0.08);
+}
+
+.goal-badge-name {
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: #e6e9f0;
+}
+
+.goal-badge-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.goal-badge-bar div {
+  height: 100%;
+  background: #5ed6c8;
+}
+
+.goal-badge-detail {
+  margin-top: 4px;
+  color: #9aa3b8;
+}
+
+.goal-badge-stamp {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: #7ed6a8;
+  border: 1.5px solid #7ed6a8;
+  border-radius: 3px;
+  transform: rotate(-4deg);
+}
+
+.goal-ladder {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.goal-rung {
+  padding: 2px 7px;
+  font-size: 11px;
+  color: #6b7694;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+}
+
+.goal-rung.is-climbed {
+  color: #7ed6a8;
+  border-color: rgba(126, 214, 168, 0.5);
+}
+
+.goal-rung.is-current {
+  color: #fff;
+  border-color: #5ed6c8;
 }
 
 .goal-ahead {
@@ -2575,4 +2653,60 @@ button.inspector-crumb:hover {
 .inspector-plan-hub:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* The milestone stamp (ui/stamp.ts): lands over the map, tilted like a
+   rubber stamp, then fades. Pointer-transparent so play carries on. */
+#milestone-stamp {
+  position: fixed;
+  top: 22%;
+  left: 32%;
+  z-index: 25;
+  padding: 10px 18px;
+  text-align: center;
+  font-family: ui-monospace, Consolas, monospace;
+  color: #7fd88f;
+  border: 3px solid #7fd88f;
+  border-radius: 6px;
+  background: rgba(10, 12, 18, 0.8);
+  transform: translate(-50%, 0) rotate(-6deg);
+  pointer-events: none;
+}
+
+#milestone-stamp[hidden] {
+  display: none;
+}
+
+#milestone-stamp.is-landing {
+  animation: stamp-land 2.8s ease-out forwards;
+}
+
+.stamp-kicker {
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.stamp-title {
+  font-size: 22px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+@keyframes stamp-land {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0) rotate(-6deg) scale(1.8);
+  }
+  12% {
+    opacity: 1;
+    transform: translate(-50%, 0) rotate(-6deg) scale(1);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 0) rotate(-6deg) scale(1);
+  }
 }

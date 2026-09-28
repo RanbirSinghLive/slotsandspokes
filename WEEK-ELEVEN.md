@@ -120,6 +120,10 @@ form is only used where its tooltip is one hover away.
    opening it, the scroll pauses under the pointer.
 9. **Milestones as stamps**: a short stamp when one is earned
    ("MILESTONE · FIRST IN"), and the Goals view as a ladder of badges.
+   **Done:** `ui/stamp.ts` lands a tilted stamp over the map for each
+   milestone met or tier climbed, queued so two at once both show. The
+   Goals view's milestones are badges (a bar filling toward each, a met
+   one stamped with its day), the ladder a row of rungs.
 6. **Tighter stat cards**: one number and one arrow ("▲ $50k"), the
    comparison in the tooltip; Runway in days or "Stable"; the Head
    office card a fuel sparkline.

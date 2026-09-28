@@ -1078,6 +1078,16 @@ setting `animation: none`, forcing a reflow (reading `offsetWidth`),
 then reapplying it — otherwise the browser just continues whatever
 frame the previous animation was already on instead of starting over.
 
+## The milestone stamp (`src/ui/stamp.ts`)
+
+When a milestone is met or a tier climbed, a stamp lands over the map
+("MILESTONE · A SECOND BASE", "PROMOTED · NOW A NETWORK AIRLINE"), holds
+about two seconds and fades. Several at one rollover queue and show in
+turn. It keeps its own record of what it has seen, like the ticker, and
+its first call only records where the airline stands, so loading a save
+stamps nothing. The Goals view shows the current tier's milestones as
+badges, each with a bar filling toward it or stamped with the day it was met.
+
 ## Panel (`src/ui/panels.ts`)
 
 A real HTML sidebar, 420px wide (canvas width = `window.innerWidth - 420`,

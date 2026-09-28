@@ -11,24 +11,44 @@ import { select } from '../selection';
  * innovations it opens are adopted at Head office (ui/inspector/headOffice.ts).
  */
 
-/** One milestone as a row: its name and what to do, then met (and when) or how close. */
-function milestoneRow(state: SimState, milestone: Milestone): HTMLElement {
-  const row = document.createElement('div');
-  row.className = 'inspector-row goal-row';
+/**
+ * One milestone as a badge: its name (what to do in its (i)), and a bar
+ * filling toward it, or the day it was met, stamped.
+ */
+function milestoneBadge(state: SimState, milestone: Milestone): HTMLElement {
+  const badge = document.createElement('div');
+  badge.className = 'goal-badge';
   const met = isMilestoneMet(state, milestone.id);
-  row.classList.toggle('is-met', met);
-  const name = document.createElement('span');
-  name.append(`${met ? '✓' : '○'} ${milestone.name} `, info(milestone.description));
-  const detail = document.createElement('span');
-  detail.className = 'inspector-row-detail';
+  badge.classList.toggle('is-met', met);
+  const name = document.createElement('div');
+  name.className = 'goal-badge-name';
+  name.append(`${milestone.name} `, info(milestone.description));
+  badge.append(name);
   if (met) {
-    detail.textContent = `met day ${state.milestonesMet![milestone.id]}`;
-  } else {
-    const progress = milestone.progress(state);
-    detail.textContent = progress ? `${progress.current.toLocaleString()}/${progress.target.toLocaleString()} ${progress.unit}` : milestone.description;
+    const stamp = document.createElement('div');
+    stamp.className = 'goal-badge-stamp';
+    stamp.textContent = `Met · day ${state.milestonesMet![milestone.id]}`;
+    badge.append(stamp);
+    return badge;
   }
-  row.append(name, detail);
-  return row;
+  const progress = milestone.progress(state);
+  if (progress) {
+    const bar = document.createElement('div');
+    bar.className = 'goal-badge-bar';
+    const fill = document.createElement('div');
+    fill.style.width = `${Math.min(100, (progress.current / Math.max(1, progress.target)) * 100)}%`;
+    bar.append(fill);
+    const detail = document.createElement('div');
+    detail.className = 'goal-badge-detail';
+    detail.textContent = `${progress.current.toLocaleString()}/${progress.target.toLocaleString()} ${progress.unit}`;
+    badge.append(bar, detail);
+  } else {
+    const detail = document.createElement('div');
+    detail.className = 'goal-badge-detail';
+    detail.textContent = milestone.description;
+    badge.append(detail);
+  }
+  return badge;
 }
 
 /** One line saying where the airline stands, for the Network view's Goals row. */
@@ -57,8 +77,8 @@ export function buildGoalsView(state: SimState): HTMLElement {
     );
     if (tier.opens.length > 0) root.append(line(`Opens ${tier.opens.join(' · ')}`, 'inspector-line is-good'));
     const list = document.createElement('div');
-    list.className = 'inspector-rows';
-    list.append(...tier.milestones.map((milestone) => milestoneRow(state, milestone)));
+    list.className = 'goal-badges';
+    list.append(...tier.milestones.map((milestone) => milestoneBadge(state, milestone)));
     root.append(heading(tier.name), list);
   } else {
     root.append(line('Top tier reached', 'inspector-line is-good'));
@@ -67,14 +87,20 @@ export function buildGoalsView(state: SimState): HTMLElement {
   const opened = openedSoFar(state);
   if (opened.length > 0) root.append(heading('Opened so far'), ...opened.map((thing) => line(thing)));
 
-  // The rest of the ladder, climbed and still ahead, so the whole shape is visible.
-  root.append(heading('The ladder'));
+  // The whole ladder as a row of rungs, climbed, current and ahead, each
+  // with what it opens in its tooltip.
+  const ladder = document.createElement('div');
+  ladder.className = 'goal-ladder';
   LADDER.forEach((each, i) => {
-    const status = i < climbed ? '✓' : i === climbed ? '▸' : '○';
-    const row = line(`${status} ${each.name}${each.opens.length > 0 ? ` · opens ${each.opens.join(' · ')}` : ''}`);
-    if (i > climbed) row.classList.add('goal-ahead');
-    root.append(row);
+    const rung = document.createElement('span');
+    rung.className = 'goal-rung';
+    rung.classList.toggle('is-climbed', i < climbed);
+    rung.classList.toggle('is-current', i === climbed);
+    rung.textContent = `${i < climbed ? '✓ ' : ''}${each.name}`;
+    if (each.opens.length > 0) rung.title = `Opens ${each.opens.join(' · ')}`;
+    ladder.append(rung);
   });
+  root.append(heading('The ladder'), ladder);
 
   // Innovations the ladder opens are adopted at Head office.
   const link = document.createElement('button');

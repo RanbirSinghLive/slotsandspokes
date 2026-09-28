@@ -43,6 +43,7 @@ import { setupFarePolicy, updateFarePolicy } from './ui/farePolicy';
 import { setupOnTimePanel, updateOnTimePanel } from './ui/onTime';
 import { setupInfoTooltips } from './ui/infoTooltip';
 import { updateTicker } from './ui/ticker';
+import { updateStamps } from './ui/stamp';
 import { updateAlerts } from './ui/alerts';
 import { updatePoolBars } from './ui/poolBars';
 import { setupGameOver, updateGameOver } from './ui/gameOver';
@@ -269,6 +270,7 @@ function render(nowMs: number = performance.now()): void {
   updatePanel(state);
   if (sidebarTab === 'fleet') updateFarePolicy(state);
   updateTicker(state);
+  updateStamps(state, performance.now());
   updateMarket(state);
   updatePoolBars(state);
   // Always-visible regardless of which tab is open — see ui/alerts.ts's
