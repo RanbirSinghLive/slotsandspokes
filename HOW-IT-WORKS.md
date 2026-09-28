@@ -694,7 +694,8 @@ of the base map that frame. `basemap.ts` is the one layer always drawn
 first, every time the map panel is visible.
 
 **The map's four corners** each have one job: top left the clock,
-speeds and ops board (with the alerts under them); top right the
+speeds, ops board and a P&L strip (with the alerts under them, one
+column, `#now-corner`); top right the
 **lens**; bottom left zoom, back-to-home and the airport filter (All ·
 Yours · Contested); bottom right the fleet's plane pools. The two new
 corners sit in `#map-surface`, a pointer-transparent box the size of
@@ -1099,6 +1100,14 @@ turn. It keeps its own record of what it has seen, like the ticker, and
 its first call only records where the airline stands, so loading a save
 stamps nothing. The Goals view shows the current tier's milestones as
 badges, each with a bar filling toward it or stamped with the day it was met.
+
+## The P&L strip (`src/ui/hudPnl.ts`)
+
+Under the ops board: the last 10 finished days as small bars, green for
+a day that made money and red for one that lost it, tallest for the
+biggest either way, then today's running margin ("−$4k today").
+Hovering it opens the full Revenue, Cost and Margin chart, built by the
+same `buildPnlCharts()` as the Overview's Last 7 days.
 
 ## The ops board (`src/ui/opsBoard.ts`)
 

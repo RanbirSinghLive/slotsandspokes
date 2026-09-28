@@ -44,6 +44,7 @@ import { setupInfoTooltips } from './ui/infoTooltip';
 import { updateTicker } from './ui/ticker';
 import { updateStamps } from './ui/stamp';
 import { updateOpsBoard } from './ui/opsBoard';
+import { updateHudPnl } from './ui/hudPnl';
 import { updateAlerts } from './ui/alerts';
 import { updatePoolBars } from './ui/poolBars';
 import { setupGameOver, updateGameOver } from './ui/gameOver';
@@ -231,6 +232,7 @@ function render(nowMs: number = performance.now()): void {
   updateTicker(state);
   updateStamps(state, performance.now());
   updateOpsBoard(state, () => select({ kind: 'routes', sort: 'completion' }));
+  updateHudPnl(state);
   updateMarket(state);
   updatePoolBars(state);
   // Always visible, whatever screen is open: see ui/alerts.ts's own

@@ -44,14 +44,21 @@
         <button type="button" id="new-route-cancel">Cancel</button>
       </div>
     </div>
-    <div id="hud">
-      <div id="clock">Jan 1, 2027 · 00:00</div>
-      <div id="ops-board"></div>
-      <div id="speed-controls">
-        <button type="button" data-speed="0">Pause</button>
-        <button type="button" data-speed="1" class="active">1×</button>
-        <button type="button" data-speed="20">20×</button>
-        <button type="button" data-speed="100">100×</button>
+    <!-- Top left of the map: now. The clock bar, and the alerts under it. -->
+    <div id="now-corner">
+      <div id="hud">
+        <div id="clock">Jan 1, 2027 · 00:00</div>
+        <div id="ops-board"></div>
+        <div id="hud-pnl"></div>
+        <div id="speed-controls">
+          <button type="button" data-speed="0">Pause</button>
+          <button type="button" data-speed="1" class="active">1×</button>
+          <button type="button" data-speed="20">20×</button>
+          <button type="button" data-speed="100">100×</button>
+        </div>
+      </div>
+      <div id="alert-strip" hidden>
+        <div id="alert-strip-list"></div>
       </div>
     </div>
     <!-- The map's own box, for the corners that rearrange with its width (style.css's container queries). -->
@@ -84,9 +91,6 @@
         <button type="button" data-airports="contested" title="Yours and your rivals'">Contested</button>
       </div>
     </div>
-    </div>
-    <div id="alert-strip" hidden>
-      <div id="alert-strip-list"></div>
     </div>
     <!-- The panel's rail (ui/rail.ts): every screen one click away, and still there with the panel hidden. -->
     <nav id="rail" aria-label="Screens">

@@ -56,9 +56,14 @@ export function updatePnlHistoryPanel(state: SimState): void {
   if (signature === lastSignature) return;
   lastSignature = signature;
 
-  containerEl.replaceChildren(
+  containerEl.replaceChildren(...buildPnlCharts(state));
+}
+
+/** The three charts, Revenue, Cost and Margin: for the Overview, and the map's P&L strip's hover card (ui/hudPnl.ts). */
+export function buildPnlCharts(state: SimState): HTMLElement[] {
+  return [
     buildChart('Revenue', state.revenueHistory, state.todayRevenue, false),
     buildChart('Cost', state.costHistory, state.todayCost, false),
     buildChart('Margin', state.marginHistory, state.todayMargin, true),
-  );
+  ];
 }

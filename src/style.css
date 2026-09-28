@@ -39,14 +39,32 @@ body {
   display: none;
 }
 
-#hud {
+/* Top left of the map: the clock bar and the alerts under it, one column,
+   so the alerts sit below the bar however many rows it has. Shrinks to
+   what it holds, and never wider than the map. */
+#now-corner {
   position: fixed;
   top: 12px;
   left: 12px;
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: calc(100vw - var(--panel-width) - 24px);
+}
+
+/* A small grid sized to its contents: the clock and speeds on one row,
+   the ops board and the P&L strip each on their own below. */
+#hud {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-areas:
+    'clock speed'
+    'ops ops'
+    'pnl pnl';
   align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
+  column-gap: 12px;
+  row-gap: 6px;
   padding: 8px 12px;
   background: rgba(10, 12, 18, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -54,16 +72,14 @@ body {
   font-family: ui-monospace, Consolas, monospace;
   font-size: 13px;
   color: #cdd3e0;
-  /* Without this, the HUD bar's natural
-     width could extend into the sidebar's own space on a narrower
-     window, and #panel (later in the DOM, so it wins the overlap)
-     would silently eat clicks meant for whatever HUD button sat under
-     it. Wrapping instead of overlapping keeps every control reachable
-     regardless of window width. */
-  max-width: calc(100vw - var(--panel-width) - 24px);
+}
+
+#clock {
+  grid-area: clock;
 }
 
 #speed-controls {
+  grid-area: speed;
   display: flex;
   gap: 4px;
 }
@@ -316,28 +332,14 @@ body {
   text-align: center;
 }
 
-/* A narrower map: the lens drops below the clock bar instead of sharing
-   its row; narrower still, the bottom-left corner stacks so it clears the
-   fleet bars. */
-@container (max-width: 980px) {
-  #lens-corner {
-    top: 92px;
-  }
-}
-
-@container (max-width: 720px) {
-  #where-corner {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-  }
-
-  /* Too narrow to share the top with the clock bar and the alerts: the
-     lens sits above the bottom-left corner instead, its legend and
-     chips growing upward from the buttons. */
+/* A narrower map: the clock box and the lens would meet at the top, so
+   the lens sits above the bottom-left corner instead, its legend and
+   chips growing upward from the buttons. Narrower still, the bottom-left
+   corner stacks so it clears the fleet bars. */
+@container (max-width: 880px) {
   #lens-corner {
     top: auto;
-    bottom: 132px;
+    bottom: 80px;
     left: 12px;
     right: auto;
     flex-direction: column-reverse;
@@ -350,6 +352,18 @@ body {
 
   #lens-airlines {
     justify-content: flex-start;
+  }
+}
+
+@container (max-width: 720px) {
+  #where-corner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  #lens-corner {
+    bottom: 132px;
   }
 }
 
@@ -372,18 +386,12 @@ body {
   border-radius: 2px;
 }
 
-/* The alert strip (ui/alerts.ts): real problems, whatever sidebar tab
-   is open. Always on screen, unlike everything else here
-   that's conditional on a toggle or a mode, because a problem you didn't
-   go looking for is the whole reason this exists. Positioned below #hud
-   rather than beside it — a fixed offset, same approach every other
-   floating element here already takes (main.ts measures nothing at
-   runtime to place these), generous enough to clear the HUD's own height
-   even when it's wrapped onto two lines on a narrow window. */
+/* The alert strip (ui/alerts.ts): real problems, whatever screen is
+   open. Always on screen, unlike everything else here that's conditional
+   on a toggle or a mode, because a problem you didn't go looking for is
+   the whole reason this exists. It sits under the clock bar in
+   #now-corner's column. */
 #alert-strip {
-  position: fixed;
-  top: 68px;
-  left: 12px;
   max-width: 320px;
   padding: 6px;
   background: rgba(10, 12, 18, 0.85);
@@ -2752,8 +2760,7 @@ button.inspector-crumb:hover {
 /* The ops board in the HUD (ui/opsBoard.ts): today's operation in one
    line, a row of its own under the clock and speed controls. */
 #ops-board {
-  order: 10;
-  flex-basis: 100%;
+  grid-area: ops;
   display: flex;
   gap: 12px;
   font-family: ui-monospace, Consolas, monospace;
@@ -2897,4 +2904,60 @@ button.ops-item:hover {
 /* A section scrolled to by a chip stops clear of the pinned chips. */
 #inspector-body h2 {
   scroll-margin-top: 40px;
+}
+
+/* The P&L strip in the clock bar (ui/hudPnl.ts): a bar per finished day,
+   green made money and red lost it, then today's running margin. */
+#hud-pnl {
+  grid-area: pnl;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  cursor: default;
+}
+
+.hud-pnl-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+}
+
+.hud-pnl-bars span {
+  width: 6px;
+  border-radius: 1px;
+}
+
+.hud-pnl-bars .is-profit {
+  background: #5fc98a;
+}
+
+.hud-pnl-bars .is-loss {
+  background: #ff8080;
+}
+
+.hud-pnl-today {
+  color: #9aa3b8;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The full chart, on hovering the strip. */
+#hud-pnl-card {
+  position: fixed;
+  z-index: 35;
+  width: 300px;
+  padding: 10px 12px;
+  background: rgba(10, 12, 18, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  color: #cdd3e0;
+  pointer-events: none;
+}
+
+#hud-pnl-card[hidden] {
+  display: none;
 }
