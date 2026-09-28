@@ -158,6 +158,10 @@ export function setupJumpBox(state: SimState): void {
     event.stopPropagation();
   });
   inputEl.addEventListener('blur', () => closeJumpBox());
+  // A click anywhere else closes it too, focused or not.
+  document.addEventListener('mousedown', (event) => {
+    if (isJumpBoxOpen() && !boxEl.contains(event.target as Node)) closeJumpBox();
+  });
   window.addEventListener('keydown', (event) => {
     const target = event.target as HTMLElement | null;
     const typing = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
