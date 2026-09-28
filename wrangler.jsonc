@@ -1,0 +1,14 @@
+// Cloudflare's deploy settings (`npx wrangler deploy`, run by its build
+// after `npm run build`): the game is a static site, served straight from
+// Vite's dist folder. No Worker code, and no Cloudflare plugin in the Vite
+// build; without this file, wrangler tries to add one and fails.
+{
+  "$schema": "https://unpkg.com/wrangler/config-schema.json",
+  "name": "slotsandspokes",
+  "compatibility_date": "2026-09-26",
+  "assets": {
+    "directory": "./dist",
+    // Any unknown path serves the game rather than a 404.
+    "not_found_handling": "single-page-application"
+  }
+}
