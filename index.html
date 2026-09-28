@@ -186,21 +186,10 @@
             <div id="market-strip"></div>
           </section>
           <section id="rotations-section">
-            <h2>Rotations</h2>
+            <h2>Rotations <button type="button" class="info-mark" aria-label="What this means" data-info="Each plane's day from 06:00 to 22:00, home time. Solid blocks are flights; the faint span around them is one rotation, out from base and back. Gaps are time the plane sits idle. Click a rotation to open its route; hover it for × to remove it. The line is now.">i</button></h2>
             <ul id="schedule-warnings" hidden></ul>
-            <table id="rotations-table" class="panel-table">
-              <thead>
-                <tr>
-                  <th>Plane</th>
-                  <th>Rotation</th>
-                  <th>Window</th>
-                  <th>Uses</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-            <div id="rotations-empty">No rotations yet. Tap an airport on the map and choose Route.</div>
+            <div id="rotations-timeline"></div>
+            <div id="rotations-empty">None yet · tap an airport on the map, then Route</div>
           </section>
         </div>
         <div id="ontime-panel" hidden>

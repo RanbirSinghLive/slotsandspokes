@@ -809,27 +809,116 @@ body {
   box-sizing: border-box;
 }
 
-/* The rotations list. The remove button drops a whole rotation, not a
+/* The rotations timeline (ui/panels.ts): a row per plane, its day across
+   the usable hours. The remove button drops a whole rotation, not a
    single leg: a rotation is the unit the player builds, and deleting one
    leg out of the middle would strand the rest of it away from base. */
-#rotations-table td:last-child,
-#rotations-table th:last-child {
-  width: 24px;
-  padding-right: 0;
+#rotations-timeline {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 8px;
+  row-gap: 6px;
+  padding-right: 10px;
+  font-size: 11px;
 }
 
-/* The chain can be long (YHZ → YQM → YFC → YHZ), so let it be the column
-   that gives, rather than pushing the times and the percentage off. */
-.rotation-route-cell {
-  word-break: break-word;
+.timeline-axis {
+  grid-column: 2;
+  position: relative;
+  height: 12px;
+  font-size: 9px;
+  color: #6b7694;
+}
+
+.timeline-axis span {
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+.timeline-row {
+  display: contents;
+}
+
+.timeline-plane {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.timeline-share {
+  margin-left: 4px;
+  color: #6b7694;
+  font-variant-numeric: tabular-nums;
+}
+
+.timeline-track {
+  position: relative;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 3px;
+}
+
+.timeline-rotation {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(94, 214, 200, 0.12);
+  border: 1px solid rgba(94, 214, 200, 0.25);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.timeline-rotation:hover {
+  background: rgba(94, 214, 200, 0.22);
 }
 
 /* An open rotation never makes it back to base — only reachable from a
    hand-edited save or a base changed under existing legs. Flagged rather
    than hidden, since these are exactly the legs a player needs to find
    and remove. */
-.rotation-row--open .rotation-route-cell {
-  color: #ff8080;
+.timeline-rotation.is-open {
+  border-color: #ff8080;
+}
+
+.timeline-leg {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  overflow: hidden;
+  font-size: 9px;
+  line-height: 14px;
+  text-align: center;
+  color: #0a0c12;
+  background: #5ed6c8;
+  border-radius: 2px;
+}
+
+.timeline-now {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 1px;
+  background: #ffd166;
+  pointer-events: none;
+}
+
+.timeline-now[hidden] {
+  display: none;
+}
+
+.timeline-rotation .rotation-remove-button {
+  position: absolute;
+  z-index: 1;
+  background: #0a0c12;
+  top: -7px;
+  right: -7px;
+  display: none;
+}
+
+.timeline-rotation:hover .rotation-remove-button,
+.timeline-rotation .rotation-remove-button.is-armed {
+  display: block;
 }
 
 #rotations-empty {
@@ -843,8 +932,8 @@ body {
 }
 
 .rotation-remove-button {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   padding: 0;
   line-height: 1;
   font-family: inherit;
@@ -856,7 +945,8 @@ body {
   cursor: pointer;
 }
 
-.rotation-remove-button:hover {
+.rotation-remove-button:hover,
+.rotation-remove-button.is-armed {
   color: #ff8080;
   border-color: #ff8080;
 }

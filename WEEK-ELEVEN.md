@@ -111,6 +111,9 @@ form is only used where its tooltip is one hover away.
    locked class a lock and its (i) across the number columns.
 4. **Rotations as a timeline**: one row per plane, its day drawn as
    bars across 06:00–22:00, replacing the Window and Uses columns.
+   **Done:** flights as labelled blocks inside each rotation's span,
+   idle planes as empty rows, a now line, click a span for its route,
+   × on hover (two clicks) to remove.
 8. **Clickable ticker lines**: each tag coloured, and clicking a line
    opens what it names (carried forward from week eight).
 9. **Milestones as stamps**: a short stamp when one is earned

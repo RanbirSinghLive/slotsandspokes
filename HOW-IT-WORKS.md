@@ -1270,12 +1270,17 @@ can fix it.
 The popover's headline reading: "Uses 14% of an aircraft — YUL has 1.00
 spare, 0.86 after this."
 
-## Rotations list (`src/ui/panels.ts`)
+## Rotations timeline (`src/ui/panels.ts`)
 
-The Gantt rotation board and the per-leg schedule table are both gone. The
-Fleet tab lists rotations instead: one row per rotation with its chain
-(`YHZ → YQM → YFC → YHZ`), its window, its utilisation share, and a
-remove button.
+The Fleet tab draws each plane's day as a timeline row across the usable
+day (06:00–22:00 home time, stretched if a long-haul rotation runs
+outside it): the tail and its share of the day, then each flight as a
+solid block labelled with where it lands, inside a faint span for its
+rotation. Idle planes get an empty row, and the gaps between spans are
+idle time. A yellow line marks now. Hovering a span shows its chain
+(`YHZ → YQM → YFC → YHZ`), window and share; clicking it opens its
+route; its × removes it (two clicks). It is a read-out, not an editor:
+times are packed automatically, so there is nothing to drag.
 
 `rotationsForTail()` (in `sim/utilisation.ts`, so it stays testable
 without a browser) derives rotations by splitting a tail's departure-
@@ -1289,7 +1294,7 @@ the player built. Any market left with no legs at all loses its
 `routeSettings` entry and Commercial row too. A flight already airborne is
 unaffected — `ActiveFlight` carries its own copied data.
 
-A rotation that never returns to base is flagged red rather than hidden.
+A rotation that never returns to base is outlined red rather than hidden.
 That's only reachable by changing a base in the Fleet tab while legs
 already exist, which regroups them around the new base — the one remaining
 way to break a rotation from outside, and the red flag plus the remove

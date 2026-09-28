@@ -2,8 +2,8 @@ import { removeRotation as removeRotationFromSchedule } from '../sim/playerActio
 import { money, shortMoney } from './format';
 import { formatNps, networkNps } from '../sim/nps';
 import { validateSchedule } from '../sim/schedule';
-import { allRotations, utilisationProblems, type Rotation } from '../sim/utilisation';
-import { select, type Selection } from './selection';
+import { allRotations, USABLE_DAY_END_MINUTE, USABLE_DAY_START_MINUTE, utilisationProblems, type Rotation } from '../sim/utilisation';
+import { select, selectRoute, type Selection } from './selection';
 import { networkTrends, type Measure } from '../sim/trends';
 import { classByCode } from '../sim/aircraftClasses';
 import { planeIconElement } from './planeIcons';
@@ -12,7 +12,7 @@ import { formatLoadFactor, networkLoadFactor } from '../sim/loadFactor';
 import { goalsSummary } from './inspector/goals';
 import { headOfficeSummary } from './inspector/headOffice';
 import type { SimState } from '../sim/state';
-import { minuteOfDayToTimeString } from '../sim/clock';
+import { minuteOfDay, minuteOfDayToTimeString } from '../sim/clock';
 
 // Must match the --panel-width custom property's default value in
 // style.css — see the comment there. Wide enough for the tab bar, the
@@ -82,7 +82,7 @@ function linkCard(card: HTMLElement, label: string, value: string): void {
   valueEl.textContent = `${value} ›`;
   card.replaceChildren(labelEl, valueEl);
 }
-const rotationsBody = document.querySelector<HTMLTableSectionElement>('#rotations-table tbody')!;
+const rotationsTimelineEl = document.querySelector<HTMLDivElement>('#rotations-timeline')!;
 const rotationsEmptyEl = document.querySelector<HTMLDivElement>('#rotations-empty')!;
 const scheduleWarningsEl = document.querySelector<HTMLUListElement>('#schedule-warnings')!;
 
@@ -146,6 +146,7 @@ export function updatePanel(state: SimState): void {
   updatePnlHistoryPanel(state);
 
   renderRotations(state);
+  updateTimelineNow(state);
 }
 
 // The formatter itself lives in sim/clock.ts (the sim writes clock times
@@ -153,7 +154,7 @@ export function updatePanel(state: SimState): void {
 export { minuteOfDayToTimeString };
 
 /**
- * The rotations list: one row per rotation, never per leg. Rotations are
+ * The rotations timeline: removed one rotation at a time, never per leg. Rotations are
  * packed into the day automatically, so a per-leg time field would be a
  * control that lies, and deleting one leg out of a rotation would strand
  * the rest of it away from base. The unit the player builds is the unit
@@ -162,11 +163,12 @@ export { minuteOfDayToTimeString };
  * Rebuilt **only when the rotations actually change** — a per-frame
  * rebuild once broke the remove buttons outright (a click only fires if
  * mousedown and mouseup land on the same element).
- * Nothing here is time-varying anyway: a rotation's chain, window and
- * share only move when a rotation is added or removed, or when a base
- * change regroups the legs. `signature` captures exactly that.
+ * The only thing that moves with time is the now line, which
+ * updateTimelineNow() slides every frame without a rebuild. A rotation's
+ * chain, window and share only move when a rotation is added or removed,
+ * or when a base change regroups the legs. `signature` captures exactly that.
  *
- * A row's remove handler closes over its `Rotation`, which holds the same
+ * A rotation's remove handler closes over its `Rotation`, which holds the same
  * leg objects that are in `state.schedule` — so even a handler built
  * several changes ago still removes the right legs, and the rebuild that
  * follows replaces it.
@@ -178,61 +180,133 @@ let rotationsSignature: string | null = null;
 
 function renderRotations(state: SimState): void {
   const rotations = allRotations(state);
-  const signature = rotations
-    .map((r) => `${r.tail}:${r.airports.join('>')}:${r.departMinute}:${r.arriveMinute}:${r.closed}`)
-    .join('|');
+  const signature =
+    state.aircraft.map((aircraft) => aircraft.tail).join(',') +
+    '|' +
+    rotations.map((r) => `${r.tail}:${r.airports.join('>')}:${r.departMinute}:${r.arriveMinute}:${r.closed}`).join('|');
   if (signature === rotationsSignature) return;
   rotationsSignature = signature;
 
   rotationsEmptyEl.hidden = rotations.length > 0;
-  rotationsBody.innerHTML = '';
+  rotationsTimelineEl.replaceChildren(...(rotations.length > 0 ? buildTimeline(state, rotations) : []));
+}
 
-  for (const rotation of rotations) {
-    const row = document.createElement('tr');
-    row.className = 'rotation-row';
-    if (!rotation.closed) row.classList.add('rotation-row--open');
+/**
+ * The rotations as a timeline: one row per plane, its day drawn across
+ * the usable day (06:00–22:00 home time, stretched if a long-haul
+ * rotation runs outside it). Each flight is a solid block labelled with
+ * where it lands; the faint span around a rotation's flights is the
+ * rotation, and opens its route. Gaps are the plane sitting idle, which
+ * is what a list of windows and percentages hid.
+ */
+function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
+  const start = Math.min(USABLE_DAY_START_MINUTE, ...rotations.map((r) => r.departMinute));
+  const end = Math.max(USABLE_DAY_END_MINUTE, ...rotations.map((r) => r.arriveMinute));
+  timelineWindow = { start, end };
+  const at = (minute: number) => `${((minute - start) / (end - start)) * 100}%`;
+  const width = (minutes: number) => `${(minutes / (end - start)) * 100}%`;
 
-    // The plane opens its own view (ui/inspector/aircraft.ts): its whole
-    // day, leg by leg.
-    const planeCell = document.createElement('td');
-    const typeCode = state.aircraft.find((a) => a.tail === rotation.tail)?.typeCode ?? '';
-    const planeLink = document.createElement('button');
-    planeLink.type = 'button';
-    planeLink.className = 'inspector-link';
-    planeLink.append(planeIconElement(typeCode), classByCode(typeCode)?.name ?? typeCode);
-    planeLink.title = `${rotation.tail}: open its day`;
-    planeLink.addEventListener('click', () => select({ kind: 'aircraft', tail: rotation.tail }));
-    planeCell.append(planeLink);
+  // Hour ticks every four hours, labelled.
+  const axis = document.createElement('div');
+  axis.className = 'timeline-axis';
+  for (let hour = Math.ceil(start / 240) * 4; hour * 60 <= end; hour += 4) {
+    const tick = document.createElement('span');
+    tick.style.left = at(hour * 60);
+    tick.textContent = String(hour % 24).padStart(2, '0');
+    axis.append(tick);
+  }
+  const rows: HTMLElement[] = [axis];
 
-    const routeCell = document.createElement('td');
-    routeCell.className = 'rotation-route-cell';
-    routeCell.textContent = rotation.airports.join(' → ');
+  for (const aircraft of state.aircraft) {
+    // A plane with no flights still gets its row: an empty track is an idle plane.
+    const own = rotations.filter((rotation) => rotation.tail === aircraft.tail);
+    const row = document.createElement('div');
+    row.className = 'timeline-row';
 
-    const windowCell = document.createElement('td');
-    windowCell.textContent = `${minuteOfDayToTimeString(rotation.departMinute)}–${minuteOfDayToTimeString(rotation.arriveMinute)}`;
+    // The plane opens its own view (ui/inspector/aircraft.ts).
+    const plane = document.createElement('button');
+    plane.type = 'button';
+    plane.className = 'inspector-link timeline-plane';
+    plane.append(planeIconElement(aircraft.typeCode), ` ${aircraft.tail}`);
+    const share = own.reduce((sum, rotation) => sum + rotation.share, 0);
+    const shareEl = document.createElement('span');
+    shareEl.className = 'timeline-share';
+    shareEl.textContent = `${Math.round(share * 100)}%`;
+    plane.append(shareEl);
+    plane.title = `${classByCode(aircraft.typeCode)?.name ?? aircraft.typeCode} ${aircraft.tail} · ${aircraft.baseAirport ?? 'no base'} · ${Math.round(share * 100)}% of its day`;
+    plane.addEventListener('click', () => select({ kind: 'aircraft', tail: aircraft.tail }));
 
-    // The pivot's headline number, per rotation: what share of one
-    // aircraft's usable day this costs. Adding up a tail's rows tells the
-    // player how full that aeroplane is without a timeline to read.
-    const shareCell = document.createElement('td');
-    shareCell.textContent = `${Math.round(rotation.share * 100)}%`;
+    const track = document.createElement('div');
+    track.className = 'timeline-track';
+    for (const rotation of own) {
+      const span = document.createElement('div');
+      span.className = 'timeline-rotation';
+      span.classList.toggle('is-open', !rotation.closed);
+      span.style.left = at(rotation.departMinute);
+      span.style.width = width(rotation.arriveMinute - rotation.departMinute);
+      span.title =
+        `${rotation.airports.join(' → ')} · ${minuteOfDayToTimeString(rotation.departMinute)}–${minuteOfDayToTimeString(rotation.arriveMinute)}` +
+        ` · ${Math.round(rotation.share * 100)}% of a plane` +
+        (rotation.closed ? '' : ' · never returns to base');
+      span.addEventListener('click', () => selectRoute(state, rotation.airports[0], rotation.airports[1]));
+      for (const leg of rotation.legs) {
+        const block = document.createElement('div');
+        block.className = 'timeline-leg';
+        block.style.left = `${((leg.departMinute - rotation.departMinute) / (rotation.arriveMinute - rotation.departMinute)) * 100}%`;
+        block.style.width = `${(leg.blockMinutes / (rotation.arriveMinute - rotation.departMinute)) * 100}%`;
+        block.textContent = leg.dest;
+        span.append(block);
+      }
+      span.append(removeButtonFor(rotation, state));
+      track.append(span);
+    }
+    const now = document.createElement('div');
+    now.className = 'timeline-now';
+    track.append(now);
+    row.append(plane, track);
+    rows.push(row);
+  }
+  return rows;
+}
 
-    const removeCell = document.createElement('td');
-    const removeButton = document.createElement('button');
-    removeButton.type = 'button';
-    removeButton.className = 'rotation-remove-button';
-    removeButton.textContent = '×';
-    removeButton.setAttribute('aria-label', `Remove ${rotation.tail} ${rotation.airports.join(' ')}`);
-    removeButton.addEventListener('click', () => removeRotation(rotation, state));
-    removeCell.appendChild(removeButton);
+/** A rotation's ×: two clicks, since a rotation can't be put back. */
+function removeButtonFor(rotation: Rotation, state: SimState): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'rotation-remove-button';
+  button.textContent = '×';
+  button.setAttribute('aria-label', `Remove ${rotation.tail} ${rotation.airports.join(' ')}`);
+  let armed = false;
+  button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (!armed) {
+      armed = true;
+      button.classList.add('is-armed');
+      button.title = 'Click again to remove this rotation';
+      return;
+    }
+    removeRotation(rotation, state);
+  });
+  return button;
+}
 
-    row.append(planeCell, routeCell, windowCell, shareCell, removeCell);
-    rotationsBody.appendChild(row);
+/** The timeline's minute range as last drawn, for placing the now line each frame. */
+let timelineWindow: { start: number; end: number } | null = null;
+
+/** Move every row's now line to the current home-local time: cheap, so it runs every frame. */
+function updateTimelineNow(state: SimState): void {
+  if (!timelineWindow) return;
+  const minute = minuteOfDay(state);
+  const inside = minute >= timelineWindow.start && minute <= timelineWindow.end;
+  const left = `${((minute - timelineWindow.start) / (timelineWindow.end - timelineWindow.start)) * 100}%`;
+  for (const line of rotationsTimelineEl.querySelectorAll<HTMLElement>('.timeline-now')) {
+    line.hidden = !inside;
+    line.style.left = left;
   }
 }
 
 /**
- * The rotations table's remove button: sim/playerActions.ts takes the
+ * The timeline's remove button: sim/playerActions.ts takes the
  * rotation out, then the warnings are redrawn for the new schedule.
  */
 export function removeRotation(rotation: Rotation, state: SimState): void {
