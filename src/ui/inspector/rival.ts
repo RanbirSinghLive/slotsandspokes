@@ -11,6 +11,7 @@ import { legsServingMarket, marketKey, recommendedFare } from '../../sim/schedul
 import type { SimState } from '../../sim/state';
 import { select, selectRoute } from '../selection';
 import { linkToMap } from '../mapLink';
+import { rivalsInSight } from '../../sim/reach';
 
 /**
  * The inspector's views of rival airlines (ui/inspector/inspector.ts):
@@ -30,8 +31,11 @@ function title(text: string): HTMLElement {
 
 /** Every rival airline on the map, by code, with its name and routes. */
 function rivalsOnMap(state: SimState): { code: string; airline: string; routes: CompetitorOffering[] }[] {
+  // Only rivals the player can see: one flying wholly in the fog isn't on their map.
+  const inSight = rivalsInSight(state);
   const byCode = new Map<string, { code: string; airline: string; routes: CompetitorOffering[] }>();
   for (const route of state.competitorRoutes) {
+    if (!inSight.has(route.code)) continue;
     const entry = byCode.get(route.code) ?? { code: route.code, airline: route.airline, routes: [] };
     entry.routes.push(route);
     byCode.set(route.code, entry);

@@ -43,6 +43,21 @@ export function networkAirports(state: SimState): Set<string> {
   return network;
 }
 
+/**
+ * The rival airlines the player can see: those with at least one route
+ * whose two airports are both known, the same test the map uses to draw
+ * a rival route. A rival flying only inside the fog is not news to this
+ * player, so the lists, the lens and the ticker leave it out.
+ */
+export function rivalsInSight(state: SimState): Set<string> {
+  const known = new Set(state.knownAirports);
+  const codes = new Set<string>();
+  for (const route of state.competitorRoutes) {
+    if (known.has(route.origin) && known.has(route.dest)) codes.add(route.code);
+  }
+  return codes;
+}
+
 /** Range of the biggest class currently leased; a propeller's if there are no planes. */
 export function bestRangeNm(state: SimState): number {
   const ranges = state.aircraft.map((aircraft) => classByCode(aircraft.typeCode)?.rangeNm ?? 0);

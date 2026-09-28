@@ -3,6 +3,7 @@ import { marketKey } from '../sim/schedule';
 import type { SimState } from '../sim/state';
 import { airports } from '../render/airports';
 import { select, selectRoute, type Selection } from './selection';
+import { rivalsInSight } from '../sim/reach';
 
 /**
  * The jump box: press / (or ⌘K / Ctrl+K), type an airport, a tail, a
@@ -49,7 +50,8 @@ function targets(state: SimState): Target[] {
       go: () => select({ kind: 'aircraft', tail: aircraft.tail }),
     });
   }
-  const rivals = new Map(state.competitorRoutes.map((route) => [route.code, route.airline]));
+  const inSight = rivalsInSight(state);
+  const rivals = new Map(state.competitorRoutes.filter((route) => inSight.has(route.code)).map((route) => [route.code, route.airline]));
   for (const [code, airline] of rivals) {
     list.push({ label: `${airline} (${code})`, kind: 'rival', keys: [code.toLowerCase(), airline.toLowerCase()], go: () => select({ kind: 'rival', code }) });
   }

@@ -12,6 +12,7 @@ import { legsServingMarket, marketKey, recommendedFare } from '../sim/schedule';
 import { AIRCRAFT_CLASSES } from '../sim/aircraftClasses';
 import type { SimState } from '../sim/state';
 import { select, type Selection } from './selection';
+import { rivalsInSight } from '../sim/reach';
 
 const tickerTrack = document.querySelector<HTMLDivElement>('#ticker-track')!;
 
@@ -455,10 +456,12 @@ function pollMarketEvents(state: SimState): void {
   }
   lastListingId = Math.max(lastListingId, state.market.nextListingId - 1);
 
+  const inSight = rivalsInSight(state);
   for (const [code, fleet] of Object.entries(state.competitorFleets)) {
     const previous = seenRivalFleetSizes.get(code) ?? fleet.length;
     seenRivalFleetSizes.set(code, fleet.length);
-    if (fleet.length <= previous) continue;
+    // A rival flying only in the fog isn't news to this player.
+    if (fleet.length <= previous || !inSight.has(code)) continue;
     const airline = state.competitorRoutes.find((route) => route.code === code)?.airline ?? code;
     for (const typeCode of fleet.slice(previous)) {
       const name = AIRCRAFT_CLASSES.find((c) => c.code === typeCode)?.name ?? typeCode;

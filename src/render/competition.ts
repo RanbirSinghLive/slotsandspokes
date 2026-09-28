@@ -4,6 +4,7 @@ import { projection } from './projection';
 import { airports, isAirportKnown, type Airport } from './airports';
 import { PLAYER_AIRLINE } from '../sim/airline';
 import type { SimState } from '../sim/state';
+import { rivalsInSight } from '../sim/reach';
 
 const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]));
 
@@ -95,14 +96,15 @@ function allCompetitorMarketKeysFrom(byAirline: Map<string, Map<string, { origin
 }
 
 /**
- * Every airline with at least one competitor route, sorted — exported so
- * main.ts can populate the per-airline selector without duplicating
- * data/competitors.json's shape or re-deriving this list itself. The
- * roster grows: rivals enter as the game goes on (sim/pressure.ts), so
- * main.ts rebuilds the selector whenever this list changes.
+ * Every rival airline the player can see (sim/reach.ts's rivalsInSight():
+ * a route with both ends out of the fog), sorted, for the Rivals lens's
+ * chips. The roster grows as rivals enter and the fog lifts, so main.ts
+ * rebuilds the chips whenever this list changes.
  */
 export function competitorAirlines(state: SimState): string[] {
-  return [...competitorRoutesByAirlineFrom(state).keys()].sort();
+  const inSight = rivalsInSight(state);
+  const names = new Set(state.competitorRoutes.filter((route) => inSight.has(route.code)).map((route) => route.airline));
+  return [...names].sort();
 }
 
 /**
