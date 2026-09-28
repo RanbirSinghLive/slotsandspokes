@@ -51,6 +51,7 @@ import { updateRunway } from './ui/runway';
 import { isInsolvent } from './sim/insolvency';
 import { setupGameControls } from './ui/gameControls';
 import { setupRail, updateRail } from './ui/rail';
+import { closeJumpBox, isJumpBoxOpen, openJumpBox, setupJumpBox } from './ui/jumpBox';
 import { loadSavedState, saveState } from './ui/save';
 
 // Resume a saved game if one exists. A fresh game starts from
@@ -401,6 +402,8 @@ function setPanelHidden(hidden: boolean): void {
   resize();
 }
 setupRail({ isHidden: () => panelHidden, setHidden: setPanelHidden });
+setupJumpBox(state);
+document.querySelector('#rail-jump')!.addEventListener('click', () => openJumpBox(state));
 
 // The inspector (ui/inspector/) follows the selection: a map click, a link
 // or the breadcrumb changes it, and the panel rebuilds to show it. A hidden
@@ -741,6 +744,10 @@ window.addEventListener(
   'keydown',
   (event) => {
     if (event.key !== 'Escape' || choosingHome) return;
+    if (isJumpBoxOpen()) {
+      closeJumpBox();
+      return;
+    }
     if (isRouteBuilderActive() || isMapMenuOpen() || isHubPlannerOpen()) return;
     back();
   },

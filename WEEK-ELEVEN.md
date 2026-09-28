@@ -282,6 +282,8 @@ its sort), now fixed.
 **Slice 2 done:** the status dots, worked out twice a second in
 `ui/rail.ts`.
 
+**Slice 3 done:** the jump box, also on the rail as Jump.
+
 ---
 
 ## Carried forward

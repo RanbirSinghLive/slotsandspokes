@@ -1123,7 +1123,14 @@ stretched, Routes amber for a route that lost money yesterday, Money red
 under a month of cash), or for something new since that screen was last
 open, like unread mail (Goals green for a milestone, Rivals amber for a
 rival on one of your markets, Office green for an executive or
-innovation newly on offer). The canvas gets the width left
+innovation newly on offer).
+
+**The jump box** (`ui/jumpBox.ts`): `/`, ⌘K or Ctrl+K, or Jump at the
+top of the rail, opens a search at the top of the map over every
+screen, known airport, your planes, rivals on the map and your routes
+("yyz lga" finds YYZ–LGA). An exact code beats a prefix, which beats a
+word start, which beats anywhere; the arrow keys and Enter pick, Esc
+closes. Keys typed into it never reach the lens or the route builder. The canvas gets the width left
 over (`--panel-width` covers rail and panel, kept in sync via
 `PANEL_WIDTH_PX` and `RAIL_WIDTH_PX`).
 
