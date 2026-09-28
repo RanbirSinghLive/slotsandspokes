@@ -142,7 +142,14 @@ throughout (UI and copy only).
 
 ---
 
-## Thread 2: the product builder
+## Thread 2: the product (paused)
+
+**Paused by the owner: an idea for now, not scheduled.** If it comes
+back: call it "the product", and spread it where each decision is made
+rather than one builder screen: the passenger mix shown in the route
+and airport views, a cabin layout per aircraft class in the Fleet tab,
+fare families (Basic, Standard, Flex) beside Fare policy instead of a
+bare bag fee, and cruise speed at Head office beside fuel.
 
 **What the model has today** (checked for the owner): three passenger
 segments exist in `sim/choiceModel.ts`, business 20%, leisure 50%, VFR
@@ -204,6 +211,28 @@ hedging from week ten.
 **Philosophy check:** each product choice is an edge rivals can copy
 (a cabin) or a trade with a cost (bags cost NPS, speed costs fuel);
 none is a permanent free bonus.
+
+---
+
+## Thread 3: the map surface, four corners
+
+The layers were three unlabelled icon dropdowns (a folded map, a globe,
+a pin), each with its own selection rule, crammed into the clock bar,
+with a legend and a rival picker popping up elsewhere. Rework: each
+corner of the map has one job.
+
+- **Top left, Now:** date and time, speeds, the ops board, and the
+  alerts under them.
+- **Top right, Lens:** one always-visible row of labelled buttons,
+  Network · Profit · On-time · Demand · Rivals. One lens at a time, one
+  click, keys 1–5. The lens's legend and its own filter (which rival)
+  sit directly under it. Folds the Demand/Competition overlays and the
+  map modes into one idea; showing Demand and Rivals together is given up.
+- **Bottom left, Where:** zoom in, zoom out, back to home, and the
+  airport filter (All · Yours · Contested) as a visible three-way switch.
+- **Bottom right, Fleet:** the plane pools, as now.
+
+UI only: headless output must stay byte-identical.
 
 ---
 
