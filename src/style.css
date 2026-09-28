@@ -61,15 +61,15 @@ body {
   max-width: calc(100vw - var(--panel-width) - 24px);
 }
 
-#speed-controls,
-#view-toggle {
+#speed-controls {
   display: flex;
   gap: 4px;
 }
 
 #speed-controls button,
-#view-toggle button,
-#panel-toggle {
+#panel-toggle,
+#lens-bar button,
+#where-corner button {
   font-family: inherit;
   font-size: inherit;
   color: #cdd3e0;
@@ -81,28 +81,24 @@ body {
 }
 
 #speed-controls button:hover,
-#view-toggle button:hover,
-#panel-toggle:hover {
+#panel-toggle:hover,
+#lens-bar button:hover,
+#where-corner button:hover {
   border-color: rgba(255, 255, 255, 0.5);
 }
 
 #speed-controls button.active,
-#view-toggle button.active,
-#panel-toggle.active {
+#panel-toggle.active,
+#lens-bar button.active,
+#where-corner button.active {
   background: #3a4258;
   border-color: #6b7694;
   color: #fff;
 }
 
-/* Icon-only and centered, same sizing as .view-group-trigger — but its
-   own rule rather than that shared class, since giving it a matching
-   `#panel-toggle` selector here (not `.view-group-trigger`) means these
-   two width/height/padding declarations are the only ones that apply,
-   with nothing else to conflict with them. Sits after the view-toggle
-   group rather than inside it: it isn't a map layer choice, it's "does
-   the sidebar exist right now." .active means the panel is currently
-   hidden (click to bring it back), same "on" convention the
-   Demand/Competition overlay buttons already use. */
+/* Icon-only and centered. It isn't a map choice, it's "does the sidebar
+   exist right now"; .active means the panel is hidden (click to bring it
+   back). */
 #panel-toggle {
   display: flex;
   align-items: center;
@@ -116,11 +112,6 @@ body {
 #panel-toggle svg {
   width: 15px;
   height: 15px;
-}
-
-#view-toggle {
-  padding-left: 12px;
-  border-left: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 /* The Game tab: New Game, Save and Load (ui/gameControls.ts). */
@@ -214,132 +205,182 @@ body {
   color: #9aa3b8;
 }
 
-/* Each of the two view groups (Maps: Ops/Demand/Competition; Reports:
-   Rotation/Commercial) is an icon button that opens a small dropdown of
-   its views — see main.ts's view-toggle wiring. The Competition map's
-   airline filter reuses the exact same .view-group/.view-dropdown
-   structure and hover/click behavior, just with a text trigger instead
-   of an icon (an airline name doesn't have an icon to show). .view-group
-   is the positioning anchor for its own .view-dropdown. */
-.view-group {
-  position: relative;
-}
 
-.view-group-trigger {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-}
-
-.view-group-trigger svg {
-  width: 15px;
-  height: 15px;
-}
-
-.view-group-trigger--text {
-  width: auto;
-  height: auto;
-  padding: 3px 8px;
-  white-space: nowrap;
-}
-
-.view-dropdown {
-  position: absolute;
-  /* Flush against the trigger (no gap) rather than offset a few pixels
-     below it — opening on hover means the mouse has to travel from the
-     trigger down into this box, and any real gap is a dead zone where
-     .view-group briefly stops being hovered, closing the dropdown before
-     the pointer ever reaches it. */
-  top: 100%;
-  left: 0;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 100px;
-  padding: 6px;
-  background: rgba(10, 12, 18, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 6px;
-}
-
-/* Same CSS-specificity gotcha CLAUDE.md already documents for #map vs.
-   the sidebar's tab panes: a class selector (0-1-0) ties the browser's own
-   default `[hidden] { display: none }` (0-1-0), and without this
-   explicit override the later rule above wins, so [hidden] silently
-   stops hiding the dropdown at all. */
-.view-dropdown[hidden] {
-  display: none;
-}
-
-.view-dropdown button {
-  text-align: left;
-  width: 100%;
-}
-
-/* The map-layers picker (Demand/Competition) is a deliberate on/off
-   control, not a nav menu — Google Maps' own layers button is
-   the reference point, so it gets more visual weight than the plain
-   hover dropdowns: a small gap and its own shadow so it reads as a
-   floating card that popped up, not a menu flush against its trigger
-   (which only mattered for the hover-to-open groups — see main.ts's
-   isLayersPicker). The mapmode picker is the same deliberate-choice
-   shape, just single-select, so it shares the treatment. */
-[data-group='maps'] .view-dropdown,
-[data-group='mapmode'] .view-dropdown {
-  top: calc(100% + 6px);
-  padding: 8px;
-  gap: 6px;
-  min-width: 140px;
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-}
-
-[data-group='maps'] .view-dropdown button,
-[data-group='mapmode'] .view-dropdown button {
-  padding: 5px 8px;
-}
-
-/* The mapmode legend — what the current recolouring means.
-   Floats bottom-left of the map, same "real DOM over the canvas" pattern
-   the HUD clock and speed controls already use, not drawn into the
-   canvas itself (CLAUDE.md's panel rule). Hidden whenever mapMode is
-   'none', so it only ever appears alongside something it's explaining. */
-#mapmode-legend {
+/* The map's four corners, each with one job (WEEK-ELEVEN thread 3):
+   top left the clock and ops board (#hud), top right the lens, bottom
+   left where you're looking, bottom right the fleet (#pool-bars). Real
+   DOM over the canvas (CLAUDE.md's panel rule). */
+/* The map's box, transparent to the pointer: its corners are placed in
+   it, and rearrange by its width (container queries below), since how
+   much room they have depends on the side panel as much as the window. */
+#map-surface {
   position: fixed;
-  left: 12px;
-  bottom: 12px;
-  padding: 8px 12px;
-  background: rgba(10, 12, 18, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: 12px;
-  color: #cdd3e0;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: calc(100vw - var(--panel-width));
+  container-type: inline-size;
   pointer-events: none;
 }
 
-#mapmode-legend[hidden] {
+#map-surface > * {
+  pointer-events: auto;
+}
+
+#lens-corner {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  max-width: 420px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  color: #cdd3e0;
+}
+
+#lens-bar,
+#where-corner {
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  background: rgba(10, 12, 18, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+}
+
+#lens-bar button,
+#where-corner button {
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
+#lens-legend,
+#lens-airlines {
+  padding: 6px 10px;
+  background: rgba(10, 12, 18, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+}
+
+#lens-legend[hidden],
+#lens-airlines[hidden] {
   display: none;
 }
 
-#mapmode-legend-title {
+#lens-legend-title {
   color: #9aa3b8;
-  margin-bottom: 6px;
 }
 
-#mapmode-legend-scale {
+#lens-legend-scale {
   display: flex;
-  gap: 14px;
+  gap: 12px;
 }
 
-#mapmode-legend-scale > div {
+#lens-legend-scale:not(:empty) {
+  margin-top: 5px;
+}
+
+#lens-legend-scale > div {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+}
+
+/* A chip per rival under the Rivals lens, wrapping when there are many. */
+#lens-airlines {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+#lens-airlines button {
+  font: inherit;
+  color: #cdd3e0;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+#lens-airlines button.active {
+  color: #0a0c12;
+  background: #ffd166;
+  border-color: #ffd166;
+}
+
+#where-corner {
+  position: absolute;
+  left: 12px;
+  bottom: 40px;
+  align-items: center;
+  gap: 10px;
+  font-family: ui-monospace, Consolas, monospace;
+}
+
+.where-zoom,
+#airport-filter {
+  display: flex;
+  gap: 4px;
+}
+
+.where-zoom button {
+  width: 26px;
+  padding: 3px 0 !important;
+  text-align: center;
+}
+
+/* A narrower map: the lens drops below the clock bar instead of sharing
+   its row; narrower still, the bottom-left corner stacks so it clears the
+   fleet bars. */
+@container (max-width: 980px) {
+  #lens-corner {
+    top: 92px;
+  }
+}
+
+@container (max-width: 720px) {
+  #where-corner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  /* Too narrow to share the top with the clock bar and the alerts: the
+     lens sits above the bottom-left corner instead, its legend and
+     chips growing upward from the buttons. */
+  #lens-corner {
+    top: auto;
+    bottom: 132px;
+    left: 12px;
+    right: auto;
+    flex-direction: column-reverse;
+    align-items: flex-start;
+  }
+
+  #lens-bar {
+    flex-wrap: wrap;
+  }
+
+  #lens-airlines {
+    justify-content: flex-start;
+  }
+}
+
+/* Narrowest: no room for two corners side by side at the bottom, so the
+   bottom-left one rises above the fleet bars. */
+@container (max-width: 520px) {
+  #where-corner {
+    bottom: 96px;
+  }
+
+  #lens-corner {
+    bottom: 190px;
+  }
 }
 
 .mapmode-legend-swatch {
@@ -457,11 +498,9 @@ body {
 }
 
 /* The sidebar's tab bar, the first thing in it: clicking a tab swaps
-   which pane shows inside #sidebar-tab-content. Icon-only, same "aria-label plus a real `title` for the hover
-   description" shape #view-toggle's Maps/Reports icon buttons already
-   used — a native title tooltip is a fine amount of ceremony for a single
-   short line, not worth a custom tooltip component the way the rotation
-   board's bar tooltip needed. */
+   which pane shows inside #sidebar-tab-content. Icon-only, with an aria-label plus a real `title` for the hover
+   description: a native title tooltip is a fine amount of ceremony for a
+   single short line. */
 #sidebar-tabs {
   display: flex;
   flex-wrap: wrap;

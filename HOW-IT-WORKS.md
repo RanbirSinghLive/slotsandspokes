@@ -693,9 +693,21 @@ and, when it's `'map'`, two independent booleans (`demandOverlayOn`,
 of the base map that frame. `basemap.ts` is the one layer always drawn
 first, every time the map panel is visible.
 
-Demand and Competition are overlays: independent on/off toggles (two
-buttons in the Maps dropdown) layered on the one persistent map panel,
-so a route can be drawn while either is showing.
+**The map's four corners** each have one job: top left the clock,
+speeds and ops board (with the alerts under them); top right the
+**lens**; bottom left zoom, back-to-home and the airport filter (All ·
+Yours · Contested); bottom right the fleet's plane pools. The two new
+corners sit in `#map-surface`, a pointer-transparent box the size of
+the map, and rearrange with its width through CSS container queries (on
+a narrow map the lens moves down, then to the bottom left).
+
+The lens is one row of labelled buttons, Network · Profit · On-time ·
+Demand · Rivals, one on at a time (keys 1–5), with its legend and
+filter directly under it. `setLens()` in main.ts sets the three flags
+the renderer reads: `demandOverlayOn` for Demand, `competitionOverlayOn`
+for Rivals, `mapMode` for Profit and On-time. The Rivals lens adds a
+chip per rival airline to narrow it to one. A route can be drawn under
+any lens.
 
 **The map panel** — draw order back to front, every frame:
 
@@ -722,8 +734,8 @@ so a route can be drawn while either is showing.
    competitor also flies it, so drawing both would double every
    own-route line. `drawCompetitionLayer()` draws every market that
    falls into exactly one of three states relative to a second piece of
-   state (`selectedCompetitorAirline`, driven by a filter dropdown shown
-   only while this overlay is on — `null` means "any competitor," a
+   state (`selectedCompetitorAirline`, driven by the Rivals lens's
+   airline chips — `null` means "any competitor," a
    specific name means just that one carrier):
    - **Yours only** — default color. The competitor set doesn't serve
      this market at all.
@@ -1140,8 +1152,8 @@ above. Everything else sits under **Airports**, **Fleet** or **Rivals**:
 | A route | click its line, or a market row | the route view: flights, demand, rivals, fare stances, pools, margin and on-time |
 | Fleet list | the breadcrumb, from a plane | every aircraft: base, how much of its day it uses, on time today, AOG |
 | An aircraft | click it in flight on the map, its row in the rotations table, or its tail in an airport's view | its specs and age (and what the age does to its delays), where it is now, how much of the day it uses, its whole day in order (flown legs with how late and why, passengers and margin; the one in the air; upcoming legs with projected lateness; cancelled ones), its rotations, and Return to lessor |
-| Rivals list | "All competitors" in the Competition overlay, or the breadcrumb | every rival airline, biggest first: routes (and how many against you), estimated margin a day, routes losing money |
-| A rival | its name anywhere in the panel, or picking it in the Competition overlay | its fleet, routes against the 20-route cap, its average seats per flight and any planes beyond what its flying needs, every route worst first (fare against the going rate, margin a day, losing streak, grace left, about when it closes), and markets it closed recently |
+| Rivals list | "All" among the Rivals lens's chips, or the breadcrumb | every rival airline, biggest first: routes (and how many against you), estimated margin a day, routes losing money |
+| A rival | its name anywhere in the panel, or its chip under the Rivals lens | its fleet, routes against the 20-route cap, its average seats per flight and any planes beyond what its flying needs, every route worst first (fare against the going rate, margin a day, losing streak, grace left, about when it closes), and markets it closed recently |
 
 The breadcrumb reads Network › Airports › YYZ › YYZ – ORD, or Network ›
 Rivals › Ironbridge Airlines. A route opened from the map goes under its

@@ -18,7 +18,7 @@ import { showFlightTooltip, hideFlightTooltip } from './ui/flightTooltip';
 import { showAirportTooltip, hideAirportTooltip } from './ui/airportTooltip';
 import { drawDemandLayer } from './render/demand';
 import { drawCompetitionLayer, competitorAirlines, findCompetitionHover, drawNewCompetitorRouteFlashes } from './render/competition';
-import { drawRouteMapMode, MAP_MODES, MAP_MODE_COLORS, type MapMode } from './render/mapmodes';
+import { drawRouteMapMode, MAP_MODE_COLORS, type MapMode } from './render/mapmodes';
 import { showCompetitionTooltip, hideCompetitionTooltip } from './ui/competitionTooltip';
 import { createNewGameState, type SimState } from './sim/state';
 import { chooseHome, homeOptions } from './sim/homes';
@@ -83,83 +83,54 @@ const canvas = document.querySelector<HTMLCanvasElement>('#map')!;
 const ctx = canvas.getContext('2d')!;
 const clockEl = document.querySelector<HTMLDivElement>('#clock')!;
 const speedButtons = document.querySelectorAll<HTMLButtonElement>('#speed-controls button');
-// Demand/Competition: independent on/off toggles layered on top of the
-// map, not exclusive views (see the overlay-toggle wiring below). The
-// ledgers live in sidebar tabs (switchToSidebarTab()), so the map is
-// never something you navigate away from.
-const overlayToggleButtons = document.querySelectorAll<HTMLButtonElement>('#view-toggle .view-dropdown button[data-overlay]');
-// Both hover-dropdown groups share one wiring pass below — the Maps
-// (Demand/Competition) group and the Competition map's airline filter,
-// which reuses the exact same .view-group/.view-dropdown markup and
-// open/close behavior, just with a text trigger instead of an icon.
-const viewGroups = document.querySelectorAll<HTMLDivElement>('#hud .view-group');
-const competitionAirlineGroup = document.querySelector<HTMLDivElement>('#competition-airline-group')!;
-const competitionAirlineTrigger = document.querySelector<HTMLButtonElement>('#competition-airline-trigger')!;
-const competitionAirlineDropdown = document.querySelector<HTMLDivElement>('#competition-airline-dropdown')!;
-const mapModeDropdown = document.querySelector<HTMLDivElement>('#mapmode-dropdown')!;
-const mapModeLegend = document.querySelector<HTMLDivElement>('#mapmode-legend')!;
-const mapModeLegendTitle = document.querySelector<HTMLDivElement>('#mapmode-legend-title')!;
-const mapModeLegendScale = document.querySelector<HTMLDivElement>('#mapmode-legend-scale')!;
+// The map's lens (index.html's #lens-corner): one at a time, its legend
+// and filter directly under the buttons. See setLens() below.
+const lensButtons = document.querySelectorAll<HTMLButtonElement>('#lens-bar button[data-lens]');
+const lensLegend = document.querySelector<HTMLDivElement>('#lens-legend')!;
+const lensLegendTitle = document.querySelector<HTMLDivElement>('#lens-legend-title')!;
+const lensLegendScale = document.querySelector<HTMLDivElement>('#lens-legend-scale')!;
+const lensAirlines = document.querySelector<HTMLDivElement>('#lens-airlines')!;
 
-// Built from MAP_MODES (render/mapmodes.ts) rather than hand-authored in
-// index.html, so the button list can never drift out of sync with the
-// enum main.ts is actually switching on.
-for (const { mode, label } of MAP_MODES) {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.dataset.mapmode = mode;
-  button.textContent = label;
-  if (mode === 'none') button.classList.add('active');
-  mapModeDropdown.appendChild(button);
-}
-
-// null means "All competitors" (the aggregate Competition overlay); a
-// specific airline name filters render/competition.ts's layer down to
-// just that carrier's own network. Lives outside render() the same way
-// sidebarTab does, since it's persistent UI state, not simulated state.
+// null means every rival (the whole Rivals lens); an airline name filters
+// render/competition.ts's layer down to that carrier's own network. Lives
+// outside render() the same way sidebarTab does, since it's persistent
+// UI state, not simulated state.
 let selectedCompetitorAirline: string | null = null;
 
-function selectCompetitorAirline(button: HTMLButtonElement): void {
-  selectedCompetitorAirline = button.dataset.airline || null;
-  competitionAirlineTrigger.textContent = button.textContent;
-  competitionAirlineDropdown
-    .querySelectorAll<HTMLButtonElement>('button')
-    .forEach((b) => b.classList.toggle('active', b === button));
-  closeAllDropdowns(); // function declaration, hoisted — defined further down with the other view groups
+function selectCompetitorAirline(airline: string | null): void {
+  selectedCompetitorAirline = airline;
+  lensAirlines.querySelectorAll<HTMLButtonElement>('button').forEach((b) => b.classList.toggle('active', (b.dataset.airline || null) === airline));
   hideCompetitionTooltip(); // stale position/content for whatever was hovered under the old filter
-  // The side panel follows the filter: one airline opens its view, "All
-  // competitors" the list of rivals (ui/inspector/rival.ts).
-  const code = state.competitorRoutes.find((route) => route.airline === selectedCompetitorAirline)?.code;
+  // The side panel follows the filter: one airline opens its view, every
+  // rival the list of rivals (ui/inspector/rival.ts).
+  const code = state.competitorRoutes.find((route) => route.airline === airline)?.code;
   select(code ? { kind: 'rival', code } : { kind: 'rivals' });
   render();
 }
 
-// The static "All competitors" button already in the HTML.
-competitionAirlineDropdown.querySelectorAll<HTMLButtonElement>('button').forEach((button) => {
-  button.addEventListener('click', () => selectCompetitorAirline(button));
-});
-
-// New rivals enter as the game goes on (sim/pressure.ts), so the list of
-// airlines is rebuilt whenever it changes rather than once at startup. If
-// the airline being filtered on ever vanished it would fall back to "All".
+// New rivals enter as the game goes on (sim/pressure.ts), so the chips are
+// rebuilt whenever the list of airlines changes rather than once at
+// startup. If the airline being filtered on vanished, the filter falls
+// back to every rival.
 let competitorAirlineSignature = '';
 
-function syncCompetitorAirlineDropdown(): void {
+function syncCompetitorAirlineChips(): void {
   const airlines = competitorAirlines(state);
   const signature = airlines.join('|');
   if (signature === competitorAirlineSignature) return;
   competitorAirlineSignature = signature;
+  if (selectedCompetitorAirline && !airlines.includes(selectedCompetitorAirline)) selectedCompetitorAirline = null;
 
-  competitionAirlineDropdown.querySelectorAll<HTMLButtonElement>('button[data-airline]:not([data-airline=""])').forEach((b) => b.remove());
-  for (const airline of airlines) {
+  const chip = (label: string, airline: string | null) => {
     const button = document.createElement('button');
     button.type = 'button';
-    button.dataset.airline = airline;
-    button.textContent = airline;
+    button.dataset.airline = airline ?? '';
+    button.textContent = label;
     button.classList.toggle('active', airline === selectedCompetitorAirline);
-    button.addEventListener('click', () => selectCompetitorAirline(button));
-    competitionAirlineDropdown.appendChild(button);
-  }
+    button.addEventListener('click', () => selectCompetitorAirline(airline));
+    return button;
+  };
+  lensAirlines.replaceChildren(chip('All', null), ...airlines.map((airline) => chip(airline, airline)));
 }
 
 // Sidebar tabs: content panes inside the sidebar (#sidebar-tab-content)
@@ -300,7 +271,7 @@ function render(nowMs: number = performance.now()): void {
 
   // The known airports, less any the map's airport filter hides (ui/airportFilter.ts).
   setKnownAirports(visibleAirports(state));
-  syncCompetitorAirlineDropdown();
+  syncCompetitorAirlineChips();
   ctx.clearRect(0, 0, cssWidth, cssHeight);
   drawBasemap(ctx);
   drawTerminator(ctx, latestFractionalMinute);
@@ -638,147 +609,81 @@ sidebarTabButtons.forEach((button) => {
   });
 });
 
-function closeAllDropdowns(): void {
-  viewGroups.forEach((group) => {
-    group.querySelector<HTMLDivElement>('.view-dropdown')!.hidden = true;
-    group.querySelector<HTMLButtonElement>('.view-group-trigger')!.setAttribute('aria-expanded', 'false');
+/**
+ * The map's lens: what the map is showing on top of your network. One at
+ * a time, so there's one rule for every button and the one that's on is
+ * always lit. Network is the plain map; Profit and On-time recolour your
+ * routes (render/mapmodes.ts); Demand draws every market's demand and
+ * headroom (render/demand.ts); Rivals draws the rival networks, with a
+ * chip per airline to narrow it to one (render/competition.ts).
+ */
+type Lens = 'network' | 'profit' | 'ontime' | 'demand' | 'rivals';
+const LENS_ORDER: Lens[] = ['network', 'profit', 'ontime', 'demand', 'rivals'];
+let lens: Lens = 'network';
+
+function setLens(next: Lens): void {
+  lens = next;
+  demandOverlayOn = lens === 'demand';
+  competitionOverlayOn = lens === 'rivals';
+  mapMode = lens === 'profit' ? 'profitability' : lens === 'ontime' ? 'ontime' : 'none';
+  lensButtons.forEach((button) => {
+    const on = button.dataset.lens === lens;
+    button.classList.toggle('active', on);
+    button.setAttribute('aria-checked', String(on));
   });
+  lensAirlines.hidden = lens !== 'rivals';
+  hideCompetitionTooltip(); // stale content from whatever was hovered under the old lens
+  updateLensLegend();
+  render();
 }
 
-viewGroups.forEach((group) => {
-  const trigger = group.querySelector<HTMLButtonElement>('.view-group-trigger')!;
-  const dropdown = group.querySelector<HTMLDivElement>('.view-dropdown')!;
+lensButtons.forEach((button) => button.addEventListener('click', () => setLens(button.dataset.lens as Lens)));
 
-  function openThisDropdown(): void {
-    closeAllDropdowns();
-    dropdown.hidden = false;
-    trigger.setAttribute('aria-expanded', 'true');
-  }
-
-  function closeThisDropdown(): void {
-    dropdown.hidden = true;
-    trigger.setAttribute('aria-expanded', 'false');
-  }
-
-  // The map-layers group (Demand/Competition) is a deliberate on/off
-  // picker, as Google Maps' layers button is, so it opens and closes
-  // strictly on click, never on hover. The Competition airline filter
-  // opens on hover, since it's a plain single-select list you're just
-  // browsing. The mapmode and airports pickers are deliberate choices
-  // like the layers group, so they're click-only too.
-  const isLayersPicker = group.dataset.group === 'maps' || group.dataset.group === 'mapmode' || group.dataset.group === 'airports';
-
-  trigger.addEventListener('click', (event) => {
-    event.stopPropagation(); // don't immediately re-close via the document listener below
-    // Click always *opens* for the hover-opened groups (never toggles
-    // closed) — hover has already opened it by the time a click fires, so
-    // a toggle would immediately close what hover just opened. The
-    // layers picker has no hover-open to race against, so its click is a
-    // real open/close toggle instead.
-    if (isLayersPicker && !dropdown.hidden) {
-      closeThisDropdown();
-    } else {
-      openThisDropdown();
-    }
-  });
-
-  if (!isLayersPicker) {
-    // Opening on hover (not just click) is why .view-dropdown sits flush
-    // against its trigger with no gap in style.css — mouseenter/mouseleave
-    // fire on `group` as a whole, which contains both the trigger and the
-    // dropdown, so moving the pointer from one into the other never counts
-    // as leaving the group; a real gap between them would.
-    group.addEventListener('mouseenter', openThisDropdown);
-    group.addEventListener('mouseleave', closeThisDropdown);
-  }
-});
-
-// Clicking anywhere outside a group (its trigger or its open dropdown)
-// closes whichever one is open — standard dropdown-menu behavior.
-document.addEventListener('click', (event) => {
-  const target = event.target as Node;
-  const clickedInsideAGroup = [...viewGroups].some((group) => group.contains(target));
-  if (!clickedInsideAGroup) closeAllDropdowns();
+// Keys 1–5 pick a lens, unless the player is typing into something.
+window.addEventListener('keydown', (event) => {
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  const target = event.target as HTMLElement | null;
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+  const index = Number(event.key) - 1;
+  if (Number.isInteger(index) && index >= 0 && index < LENS_ORDER.length) setLens(LENS_ORDER[index]);
 });
 
 /**
- * Demand and Competition, as independent on/off toggles layered on the
- * map. Each toggle's `.active` class (reusing the same styling
- * `#view-toggle button.active` already has) is the only visual
- * "checkbox" state; there's no separate checkmark glyph. Unlike week
- * four, flipping one doesn't need to "switch to the Map panel" anymore —
- * the map is always showing regardless of which sidebar tab is open.
+ * The legend under the lens: its title and colour key. Swatch colours
+ * come from the renderers' own exports (MAP_MODE_COLORS), so this can
+ * never describe a scale the map isn't drawing. The plain Network lens
+ * needs no key.
  */
-overlayToggleButtons.forEach((button) => {
-  button.addEventListener('click', () => {
-    closeAllDropdowns();
-
-    if (button.dataset.overlay === 'demand') {
-      demandOverlayOn = !demandOverlayOn;
-      button.classList.toggle('active', demandOverlayOn);
-    } else if (button.dataset.overlay === 'competition') {
-      competitionOverlayOn = !competitionOverlayOn;
-      button.classList.toggle('active', competitionOverlayOn);
-      hideCompetitionTooltip(); // stale content from whatever was hovered under the old on/off state
-    }
-
-    competitionAirlineGroup.hidden = !competitionOverlayOn;
-    render();
-  });
-});
-
-// Which airports the map shows (ui/airportFilter.ts): a single choice, like
-// the mapmode picker.
-const airportFilterButtons = document.querySelectorAll<HTMLButtonElement>('#view-toggle button[data-airports]');
-airportFilterButtons.forEach((button) => {
-  button.addEventListener('click', () => {
-    closeAllDropdowns();
-    setAirportFilter(button.dataset.airports as AirportFilter);
-    airportFilterButtons.forEach((other) => other.classList.toggle('active', other === button));
-    render();
-  });
-});
-
-/**
- * Fills the legend's title and colour key for whichever mapmode is
- * active, and hides the whole thing for `'none'` — a legend with nothing
- * to key would just be clutter. Text and swatch colours both come from
- * render/mapmodes.ts's own exports (MAP_MODE_COLORS), so this can never
- * describe a scale the map isn't actually drawing.
- */
-function updateMapModeLegend(): void {
-  mapModeLegend.hidden = mapMode === 'none';
-  if (mapMode === 'none') return;
-
+function updateLensLegend(): void {
+  lensLegend.hidden = lens === 'network';
   const swatch = (color: string, label: string) =>
     `<div><span class="mapmode-legend-swatch" style="background:${color}"></span><span>${label}</span></div>`;
-
-  if (mapMode === 'profitability') {
-    mapModeLegendTitle.textContent = 'Profitability (margin ÷ revenue)';
-    mapModeLegendScale.innerHTML =
-      swatch(MAP_MODE_COLORS.loss, 'Losing money') +
-      swatch(MAP_MODE_COLORS.breakeven, 'Breakeven') +
-      swatch(MAP_MODE_COLORS.profit, '+20% margin or better');
-  } else {
-    mapModeLegendTitle.textContent = 'On-time performance';
-    mapModeLegendScale.innerHTML =
-      swatch(MAP_MODE_COLORS.loss, '0% on-time') +
-      swatch(MAP_MODE_COLORS.breakeven, `${Math.round(OTP_BASELINE * 100)}% (the on-time baseline)`) +
-      swatch(MAP_MODE_COLORS.profit, '100% on-time');
+  if (lens === 'profit') {
+    lensLegendTitle.textContent = 'Margin ÷ revenue';
+    lensLegendScale.innerHTML =
+      swatch(MAP_MODE_COLORS.loss, 'loss') + swatch(MAP_MODE_COLORS.breakeven, 'breakeven') + swatch(MAP_MODE_COLORS.profit, '+20%');
+  } else if (lens === 'ontime') {
+    lensLegendTitle.textContent = 'On-time, last 7 days';
+    lensLegendScale.innerHTML =
+      swatch(MAP_MODE_COLORS.loss, '0%') +
+      swatch(MAP_MODE_COLORS.breakeven, `${Math.round(OTP_BASELINE * 100)}% baseline`) +
+      swatch(MAP_MODE_COLORS.profit, '100%');
+  } else if (lens === 'demand') {
+    lensLegendTitle.textContent = 'Demand · faint arc potential, solid arc today';
+    lensLegendScale.innerHTML = '';
+  } else if (lens === 'rivals') {
+    lensLegendTitle.textContent = 'Rival networks · pick one to narrow';
+    lensLegendScale.innerHTML = '';
   }
 }
 
-/**
- * The mapmode picker: single-select, unlike Demand/Competition's
- * independent toggles, since there's only one map underneath to recolour.
- * Picking a mode deselects every other button in the same dropdown.
- */
-mapModeDropdown.querySelectorAll<HTMLButtonElement>('button[data-mapmode]').forEach((button) => {
+// Which airports the map shows (ui/airportFilter.ts): a visible three-way
+// switch in the bottom-left corner.
+const airportFilterButtons = document.querySelectorAll<HTMLButtonElement>('#airport-filter button[data-airports]');
+airportFilterButtons.forEach((button) => {
   button.addEventListener('click', () => {
-    closeAllDropdowns();
-    mapMode = button.dataset.mapmode as MapMode;
-    mapModeDropdown.querySelectorAll<HTMLButtonElement>('button[data-mapmode]').forEach((b) => b.classList.toggle('active', b === button));
-    updateMapModeLegend();
+    setAirportFilter(button.dataset.airports as AirportFilter);
+    airportFilterButtons.forEach((other) => other.classList.toggle('active', other === button));
     render();
   });
 });
@@ -943,31 +848,34 @@ window.addEventListener('keydown', handleMapMenuKeyDown);
 const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 20;
 
+/** Zoom by `factor`, keeping the geographic point under screen (x, y) where it is. */
+function zoomAt(x: number, y: number, factor: number): void {
+  const geoUnderPoint = projection.invert?.([x, y]);
+  if (!geoUnderPoint) return;
+  const clampedScale = Math.min(Math.max(projection.scale() * factor, baselineScale * MIN_ZOOM), baselineScale * MAX_ZOOM);
+  projection.scale(clampedScale);
+  const [driftedX, driftedY] = projection(geoUnderPoint)!;
+  const [tx, ty] = projection.translate();
+  projection.translate([tx + (x - driftedX), ty + (y - driftedY)]);
+  render();
+}
+
 canvas.addEventListener(
   'wheel',
   (event) => {
     event.preventDefault();
-
-    const mouseX = event.clientX;
-    const mouseY = event.clientY;
-    const geoUnderMouse = projection.invert?.([mouseX, mouseY]);
-    if (!geoUnderMouse) return;
-
-    const zoomFactor = Math.pow(1.002, -event.deltaY);
-    const currentScale = projection.scale();
-    const targetScale = currentScale * zoomFactor;
-    const clampedScale = Math.min(Math.max(targetScale, baselineScale * MIN_ZOOM), baselineScale * MAX_ZOOM);
-
-    projection.scale(clampedScale);
-
-    const [driftedX, driftedY] = projection(geoUnderMouse)!;
-    const [tx, ty] = projection.translate();
-    projection.translate([tx + (mouseX - driftedX), ty + (mouseY - driftedY)]);
-
-    render();
+    zoomAt(event.clientX, event.clientY, Math.pow(1.002, -event.deltaY));
   },
   { passive: false },
 );
+
+// The bottom-left corner's buttons: zoom toward the middle of the map,
+// or refit it around home, as at the start.
+const ZOOM_BUTTON_FACTOR = 1.5;
+const mapMiddle = (): [number, number] => [canvas.clientWidth / 2, canvas.clientHeight / 2];
+document.querySelector('#zoom-in')!.addEventListener('click', () => zoomAt(...mapMiddle(), ZOOM_BUTTON_FACTOR));
+document.querySelector('#zoom-out')!.addEventListener('click', () => zoomAt(...mapMiddle(), 1 / ZOOM_BUTTON_FACTOR));
+document.querySelector('#zoom-home')!.addEventListener('click', () => resize());
 
 // --- Choosing a home city (new games only) ---
 //

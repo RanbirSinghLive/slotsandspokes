@@ -234,6 +234,15 @@ corner of the map has one job.
 
 UI only: headless output must stay byte-identical.
 
+**Status: done.** As planned, plus: the corners that move live in
+`#map-surface`, a map-sized box, so CSS container queries rearrange
+them by the map's width (the side panel eats as much as a small window
+does): below 980px the lens drops under the clock bar, below 720px it
+moves to the bottom left above the zoom buttons, below 520px both rise
+above the fleet bars. The hide-panel button stays in the clock bar
+until the inspector is reworked. `MAP_MODES` (the old dropdown's list)
+is gone.
+
 ---
 
 ## Carried forward

@@ -53,62 +53,6 @@
         <button type="button" data-speed="20">20×</button>
         <button type="button" data-speed="100">100×</button>
       </div>
-      <div id="view-toggle">
-        <div class="view-group" data-group="maps">
-          <button type="button" class="view-group-trigger active" aria-label="Maps" aria-haspopup="true" aria-expanded="false">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
-              <line x1="8" y1="2" x2="8" y2="18" />
-              <line x1="16" y1="6" x2="16" y2="22" />
-            </svg>
-          </button>
-          <div class="view-dropdown" hidden>
-            <button type="button" data-overlay="demand">Demand</button>
-            <button type="button" data-overlay="competition">Competition</button>
-          </div>
-        </div>
-        <div class="view-group" data-group="mapmode">
-          <button type="button" class="view-group-trigger" aria-label="Mapmode" aria-haspopup="true" aria-expanded="false">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M2 12h20" />
-              <path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20Z" />
-            </svg>
-          </button>
-          <div class="view-dropdown" id="mapmode-dropdown" hidden></div>
-        </div>
-        <div class="view-group" data-group="airports">
-          <button type="button" class="view-group-trigger" aria-label="Airports shown" title="Airports shown" aria-haspopup="true" aria-expanded="false">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Z" />
-              <circle cx="12" cy="9.5" r="2.5" />
-            </svg>
-          </button>
-          <div class="view-dropdown" hidden>
-            <button type="button" data-airports="all" class="active">All airports</button>
-            <button type="button" data-airports="yours">Only yours</button>
-            <button type="button" data-airports="contested">Yours and rivals'</button>
-          </div>
-        </div>
-      </div>
-      <div id="mapmode-legend" hidden>
-        <div id="mapmode-legend-title"></div>
-        <div id="mapmode-legend-scale"></div>
-      </div>
-      <div class="view-group" id="competition-airline-group" data-group="competition-airline" hidden>
-        <button
-          type="button"
-          class="view-group-trigger view-group-trigger--text"
-          id="competition-airline-trigger"
-          aria-haspopup="true"
-          aria-expanded="false"
-        >
-          All competitors
-        </button>
-        <div class="view-dropdown" id="competition-airline-dropdown" hidden>
-          <button type="button" data-airline="" class="active">All competitors</button>
-        </div>
-      </div>
       <button
         type="button"
         id="panel-toggle"
@@ -120,6 +64,37 @@
           <line x1="15" y1="3" x2="15" y2="21" />
         </svg>
       </button>
+    </div>
+    <!-- The map's own box, for the corners that rearrange with its width (style.css's container queries). -->
+    <div id="map-surface">
+    <!-- Top right of the map: the lens, one at a time, with its legend and filter under it (main.ts). -->
+    <div id="lens-corner">
+      <div id="lens-bar" role="radiogroup" aria-label="Map lens">
+        <button type="button" data-lens="network" class="active" title="Your network (1)">Network</button>
+        <button type="button" data-lens="profit" title="Routes coloured by margin (2)">Profit</button>
+        <button type="button" data-lens="ontime" title="Routes coloured by on-time (3)">On-time</button>
+        <button type="button" data-lens="demand" title="Every market's demand and headroom (4)">Demand</button>
+        <button type="button" data-lens="rivals" title="Rival networks (5)">Rivals</button>
+      </div>
+      <div id="lens-legend" hidden>
+        <div id="lens-legend-title"></div>
+        <div id="lens-legend-scale"></div>
+      </div>
+      <div id="lens-airlines" hidden></div>
+    </div>
+    <!-- Bottom left of the map: where you're looking, and which airports show. -->
+    <div id="where-corner">
+      <div class="where-zoom">
+        <button type="button" id="zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
+        <button type="button" id="zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
+        <button type="button" id="zoom-home" title="Back to home" aria-label="Back to home">⌂</button>
+      </div>
+      <div id="airport-filter" role="radiogroup" aria-label="Airports shown">
+        <button type="button" data-airports="all" class="active" title="Every airport in reach">All</button>
+        <button type="button" data-airports="yours" title="Only airports you fly to">Yours</button>
+        <button type="button" data-airports="contested" title="Yours and your rivals'">Contested</button>
+      </div>
+    </div>
     </div>
     <div id="alert-strip" hidden>
       <div id="alert-strip-list"></div>

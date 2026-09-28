@@ -18,17 +18,12 @@ import type { SimState } from '../sim/state';
  * Two modes to start, both reusing numbers the sim already produces
  * rather than inventing new ones: `summarizeMarket()` (sim/marketSummary.ts,
  * the same formula the Commercial panel's own numbers come from) for
- * profitability, and `state.onTimeByMarket` for on-time. More modes are
- * additive — a new entry in `MAP_MODES` plus a colour function, nothing
- * structural.
+ * profitability, and `state.onTimeByMarket` for on-time. Each is one of
+ * the map's lenses (main.ts's setLens()); another mode is a colour
+ * function plus a lens button.
  */
 export type MapMode = 'none' | 'profitability' | 'ontime';
 
-export const MAP_MODES: { mode: MapMode; label: string }[] = [
-  { mode: 'none', label: 'Off' },
-  { mode: 'profitability', label: 'Profitability' },
-  { mode: 'ontime', label: 'On-Time' },
-];
 
 const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]));
 
