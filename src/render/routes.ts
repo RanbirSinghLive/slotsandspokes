@@ -63,8 +63,9 @@ export function drawRoutes(ctx: CanvasRenderingContext2D, state: SimState): void
     ctx.stroke();
   }
 
-  // A route with more demand than seats, in the same amber as the solid
-  // pips at its ends: the one that needs a flight or a bigger plane.
+  // A route with more demand than seats, in the same amber as the Demand
+  // lens's rim round its airports: the one that needs a flight or a
+  // bigger plane.
   const spilling = spillingMarkets(state);
   if (spilling.size > 0) {
     ctx.save();

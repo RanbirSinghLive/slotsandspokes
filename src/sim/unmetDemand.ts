@@ -96,14 +96,3 @@ export function spillingMarkets(state: SimState): Set<string> {
   }
   return spilling;
 }
-
-/**
- * How many pips to draw for a number of passengers: a log scale, so a
- * town of a few hundred shows a pip or two and a big city fills the ring.
- * Zero for fewer than one passenger, capped at MAX_PIPS.
- */
-export const MAX_PIPS = 12;
-export function pipCount(passengers: number): number {
-  if (passengers < 1) return 0;
-  return Math.min(MAX_PIPS, Math.max(1, Math.ceil(Math.log2(1 + passengers / 10))));
-}

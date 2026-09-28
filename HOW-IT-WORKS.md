@@ -717,16 +717,18 @@ any lens.
    centered on the antisolar point, computed from `simMinute` (declination
    from day-of-year, subsolar longitude from minute-of-day). Semi-
    transparent dark navy, so land and ocean still show through it.
-3. `demand.ts`'s `drawDemandLayer()`, **only if `demandOverlayOn`** — one
-   geodesic arc for every one of the 10 airports' 45 distinct pairs,
-   width and opacity scaled to that pair's `sim/demand.ts` figure
-   relative to the single busiest pair, so the big markets read as the
-   thickest, brightest lines. A pair that already has scheduled service
-   (same bidirectional "served" definition `routes.ts` uses) gets an
-   amber halo drawn behind its arc. Drawn *before* the route layer below
-   on purpose — this is background context your own network then draws
-   on top of, not the other way around. No longer draws its own
-   airports (see below).
+3. `demand.ts`'s `drawDemandLayer()`, **only under the Demand lens** —
+   built to answer "where do I fly next?". A circle per airport sized by
+   the people there not on your planes (`sim/unmetDemand.ts`'s latent
+   demand), in the five steps the panel names in words (Tiny to Huge,
+   `airportDemandSize()`), so map and airport view agree. Teal where the
+   airport is underserved by every airline (`sim/serviceLevel.ts`),
+   brighter when starved; grey where it's well served; an amber rim where
+   you're turning passengers away today. No lines until asked: the
+   hovered airport (else the selected one) gets its six biggest markets
+   as arcs, teal where you don't fly yet and amber where you do, thicker
+   the bigger. Drawn *before* the route layer below, so your network and
+   the airport dots sit on top.
 4. Your own network — **either** `routes.ts` (plain gray, one thin arc
    per distinct city pair, if `competitionOverlayOn` is off) **or**
    `competition.ts`'s `drawCompetitionLayer()` (if it's on). These are
@@ -1806,11 +1808,11 @@ world, so at the start every airport is starved: the first routes build
 fast, and the edge wears off as someone serves each airport (the game's
 philosophy in CLAUDE.md). The airport view says it in words: "Starved
 for service", "Underserved" or "Well served", with what that means for a
-new route. On the map, the **Demand layer** draws a faint dashed teal
-ring round every airport at least a quarter starved, stronger the
-hungrier it is (only with that layer, since early on almost everything
-is starved). As you and rivals serve a region its rings fade, so the
-untouched edges show. The benchmark is set where an airport flown hard gets there:
+new route. On the map, the **Demand lens** colours each airport's circle
+teal once it is at least a quarter starved, brighter the hungrier it is
+(only under that lens, since early on almost everything is starved). As
+you and rivals serve a region its circles turn grey, so the untouched
+edges show. The benchmark is set where an airport flown hard gets there:
 the steady headless player's home by its first month or two, Toronto
 and O'Hare by day 120. At 0.02 almost nothing ever counted as served,
 and the boost was just a flat 3× everywhere.

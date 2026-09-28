@@ -5,8 +5,6 @@ import { dailyDeparturesAt, airportLevel, airportLoad } from '../sim/airports';
 import { slotFeesPerDayAt, slotsHeld } from '../sim/slots';
 import { worstPoolShareByBase } from '../sim/utilisation';
 import { getMapPreview } from './preview';
-import { pipCount, unmetDemandByAirport, unmetDemandInputs, type AirportUnmet } from '../sim/unmetDemand';
-import { hungerByAirport } from '../sim/serviceLevel';
 import type { SimState } from '../sim/state';
 
 export type Airport = {
@@ -46,29 +44,6 @@ export function setKnownAirports(list: string[]): void {
 export function isAirportKnown(iata: string): boolean {
   return knownSet === null || knownSet.has(iata);
 }
-
-// Unmet demand, drawn like passengers waiting at a station (sim/unmetDemand.ts
-// has the definitions): a ring of small pips around each airport, hollow for
-// riders nobody is carrying yet and solid amber for riders being turned away
-// on a route you already fly. Solid pips fill the ring first. They skip the
-// stretch of the ring to the right of the dot, where the label sits. Drawn
-// only while the Demand layer is on.
-const PIP_RADIUS = 1.7;
-const PIP_ORBIT_OFFSET = 9;
-const PIP_FIRST_ANGLE_DEG = 40;
-const PIP_LAST_ANGLE_DEG = 320;
-const PIP_HOLLOW = '#9aa3b8';
-const PIP_SPILLED = '#ffb347';
-/**
- * The hunger ring (sim/serviceLevel.ts): a faint dashed ring outside the
- * pips round an airport starved or underserved for service, stronger the
- * hungrier it is. Teal, the colour nothing else on the map uses for
- * warnings, since it marks an opportunity rather than a problem.
- */
-const HUNGER_RING_RGB = '94, 214, 196';
-const HUNGER_RING_OFFSET = PIP_ORBIT_OFFSET + 5;
-/** Below this hunger an airport counts as well served and gets no ring. */
-const HUNGER_RING_MIN = 0.25;
 
 const MARKER_RADIUS = 3;
 // The load at which congestion delays start (sim/delays.ts), and so the
@@ -138,37 +113,6 @@ function presenceRadius(departures: number): number {
 }
 
 /**
- * The last unmetDemandByAirport() answer and what it was worked out from.
- * It walks every known airport pair, too much to repeat every frame.
- * Its inputs change only when a route or plane changes or a day ends.
- */
-let unmetCache: { state: SimState; inputs: string; byIata: Map<string, AirportUnmet> } | null = null;
-
-/**
- * The last hungerByAirport() answer. Hunger moves when seats move (a route,
- * a plane, a rival) or a day ends (demand grows), so this key is enough to
- * redraw it at least once a day without working it out every frame.
- */
-let hungerCache: { state: SimState; inputs: string; byIata: Map<string, number> } | null = null;
-
-function cachedHunger(state: SimState): Map<string, number> {
-  const rivalFlights = state.competitorRoutes.reduce((total, route) => total + route.dailyFrequency, 0);
-  const inputs = `${unmetDemandInputs(state)}|${state.competitorRoutes.length}|${rivalFlights}`;
-  if (hungerCache?.state !== state || hungerCache.inputs !== inputs) {
-    hungerCache = { state, inputs, byIata: hungerByAirport(state) };
-  }
-  return hungerCache.byIata;
-}
-
-function cachedUnmetDemand(state: SimState): Map<string, AirportUnmet> {
-  const inputs = unmetDemandInputs(state);
-  if (unmetCache?.state !== state || unmetCache.inputs !== inputs) {
-    unmetCache = { state, inputs, byIata: unmetDemandByAirport(state) };
-  }
-  return unmetCache.byIata;
-}
-
-/**
  * Draw a dot plus IATA code for every airport, sized and coloured by how
  * much of an airline you are there, with a capacity ring at every base
  * showing how full its pooled aircraft-day budget is.
@@ -177,7 +121,7 @@ function cachedUnmetDemand(state: SimState): Map<string, AirportUnmet> {
  * placeLabels() below for how close airports (YUL/YOW, YSJ/YFC) keep
  * their codes from printing on top of each other.
  */
-export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState, showUnmetDemand: boolean): void {
+export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState): void {
   ctx.font = LABEL_FONT;
   ctx.textBaseline = 'middle';
   const pendingLabels: PendingLabel[] = [];
@@ -191,12 +135,6 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState, sho
   const worstShareByIata = worstPoolShareByBase(state);
   // With a menu button hovered: where each ring would land if it were
   // pressed, drawn as a dashed arc just outside the real one.
-  // Only with the Demand layer on: always drawn, the pips cluttered every
-  // airport all the time with something the player mostly isn't asking about.
-  const unmetByIata = showUnmetDemand ? cachedUnmetDemand(state) : new Map<string, never>();
-  // How starved each airport is for service, shown with the same layer:
-  // most of the map starts starved, so always on it would be noise.
-  const hungerByIata = showUnmetDemand ? cachedHunger(state) : new Map<string, number>();
   const previewEffects = getMapPreview()?.effects ?? [];
   const previewShareByIata = previewEffects.length > 0 ? worstPoolShareByBase(state, previewEffects) : null;
   // Planes and crews on their way, and planes going back (sim/fleetTiming.ts).
@@ -268,39 +206,6 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState, sho
         ctx.stroke();
         ctx.restore();
       }
-    }
-
-    const unmet = unmetByIata.get(airport.iata);
-    if (unmet) {
-      const total = pipCount(unmet.latent);
-      const solid = Math.min(total, pipCount(unmet.spilled));
-      const orbit = radius + PIP_ORBIT_OFFSET;
-      for (let i = 0; i < total; i++) {
-        const t = total === 1 ? 0.5 : i / (total - 1);
-        const angle = ((PIP_FIRST_ANGLE_DEG + t * (PIP_LAST_ANGLE_DEG - PIP_FIRST_ANGLE_DEG)) * Math.PI) / 180;
-        ctx.beginPath();
-        ctx.arc(x + Math.cos(angle) * orbit, y + Math.sin(angle) * orbit, PIP_RADIUS, 0, 2 * Math.PI);
-        if (i < solid) {
-          ctx.fillStyle = PIP_SPILLED;
-          ctx.fill();
-        } else {
-          ctx.strokeStyle = PIP_HOLLOW;
-          ctx.lineWidth = 1;
-          ctx.stroke();
-        }
-      }
-    }
-
-    const hunger = hungerByIata.get(airport.iata) ?? 0;
-    if (hunger >= HUNGER_RING_MIN) {
-      ctx.save();
-      ctx.setLineDash([2, 3]);
-      ctx.beginPath();
-      ctx.arc(x, y, radius + HUNGER_RING_OFFSET, 0, 2 * Math.PI);
-      ctx.strokeStyle = `rgba(${HUNGER_RING_RGB}, ${0.15 + 0.45 * hunger})`;
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      ctx.restore();
     }
 
     ctx.beginPath();

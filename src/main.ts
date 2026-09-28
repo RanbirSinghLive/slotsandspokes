@@ -263,7 +263,12 @@ function render(nowMs: number = performance.now()): void {
   // by estimated demand) so your own network — either plain gray or, if
   // the Competition overlay is also on, three-way colored — always draws
   // on top of it, not the other way around.
-  if (demandOverlayOn) drawDemandLayer(ctx, state);
+  if (demandOverlayOn) {
+    // Lines for one airport's markets: the one under the pointer, else the selected one.
+    const hovered = hoverPoint && !isRouteBuilderActive() && !isMapMenuOpen() ? nearestAirportCandidate(hoverPoint.x, hoverPoint.y) : null;
+    const selected = getSelection();
+    drawDemandLayer(ctx, state, hovered?.airport.iata ?? (selected.kind === 'airport' ? selected.iata : null));
+  }
 
   // Mapmode, Competition and the plain grey network are three ways to draw
   // the same route lines, never combined — each already draws every route,
@@ -312,8 +317,7 @@ function render(nowMs: number = performance.now()): void {
   }
 
   drawAircraft(ctx, state, latestFractionalMinute, hoveredFlight?.legId ?? selectedFlight?.legId ?? null);
-  // The unmet-demand pips around airports belong to the Demand layer.
-  drawAirports(ctx, state, demandOverlayOn);
+  drawAirports(ctx, state);
   // The airport the side panel is showing, on top of its dot.
   if (selection.kind === 'airport') drawSelectedAirport(ctx, selection.iata);
   if (mapHover?.kind === 'airport') drawSelectedAirport(ctx, mapHover.iata);
@@ -605,8 +609,9 @@ function updateLensLegend(): void {
       swatch(MAP_MODE_COLORS.breakeven, `${Math.round(OTP_BASELINE * 100)}% baseline`) +
       swatch(MAP_MODE_COLORS.profit, '100%');
   } else if (lens === 'demand') {
-    lensLegendTitle.textContent = 'Demand · faint arc potential, solid arc today';
-    lensLegendScale.innerHTML = '';
+    lensLegendTitle.textContent = 'People waiting to fly · hover an airport for its biggest markets';
+    lensLegendScale.innerHTML =
+      swatch('rgba(94, 214, 196, 0.6)', 'underserved') + swatch('rgba(154, 163, 184, 0.5)', 'well served') + swatch('#ffb347', 'you turn away');
   } else if (lens === 'rivals') {
     lensLegendTitle.textContent = 'Rival networks · pick one to narrow';
     lensLegendScale.innerHTML = '';

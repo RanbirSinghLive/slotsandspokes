@@ -2,128 +2,128 @@ import { geoPath } from 'd3-geo';
 import type { LineString } from 'geojson';
 import { projection } from './projection';
 import { airports, isAirportKnown } from './airports';
-import { potentialDailyDemand } from '../sim/demand';
-import { actualDailyDemand, currentPotentialDemand } from '../sim/marketDemand';
+import { currentPotentialDemand } from '../sim/marketDemand';
+import { airportDemandSize, sizeRank } from '../sim/marketSize';
+import { marketKey } from '../sim/schedule';
+import { hungerByAirport } from '../sim/serviceLevel';
 import type { SimState } from '../sim/state';
+import { unmetDemandByAirport, unmetDemandInputs, type AirportUnmet } from '../sim/unmetDemand';
 
-const DEMAND_STROKE = '#4a90d9';
-const SERVED_HIGHLIGHT = '#ffd166';
-const MIN_ARC_WIDTH = 0.75;
-const MAX_ARC_WIDTH = 6;
-const MIN_ARC_ALPHA = 0.25;
-const MAX_ARC_ALPHA = 0.9;
+/**
+ * The Demand lens: where to fly next, readable at a glance.
+ *
+ * - **A circle per airport**, sized by how many people want to fly from
+ *   there and aren't on your planes (sim/unmetDemand.ts's latent demand),
+ *   in the same five steps the panel names in words (Tiny to Huge,
+ *   sim/marketSize.ts), so the map and the airport view agree.
+ * - **Its colour is the opportunity**: teal where the airport is
+ *   underserved by every airline (sim/serviceLevel.ts), brighter when
+ *   starved, since new routes there build their market fastest; grey
+ *   where it's already well served.
+ * - **An amber rim** where you're turning passengers away today: a route
+ *   of yours there needs more seats.
+ * - **Lines only on request**: hovering (or selecting) an airport draws
+ *   its biggest markets from there, teal where nobody of yours flies yet,
+ *   amber where you do, thicker the bigger. Every pair at once was
+ *   thousands of lines and told nothing.
+ *
+ * Drawn under the routes and the airport dots, so they sit on top of it.
+ */
 
-// Potential is drawn as a wide, faint arc and actual demand as a solid
-// one on top of it, so the gap between them *is* the headroom: a fat
-// ghost with a thin bright core is a big market nobody has built yet, and
-// the two converging means a market near maturity. Demand grows
-// (sim/marketDemand.ts), and this gap is what the map can teach that a
-// table wouldn't.
-const POTENTIAL_ALPHA = 0.22;
-
-function pairKey(a: string, b: string): string {
-  return [a, b].sort().join('-');
-}
-
-// Every distinct pair among the map's airports. Only the pair list is
-// static: the demand figures move day to day, so drawDemandLayer() reads
-// them per frame.
-const pairs: { origin: string; dest: string }[] = [];
-for (let i = 0; i < airports.length; i++) {
-  for (let j = i + 1; j < airports.length; j++) {
-    pairs.push({ origin: airports[i].iata, dest: airports[j].iata });
-  }
-}
-
-// The busiest pair's *potential*, which is static — so the arc scale
-// stays fixed as markets grow into it. Scaling to the current busiest
-// actual instead would rescale the whole map every day and make growth
-// impossible to see, since every arc would grow together.
-const maxPotential = Math.max(...pairs.map((p) => potentialDailyDemand(p.origin, p.dest)));
+/** A circle's radius for each size, Tiny to Huge. */
+const SIZE_RADIUS_PX = [3, 5, 8, 12, 16];
+const TEAL = '94, 214, 196';
+const GREY = '154, 163, 184';
+const SPILL_RIM = '#ffb347';
+/** Below this hunger an airport counts as well served: grey, not teal. */
+const HUNGER_MIN = 0.25;
+/** How many of the focused airport's markets get a line. */
+const FOCUS_MARKETS = 6;
+const FOCUS_MIN_WIDTH = 1;
+const FOCUS_MAX_WIDTH = 6;
+const FOCUS_OPEN = '#5ed6c4';
+const FOCUS_FLOWN = '#ffd166';
 
 const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]));
 
 /**
- * Which pairs currently have at least one scheduled leg, in either
- * direction — the same bidirectional definition render/routes.ts uses for
- * the route network, so "served" here means the same thing it does there.
- * Computed fresh from `state.schedule` on every call, so the halo moves
- * as soon as a route is added or removed.
+ * The last unmetDemandByAirport() and hungerByAirport() answers and what
+ * they were worked out from. Both walk every known airport pair, too much
+ * to repeat every frame; their inputs change only when a route, a plane
+ * or a rival changes, or a day ends.
  */
-function servedPairsFrom(state: SimState): Set<string> {
-  const served = new Set<string>();
-  for (const leg of state.schedule) {
-    served.add(pairKey(leg.origin, leg.dest));
+let cache: { state: SimState; inputs: string; unmet: Map<string, AirportUnmet>; hunger: Map<string, number> } | null = null;
+
+function cached(state: SimState): { unmet: Map<string, AirportUnmet>; hunger: Map<string, number> } {
+  const rivalFlights = state.competitorRoutes.reduce((total, route) => total + route.dailyFrequency, 0);
+  const inputs = `${unmetDemandInputs(state)}|${state.competitorRoutes.length}|${rivalFlights}`;
+  if (cache?.state !== state || cache.inputs !== inputs) {
+    cache = { state, inputs, unmet: unmetDemandByAirport(state), hunger: hungerByAirport(state) };
   }
-  return served;
+  return cache;
 }
 
-/**
- * The Demand overlay, a toggle layered on the base map (see main.ts's
- * render()): every city pair drawn as a geodesic arc, width and opacity scaled
- * to that pair's estimated daily demand (sim/demand.ts) — the busiest
- * markets stand out as the thickest, brightest lines. A pair that already
- * has scheduled service (same "served" definition render/routes.ts uses)
- * gets an amber halo behind its arc, so it's visible at a glance which
- * big markets are already flown and which are still white space.
- *
- * Doesn't draw airports: the base layer draws them once, and drawing
- * them here too would double every dot.
- */
-export function drawDemandLayer(ctx: CanvasRenderingContext2D, state: SimState): void {
+/** `focus` is the airport whose markets get lines: the hovered one, else the selected one, else none. */
+export function drawDemandLayer(ctx: CanvasRenderingContext2D, state: SimState, focus: string | null): void {
+  const { unmet, hunger } = cached(state);
+  if (focus) drawFocusMarkets(ctx, state, focus);
+
+  for (const airport of airports) {
+    if (!isAirportKnown(airport.iata)) continue;
+    const waiting = unmet.get(airport.iata);
+    if (!waiting || waiting.latent < 1) continue;
+    const point = projection([airport.lon, airport.lat]);
+    if (!point) continue;
+    const radius = SIZE_RADIUS_PX[sizeRank(airportDemandSize(waiting.latent))];
+    const hungry = hunger.get(airport.iata) ?? 0;
+    const rgb = hungry >= HUNGER_MIN ? TEAL : GREY;
+    const alpha = hungry >= HUNGER_MIN ? 0.18 + 0.3 * hungry : 0.14;
+
+    ctx.beginPath();
+    ctx.arc(point[0], point[1], radius, 0, 2 * Math.PI);
+    ctx.fillStyle = `rgba(${rgb}, ${alpha})`;
+    ctx.fill();
+    ctx.strokeStyle = `rgba(${rgb}, ${Math.min(0.8, alpha + 0.25)})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    if (waiting.spilled >= 1) {
+      ctx.beginPath();
+      ctx.arc(point[0], point[1], radius + 2, 0, 2 * Math.PI);
+      ctx.strokeStyle = SPILL_RIM;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+}
+
+/** The focused airport's biggest markets as arcs, to known airports only. */
+function drawFocusMarkets(ctx: CanvasRenderingContext2D, state: SimState, focus: string): void {
+  const from = airportsByIata.get(focus);
+  if (!from || !isAirportKnown(focus)) return;
+  const flown = new Set(state.schedule.map((leg) => marketKey(leg.origin, leg.dest)));
+  const markets = airports
+    .filter((other) => other.iata !== focus && isAirportKnown(other.iata))
+    .map((other) => ({ other, potential: currentPotentialDemand(state, focus, other.iata) }))
+    .filter((market) => market.potential > 0)
+    .sort((x, y) => y.potential - x.potential)
+    .slice(0, FOCUS_MARKETS);
+  const biggest = markets[0]?.potential ?? 1;
   const path = geoPath(projection, ctx);
-  const servedPairs = servedPairsFrom(state);
-
-  for (const { origin, dest } of pairs) {
-    if (!isAirportKnown(origin) || !isAirportKnown(dest)) continue;
-    const originAirport = airportsByIata.get(origin);
-    const destAirport = airportsByIata.get(dest);
-    if (!originAirport || !destAirport) continue;
-
-    const potential = currentPotentialDemand(state, origin, dest);
-    const actual = actualDailyDemand(state, origin, dest);
-
-    // Both widths share the same scale (the busiest pair's potential), so
-    // the two arcs on one market are directly comparable by eye.
-    const potentialT = potential / maxPotential;
-    const actualT = actual / maxPotential;
-    const potentialWidth = MIN_ARC_WIDTH + potentialT * (MAX_ARC_WIDTH - MIN_ARC_WIDTH);
-    const actualWidth = MIN_ARC_WIDTH + actualT * (MAX_ARC_WIDTH - MIN_ARC_WIDTH);
-    const actualAlpha = MIN_ARC_ALPHA + actualT * (MAX_ARC_ALPHA - MIN_ARC_ALPHA);
-
+  for (const { other, potential } of markets) {
     const line: LineString = {
       type: 'LineString',
       coordinates: [
-        [originAirport.lon, originAirport.lat],
-        [destAirport.lon, destAirport.lat],
+        [from.lon, from.lat],
+        [other.lon, other.lat],
       ],
     };
-
-    if (servedPairs.has(pairKey(origin, dest))) {
-      ctx.beginPath();
-      path(line);
-      ctx.strokeStyle = SERVED_HIGHLIGHT;
-      ctx.globalAlpha = 0.35;
-      ctx.lineWidth = potentialWidth + 3;
-      ctx.stroke();
-    }
-
-    // Potential first, underneath — the "how big could this get" ghost.
     ctx.beginPath();
     path(line);
-    ctx.strokeStyle = DEMAND_STROKE;
-    ctx.globalAlpha = POTENTIAL_ALPHA;
-    ctx.lineWidth = potentialWidth;
-    ctx.stroke();
-
-    // Actual on top — what really flies today.
-    ctx.beginPath();
-    path(line);
-    ctx.strokeStyle = DEMAND_STROKE;
-    ctx.globalAlpha = actualAlpha;
-    ctx.lineWidth = actualWidth;
+    ctx.strokeStyle = flown.has(marketKey(focus, other.iata)) ? FOCUS_FLOWN : FOCUS_OPEN;
+    ctx.globalAlpha = 0.75;
+    ctx.lineWidth = FOCUS_MIN_WIDTH + (potential / biggest) * (FOCUS_MAX_WIDTH - FOCUS_MIN_WIDTH);
     ctx.stroke();
   }
-
   ctx.globalAlpha = 1;
 }

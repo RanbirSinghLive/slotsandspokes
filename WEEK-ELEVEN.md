@@ -310,6 +310,13 @@ in one `#now-corner` column), since stretching to the map's width it ran
 into the lens; on a map under 880px the lens moves to the bottom left.
 Enter confirms a route as the ring's ✓ does.
 
+- **The Demand lens made usable** (asked for after): every city pair's
+  arc, the pips and the hunger rings together looked busy and answered
+  nothing. Now one circle per airport, sized Tiny to Huge by the people
+  waiting, teal where underserved and grey where well served, an amber
+  rim where you turn passengers away; lines only for the hovered or
+  selected airport's six biggest markets. **Done.**
+
 ---
 
 ## Carried forward

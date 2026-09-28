@@ -10,7 +10,7 @@ import { linkToMap } from '../mapLink';
 /**
  * The inspector's list of airports (ui/inspector/inspector.ts): every
  * airport you can see, as a table you can sort, each row opening that
- * airport's view. What the map shows spread out (dot size, glow, pips),
+ * airport's view. What the map shows spread out (dot size, glow, the Demand lens),
  * lined up so you can compare: where you're strongest, which fields are
  * filling up, what slots cost, where passengers are waiting.
  */
