@@ -2725,3 +2725,40 @@ button.inspector-crumb:hover {
     transform: translate(-50%, 0) rotate(-6deg) scale(1);
   }
 }
+
+/* The ops board in the HUD (ui/opsBoard.ts): today's operation in one
+   line, a row of its own under the clock and speed controls. */
+#ops-board {
+  order: 10;
+  flex-basis: 100%;
+  display: flex;
+  gap: 12px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  color: #cdd3e0;
+}
+
+.ops-item {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+button.ops-item {
+  cursor: pointer;
+}
+
+button.ops-item:hover {
+  text-decoration: underline;
+}
+
+.ops-item.is-warn {
+  color: #ff8080;
+}
+
+.ops-code {
+  color: #6b7694;
+}

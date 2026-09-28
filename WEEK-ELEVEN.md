@@ -133,6 +133,12 @@ form is only used where its tooltip is one hover away.
    average so a wobble doesn't read as a spike.
 10. **An ops board strip** under the clock: flown / to go / late /
     cancelled today, the late count a link to the worst route.
+    **Done:** `ui/opsBoard.ts`: DEP · AIR · TO GO · LATE · CNX, LATE
+    opening the route with the most late landings today, CNX the
+    On-time tab.
+
+**Thread 1 status: all ten items done.** Headless output byte-identical
+throughout (UI and copy only).
 
 ---
 

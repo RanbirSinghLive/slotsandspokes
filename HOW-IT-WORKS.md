@@ -1088,6 +1088,15 @@ its first call only records where the airline stands, so loading a save
 stamps nothing. The Goals view shows the current tier's milestones as
 badges, each with a bar filling toward it or stamped with the day it was met.
 
+## The ops board (`src/ui/opsBoard.ts`)
+
+A line under the clock reads today's operation the way an operations
+centre does: DEP (flown and landed), AIR (in the air), TO GO (still to
+depart), LATE (landed past the on-time grace) and CNX (cancelled).
+LATE opens the route with the most late landings today; CNX opens the
+On-time tab's causes. Counted from `todayLegResults`, `activeFlights`
+and `cancelledToday`, so it resets at the home midnight.
+
 ## Panel (`src/ui/panels.ts`)
 
 A real HTML sidebar, 420px wide (canvas width = `window.innerWidth - 420`,
