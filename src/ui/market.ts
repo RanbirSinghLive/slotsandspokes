@@ -3,6 +3,7 @@ import { airlineCalled, classOpen, tierThatOpens } from '../sim/ladder';
 import { daysUntilNextListing, listingsOf } from '../sim/market';
 import type { SimState } from '../sim/state';
 import { info } from './inspector/dom';
+import { planeIconElement } from './planeIcons';
 
 /**
  * The fleet market's readouts (sim/market.ts), apart from the lease
@@ -33,35 +34,46 @@ function renderStrip(state: SimState): void {
   const rows = AIRCRAFT_CLASSES.map((cls) => {
     const listings = listingsOf(state, cls.code);
     const next = daysUntilNextListing(state, cls.code);
-    const when = `${next}d`;
     const opener = tierThatOpens(cls.code);
     // A locked class is just locked: its listings are for rivals until the ladder opens it.
     const locked = !classOpen(state, cls.code);
-    const status = locked
-      ? 'Locked'
-      : listings.length === 0
-        ? `none · next ${when}`
-        : `${listings.length} · ${listings.map((l) => l.ageYears).join(', ')} yrs · next ${when}`;
-    const why = locked ? `Opens as ${opener ? airlineCalled(opener) : 'a bigger airline'}. See Goals.` : null;
-    return { name: cls.name, status, why, empty: locked || listings.length === 0 };
+    return {
+      code: cls.code,
+      name: cls.name,
+      listed: String(listings.length),
+      ages: listings.length > 0 ? listings.map((l) => l.ageYears).join(' ') : '—',
+      next: `${next}d`,
+      why: locked ? `Opens as ${opener ? airlineCalled(opener) : 'a bigger airline'}. See Goals.` : null,
+      empty: locked || listings.length === 0,
+    };
   });
-  const signature = rows.map((row) => `${row.name}:${row.status}:${row.why}`).join('|');
+  const signature = rows.map((row) => `${row.name}:${row.listed}:${row.ages}:${row.next}:${row.why}`).join('|');
   if (signature === stripSignature) return;
   stripSignature = signature;
-  stripEl.replaceChildren(
-    ...rows.map((row) => {
-      const div = document.createElement('div');
-      div.className = 'market-row';
-      div.classList.toggle('is-empty', row.empty);
-      const name = document.createElement('span');
-      name.textContent = row.name;
-      const status = document.createElement('span');
-      status.textContent = row.status;
-      if (row.why) status.append(' ', info(row.why));
-      div.append(name, status);
-      return div;
-    }),
-  );
+
+  // A grid: class, how many listed, their ages in years, days to the next arrival.
+  const cell = (text: string, className = '') => {
+    const span = document.createElement('span');
+    span.className = className;
+    span.textContent = text;
+    return span;
+  };
+  const header = [cell('Class'), cell('Listed', 'market-num'), cell('Ages (yrs)', 'market-num'), cell('Next', 'market-num')];
+  header.forEach((span) => span.classList.add('market-head'));
+  const cells: HTMLElement[] = [...header];
+  for (const row of rows) {
+    const name = cell('', row.empty ? 'is-empty' : '');
+    name.append(planeIconElement(row.code), ` ${row.name}`);
+    cells.push(name);
+    if (row.why) {
+      const locked = cell('🔒 Locked ', 'market-locked is-empty');
+      locked.append(info(row.why));
+      cells.push(locked);
+    } else {
+      cells.push(cell(row.listed, `market-num${row.empty ? ' is-empty' : ''}`), cell(row.ages, 'market-num is-empty'), cell(row.next, 'market-num'));
+    }
+  }
+  stripEl.replaceChildren(...cells);
 }
 
 // Classes already open when this page loaded aren't announced, only one

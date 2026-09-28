@@ -1784,22 +1784,37 @@ body {
   margin-bottom: 16px;
 }
 
-.market-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 2px 0;
+#market-strip {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  column-gap: 14px;
+  row-gap: 3px;
+  /* Clear of the sidebar's overlay scrollbar. */
+  padding-right: 10px;
   font-size: 12px;
   color: #cdd3e0;
 }
 
-.market-row span:last-child {
-  color: #9aa3b8;
-  text-align: right;
+#market-strip .market-head {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6b7694;
 }
 
-.market-row.is-empty span:last-child {
+#market-strip .market-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#market-strip .is-empty {
   color: #6b7694;
+}
+
+/* A locked class spans the three number columns. */
+#market-strip .market-locked {
+  grid-column: span 3;
+  text-align: right;
 }
 
 #market-debut-close {

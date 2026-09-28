@@ -107,6 +107,8 @@ form is only used where its tooltip is one hover away.
 5. **The Lessor as a grid**: one row per class with a count, the
    next arrival ("2d"), and a lock icon for a locked class, its unlock
    condition in the tooltip.
+   **Done:** a CSS grid (class with its icon, listed, ages, next), a
+   locked class a lock and its (i) across the number columns.
 4. **Rotations as a timeline**: one row per plane, its day drawn as
    bars across 06:00–22:00, replacing the Window and Uses columns.
 8. **Clickable ticker lines**: each tag coloured, and clicking a line
