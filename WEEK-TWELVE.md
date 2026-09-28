@@ -49,6 +49,20 @@ comes by a link and a save file.
 
 ---
 
+## Status
+
+- **Hosted:** GitHub remote `RanbirSinghLive/slotsandspokes`, deploying
+  on Cloudflare Pages on push; Node pinned to 22 (`.nvmrc`).
+- **Done:** version 0.1.0 (shown in the Game screen, stamped in saves);
+  save formats and migrations under one fixed key, the old save carried
+  over; export and import as a file; an unreadable save kept and
+  offered for download; the crash catcher; Credits (with GeoNames' CC BY
+  attribution); the desktop-only notice; an Alpha badge on the rail;
+  the page titled Slots & Spokes.
+- **Still to do from threads 1–5:** the browser pass, rival codes that
+  are real airlines', the first-run guide, feedback and the year one
+  report.
+
 ## Thread 1: reachable (must)
 
 - A git remote and a static deploy on push; the domain pointed at it.

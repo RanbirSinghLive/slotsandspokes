@@ -3102,3 +3102,67 @@ button.ops-item:hover {
 .crew-action {
   font-size: 11px;
 }
+
+/* The rail's Alpha badge (main.ts): opens the Game screen. */
+.rail-badge {
+  margin: 0 4px 6px;
+  padding: 3px 0;
+  font: inherit;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #0a0c12;
+  background: #e8c170;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.rail-badge:hover {
+  background: #ffd98a;
+}
+
+#desktop-notice[hidden] {
+  display: none;
+}
+
+/* The problem card (ui/problemCard.ts): above everything, the game paused under it. */
+.problem-overlay {
+  z-index: 50;
+}
+
+.problem-card {
+  max-width: 480px;
+  border-color: #ff8080;
+}
+
+.problem-detail {
+  max-height: 140px;
+  overflow: auto;
+  padding: 8px;
+  font-size: 11px;
+  white-space: pre-wrap;
+  color: #9aa3b8;
+  background: #05070c;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  user-select: text;
+}
+
+/* The Game screen's credits. */
+.credits {
+  margin: 4px 0 0;
+  padding-left: 16px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #9aa3b8;
+}
+
+.credits a,
+#about-section a {
+  color: #5ed6c8;
+}
+
+#save-file-section button {
+  margin-right: 6px;
+}

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>airgame</title>
+    <title>Slots & Spokes</title>
   </head>
   <body>
     <canvas id="map"></canvas>
@@ -120,6 +120,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="1"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01"/></svg><span class="rail-label">Office</span><span class="rail-dot" hidden></span>
       </button>
       <div class="rail-spacer"></div>
+      <button type="button" class="rail-badge" id="rail-alpha" title="An early alpha build: things will change and break. The Game screen has the version, your save as a file, and the credits." aria-label="Alpha build: open Game">ALPHA</button>
       <button type="button" class="rail-item" data-go="game" title="Save, load and new game" aria-label="Game">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg><span class="rail-label">Game</span><span class="rail-dot" hidden></span>
       </button>
@@ -206,6 +207,13 @@
               <button type="button" id="load-game-confirm-cancel">Cancel</button>
             </div>
           </section>
+          <section id="save-file-section">
+            <h2>Save file <button type="button" class="info-mark" aria-label="What this means" data-info="Your game lives in this browser. Export it to keep a copy, move it to another browser or computer, or attach it to a bug report; import one to play it here. Importing replaces the game in this browser.">i</button></h2>
+            <button type="button" id="export-save-button">Export save</button>
+            <button type="button" id="import-save-button">Import save</button>
+            <input type="file" id="import-save-input" accept="application/json,.json" hidden />
+            <div id="save-file-status"></div>
+          </section>
           <section id="new-game-section">
                     <h2>New Game <button type="button" class="info-mark" aria-label="What this means" data-info="Erase this save entirely and start a brand-new airline.">i</button></h2>
             <button type="button" id="new-game-button">New Game</button>
@@ -215,10 +223,32 @@
               <button type="button" id="new-game-confirm-cancel">Cancel</button>
             </div>
           </section>
+          <section id="about-section">
+            <h2>About</h2>
+            <div id="about-version"></div>
+            <h2>Credits</h2>
+            <ul class="credits">
+              <li>Airports: <a href="https://ourairports.com/data/" target="_blank" rel="noopener">OurAirports</a> (public domain)</li>
+              <li>Map: <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a> (public domain)</li>
+              <li>Populations: <a href="https://www.geonames.org/" target="_blank" rel="noopener">GeoNames</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>; checked against Statistics Canada census metropolitan areas (<a href="https://open.canada.ca/en/open-government-licence-canada" target="_blank" rel="noopener">Open Government Licence – Canada</a>)</li>
+              <li>Code: <a href="https://d3js.org/" target="_blank" rel="noopener">d3-geo</a> and <a href="https://github.com/topojson/topojson-client" target="_blank" rel="noopener">topojson-client</a> (ISC licence)</li>
+              <li>Airlines, rivals and every number in the game are made up: no real airline's data is used.</li>
+            </ul>
+          </section>
         </div>
       </div>
     </aside>
     <div id="milestone-stamp" hidden></div>
+    <!-- Shown on load on a narrow screen (main.ts): the game needs a desktop's room. -->
+    <div id="desktop-notice" class="modal-overlay" hidden>
+      <div class="modal-box">
+        <h2>Best on a desktop</h2>
+        <p>Slots &amp; Spokes is an alpha built for a desktop or laptop browser, at least 900 pixels wide: the map and the panel need the room. On a phone or a small window, parts of it won't fit.</p>
+        <div class="modal-actions">
+          <button type="button" id="desktop-notice-continue">Continue anyway</button>
+        </div>
+      </div>
+    </div>
     <!-- The jump box (ui/jumpBox.ts): / or ⌘K. -->
     <div id="jump-box" hidden>
       <input id="jump-input" type="text" autocomplete="off" spellcheck="false" placeholder="Jump to an airport, plane, rival, route or screen" aria-label="Jump to" />

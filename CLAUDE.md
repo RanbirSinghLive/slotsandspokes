@@ -66,8 +66,10 @@ economy gets tuned.
 3. `state` survives `JSON.parse(JSON.stringify(state))` unchanged: no class
    instances, `Map`, `Set`, functions or cycles *in state*. (A `Map` as a
    local variable or a module-level lookup over `data/` is fine.) This is
-   what saves are. When `SimState`'s shape changes incompatibly, bump
-   `SAVE_KEY` in `ui/save.ts`.
+   what saves are. A new field is optional (`?`, read with `??`) so old
+   saves load as they are; a change old saves can't load bumps
+   `SAVE_FORMAT` in `ui/save.ts` and adds a migration there. Never
+   orphan players' saves by changing the key.
 4. **Game rules live in `src/sim/`, even when only the UI calls them.** If
    code decides whether something is *allowed* or *what it costs*, it belongs
    in the sim, and the UI calls it and then refreshes the page. Example:

@@ -1500,16 +1500,34 @@ mattering next to everything else `step()` already does every minute.
 
 ## Persistence (`src/ui/save.ts`)
 
-A save is `JSON.stringify(state)` in `localStorage` under `SAVE_KEY`
-(`airgame-save-v44` at the time of writing). The key is bumped by hand
-whenever `SimState`'s shape changes incompatibly, so an old save is
-simply never found again rather than crashing on a missing field — not a
-migration system. This works only because `SimState` survives the JSON
-round trip unchanged (CLAUDE.md).
+A save is `JSON.stringify(state)` in `localStorage` under one fixed key,
+`slotsandspokes-save`, wrapped with its **format** (`SAVE_FORMAT`), the
+game version that wrote it and when. Players' games must survive an
+update, so the key never changes:
+
+- A new `SimState` field is optional (`?`, read with `??`): old saves
+  just lack it.
+- A change old saves can't load bumps `SAVE_FORMAT` and adds a
+  migration, `MIGRATIONS[n]` turning a format n − 1 state into format n;
+  loading runs every step after the save's own format, then the
+  always-safe fixes (`ensureCrewBases()`).
+- A save this build can't read (from a newer build, damaged, or a
+  migration that throws) is **left in place**: saving is held, and a
+  card says why and offers it as a download before a new game replaces it.
+- Saves from before this scheme, under `airgame-save-v46`, are read as
+  format 1 and moved to the new key on the next save.
+
+The Game screen **exports** the save as a file (named for the home and
+the day) and **imports** one, which goes through the same upgrade and
+reloads. It also shows the version and format, and the credits.
+
+**The crash catcher** (`ui/problemCard.ts`): an uncaught error or
+rejected promise pauses the game and shows a card with the error, the
+version, a download of the save as it stands, and Reload.
 
 `main.ts` saves once per simulated day crossed and loads once at
-startup, falling back to a new game (and the home picker) if nothing
-parses. Every `localStorage` call swallows its errors: a missed save is
+startup, falling back to a new game (and the home picker) when there's
+no save. Every `localStorage` call swallows its errors: a missed save is
 an inconvenience, not a crash. Saves stay small — about 60 KB after
 three simulated years — because every history array is capped.
 

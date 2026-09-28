@@ -54,14 +54,27 @@ import { setupGameControls } from './ui/gameControls';
 import { setupRail, updateRail } from './ui/rail';
 import { closeJumpBox, isJumpBoxOpen, openJumpBox, setupJumpBox } from './ui/jumpBox';
 import { clearMapHover, getMapHover, setupMapLinks } from './ui/mapLink';
-import { loadSavedState, saveState } from './ui/save';
+import { holdSaving, loadSavedState, saveFileText, saveState, storedSaveText } from './ui/save';
+import { setupCrashCatcher, showProblemCard } from './ui/problemCard';
 
 // Resume a saved game if one exists. A fresh game starts from
 // createNewGameState(), seeded from Date.now() so every new playthrough
 // gets its own weather and delay history. (The headless runner starts
 // the same way but with a fixed seed — see src/headless/newGame.ts.)
-const savedState = loadSavedState();
+const loaded = loadSavedState();
+const savedState = loaded.kind === 'loaded' ? loaded.state : null;
 const state: SimState = savedState ?? createNewGameState();
+// A save this build can't read is kept, not overwritten: saving waits
+// until the player has seen why, and can download it first.
+if (loaded.kind === 'unreadable') {
+  holdSaving(true);
+  showProblemCard({
+    title: 'Your save can\'t be loaded',
+    message: `${loaded.reason} It's still stored. Download it to keep it; starting a new game will replace it.`,
+    saveText: storedSaveText,
+    actions: [{ label: 'Start a new game', run: () => holdSaving(false) }],
+  });
+}
 // A game with no save to resume starts by choosing a home city (see the
 // picker at the bottom of this file). Until then it is paused.
 let choosingHome = savedState === null;
@@ -423,6 +436,18 @@ function setPanelHidden(hidden: boolean): void {
 }
 setupRail({ isHidden: () => panelHidden, setHidden: setPanelHidden });
 setupJumpBox(state);
+// The rail's Alpha badge opens the Game screen: the version, the save as a file, the credits.
+document.querySelector('#rail-alpha')!.addEventListener('click', () => {
+  if (panelHidden) setPanelHidden(false);
+  select({ kind: 'game' });
+});
+// A narrow screen gets told once that the game wants a desktop's room.
+const DESKTOP_MIN_WIDTH_PX = 900;
+const desktopNotice = document.querySelector<HTMLElement>('#desktop-notice')!;
+if (window.innerWidth < DESKTOP_MIN_WIDTH_PX) desktopNotice.hidden = false;
+document.querySelector('#desktop-notice-continue')!.addEventListener('click', () => {
+  desktopNotice.hidden = true;
+});
 setupMapLinks(() => render());
 document.querySelector('#rail-jump')!.addEventListener('click', () => openJumpBox(state));
 
@@ -518,6 +543,17 @@ function tick(nowMs: number): void {
 }
 
 requestAnimationFrame(tick);
+
+// Anything uncaught pauses the game and says so, with the save to keep
+// (ui/problemCard.ts). The frame loop stops at an error in it, so the
+// card's way on is a reload from the last save.
+setupCrashCatcher(
+  () => {
+    speedMultiplier = 0;
+    speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === 0));
+  },
+  () => saveFileText(state),
+);
 
 // Remembers whatever speed was active before a pause, so unpausing (either
 // the Pause button or the spacebar, below) resumes at that speed instead of

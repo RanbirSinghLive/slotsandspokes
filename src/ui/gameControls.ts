@@ -1,11 +1,20 @@
-import { saveState, clearSavedState, hasSavedState } from './save';
+import { saveState, clearSavedState, hasSavedState, downloadText, importSaveText, saveFileText, SAVE_FORMAT } from './save';
+import { dayIndex } from '../sim/clock';
 import type { SimState } from '../sim/state';
+import { GAME_VERSION } from './version';
 
 /**
- * The Game tab: New Game, Save, and Load. Saving also happens
+ * The Game screen: Save, Load, the save as a file (export and import),
+ * New Game, and About (the build and the credits). Saving also happens
  * automatically once per simulated day (ui/save.ts); these let the player
- * force one, or step back to the last one.
+ * force one, step back to the last one, or move it between browsers.
  */
+
+const exportSaveButton = document.querySelector<HTMLButtonElement>('#export-save-button')!;
+const importSaveButton = document.querySelector<HTMLButtonElement>('#import-save-button')!;
+const importSaveInput = document.querySelector<HTMLInputElement>('#import-save-input')!;
+const saveFileStatus = document.querySelector<HTMLDivElement>('#save-file-status')!;
+const aboutVersion = document.querySelector<HTMLDivElement>('#about-version')!;
 
 const saveGameButton = document.querySelector<HTMLButtonElement>('#save-game-button')!;
 const saveGameStatus = document.querySelector<HTMLDivElement>('#save-game-status')!;
@@ -62,6 +71,28 @@ export function setupGameControls(state: SimState): void {
     loadGameConfirmEl.hidden = true;
     loadGameButton.hidden = false;
   });
+
+  // The save as a file: named for the home and the day, so a player with
+  // several can tell them apart.
+  exportSaveButton.addEventListener('click', () => {
+    downloadText(`slotsandspokes-${state.homeAirport}-day${dayIndex(state)}.json`, saveFileText(state));
+    saveFileStatus.textContent = 'Exported.';
+  });
+  importSaveButton.addEventListener('click', () => importSaveInput.click());
+  importSaveInput.addEventListener('change', async () => {
+    const file = importSaveInput.files?.[0];
+    importSaveInput.value = '';
+    if (!file) return;
+    const result = importSaveText(await file.text());
+    if (!result.ok) {
+      saveFileStatus.textContent = result.reason;
+      return;
+    }
+    // Like Load: the page reads the save afresh on load.
+    window.location.reload();
+  });
+
+  aboutVersion.textContent = `Slots & Spokes ${GAME_VERSION} · alpha · save format ${SAVE_FORMAT}`;
 
   newGameButton.addEventListener('click', () => {
     newGameButton.hidden = true;
