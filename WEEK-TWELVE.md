@@ -65,8 +65,13 @@ comes by a link and a save file.
   as a CSV that a daily scheduled scan reads, triages against the code
   and turns into suggested fixes for the owner to approve; the scan
   never changes code itself.
+- **The tutorial** (asked for by the owner in place of the desktop
+  pop-up): a first-visit welcome card (play or skip; the desktop note
+  folded into it on a narrow screen), then nine spotlight steps over the
+  real screen, two of them hands-on (choose a home, fly a first route).
+  Replayable from the Game screen.
 - **Still to do from threads 1–5:** the browser pass, rival codes that
-  are real airlines', the first-run guide and the year one report.
+  are real airlines', and the year one report.
 
 ## Thread 1: reachable (must)
 

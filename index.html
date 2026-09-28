@@ -229,6 +229,7 @@
           <section id="about-section">
             <h2>About</h2>
             <div id="about-version"></div>
+            <p class="about-feedback">New to it? <button type="button" id="about-tutorial-button">Play the tutorial</button></p>
             <p class="about-feedback">It's an alpha: what broke, confused or bored you is the most useful thing you can send. <button type="button" id="about-feedback-button">Send feedback</button></p>
             <h2>Credits</h2>
             <ul class="credits">
@@ -243,16 +244,6 @@
       </div>
     </aside>
     <div id="milestone-stamp" hidden></div>
-    <!-- Shown on load on a narrow screen (main.ts): the game needs a desktop's room. -->
-    <div id="desktop-notice" class="modal-overlay" hidden>
-      <div class="modal-box">
-        <h2>Best on a desktop</h2>
-        <p>Slots &amp; Spokes is an alpha built for a desktop or laptop browser, at least 900 pixels wide: the map and the panel need the room. On a phone or a small window, parts of it won't fit.</p>
-        <div class="modal-actions">
-          <button type="button" id="desktop-notice-continue">Continue anyway</button>
-        </div>
-      </div>
-    </div>
     <!-- The jump box (ui/jumpBox.ts): / or ⌘K. -->
     <div id="jump-box" hidden>
       <input id="jump-input" type="text" autocomplete="off" spellcheck="false" placeholder="Jump to an airport, plane, rival, route or screen" aria-label="Jump to" />

@@ -1498,6 +1498,24 @@ measurable change from the pre-weather baseline. At most 10 plain
 objects, a handful of comparisons once a day; nowhere close to
 mattering next to everything else `step()` already does every minute.
 
+## The tutorial (`src/ui/tutorial.ts`)
+
+A first visit opens a welcome card: play the tutorial or skip it (and,
+under 900px wide, a line that the game wants a desktop). The answer is
+remembered in `localStorage` (`slotsandspokes-tutorial`), so it asks once;
+the Game screen's "Play the tutorial" starts it again.
+
+Nine steps over the real screen, each a spotlight on its target (a gold
+frame, the rest dimmed by a huge shadow, clicks passing through) and a
+card beside it with Back, Next and Skip tutorial: pick a home (the home
+picker), your airline (the map), fly your first route, the clock, today's
+operation (ops board and P&L strip), the lenses, the rail, Goals, and a
+last word on edges fading and cash. The two hands-on steps, choosing a
+home and drawing a first route, move on by themselves once done (a
+"Skip this step" meanwhile), and are passed over when already done. The
+clock pauses for reading after the home is chosen, and runs at 1× again
+at the end.
+
 ## Persistence (`src/ui/save.ts`)
 
 A save is `JSON.stringify(state)` in `localStorage` under one fixed key,

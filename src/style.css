@@ -3122,9 +3122,6 @@ button.ops-item:hover {
   background: #ffd98a;
 }
 
-#desktop-notice[hidden] {
-  display: none;
-}
 
 /* The problem card (ui/problemCard.ts): above everything, the game paused under it. */
 .problem-overlay {
@@ -3181,4 +3178,101 @@ button.ops-item:hover {
 
 .about-feedback button {
   margin-left: 4px;
+}
+
+/* The tutorial (ui/tutorial.ts): a spotlight that dims everything but its
+   target (the huge shadow is the dimming), and a card beside it. The
+   spotlight lets clicks through, so a hands-on step can be done under it. */
+#tutorial-spotlight {
+  position: fixed;
+  z-index: 55;
+  border: 2px solid #e8c170;
+  border-radius: 8px;
+  box-shadow: 0 0 0 9999px rgba(5, 7, 12, 0.62), 0 0 24px rgba(232, 193, 112, 0.35);
+  pointer-events: none;
+  transition: left 0.25s ease, top 0.25s ease, width 0.25s ease, height 0.25s ease;
+}
+
+#tutorial-spotlight[hidden],
+#tutorial-card[hidden] {
+  display: none;
+}
+
+#tutorial-card {
+  position: fixed;
+  z-index: 60;
+  width: min(360px, calc(100vw - 16px));
+  box-sizing: border-box;
+  padding: 16px 18px 14px;
+  background: #0e1016;
+  border: 1px solid #e8c170;
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #cdd3e0;
+}
+
+#tutorial-card.is-centred {
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%);
+}
+
+#tutorial-card h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  color: #fff;
+}
+
+#tutorial-card p {
+  margin: 0 0 12px;
+}
+
+.tutorial-count {
+  margin-bottom: 4px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: #e8c170;
+}
+
+.tutorial-note {
+  font-size: 11px;
+  color: #9aa3b8;
+}
+
+.tutorial-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.tutorial-actions button {
+  padding: 5px 12px;
+  font: inherit;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.tutorial-skip {
+  margin-right: auto;
+  color: #9aa3b8;
+  background: none;
+  border: none;
+  padding-left: 0 !important;
+}
+
+.tutorial-back {
+  color: #cdd3e0;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.tutorial-next {
+  color: #0a0c12;
+  background: #e8c170;
+  border: 1px solid #e8c170;
+  font-weight: 700;
 }

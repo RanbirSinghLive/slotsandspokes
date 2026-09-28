@@ -57,6 +57,7 @@ import { clearMapHover, getMapHover, setupMapLinks } from './ui/mapLink';
 import { holdSaving, loadSavedState, saveFileText, saveState, storedSaveText } from './ui/save';
 import { setupCrashCatcher, showProblemCard } from './ui/problemCard';
 import { feedbackUrl, openFeedback } from './ui/feedback';
+import { setupTutorial, startTutorial, updateTutorial } from './ui/tutorial';
 
 // Resume a saved game if one exists. A fresh game starts from
 // createNewGameState(), seeded from Date.now() so every new playthrough
@@ -247,6 +248,7 @@ function render(nowMs: number = performance.now()): void {
   updateStamps(state, performance.now());
   updateOpsBoard(state, () => select({ kind: 'routes', sort: 'completion' }));
   updateHudPnl(state);
+  updateTutorial(state, choosingHome);
   updateMarket(state);
   updatePoolBars(state);
   // Always visible, whatever screen is open: see ui/alerts.ts's own
@@ -445,12 +447,10 @@ document.querySelector('#rail-alpha')!.addEventListener('click', () => {
   if (panelHidden) setPanelHidden(false);
   select({ kind: 'game' });
 });
-// A narrow screen gets told once that the game wants a desktop's room.
-const DESKTOP_MIN_WIDTH_PX = 900;
-const desktopNotice = document.querySelector<HTMLElement>('#desktop-notice')!;
-if (window.innerWidth < DESKTOP_MIN_WIDTH_PX) desktopNotice.hidden = false;
-document.querySelector('#desktop-notice-continue')!.addEventListener('click', () => {
-  desktopNotice.hidden = true;
+// The tutorial (ui/tutorial.ts): offered on a first visit, and from the Game screen.
+document.querySelector('#about-tutorial-button')!.addEventListener('click', () => {
+  select(NETWORK);
+  startTutorial();
 });
 setupMapLinks(() => render());
 document.querySelector('#rail-jump')!.addEventListener('click', () => openJumpBox(state));
@@ -547,6 +547,14 @@ function tick(nowMs: number): void {
 }
 
 requestAnimationFrame(tick);
+
+// The first-visit tutorial prompt, with the clock to pause for reading
+// and run again at the end.
+setupTutorial((speed) => {
+  speedMultiplier = speed;
+  if (speed !== 0) speedBeforePause = speed;
+  speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === speed));
+});
 
 // Anything uncaught pauses the game and says so, with the save to keep
 // (ui/problemCard.ts). The frame loop stops at an error in it, so the
