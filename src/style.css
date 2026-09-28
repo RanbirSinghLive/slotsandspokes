@@ -1327,14 +1327,6 @@ body {
   margin-top: 4px;
 }
 
-#new-route-confirm:disabled,
-#new-route-add-stop:disabled {
-  background: transparent;
-  border-color: rgba(255, 255, 255, 0.15);
-  color: #6b7694;
-  cursor: not-allowed;
-}
-
 /* The fare policy slider (ui/farePolicy.ts): slider above its value. */
 .lever-control {
   display: flex;
