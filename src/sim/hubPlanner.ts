@@ -154,6 +154,48 @@ function hubWaitCostPerDay(state: SimState, hub: string, style: HubStyle): numbe
   return cost;
 }
 
+/**
+ * Each style for this hub, previewed on the schedule it would re-time
+ * (connections come from real times, sim/hubs.ts), and the best change
+ * from the current one if any pays. The style half of planHub(), apart so
+ * a caller that only wants the style (the headless player's weekly look)
+ * doesn't pay for valuing a flight to every spoke.
+ */
+export function styleAdvice(state: SimState, hub: string): { styles: StylePreview[]; best: HubMove | null } {
+  const style = hubStyleAt(state, hub);
+  const lateDays = new Set<HubStyle>();
+  const afters = new Map<HubStyle, SimState>();
+  const styles: StylePreview[] = HUB_STYLE_ORDER.map((candidate) => {
+    const plan = candidate === style ? null : planHubStyleChange(state, hub, candidate);
+    const after = { ...state, hubStyles: { ...state.hubStyles, [hub]: candidate }, schedule: plan?.ok ? plan.schedule : state.schedule };
+    afters.set(candidate, after);
+    if (plan?.ok && latestArrival(plan.schedule) > USABLE_DAY_END_MINUTE - CURFEW_MARGIN_MINUTES) lateDays.add(candidate);
+    return {
+      style: candidate,
+      connecting: connectingPassengersThrough(after, hub),
+      load: airportLoad(after, hub),
+      blockedReason: plan && !plan.ok ? plan.reason : null,
+    };
+  });
+
+  let best: HubMove | null = null;
+  for (const preview of styles) {
+    if (preview.style === style || preview.blockedReason) continue;
+    if (preview.load > MAX_RECOMMENDED_LOAD && preview.load > airportLoad(state, hub)) continue;
+    if (lateDays.has(preview.style) && latestArrival(state.schedule) <= USABLE_DAY_END_MINUTE - CURFEW_MARGIN_MINUTES) continue;
+    const after = afters.get(preview.style)!;
+    const { revenue, passengers } = connectionRevenueGain(state, after, hub);
+    // Going to a less-banked style loses connections too; value that loss the same capped way.
+    const { revenue: lost } = connectionRevenueGain(after, state, hub);
+    const waitSaving = hubWaitCostPerDay(state, hub, style) - hubWaitCostPerDay(state, hub, preview.style);
+    const gainPerDay = revenue - lost + waitSaving;
+    if (gainPerDay > 0 && (!best || gainPerDay > best.gainPerDay)) {
+      best = { kind: 'style', style: preview.style, gainPerDay, extraConnecting: passengers };
+    }
+  }
+  return { styles, best };
+}
+
 export function planHub(state: SimState, hub: string): HubPlan {
   const style = hubStyleAt(state, hub);
   const spokeFlights = spokesOf(state, hub);
@@ -168,39 +210,8 @@ export function planHub(state: SimState, hub: string): HubPlan {
     grid[`${first}|${second}`] = flow.passengers;
   }
 
-  const lateDays = new Set<HubStyle>();
-  const styles: StylePreview[] = HUB_STYLE_ORDER.map((candidate) => {
-    const plan = candidate === style ? null : planHubStyleChange(state, hub, candidate);
-    // Connections come from real times (sim/hubs.ts), so a style is judged on the schedule it would re-time.
-    const after = { ...state, hubStyles: { ...state.hubStyles, [hub]: candidate }, schedule: plan?.ok ? plan.schedule : state.schedule };
-    if (plan?.ok && latestArrival(plan.schedule) > USABLE_DAY_END_MINUTE - CURFEW_MARGIN_MINUTES) lateDays.add(candidate);
-    return {
-      style: candidate,
-      connecting: connectingPassengersThrough(after, hub),
-      load: airportLoad(after, hub),
-      blockedReason: plan && !plan.ok ? plan.reason : null,
-    };
-  });
-
+  const { styles, best: bestStyle } = styleAdvice(state, hub);
   const moves: HubMove[] = [];
-
-  // Best style change, if any beats staying put.
-  let bestStyle: HubMove | null = null;
-  for (const preview of styles) {
-    if (preview.style === style || preview.blockedReason) continue;
-    if (preview.load > MAX_RECOMMENDED_LOAD && preview.load > airportLoad(state, hub)) continue;
-    if (lateDays.has(preview.style) && latestArrival(state.schedule) <= USABLE_DAY_END_MINUTE - CURFEW_MARGIN_MINUTES) continue;
-    const plan = planHubStyleChange(state, hub, preview.style);
-    const after = { ...state, hubStyles: { ...state.hubStyles, [hub]: preview.style }, schedule: plan.ok ? plan.schedule : state.schedule };
-    const { revenue, passengers } = connectionRevenueGain(state, after, hub);
-    // Going to a less-banked style loses connections too; value that loss the same capped way.
-    const { revenue: lost } = connectionRevenueGain(after, state, hub);
-    const waitSaving = hubWaitCostPerDay(state, hub, style) - hubWaitCostPerDay(state, hub, preview.style);
-    const gainPerDay = revenue - lost + waitSaving;
-    if (gainPerDay > 0 && (!bestStyle || gainPerDay > bestStyle.gainPerDay)) {
-      bestStyle = { kind: 'style', style: preview.style, gainPerDay, extraConnecting: passengers };
-    }
-  }
   if (bestStyle) moves.push(bestStyle);
 
   // Best frequency addition.

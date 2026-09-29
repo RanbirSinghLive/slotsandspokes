@@ -2,7 +2,7 @@ import { currentPotentialDemand } from '../sim/marketDemand';
 import { contractOn, contractsOf, performanceFactor } from '../sim/contracts';
 import airportsData from '../../data/airports.json';
 import { inboundAt } from '../sim/fleetTiming';
-import { planHub } from '../sim/hubPlanner';
+import { styleAdvice } from '../sim/hubPlanner';
 import { airportHours, averageHourLoad } from '../sim/hours';
 import { lastWeekMargin } from '../sim/pnlHistory';
 import { AIRCRAFT_CLASSES, classByCode } from '../sim/aircraftClasses';
@@ -363,7 +363,7 @@ const HUB_STYLE_WORTH_PER_DAY = 500;
 function runHomeHub(state: SimState): string[] {
   if (dayIndex(state) % HUB_REVIEW_DAYS !== 0) return [];
   const home = state.homeAirport;
-  const move = planHub(state, home).moves.find((m) => m.kind === 'style');
+  const move = styleAdvice(state, home).best;
   if (!move || move.kind !== 'style' || move.gainPerDay < HUB_STYLE_WORTH_PER_DAY) return [];
   const result = actions.setHubStyle(state, home, move.style);
   return result.ok ? [result.message] : [];

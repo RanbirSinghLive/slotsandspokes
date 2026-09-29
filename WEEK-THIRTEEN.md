@@ -54,10 +54,18 @@ the owner:
   where it was, and says why when it snaps back; no drop onto an AOG
   plane. The airport hour chart has a y-axis in movements, a dashed
   line at the hour's room, and a readout of the hour under the pointer.
-- **Balance, steady medians after thread 5:** YUL $1.7M (2/6 busts), YYZ
-  $19.6M, BOS $43.6M (2/6), PHL $57.2M, LHR $132.8M (1/6), YHZ busts 6/6.
-  Harsher than before the project at YUL, YYZ and YHZ: the balance pass
-  is next.
+- **Balance, steady medians, connection scale 0.5** (0.4 and 0.6 tried):
+  YUL $0.8M (3/6 busts), YYZ $37.0M (1/6), BOS $86.4M, PHL $76.4M, LHR
+  $123.4M, YHZ busts 5/6. Before the project: YUL $17.2M (1/6), YYZ
+  $36.6M, BOS $14.0M, PHL $56.9M, LHR $71.0M, YHZ 4/6. Big homes are now
+  easier, YUL and YHZ harder. Measured cause at YUL seed 1: curfew
+  cancellations up from 10 to 36 in 60 days and "not in position" from 3
+  to 20, as days run later; the steady player cuts routes over
+  cancellations and never grows. **Open: the balance pass**, starting
+  there.
+- Re-timing packs each rotation into the earliest start with room
+  (`roomyStart()`), and the headless hub review uses `styleAdvice()`, not
+  the whole Plan hub: a PHL year runs in 16 s (56 s with the whole plan).
 
 **State at handoff:** save key `slotsandspokes-save`, save format 2.
 Every leg already has a real time (`ScheduleLeg.departMinute`), but the

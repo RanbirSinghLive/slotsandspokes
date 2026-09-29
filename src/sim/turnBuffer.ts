@@ -1,6 +1,7 @@
 import { classByCode } from './aircraftClasses';
 import { marketKey, nextLegId, type ScheduleLeg } from './schedule';
 import { nextBankMinute } from './hubStyle';
+import { hourlyRoomProblem, hourOf } from './hours';
 import {
   aircraftUtilisation,
   isLongHaulRoundTrip,
@@ -65,29 +66,65 @@ function collides(schedule: ScheduleLeg[], leg: ScheduleLeg, departMinute: numbe
 
 /**
  * Re-space one aircraft's whole day: within a rotation each leg leaves one
- * block time plus one scheduled turn after the previous one. A rotation
- * starts where it did unless the one before now runs into it (so a gap the
- * planner or the Schedule put there, to reach a free hour, stays), and at a
- * banked hub on the next wave (sim/hubStyle.ts's nextBankMinute()).
- * Mutates the legs in `work.schedule`.
+ * block time plus one scheduled turn after the previous one. The day's
+ * first rotation keeps its start. Each later one starts as soon after the
+ * one before as it has room in every hour its legs use (sim/hours.ts) and,
+ * at a banked hub, on a wave (sim/hubStyle.ts's nextBankMinute()): so the
+ * day closes up behind a removed flight, and a longer turn pushes the rest
+ * later, but nothing is packed into a full hour. Mutates the legs in
+ * `work.schedule`.
  */
 function repackTail(work: SimState, tail: string): void {
   const legs = work.schedule.filter((leg) => leg.tail === tail).sort((a, b) => a.departMinute - b.departMinute);
   if (legs.length === 0) return;
   const base = work.aircraft.find((aircraft) => aircraft.tail === tail)?.baseAirport;
-  const originalStarts = legs.map((leg) => leg.departMinute);
 
-  let cursor = legs[0].departMinute;
+  // The first rotation keeps its start, on a wave at a banked base.
+  let cursor = legs[0].origin === base ? nextBankMinute(work, base, legs[0].departMinute) : legs[0].departMinute;
   for (let i = 0; i < legs.length; i++) {
     const leg = legs[i];
-    const startsRotation = i === 0 || (leg.origin === base && legs[i - 1].dest === base);
-    let departMinute = startsRotation ? nextBankMinute(work, base, Math.max(cursor, originalStarts[i])) : cursor;
+    const startsRotation = i > 0 && leg.origin === base && legs[i - 1].dest === base;
+    let departMinute = startsRotation ? roomyStart(work, legs, i, base, cursor) : cursor;
     for (let nudge = 0; nudge < MAX_COLLISION_NUDGES && collides(work.schedule, leg, departMinute); nudge++) {
       departMinute += COLLISION_NUDGE_MINUTES;
     }
     leg.departMinute = departMinute;
     cursor = departMinute + leg.blockMinutes + scheduledTurnMinutes(work, leg.origin, leg.dest);
   }
+}
+
+/**
+ * The earliest start from `cursor` (on a wave at a banked base) for the
+ * rotation beginning at `legs[from]` that has room in every hour its legs
+ * would use, searched like the route planner's (sim/rotations.ts): each
+ * try clears the full hour it hit. The earliest start at all when no hour
+ * fits before the day ends: an over-full hour congests, it doesn't stop
+ * the re-spacing.
+ */
+function roomyStart(work: SimState, legs: ScheduleLeg[], from: number, base: string | null | undefined, cursor: number): number {
+  let to = from;
+  while (to < legs.length - 1 && legs[to].dest !== base) to++;
+  const rotation = legs.slice(from, to + 1);
+  const packedFrom = (start: number) => {
+    let at = start;
+    return rotation.map((leg) => {
+      const packed = { origin: leg.origin, dest: leg.dest, departMinute: at, blockMinutes: leg.blockMinutes };
+      at += leg.blockMinutes + scheduledTurnMinutes(work, leg.origin, leg.dest);
+      return packed;
+    });
+  };
+  const earliest = nextBankMinute(work, base, cursor);
+  const cache = new Map();
+  let start = earliest;
+  for (let tries = 0; tries < 24; tries++) {
+    const packed = packedFrom(start);
+    const last = packed[packed.length - 1];
+    if (last.departMinute + last.blockMinutes > USABLE_DAY_END_MINUTE) break;
+    const problem = hourlyRoomProblem(work, packed, cache, rotation);
+    if (!problem) return start;
+    start = nextBankMinute(work, base, start + Math.max(COLLISION_NUDGE_MINUTES, (hourOf(problem.minute) + 1) * 60 - (problem.minute % 1440)));
+  }
+  return earliest;
 }
 
 /** Whether this tail's day, as currently scheduled, ends inside the usable day. */

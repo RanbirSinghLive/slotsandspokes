@@ -41,13 +41,13 @@ const CONNECT_SHARE = 0.03;
  * is 1 - e^(-connections / CONNECTION_SCALE), where each arrival from A
  * counts as much as its best onward departure to B is good (1 for a wait
  * up to GOOD_CONNECT_MINUTES, falling to POOR_CONNECT_QUALITY at the
- * longest). One good connection a day lines up about 81% of passengers.
- * Set so a Rolling hub, whose times meet only by chance, connects about
- * as many as the frequency-based model did (measured on the steady
- * player's networks at day 150: 0.19–0.21 a spoke pair against 0.22),
- * leaving banks to earn more.
+ * longest). One good connection a day lines up about 86% of passengers.
+ * Set so a Rolling hub, whose times meet only by chance, connects at
+ * least as many as the frequency-based model did (at 0.6, measured on
+ * the steady player's networks at day 150: 0.19–0.21 a spoke pair
+ * against 0.22), leaving banks to earn more.
  */
-const CONNECTION_SCALE = 0.6;
+const CONNECTION_SCALE = 0.5;
 /** The shortest wait at the hub a passenger and their bag can make. */
 export const MIN_CONNECT_MINUTES = 40;
 /** A wait up to this long is a good connection... */
