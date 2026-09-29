@@ -185,6 +185,13 @@ export function legsServingMarket(origin: string, dest: string, legs: ScheduleLe
   ).length;
 }
 
+/** When each of the player's legs on this market departs (schedule minutes), both directions: what time-of-day demand reads (sim/timeOfDay.ts). */
+export function marketDepartMinutes(origin: string, dest: string, legs: ScheduleLeg[]): number[] {
+  return legs
+    .filter((leg) => (leg.origin === origin && leg.dest === dest) || (leg.origin === dest && leg.dest === origin))
+    .map((leg) => leg.departMinute);
+}
+
 /**
  * Every airport the player's network currently touches — every leg's
  * origin *and* destination, since a market served in only one direction

@@ -118,34 +118,31 @@ function waterFill(total: number, room: number[]): number[] {
  * rivals and the planner ask for thousands of times a day.
  */
 function trafficKey(state: SimState): string {
-  let legs = state.schedule.length;
-  for (const leg of state.schedule) legs = (legs * 31 + leg.departMinute * 7 + leg.blockMinutes + codeOf(leg.origin) * 3 + codeOf(leg.dest)) % 2147483647;
-  let rivals = state.competitorRoutes.length;
-  for (const route of state.competitorRoutes) rivals = (rivals * 31 + route.dailyFrequency * 7 + codeOf(route.origin) * 3 + codeOf(route.dest)) % 2147483647;
-  return `${legs}:${rivals}`;
+  // The schedule changes by legs added, removed or retimed, and rival
+  // routes by being added, removed or re-frequenced: each moves a count or
+  // one of these sums (a route's frequency weighted by its place, so a
+  // change moves the sum even when another cancels it out).
+  let times = 0;
+  for (const leg of state.schedule) times += leg.departMinute * 3 + leg.blockMinutes;
+  let frequencies = 0;
+  for (let i = 0; i < state.competitorRoutes.length; i++) frequencies += state.competitorRoutes[i].dailyFrequency * (i + 1);
+  return `${state.schedule.length}:${times}:${state.competitorRoutes.length}:${frequencies}`;
 }
 
-function codeOf(iata: string): number {
-  return iata.charCodeAt(0) * 1369 + iata.charCodeAt(1) * 37 + iata.charCodeAt(2);
-}
-
-// The last state asked about, its traffic, and each airport's day worked out
-// since. Module-level and outside SimState: it's a memo of a pure function,
-// so it never changes a result, and a save never sees it.
-let cachedState: SimState | null = null;
-let cachedKey = '';
-let cachedHours = new Map<string, AirportHours>();
+// For each state asked about (the game's, and the what-if copies forecasts
+// make), its traffic and each airport's day worked out since. A WeakMap, so
+// a what-if copy's entry goes when the copy does. Outside SimState: it's a
+// memo of a pure function, so it never changes a result, and a save never
+// sees it.
+const cache = new WeakMap<SimState, { key: string; hours: Map<string, AirportHours> }>();
 
 /** One airport's day by the hour: yours, rivals' and the room in each. */
 export function airportHours(state: SimState, iata: string): AirportHours {
   const key = trafficKey(state);
-  if (state !== cachedState || key !== cachedKey) {
-    cachedState = state;
-    cachedKey = key;
-    cachedHours = new Map();
-  }
-  let hours = cachedHours.get(iata);
-  if (!hours) cachedHours.set(iata, (hours = buildAirportHours(state, iata)));
+  let entry = cache.get(state);
+  if (!entry || entry.key !== key) cache.set(state, (entry = { key, hours: new Map() }));
+  let hours = entry.hours.get(iata);
+  if (!hours) entry.hours.set(iata, (hours = buildAirportHours(state, iata)));
   return hours;
 }
 
@@ -202,28 +199,36 @@ export function freeInDay(hours: AirportHours): number {
 
 /**
  * The first airport and hour these new legs would overfill, counting the
- * legs' own movements together, or null when every one fits. `cache`
- * lets a caller trying many start times build each airport's day once.
+ * legs' own movements together, or null when every one fits. `minute` is
+ * the schedule minute of the earliest of this rotation's movements in
+ * that hour, so a caller searching for a later start knows how far to
+ * move it to clear the hour. `cache` lets a caller trying many start
+ * times build each airport's day once.
  */
 export function hourlyRoomProblem(
   state: SimState,
   legs: PackedLeg[],
   cache: Map<string, AirportHours> = new Map(),
-): { iata: string; hour: number } | null {
-  const wanted = new Map<string, number>();
-  const add = (iata: string, hour: number) => wanted.set(`${iata}@${hour}`, (wanted.get(`${iata}@${hour}`) ?? 0) + 1);
+): { iata: string; hour: number; minute: number } | null {
+  const wanted = new Map<string, { iata: string; hour: number; count: number; minute: number }>();
+  const add = (iata: string, minute: number) => {
+    const hour = hourOf(minute);
+    const key = `${iata}@${hour}`;
+    const entry = wanted.get(key);
+    if (entry) entry.count += 1;
+    else wanted.set(key, { iata, hour, count: 1, minute });
+  };
   for (const leg of legs) {
-    add(leg.origin, hourOf(leg.departMinute));
-    add(leg.dest, hourOf(leg.departMinute + leg.blockMinutes));
+    add(leg.origin, leg.departMinute);
+    add(leg.dest, leg.departMinute + leg.blockMinutes);
   }
-  for (const [key, count] of wanted) {
-    const [iata, hourText] = key.split('@');
-    const hour = Number(hourText);
+  let first: { iata: string; hour: number; minute: number } | null = null;
+  for (const { iata, hour, count, minute } of wanted.values()) {
     let hours = cache.get(iata);
     if (!hours) cache.set(iata, (hours = airportHours(state, iata)));
-    if (freeInHour(hours, hour) < count) return { iata, hour };
+    if (freeInHour(hours, hour) < count && (!first || minute < first.minute)) first = { iata, hour, minute };
   }
-  return null;
+  return first;
 }
 
 /** How far a slot's price moves for each whole hour's room its hour is busier (or quieter) than the airport's average hour. */

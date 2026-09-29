@@ -1,7 +1,7 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { classRank } from './aircraftClasses';
 import { dailyMovementsAt } from './airports';
-import { airportHours, hourlyRoomProblem, hoursWithRoom, type AirportHours } from './hours';
+import { airportHours, hourlyRoomProblem, hourOf, hoursWithRoom, type AirportHours } from './hours';
 import { minuteOfDayToTimeString } from './clock';
 import { greatCircleDistanceNm } from './geo';
 import { policyFare } from './pricing';
@@ -220,15 +220,22 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
   let heldBack: RotationPlan['heldBack'] = null;
   let roomProblem = firstProblem;
   if (firstProblem && !longHaul) {
-    for (let start = earliestStart + HOUR_SEARCH_STEP; start <= USABLE_DAY_END_MINUTE; start += HOUR_SEARCH_STEP) {
+    // Each try moves the start just far enough to push the earliest
+    // offending movement past the end of its full hour, so the search
+    // takes at most an hour's worth of tries per hour of the day.
+    let problem: { minute: number } | null = firstProblem;
+    let start = earliestStart;
+    while (problem) {
+      start += Math.max(HOUR_SEARCH_STEP, Math.ceil(((hourOf(problem.minute) + 1) * 60 - (problem.minute % 1440)) / HOUR_SEARCH_STEP) * HOUR_SEARCH_STEP);
+      if (start > USABLE_DAY_END_MINUTE) break;
       const attempt = packRotationAvoidingCollisions(rotationAirports, type?.cruiseKts, start, state);
       const end = attempt[attempt.length - 1];
       if (end && end.departMinute + end.blockMinutes > USABLE_DAY_END_MINUTE) break;
-      if (!hourlyRoomProblem(state, attempt, roomCache)) {
-        heldBack = { ...firstProblem, fromMinute: legs[0]?.departMinute ?? earliestStart };
+      problem = hourlyRoomProblem(state, attempt, roomCache);
+      if (!problem) {
+        heldBack = { iata: firstProblem.iata, hour: firstProblem.hour, fromMinute: legs[0]?.departMinute ?? earliestStart };
         legs = attempt;
         roomProblem = null;
-        break;
       }
     }
   }

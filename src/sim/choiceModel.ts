@@ -1,5 +1,6 @@
 import type { CompetitorOffering } from './competitors';
 import { recommendedFare } from './schedule';
+import { segmentTimeFit, type SegmentName } from './timeOfDay';
 
 // The "connective piece" from WEEK-TWO.md's Layers — the standard technique
 // for this is a multinomial logit: score every option a traveler could pick
@@ -36,7 +37,7 @@ function competitorsServingMarket(
  * just not this one); all three must sum to 1.
  */
 type Segment = {
-  name: 'business' | 'leisure' | 'vfr';
+  name: SegmentName;
   shareOfDemand: number;
   weightPrice: number;
   weightSchedule: number;
@@ -92,8 +93,20 @@ function relativeFare(fare: number, goingRate: number): number {
   return (fare * REFERENCE_FARE) / goingRate;
 }
 
-function utility(segment: Segment, fare: number, dailyFrequency: number, goingRate: number): number {
-  const scheduleFit = Math.log2(1 + dailyFrequency);
+/** Each segment's share of demand, by name: the mix a flight's hour is judged against (sim/timeOfDay.ts). */
+export const SEGMENT_SHARES: Record<SegmentName, number> = Object.fromEntries(SEGMENTS.map((segment) => [segment.name, segment.shareOfDemand])) as Record<
+  SegmentName,
+  number
+>;
+
+/**
+ * `timeFit` is how well the offering's departure hours suit this segment
+ * (sim/timeOfDay.ts's segmentTimeFit()): its frequency counts for that
+ * much, so three midday flights are worth fewer to a business traveller
+ * than three at the peaks. 1 for a rival, spread over the day.
+ */
+function utility(segment: Segment, fare: number, dailyFrequency: number, goingRate: number, timeFit = 1): number {
+  const scheduleFit = Math.log2(1 + dailyFrequency * timeFit);
   return segment.intercept - segment.weightPrice * relativeFare(fare, goingRate) + segment.weightSchedule * scheduleFit;
 }
 
@@ -112,8 +125,9 @@ function scores(
   competitors: CompetitorOffering[],
   goingRate: number,
   brandEdge: number,
+  departMinutes?: number[],
 ): { yourScore: number; competitorScore: number } {
-  const yourScore = Math.exp(utility(segment, fare, legsServingMarket, goingRate));
+  const yourScore = Math.exp(utility(segment, fare, legsServingMarket, goingRate, segmentTimeFit(segment.name, departMinutes)));
   // Your name against theirs (sim/nps.ts's brandEdge()): a better NPS
   // makes each rival's offer look that much worse, which moves passengers
   // between airlines without changing how many travel at all.
@@ -139,8 +153,9 @@ function segmentBookingShare(
   competitors: CompetitorOffering[],
   goingRate: number,
   brandEdge: number,
+  departMinutes?: number[],
 ): number {
-  const { yourScore, competitorScore } = scores(segment, fare, legsServingMarket, competitors, goingRate, brandEdge);
+  const { yourScore, competitorScore } = scores(segment, fare, legsServingMarket, competitors, goingRate, brandEdge, departMinutes);
   const stayHomeScore = Math.exp(0);
   return yourScore / (yourScore + stayHomeScore + competitorScore);
 }
@@ -162,8 +177,9 @@ function segmentTrafficShare(
   competitors: CompetitorOffering[],
   goingRate: number,
   brandEdge: number,
+  departMinutes?: number[],
 ): number {
-  const { yourScore, competitorScore } = scores(segment, fare, legsServingMarket, competitors, goingRate, brandEdge);
+  const { yourScore, competitorScore } = scores(segment, fare, legsServingMarket, competitors, goingRate, brandEdge, departMinutes);
   return yourScore / (yourScore + competitorScore);
 }
 
@@ -185,6 +201,8 @@ export function bookingShare(
   competitorRoutes: CompetitorOffering[],
   /** How far your NPS on this market pulls passengers from a typical rival, in utility (sim/nps.ts's brandEdge()). */
   brandEdge: number,
+  /** Your departures on the market (schedule minutes, both directions), for how well their hours suit each segment; omitted counts as a rival's spread. */
+  departMinutes?: number[],
 ): number {
   const marketCompetitors = competitorsServingMarket(originIata, destIata, competitorRoutes);
   const goingRate = recommendedFare(originIata, destIata);
@@ -192,7 +210,7 @@ export function bookingShare(
     (total, segment) =>
       total +
       segment.shareOfDemand *
-        segmentBookingShare(segment, fare, legsServingMarket, marketCompetitors, goingRate, brandEdge),
+        segmentBookingShare(segment, fare, legsServingMarket, marketCompetitors, goingRate, brandEdge, departMinutes),
     0,
   );
 }
@@ -215,6 +233,8 @@ export function trafficShare(
   competitorRoutes: CompetitorOffering[],
   /** How far your NPS on this market pulls passengers from a typical rival, in utility (sim/nps.ts's brandEdge()). */
   brandEdge: number,
+  /** Your departures on the market, as for bookingShare(). */
+  departMinutes?: number[],
 ): number {
   const marketCompetitors = competitorsServingMarket(originIata, destIata, competitorRoutes);
   const goingRate = recommendedFare(originIata, destIata);
@@ -222,7 +242,7 @@ export function trafficShare(
     (total, segment) =>
       total +
       segment.shareOfDemand *
-        segmentTrafficShare(segment, fare, legsServingMarket, marketCompetitors, goingRate, brandEdge),
+        segmentTrafficShare(segment, fare, legsServingMarket, marketCompetitors, goingRate, brandEdge, departMinutes),
     0,
   );
 }
@@ -241,6 +261,8 @@ export function rivalBookingShare(
   competitorRoutes: CompetitorOffering[],
   /** The player's brand edge on this market (sim/nps.ts), which counts against every rival when the player flies it. */
   brandEdge: number,
+  /** The player's departures on the market, for how well their hours suit each segment. */
+  playerDepartMinutes?: number[],
 ): number {
   const marketCompetitors = competitorsServingMarket(route.origin, route.dest, competitorRoutes);
   const goingRate = recommendedFare(route.origin, route.dest);
@@ -252,7 +274,7 @@ export function rivalBookingShare(
       0,
     );
     const playerScore =
-      playerLegs > 0 ? Math.exp(utility(segment, playerFare, playerLegs, goingRate)) : 0;
+      playerLegs > 0 ? Math.exp(utility(segment, playerFare, playerLegs, goingRate, segmentTimeFit(segment.name, playerDepartMinutes))) : 0;
     const stayHomeScore = Math.exp(0);
     return total + segment.shareOfDemand * (rivalScore / (allRivals + playerScore + stayHomeScore));
   }, 0);

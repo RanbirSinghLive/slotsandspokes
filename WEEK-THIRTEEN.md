@@ -30,6 +30,12 @@ the owner:
   medians, year): YUL $14.8M, YYZ $49M, BOS $39M, PHL $79M, LHR $188M,
   YHZ busts 5/6: easier at big homes, harder at thin ones. The pass
   waits for threads 3 and 5, which move it again.
+- **Done: thread 3.** `sim/timeOfDay.ts`: segment curves; a market's
+  passengers split by each flight's hour; a schedule's time fit counts
+  (at 35% strength) in the choice against rivals. Balance about where
+  thread 2 left it (steady medians: YUL $10M, YYZ $46M, BOS $21M, PHL
+  $76M, LHR $186M; YHZ busts 4/6). The hour search jumps by hours, so a
+  year runs in about 17 s (8 s before the thread, on a smaller airline).
 
 **State at handoff:** save key `slotsandspokes-save`, save format 2.
 Every leg already has a real time (`ScheduleLeg.departMinute`), but the

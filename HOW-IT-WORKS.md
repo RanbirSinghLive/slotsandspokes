@@ -1907,6 +1907,35 @@ and the boost was just a flat 3× everywhere.
 
 ---
 
+## Time of day (`src/sim/timeOfDay.ts`)
+
+When a flight leaves matters to who flies it. Each passenger segment
+has a curve over the usable day (home clock), 1 being an ordinary hour:
+**business** peaks at 07:00 (1.7) and 17:00 (1.6) and falls to 0.3 by
+21:00; **leisure** is nearly flat, a little higher mid-morning to
+afternoon; **VFR** leans to midday and evening. A departure outside the
+usable day scores 0.4 for everyone.
+
+- **A market's passengers split by hour.** Of the demand for the
+  player's flights on a market, each flight gets a share weighted by
+  how well its hour suits the whole mix (`flightDemandShare()`), so the
+  07:00 flight fills first and a 13:00 one carries fewer. Total demand
+  for the market doesn't change with timing.
+- **Timing counts against rivals.** In the choice model
+  (`sim/choiceModel.ts`), an offering's frequency is worth its flights
+  times its **time fit** for that segment: how well its hours suit the
+  segment against a rival's flights spread by the slot profile
+  (`sim/hours.ts`). Only 35% of the gap counts (`TIME_FIT_STRENGTH`):
+  at full strength the planner's morning-heavy schedule, which a
+  player gets without trying, doubled a year's profit. Business, the
+  most schedule-hungry segment, feels it most.
+
+So a peak slot is worth its higher price, and an off-peak one (cheap,
+and open at a full hub) still pays, mostly on leisure passengers.
+Rivals have no times, so each counts as spread over the day.
+
+---
+
 ## Fare policy (`src/sim/pricing.ts`)
 
 One airline-wide multiplier on `recommendedFare()` prices the whole

@@ -1,6 +1,6 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { flightResult, type EconomyAircraftType } from './economy';
-import { MIN_TURN_MINUTES, legsServingMarket, marketKey, type ScheduleLeg } from './schedule';
+import { MIN_TURN_MINUTES, legsServingMarket, marketDepartMinutes, marketKey, type ScheduleLeg } from './schedule';
 import { breaksCurfew, rotationStartingWith } from './curfew';
 import { rollDailyWeather, isAirportClosed } from './weather';
 import { rollDailyShocks } from './shocks';
@@ -513,6 +513,10 @@ export function step(state: SimState): void {
             state.competitorRoutes,
             spilloverAvailable,
             bookingPerks(state, flight.origin, flight.dest),
+            {
+              departMinute: state.schedule.find((leg) => leg.legId === flight.legId)?.departMinute ?? homeMinuteOfDay(state, flight.scheduledDepartMinute),
+              marketDepartMinutes: marketDepartMinutes(flight.origin, flight.dest, state.schedule),
+            },
           );
           state.spilloverByMarket[key] = spilloverAvailable + result.spilloverDelta;
           flightPassengers = result.pax;

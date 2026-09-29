@@ -1,4 +1,5 @@
-import { bookingShare } from './choiceModel';
+import { bookingShare, SEGMENT_SHARES } from './choiceModel';
+import { flightDemandShare } from './timeOfDay';
 import { recommendedFare } from './schedule';
 import { FUEL_SHARE_OF_BLOCK_HOUR_COST } from './fuel';
 import type { CompetitorOffering } from './competitors';
@@ -215,9 +216,19 @@ export function flightResult(
   // ticket's yield, and how many turned-away passengers wait for a later
   // flight.
   perks: BookingPerks,
+  /**
+   * When this flight and the market's others leave (schedule minutes, all
+   * of your departures on the market, both directions): the flight's share
+   * of the market's passengers follows how well its hour suits them, and
+   * the market's hours count in the choice against rivals
+   * (sim/timeOfDay.ts). Without it, flights split the market evenly.
+   */
+  timing?: { departMinute: number; marketDepartMinutes: number[] },
 ): FlightResult {
-  const demandPerFlight = marketDailyDemand / legsServingMarket;
-  const share = bookingShare(fare, legsServingMarket, leg.origin, leg.dest, competitorRoutes, perks.brandEdge);
+  const demandPerFlight = timing
+    ? marketDailyDemand * flightDemandShare(timing.departMinute, timing.marketDepartMinutes, SEGMENT_SHARES)
+    : marketDailyDemand / legsServingMarket;
+  const share = bookingShare(fare, legsServingMarket, leg.origin, leg.dest, competitorRoutes, perks.brandEdge, timing?.marketDepartMinutes);
   const connecting = connectingDailyDemand * connectingPriceResponse(fare, legsServingMarket, leg.origin, leg.dest, competitorRoutes, perks.brandEdge);
   const bookedDemand = demandPerFlight * share + connecting / legsServingMarket;
   const seatCeiling = Math.round(type.seats * LOAD_FACTOR);
