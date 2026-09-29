@@ -1327,8 +1327,14 @@ appends the pending destination and re-arms from it, so
 `YUL-YFC-YQM-YFC-YQM-YUL` is one gesture. Confirm closes the loop back to
 the base; a plain out-and-back is the two-airport chain.
 
-The plane is chosen for you: `autoPickTail()` takes the smallest-class
-aircraft based at the origin (or not yet based) whose plan has no error.
+The type can be chosen, the plane can't: with more than one type based
+at an airport, its ring's Draw route fans out one choice per type (its
+silhouette, seats, range, planes and share of the day free; greyed out
+with no time free), and with one type it draws straight away.
+`autoPickTail()` then takes the smallest-class aircraft of that type (any
+type, when none was chosen, as the headless player does) based at the
+origin (or not yet based) whose plan has no error. The chosen type shows
+in the hover tooltip's title, the range ring and the confirm card.
 An unbased plane becomes based at the origin by flying its first rotation
 there. After the first rotation, a rotation must start from an airport
 already in the network.

@@ -11,6 +11,7 @@ import type { SimState } from '../sim/state';
 import { select, selectRoute } from './selection';
 import { redrawInspectorPreview, renderInspector } from './inspector/inspector';
 import { candidateTailsAt } from '../sim/rotations';
+import { utilisationPools } from '../sim/utilisation';
 import { armRouteBuilderAt, describeSlotQuotes } from './routeBuilder';
 import { hideCompetitionTooltip } from './competitionTooltip';
 import { hideRadial, showRadial, updateRadial, type RadialAction } from './radial';
@@ -130,7 +131,32 @@ function onPreview(preview: MapPreview | null): void {
 
 
 function airportActions(airport: Airport, state: SimState): RadialAction[] {
-  const hasPlane = candidateTailsAt(state, airport.iata).length > 0;
+  const tailsHere = candidateTailsAt(state, airport.iata);
+  const hasPlane = tailsHere.length > 0;
+
+  // Draw route with a chosen type: one choice per type based here, so a
+  // Regional can take a new route a Propeller could also fly. With one
+  // type here the button draws with it straight away.
+  const typesHere = AIRCRAFT_CLASSES.filter((cls) => tailsHere.some((tail) => state.aircraft.find((a) => a.tail === tail)?.typeCode === cls.code));
+  const pools = utilisationPools(state, airport.iata);
+  const drawChoices: RadialAction[] = typesHere.map((cls) => {
+    const pool = pools.find((p) => p.code === cls.code);
+    const free = pool ? Math.max(0, Math.round((1 - pool.share) * 100)) : 0;
+    const planes = pool?.planes ?? 0;
+    return {
+      id: `route:${cls.code}`,
+      label: `Draw route · ${cls.name} · ${cls.seats} seats · ${cls.rangeNm}nm · ${planes} plane${planes === 1 ? '' : 's'} · ${free}% of day free`,
+      icon: planeIconInner(cls.code),
+      large: true,
+      angleDeg: 0,
+      disabledReason: free <= 0 ? `No ${cls.name} time free at ${airport.iata} · lease one or free one up` : undefined,
+      onSelect: () => {
+        armRouteBuilderAt(airport, cls.code);
+        hideMapMenu();
+        return true;
+      },
+    };
+  });
 
   // Returning a lease early (sim/market.ts): one choice per plane based
   // here. Only a plane with nothing scheduled can go; the rest say why.
@@ -261,10 +287,14 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
       icon: ICON.route,
       angleDeg: -115,
       disabledReason: hasPlane ? undefined : `No plane based at ${airport.iata} · lease one first`,
-      onSelect: () => {
-        armRouteBuilderAt(airport);
-        hideMapMenu();
-      },
+      ...(typesHere.length > 1
+        ? { label: 'Draw route · choose the type', children: drawChoices }
+        : {
+            onSelect: () => {
+              armRouteBuilderAt(airport, typesHere[0]?.code);
+              hideMapMenu();
+            },
+          }),
     },
     { id: 'plane', label: 'Lease a plane here', icon: ICON.plane, angleDeg: -65, children: planeChoices },
     {

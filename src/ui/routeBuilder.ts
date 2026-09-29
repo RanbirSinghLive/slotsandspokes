@@ -64,7 +64,7 @@ function showRouteHoverTooltip(
   const aircraft = tail ? state.aircraft.find((a) => a.tail === tail) : undefined;
   const type = aircraft ? aircraftTypesByCode.get(aircraft.typeCode) : undefined;
 
-  routeHoverTooltipTitle.textContent = `${origin.iata} → ${candidate.iata}`;
+  routeHoverTooltipTitle.textContent = `${origin.iata} → ${candidate.iata}${type ? ` · ${type.name}` : ''}`;
 
   if (type) {
     const existingFrequency = legsServingMarket(origin.iata, candidate.iata, state.schedule);
@@ -154,8 +154,9 @@ export function hideRouteHoverTooltip(): void {
  * draw a live preview toward the cursor, and click a second airport to
  * confirm. `idle`/`armed`/`confirming` is the whole state machine; nothing
  * here is part of SimState, since it's transient interaction state, not
- * simulated-world state. Nobody names a plane: autoPickTail() chooses one
- * once the destination is known, so the player never sees a tail.
+ * simulated-world state. The player may name a type (the ring's Draw
+ * route fan, ui/mapMenu.ts), never a tail: autoPickTail() chooses the
+ * plane of that type once the destination is known.
  *
  * What gets built is a **rotation**, not a single leg: an ordered chain of
  * airports starting and ending at the aircraft's base. `chain` holds the
@@ -171,6 +172,9 @@ type BuilderState =
   | { mode: 'confirming'; chain: Airport[]; dest: Airport };
 
 let builderState: BuilderState = { mode: 'idle' };
+// The aircraft type the player chose to draw with, or undefined to let
+// autoPickTail() take the smallest that fits.
+let chosenType: string | undefined;
 // Only meaningful while armed: where the cursor currently is (in lon/lat,
 // for drawing the preview) and which airport, if any, it's close enough to
 // snap onto.
@@ -202,6 +206,7 @@ function setArmedCursor(armed: boolean): void {
 
 function reset(): void {
   builderState = { mode: 'idle' };
+  chosenType = undefined;
   previewGeo = null;
   candidate = null;
   setArmedCursor(false);
@@ -213,7 +218,7 @@ function reset(): void {
 /** The plane the gesture in progress will use. */
 function activeTail(state: SimState, dest: Airport | null): string | null {
   if (builderState.mode === 'idle') return null;
-  return autoPickTail(state, builderState.chain, dest);
+  return autoPickTail(state, builderState.chain, dest, chosenType);
 }
 
 /**
@@ -226,8 +231,9 @@ export function isRouteBuilderActive(): boolean {
   return builderState.mode !== 'idle';
 }
 
-export function armRouteBuilderAt(airport: Airport): void {
+export function armRouteBuilderAt(airport: Airport, typeCode?: string): void {
   builderState = { mode: 'armed', chain: [airport] };
+  chosenType = typeCode;
   setArmedCursor(true);
 }
 

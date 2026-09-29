@@ -371,8 +371,11 @@ export function candidateTailsAt(state: SimState, baseIata: string): string[] {
  * show that plane's actual error, not a vague "no plane". Null only when
  * there is no candidate at all.
  */
-export function autoPickTail(state: SimState, chain: RotationStop[], dest: RotationStop | null): string | null {
-  const candidates = candidateTailsAt(state, chain[0].iata);
+export function autoPickTail(state: SimState, chain: RotationStop[], dest: RotationStop | null, typeCode?: string): string | null {
+  // The player can name the type (the ring's Draw route fan, ui/mapMenu.ts); the plane is still picked for them.
+  const candidates = candidateTailsAt(state, chain[0].iata).filter(
+    (tail) => typeCode === undefined || state.aircraft.find((a) => a.tail === tail)?.typeCode === typeCode,
+  );
   if (candidates.length === 0) return null;
   if (!dest) return candidates[0];
   const fitting = candidates.find((tail) => planRotation(chain, dest, tail, state).error === null);
