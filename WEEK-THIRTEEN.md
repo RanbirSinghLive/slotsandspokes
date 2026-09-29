@@ -71,6 +71,18 @@ the owner:
   medians now: YUL $23.4M (0/6), YYZ $71.3M, BOS $82.9M, PHL $91.1M,
   LHR $151.5M, YHZ busts 6/6. Next: big homes are far easier than before
   the project, and YHZ.
+- **Balance pass, step 2:** six seeds a home proved too noisy to tune
+  by (medians swung 10× between near-identical settings), so the
+  timing floor was chosen on 18 seeds a home: at 0.3 (a Rolling hub
+  connects about half, as the flat Rolling style did) YUL $13.8M with
+  2/18 busts, YYZ $38.0M, PHL $95.3M, YHZ 12/18 busts, against YUL
+  $17.2M (1/6), YYZ $36.6M, PHL $56.9M, YHZ 4/6 before the project.
+  Less hourly room and a weaker time-of-day pull were tried too: room
+  at 0.8 cut big homes by a third but hurt YUL (and brings back "full
+  too soon"); time of day barely moved anything. Standard report (6
+  seeds): YUL $3.0M (1/6), YYZ $35.9M, BOS $78.0M (1/6), PHL $101.3M,
+  LHR $116.2M, YHZ $0.7M (3/6). **Still open:** the biggest homes (BOS,
+  PHL, LHR) run about half again richer than before the project.
 - Re-timing packs each rotation into the earliest start with room
   (`roomyStart()`), and the headless hub review uses `styleAdvice()`, not
   the whole Plan hub: a PHL year runs in 16 s (56 s with the whole plan).

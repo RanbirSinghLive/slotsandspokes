@@ -46,8 +46,15 @@ const FREQUENCY_SCALE = 2;
  * One good connection a day is about 86% timed.
  */
 const CONNECTION_SCALE = 0.5;
-/** The share of possible connections made even when no times meet. */
-const TIMING_FLOOR = 0.5;
+/**
+ * The share of possible connections made even when no times meet. Set so
+ * a Rolling hub, whose flights meet only by chance (about 40% timed),
+ * connects about as the flat Rolling style (0.5) did, and perfect timing
+ * as Tight banks (1.0) did: with 18 seeds a home, the steady player's
+ * year matched before timed connections at Montréal ($13.8M, 2 busts),
+ * Toronto ($38M) and Halifax (12 busts); at 0.5 Toronto made $70M.
+ */
+const TIMING_FLOOR = 0.3;
 /** The shortest wait at the hub a passenger and their bag can make. */
 export const MIN_CONNECT_MINUTES = 40;
 /** A wait up to this long is a good connection... */
