@@ -66,6 +66,7 @@ export function planRetime(state: SimState, legIds: string[], toTail: string, st
   if (to.typeCode !== from.typeCode) return fail(`${toTail} is a different type`);
   if (to.baseAirport !== from.baseAirport) return fail(`${toTail} is based at ${to.baseAirport ?? 'no base'}`);
   if (to.returningOnDay !== undefined || to.rebase) return fail(`${toTail} is leaving the base`);
+  if (toTail !== fromTail && state.aogs.some((event) => event.tail === toTail)) return fail(`${toTail} AOG`);
 
   // Not while it's flying: a leg in the air, or some flown and some not.
   const airborne = new Set(state.activeFlights.map((flight) => flight.legId));

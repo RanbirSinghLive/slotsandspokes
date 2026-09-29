@@ -2094,8 +2094,9 @@ free hour for a new flight.
 
 People travelling between two of the player's spokes A and B, changing
 planes at a hub H the player flies to from both. Aggregate flows per
-city pair, not individual passengers. It is worked out from how often
-routes fly, never from times, because the player never authors times.
+city pair, not individual passengers. It is worked out from the
+schedule's **real times**: a passenger connects only where a flight in
+from A meets one out to B.
 
 For each pair of spokes at a hub, passengers a day (both directions) =
 
@@ -2104,10 +2105,18 @@ For each pair of spokes at a hub, passengers a day (both directions) =
 | A–B potential demand | the gravity model (`sim/demand.ts`) |
 | × 3% | the share willing to change planes (`CONNECT_SHARE`) |
 | × establishment | the less built-up spoke route's local traffic ÷ 40 a day, capped at 1, so a new route feeds about a quarter |
-| × frequency chance | `1 − e^(−flights/2)` on the thinner route: about 40% at one daily flight, 63% at two, 86% at four |
-| × hub style | Rolling 0.5, Banked 0.75, Tight banks 1.0 |
+| × timed chance | `1 − e^(−connections/0.6)` each way, averaged over the two: every arrival from A counts as much as its best onward departure to B is good |
 | × circuity | full up to 1.3× the direct distance, falling to nothing at 2× |
 | × nonstop discount | 0.2 if anyone, player or rival, flies A–B direct |
+
+**A good connection** is a wait at the hub of 40 minutes (the shortest a
+passenger and their bag can make) to 75 minutes, worth 1; longer waits
+are worth less, down to 0.25 at 3 hours, and nothing after. Onward on
+**the same plane** is a through flight: passengers stay aboard, so it's
+a good connection at any wait. The scale (0.6) was set so a Rolling
+hub, whose flights meet only by chance, connects about as many as the
+earlier frequency-based model did (0.19–0.21 a spoke pair against 0.22,
+measured on the steady player's networks at day 150); banks earn more.
 
 **They ride both legs.** Each flow is added to the demand of both routes
 it uses (`connectingDemandOnMarket()`), where it books seats and pays
@@ -2121,25 +2130,39 @@ doesn't stay full on connections alone.
 for the flows at both ends, and working them out visits every pair of a
 hub's spokes, so a thirty-spoke hub made them most of the simulation's
 time. `connectingFlowsAt()` writes out its inputs as a short string: the
-spokes with their flights and establishment, demand growth, the hub
-style, and which spoke pairs anyone flies nonstop. It reuses the last
+spokes with their arrival and departure times (and planes) at the hub
+and establishment, demand growth, and which spoke pairs anyone flies
+nonstop. It reuses the last
 answer for that hub while the string matches. The answer is exact, and a
 "what if" copy of the state (the hub planner's, the ring's) gets its own
 right answer. The cache is a module variable, never saved.
 
-**Hub styles** trade connections against the airport and the planes:
+**Hub styles** are how the planner times a hub's rotations, and so how
+well they meet:
 
-| Style | Connections | Peak congestion | Extra ground time per arrival |
-|---|---|---|---|
-| Rolling (default) | 0.5 | 1.5× | none |
-| Banked | 0.75 | 1.75× | 20 min |
-| Tight banks | 1.0 | 2.1× | 35 min |
+| Style | Waves | Extra ground time per arrival |
+|---|---|---|
+| Rolling (default) | none: planes leave when ready | none |
+| Banked | every 3 h from 07:00 | 20 min |
+| Tight banks | every 2 h from 07:00 | 35 min |
 
-The extra ground time is paid in aircraft utilisation, like a turn
-buffer, and like one it absorbs delays. Changing style re-times every
-plane flying into the hub (`applyHubStyleChange()`). Where a plane's day
-overflows, rotations move to other planes in the same pool; the change is
-refused only when no plane has room.
+Under a banked style every rotation from the hub starts on a wave
+(`nextBankMinute()`): new ones from the planner, and existing ones when
+the style changes. Departures bunch, so the planes coming back meet the
+next wave; but the wave hours fill (`sim/hours.ts`) and congest, and
+the extra ground time is paid in aircraft utilisation, like a turn
+buffer (and like one it absorbs delays). Changing style re-times every
+plane flying into the hub or based there (`applyHubStyleChange()`).
+Where a plane's day overflows, rotations move to other planes in the
+same pool; the change is refused only when no plane has room. Re-timing
+keeps each rotation's start unless the one before it now runs into it,
+so gaps the planner or the Schedule made to reach a free hour stay.
+The ring's Hub style choices and the Plan hub window value each style on
+the schedule it would re-time (`connectingUnderStyle()`).
+
+The headless player runs its home hub the way Plan hub says pays best,
+reviewed weekly, when the gain is at least $500 a day: a player who
+never touched the style would connect only by chance.
 
 **On the map**, hovering a hub draws its connecting flows. Fainter dashed
 curves show its own passengers who connect onward somewhere else

@@ -2,6 +2,7 @@ import aircraftTypesData from '../../data/aircraft-types.json';
 import { classRank } from './aircraftClasses';
 import { dailyMovementsAt } from './airports';
 import { airportHours, hourlyRoomProblem, hourOf, hoursWithRoom, type AirportHours } from './hours';
+import { nextBankMinute } from './hubStyle';
 import { minuteOfDayToTimeString } from './clock';
 import { greatCircleDistanceNm } from './geo';
 import { policyFare } from './pricing';
@@ -197,7 +198,8 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
   const aircraft = state.aircraft.find((a) => a.tail === tail);
   const type = aircraft ? aircraftTypesByCode.get(aircraft.typeCode) : undefined;
 
-  const earliestStart = rotationStartMinute(tail, state);
+  // At a banked hub a rotation waits for the next wave (sim/hubStyle.ts).
+  const earliestStart = nextBankMinute(state, base.iata, rotationStartMinute(tail, state));
   let legs = packRotationAvoidingCollisions(rotationAirports, type?.cruiseKts, earliestStart, state);
   const clockMinutes = legs.reduce(
     (total, leg) => total + legUtilisationMinutes(leg.blockMinutes, extraTurnMinutes(state, leg.origin, leg.dest)),

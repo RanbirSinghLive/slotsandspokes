@@ -170,8 +170,9 @@ export function planHub(state: SimState, hub: string): HubPlan {
 
   const lateDays = new Set<HubStyle>();
   const styles: StylePreview[] = HUB_STYLE_ORDER.map((candidate) => {
-    const after = { ...state, hubStyles: { ...state.hubStyles, [hub]: candidate } };
     const plan = candidate === style ? null : planHubStyleChange(state, hub, candidate);
+    // Connections come from real times (sim/hubs.ts), so a style is judged on the schedule it would re-time.
+    const after = { ...state, hubStyles: { ...state.hubStyles, [hub]: candidate }, schedule: plan?.ok ? plan.schedule : state.schedule };
     if (plan?.ok && latestArrival(plan.schedule) > USABLE_DAY_END_MINUTE - CURFEW_MARGIN_MINUTES) lateDays.add(candidate);
     return {
       style: candidate,
@@ -189,7 +190,8 @@ export function planHub(state: SimState, hub: string): HubPlan {
     if (preview.style === style || preview.blockedReason) continue;
     if (preview.load > MAX_RECOMMENDED_LOAD && preview.load > airportLoad(state, hub)) continue;
     if (lateDays.has(preview.style) && latestArrival(state.schedule) <= USABLE_DAY_END_MINUTE - CURFEW_MARGIN_MINUTES) continue;
-    const after = { ...state, hubStyles: { ...state.hubStyles, [hub]: preview.style } };
+    const plan = planHubStyleChange(state, hub, preview.style);
+    const after = { ...state, hubStyles: { ...state.hubStyles, [hub]: preview.style }, schedule: plan.ok ? plan.schedule : state.schedule };
     const { revenue, passengers } = connectionRevenueGain(state, after, hub);
     // Going to a less-banked style loses connections too; value that loss the same capped way.
     const { revenue: lost } = connectionRevenueGain(after, state, hub);

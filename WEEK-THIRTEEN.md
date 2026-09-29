@@ -42,6 +42,22 @@ the owner:
   live by `sim/retime.ts` (hour room, turns, curfew, slots re-priced by
   hour, margin change, crew warning); a move to a time already past
   today starts tomorrow.
+- **Done: thread 5.** Connections from real times (40 min to 3 h at the
+  hub, through flights on the same plane); hub style is the planner's
+  waves (Banked every 3 h, Tight every 2 h from 07:00); re-timing keeps
+  rotation starts; the headless player follows Plan hub's style advice
+  weekly. Connection scale set so Rolling ≈ the old model on mid-game
+  networks.
+- **From the owner's first tries:** the drag cancels cleanly if the
+  panel rebuilds under it (it used to freeze the timeline), holds the
+  clock while held, shows its time on the block and a dashed outline of
+  where it was, and says why when it snaps back; no drop onto an AOG
+  plane. The airport hour chart has a y-axis in movements, a dashed
+  line at the hour's room, and a readout of the hour under the pointer.
+- **Balance, steady medians after thread 5:** YUL $1.7M (2/6 busts), YYZ
+  $19.6M, BOS $43.6M (2/6), PHL $57.2M, LHR $132.8M (1/6), YHZ busts 6/6.
+  Harsher than before the project at YUL, YYZ and YHZ: the balance pass
+  is next.
 
 **State at handoff:** save key `slotsandspokes-save`, save format 2.
 Every leg already has a real time (`ScheduleLeg.departMinute`), but the

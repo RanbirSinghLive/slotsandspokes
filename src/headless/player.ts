@@ -2,6 +2,7 @@ import { currentPotentialDemand } from '../sim/marketDemand';
 import { contractOn, contractsOf, performanceFactor } from '../sim/contracts';
 import airportsData from '../../data/airports.json';
 import { inboundAt } from '../sim/fleetTiming';
+import { planHub } from '../sim/hubPlanner';
 import { airportHours, averageHourLoad } from '../sim/hours';
 import { lastWeekMargin } from '../sim/pnlHistory';
 import { AIRCRAFT_CLASSES, classByCode } from '../sim/aircraftClasses';
@@ -335,12 +336,37 @@ function steadyPlayer(kind: 'steady' | 'sitter' | 'bold'): Player {
         ...returnIdle(state, memory),
         ...keepCrews(state, memory),
         ...pickStances(state, memory),
+        ...runHomeHub(state),
         ...adoptInnovations(state),
         ...(kind === 'steady' ? hedgeWhenCheap(state) : []),
         ...(kind === 'steady' ? hireExecutives(state) : []),
       ];
     },
   };
+}
+
+// --- The home hub ------------------------------------------------------
+
+/** How often the player looks at how its home hub is run, in days. */
+const HUB_REVIEW_DAYS = 7;
+/** A style change has to be worth this much a day before it's made. */
+const HUB_STYLE_WORTH_PER_DAY = 500;
+
+/**
+ * Once a week, run the home hub the way the Plan hub window
+ * (sim/hubPlanner.ts) says pays best, when its advice is worth
+ * HUB_STYLE_WORTH_PER_DAY or more. Connections come from real times
+ * (sim/hubs.ts), and a hub's style is how its rotations are timed, so a
+ * player who never touched it would connect only by chance: the balance
+ * numbers would describe a player who never opens the window.
+ */
+function runHomeHub(state: SimState): string[] {
+  if (dayIndex(state) % HUB_REVIEW_DAYS !== 0) return [];
+  const home = state.homeAirport;
+  const move = planHub(state, home).moves.find((m) => m.kind === 'style');
+  if (!move || move.kind !== 'style' || move.gainPerDay < HUB_STYLE_WORTH_PER_DAY) return [];
+  const result = actions.setHubStyle(state, home, move.style);
+  return result.ok ? [result.message] : [];
 }
 
 // --- Contracts -------------------------------------------------------

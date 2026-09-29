@@ -4,7 +4,7 @@ import { money } from './format';
 import { findNearestOwnRoute } from '../render/routes';
 import { projection } from '../render/projection';
 import { TURN_BUFFER_CHOICES } from '../sim/turnBuffer';
-import { connectingPassengersThrough, spokesOf } from '../sim/hubs';
+import { connectingUnderStyle, spokesOf } from '../sim/hubs';
 import { HUB_STYLES, HUB_STYLE_ORDER, hubStyleAt } from '../sim/hubStyle';
 import { setMapPreview, type MapPreview } from '../render/preview';
 import type { SimState } from '../sim/state';
@@ -250,9 +250,7 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
     const spec = HUB_STYLES[style];
     const isCurrent = style === current;
     const plan = isCurrent ? null : ops.previewHubStyle(state, airport.iata, style);
-    const connectingAfter = Math.round(
-      connectingPassengersThrough({ ...state, hubStyles: { ...state.hubStyles, [airport.iata]: style } }, airport.iata),
-    );
+    const connectingAfter = Math.round(connectingUnderStyle(state, airport.iata, style));
     return {
       id: `hub:${style}`,
       label: `${spec.name}${isCurrent ? ' (current)' : ''} · ~${connectingAfter} connecting/day · ${spec.description}`,

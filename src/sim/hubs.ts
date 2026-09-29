@@ -3,7 +3,7 @@ import { executiveConnectingMultiplier } from './executives';
 import { connectingFeedMultiplier } from './innovations';
 import { actualDailyDemand, currentPotentialDemand } from './marketDemand';
 import { marketKey } from './schedule';
-import { HUB_STYLES, hubStyleAt, type HubStyle } from './hubStyle';
+import { hubStyleAt, type HubStyle } from './hubStyle';
 import { planRespace, applyRespace, workingCopy, type TurnBufferPlan } from './turnBuffer';
 import { recessionFactor } from './shocks';
 import type { SimState } from './state';
@@ -14,15 +14,16 @@ import type { SimState } from './state';
  * replaces the flat "connectivity multiplier", which paid a hub
  * for its size whether or not anything connected through it.
  *
- * Worked out from how often routes fly, never from times — the player
- * never authors a schedule (WEEK-SEVEN.md), and a connection model that
- * needed them would drag a timeline back in. For each pair of spokes:
+ * Worked out from the schedule's real times (WEEK-THIRTEEN.md, thread 5):
+ * a passenger from A connects to B only where a flight in from A lands at
+ * the hub between MIN_CONNECT_MINUTES and MAX_CONNECT_MINUTES before one
+ * out to B leaves, or the same plane flies on to B (a through flight). How a hub is run (sim/hubStyle.ts) is how the planner
+ * times its rotations, and so how well they meet. For each pair of spokes:
  *
  *   passengers = A–B city-pair potential   (the gravity model, sim/demand.ts)
  *              × CONNECT_SHARE             (the slice willing to change planes)
  *              × establishment             (how built-up both spoke routes are)
- *              × frequency chance          (more flights, more that line up)
- *              × hub style efficiency      (sim/hubStyle.ts)
+ *              × timed chance              (how many arrivals meet a departure, and how soon)
  *              × circuity                  (nobody flies far out of their way)
  *              × nonstop discount          (fewer connect if anyone flies A–B direct)
  *
@@ -36,12 +37,25 @@ import type { SimState } from './state';
 /** Share of an A–B city pair's latent demand that would connect through a hub rather than go another way. */
 const CONNECT_SHARE = 0.03;
 /**
- * How fast more frequency helps: the chance a passenger finds a workable
- * connection is 1 - e^(-flights / FREQUENCY_SCALE) on the thinner of the
- * two routes. One daily flight each way lines up about 40% of the time,
- * two about 63%, four about 86%.
+ * How fast more good connections help: the chance a passenger finds one
+ * is 1 - e^(-connections / CONNECTION_SCALE), where each arrival from A
+ * counts as much as its best onward departure to B is good (1 for a wait
+ * up to GOOD_CONNECT_MINUTES, falling to POOR_CONNECT_QUALITY at the
+ * longest). One good connection a day lines up about 81% of passengers.
+ * Set so a Rolling hub, whose times meet only by chance, connects about
+ * as many as the frequency-based model did (measured on the steady
+ * player's networks at day 150: 0.19–0.21 a spoke pair against 0.22),
+ * leaving banks to earn more.
  */
-const FREQUENCY_SCALE = 2;
+const CONNECTION_SCALE = 0.6;
+/** The shortest wait at the hub a passenger and their bag can make. */
+export const MIN_CONNECT_MINUTES = 40;
+/** A wait up to this long is a good connection... */
+const GOOD_CONNECT_MINUTES = 75;
+/** ...falling to this much of one at the longest wait anyone takes... */
+const POOR_CONNECT_QUALITY = 0.25;
+/** ...which is this. */
+export const MAX_CONNECT_MINUTES = 180;
 /** Routing via the hub at up to this multiple of the direct distance costs nothing... */
 const CIRCUITY_FREE = 1.3;
 /** ...and nobody connects beyond this multiple. */
@@ -90,22 +104,73 @@ function establishment(state: SimState, a: string, b: string): number {
   return target > 0 ? Math.min(1, actualDailyDemand(state, a, b) / target) : 0;
 }
 
-function frequencyChance(flightsPerDay: number): number {
-  return 1 - Math.exp(-flightsPerDay / FREQUENCY_SCALE);
+/** How good a connection with this wait at the hub is, 0–1; 0 outside the connecting window. */
+export function connectionQuality(waitMinutes: number): number {
+  if (waitMinutes < MIN_CONNECT_MINUTES || waitMinutes > MAX_CONNECT_MINUTES) return 0;
+  if (waitMinutes <= GOOD_CONNECT_MINUTES) return 1;
+  return 1 - ((1 - POOR_CONNECT_QUALITY) * (waitMinutes - GOOD_CONNECT_MINUTES)) / (MAX_CONNECT_MINUTES - GOOD_CONNECT_MINUTES);
+}
+
+/**
+ * Every arrival counted by its best onward departure: the connections a
+ * day one way. Onward on the same plane is a through flight: passengers
+ * stay aboard, so it's a good connection at any wait, the turn included.
+ */
+function connectionsOneWay(arrivals: HubTime[], departures: HubTime[]): number {
+  let total = 0;
+  for (const arrival of arrivals) {
+    let best = 0;
+    for (const departure of departures) {
+      const wait = departure.minute - arrival.minute;
+      const quality = departure.tail === arrival.tail && wait >= 0 && wait <= MAX_CONNECT_MINUTES ? 1 : connectionQuality(wait);
+      if (quality > best) best = quality;
+    }
+    total += best;
+  }
+  return total;
+}
+
+/** The chance a passenger between A and B finds a connection at the hub, averaged over both directions. */
+function timedChance(times: SpokeTimes, a: string, b: string): number {
+  const chance = (connections: number) => 1 - Math.exp(-connections / CONNECTION_SCALE);
+  const ab = connectionsOneWay(times.arrivalsFrom.get(a) ?? [], times.departuresTo.get(b) ?? []);
+  const ba = connectionsOneWay(times.arrivalsFrom.get(b) ?? [], times.departuresTo.get(a) ?? []);
+  return (chance(ab) + chance(ba)) / 2;
+}
+
+/** A flight at the hub: when it lands or leaves (schedule minutes, home clock) and on which plane. */
+type HubTime = { minute: number; tail: string };
+
+/** When your flights land at the hub from each spoke, and leave it for each. */
+type SpokeTimes = { arrivalsFrom: Map<string, HubTime[]>; departuresTo: Map<string, HubTime[]> };
+
+function spokeTimes(state: SimState, hub: string): SpokeTimes {
+  const arrivalsFrom = new Map<string, HubTime[]>();
+  const departuresTo = new Map<string, HubTime[]>();
+  const add = (map: Map<string, HubTime[]>, spoke: string, time: HubTime) => {
+    const list = map.get(spoke);
+    if (list) list.push(time);
+    else map.set(spoke, [time]);
+  };
+  for (const leg of state.schedule) {
+    if (leg.dest === hub) add(arrivalsFrom, leg.origin, { minute: leg.departMinute + leg.blockMinutes, tail: leg.tail });
+    if (leg.origin === hub) add(departuresTo, leg.dest, { minute: leg.departMinute, tail: leg.tail });
+  }
+  for (const list of [...arrivalsFrom.values(), ...departuresTo.values()]) list.sort((x, y) => x.minute - y.minute);
+  return { arrivalsFrom, departuresTo };
 }
 
 /**
  * Connecting passengers between spokes `a` and `b` through `hub`, given
- * each spoke route's flights per day and establishment, and whether anyone
- * flies A–B nonstop.
+ * when each spoke's flights meet at the hub, each spoke route's
+ * establishment, and whether anyone flies A–B nonstop.
  */
 function flowBetween(
   state: SimState,
   hub: string,
   a: string,
   b: string,
-  flightsA: number,
-  flightsB: number,
+  times: SpokeTimes,
   establishedA: number,
   establishedB: number,
   nonstopFlown: boolean,
@@ -115,8 +180,7 @@ function flowBetween(
     currentPotentialDemand(state, a, b) *
     CONNECT_SHARE *
     Math.min(establishedA, establishedB) *
-    frequencyChance(Math.min(flightsA, flightsB)) *
-    HUB_STYLES[hubStyleAt(state, hub)].connectionEfficiency *
+    timedChance(times, a, b) *
     circuityFactor(a, hub, b) *
     nonstop *
     // A codeshare partner (sim/innovations.ts) and a network CCO
@@ -135,8 +199,8 @@ function flowBetween(
  * pair of spokes, which grows with the square of the hub's size: at
  * thirty spokes it was two-thirds of all simulation time. Yet the answer
  * only changes when one of its inputs does, and those are few: the
- * spokes and their flights, how built-up each spoke route is, demand
- * growth, the hub's style, and which spoke pairs anyone flies nonstop.
+ * spokes and when their flights meet at the hub, how built-up each spoke
+ * route is, demand growth, and which spoke pairs anyone flies nonstop.
  *
  * So each call writes those inputs out as a string, which is cheap, and
  * reuses the last answer when the string matches. That makes it exact by
@@ -164,9 +228,16 @@ export function connectingFlowsAt(state: SimState, hub: string): ConnectingFlow[
     if (spokeSet.has(route.origin) && spokeSet.has(route.dest)) nonstop.add(marketKey(route.origin, route.dest));
   }
   const established = spokes.map(([spoke]) => establishment(state, spoke, hub));
+  const times = spokeTimes(state, hub);
+  const timeKey = spokes
+    .map(([spoke]) => {
+      const list = (entries: HubTime[] | undefined) => (entries ?? []).map((t) => `${t.minute}${t.tail}`).join('.');
+      return `${spoke}<${list(times.arrivalsFrom.get(spoke))}>${list(times.departuresTo.get(spoke))}`;
+    })
+    .join(',');
 
   const inputs = [
-    hubStyleAt(state, hub),
+    timeKey,
     connectingFeedMultiplier(state),
     executiveConnectingMultiplier(state),
     state.demandGrowthMultiplier,
@@ -180,9 +251,9 @@ export function connectingFlowsAt(state: SimState, hub: string): ConnectingFlow[
   const flows: ConnectingFlow[] = [];
   for (let i = 0; i < spokes.length; i++) {
     for (let j = i + 1; j < spokes.length; j++) {
-      const [a, flightsA] = spokes[i];
-      const [b, flightsB] = spokes[j];
-      const passengers = flowBetween(state, hub, a, b, flightsA, flightsB, established[i], established[j], nonstop.has(marketKey(a, b)));
+      const [a] = spokes[i];
+      const [b] = spokes[j];
+      const passengers = flowBetween(state, hub, a, b, times, established[i], established[j], nonstop.has(marketKey(a, b)));
       if (passengers >= 0.5) flows.push({ hub, a, b, passengers });
     }
   }
@@ -232,13 +303,23 @@ export function connectingDemandOnMarket(state: SimState, origin: string, dest: 
 
 /**
  * What switching `hub` to `style` would do to the schedule: every plane
- * flying into it gets the style's hub wait after each arrival there,
+ * flying into it gets the style's hub wait after each arrival there, and
+ * every plane based there starts its rotations on the style's waves,
  * re-timed and re-pooled exactly like a turn-buffer change.
  */
 export function planHubStyleChange(state: SimState, hub: string, style: HubStyle): TurnBufferPlan {
   const work = workingCopy(state, { hubStyles: { ...state.hubStyles, [hub]: style } });
-  const affectedTails = [...new Set(state.schedule.filter((leg) => leg.dest === hub).map((leg) => leg.tail))];
+  const basedHere = new Set(state.aircraft.filter((aircraft) => aircraft.baseAirport === hub).map((aircraft) => aircraft.tail));
+  const affectedTails = [...new Set(state.schedule.filter((leg) => leg.dest === hub || basedHere.has(leg.tail)).map((leg) => leg.tail))];
   return planRespace(state, work, affectedTails);
+}
+
+/** Connecting passengers a day through `hub` if it were run as `style`, its flights re-timed to match. */
+export function connectingUnderStyle(state: SimState, hub: string, style: HubStyle): number {
+  if (style === hubStyleAt(state, hub)) return connectingPassengersThrough(state, hub);
+  const plan = planHubStyleChange(state, hub, style);
+  if (!plan.ok) return connectingPassengersThrough(state, hub);
+  return connectingPassengersThrough({ ...state, hubStyles: { ...state.hubStyles, [hub]: style }, schedule: plan.schedule }, hub);
 }
 
 export function applyHubStyleChange(

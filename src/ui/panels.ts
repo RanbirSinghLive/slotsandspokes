@@ -214,8 +214,11 @@ let lastTimelineState: SimState | null = null;
 
 function renderRotations(state: SimState): void {
   lastTimelineState = state;
-  // Mid-drag the timeline is the player's; a rebuild would drop what they hold.
-  if (drag) return;
+  // Mid-drag the timeline is the player's; a rebuild would drop what they
+  // hold. Unless what they hold is already gone (the panel rebuilt around
+  // it): then the drag is over.
+  if (drag && drag.span.isConnected) return;
+  if (drag) cancelDrag();
   const rotations = allRotations(state);
   const signature =
     [...collapsedTypes].join(',') +
@@ -378,6 +381,19 @@ type Drag = {
 
 let drag: Drag | null = null;
 let justDragged = false;
+/** Where the held rotation started, drawn dashed while it's dragged. */
+let dragGhost: HTMLElement | null = null;
+
+/**
+ * The clock is held while a rotation is dragged, so the numbers in the tip
+ * don't move under the player, and runs again at its speed after.
+ * main.ts owns the speed, so it hands these in.
+ */
+let scheduleClock: { hold: () => void; release: () => void } = { hold: () => {}, release: () => {} };
+
+export function setScheduleClock(clock: { hold: () => void; release: () => void }): void {
+  scheduleClock = clock;
+}
 let timelineHours: { label: HTMLElement; strip: HTMLElement; at: (minute: number) => string; width: (minutes: number) => string } | null = null;
 const DRAG_THRESHOLD_PX = 4;
 
@@ -411,6 +427,7 @@ function startDrag(event: PointerEvent, span: HTMLElement, rotation: Rotation, t
   span.addEventListener('pointermove', onDragMove);
   span.addEventListener('pointerup', onDragEnd);
   span.addEventListener('pointercancel', cancelDrag);
+  span.addEventListener('lostpointercapture', cancelDrag);
 }
 
 function onDragMove(event: PointerEvent): void {
@@ -420,7 +437,16 @@ function onDragMove(event: PointerEvent): void {
   if (!drag.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
   if (!drag.moved) {
     drag.moved = true;
+    scheduleClock.hold();
     drag.span.classList.add('is-dragging');
+    // The browser's own hover tips would sit over what's being dragged.
+    drag.span.removeAttribute('title');
+    for (const el of rotationsTimelineEl.querySelectorAll('[title]')) el.removeAttribute('title');
+    dragGhost = document.createElement('div');
+    dragGhost.className = 'timeline-ghost';
+    dragGhost.style.left = drag.span.style.left;
+    dragGhost.style.width = drag.span.style.width;
+    drag.homeTrack.append(dragGhost);
     showBaseHours(lastTimelineState, drag.rotation.airports[0]);
   }
   // The row under the pointer, if it's a plane of the same type; else its own.
@@ -437,12 +463,14 @@ function onDragMove(event: PointerEvent): void {
   }
   const plan = drag.plan!;
   drag.span.classList.toggle('is-bad', !plan.ok);
+  drag.span.dataset.time = minuteOfDayToTimeString(start);
   dragTip.textContent = plan.ok ? describeRetime(plan, tail, drag.rotation.tail, start) : `${minuteOfDayToTimeString(start)} · ${plan.reason}`;
   dragTip.classList.toggle('is-bad', !plan.ok);
   dragTip.hidden = false;
   const spanRect = drag.span.getBoundingClientRect();
   dragTip.style.left = `${Math.max(8, Math.min(window.innerWidth - dragTip.offsetWidth - 8, spanRect.left))}px`;
-  dragTip.style.top = `${Math.max(8, spanRect.top - dragTip.offsetHeight - 6)}px`;
+  // Under the block: its time is on top of it.
+  dragTip.style.top = `${Math.min(window.innerHeight - dragTip.offsetHeight - 8, spanRect.bottom + 6)}px`;
 }
 
 /** What a move would do, in ops shorthand: "08:10 · C-P004 · +$1,200/day · slots +$40/day". */
@@ -468,6 +496,9 @@ function onDragEnd(): void {
     const result = retimeRotation(lastTimelineState, rotation.legs.map((leg) => leg.legId), target.tail, target.start);
     renderScheduleWarnings(scheduleProblems(lastTimelineState));
     flashTip(result.ok ? result.message : result.reason, !result.ok);
+  } else if (plan && !plan.ok) {
+    // Snapped back: say why, where the tip was, so the player isn't left guessing.
+    flashTip(`Not moved · ${plan.reason}`, true);
   }
   rebuildTimeline();
 }
@@ -483,6 +514,11 @@ function finishDrag(): void {
   drag.span.removeEventListener('pointermove', onDragMove);
   drag.span.removeEventListener('pointerup', onDragEnd);
   drag.span.removeEventListener('pointercancel', cancelDrag);
+  drag.span.removeEventListener('lostpointercapture', cancelDrag);
+  if (drag.moved) scheduleClock.release();
+  delete drag.span.dataset.time;
+  dragGhost?.remove();
+  dragGhost = null;
   drag = null;
   dragTip.hidden = true;
   if (timelineHours) {

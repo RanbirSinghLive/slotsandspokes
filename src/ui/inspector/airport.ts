@@ -164,31 +164,69 @@ function loadAndSlots(state: SimState, iata: string): HTMLElement[] {
 
 /**
  * The airport's day by the hour, 06:00–22:00: a column per hour, yours
- * (blue) and rivals' (grey) stacked against the hour's room, red past it.
- * Hovering a column says the numbers.
+ * (blue) and rivals' (grey) stacked on one scale, with the hour's room as
+ * a dashed line and a y-axis in movements. Pointing at a column puts its
+ * numbers in the line under the chart; otherwise that line reads the
+ * busiest hour.
  */
 function hourStrip(hours: AirportHours): HTMLElement {
+  const openHours = Array.from({ length: OPEN_HOURS }, (_, i) => FIRST_OPEN_HOUR + i);
+  const capacity = hours.capacity[FIRST_OPEN_HOUR];
+  const top = Math.max(1, capacity, ...openHours.map((hour) => hours.mine[hour] + hours.rivals[hour]));
+  const pct = (n: number) => `${(n / top) * 100}%`;
+  const one = (n: number) => String(Math.round(n * 10) / 10);
+  const hourText = (hour: number) => `${String(hour).padStart(2, '0')}:00`;
+  const describe = (hour: number) =>
+    `${hourText(hour)} · you ${hours.mine[hour]} · rivals ${one(hours.rivals[hour])} · room ${Math.max(0, freeInHour(hours, hour))} of ${one(capacity)}`;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'hour-chart';
+  const axis = document.createElement('div');
+  axis.className = 'hour-axis';
+  for (const [value, label] of [
+    [top, one(top)],
+    [0, '0'],
+  ] as const) {
+    const tick = document.createElement('span');
+    tick.style.bottom = pct(value);
+    tick.textContent = label;
+    axis.append(tick);
+  }
   const strip = document.createElement('div');
   strip.className = 'hour-strip';
-  for (let hour = FIRST_OPEN_HOUR; hour < FIRST_OPEN_HOUR + OPEN_HOURS; hour++) {
-    const capacity = hours.capacity[hour];
+  const capLine = document.createElement('span');
+  capLine.className = 'hour-strip-cap';
+  capLine.style.bottom = pct(capacity);
+  capLine.title = `Room ${one(capacity)} movements an hour`;
+  strip.append(capLine);
+
+  const readout = line('', 'inspector-line hour-readout');
+  const peak = peakHour(hours).hour;
+  const rest = `Peak ${describe(peak)}`;
+  readout.textContent = rest;
+
+  for (const hour of openHours) {
     const mine = hours.mine[hour];
     const rivals = hours.rivals[hour];
     const column = document.createElement('div');
     column.className = 'hour-strip-col';
-    const over = mine + rivals > capacity + 1e-6;
     column.classList.toggle('is-full', freeInHour(hours, hour) < 1);
-    column.classList.toggle('is-over', over);
-    const scale = Math.max(capacity, mine + rivals, 1);
+    column.classList.toggle('is-over', mine + rivals > capacity + 1e-6);
     const mineEl = document.createElement('span');
     mineEl.className = 'hour-strip-mine';
-    mineEl.style.height = `${(mine / scale) * 100}%`;
+    mineEl.style.height = pct(mine);
     const rivalEl = document.createElement('span');
     rivalEl.className = 'hour-strip-rivals';
-    rivalEl.style.height = `${(rivals / scale) * 100}%`;
+    rivalEl.style.height = pct(rivals);
     column.append(rivalEl, mineEl);
-    const label = `${String(hour).padStart(2, '0')}:00`;
-    column.title = `${label} · you ${mine} · rivals ${Math.round(rivals * 10) / 10} · room ${Math.max(0, freeInHour(hours, hour))} of ${Math.round(capacity * 10) / 10}`;
+    column.addEventListener('mouseenter', () => {
+      readout.textContent = describe(hour);
+      column.classList.add('is-hover');
+    });
+    column.addEventListener('mouseleave', () => {
+      readout.textContent = rest;
+      column.classList.remove('is-hover');
+    });
     if (hour % 4 === 2) {
       const tick = document.createElement('span');
       tick.className = 'hour-strip-tick';
@@ -197,7 +235,10 @@ function hourStrip(hours: AirportHours): HTMLElement {
     }
     strip.append(column);
   }
-  return strip;
+  wrap.append(axis, strip);
+  const block = document.createElement('div');
+  block.append(wrap, readout);
+  return block;
 }
 
 /**

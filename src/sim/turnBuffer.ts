@@ -1,5 +1,6 @@
 import { classByCode } from './aircraftClasses';
 import { marketKey, nextLegId, type ScheduleLeg } from './schedule';
+import { nextBankMinute } from './hubStyle';
 import {
   aircraftUtilisation,
   isLongHaulRoundTrip,
@@ -63,17 +64,24 @@ function collides(schedule: ScheduleLeg[], leg: ScheduleLeg, departMinute: numbe
 }
 
 /**
- * Re-space one aircraft's whole day, keeping its first departure where it
- * is: each leg leaves one block time plus one scheduled turn after the
- * previous one. Mutates the legs in `work.schedule`.
+ * Re-space one aircraft's whole day: within a rotation each leg leaves one
+ * block time plus one scheduled turn after the previous one. A rotation
+ * starts where it did unless the one before now runs into it (so a gap the
+ * planner or the Schedule put there, to reach a free hour, stays), and at a
+ * banked hub on the next wave (sim/hubStyle.ts's nextBankMinute()).
+ * Mutates the legs in `work.schedule`.
  */
 function repackTail(work: SimState, tail: string): void {
   const legs = work.schedule.filter((leg) => leg.tail === tail).sort((a, b) => a.departMinute - b.departMinute);
   if (legs.length === 0) return;
+  const base = work.aircraft.find((aircraft) => aircraft.tail === tail)?.baseAirport;
+  const originalStarts = legs.map((leg) => leg.departMinute);
 
   let cursor = legs[0].departMinute;
-  for (const leg of legs) {
-    let departMinute = cursor;
+  for (let i = 0; i < legs.length; i++) {
+    const leg = legs[i];
+    const startsRotation = i === 0 || (leg.origin === base && legs[i - 1].dest === base);
+    let departMinute = startsRotation ? nextBankMinute(work, base, Math.max(cursor, originalStarts[i])) : cursor;
     for (let nudge = 0; nudge < MAX_COLLISION_NUDGES && collides(work.schedule, leg, departMinute); nudge++) {
       departMinute += COLLISION_NUDGE_MINUTES;
     }

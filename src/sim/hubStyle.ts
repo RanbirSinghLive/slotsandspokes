@@ -1,16 +1,18 @@
 import type { SimState } from './state';
 
 /**
- * How a hub is run, chosen per airport. No times involved: the player
- * picks a style and the schedule follows (sim/hubs.ts re-times it). Three
- * things pull against each other:
+ * How a hub is run, chosen per airport: how the route planner times the
+ * rotations that start there (WEEK-THIRTEEN.md, thread 5). Connections
+ * come from real times (sim/hubs.ts: an arrival meets a departure within
+ * a few hours), so the style is what lines them up. Three things pull
+ * against each other:
  *
- *   - Connection efficiency: how many of the passengers who *could*
- *     connect through here actually make it (sim/hubs.ts). Banking flights
- *     into waves lines arrivals up with departures.
- *   - Peaks: how bunched the airport's traffic is, which shows in the
- *     real hours its flights use (sim/hours.ts). Waves are peaks, so they
- *     fill hours and congest.
+ *   - Banks: under Banked or Tight banks, every rotation from the hub
+ *     starts on a wave (every BANK_PERIOD from FIRST_BANK_MINUTE), so
+ *     departures bunch and the planes coming back meet the next wave.
+ *     Rolling lets each plane go when it's ready.
+ *   - Peaks: waves bunch departures into the same hours, which fill
+ *     (sim/hours.ts) and congest.
  *   - Hub wait: extra scheduled ground time after every flight *into* this
  *     airport, while the wave assembles. Paid for in aircraft time, like a
  *     turn buffer (sim/turnBuffer.ts) — and, like one, it absorbs delays.
@@ -23,27 +25,31 @@ export type HubStyle = 'rolling' | 'banked' | 'tight';
 export type HubStyleSpec = {
   name: string;
   description: string;
-  connectionEfficiency: number;
+  /** Minutes between waves, or 0 for none (Rolling). */
+  bankPeriodMinutes: number;
   hubWaitMinutes: number;
 };
+
+/** The first wave of the day, home time. */
+export const FIRST_BANK_MINUTE = 7 * 60;
 
 export const HUB_STYLES: Record<HubStyle, HubStyleSpec> = {
   rolling: {
     name: 'Rolling',
-    description: 'Flights spread through the day. Smooth, but fewer connections line up.',
-    connectionEfficiency: 0.5,
+    description: 'Planes leave when ready. Smooth hours; connections only where times happen to meet.',
+    bankPeriodMinutes: 0,
     hubWaitMinutes: 0,
   },
   banked: {
     name: 'Banked',
-    description: 'Arrivals and departures grouped into waves. More connections, busier peaks, 20 min extra ground time per arrival.',
-    connectionEfficiency: 0.75,
+    description: 'Departures in waves every 3 h, 20 min extra ground time per arrival. More connections, fuller wave hours.',
+    bankPeriodMinutes: 180,
     hubWaitMinutes: 20,
   },
   tight: {
     name: 'Tight banks',
-    description: 'Short, dense waves. Most connections, sharpest peaks, 35 min extra ground time per arrival.',
-    connectionEfficiency: 1,
+    description: 'Waves every 2 h, 35 min extra ground time per arrival. Most connections, sharpest peaks.',
+    bankPeriodMinutes: 120,
     hubWaitMinutes: 35,
   },
 };
@@ -58,4 +64,16 @@ export function hubStyleAt(state: SimState, iata: string): HubStyle {
 /** Extra scheduled ground time after a flight into this airport. */
 export function hubWaitMinutes(state: SimState, iata: string): number {
   return HUB_STYLES[hubStyleAt(state, iata)].hubWaitMinutes;
+}
+
+/**
+ * When a rotation from this airport that could start at `minute` starts:
+ * the next wave at a banked hub (never before `minute`), `minute` itself
+ * under Rolling. Schedule minutes, home clock.
+ */
+export function nextBankMinute(state: SimState, iata: string | null | undefined, minute: number): number {
+  if (!iata) return minute;
+  const period = HUB_STYLES[hubStyleAt(state, iata)].bankPeriodMinutes;
+  if (period <= 0 || minute <= FIRST_BANK_MINUTE) return period <= 0 ? minute : FIRST_BANK_MINUTE;
+  return FIRST_BANK_MINUTE + Math.ceil((minute - FIRST_BANK_MINUTE) / period) * period;
 }

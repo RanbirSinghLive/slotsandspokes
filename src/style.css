@@ -986,6 +986,36 @@ body {
   box-shadow: 0 0 0 1px var(--puck), 0 2px 6px rgba(0, 0, 0, 0.5);
 }
 
+/* The time the held rotation would leave, on the block itself. */
+.timeline-rotation.is-dragging::after {
+  content: attr(data-time);
+  position: absolute;
+  bottom: 100%;
+  left: -1px;
+  margin-bottom: 2px;
+  padding: 0 4px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 14px;
+  color: #0a0c12;
+  background: var(--puck);
+  border-radius: 3px;
+}
+
+.timeline-rotation.is-dragging.is-bad::after {
+  background: #ff5c5c;
+}
+
+/* Where the held rotation started. */
+.timeline-ghost {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border: 1px dashed color-mix(in srgb, var(--puck) 60%, transparent);
+  border-radius: 3px;
+  pointer-events: none;
+}
+
 .timeline-rotation.is-dragging.is-bad {
   background: rgba(255, 92, 92, 0.2);
   box-shadow: 0 0 0 1px #ff5c5c;
@@ -1019,6 +1049,7 @@ body {
   position: fixed;
   z-index: 60;
   padding: 3px 7px;
+  font-family: ui-monospace, Consolas, monospace;
   font-size: 11px;
   color: #e6e9f0;
   white-space: nowrap;
@@ -1307,13 +1338,54 @@ body {
   color: #ff8080;
 }
 
-/* An airport's day by the hour (ui/inspector/airport.ts): yours over rivals' in each hour's room. */
+/* An airport's day by the hour (ui/inspector/airport.ts): yours over
+   rivals' in each hour, on one scale, against the hour's room. */
+.hour-chart {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 4px;
+  margin: 4px 0 14px;
+}
+
+.hour-axis {
+  position: relative;
+  height: 44px;
+  font-size: 9px;
+  color: #8a93a6;
+  text-align: right;
+}
+
+.hour-axis span {
+  position: absolute;
+  right: 0;
+  transform: translateY(50%);
+  line-height: 10px;
+}
+
 .hour-strip {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(16, 1fr);
   gap: 2px;
-  height: 34px;
-  margin: 2px 0 16px;
+  height: 44px;
+}
+
+.hour-strip-cap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  border-top: 1px dashed #ffb347;
+  pointer-events: none;
+}
+
+.hour-strip-col.is-hover {
+  outline: 1px solid #c8d0e0;
+}
+
+.hour-readout {
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 8px;
 }
 
 .hour-strip-col {
@@ -1324,12 +1396,13 @@ body {
   border-radius: 2px;
 }
 
-.hour-strip-col.is-full {
-  box-shadow: inset 0 2px 0 #ffb347;
+.hour-strip-col.is-full .hour-strip-rivals,
+.hour-strip-col.is-full .hour-strip-mine {
+  filter: saturate(1.3) brightness(1.1);
 }
 
-.hour-strip-col.is-over {
-  box-shadow: inset 0 2px 0 #ff5c5c;
+.hour-strip-col.is-over .hour-strip-rivals {
+  background: #ff5c5c;
 }
 
 .hour-strip-mine {

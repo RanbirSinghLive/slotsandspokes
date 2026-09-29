@@ -25,7 +25,7 @@ import { chooseHome, homeOptions } from './sim/homes';
 import { showHomePicker } from './ui/homePicker';
 import { setAirportFilter, visibleAirports, type AirportFilter } from './ui/airportFilter';
 import { step } from './sim/step';
-import { updatePanel, renderScheduleWarnings, scheduleProblems, PANEL_WIDTH_PX } from './ui/panels';
+import { updatePanel, renderScheduleWarnings, scheduleProblems, PANEL_WIDTH_PX, setScheduleClock } from './ui/panels';
 import {
   setupRouteBuilder,
   handleRouteBuilderMouseDown,
@@ -567,6 +567,23 @@ setupCrashCatcher(
   () => saveFileText(state),
   () => feedbackUrl(state),
 );
+
+// The Schedule holds the clock while a rotation is dragged (ui/panels.ts),
+// so what its tip reads doesn't move under the player, then runs again at
+// the speed it had.
+let speedBeforeDrag: number | null = null;
+setScheduleClock({
+  hold: () => {
+    if (speedBeforeDrag !== null) return;
+    speedBeforeDrag = speedMultiplier;
+    speedMultiplier = 0;
+  },
+  release: () => {
+    if (speedBeforeDrag === null) return;
+    speedMultiplier = speedBeforeDrag;
+    speedBeforeDrag = null;
+  },
+});
 
 // Remembers whatever speed was active before a pause, so unpausing (either
 // the Pause button or the spacebar, below) resumes at that speed instead of
