@@ -777,7 +777,7 @@ any lens.
    Where a code doesn't fit, no label at that zoom. So the map thins itself by
    importance as it zooms out. The overlays never draw airports
    themselves, so layering them never doubles a dot.
-7. `weather.ts`'s `drawWeatherEffects()` — flash/particle effects at
+7. `weather.ts`'s `drawWeatherEffects()` — a storm cell or snow particles at
    airports with active weather (see "Weather," below).
 8. The route-builder's own preview (below).
 
@@ -1381,8 +1381,10 @@ rotation shows its chain, window and share; clicking it opens its route;
 its × removes it (two clicks).
 
 **Dragging a rotation** moves it, whole, its legs keeping their turns:
-left and right in 5-minute steps, or onto another plane of its type at
-its base. While it's held, `planRetime()` checks and prices the move and
+left and right in 5-minute steps, or up and down onto another plane of
+its type at its base (the row it would go to is outlined; the block
+slides over it but stays put in the page, since moving it would drop the
+pointer). While it's held, `planRetime()` checks and prices the move and
 a tip says what it would do ("10:15 · slots −$235/day") or why it can't
 ("ALB 08:00 full", "Overlaps C-R002's ALB→YUL at 08:55"), the block
 turns red where it can't go, and the base's hours show across the top
@@ -1517,14 +1519,16 @@ check, not per minute:
 Every roll goes through `state.rngSeed` (`sim/rng.ts`), so weather is
 exactly as reproducible as M9's delays: same seed, same weather history.
 
-**Visuals are the one place this deliberately breaks determinism**:
+**Visuals run on the page's clock, not the sim's**:
 `render/weather.ts`'s `drawWeatherEffects()` (drawn on the map panel
-only, after `drawAirports()`) gives a thunderstorm airport an occasional bright
-flash (`Math.random()`, ~5% chance per rendered frame) and a snowstorm
-airport a handful of small drifting particles, driven by a plain frame
-counter. CLAUDE.md's determinism rule is about `step()`, not rendering —
-nothing needs a flash to look identical on replay, only "a thunderstorm
-was active here" does, and that part *is* in `state`.
+only, after `drawAirports()`) gives a thunderstorm airport a soft violet
+cell and a small amber bolt, both brightening and dimming over about
+3 seconds, each airport on its own beat (from where it is) so a front
+ripples instead of flashing in step; random per-frame flashes strobed
+when a whole front was through. A snowstorm airport gets a handful of
+small drifting particles, driven by a plain frame counter. CLAUDE.md's
+determinism rule is about `step()`, not rendering: only "a thunderstorm
+was active here" needs to replay, and that part *is* in `state`.
 
 **Performance**: verified via the headless runner over a full simulated
 year (525,600 calls to `step()`) at 0.57 real CPU seconds — no

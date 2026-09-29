@@ -449,10 +449,20 @@ function onDragMove(event: PointerEvent): void {
     drag.homeTrack.append(dragGhost);
     showBaseHours(lastTimelineState, drag.rotation.airports[0]);
   }
-  // The row under the pointer, if it's a plane of the same type; else its own.
-  const under = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('.timeline-track[data-tail]');
-  const track = under && under.dataset.type === drag.homeTrack.dataset.type ? under : drag.homeTrack;
-  if (drag.span.parentElement !== track) track.append(drag.span);
+  // The row the pointer is level with, if it's a plane of the same type;
+  // else its own. Picked by height, not by what's under the pointer (the
+  // held block itself is), and shown by sliding the block over that row
+  // rather than moving it in the page: moving it would drop the pointer
+  // capture and end the drag.
+  const homeRect = drag.homeTrack.getBoundingClientRect();
+  const sameType = [...rotationsTimelineEl.querySelectorAll<HTMLElement>(`.timeline-track[data-type="${drag.homeTrack.dataset.type}"]`)];
+  const track =
+    sameType.find((candidate) => {
+      const rect = candidate.getBoundingClientRect();
+      return event.clientY >= rect.top - 3 && event.clientY <= rect.bottom + 3;
+    }) ?? drag.homeTrack;
+  drag.span.style.transform = `translateY(${track.getBoundingClientRect().top - homeRect.top}px)`;
+  for (const candidate of sameType) candidate.classList.toggle('is-drop-target', candidate === track && track !== drag.homeTrack);
   const start = Math.round((drag.rotation.departMinute + dx * drag.minutesPerPx) / 5) * 5;
   const tail = track.dataset.tail!;
   drag.span.style.left = `${((start - timelineWindow.start) / (timelineWindow.end - timelineWindow.start)) * 100}%`;
@@ -517,6 +527,8 @@ function finishDrag(): void {
   drag.span.removeEventListener('lostpointercapture', cancelDrag);
   if (drag.moved) scheduleClock.release();
   delete drag.span.dataset.time;
+  drag.span.style.transform = '';
+  for (const el of rotationsTimelineEl.querySelectorAll('.is-drop-target')) el.classList.remove('is-drop-target');
   dragGhost?.remove();
   dragGhost = null;
   drag = null;

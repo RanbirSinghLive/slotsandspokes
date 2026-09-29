@@ -3,12 +3,11 @@ import { airports, isAirportKnown } from './airports';
 import type { SimState } from '../sim/state';
 
 // Purely decorative — CLAUDE.md's determinism rule is about step() (the
-// simulation), not rendering, so there's no reason a lightning flash or a
-// snow particle needs to look identical on every replay of the same
-// state. `Math.random()` here is fine in a way it would never be under
-// sim/.
-const FLASH_PROBABILITY_PER_FRAME = 0.05;
-const FLASH_RADIUS_PX = 16;
+// simulation), not rendering, so an animation here can run on the page's
+// own clock rather than on state.
+const STORM_RADIUS_PX = 18;
+/** A storm cell's glow breathes this slowly, so a whole front reads as weather, not a strobe. */
+const STORM_PULSE_MS = 3200;
 const SNOW_PARTICLE_COUNT = 5;
 const SNOW_RADIUS_PX = 10;
 
@@ -17,12 +16,27 @@ const SNOW_RADIUS_PX = 10;
 // it doesn't need to (and shouldn't) come from state.simMinute.
 let animationFrame = 0;
 
+/** A small lightning bolt, centred on (x, y). */
+function drawBolt(ctx: CanvasRenderingContext2D, x: number, y: number, alpha: number): void {
+  ctx.beginPath();
+  ctx.moveTo(x + 1.5, y - 6);
+  ctx.lineTo(x - 3, y + 1);
+  ctx.lineTo(x, y + 1);
+  ctx.lineTo(x - 1.5, y + 6);
+  ctx.lineTo(x + 3.5, y - 1.5);
+  ctx.lineTo(x + 0.5, y - 1.5);
+  ctx.closePath();
+  ctx.fillStyle = `rgba(255, 214, 102, ${alpha})`;
+  ctx.fill();
+}
+
 /**
- * A subtle flash/drift at any airport currently under active weather
- * (sim/weather.ts) — thunderstorm airports flicker with an occasional
- * bright flash, snowstorm airports get a handful of small particles
- * drifting past. Ops mode only; called from main.ts's render() after
- * drawAirports() so the effect sits on top of the airport dot.
+ * The weather at every airport under it (sim/weather.ts): a thunderstorm
+ * is a soft violet cell with a small bolt beside the dot, its glow rising
+ * and falling slowly, each airport on its own beat so a front ripples
+ * rather than flashing in step; a snowstorm is a handful of small
+ * particles drifting past. Called from main.ts's render() after
+ * drawAirports() so it sits on top of the airport dot.
  */
 export function drawWeatherEffects(ctx: CanvasRenderingContext2D, state: SimState): void {
   animationFrame += 1;
@@ -36,12 +50,17 @@ export function drawWeatherEffects(ctx: CanvasRenderingContext2D, state: SimStat
     const [x, y] = point;
 
     if (event.kind === 'thunderstorm') {
-      if (Math.random() < FLASH_PROBABILITY_PER_FRAME) {
-        ctx.beginPath();
-        ctx.arc(x, y, FLASH_RADIUS_PX, 0, 2 * Math.PI);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
-        ctx.fill();
-      }
+      // Each airport's own beat, from where it is, so neighbours in a front drift out of step.
+      const beat = (performance.now() / STORM_PULSE_MS + (airport.lon + airport.lat) * 0.37) * 2 * Math.PI;
+      const pulse = 0.5 + 0.5 * Math.sin(beat);
+      const glow = ctx.createRadialGradient(x, y, 0, x, y, STORM_RADIUS_PX);
+      glow.addColorStop(0, `rgba(150, 130, 230, ${0.22 + 0.12 * pulse})`);
+      glow.addColorStop(1, 'rgba(150, 130, 230, 0)');
+      ctx.beginPath();
+      ctx.arc(x, y, STORM_RADIUS_PX, 0, 2 * Math.PI);
+      ctx.fillStyle = glow;
+      ctx.fill();
+      drawBolt(ctx, x + 9, y - 8, 0.6 + 0.35 * pulse);
     } else {
       ctx.fillStyle = 'rgba(230, 240, 255, 0.75)';
       for (let i = 0; i < SNOW_PARTICLE_COUNT; i++) {
