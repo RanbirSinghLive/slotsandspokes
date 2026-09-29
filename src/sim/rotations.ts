@@ -373,6 +373,7 @@ export function candidateTailsAt(state: SimState, baseIata: string): string[] {
  */
 export function autoPickTail(state: SimState, chain: RotationStop[], dest: RotationStop | null, typeCode?: string): string | null {
   // The player can name the type (the ring's Draw route fan, ui/mapMenu.ts); the plane is still picked for them.
+  // An AOG doesn't rule a plane out: it's back in days, and the schedule is built for the long run.
   const candidates = candidateTailsAt(state, chain[0].iata).filter(
     (tail) => typeCode === undefined || state.aircraft.find((a) => a.tail === tail)?.typeCode === typeCode,
   );
