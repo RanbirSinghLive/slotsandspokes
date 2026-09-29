@@ -11,6 +11,7 @@ import { rollTotalDelayMinutes, isOnTimeArrival } from './delays';
 import { rollCompetitorRouteOpenings, rollCompetitorFrequencyGrowth, rollRivalEntry, rollDailyRivalFares } from './competitors';
 import { bookingPerks, runningCostForDay } from './innovations';
 import { rollDailyFleet } from './fleetTiming';
+import { rollDailyRebases } from './rebase';
 import { networkOverheadPerDay } from './overhead';
 import { rollDailyMarketDemand, actualDailyDemand } from './marketDemand';
 import { revealReach } from './reach';
@@ -198,6 +199,7 @@ export function step(state: SimState): void {
     // day's leases are charged: a plane delivered today pays from today,
     // one gone back today pays nothing more.
     rollDailyFleet(state);
+    rollDailyRebases(state);
 
     // Lease cost: a flat per-day charge, not tied to whether the aircraft
     // actually flew that day. Every aircraft is leased (sim/leasing.ts).

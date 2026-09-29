@@ -142,8 +142,8 @@ function baseSpareMinutes(state: SimState, baseIata: string, tail: string): numb
   const pool = state.aircraft.filter(
     (aircraft) => aircraft.baseAirport === baseIata || (aircraft.tail === tail && aircraft.baseAirport === null),
   );
-  // A plane grounded by an AOG (sim/aog.ts) offers no time until it's back.
-  const flyable = pool.filter((aircraft) => !state.aogs.some((event) => event.tail === aircraft.tail));
+  // A plane grounded by an AOG (sim/aog.ts), or ferrying to another base (sim/rebase.ts), offers no time.
+  const flyable = pool.filter((aircraft) => !state.aogs.some((event) => event.tail === aircraft.tail) && aircraft.rebase === undefined);
   const capacityMinutes = flyable.length * USABLE_DAY_MINUTES;
   const usedMinutes = pool.reduce((total, aircraft) => total + aircraftUtilisation(state, aircraft.tail).minutes, 0);
   return capacityMinutes - usedMinutes;
@@ -357,7 +357,7 @@ function findExactTimeCollision(
  */
 export function candidateTailsAt(state: SimState, baseIata: string): string[] {
   return state.aircraft
-    .filter((a) => (a.baseAirport === baseIata || a.baseAirport === null) && a.returningOnDay === undefined)
+    .filter((a) => (a.baseAirport === baseIata || a.baseAirport === null) && a.returningOnDay === undefined && a.rebase === undefined)
     .map((a, index) => ({ tail: a.tail, rank: classRank(a.typeCode), index }))
     .sort((a, b) => a.rank - b.rank || a.index - b.index)
     .map((a) => a.tail);

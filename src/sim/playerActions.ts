@@ -45,6 +45,7 @@ import {
 } from './innovations';
 import { cashNeededToLease, LEASE_RESERVE_DAYS, leaseRateFor, loadLeaseRates } from './leasing';
 import { inboundAt, orderLease } from './fleetTiming';
+import { rebaseOptions, rebasePlane, type RebaseOption } from './rebase';
 import { daysUntilNextListing, listingsOf, returnBlockedReason, returnFee, returnLease, takeListing, type MarketListing } from './market';
 import { airlineCalled, classOpen, tierThatOpens } from './ladder';
 import { actualDailyDemand, currentPotentialDemand } from './marketDemand';
@@ -533,7 +534,7 @@ export function clearPlane(state: SimState, tail: string): Outcome<{ message: st
 /** Planes based here that could go back to the lessor now, and the ones that can't with why. */
 export function returnOptions(state: SimState, iata: string): { tail: string; name: string; fee: number; saves: number; ageYears: number; blocked: string | null }[] {
   return state.aircraft
-    .filter((aircraft) => aircraft.baseAirport === iata && aircraft.returningOnDay === undefined)
+    .filter((aircraft) => aircraft.baseAirport === iata && aircraft.returningOnDay === undefined && aircraft.rebase === undefined)
     .map((aircraft) => ({
       tail: aircraft.tail,
       name: classByCode(aircraft.typeCode)?.name ?? aircraft.typeCode,
@@ -546,6 +547,20 @@ export function returnOptions(state: SimState, iata: string): { tail: string; na
 
 export function returnPlane(state: SimState, tail: string): Outcome<{ message: string }> {
   return returnLease(state, tail);
+}
+
+/** Every other crew base a plane could ferry to (sim/rebase.ts), with its cost and crews there. */
+export function rebaseOptionsFor(state: SimState, tail: string): { blocked: string | null; options: RebaseOption[] } {
+  return rebaseOptions(state, tail);
+}
+
+/** Ferry a plane with no flights to another crew base; the new base's crew need is added to the message. */
+export function rebasePlaneTo(state: SimState, tail: string, to: string): Outcome<{ message: string }> {
+  const result = rebasePlane(state, tail, to);
+  if (!result.ok) return result;
+  const typeCode = state.aircraft.find((a) => a.tail === tail)?.typeCode ?? '';
+  const crewNote = crewAdvice(state, to, typeCode);
+  return { ok: true, message: result.message + (crewNote ? ` · ${crewNote}` : '') };
 }
 
 // --- Innovations --------------------------------------------------------------

@@ -2170,6 +2170,18 @@ ahead rather than reacted with:
   the planner's choice of plane, and still costs its lease and overhead,
   so swapping planes all the time costs twice. The return fee is paid up
   front.
+- **Rebasing** (`src/sim/rebase.ts`). A plane with no flights, on the
+  ground and not AOG or returning, can ferry empty to another of the
+  airline's crew bases, from its view on the Fleet screen. It pays the
+  ferry (block and departure costs, one hop per stretch of its range)
+  plus 3 days of its lease, then is away 2 days (`Aircraft.rebase`):
+  it flies nothing, isn't in the pools or the planner's choice, and
+  can't go AOG. It joins the new base at rollover. Crews don't move with
+  it, so it counts as a plane on its way at the new base
+  (`inboundAt()`) and needs 2 crews rated on it there, like a delivery.
+  It's cheaper and quicker than a return plus a new lease (14 days of
+  lease and a 7-day delivery), but not free, so moving the fleet to
+  wherever pays today still costs something.
 - **Crews** join 7 days after hiring, 10 after retraining (above).
 
 A fleet programmes COO (Lena Fischer) halves delivery and return times,
@@ -2181,7 +2193,7 @@ under its dot (`pendingByAirport()`): "+1 plane 3d · +2 crews 5d ·
 counts as an obstacle for the labels. The ticker says when a plane is
 delivered, when one has gone back, and when crews join.
 
-The headless player leases a class only with none of it already on its
+The headless player never rebases. It leases a class only with none of it already on its
 way (pools don't count a plane until it's delivered), hires its crews
 the same day, and fills any plane with nothing to fly (a delivery, or
 one emptied by cuts) with a whole day at once.

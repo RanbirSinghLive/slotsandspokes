@@ -13,6 +13,8 @@ import { planeIconElement } from '../planeIcons';
 import * as ops from '../routeActions';
 import { select, selectRoute } from '../selection';
 import { linkToMap } from '../mapLink';
+import { REBASE_DAYS, REBASE_FEE_LEASE_DAYS } from '../../sim/rebase';
+import { CREWS_PER_NEW_PLANE } from '../../sim/crews';
 
 /**
  * The inspector's views of the player's own aircraft
@@ -110,7 +112,8 @@ export function buildFleetView(state: SimState): HTMLElement {
     const detail = document.createElement('span');
     detail.className = 'inspector-row-detail';
     detail.textContent =
-      `${aircraft.baseAirport ?? 'no base'} · ${Math.round(use.share * 100)}% of day` +
+      (aircraft.rebase ? `${aircraft.rebase.from}→${aircraft.rebase.to} day ${aircraft.rebase.arrivesDay}` : (aircraft.baseAirport ?? 'no base')) +
+      ` · ${Math.round(use.share * 100)}% of day` +
       (flown > 0 ? ` · OTP ${onTime}/${flown}` : '') +
       (loadFactor !== null ? ` · LF ${Math.round(loadFactor * 100)}%` : '') +
       (aogFor(state, aircraft.tail) ? ' · AOG' : '');
@@ -152,6 +155,11 @@ export function buildAircraftView(state: SimState, tail: string, changed: () => 
     now.textContent = `Returning · gone day ${plane.returningOnDay} (${days}d) · lease still charged`;
     now.classList.add('is-over');
   }
+  if (plane?.rebase) {
+    const days = plane.rebase.arrivesDay - dayIndex(state);
+    now.textContent = `Ferrying ${plane.rebase.from}→${plane.rebase.to} · based there day ${plane.rebase.arrivesDay} (${days}d) · lease still charged`;
+    now.classList.add('is-warn');
+  }
   const aog = aogFor(state, tail);
   if (aog) {
     const days = daysUntilReturn(state, aog);
@@ -191,6 +199,8 @@ export function buildAircraftView(state: SimState, tail: string, changed: () => 
     root.append(list);
   }
 
+  const rebaseBlock = buildRebase(state, tail, changed);
+  if (rebaseBlock) root.append(rebaseBlock);
   const returnBlock = buildReturn(state, tail, changed);
   if (returnBlock) root.append(returnBlock);
   return root;
@@ -252,6 +262,56 @@ function buildDay(state: SimState, tail: string): HTMLElement {
     list.append(row);
   }
   return list;
+}
+
+/**
+ * Moving the plane to another crew base (sim/rebase.ts): one two-step
+ * button per base, cheapest first, with the crews rated on it there.
+ */
+function buildRebase(state: SimState, tail: string, changed: () => void): HTMLElement | null {
+  const aircraft = state.aircraft.find((a) => a.tail === tail)!;
+  if (!aircraft.baseAirport || aircraft.returningOnDay !== undefined || aircraft.rebase) return null;
+  const { blocked, options } = ops.rebaseOptionsFor(state, tail);
+  const block = document.createElement('div');
+  block.className = 'inspector-return';
+  block.append(
+    heading(
+      'Rebase',
+      `Ferry it empty to another of your crew bases: the flight's cost plus ${REBASE_FEE_LEASE_DAYS} days of lease, and ${REBASE_DAYS} days away flying nothing. Crews stay where they are, so the new base needs ${CREWS_PER_NEW_PLANE} crews rated on it, like a delivery.`,
+    ),
+  );
+  if (options.length === 0) {
+    block.append(line(`One crew base · lease a plane at another airport to open a second`));
+    return block;
+  }
+  if (blocked) block.append(line(blocked, 'inspector-line is-warn'));
+  for (const option of options) {
+    const button = linkToMap(document.createElement('button'), { kind: 'airport', iata: option.to });
+    button.type = 'button';
+    button.className = 'inspector-plan-hub';
+    const label = `Rebase to ${option.to} · ${money(option.fee)}${option.hops > 1 ? ` · ${option.hops} hops` : ''} · based day ${option.arrivesDay}`;
+    button.textContent = label;
+    button.disabled = option.blocked !== null;
+    let armed = false;
+    button.addEventListener('click', () => {
+      if (!armed) {
+        armed = true;
+        button.textContent = `Confirm ${tail} to ${option.to}`;
+        button.classList.add('is-act');
+        return;
+      }
+      ops.rebasePlane(state, tail, option.to);
+      changed();
+    });
+    const short = option.crews < option.crewsNeeded;
+    const name = classByCode(aircraft.typeCode)?.name ?? aircraft.typeCode;
+    const detail = line(
+      `${option.to} ${name} crews ${option.crews}/${option.crewsNeeded}${short ? ' · short' : ''}` + (option.blocked && option.blocked !== blocked ? ` · ${option.blocked}` : ''),
+      short ? 'inspector-line is-warn' : 'inspector-line',
+    );
+    block.append(button, detail);
+  }
+  return block;
 }
 
 /**

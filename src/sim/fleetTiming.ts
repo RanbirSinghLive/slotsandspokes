@@ -57,9 +57,24 @@ export function orderLease(state: SimState, listing: MarketListing, base: string
   return arrivesDay;
 }
 
-/** Planes on their way to an airport (or anywhere), optionally of one class. */
+/**
+ * Planes on their way to an airport (or anywhere), optionally of one
+ * class: leases being delivered, and planes ferrying in from another base
+ * (sim/rebase.ts), which need crews there just the same.
+ */
 export function inboundAt(state: SimState, base?: string, typeCode?: string): InboundLease[] {
-  return (state.inboundLeases ?? []).filter((lease) => (base === undefined || lease.base === base) && (typeCode === undefined || lease.typeCode === typeCode));
+  const ferrying: InboundLease[] = state.aircraft
+    .filter((aircraft) => aircraft.rebase)
+    .map((aircraft) => ({
+      typeCode: aircraft.typeCode,
+      base: aircraft.rebase!.to,
+      ageYears: aircraft.ageYears,
+      leasePricePerDay: aircraft.leaseCostPerDay,
+      arrivesDay: aircraft.rebase!.arrivesDay,
+    }));
+  return [...(state.inboundLeases ?? []), ...ferrying].filter(
+    (lease) => (base === undefined || lease.base === base) && (typeCode === undefined || lease.typeCode === typeCode),
+  );
 }
 
 /** Whether this plane is on its way back to the lessor. */
@@ -121,12 +136,13 @@ export function pendingByAirport(state: SimState): Map<string, PendingAt> {
     if (!entry) byIata.set(iata, (entry = { planesIn: [], crewsIn: [], planesOut: [] }));
     return entry;
   };
-  for (const lease of state.inboundLeases ?? []) at(lease.base).planesIn.push({ count: 1, day: lease.arrivesDay });
+  for (const lease of inboundAt(state)) at(lease.base).planesIn.push({ count: 1, day: lease.arrivesDay });
   for (const [iata, base] of Object.entries(state.crewBases ?? {})) {
     for (const batch of [...(base.hiring ?? []), ...(base.retraining ?? [])]) at(iata).crewsIn.push({ count: batch.count, day: batch.readyDay });
   }
   for (const aircraft of state.aircraft) {
     if (aircraft.returningOnDay !== undefined && aircraft.baseAirport) at(aircraft.baseAirport).planesOut.push({ count: 1, day: aircraft.returningOnDay });
+    if (aircraft.rebase) at(aircraft.rebase.from).planesOut.push({ count: 1, day: aircraft.rebase.arrivesDay });
   }
   const result = new Map<string, PendingAt>();
   for (const [iata, entry] of byIata) {

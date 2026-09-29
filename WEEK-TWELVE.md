@@ -70,6 +70,10 @@ comes by a link and a save file.
   folded into it on a narrow screen), then nine spotlight steps over the
   real screen, two of them hands-on (choose a home, fly a first route).
   Replayable from the Game screen.
+- **Asked for by the owner:** crews hired by type from an airport's
+  ring; planes rebased between crew bases from the Fleet screen (a
+  paid ferry and 2 days away, crews staying put). The headless player
+  doesn't rebase yet.
 - **Still to do from threads 1–5:** the browser pass, rival codes that
   are real airlines', and the year one report.
 

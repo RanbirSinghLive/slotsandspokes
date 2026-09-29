@@ -70,6 +70,8 @@ export type Aircraft = {
   baseAirport: string | null;
   /** Set while it's on its way back to the lessor (sim/fleetTiming.ts): the day it goes. It flies nothing meanwhile. */
   returningOnDay?: number;
+  /** Set while it ferries to another crew base (sim/rebase.ts). It flies nothing meanwhile, and joins `to` on `arrivesDay`. */
+  rebase?: { from: string; to: string; arrivesDay: number };
 };
 
 /** How one leg went, once it has landed. */

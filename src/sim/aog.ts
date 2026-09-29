@@ -152,6 +152,8 @@ export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
     // Only a plane sitting at its base can go down there. A long-haul
     // aircraft still in the air at midnight is skipped until it lands.
     if (aircraft.status !== 'ground' || !aircraft.baseAirport || aircraft.atAirport !== aircraft.baseAirport) continue;
+    // Nor one ferrying to another base (sim/rebase.ts).
+    if (aircraft.rebase) continue;
     if (roll >= aogChance(state, aircraft)) continue;
 
     const maxExtraDays = DURATION_BASE_EXTRA_DAYS + Math.round(effectiveAge(state, aircraft) * DURATION_EXTRA_DAYS_PER_EFFECTIVE_YEAR);

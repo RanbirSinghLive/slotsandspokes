@@ -30,6 +30,7 @@ export {
   previewRemoveRoute,
   previewTurnBuffer,
   returnOptions,
+  rebaseOptionsFor,
   routeBase,
   rotationsServing,
   summariseMarket,
@@ -59,6 +60,10 @@ export function retrainCrewsAt(state: SimState, iata: string, from: string, to: 
 
 export function releaseCrewsAt(state: SimState, iata: string, classCode: string, count: number) {
   return afterChange(state, actions.releaseCrewsAt(state, iata, classCode, count));
+}
+
+export function rebasePlane(state: SimState, tail: string, to: string) {
+  return afterChange(state, actions.rebasePlaneTo(state, tail, to));
 }
 
 export function clearPlane(state: SimState, tail: string) {
