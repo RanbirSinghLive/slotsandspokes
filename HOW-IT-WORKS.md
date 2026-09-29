@@ -1064,7 +1064,7 @@ rivals opening, repricing and pulling out) whichever panel is showing.
 Each line leads with a coloured tag (AOG, CNX, CREW, FLEET, LESSOR,
 RIVAL, FARE, FUEL, SHOCK, WX, GOAL, REACH, CONTRACT), stored apart from the text.
 Most carry a target, the inspector view that explains them (an AOG its
-base, where it can be expedited; a rival's move the rival or your
+Maintenance screen, where it can be expedited; a rival's move the rival or your
 market; a milestone Goals), and are buttons that open it. The bar
 itself is `pointer-events: none` so it never blocks the map; only its
 lines take the pointer, and hovering one pauses the scroll so it can
@@ -1123,12 +1123,12 @@ and `cancelledToday`, so it resets at the home midnight.
 
 A real HTML sidebar, 420px wide, with a 56px **rail** down its left edge
 (`ui/rail.ts`): every screen one labelled click away, Overview · Routes ·
-Airports · Fleet · Crews · Rivals · Money · Goals · Office, with Game and
+Airports · Fleet · Crews · Mtc · Rivals · Money · Goals · Office, with Game and
 Hide at the foot. The rail stays with the panel hidden, and clicking an
 item then slides the panel open straight to that screen; clicking the
 screen already showing hides the panel. A dot on a rail item says where to dig
 before clicking: lit while a condition lasts (Fleet red for a plane out
-or a schedule problem, Crews red for a class short and amber for one
+or a schedule problem, Mtc red for a plane AOG, Crews red for a class short and amber for one
 stretched, Routes amber for a route that lost money yesterday, Money red
 under a month of cash), or for something new since that screen was last
 open, like unread mail (Goals green for a milestone, Rivals amber for a
@@ -1193,7 +1193,8 @@ The rail's screens are selections too; the detail views sit under
 | Selection | How you get there | What it shows |
 |---|---|---|
 | Airports list | the rail | every known airport (served, or all known), sortable by departures, load, slots or waiting riders |
-| An airport | click its dot, or its row | presence, waiting riders, load, slots, grounded planes with Expedite, Plan hub, planes based there, and every market flown from it |
+| An airport | click its dot, or its row | presence, waiting riders, load, slots, a line per grounded plane (opening Maintenance), Plan hub, planes based there, and every market flown from it. Its crews are on the Crews screen only |
+| Maintenance | the rail (Mtc), an AOG line in the ticker or an airport | every AOG with its fault, days back, what it cancels and Expedite 1d; every plane's health by type, oldest first: age, tech dispatch, today's AOG chance, useful life left |
 | A route | click its line, or a market row | the route view: flights, demand, rivals, fare stances, pools, margin and on-time |
 | Fleet list | the rail, the map's fleet bars, or the breadcrumb from a plane | every aircraft: base, how much of its day it uses, on time today, AOG |
 | An aircraft | click it in flight on the map, its row in the Fleet list or timeline, or its tail in an airport's view | its specs and age (and what the age does to its delays), where it is now, how much of the day it uses, its whole day in order (flown legs with how late and why, passengers and margin; the one in the air; upcoming legs with projected lateness; cancelled ones), its rotations, and Return to lessor |

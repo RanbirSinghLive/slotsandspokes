@@ -21,6 +21,8 @@ export type Selection =
   | { kind: 'fleet' }
   /** Every crew base's crews by class (ui/inspector/crews.ts). */
   | { kind: 'crews' }
+  /** AOGs and fleet health (ui/inspector/maintenance.ts). */
+  | { kind: 'maintenance' }
   /** Save, load and new game. */
   | { kind: 'game' }
   | { kind: 'goals' }

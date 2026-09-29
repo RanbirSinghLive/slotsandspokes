@@ -4,7 +4,7 @@ import { money, shortMoney } from '../format';
 import { crewShare } from '../../sim/crews';
 import { line, heading, lineWithInfo } from './dom';
 import { formatNps, marketNps } from '../../sim/nps';
-import { daysUntilReturn, expediteCost, expediteRepair } from '../../sim/aog';
+import { daysUntilReturn } from '../../sim/aog';
 import { congestionParameters } from '../../sim/delays';
 import { connectingPassengersThrough } from '../../sim/hubs';
 import { planHub } from '../../sim/hubPlanner';
@@ -45,7 +45,7 @@ const namesByIata = new Map(airports.map((airport) => [airport.iata, airport.nam
 
 /**
  * Build the view. `changed` is called after the player changes something
- * from inside it (an expedited repair, the hub planner), so the inspector
+ * from inside it (the hub planner), so the inspector
  * can rebuild.
  */
 export function buildAirportView(state: SimState, iata: string, changed: () => void): AirportView {
@@ -98,7 +98,7 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
     );
   }
   root.append(...loadAndSlots(state, iata));
-  root.append(...groundedPlanes(state, iata, changed));
+  root.append(...groundedPlanes(state, iata));
 
   const hubButton = planHubButton(state, iata, changed);
   if (hubButton) root.append(hubButton);
@@ -126,7 +126,6 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
   } else {
     root.append(line('None'));
   }
-  root.append(...crewSection(state, iata, changed));
 
   root.append(heading('Markets'), marketRows(state, iata));
   return { root, redrawPools };
@@ -160,33 +159,21 @@ function loadAndSlots(state: SimState, iata: string): HTMLElement[] {
 }
 
 /**
- * Planes based here that are grounded with an AOG (sim/aog.ts): what's
- * wrong, when they're back, and a button to pay for a day sooner. What
- * each AOG cancels goes in the ticker, not here.
+ * Planes based here that are grounded with an AOG (sim/aog.ts), one line
+ * each; the repair and the button to expedite it are on the Maintenance
+ * screen, where every AOG is.
  */
-function groundedPlanes(state: SimState, iata: string, changed: () => void): HTMLElement[] {
+function groundedPlanes(state: SimState, iata: string): HTMLElement[] {
   return state.aogs
     .filter((event) => event.base === iata)
     .map((event) => {
-      const row = document.createElement('div');
-      row.className = 'airport-aog-row';
-      const days = daysUntilReturn(state, event);
-      const text = document.createElement('span');
-      text.textContent = `AOG · ${event.tail} · ${event.fault} · back ${days}d`;
-      row.append(text);
-      const cost = expediteCost(state, event.tail);
-      if (cost !== null) {
-        const expedite = document.createElement('button');
-        expedite.type = 'button';
-        expedite.textContent = `Expedite 1d · ${money(cost)}`;
-        expedite.disabled = state.cash < cost;
-        if (expedite.disabled) expedite.title = `Needs $${cost.toLocaleString()} on hand.`;
-        expedite.addEventListener('click', () => {
-          expediteRepair(state, event.tail);
-          changed();
-        });
-        row.append(expedite);
-      }
+      const row = line('', 'inspector-line is-over');
+      const link = document.createElement('button');
+      link.type = 'button';
+      link.className = 'inspector-link';
+      link.textContent = `AOG · ${event.tail} · ${event.fault} · back ${daysUntilReturn(state, event)}d · Mtc ›`;
+      link.addEventListener('click', () => select({ kind: 'maintenance' }));
+      row.append(link);
       return row;
     });
 }
@@ -247,72 +234,4 @@ function marketRows(state: SimState, iata: string): HTMLElement {
     list.append(row);
   }
   return list;
-}
-
-/**
- * The crew base here (sim/crews.ts), class by class: how its crews stand
- * against its planes (their bars are the thin ones under the plane pools
- * above), and buttons to hire, retrain from another class, or let crews
- * go. Nothing where there's no base.
- */
-function crewSection(state: SimState, iata: string, changed: () => void): HTMLElement[] {
-  const readout = ops.crewReadout(state, iata);
-  if (!readout) return [];
-  return [heading('Crews', crewExplanation(readout)), ...crewRows(state, iata, changed)];
-}
-
-/** How crews work, for the (i) beside a Crews heading. */
-export function crewExplanation(readout: { leadDays: number; retrainDays: number }): string {
-  return `Crews are rated for one class. Hiring takes ${readout.leadDays} days; retraining from another class takes ${readout.retrainDays} and costs half a hire. Enough crews keep shifts to 8 hours; fewer means late legs flown tired, and too few grounds planes. Spare crews cost standby pay.`;
-}
-
-/**
- * A base's crews, class by class: how they stand against its planes, and
- * buttons to hire, retrain from another class, or release. Shared by the
- * airport view and the Crews screen (ui/inspector/crews.ts).
- */
-export function crewRows(state: SimState, iata: string, changed: () => void): HTMLElement[] {
-  const readout = ops.crewReadout(state, iata);
-  if (!readout) return [];
-  const nodes: HTMLElement[] = [];
-  const button = (label: string, disabled: boolean, act: () => void) => {
-    const el = document.createElement('button');
-    el.type = 'button';
-    el.className = 'inspector-plan-hub';
-    el.textContent = label;
-    el.disabled = disabled;
-    el.addEventListener('click', () => {
-      act();
-      changed();
-    });
-    return el;
-  };
-  for (const crew of readout.classes) {
-    const spare = crew.crews - crew.ideal;
-    const joining = crew.arriving > 0 ? ` · +${crew.arriving} joining` : '';
-    const status =
-      crew.crews < crew.minimum
-        ? `short · need ${crew.minimum} · planes grounded`
-        : crew.crews < crew.ideal
-          ? `stretched · ${crew.ideal} for 8h shifts`
-          : spare > 0
-            ? `${spare} spare · ${money(crew.standbyPerDay)}/day each`
-            : crew.ideal > 0
-              ? 'right-sized'
-              : 'no planes here';
-    nodes.push(line(`${crew.name} ×${crew.crews} · ${status}${joining}`, crew.crews < crew.minimum ? 'inspector-line is-over' : 'inspector-line'));
-    const row = document.createElement('div');
-    row.className = 'crew-buttons';
-    row.append(button(`Hire 1 · ${money(crew.hireFee)}`, !crew.open || state.cash < crew.hireFee, () => ops.hireCrewsAt(state, iata, crew.classCode, 1)));
-    // Retrain one from whichever other class has the most spare.
-    const donor = readout.classes
-      .filter((other) => other.classCode !== crew.classCode && other.crews - other.ideal > 0)
-      .sort((x, y) => y.crews - y.ideal - (x.crews - x.ideal))[0];
-    if (donor && crew.open) {
-      row.append(button(`Retrain 1 from ${donor.name} · ${money(crew.retrainFee)}`, state.cash < crew.retrainFee, () => ops.retrainCrewsAt(state, iata, donor.classCode, crew.classCode, 1)));
-    }
-    if (spare > 0) row.append(button('Release 1', false, () => ops.releaseCrewsAt(state, iata, crew.classCode, 1)));
-    nodes.push(row);
-  }
-  return nodes;
 }

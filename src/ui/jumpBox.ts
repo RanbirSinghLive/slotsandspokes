@@ -28,6 +28,7 @@ const SCREENS: [string, Selection][] = [
   ['Airports', { kind: 'airports' }],
   ['Fleet', { kind: 'fleet' }],
   ['Crews', { kind: 'crews' }],
+  ['Maintenance', { kind: 'maintenance' }],
   ['Rivals', { kind: 'rivals' }],
   ['Money', { kind: 'money' }],
   ['Goals', { kind: 'goals' }],

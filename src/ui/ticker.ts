@@ -433,11 +433,11 @@ function pollAogEvents(state: SimState): void {
         state.simMinute,
         'AOG',
         `${event.base} · ${event.tail} · ${event.fault} · back ~${days}d · ` + (uncovered ? `CNX ${uncovered}` : 'flying covered'),
-        // Its base's view, where the repair can be expedited.
-        { kind: 'airport', iata: event.base },
+        // The Maintenance screen, where the repair can be expedited.
+        { kind: 'maintenance' },
       );
     } else if (uncovered !== previous) {
-      pushEvent(state.simMinute, 'AOG', `${event.tail} · ` + (uncovered ? `CNX ${uncovered}` : 'all flying now covered'), { kind: 'airport', iata: event.base });
+      pushEvent(state.simMinute, 'AOG', `${event.tail} · ` + (uncovered ? `CNX ${uncovered}` : 'all flying now covered'), { kind: 'maintenance' });
     }
     seenAogs.set(event.tail, uncovered);
   }

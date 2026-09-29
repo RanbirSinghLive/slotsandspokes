@@ -17,7 +17,7 @@ import { anyEntryShort } from '../sim/crewPlan';
  *
  * A dot on an item says where to dig before clicking. Two kinds:
  *   - a condition, lit while it lasts: a plane out or a schedule problem
- *     (Fleet, red), a class short of crews (Crews, red; stretched, or a
+ *     (Fleet, red), a plane AOG (Mtc, red), a class short of crews (Crews, red; stretched, or a
  *     plane on its way that would enter service short, amber),
  *     a route that lost money yesterday (Routes, amber), cash running out
  *     within a month (Money, red);
@@ -33,7 +33,7 @@ const railEl = document.querySelector<HTMLElement>('#rail')!;
 const items = [...railEl.querySelectorAll<HTMLButtonElement>('.rail-item[data-go]')];
 const hideButton = railEl.querySelector<HTMLButtonElement>('#rail-hide')!;
 
-type Screen = 'network' | 'routes' | 'airports' | 'fleet' | 'crews' | 'rivals' | 'money' | 'goals' | 'headOffice' | 'game';
+type Screen = 'network' | 'routes' | 'airports' | 'fleet' | 'crews' | 'maintenance' | 'rivals' | 'money' | 'goals' | 'headOffice' | 'game';
 
 /** Where each rail item goes. Routes opens worst margin first. */
 function targetOf(screen: Screen): Selection {
@@ -93,7 +93,7 @@ function newsIds(state: SimState): Partial<Record<Screen, string[]>> {
 }
 
 function conditions(state: SimState): Partial<Record<Screen, Dot>> {
-  const fleetBad = state.aogs.length > 0 || state.groundedTails.length > 0 || scheduleProblems(state).length > 0;
+  const fleetBad = state.groundedTails.length > 0 || scheduleProblems(state).length > 0;
   let crews: Dot = null;
   for (const iata of Object.keys(crewBases(state))) {
     for (const crew of ops.crewReadout(state, iata)?.classes ?? []) {
@@ -112,6 +112,7 @@ function conditions(state: SimState): Partial<Record<Screen, Dot>> {
   return {
     fleet: fleetBad ? 'bad' : null,
     crews,
+    maintenance: state.aogs.length > 0 ? 'bad' : null,
     routes: losing ? 'warn' : null,
     money: runway !== null && runway <= RUNWAY_WARN_DAYS ? 'bad' : null,
   };
