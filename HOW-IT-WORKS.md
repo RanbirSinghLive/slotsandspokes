@@ -2149,6 +2149,13 @@ joining by that day. It's a read-out with no rules of its own.
 The Crews dot on the rail lights amber when an inbound plane would enter
 service short, as well as red when a class is short today.
 
+Hiring can also be done on the map. A crew base's airport ring has **Hire
+crews**, which fans out one choice per type the ladder has opened, each
+with the plane's silhouette. Its hint shows the fee, the day the crew
+joins, crews rated and joining against need, and any shortfall at an EIS.
+One click hires one crew; hold for more. Converting and releasing crews
+stay on the Crews screen, where the whole roster is in view.
+
 ## Fleet timing (`src/sim/fleetTiming.ts`)
 
 Every change to the fleet takes time, so planes and crews are planned

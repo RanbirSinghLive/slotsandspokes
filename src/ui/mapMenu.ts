@@ -20,6 +20,8 @@ import * as ops from './routeActions';
 import { planeIconInner } from './planeIcons';
 import { AIRCRAFT_CLASSES } from '../sim/aircraftClasses';
 import { USEFUL_LIFE_YEARS } from '../sim/leasing';
+import { crewPlan } from '../sim/crewPlan';
+import { dayIndex } from '../sim/clock';
 
 /**
  * Click something on the map, get a ring of actions for it at the click,
@@ -63,6 +65,8 @@ const ICON = {
   // Three spokes meeting at a hub.
   hub: '<circle cx="12" cy="12" r="2.5"/><path d="M12 9.5V3"/><path d="M9.8 13.3 4.5 17"/><path d="M14.2 13.3 19.5 17"/>',
   clock: '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>',
+  // Two people: a crew.
+  crew: '<circle cx="9" cy="8" r="3"/><path d="M3 20v-1a6 6 0 0 1 12 0v1"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.2a5 5 0 0 1 5 4.8v1"/>',
 };
 
 /** A short label drawn as the button's icon, for choices that are numbers rather than things. */
@@ -174,6 +178,43 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
     },
   }));
 
+  // Hiring crews (sim/crews.ts), one choice per type the base can crew.
+  // Converting crews between types stays on the Crews screen, where the
+  // whole roster is in view.
+  const crews = ops.crewReadout(state, airport.iata);
+  const basePlan = crewPlan(state).find((base) => base.iata === airport.iata);
+  const hireDay = dayIndex(state) + (crews?.leadDays ?? 0);
+  const crewChoices: RadialAction[] = (crews?.classes ?? [])
+    .filter((c) => c.open)
+    .map((c) => {
+      const eisShort = basePlan?.classes.find((p) => p.classCode === c.classCode)?.entries.find((e) => e.short > 0);
+      const parts = [
+        `Hire 1 ${c.name} crew · ${money(c.hireFee)} · joins day ${hireDay}`,
+        `${c.crews} rated${c.arriving > 0 ? ` +${c.arriving} joining` : ''}`,
+        `need ${c.ideal} (min ${c.minimum})`,
+      ];
+      if (eisShort) {
+        const late = hireDay - eisShort.day;
+        parts.push(`short ${eisShort.short} at EIS day ${eisShort.day}${late > 0 ? ` · a hire joins ${late}d late` : ''}`);
+      }
+      parts.push('hold for more');
+      return {
+        id: `crew:${c.classCode}`,
+        label: parts.join(' · '),
+        icon: planeIconInner(c.classCode),
+        large: true,
+        angleDeg: 0,
+        repeatable: true,
+        disabledReason: state.cash < c.hireFee ? `Needs ${money(c.hireFee)} on hand to hire a ${c.name} crew.` : undefined,
+        onSelect: () => {
+          const result = ops.hireCrewsAt(state, airport.iata, c.classCode, 1);
+          notice = result.ok ? result.message : result.reason;
+          refresh();
+          return false;
+        },
+      };
+    });
+
   // Hub style (sim/hubStyle.ts): each choice planned up front, like the
   // route ring's turn buffer, so one the base can't absorb is greyed out
   // with the reason, and hovering one previews its effect on the pools.
@@ -226,6 +267,18 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
       },
     },
     { id: 'plane', label: 'Lease a plane here', icon: ICON.plane, angleDeg: -65, children: planeChoices },
+    {
+      id: 'crew',
+      label: `Hire crews at ${airport.iata} · by type`,
+      icon: ICON.crew,
+      angleDeg: -15,
+      disabledReason: !crews
+        ? `No crew base at ${airport.iata} · leasing a plane here opens one`
+        : crewChoices.length === 0
+          ? 'No aircraft type open to crew yet'
+          : undefined,
+      children: crewChoices,
+    },
     {
       id: 'return',
       label: 'Return a plane',
