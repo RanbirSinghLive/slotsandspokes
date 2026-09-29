@@ -2188,8 +2188,11 @@ A fleet programmes COO (Lena Fischer) halves delivery and return times,
 a crew academy hiring and retraining times.
 
 **On the map**, an airport with anything under way shows one amber line
-under its dot (`pendingByAirport()`): "+1 plane 3d · +2 crews 5d ·
-−1 plane 8d", each with the days until the first of them happens. It
+under its dot (`pendingByAirport()`): a plane glyph "+1 3d", a crew
+glyph "+2 5d", a plane glyph "−1 8d" (planes on their way, crews
+joining, planes going), each with the days until the first of them
+happens. Glyphs are drawn shapes, not emoji, so they look the same in
+every browser. It
 counts as an obstacle for the labels. The ticker says when a plane is
 delivered, when one has gone back, and when crews join.
 
