@@ -74,8 +74,12 @@ comes by a link and a save file.
   ring; planes rebased between crew bases from the Fleet screen (a
   paid ferry and 2 days away, crews staying put). The headless player
   doesn't rebase yet.
-- **Still to do from threads 1–5:** the browser pass, rival codes that
-  are real airlines', and the year one report.
+- **Rival codes:** SK and IB (SAS, Iberia) renamed YK and IJ, with a
+  save migration (format 2). Every two-letter pair is some airline's
+  somewhere; others in the game belong to well-known ones (AR, BR, MS,
+  HX, NW, RX): the owner decides whether to rename those too.
+- **Still to do from threads 1–5:** the browser pass and the year one
+  report.
 
 ## Thread 1: reachable (must)
 

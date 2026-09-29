@@ -1,9 +1,9 @@
 [
-  { "airline": "Skyline Air", "code": "SK" },
+  { "airline": "Skyline Air", "code": "YK" },
   { "airline": "Northwind Regional", "code": "NW" },
   { "airline": "Meridian Airways", "code": "MD" },
   { "airline": "Harbour Express", "code": "HX" },
   { "airline": "Cascade Connect", "code": "CC" },
-  { "airline": "Ironbridge Airlines", "code": "IB" },
+  { "airline": "Ironbridge Airlines", "code": "IJ" },
   { "airline": "Larkspur Air", "code": "LK" }
 ]

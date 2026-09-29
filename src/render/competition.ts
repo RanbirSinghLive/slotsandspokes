@@ -34,12 +34,12 @@ const AIRLINE_COLORS: Record<string, string> = {
   TA: '#e05a5a',
   BR: '#b388ff',
   // Rivals that enter later (data/rival-airlines.json).
-  SK: '#4fd1c5',
+  YK: '#4fd1c5',
   NW: '#f6e05e',
   MD: '#f687b3',
   HX: '#68d391',
   CC: '#fc8181',
-  IB: '#90cdf4',
+  IJ: '#90cdf4',
   LK: '#d6bcfa',
 };
 

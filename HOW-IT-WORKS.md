@@ -1534,7 +1534,9 @@ update, so the key never changes:
 - A change old saves can't load bumps `SAVE_FORMAT` and adds a
   migration, `MIGRATIONS[n]` turning a format n − 1 state into format n;
   loading runs every step after the save's own format, then the
-  always-safe fixes (`ensureCrewBases()`).
+  always-safe fixes (`ensureCrewBases()`). Format 2 renamed two rivals
+  whose codes were real airlines' (SK to YK, IB to IJ) wherever a code
+  is kept, values and keys alike.
 - A save this build can't read (from a newer build, damaged, or a
   migration that throws) is **left in place**: saving is held, and a
   card says why and offers it as a download before a new game replaces it.

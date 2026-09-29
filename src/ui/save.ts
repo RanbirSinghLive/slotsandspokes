@@ -28,7 +28,7 @@ const SAVE_KEY = 'slotsandspokes-save';
 const LEGACY_KEY = 'airgame-save-v46';
 
 /** The shape of SimState this build writes. Bump it with a migration below. */
-export const SAVE_FORMAT = 1;
+export const SAVE_FORMAT = 2;
 
 type SaveFile = { format: number; gameVersion: string; savedAt?: string; state: SimState };
 
@@ -36,7 +36,37 @@ type SaveFile = { format: number; gameVersion: string; savedAt?: string; state: 
  * One step per format after the first: `MIGRATIONS[n]` turns a format
  * n − 1 state into format n. Each is plain code over the parsed JSON.
  */
-const MIGRATIONS: Record<number, (state: SimState) => void> = {};
+const MIGRATIONS: Record<number, (state: SimState) => void> = {
+  // Two rivals' codes were real airlines' (SK is SAS, IB is Iberia): rename them wherever a code is kept.
+  2: (state) => renameCodes(state, { SK: 'YK', IB: 'IJ' }),
+};
+
+/**
+ * Rename airline codes throughout a state: every string value equal to an
+ * old code, and every object key that is one (the rivals' fleets and
+ * milestones are keyed by code). Nothing else in a save is a bare
+ * two-letter string: airports are three letters, markets "ALB-YYZ".
+ */
+function renameCodes(state: SimState, renames: Record<string, string>): void {
+  const walk = (value: unknown): unknown => {
+    if (typeof value === 'string') return renames[value] ?? value;
+    if (Array.isArray(value)) {
+      for (let i = 0; i < value.length; i++) value[i] = walk(value[i]);
+      return value;
+    }
+    if (value && typeof value === 'object') {
+      const record = value as Record<string, unknown>;
+      for (const key of Object.keys(record)) {
+        const renamed = renames[key] ?? key;
+        const walked = walk(record[key]);
+        if (renamed !== key) delete record[key];
+        record[renamed] = walked;
+      }
+    }
+    return value;
+  };
+  walk(state);
+}
 
 /**
  * Upgrades every load gets, whatever its format: fixes for older shapes
