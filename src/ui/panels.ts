@@ -1,12 +1,14 @@
-import { removeRotation as removeRotationFromSchedule } from '../sim/playerActions';
+import { planRetimeRotation, removeRotation as removeRotationFromSchedule, retimeRotation } from '../sim/playerActions';
+import type { RetimePlan } from '../sim/retime';
+import { airportHours, FIRST_OPEN_HOUR, freeInHour, OPEN_HOURS } from '../sim/hours';
 import { money, shortMoney } from './format';
 import { formatNps, networkNps } from '../sim/nps';
 import { validateSchedule } from '../sim/schedule';
 import { allRotations, USABLE_DAY_END_MINUTE, USABLE_DAY_START_MINUTE, utilisationProblems, type Rotation } from '../sim/utilisation';
 import { select, selectRoute, type Selection } from './selection';
 import { networkTrends, type Measure } from '../sim/trends';
-import { classByCode } from '../sim/aircraftClasses';
-import { planeIconElement } from './planeIcons';
+import { AIRCRAFT_CLASSES, pluralClassName } from '../sim/aircraftClasses';
+import { planeIconElement, TYPE_COLOURS } from './planeIcons';
 import { updatePnlHistoryPanel } from './pnlHistory';
 import { formatLoadFactor, networkLoadFactor } from '../sim/loadFactor';
 import { goalsSummary } from './inspector/goals';
@@ -182,19 +184,19 @@ export function updatePanel(state: SimState): void {
 export { minuteOfDayToTimeString };
 
 /**
- * The rotations timeline: removed one rotation at a time, never per leg. Rotations are
- * packed into the day automatically, so a per-leg time field would be a
- * control that lies, and deleting one leg out of a rotation would strand
- * the rest of it away from base. The unit the player builds is the unit
- * they remove.
+ * The Schedule: a rotation is removed and moved whole, never per leg.
+ * Deleting or shifting one leg out of a rotation would strand the rest of
+ * it away from base; the unit the player builds is the unit they move and
+ * remove.
  *
  * Rebuilt **only when the rotations actually change** — a per-frame
  * rebuild once broke the remove buttons outright (a click only fires if
- * mousedown and mouseup land on the same element).
+ * mousedown and mouseup land on the same element), and never mid-drag.
  * The only thing that moves with time is the now line, which
  * updateTimelineNow() slides every frame without a rebuild. A rotation's
- * chain, window and share only move when a rotation is added or removed,
- * or when a base change regroups the legs. `signature` captures exactly that.
+ * chain, window and share only move when a rotation is added, removed or
+ * moved, when a base change regroups the legs, or when a type's group is
+ * folded. `signature` captures exactly that.
  *
  * A rotation's remove handler closes over its `Rotation`, which holds the same
  * leg objects that are in `state.schedule` — so even a handler built
@@ -206,9 +208,18 @@ export { minuteOfDayToTimeString };
 // the build that sets the empty-state message's visibility.
 let rotationsSignature: string | null = null;
 
+/** Types whose group of rows is folded away, by type code: remembered for the session. */
+const collapsedTypes = new Set<string>();
+let lastTimelineState: SimState | null = null;
+
 function renderRotations(state: SimState): void {
+  lastTimelineState = state;
+  // Mid-drag the timeline is the player's; a rebuild would drop what they hold.
+  if (drag) return;
   const rotations = allRotations(state);
   const signature =
+    [...collapsedTypes].join(',') +
+    '|' +
     state.aircraft.map((aircraft) => aircraft.tail).join(',') +
     '|' +
     rotations.map((r) => `${r.tail}:${r.airports.join('>')}:${r.departMinute}:${r.arriveMinute}:${r.closed}`).join('|');
@@ -219,13 +230,26 @@ function renderRotations(state: SimState): void {
   rotationsTimelineEl.replaceChildren(...(rotations.length > 0 ? buildTimeline(state, rotations) : []));
 }
 
+/** Rebuild now, whatever the signature says: a group folded or unfolded, a move made. */
+function rebuildTimeline(): void {
+  rotationsSignature = null;
+  if (lastTimelineState) renderRotations(lastTimelineState);
+}
+
 /**
- * The rotations as a timeline: one row per plane, its day drawn across
- * the usable day (06:00–22:00 home time, stretched if a long-haul
- * rotation runs outside it). Each flight is a solid block labelled with
- * where it lands; the faint span around a rotation's flights is the
- * rotation, and opens its route. Gaps are the plane sitting idle, which
- * is what a list of windows and percentages hid.
+ * The Schedule: the rotations as a timeline, one row per plane, planes
+ * grouped by type under a header that folds the group away. Each
+ * rotation is a block in its type's colour (TYPE_COLOURS), its flights
+ * solid inside it and labelled with where they land; gaps are the plane
+ * sitting idle. The day runs 06:00–22:00 home time, stretched if a
+ * long-haul rotation runs outside it.
+ *
+ * A rotation can be **dragged**: left and right to move it in the day, in
+ * 5-minute steps, or down or up onto another plane of its type at its
+ * base. While it's held, the sim plans the move (sim/retime.ts) and a tip
+ * says what it would do or why it can't, and the base's hours show across
+ * the top, room in each (sim/hours.ts). Let go to make it; Esc puts it
+ * back. A click without a drag opens its route.
  */
 function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
   const start = Math.min(USABLE_DAY_START_MINUTE, ...rotations.map((r) => r.departMinute));
@@ -243,58 +267,264 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
     tick.textContent = String(hour % 24).padStart(2, '0');
     axis.append(tick);
   }
-  const rows: HTMLElement[] = [axis];
+  // The dragged rotation's base, hour by hour: filled while a drag is on.
+  const hoursLabel = document.createElement('span');
+  hoursLabel.className = 'timeline-hours-label';
+  const hoursStrip = document.createElement('div');
+  hoursStrip.className = 'timeline-hours';
+  timelineHours = { label: hoursLabel, strip: hoursStrip, at, width };
+  const rows: HTMLElement[] = [document.createElement('span'), axis, hoursLabel, hoursStrip];
 
-  for (const aircraft of state.aircraft) {
-    // A plane with no flights still gets its row: an empty track is an idle plane.
-    const own = rotations.filter((rotation) => rotation.tail === aircraft.tail);
-    const row = document.createElement('div');
-    row.className = 'timeline-row';
+  for (const cls of AIRCRAFT_CLASSES) {
+    const planes = state.aircraft.filter((aircraft) => aircraft.typeCode === cls.code);
+    if (planes.length === 0) continue;
+    const colour = TYPE_COLOURS[cls.code] ?? '#5ed6c8';
+    const collapsed = collapsedTypes.has(cls.code);
+    const used = planes.reduce((sum, aircraft) => sum + rotations.filter((r) => r.tail === aircraft.tail).reduce((t, r) => t + r.share, 0), 0);
 
-    // The plane opens its own view (ui/inspector/aircraft.ts).
-    const plane = linkToMap(document.createElement('button'), { kind: 'aircraft', tail: aircraft.tail });
-    plane.type = 'button';
-    plane.className = 'inspector-link timeline-plane';
-    plane.append(planeIconElement(aircraft.typeCode), ` ${aircraft.tail}`);
-    const share = own.reduce((sum, rotation) => sum + rotation.share, 0);
-    const shareEl = document.createElement('span');
-    shareEl.className = 'timeline-share';
-    shareEl.textContent = `${Math.round(share * 100)}%`;
-    plane.append(shareEl);
-    plane.title = `${classByCode(aircraft.typeCode)?.name ?? aircraft.typeCode} ${aircraft.tail} · ${aircraft.baseAirport ?? 'no base'} · ${Math.round(share * 100)}% of its day`;
-    plane.addEventListener('click', () => select({ kind: 'aircraft', tail: aircraft.tail }));
+    const header = document.createElement('button');
+    header.type = 'button';
+    header.className = 'timeline-group';
+    header.style.setProperty('--puck', colour);
+    header.setAttribute('aria-expanded', String(!collapsed));
+    header.append(`${collapsed ? '▸' : '▾'} `, planeIconElement(cls.code), ` ${pluralClassName(cls.name)} ×${planes.length}`);
+    const usedEl = document.createElement('span');
+    usedEl.className = 'timeline-share';
+    usedEl.textContent = `${Math.round((used / planes.length) * 100)}% used`;
+    header.append(usedEl);
+    header.addEventListener('click', () => {
+      if (collapsedTypes.has(cls.code)) collapsedTypes.delete(cls.code);
+      else collapsedTypes.add(cls.code);
+      rebuildTimeline();
+    });
+    rows.push(header);
+    if (collapsed) continue;
 
-    const track = document.createElement('div');
-    track.className = 'timeline-track';
-    for (const rotation of own) {
-      const span = linkToMap(document.createElement('div'), { kind: 'route', a: rotation.airports[0], b: rotation.airports[1] });
-      span.className = 'timeline-rotation';
-      span.classList.toggle('is-open', !rotation.closed);
-      span.style.left = at(rotation.departMinute);
-      span.style.width = width(rotation.arriveMinute - rotation.departMinute);
-      span.title =
-        `${rotation.airports.join(' → ')} · ${minuteOfDayToTimeString(rotation.departMinute)}–${minuteOfDayToTimeString(rotation.arriveMinute)}` +
-        ` · ${Math.round(rotation.share * 100)}% of a plane` +
-        (rotation.closed ? '' : ' · never returns to base');
-      span.addEventListener('click', () => selectRoute(state, rotation.airports[0], rotation.airports[1]));
-      for (const leg of rotation.legs) {
-        const block = document.createElement('div');
-        block.className = 'timeline-leg';
-        block.style.left = `${((leg.departMinute - rotation.departMinute) / (rotation.arriveMinute - rotation.departMinute)) * 100}%`;
-        block.style.width = `${(leg.blockMinutes / (rotation.arriveMinute - rotation.departMinute)) * 100}%`;
-        block.textContent = leg.dest;
-        span.append(block);
+    for (const aircraft of planes) {
+      // A plane with no flights still gets its row: an empty track is an idle plane.
+      const own = rotations.filter((rotation) => rotation.tail === aircraft.tail);
+      const row = document.createElement('div');
+      row.className = 'timeline-row';
+
+      // The plane opens its own view (ui/inspector/aircraft.ts).
+      const plane = linkToMap(document.createElement('button'), { kind: 'aircraft', tail: aircraft.tail });
+      plane.type = 'button';
+      plane.className = 'inspector-link timeline-plane';
+      plane.append(aircraft.tail);
+      const share = own.reduce((sum, rotation) => sum + rotation.share, 0);
+      const shareEl = document.createElement('span');
+      shareEl.className = 'timeline-share';
+      shareEl.textContent = `${Math.round(share * 100)}%`;
+      plane.append(shareEl);
+      plane.title = `${cls.name} ${aircraft.tail} · ${aircraft.baseAirport ?? 'no base'} · ${Math.round(share * 100)}% of its day`;
+      plane.addEventListener('click', () => select({ kind: 'aircraft', tail: aircraft.tail }));
+
+      const track = document.createElement('div');
+      track.className = 'timeline-track';
+      track.dataset.tail = aircraft.tail;
+      track.dataset.type = aircraft.typeCode;
+      track.style.setProperty('--puck', colour);
+      for (const rotation of own) {
+        const span = linkToMap(document.createElement('div'), { kind: 'route', a: rotation.airports[0], b: rotation.airports[1] });
+        span.className = 'timeline-rotation';
+        span.classList.toggle('is-open', !rotation.closed);
+        span.style.left = at(rotation.departMinute);
+        span.style.width = width(rotation.arriveMinute - rotation.departMinute);
+        span.title =
+          `${rotation.airports.join(' → ')} · ${minuteOfDayToTimeString(rotation.departMinute)}–${minuteOfDayToTimeString(rotation.arriveMinute)}` +
+          ` · ${Math.round(rotation.share * 100)}% of a plane` +
+          (rotation.closed ? ' · drag to move it' : ' · never returns to base');
+        span.addEventListener('pointerdown', (event) => startDrag(event, span, rotation, track));
+        span.addEventListener('click', () => {
+          // A drag ends in a click too; only a plain click opens the route.
+          if (justDragged) return;
+          selectRoute(state, rotation.airports[0], rotation.airports[1]);
+        });
+        for (const leg of rotation.legs) {
+          const block = document.createElement('div');
+          block.className = 'timeline-leg';
+          block.style.left = `${((leg.departMinute - rotation.departMinute) / (rotation.arriveMinute - rotation.departMinute)) * 100}%`;
+          block.style.width = `${(leg.blockMinutes / (rotation.arriveMinute - rotation.departMinute)) * 100}%`;
+          block.textContent = leg.dest;
+          span.append(block);
+        }
+        span.append(removeButtonFor(rotation, state));
+        track.append(span);
       }
-      span.append(removeButtonFor(rotation, state));
-      track.append(span);
+      const now = document.createElement('div');
+      now.className = 'timeline-now';
+      track.append(now);
+      row.append(plane, track);
+      rows.push(row);
     }
-    const now = document.createElement('div');
-    now.className = 'timeline-now';
-    track.append(now);
-    row.append(plane, track);
-    rows.push(row);
   }
   return rows;
+}
+
+// --- Dragging a rotation ----------------------------------------------------
+
+type Drag = {
+  rotation: Rotation;
+  span: HTMLElement;
+  homeTrack: HTMLElement;
+  startX: number;
+  startY: number;
+  /** Minutes of the day per pixel of track, as laid out when the drag began. */
+  minutesPerPx: number;
+  moved: boolean;
+  target: { tail: string; start: number } | null;
+  plan: RetimePlan | null;
+};
+
+let drag: Drag | null = null;
+let justDragged = false;
+let timelineHours: { label: HTMLElement; strip: HTMLElement; at: (minute: number) => string; width: (minutes: number) => string } | null = null;
+const DRAG_THRESHOLD_PX = 4;
+
+const dragTip = document.createElement('div');
+dragTip.id = 'timeline-drag-tip';
+dragTip.hidden = true;
+document.body.append(dragTip);
+
+function startDrag(event: PointerEvent, span: HTMLElement, rotation: Rotation, track: HTMLElement): void {
+  if (event.button !== 0 || !rotation.closed) return;
+  if ((event.target as HTMLElement).closest('.rotation-remove-button')) return;
+  if (!timelineWindow) return;
+  const rect = track.getBoundingClientRect();
+  drag = {
+    rotation,
+    span,
+    homeTrack: track,
+    startX: event.clientX,
+    startY: event.clientY,
+    minutesPerPx: (timelineWindow.end - timelineWindow.start) / Math.max(1, rect.width),
+    moved: false,
+    target: null,
+    plan: null,
+  };
+  // Keep the pointer while it's held, even off the row; not every pointer can be captured.
+  try {
+    span.setPointerCapture(event.pointerId);
+  } catch {
+    // A drag still works while the pointer stays over the span.
+  }
+  span.addEventListener('pointermove', onDragMove);
+  span.addEventListener('pointerup', onDragEnd);
+  span.addEventListener('pointercancel', cancelDrag);
+}
+
+function onDragMove(event: PointerEvent): void {
+  if (!drag || !lastTimelineState || !timelineWindow) return;
+  const dx = event.clientX - drag.startX;
+  const dy = event.clientY - drag.startY;
+  if (!drag.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+  if (!drag.moved) {
+    drag.moved = true;
+    drag.span.classList.add('is-dragging');
+    showBaseHours(lastTimelineState, drag.rotation.airports[0]);
+  }
+  // The row under the pointer, if it's a plane of the same type; else its own.
+  const under = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('.timeline-track[data-tail]');
+  const track = under && under.dataset.type === drag.homeTrack.dataset.type ? under : drag.homeTrack;
+  if (drag.span.parentElement !== track) track.append(drag.span);
+  const start = Math.round((drag.rotation.departMinute + dx * drag.minutesPerPx) / 5) * 5;
+  const tail = track.dataset.tail!;
+  drag.span.style.left = `${((start - timelineWindow.start) / (timelineWindow.end - timelineWindow.start)) * 100}%`;
+
+  if (!drag.target || drag.target.tail !== tail || drag.target.start !== start) {
+    drag.target = { tail, start };
+    drag.plan = planRetimeRotation(lastTimelineState, drag.rotation.legs.map((leg) => leg.legId), tail, start);
+  }
+  const plan = drag.plan!;
+  drag.span.classList.toggle('is-bad', !plan.ok);
+  dragTip.textContent = plan.ok ? describeRetime(plan, tail, drag.rotation.tail, start) : `${minuteOfDayToTimeString(start)} · ${plan.reason}`;
+  dragTip.classList.toggle('is-bad', !plan.ok);
+  dragTip.hidden = false;
+  const spanRect = drag.span.getBoundingClientRect();
+  dragTip.style.left = `${Math.max(8, Math.min(window.innerWidth - dragTip.offsetWidth - 8, spanRect.left))}px`;
+  dragTip.style.top = `${Math.max(8, spanRect.top - dragTip.offsetHeight - 6)}px`;
+}
+
+/** What a move would do, in ops shorthand: "08:10 · C-P004 · +$1,200/day · slots +$40/day". */
+function describeRetime(plan: RetimePlan, tail: string, fromTail: string, start: number): string {
+  const parts = [minuteOfDayToTimeString(start)];
+  if (tail !== fromTail) parts.push(tail);
+  if (plan.marginChangePerDay !== 0) parts.push(`${plan.marginChangePerDay > 0 ? '+' : '−'}${shortMoney(Math.abs(plan.marginChangePerDay))}/day`);
+  if (plan.slotFeeChangePerDay !== 0) parts.push(`slots ${plan.slotFeeChangePerDay > 0 ? '+' : '−'}${shortMoney(Math.abs(plan.slotFeeChangePerDay))}/day`);
+  if (plan.startsTomorrow) parts.push('from tomorrow');
+  if (plan.crewWarning) parts.push(plan.crewWarning);
+  return parts.join(' · ');
+}
+
+function onDragEnd(): void {
+  if (!drag) return;
+  const { moved, plan, target, rotation } = drag;
+  finishDrag();
+  if (!moved) return;
+  // The click that follows a drag isn't a click on the route.
+  justDragged = true;
+  setTimeout(() => (justDragged = false), 0);
+  if (plan?.ok && target && lastTimelineState && (target.start !== rotation.departMinute || target.tail !== rotation.tail)) {
+    const result = retimeRotation(lastTimelineState, rotation.legs.map((leg) => leg.legId), target.tail, target.start);
+    renderScheduleWarnings(scheduleProblems(lastTimelineState));
+    flashTip(result.ok ? result.message : result.reason, !result.ok);
+  }
+  rebuildTimeline();
+}
+
+function cancelDrag(): void {
+  if (!drag) return;
+  finishDrag();
+  rebuildTimeline();
+}
+
+function finishDrag(): void {
+  if (!drag) return;
+  drag.span.removeEventListener('pointermove', onDragMove);
+  drag.span.removeEventListener('pointerup', onDragEnd);
+  drag.span.removeEventListener('pointercancel', cancelDrag);
+  drag = null;
+  dragTip.hidden = true;
+  if (timelineHours) {
+    timelineHours.label.textContent = '';
+    timelineHours.strip.replaceChildren();
+  }
+}
+
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && drag) {
+    event.stopPropagation();
+    cancelDrag();
+  }
+}, true);
+
+/** The result of a move, shown where the tip was for a moment. */
+function flashTip(text: string, bad: boolean): void {
+  dragTip.textContent = text;
+  dragTip.classList.toggle('is-bad', bad);
+  dragTip.hidden = false;
+  setTimeout(() => {
+    if (!drag) dragTip.hidden = true;
+  }, 2500);
+}
+
+/** The dragged rotation's base across the top of the timeline, an hour a cell: room left (dim), full (amber). */
+function showBaseHours(state: SimState, iata: string): void {
+  if (!timelineHours) return;
+  const hours = airportHours(state, iata);
+  timelineHours.label.textContent = iata;
+  const cells: HTMLElement[] = [];
+  for (let hour = FIRST_OPEN_HOUR; hour < FIRST_OPEN_HOUR + OPEN_HOURS; hour++) {
+    const cell = document.createElement('span');
+    cell.className = 'timeline-hour';
+    const free = freeInHour(hours, hour);
+    cell.classList.toggle('is-full', free < 1);
+    cell.style.left = timelineHours.at(hour * 60);
+    cell.style.width = timelineHours.width(60);
+    cell.title = `${String(hour).padStart(2, '0')}:00 · room ${Math.max(0, free)}`;
+    cells.push(cell);
+  }
+  timelineHours.strip.replaceChildren(...cells);
 }
 
 /** A rotation's ×: two clicks, since a rotation can't be put back. */

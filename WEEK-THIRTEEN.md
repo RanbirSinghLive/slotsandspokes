@@ -36,6 +36,12 @@ the owner:
   thread 2 left it (steady medians: YUL $10M, YYZ $46M, BOS $21M, PHL
   $76M, LHR $186M; YHZ busts 4/6). The hour search jumps by hours, so a
   year runs in about 17 s (8 s before the thread, on a smaller airline).
+- **Done: thread 4.** The Fleet screen's Schedule is the Gantt: planes
+  grouped by type (folding), a colour per type, rotations dragged in
+  5-minute steps or onto another plane of the type, planned and priced
+  live by `sim/retime.ts` (hour room, turns, curfew, slots re-priced by
+  hour, margin change, crew warning); a move to a time already past
+  today starts tomorrow.
 
 **State at handoff:** save key `slotsandspokes-save`, save format 2.
 Every leg already has a real time (`ScheduleLeg.departMinute`), but the

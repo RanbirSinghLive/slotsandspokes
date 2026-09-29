@@ -172,6 +172,7 @@ export function step(state: SimState): void {
 
     state.completedToday = [];
     state.cancelledToday = [];
+    state.retimedToday = [];
     state.todayLegResults = {};
     state.todayRevenue = 0;
     state.todayCost = 0;
@@ -334,7 +335,10 @@ export function step(state: SimState): void {
   // sets: every due leg is checked against them every minute, and a list
   // search there grows with the square of the schedule. Kept in step with
   // the lists by the three places below that add to them.
-  const doneToday = doneTodaySet(state);
+  // Legs moved today to a time already past wait for tomorrow (sim/retime.ts):
+  // to the departure loop they're as good as done.
+  const retimed = state.retimedToday ?? [];
+  const doneToday = retimed.length > 0 ? new Set([...doneTodaySet(state), ...retimed]) : doneTodaySet(state);
   const airborne = new Set(state.activeFlights.map((flight) => flight.legId));
 
   for (const leg of state.schedule) {

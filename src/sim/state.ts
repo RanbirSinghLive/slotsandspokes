@@ -226,6 +226,12 @@ export type SimState = {
    * ground a whole tail or airport, which the departure loop checks directly.
    */
   cancelledToday: string[];
+  /**
+   * Legs of a rotation moved today to a time already past before it flew
+   * (sim/retime.ts): they wait for tomorrow rather than leave late now.
+   * Reset at rollover. Optional: made on first use.
+   */
+  retimedToday?: string[];
   todayRevenue: number;
   todayCost: number;
   todayMargin: number;

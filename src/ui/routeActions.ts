@@ -31,6 +31,7 @@ export {
   previewTurnBuffer,
   returnOptions,
   rebaseOptionsFor,
+  planRetimeRotation,
   routeBase,
   rotationsServing,
   summariseMarket,
@@ -60,6 +61,10 @@ export function retrainCrewsAt(state: SimState, iata: string, from: string, to: 
 
 export function releaseCrewsAt(state: SimState, iata: string, classCode: string, count: number) {
   return afterChange(state, actions.releaseCrewsAt(state, iata, classCode, count));
+}
+
+export function retimeRotation(state: SimState, legIds: string[], toTail: string, startMinute: number) {
+  return afterChange(state, actions.retimeRotation(state, legIds, toTail, startMinute));
 }
 
 export function rebasePlane(state: SimState, tail: string, to: string) {

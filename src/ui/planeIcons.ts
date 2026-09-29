@@ -67,3 +67,14 @@ export function planeIconElement(typeCode: string): SVGSVGElement {
   svg.innerHTML = planeIconInner(typeCode);
   return svg;
 }
+
+/**
+ * One colour per aircraft type, for the Schedule timeline's rotation blocks
+ * (ui/panels.ts), so a plane's type reads at a glance down the rows.
+ */
+export const TYPE_COLOURS: Record<string, string> = {
+  PROP: '#5ed6c8',
+  REGIONAL: '#f2a541',
+  NARROWBODY: '#9d8cf0',
+  WIDEBODY: '#ef7a95',
+};

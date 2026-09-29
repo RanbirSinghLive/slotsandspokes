@@ -46,6 +46,7 @@ import {
 import { cashNeededToLease, LEASE_RESERVE_DAYS, leaseRateFor, loadLeaseRates } from './leasing';
 import { inboundAt, orderLease } from './fleetTiming';
 import { rebaseOptions, rebasePlane, type RebaseOption } from './rebase';
+import { commitRetime, planRetime, type RetimePlan } from './retime';
 import { daysUntilNextListing, listingsOf, returnBlockedReason, returnFee, returnLease, takeListing, type MarketListing } from './market';
 import { airlineCalled, classOpen, tierThatOpens } from './ladder';
 import { actualDailyDemand, currentPotentialDemand } from './marketDemand';
@@ -547,6 +548,16 @@ export function returnOptions(state: SimState, iata: string): { tail: string; na
 
 export function returnPlane(state: SimState, tail: string): Outcome<{ message: string }> {
   return returnLease(state, tail);
+}
+
+/** Check and price moving a rotation to a new start, and optionally another plane of its type (sim/retime.ts). */
+export function planRetimeRotation(state: SimState, legIds: string[], toTail: string, startMinute: number): RetimePlan {
+  return planRetime(state, legIds, toTail, startMinute);
+}
+
+/** Move a rotation to a new start, and optionally another plane of its type (sim/retime.ts). */
+export function retimeRotation(state: SimState, legIds: string[], toTail: string, startMinute: number): Outcome<{ message: string }> {
+  return commitRetime(state, legIds, toTail, startMinute);
 }
 
 /** Every other crew base a plane could ferry to (sim/rebase.ts), with its cost and crews there. */

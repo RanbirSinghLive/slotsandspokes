@@ -203,13 +203,23 @@ export function freeInDay(hours: AirportHours): number {
  * the schedule minute of the earliest of this rotation's movements in
  * that hour, so a caller searching for a later start knows how far to
  * move it to clear the hour. `cache` lets a caller trying many start
- * times build each airport's day once.
+ * times build each airport's day once. `excluding` are legs on the
+ * schedule that these would replace (a rotation being moved): their own
+ * movements count as room, with rivals left where they are, so a
+ * rotation can always move within room it already holds.
  */
 export function hourlyRoomProblem(
   state: SimState,
   legs: PackedLeg[],
   cache: Map<string, AirportHours> = new Map(),
+  excluding: PackedLeg[] = [],
 ): { iata: string; hour: number; minute: number } | null {
+  const freed = new Map<string, number>();
+  const free = (iata: string, minute: number) => freed.set(`${iata}@${hourOf(minute)}`, (freed.get(`${iata}@${hourOf(minute)}`) ?? 0) + 1);
+  for (const leg of excluding) {
+    free(leg.origin, leg.departMinute);
+    free(leg.dest, leg.departMinute + leg.blockMinutes);
+  }
   const wanted = new Map<string, { iata: string; hour: number; count: number; minute: number }>();
   const add = (iata: string, minute: number) => {
     const hour = hourOf(minute);
@@ -226,7 +236,7 @@ export function hourlyRoomProblem(
   for (const { iata, hour, count, minute } of wanted.values()) {
     let hours = cache.get(iata);
     if (!hours) cache.set(iata, (hours = airportHours(state, iata)));
-    if (freeInHour(hours, hour) < count && (!first || minute < first.minute)) first = { iata, hour, minute };
+    if (freeInHour(hours, hour) + (freed.get(`${iata}@${hour}`) ?? 0) < count && (!first || minute < first.minute)) first = { iata, hour, minute };
   }
   return first;
 }

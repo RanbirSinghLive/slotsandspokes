@@ -1367,17 +1367,44 @@ stop can fix it.
 The card's headline reading: "Propeller C-P001 · 14% of a plane · YUL
 spare 1.00 → 0.86".
 
-## Rotations timeline (`src/ui/panels.ts`)
+## The Schedule (`src/ui/panels.ts`, rules in `src/sim/retime.ts`)
 
-The Fleet screen draws each plane's day as a timeline row across the usable
-day (06:00–22:00 home time, stretched if a long-haul rotation runs
-outside it): the tail and its share of the day, then each flight as a
-solid block labelled with where it lands, inside a faint span for its
-rotation. Idle planes get an empty row, and the gaps between spans are
-idle time. A yellow line marks now. Hovering a span shows its chain
-(`YHZ → YQM → YFC → YHZ`), window and share; clicking it opens its
-route; its × removes it (two clicks). It is a read-out, not an editor:
-times are packed automatically, so there is nothing to drag.
+The Fleet screen's Schedule draws each plane's day as a timeline row
+across the usable day (06:00–22:00 home time, stretched if a long-haul
+rotation runs outside it). Planes are **grouped by type**, each under a
+header ("▾ Regionals ×3 · 27% used") that folds the group away, and
+every rotation is a block in its **type's colour** (`TYPE_COLOURS`,
+`ui/planeIcons.ts`: Propeller teal, Regional orange, Narrowbody violet,
+Widebody rose), its flights solid inside it and labelled with where
+they land. Gaps are idle time. A yellow line marks now. Hovering a
+rotation shows its chain, window and share; clicking it opens its route;
+its × removes it (two clicks).
+
+**Dragging a rotation** moves it, whole, its legs keeping their turns:
+left and right in 5-minute steps, or onto another plane of its type at
+its base. While it's held, `planRetime()` checks and prices the move and
+a tip says what it would do ("10:15 · slots −$235/day") or why it can't
+("ALB 08:00 full", "Overlaps C-R002's ALB→YUL at 08:55"), the block
+turns red where it can't go, and the base's hours show across the top
+(amber where full). Letting go commits it (`commitRetime()`); Esc puts
+it back. The rules:
+
+- It must fit the usable day, its new plane's other rotations with a
+  turn either side, and room in every hour its legs now use at every
+  airport (its own old movements count as room, rivals stay where they
+  are), with no same-market departure at the same minute.
+- Not while a leg is in the air or the rotation is part flown.
+- Each departure whose hour changes has its slot re-priced at the new
+  hour (the held pair nearest the old price takes the new one), so a
+  slot taken cheap off-peak can't be dragged into the peak for free.
+- Legs flown today don't fly again (they keep their ids). A rotation
+  not flown yet today and moved to a time already past starts tomorrow
+  (`SimState.retimedToday`, cleared at rollover), rather than leaving
+  late now.
+- The tip also gives the change in its markets' daily margin at
+  today's demand (`summarizeMarket()`, which sees time of day), and
+  warns when its new plane's longer day needs more crews than the base
+  has.
 
 `rotationsForTail()` (in `sim/utilisation.ts`, so it stays testable
 without a browser) derives rotations by splitting a tail's departure-
