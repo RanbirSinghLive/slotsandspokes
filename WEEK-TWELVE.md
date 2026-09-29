@@ -140,6 +140,9 @@ comes by a link and a save file.
   shape as well as colour.
 - A changelog line in the Game screen per build.
 - Keyboard shortcuts listed in a `?` card.
+- **Mobile as good as desktop** (owner, 2026-09-28; tested on a Samsung
+  S26 Ultra): touch pan and pinch zoom, taps for what hover shows, and a
+  phone layout.
 
 ---
 
