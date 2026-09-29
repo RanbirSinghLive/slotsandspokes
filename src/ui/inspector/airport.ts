@@ -1,4 +1,5 @@
-import { airportLoad, dailyMovementsAt, slotCapacityPerDay } from '../../sim/airports';
+import { dailyMovementsAt } from '../../sim/airports';
+import { airportHours, FIRST_OPEN_HOUR, freeInHour, hoursWithRoom, OPEN_HOURS, peakHour, type AirportHours } from '../../sim/hours';
 import { inboundAt } from '../../sim/fleetTiming';
 import { money, shortMoney } from '../format';
 import { crewShare } from '../../sim/crews';
@@ -138,12 +139,15 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
  * same traffic.
  */
 function loadAndSlots(state: SimState, iata: string): HTMLElement[] {
-  const load = airportLoad(state, iata);
+  const hours = airportHours(state, iata);
+  const peak = peakHour(hours);
+  const load = peak.load;
   const { delayChance, maxDelayMinutes } = congestionParameters(load);
+  const withRoom = hoursWithRoom(hours);
   const loadLine = lineWithInfo(
-    `Load ${Math.round(load * 100)}% at peak · ${dailyMovementsAt(state, iata)}/${slotCapacityPerDay(state, iata)} movements` +
-      (delayChance > 0 ? ` · congestion delays ${Math.round(delayChance * 100)}% of flights, ≤${maxDelayMinutes} min` : ' · no congestion'),
-    'Movements are every airline\'s takeoffs and landings a day. Slots stop at the second number. As the peak hour fills, congestion delays a growing share of flights: the glow around the airport on the map.',
+    `Peak ${Math.round(load * 100)}% at ${String(peak.hour).padStart(2, '0')}:00 · ${dailyMovementsAt(state, iata)} movements · room ${withRoom}/${OPEN_HOURS}h` +
+      (delayChance > 0 ? ` · peak CONG ${Math.round(delayChance * 100)}%, ≤${maxDelayMinutes} min` : ''),
+    'Movements are every airline\'s takeoffs and landings, judged hour by hour from 06:00 to 22:00. A full hour takes no new flights; the route planner starts a new one later, when there is room. As an hour fills, congestion (CONG) delays a growing share of the flights in it: the glow around the airport on the map shows its busiest hour.',
   );
   loadLine.classList.toggle('is-warn', delayChance > 0 && load < 1);
   loadLine.classList.toggle('is-over', load >= 1);
@@ -155,7 +159,45 @@ function loadAndSlots(state: SimState, iata: string): HTMLElement[] {
     held > 0 ? `Slots ${held} pair${held === 1 ? '' : 's'} · ${money(slotFeesPerDayAt(state, iata))}/day · ${nextText}` : `Slots none held · ${nextText}`,
     'Each daily departure needs a slot pair. The first pair at an airport nobody serves is free; after that the fee rises with how busy the field is, and is locked when taken. Unused slots are released at midnight.',
   );
-  return [loadLine, slotsLine];
+  return [loadLine, hourStrip(hours), slotsLine];
+}
+
+/**
+ * The airport's day by the hour, 06:00–22:00: a column per hour, yours
+ * (blue) and rivals' (grey) stacked against the hour's room, red past it.
+ * Hovering a column says the numbers.
+ */
+function hourStrip(hours: AirportHours): HTMLElement {
+  const strip = document.createElement('div');
+  strip.className = 'hour-strip';
+  for (let hour = FIRST_OPEN_HOUR; hour < FIRST_OPEN_HOUR + OPEN_HOURS; hour++) {
+    const capacity = hours.capacity[hour];
+    const mine = hours.mine[hour];
+    const rivals = hours.rivals[hour];
+    const column = document.createElement('div');
+    column.className = 'hour-strip-col';
+    const over = mine + rivals > capacity + 1e-6;
+    column.classList.toggle('is-full', freeInHour(hours, hour) < 1);
+    column.classList.toggle('is-over', over);
+    const scale = Math.max(capacity, mine + rivals, 1);
+    const mineEl = document.createElement('span');
+    mineEl.className = 'hour-strip-mine';
+    mineEl.style.height = `${(mine / scale) * 100}%`;
+    const rivalEl = document.createElement('span');
+    rivalEl.className = 'hour-strip-rivals';
+    rivalEl.style.height = `${(rivals / scale) * 100}%`;
+    column.append(rivalEl, mineEl);
+    const label = `${String(hour).padStart(2, '0')}:00`;
+    column.title = `${label} · you ${mine} · rivals ${Math.round(rivals * 10) / 10} · room ${Math.max(0, freeInHour(hours, hour))} of ${Math.round(capacity * 10) / 10}`;
+    if (hour % 4 === 2) {
+      const tick = document.createElement('span');
+      tick.className = 'hour-strip-tick';
+      tick.textContent = String(hour).padStart(2, '0');
+      column.append(tick);
+    }
+    strip.append(column);
+  }
+  return strip;
 }
 
 /**

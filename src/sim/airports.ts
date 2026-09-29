@@ -1,6 +1,6 @@
 import airportsData from '../../data/airports.json';
 import type { SimState } from './state';
-import { HUB_STYLES, hubStyleAt } from './hubStyle';
+import { airportHours, hourLoad, peakHour } from './hours';
 
 /**
  * Airport layer: how much of an airline you are *at each
@@ -82,31 +82,20 @@ export function dailyMovementsAt(state: SimState, iata: string): number {
 }
 
 /**
- * How full the airport is at its busiest: peak movements over capacity.
- * 0.5 is comfortably busy, 1 is full, above 1 is more traffic than the
- * field can take without queueing. Drives congestion delays.
+ * How full the airport is at its busiest hour: that hour's movements, every
+ * airline's, over the hour's room (sim/hours.ts). 0.5 is comfortably busy,
+ * 1 is full, above 1 is more traffic than the field can take without
+ * queueing. Drives the airport's ring on the map and the busy-airport
+ * milestones; a leg's own congestion reads the hour it flies in
+ * (`airportLoadAt()`).
  */
 export function airportLoad(state: SimState, iata: string): number {
-  const capacity = airportCapacityPerDay(iata);
-  if (capacity <= 0) return 0;
-  // Traffic isn't spread evenly across the day: it bunches into peaks,
-  // and load is judged at the peak. How peaky depends on how the airport
-  // is run as a hub (sim/hubStyle.ts): waves are peaks.
-  return (dailyMovementsAt(state, iata) * HUB_STYLES[hubStyleAt(state, iata)].peakFactor) / capacity;
+  return peakHour(airportHours(state, iata)).load;
 }
 
-/**
- * Takeoffs and landings a day an airport gives slots for: as many as keep
- * its busiest hours within capacity (a peak load of 1), so the hub style's
- * peak factor sets it. Slots are rationed to the peak, as at real
- * slot-controlled airports, because the peak is where congestion delays
- * come from; rationing only the whole day let a hub fill until most of its
- * flights queued. The same limit for the player and every rival
- * (sim/slots.ts): an airport's slots go to whoever takes them first.
- * A hub run in waves has a sharper peak, so it fills at fewer flights.
- */
-export function slotCapacityPerDay(state: SimState, iata: string): number {
-  return Math.floor(airportCapacityPerDay(iata) / HUB_STYLES[hubStyleAt(state, iata)].peakFactor);
+/** How full the airport is in one hour of the day (0–23, home clock). */
+export function airportLoadAt(state: SimState, iata: string, hour: number): number {
+  return hourLoad(airportHours(state, iata), hour);
 }
 
 export function allAirports(): AirportSpec[] {

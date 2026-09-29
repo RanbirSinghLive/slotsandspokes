@@ -1982,13 +1982,23 @@ three across a run.
 Outstation (1–2), Focus city (3–5), Base (6–9), Hub (10+). Read off the map: the dot grows
 with departures, and Base and Hub get a faint halo.
 
-**Capacity and congestion.** Every airport has a daily capacity in
-takeoffs and landings, set in the data or derived from its population.
-Movements count every airline: the player's legs, plus one round trip at
-each end per rival daily frequency (rivals have no times). As an airport
-fills, congestion adds delay (`sim/delays.ts`) and the map draws a warm
-glow that grows and reddens. A hub's style raises its peak (see
-Connecting passengers).
+**Capacity by the hour** (`sim/hours.ts`). Every airport has a daily
+capacity in takeoffs and landings, set in the data or derived from its
+population, spread evenly over the 16 hours of the usable day
+(06:00–22:00 home time). Movements count every airline, hour by hour:
+the player's legs where they really fly (a takeoff in the hour a leg
+departs, a landing in the hour it arrives), and rivals' spread by a fixed
+profile, heaviest at 07–08 and 17–18. Rivals have frequencies but no
+times, so their profile is *water-filled* into the room the player's
+flights leave: a full hour pushes the rest of their traffic into hours
+that still have some. Rivals take the peak first and spill into the day,
+and a new flight of the player's only takes room nobody holds, so it
+never pushes a rival out. An airport's load is its busiest hour's
+(`airportLoad()`); a leg's congestion delay (`sim/delays.ts`) reads the
+hour it departs and the hour it lands. The map's glow shows the busiest
+hour. The airport view has an **hour strip**: a column per hour, the
+player's movements (blue) over rivals' (grey) against its room, amber
+along the top when the hour is full.
 
 **Slots at every airport.** Each daily departure needs a slot pair. The
 first pair at an airport nobody serves is free. Otherwise the daily fee
@@ -1996,21 +2006,30 @@ scales with how busy the airport is against the average served one, so a
 field twice as busy costs nearly three times as much. The fee is locked
 when taken, like a lease. Slots are taken automatically when a rotation
 needs them (the route builder quotes the price first) and released at
-rollover once unused, most expensive first. A full airport has no slots
-at any price, and the route builder refuses the rotation.
+rollover once unused, most expensive first. A slot in a busier hour
+costs more (`hourPriceMultiplier()`): 1.5× the gap between its hour's
+load and the airport's average hour, from half price to double, so a
+peak slot is worth paying for and an off-peak one is cheap.
 
-**Full means full at the peak.** An airport gives slots for as many
-takeoffs and landings a day as keep its busiest hours within capacity
-(`slotCapacityPerDay()`): its daily capacity over its hub style's peak
-factor, so 157 of Montréal's 236 on the default rolling style. The same
-limit binds the player and every rival, first come first served, as at
-real slot-controlled airports. Rationing only the whole day let rivals
-keep buying into a player's congested hub: from YUL they reached 164 of
-222 movements by day 240, with congestion delaying 60% of flights by up
-to 75 minutes. Rationed to the peak, YUL fills at 156 (78 the player's,
-78 rivals'), with delays of 34% up to 54 minutes. A hub run in waves has
-a sharper peak, so it closes at fewer flights. The airport view shows
-where slots stop ("68 movements a day; slots stop at 80").
+**Full means full in that hour.** A new rotation needs room in every
+hour its legs use, at every airport it touches. When the planner
+(`sim/rotations.ts`) finds one full, it starts the rotation later, in
+5-minute steps, until everything fits or it would no longer be home by
+22:00; the route card says so ("ALB 07:00 full · departs 13:10"). Only a
+rotation with no hour left is refused. Rivals are rationed the same way:
+a rival adds a flight only while the airport has room somewhere in the
+day. Rationing by the hour keeps what rationing to the peak was for (no
+hour filled past its room, so congestion stays bounded; whole-day
+rationing once let rivals drive a player's hub to 60% of flights
+delayed) while leaving the quiet middle of the day open. Because
+the planner can hold a rotation back, a plane can fly a morning and an
+evening rotation with a long wait at base between; a wait of 2 hours
+or more at base is off duty for crews (`CREW_SWAP_GAP_MINUTES`,
+`sim/crews.ts`), so the gap doesn't cost crew hours.
+
+The headless player judges an airport too busy to grow at by its
+average hour's congestion, not its peak's, since the planner finds a
+free hour for a new flight.
 
 
 ---

@@ -657,7 +657,11 @@ function updateFormValidation(chain: Airport[], dest: Airport, state: SimState):
   formUtilisation.textContent =
     `${type ? `${type.name} ${tail}` : tail} · ${Math.round(plan.rotationShare * 100)}% of a plane · ${plan.base.iata} spare ${spareBefore.toFixed(2)} → ${spareAfter.toFixed(2)}`;
 
-  formSlots.textContent = describeSlotQuotes(plan.slotQuotes);
+  // A full hour pushed it later than its plane was free (sim/rotations.ts): say where, and when it goes instead.
+  const heldBack = plan.heldBack
+    ? `${plan.heldBack.iata} ${String(plan.heldBack.hour).padStart(2, '0')}:00 full · departs ${minuteOfDayToTimeString(plan.legs[0]?.departMinute ?? 0)}`
+    : '';
+  formSlots.textContent = [describeSlotQuotes(plan.slotQuotes), heldBack].filter(Boolean).join(' · ');
 
   formError.textContent = plan.error ?? '';
 

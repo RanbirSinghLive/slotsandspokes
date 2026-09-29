@@ -1,5 +1,6 @@
-import { allAirports, dailyDeparturesAt, dailyMovementsAt, slotCapacityPerDay } from './airports';
+import { allAirports, dailyDeparturesAt, dailyMovementsAt } from './airports';
 import type { SimState } from './state';
+import { airportHours, freeInDay, hourOf, hourPriceMultiplier } from './hours';
 
 /**
  * Slots at every airport. A slot pair is the right to one daily departure
@@ -27,10 +28,13 @@ import type { SimState } from './state';
  * price first) and released at the day's rollover once nothing uses them,
  * most expensive first: use it or lose it.
  *
- * An airport with no room left has no slots to give, whatever the price.
- * Room is judged at the peak (sim/airports.ts's slotCapacityPerDay()),
- * for the player and every rival alike, so a busy hub closes to newcomers
- * once its busiest hours are full.
+ * Room is judged hour by hour (sim/hours.ts), for the player and every
+ * rival alike. A new flight of the player's needs room in the hours its
+ * legs use (the route planner looks for them, sim/rotations.ts); a rival
+ * takes the peak first and spills into the rest of the day, so an airport
+ * has no slots to give only when every hour is full. A slot in a busier
+ * hour costs more (hourPriceMultiplier()): the peak is worth paying for,
+ * not free.
  */
 
 /**
@@ -98,18 +102,19 @@ export function nextSlotFees(
   count: number,
   extraMovements = 0,
   average: number = averageServedMovements(state),
+  hourMultiplier = 1,
 ): (number | null)[] {
-  const capacity = slotCapacityPerDay(state, iata);
+  const free = freeInDay(airportHours(state, iata)) - Math.max(0, extraMovements);
   const fees: (number | null)[] = [];
   for (let i = 0; i < count; i++) {
     const movements = dailyMovementsAt(state, iata) + extraMovements + i * MOVEMENTS_PER_PAIR;
-    if (movements + MOVEMENTS_PER_PAIR > capacity) {
+    if (free - i * MOVEMENTS_PER_PAIR < MOVEMENTS_PER_PAIR) {
       fees.push(null);
     } else if (movements === 0) {
       fees.push(0);
     } else {
       const relative = movements / Math.max(average, 1);
-      fees.push(Math.round((SLOT_BASE_FEE_PER_DAY * Math.pow(relative, SLOT_PRICE_EXPONENT)) / 5) * 5);
+      fees.push(Math.round((SLOT_BASE_FEE_PER_DAY * Math.pow(relative, SLOT_PRICE_EXPONENT) * hourMultiplier) / 5) * 5);
     }
   }
   return fees;
@@ -143,15 +148,26 @@ export type SlotQuote = { iata: string; fees: number[]; full: boolean };
  * builder and the add-flight button both show this before anything is
  * committed.
  */
-export function quoteSlots(state: SimState, departuresByAirport: Map<string, number>, arrivalsByAirport: Map<string, number>): SlotQuote[] {
+export function quoteSlots(
+  state: SimState,
+  departuresByAirport: Map<string, number>,
+  arrivalsByAirport: Map<string, number>,
+  legs: { origin: string; departMinute: number }[] = [],
+): SlotQuote[] {
   const quotes: SlotQuote[] = [];
+  const average = averageServedMovements(state);
   for (const [iata, departures] of departuresByAirport) {
     const shortfall = slotsNeeded(state, iata) + departures - slotsHeld(state, iata);
     if (shortfall <= 0) continue;
     // Traffic this same rotation adds before its own new pairs: every
     // movement it makes here beyond the ones those pairs cover.
     const ownMovements = departures + (arrivalsByAirport.get(iata) ?? 0) - shortfall * MOVEMENTS_PER_PAIR;
-    const fees = nextSlotFees(state, iata, shortfall, Math.max(0, ownMovements));
+    // Priced at the hours this rotation departs from here: a peak slot costs more.
+    const hours = airportHours(state, iata);
+    const departing = legs.filter((leg) => leg.origin === iata);
+    const multiplier =
+      departing.length > 0 ? departing.reduce((sum, leg) => sum + hourPriceMultiplier(hours, hourOf(leg.departMinute)), 0) / departing.length : 1;
+    const fees = nextSlotFees(state, iata, shortfall, Math.max(0, ownMovements), average, multiplier);
     quotes.push({ iata, fees: fees.filter((fee): fee is number => fee !== null), full: fees.includes(null) });
   }
   return quotes;

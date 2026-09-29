@@ -106,12 +106,42 @@ function legsOf(state: SimState, tail: string): ScheduleLeg[] {
   return state.schedule.filter((leg) => leg.tail === tail).sort((a, b) => a.departMinute - b.departMinute);
 }
 
-/** A plane's duty day in minutes: report time plus first departure to last landing. 0 for a plane with nothing to fly. */
-export function dutyMinutes(state: SimState, tail: string): number {
+/**
+ * A wait at least this long at the plane's own base is off duty: its crew
+ * signs off and a crew reports fresh for the next stretch, as airlines
+ * swap crews at base. So a plane flying a morning and an evening rotation
+ * (an off-peak slot, sim/rotations.ts) isn't charged the idle middle of
+ * the day in crew hours.
+ */
+export const CREW_SWAP_GAP_MINUTES = 120;
+
+/**
+ * A plane's day as the stretches its crews are on duty: report time plus
+ * each run of legs from its first departure to its last landing, split at
+ * every long wait at base (CREW_SWAP_GAP_MINUTES).
+ */
+function dutyStretches(state: SimState, tail: string): { start: number; end: number }[] {
   const legs = legsOf(state, tail);
-  if (legs.length === 0) return 0;
-  const last = legs[legs.length - 1];
-  return REPORT_MINUTES + last.departMinute + last.blockMinutes - legs[0].departMinute;
+  const base = state.aircraft.find((aircraft) => aircraft.tail === tail)?.baseAirport;
+  const stretches: { start: number; end: number }[] = [];
+  for (let i = 0; i < legs.length; i++) {
+    const leg = legs[i];
+    const previous = legs[i - 1];
+    const waitAtBase = previous && previous.dest === base && leg.departMinute - (previous.departMinute + previous.blockMinutes) >= CREW_SWAP_GAP_MINUTES;
+    if (!previous || waitAtBase) stretches.push({ start: leg.departMinute - REPORT_MINUTES, end: leg.departMinute + leg.blockMinutes });
+    else stretches[stretches.length - 1].end = leg.departMinute + leg.blockMinutes;
+  }
+  return stretches;
+}
+
+/** A plane's duty in minutes: every stretch its crews are on duty, report time included. 0 for a plane with nothing to fly. */
+export function dutyMinutes(state: SimState, tail: string): number {
+  return dutyStretches(state, tail).reduce((total, stretch) => total + stretch.end - stretch.start, 0);
+}
+
+/** Minutes of duty this plane's crews have done by `minute` on the schedule clock, off-duty waits left out. */
+function onDutyBy(stretches: { start: number; end: number }[], minute: number): number {
+  return stretches.reduce((total, stretch) => total + Math.max(0, Math.min(minute, stretch.end) - stretch.start), 0);
 }
 
 function crewsFor(duty: number, shift: number): number {
@@ -361,16 +391,18 @@ export function legFatigue(state: SimState, leg: ScheduleLeg): number {
   const crews = state.crewDay?.crewsByTail[leg.tail] ?? 0;
   const start = state.crewDay?.dutyStartByTail[leg.tail];
   if (crews <= 0 || start === undefined) return 0;
-  const shift = dutyMinutes(state, leg.tail) / crews;
-  const intoDuty = leg.departMinute + leg.blockMinutes - start;
-  const shiftIndex = Math.min(crews - 1, Math.floor((leg.departMinute - start) / shift));
-  const shiftStart = start + shiftIndex * shift;
+  // Shifts share out the plane's on-duty time, so a long wait at base
+  // (dutyStretches()) neither tires the crew nor counts toward a shift.
+  const stretches = dutyStretches(state, leg.tail);
+  const shift = stretches.reduce((total, stretch) => total + stretch.end - stretch.start, 0) / crews;
+  const intoDuty = onDutyBy(stretches, leg.departMinute + leg.blockMinutes);
+  const shiftIndex = Math.min(crews - 1, Math.floor(onDutyBy(stretches, leg.departMinute) / shift));
   let intoShift = intoDuty - shiftIndex * shift;
   // Tight turns earlier in this shift tire the crew as if they'd flown longer.
   const legs = legsOf(state, leg.tail);
   for (let i = 1; i < legs.length; i++) {
     const turn = legs[i];
-    if (turn.departMinute < shiftStart || turn.departMinute > leg.departMinute) continue;
+    if (onDutyBy(stretches, turn.departMinute) < shiftIndex * shift || turn.departMinute > leg.departMinute) continue;
     const previous = legs[i - 1];
     if (turn.departMinute - (previous.departMinute + previous.blockMinutes) < TIGHT_TURN_MINUTES) intoShift += TIGHT_TURN_TIRING_MINUTES;
   }

@@ -2,6 +2,7 @@ import { currentPotentialDemand } from '../sim/marketDemand';
 import { contractOn, contractsOf, performanceFactor } from '../sim/contracts';
 import airportsData from '../../data/airports.json';
 import { inboundAt } from '../sim/fleetTiming';
+import { airportHours, averageHourLoad } from '../sim/hours';
 import { lastWeekMargin } from '../sim/pnlHistory';
 import { AIRCRAFT_CLASSES, classByCode } from '../sim/aircraftClasses';
 import { dayIndex } from '../sim/clock';
@@ -28,7 +29,6 @@ import { TURN_BUFFER_CHOICES } from '../sim/turnBuffer';
 import { networkAirports } from '../sim/reach';
 import { spillingMarkets } from '../sim/unmetDemand';
 import { aircraftUtilisation, utilisationPools } from '../sim/utilisation';
-import { airportLoad } from '../sim/airports';
 import { congestionParameters } from '../sim/delays';
 
 /**
@@ -286,9 +286,14 @@ function otherEnd(key: string, iata: string): string {
   return a === iata ? b : a;
 }
 
-/** Whether congestion at this airport already delays enough flights that adding more would make it worse. */
+/**
+ * Whether congestion at this airport already delays enough flights that
+ * adding more would make it worse. Judged at its average hour, not its
+ * peak: the route planner puts a new flight in an hour with room
+ * (sim/hours.ts), so a full morning peak alone doesn't make it too busy.
+ */
 function tooBusy(state: SimState, iata: string): boolean {
-  return congestionParameters(airportLoad(state, iata)).delayChance >= BUSY_DELAY_CHANCE;
+  return congestionParameters(averageHourLoad(airportHours(state, iata))).delayChance >= BUSY_DELAY_CHANCE;
 }
 
 function settled(state: SimState, memory: Memory, key: string): boolean {

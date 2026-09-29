@@ -5,7 +5,8 @@ import { breaksCurfew, rotationStartingWith } from './curfew';
 import { rollDailyWeather, isAirportClosed } from './weather';
 import { rollDailyShocks } from './shocks';
 import { airlineFuelPrice, recordHedgedFuel, rollDailyFuelPrice } from './fuelPrice';
-import { airportLoad } from './airports';
+import { airportLoadAt } from './airports';
+import { hourOf } from './hours';
 import { connectingDemandOnMarket } from './hubs';
 import { rollTotalDelayMinutes, isOnTimeArrival } from './delays';
 import { rollCompetitorRouteOpenings, rollCompetitorFrequencyGrowth, rollRivalEntry, rollDailyRivalFares } from './competitors';
@@ -405,9 +406,10 @@ export function step(state: SimState): void {
       aircraft.ageYears,
       weatherAtOrigin,
       lateAtDepartureMinutes,
-      // Congestion is judged at the busier of the two ends: a full
-      // airport queues its departures and holds its arrivals alike.
-      Math.max(airportLoad(state, leg.origin), airportLoad(state, leg.dest)),
+      // Congestion is judged at the busier of the two ends, each in the
+      // hour this flight uses it (sim/hours.ts): a full hour queues its
+      // departures and holds its arrivals alike.
+      Math.max(airportLoadAt(state, leg.origin, hourOf(leg.departMinute)), airportLoadAt(state, leg.dest, hourOf(leg.departMinute + leg.blockMinutes))),
       MAINTENANCE_AGE_FACTOR * executiveMaintenanceMultiplier(state),
     );
     state.rngSeed = nextSeed;

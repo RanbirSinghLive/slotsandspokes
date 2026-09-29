@@ -99,8 +99,8 @@ function rollWeatherDelay(seed: number, hasWeatherAtOrigin: boolean): [delayMinu
 }
 
 /**
- * Cause 4: congestion. `load` is the busier end's peak traffic over its
- * capacity (sim/airports.ts's airportLoad()). Below CONGESTION_ONSET_LOAD
+ * Cause 4: congestion. `load` is the busier end's traffic over its room
+ * in the hour the flight uses it (sim/airports.ts's airportLoadAt()). Below CONGESTION_ONSET_LOAD
  * an airport is simply not busy enough to queue anyone, and no random
  * number is drawn. Above it, both the chance of a delay and the worst case
  * climb, the chance on a squared curve: queues stay short while there's

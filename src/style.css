@@ -1219,13 +1219,69 @@ body {
   color: #ff8080;
 }
 
-/* Planes grounded with an AOG at this airport (ui/inspector/airport.ts). */
+/* An airport's day by the hour (ui/inspector/airport.ts): yours over rivals' in each hour's room. */
+.hour-strip {
+  display: grid;
+  grid-template-columns: repeat(16, 1fr);
+  gap: 2px;
+  height: 34px;
+  margin: 2px 0 16px;
+}
+
+.hour-strip-col {
+  position: relative;
+  display: flex;
+  flex-direction: column-reverse;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 2px;
+}
+
+.hour-strip-col.is-full {
+  box-shadow: inset 0 2px 0 #ffb347;
+}
+
+.hour-strip-col.is-over {
+  box-shadow: inset 0 2px 0 #ff5c5c;
+}
+
+.hour-strip-mine {
+  background: #4a90d9;
+}
+
+.hour-strip-rivals {
+  background: #6b7488;
+}
+
+.hour-strip-mine,
+.hour-strip-rivals {
+  display: block;
+  width: 100%;
+  border-radius: 1px;
+}
+
+.hour-strip-tick {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  font-size: 9px;
+  color: #8a93a6;
+  line-height: 12px;
+}
+
+/* Planes grounded with an AOG (ui/inspector/maintenance.ts). */
 .airport-aog-row {
   display: flex;
   flex-direction: column;
   gap: 4px;
   margin-bottom: 6px;
   color: #ff8080;
+}
+
+.airport-aog-row button.inspector-link {
+  padding: 0;
+  color: inherit;
+  background: none;
+  text-align: left;
 }
 
 .airport-aog-row button {

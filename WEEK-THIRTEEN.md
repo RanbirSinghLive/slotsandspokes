@@ -2,8 +2,34 @@
 
 Handoff document. Week twelve (alpha readiness: hosting, save safety,
 the tutorial, feedback, rebasing, crews from the ring) lives in
-`WEEK-TWELVE.md`. **Draft**: the owner trims it and picks the order
-(decisions below).
+`WEEK-TWELVE.md`.
+
+**Settled with the owner (2026-09-29):** build the whole of it now,
+threads 1–5 in order, from the git tag `pre-timed-schedule` (the last
+state before it, to go back to). Hours for slots, 5-minute steps for
+dragging; thread 5 in; rivals keep a profile, not timetables. And, from
+the owner:
+
+- **The Gantt is the Fleet screen's existing rotations timeline**,
+  edited within its size, not a new screen: planes **clustered by type,
+  each group collapsible**, and **a colour per type** for the rotation
+  blocks ("pucks") so types read at a glance.
+- **Crews live only on the Crews screen**: the airport view's Crews
+  section goes.
+- **A Maintenance screen (Mtc) under Crews** takes AOGs and Expedite,
+  plus the fleet's health (age, tech dispatch, AOG chance, life left).
+
+## Status
+
+- **Done:** the Maintenance screen, crews off the airport view.
+- **Done: threads 1–2.** `sim/hours.ts`: capacity by the hour, rivals
+  water-filled by profile, the hour strip on the airport view, the
+  planner's hour search ("ALB 07:00 full · departs 13:10"), peak slots
+  priced higher. Crew duty splits at a 2-hour wait at base, so an
+  off-peak rotation doesn't cost crew hours. Balance moved (steady
+  medians, year): YUL $14.8M, YYZ $49M, BOS $39M, PHL $79M, LHR $188M,
+  YHZ busts 5/6: easier at big homes, harder at thin ones. The pass
+  waits for threads 3 and 5, which move it again.
 
 **State at handoff:** save key `slotsandspokes-save`, save format 2.
 Every leg already has a real time (`ScheduleLeg.departMinute`), but the

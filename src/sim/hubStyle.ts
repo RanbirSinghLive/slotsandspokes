@@ -8,8 +8,9 @@ import type { SimState } from './state';
  *   - Connection efficiency: how many of the passengers who *could*
  *     connect through here actually make it (sim/hubs.ts). Banking flights
  *     into waves lines arrivals up with departures.
- *   - Peak factor: how bunched the airport's traffic is at its busiest
- *     (sim/airports.ts's airportLoad()). Waves are peaks, so they congest.
+ *   - Peaks: how bunched the airport's traffic is, which shows in the
+ *     real hours its flights use (sim/hours.ts). Waves are peaks, so they
+ *     fill hours and congest.
  *   - Hub wait: extra scheduled ground time after every flight *into* this
  *     airport, while the wave assembles. Paid for in aircraft time, like a
  *     turn buffer (sim/turnBuffer.ts) — and, like one, it absorbs delays.
@@ -23,7 +24,6 @@ export type HubStyleSpec = {
   name: string;
   description: string;
   connectionEfficiency: number;
-  peakFactor: number;
   hubWaitMinutes: number;
 };
 
@@ -32,21 +32,18 @@ export const HUB_STYLES: Record<HubStyle, HubStyleSpec> = {
     name: 'Rolling',
     description: 'Flights spread through the day. Smooth, but fewer connections line up.',
     connectionEfficiency: 0.5,
-    peakFactor: 1.5,
     hubWaitMinutes: 0,
   },
   banked: {
     name: 'Banked',
     description: 'Arrivals and departures grouped into waves. More connections, busier peaks, 20 min extra ground time per arrival.',
     connectionEfficiency: 0.75,
-    peakFactor: 1.75,
     hubWaitMinutes: 20,
   },
   tight: {
     name: 'Tight banks',
     description: 'Short, dense waves. Most connections, sharpest peaks, 35 min extra ground time per arrival.',
     connectionEfficiency: 1,
-    peakFactor: 2.1,
     hubWaitMinutes: 35,
   },
 };

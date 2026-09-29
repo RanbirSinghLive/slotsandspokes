@@ -1,6 +1,7 @@
 import { nextRandom } from './rng';
 import { executiveMaintenanceMultiplier } from './executives';
-import { airportLoad } from './airports';
+import { airportLoadAt } from './airports';
+import { hourOf } from './hours';
 import { summarizeMarket } from './marketSummary';
 import { marketKey } from './schedule';
 import { aircraftUtilisation, rotationsForTail, type Rotation } from './utilisation';
@@ -85,8 +86,11 @@ function effectiveAge(state: SimState, aircraft: Aircraft): number {
 /** Today's chance this plane goes AOG. Exported for the dev tools and any readout that wants to explain it. */
 export function aogChance(state: SimState, aircraft: Aircraft): number {
   const base = effectiveAge(state, aircraft) * AOG_CHANCE_PER_EFFECTIVE_YEAR;
-  const airports = new Set(state.schedule.filter((leg) => leg.tail === aircraft.tail).flatMap((leg) => [leg.origin, leg.dest]));
-  const busiest = Math.max(0, ...[...airports].map((iata) => airportLoad(state, iata)));
+  // The busiest hour it actually uses: a takeoff or landing at a crowded field in a crowded hour.
+  const loads = state.schedule
+    .filter((leg) => leg.tail === aircraft.tail)
+    .flatMap((leg) => [airportLoadAt(state, leg.origin, hourOf(leg.departMinute)), airportLoadAt(state, leg.dest, hourOf(leg.departMinute + leg.blockMinutes))]);
+  const busiest = Math.max(0, ...loads);
   const congestion = 1 + CONGESTION_RISK_PER_LOAD * Math.max(0, busiest - CONGESTION_RISK_ONSET_LOAD);
   const strain = 1 + UTILISATION_STRAIN_PER_SHARE * Math.max(0, aircraftUtilisation(state, aircraft.tail).share - UTILISATION_STRAIN_ONSET);
   return Math.min(AOG_CHANCE_MAX, base * congestion * strain);

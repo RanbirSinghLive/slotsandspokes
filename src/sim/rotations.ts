@@ -1,6 +1,7 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { classRank } from './aircraftClasses';
-import { dailyMovementsAt, slotCapacityPerDay } from './airports';
+import { dailyMovementsAt } from './airports';
+import { airportHours, hourlyRoomProblem, hoursWithRoom, type AirportHours } from './hours';
 import { minuteOfDayToTimeString } from './clock';
 import { greatCircleDistanceNm } from './geo';
 import { policyFare } from './pricing';
@@ -48,6 +49,14 @@ const aircraftTypesByCode = new Map<string, AircraftTypeSpec>(
 );
 
 export type PackedLeg = { origin: string; dest: string; departMinute: number; blockMinutes: number };
+
+/** How far later each try starts when an hour this rotation needs is full. */
+const HOUR_SEARCH_STEP = 5;
+
+/** An hour of the day as "07:00". */
+function hourText(hour: number): string {
+  return `${String(hour).padStart(2, '0')}:00`;
+}
 
 /** Five-minute steps, the granularity nudgeing uses to dodge an exact-time collision. */
 const COLLISION_NUDGE_MINUTES = 5;
@@ -176,6 +185,8 @@ export type RotationPlan = {
   arriveBackMinute: number;
   /** New slot pairs this rotation would take, and their daily fees (sim/slots.ts). */
   slotQuotes: SlotQuote[];
+  /** Set when a full hour pushed the rotation later than its plane was free: where, and when it would have left. */
+  heldBack: { iata: string; hour: number; fromMinute: number } | null;
   error: string | null;
   blocksAddStop: boolean;
 };
@@ -186,12 +197,8 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
   const aircraft = state.aircraft.find((a) => a.tail === tail);
   const type = aircraft ? aircraftTypesByCode.get(aircraft.typeCode) : undefined;
 
-  const legs = packRotationAvoidingCollisions(
-    rotationAirports,
-    type?.cruiseKts,
-    rotationStartMinute(tail, state),
-    state,
-  );
+  const earliestStart = rotationStartMinute(tail, state);
+  let legs = packRotationAvoidingCollisions(rotationAirports, type?.cruiseKts, earliestStart, state);
   const clockMinutes = legs.reduce(
     (total, leg) => total + legUtilisationMinutes(leg.blockMinutes, extraTurnMinutes(state, leg.origin, leg.dest)),
     0,
@@ -202,6 +209,29 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
   const tailIsEmpty = !state.schedule.some((leg) => leg.tail === tail);
   const longHaul = tailIsEmpty && rotationAirports.length === 2 && isLongHaulRoundTrip(legs.length, clockMinutes);
   const rotationMinutes = longHaul ? USABLE_DAY_MINUTES : clockMinutes;
+
+  // Room by the hour (sim/hours.ts): when an hour this rotation would use
+  // is full at one of its airports, start it later, in HOUR_SEARCH_STEP
+  // steps, until every leg fits or it would no longer be home by the end
+  // of the day. So a full peak sends a new flight off-peak by itself, and
+  // the plan says so (`heldBack`).
+  const roomCache = new Map<string, AirportHours>();
+  const firstProblem = hourlyRoomProblem(state, legs, roomCache);
+  let heldBack: RotationPlan['heldBack'] = null;
+  let roomProblem = firstProblem;
+  if (firstProblem && !longHaul) {
+    for (let start = earliestStart + HOUR_SEARCH_STEP; start <= USABLE_DAY_END_MINUTE; start += HOUR_SEARCH_STEP) {
+      const attempt = packRotationAvoidingCollisions(rotationAirports, type?.cruiseKts, start, state);
+      const end = attempt[attempt.length - 1];
+      if (end && end.departMinute + end.blockMinutes > USABLE_DAY_END_MINUTE) break;
+      if (!hourlyRoomProblem(state, attempt, roomCache)) {
+        heldBack = { ...firstProblem, fromMinute: legs[0]?.departMinute ?? earliestStart };
+        legs = attempt;
+        roomProblem = null;
+        break;
+      }
+    }
+  }
   const lastLeg = legs[legs.length - 1];
   const arriveBackMinute = lastLeg ? lastLeg.departMinute + lastLeg.blockMinutes : rotationStartMinute(tail, state);
   const spareMinutesBefore = baseSpareMinutes(state, base.iata, tail);
@@ -216,6 +246,7 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
     spareMinutesBefore,
     arriveBackMinute,
     slotQuotes: [],
+    heldBack,
     error: null,
     blocksAddStop: true,
   };
@@ -247,12 +278,12 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
     departuresByAirport.set(leg.origin, (departuresByAirport.get(leg.origin) ?? 0) + 1);
     arrivalsByAirport.set(leg.dest, (arrivalsByAirport.get(leg.dest) ?? 0) + 1);
   }
-  plan.slotQuotes = quoteSlots(state, departuresByAirport, arrivalsByAirport);
+  plan.slotQuotes = quoteSlots(state, departuresByAirport, arrivalsByAirport, legs);
   const full = plan.slotQuotes.find((quote) => quote.full);
   if (full) {
     return fail(
-      `${full.iata} is full: ${dailyMovementsAt(state, full.iata)} takeoffs and landings a day already fill its busiest hours ` +
-        `(room for ${slotCapacityPerDay(state, full.iata)}), so it has no slots left. Grow somewhere quieter, or carry the traffic on fewer, bigger aircraft.`,
+      `${full.iata} is full every hour: ${dailyMovementsAt(state, full.iata)} takeoffs and landings a day, so it has no slots left. ` +
+        `Grow somewhere quieter, or carry the traffic on fewer, bigger aircraft.`,
     );
   }
 
@@ -302,6 +333,17 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
     return fail(
       `This rotation lands back at ${base.iata} at ${minuteOfDayToTimeString(arriveBackMinute)}, past the ${minuteOfDayToTimeString(USABLE_DAY_END_MINUTE)} end of the usable day. ` +
         `Every plane based at ${base.iata} is full: lease another (tap ${base.iata}, then Plane) or shorten the rotation.`,
+    );
+  }
+
+  // No hour left for it (the search above found none).
+  if (roomProblem) {
+    const free = hoursWithRoom(roomCache.get(roomProblem.iata) ?? airportHours(state, roomProblem.iata));
+    return fail(
+      `${roomProblem.iata} is full at ${hourText(roomProblem.hour)} and every later hour this rotation could use and still be home by ` +
+        `${minuteOfDayToTimeString(USABLE_DAY_END_MINUTE)}` +
+        (free > 0 ? ` · ${free} hour${free === 1 ? '' : 's'} free there earlier: retime flights in the Schedule` : '') +
+        ` · or fly bigger aircraft, or grow elsewhere.`,
     );
   }
 
