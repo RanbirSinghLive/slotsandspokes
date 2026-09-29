@@ -23,7 +23,7 @@ import type { SimState } from './state';
  *   passengers = A–B city-pair potential   (the gravity model, sim/demand.ts)
  *              × CONNECT_SHARE             (the slice willing to change planes)
  *              × establishment             (how built-up both spoke routes are)
- *              × timed chance              (how many arrivals meet a departure, and how soon)
+ *              × frequency × timing        (how many could connect, and how many flights meet, connectingChance())
  *              × circuity                  (nobody flies far out of their way)
  *              × nonstop discount          (fewer connect if anyone flies A–B direct)
  *
@@ -36,18 +36,18 @@ import type { SimState } from './state';
 
 /** Share of an A–B city pair's latent demand that would connect through a hub rather than go another way. */
 const CONNECT_SHARE = 0.03;
+/** How fast more flights make a connection possible (connectingChance()). */
+const FREQUENCY_SCALE = 2;
 /**
- * How fast more good connections help: the chance a passenger finds one
- * is 1 - e^(-connections / CONNECTION_SCALE), where each arrival from A
- * counts as much as its best onward departure to B is good (1 for a wait
- * up to GOOD_CONNECT_MINUTES, falling to POOR_CONNECT_QUALITY at the
- * longest). One good connection a day lines up about 86% of passengers.
- * Set so a Rolling hub, whose times meet only by chance, connects at
- * least as many as the frequency-based model did (at 0.6, measured on
- * the steady player's networks at day 150: 0.19–0.21 a spoke pair
- * against 0.22), leaving banks to earn more.
+ * How well timed a spoke pair's flights are, one way: 1 - e^(-connections
+ * / CONNECTION_SCALE), where each arrival from A counts as much as its
+ * best onward departure to B is good (1 for a wait up to
+ * GOOD_CONNECT_MINUTES, falling to POOR_CONNECT_QUALITY at the longest).
+ * One good connection a day is about 86% timed.
  */
 const CONNECTION_SCALE = 0.5;
+/** The share of possible connections made even when no times meet. */
+const TIMING_FLOOR = 0.5;
 /** The shortest wait at the hub a passenger and their bag can make. */
 export const MIN_CONNECT_MINUTES = 40;
 /** A wait up to this long is a good connection... */
@@ -130,12 +130,25 @@ function connectionsOneWay(arrivals: HubTime[], departures: HubTime[]): number {
   return total;
 }
 
-/** The chance a passenger between A and B finds a connection at the hub, averaged over both directions. */
-function timedChance(times: SpokeTimes, a: string, b: string): number {
-  const chance = (connections: number) => 1 - Math.exp(-connections / CONNECTION_SCALE);
-  const ab = connectionsOneWay(times.arrivalsFrom.get(a) ?? [], times.departuresTo.get(b) ?? []);
-  const ba = connectionsOneWay(times.arrivalsFrom.get(b) ?? [], times.departuresTo.get(a) ?? []);
-  return (chance(ab) + chance(ba)) / 2;
+/**
+ * The chance a passenger between A and B finds a connection at the hub.
+ * Frequency sets how many could (1 - e^(-flights / FREQUENCY_SCALE) on the
+ * thinner spoke: about 40% at one daily flight, 63% at two, 86% at four),
+ * and timing how many of those do: TIMING_FLOOR of them with times that
+ * never meet (they take a long wait, or an overnight), all of them when
+ * every flight in meets a good one out (the timed share, both directions
+ * averaged). A frequency base keeps a small, early network connecting
+ * about as it always did, where a purely timed chance left it next to
+ * nothing (measured: the steady player went bust at Montréal 3 games in
+ * 6 against 0 in 6); timing is what a hub's style and the Schedule earn.
+ */
+function connectingChance(times: SpokeTimes, a: string, b: string): number {
+  const timed = (share: number) => 1 - Math.exp(-share / CONNECTION_SCALE);
+  const ab = timed(connectionsOneWay(times.arrivalsFrom.get(a) ?? [], times.departuresTo.get(b) ?? []));
+  const ba = timed(connectionsOneWay(times.arrivalsFrom.get(b) ?? [], times.departuresTo.get(a) ?? []));
+  const flights = (spoke: string) => ((times.arrivalsFrom.get(spoke)?.length ?? 0) + (times.departuresTo.get(spoke)?.length ?? 0)) / 2;
+  const frequency = 1 - Math.exp(-Math.min(flights(a), flights(b)) / FREQUENCY_SCALE);
+  return frequency * (TIMING_FLOOR + (1 - TIMING_FLOOR) * (ab + ba) / 2);
 }
 
 /** A flight at the hub: when it lands or leaves (schedule minutes, home clock) and on which plane. */
@@ -180,7 +193,7 @@ function flowBetween(
     currentPotentialDemand(state, a, b) *
     CONNECT_SHARE *
     Math.min(establishedA, establishedB) *
-    timedChance(times, a, b) *
+    connectingChance(times, a, b) *
     circuityFactor(a, hub, b) *
     nonstop *
     // A codeshare partner (sim/innovations.ts) and a network CCO

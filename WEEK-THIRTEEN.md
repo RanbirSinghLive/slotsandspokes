@@ -63,6 +63,14 @@ the owner:
   to 20, as days run later; the steady player cuts routes over
   cancellations and never grows. **Open: the balance pass**, starting
   there.
+- **Balance pass, step 1 (ablation):** switching each new rule off in
+  turn at YUL and YHZ found timed connections the cause (with the old
+  frequency formula YUL went 0/6 busts at $16.8M); hourly room and
+  split duty were neutral or helped. Fix: connections are frequency
+  (how many could) times timing (how many do, half to all). Steady
+  medians now: YUL $23.4M (0/6), YYZ $71.3M, BOS $82.9M, PHL $91.1M,
+  LHR $151.5M, YHZ busts 6/6. Next: big homes are far easier than before
+  the project, and YHZ.
 - Re-timing packs each rotation into the earliest start with room
   (`roomyStart()`), and the headless hub review uses `styleAdvice()`, not
   the whole Plan hub: a PHL year runs in 16 s (56 s with the whole plan).

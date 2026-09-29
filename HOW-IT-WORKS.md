@@ -2109,7 +2109,8 @@ For each pair of spokes at a hub, passengers a day (both directions) =
 | A–B potential demand | the gravity model (`sim/demand.ts`) |
 | × 3% | the share willing to change planes (`CONNECT_SHARE`) |
 | × establishment | the less built-up spoke route's local traffic ÷ 40 a day, capped at 1, so a new route feeds about a quarter |
-| × timed chance | `1 − e^(−connections/0.5)` each way, averaged over the two: every arrival from A counts as much as its best onward departure to B is good |
+| × frequency chance | `1 − e^(−flights/2)` on the thinner spoke: about 40% at one daily flight, 63% at two, 86% at four |
+| × timing | `0.5 + 0.5 × timed`, where timed is `1 − e^(−connections/0.5)` each way, averaged over the two: every arrival from A counts as much as its best onward departure to B is good |
 | × circuity | full up to 1.3× the direct distance, falling to nothing at 2× |
 | × nonstop discount | 0.2 if anyone, player or rival, flies A–B direct |
 
@@ -2117,11 +2118,14 @@ For each pair of spokes at a hub, passengers a day (both directions) =
 passenger and their bag can make) to 75 minutes, worth 1; longer waits
 are worth less, down to 0.25 at 3 hours, and nothing after. Onward on
 **the same plane** is a through flight: passengers stay aboard, so it's
-a good connection at any wait. The scale (0.5) was set so a Rolling
-hub, whose flights meet only by chance, connects at least as many as
-the earlier frequency-based model did (at 0.6 it was 0.19–0.21 a spoke
-pair against 0.22, measured on the steady player's networks at day
-150); banks earn more.
+a good connection at any wait. Frequency says how many passengers
+could connect, timing how many do: half of them even when no times
+meet (they take a long wait or an overnight), all of them when every
+flight in meets a good one out. So timing is worth up to double, the
+range the hub styles' flat efficiencies used to cover, now earned by
+the schedule. A purely timed chance left a small, early network
+connecting next to nothing: the steady player went bust at Montréal
+in 3 games of 6, against none with the frequency base.
 
 **They ride both legs.** Each flow is added to the demand of both routes
 it uses (`connectingDemandOnMarket()`), where it books seats and pays
