@@ -82,6 +82,11 @@ function portraitMarkup(traits: Traits | null, role: string): string {
   );
 }
 
+/** A portrait as SVG text, 64×64: a candidate by id, or an empty chair (null). */
+export function portraitSvg(candidateId: string | null, role: string): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">${portraitMarkup(candidateId ? (TRAITS[candidateId] ?? null) : null, role)}</svg>`;
+}
+
 /** A portrait as an <svg> element, `size` px square: a candidate by id, or an empty chair (null). */
 export function portraitElement(candidateId: string | null, role: string, size = 48): SVGSVGElement {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
