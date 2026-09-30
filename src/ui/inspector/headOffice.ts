@@ -10,12 +10,16 @@ import { describeEffect, type ExecutiveRole } from '../../sim/executives';
 import { formatNps, networkNps } from '../../sim/nps';
 import { averagePerformance, contractsOf, paymentShare, performanceFactor, RENEW_MIN_PERFORMANCE, SNAP_BACK_SHARE, type Contract } from '../../sim/contracts';
 import { select } from '../selection';
+import { portraitElement, ROLE_COLOURS } from '../portraits';
+import { innovationIconElement } from '../innovationIcons';
+import { LADDER, tiersClimbed } from '../../sim/ladder';
 
 /**
  * The Head office view (Network › Head office): the airline's decisions
  * that aren't made on the map. Fuel, with its price chart and the hedge
- * (sim/fuelPrice.ts), and the innovations the ladder opens
- * (sim/innovations.ts), and the executives (sim/executives.ts).
+ * (sim/fuelPrice.ts); contracts; the executives' three chairs
+ * (sim/executives.ts), each opening to its candidates; and the
+ * innovations the ladder opens (sim/innovations.ts), as a tech tree.
  */
 
 /** One innovation: what it does and costs, and a button to adopt it, or why it can't be yet. */
@@ -80,53 +84,96 @@ function confirmButton(label: string, confirmLabel: string, act: () => void): HT
 }
 
 /** One candidate: who they are, what they'd do and cost, and a button to hire them, or why not yet. */
-function candidateCard(state: SimState, candidate: ExecutiveOption, holder: string | null, changed: () => void): HTMLElement {
+function candidateCard(state: SimState, candidate: ExecutiveOption, role: string, holder: string | null, changed: () => void): HTMLElement {
   const card = document.createElement('div');
-  card.className = 'office-card';
+  card.className = 'office-card office-person';
   card.classList.toggle('is-locked', candidate.blocked !== null);
+  const body = document.createElement('div');
   const name = document.createElement('div');
   name.className = 'office-card-name';
   name.textContent = `${candidate.name} · ${candidate.background}`;
-  card.append(
+  body.append(
     name,
     line(candidate.flavor, 'inspector-line office-card-flavor'),
     line(describeEffect(candidate.effect)),
     line(`Sign ${money(candidate.signingFee)} · ${money(candidate.salaryPerDay)}/day`, 'inspector-line office-card-price'),
   );
   if (candidate.blocked) {
-    card.append(line(candidate.blocked, 'inspector-line goal-ahead'));
-    return card;
+    body.append(line(candidate.blocked, 'inspector-line goal-ahead'));
+  } else {
+    body.append(
+      confirmButton(
+        holder ? `Replace ${holder}` : 'Appoint',
+        `Confirm · ${money(candidate.signingFee)}${holder ? ` · ${holder} leaves, no refund` : ''}`,
+        () => {
+          ops.appointExecutiveById(state, candidate.id);
+          changed();
+        },
+      ),
+    );
   }
-  card.append(
-    confirmButton(
-      holder ? `Replace ${holder}` : 'Appoint',
-      `Confirm · ${money(candidate.signingFee)}${holder ? ` · ${holder} leaves, no refund` : ''}`,
-      () => {
-        ops.appointExecutiveById(state, candidate.id);
-        changed();
-      },
-    ),
-  );
+  card.append(portraitElement(candidate.id, role, 44), body);
   return card;
 }
 
+/** The chair opened to show its holder and candidates, if any: one at a time, kept while the view rebuilds. */
+let openChair: string | null = null;
+
+/**
+ * The three chairs as tiles, each with who holds it (their portrait, or an
+ * empty chair) and, at a glance, what they do or how many candidates are
+ * talking to you. Click one to open it: its holder, then each candidate
+ * with what they'd do, cost and whether they'll come yet.
+ */
 function executivesSection(state: SimState, changed: () => void): HTMLElement[] {
+  const chairs = ops.executiveOptions(state);
   const nodes: HTMLElement[] = [
-    heading('Executives', 'You are the chief executive; these three chairs are yours to fill. The strongest candidates only talk to an airline passengers rate well. Once hired, they stay if NPS falls.'),
+    heading('Executives', 'You are the chief executive; these three chairs are yours to fill. The strongest candidates only talk to an airline passengers rate well. Once hired, they stay if NPS falls. Click a chair to see who it could be.'),
     line(`Airline NPS ${formatNps(networkNps(state))}`),
   ];
-  for (const chair of ops.executiveOptions(state)) {
+  const row = document.createElement('div');
+  row.className = 'office-chairs';
+  for (const chair of chairs) {
+    const tile = document.createElement('button');
+    tile.type = 'button';
+    tile.className = 'office-chair-tile';
+    tile.classList.toggle('is-open', openChair === chair.role);
+    tile.classList.toggle('is-filled', chair.holder !== null);
+    tile.style.setProperty('--role', ROLE_COLOURS[chair.role] ?? '#8a93a6');
+    tile.title = chair.label;
+    const available = chair.candidates.filter((c) => !c.appointed && !c.blocked).length;
+    const role = document.createElement('span');
+    role.className = 'office-chair-role';
+    role.textContent = chair.role.toUpperCase();
+    const who = document.createElement('span');
+    who.className = 'office-chair-who';
+    who.textContent = chair.holder ? chair.holder.name : 'Vacant';
+    const note = document.createElement('span');
+    note.className = 'office-chair-note';
+    note.textContent = chair.holder ? chair.holder.background : `${available} available`;
+    tile.append(portraitElement(chair.holder?.id ?? null, chair.role, 56), role, who, note);
+    tile.addEventListener('click', () => {
+      openChair = openChair === chair.role ? null : chair.role;
+      changed();
+    });
+    row.append(tile);
+  }
+  nodes.push(row);
+
+  const chair = chairs.find((c) => c.role === openChair);
+  if (chair) {
     const title = document.createElement('h4');
     title.className = 'office-chair';
     title.textContent = chair.label;
     nodes.push(title);
     if (chair.holder) {
       const card = document.createElement('div');
-      card.className = 'office-card is-adopted';
+      card.className = 'office-card office-person is-adopted';
+      const body = document.createElement('div');
       const name = document.createElement('div');
       name.className = 'office-card-name';
       name.textContent = `✓ ${chair.holder.name} · ${chair.holder.background}`;
-      card.append(
+      body.append(
         name,
         line(describeEffect(chair.holder.effect)),
         line(`Since day ${chair.hiredDay} · ${money(chair.holder.salaryPerDay)}/day`, 'inspector-line office-card-price'),
@@ -135,12 +182,70 @@ function executivesSection(state: SimState, changed: () => void): HTMLElement[] 
           changed();
         }),
       );
+      card.append(portraitElement(chair.holder.id, chair.role, 44), body);
       nodes.push(card);
     }
     for (const candidate of chair.candidates) {
-      if (!candidate.appointed) nodes.push(candidateCard(state, candidate, chair.holder?.name ?? null, changed));
+      if (!candidate.appointed) nodes.push(candidateCard(state, candidate, chair.role, chair.holder?.name ?? null, changed));
     }
   }
+  return nodes;
+}
+
+/** The innovation opened below the tree, if any, kept while the view rebuilds. */
+let selectedInnovation: string | null = null;
+
+/**
+ * The innovations as a tech tree: the ladder's tiers down a spine (sim/ladder.ts),
+ * lit once climbed, each branching to the programmes it opens. A node is
+ * green when running, amber when it can be adopted, grey while its tier
+ * is still ahead. Click one for what it does and costs, and to adopt it.
+ */
+function techTree(state: SimState, changed: () => void): HTMLElement[] {
+  const options = ops.innovationOptions(state);
+  const climbed = tiersClimbed(state);
+  const tree = document.createElement('div');
+  tree.className = 'tech-tree';
+  LADDER.forEach((tier, index) => {
+    const here = options.filter((option) => option.openedBy === tier.id);
+    if (here.length === 0) return;
+    const reached = climbed > index;
+    const tierEl = document.createElement('div');
+    tierEl.className = 'tech-tier';
+    tierEl.classList.toggle('is-reached', reached);
+    const label = document.createElement('div');
+    label.className = 'tech-tier-label';
+    label.textContent = reached ? tier.name : `${tier.name} · ahead`;
+    const row = document.createElement('div');
+    row.className = 'tech-nodes';
+    for (const option of here) {
+      const node = document.createElement('button');
+      node.type = 'button';
+      node.className = 'tech-node';
+      node.classList.add(option.adopted ? 'is-adopted' : option.blocked ? 'is-locked' : 'is-available');
+      node.classList.toggle('is-selected', selectedInnovation === option.id);
+      const badge = document.createElement('span');
+      badge.className = 'tech-node-badge';
+      badge.append(innovationIconElement(option.id));
+      const name = document.createElement('span');
+      name.className = 'tech-node-name';
+      name.textContent = option.name;
+      const summary = document.createElement('span');
+      summary.className = 'tech-node-summary';
+      summary.textContent = option.adopted ? '✓ running' : option.summary;
+      node.append(badge, name, summary);
+      node.addEventListener('click', () => {
+        selectedInnovation = selectedInnovation === option.id ? null : option.id;
+        changed();
+      });
+      row.append(node);
+    }
+    tierEl.append(label, row);
+    tree.append(tierEl);
+  });
+  const nodes: HTMLElement[] = [tree];
+  const selected = options.find((option) => option.id === selectedInnovation);
+  if (selected) nodes.push(innovationCard(state, selected, changed));
   return nodes;
 }
 
@@ -270,8 +375,8 @@ export function buildHeadOfficeView(state: SimState, changed: () => void): HTMLE
   root.append(...executivesSection(state, changed));
 
   root.append(
-    heading('Innovations', 'Programmes the ladder opens (see Goals). Each is yours to adopt, for good, if it pays for your airline.'),
-    ...ops.innovationOptions(state).map((option) => innovationCard(state, option, changed)),
+    heading('Innovations', 'Programmes the ladder opens (see Goals): each tier down the tree opens the ones branching from it. Each is yours to adopt, for good, if it pays for your airline. Click one for what it does and costs.'),
+    ...techTree(state, changed),
   );
   return root;
 }

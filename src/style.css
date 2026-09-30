@@ -1006,6 +1006,30 @@ body {
   background: #ff5c5c;
 }
 
+/* Where the plane is on the ground (ui/panels.ts): in each turn inside a
+   rotation, and at base in the waits between rotations. */
+.timeline-ground {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #fff;
+  white-space: nowrap;
+  text-shadow: 0 0 2px #0a0c12, 0 0 2px #0a0c12;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.timeline-ground.is-base {
+  color: rgba(255, 255, 255, 0.45);
+  text-shadow: none;
+}
+
 /* The row a held rotation would move to. */
 .timeline-track.is-drop-target {
   box-shadow: inset 0 0 0 1px var(--puck);
@@ -2654,6 +2678,243 @@ button.inspector-crumb:hover {
   gap: 6px;
   flex-wrap: wrap;
   margin: 4px 0 8px;
+}
+
+/* The executives' three chairs (ui/inspector/headOffice.ts), each a tile
+   in its chair's colour (--role) that opens to its candidates. */
+.office-chairs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 6px 0 4px;
+}
+
+.office-chair-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 4px 7px;
+  font: inherit;
+  color: #c8d0e0;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 2px solid color-mix(in srgb, var(--role) 55%, transparent);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.office-chair-tile:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.office-chair-tile.is-open {
+  border-color: var(--role);
+  background: color-mix(in srgb, var(--role) 10%, transparent);
+}
+
+.office-chair-tile .portrait {
+  margin-bottom: 3px;
+}
+
+.office-chair-role {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--role);
+}
+
+.office-chair-who {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.office-chair-tile:not(.is-filled) .office-chair-who {
+  color: #6b7694;
+}
+
+.office-chair-note {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 10px;
+  color: #8a93a6;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A person's card: their portrait beside who they are. */
+.office-person {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+.portrait {
+  display: block;
+  border-radius: 10px;
+}
+
+/* The innovations as a tech tree: tiers down a spine, each branching to
+   the programmes it opens. */
+.tech-tree {
+  position: relative;
+  margin: 6px 0 8px;
+  padding-left: 22px;
+}
+
+.tech-tree::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  bottom: 18px;
+  left: 6px;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.tech-tier {
+  position: relative;
+  margin-bottom: 10px;
+}
+
+/* The tier's dot on the spine, lit once climbed. */
+.tech-tier::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: -20px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid #3a4256;
+  border-radius: 50%;
+  background: #0a0c12;
+}
+
+.tech-tier.is-reached::before {
+  border-color: #7ed6a8;
+  background: #7ed6a8;
+  box-shadow: 0 0 6px rgba(126, 214, 168, 0.6);
+}
+
+.tech-tier-label {
+  margin-bottom: 5px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a93a6;
+}
+
+.tech-tier.is-reached .tech-tier-label {
+  color: #c8d0e0;
+}
+
+.tech-nodes {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* The branch from the spine into the tier's programmes. */
+.tech-nodes::before {
+  content: '';
+  position: absolute;
+  top: 20px;
+  left: -16px;
+  width: 16px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.tech-tier.is-reached .tech-nodes::before {
+  background: rgba(126, 214, 168, 0.45);
+}
+
+.tech-node {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  align-items: center;
+  width: calc(50% - 4px);
+  min-width: 0;
+  padding: 4px 8px 4px 4px;
+  font: inherit;
+  text-align: left;
+  color: #c8d0e0;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 22px 8px 8px 22px;
+  cursor: pointer;
+}
+
+.tech-node:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.tech-node-badge {
+  grid-row: 1 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  color: #6b7694;
+  background: #141926;
+  border: 2px solid #3a4256;
+  border-radius: 50%;
+}
+
+.tech-node-badge svg {
+  width: 22px;
+  height: 22px;
+}
+
+.tech-node-name {
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tech-node-summary {
+  overflow: hidden;
+  font-size: 10px;
+  color: #8a93a6;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tech-node.is-available .tech-node-badge {
+  color: #ffb347;
+  border-color: #ffb347;
+  box-shadow: 0 0 8px rgba(255, 179, 71, 0.35);
+}
+
+.tech-node.is-adopted .tech-node-badge {
+  color: #0a0c12;
+  background: #7ed6a8;
+  border-color: #7ed6a8;
+}
+
+.tech-node.is-adopted .tech-node-summary {
+  color: #7ed6a8;
+}
+
+.tech-node.is-locked {
+  opacity: 0.55;
+}
+
+.tech-node.is-selected {
+  border-color: #c8d0e0;
 }
 
 .office-chair {

@@ -2364,6 +2364,13 @@ Head office (Network › Head office), each for good. Climbing a tier doesn't
 hand them out; it lets the player buy them, and each pays back only on
 an airline big enough to use it.
 
+Head office shows them as a **tech tree**: the ladder's tiers down a
+spine, a dot lit green once the tier is climbed, each branching to the
+programmes it opens, each a node with its own icon
+(`ui/innovationIcons.ts`): green when running, amber when it can be
+adopted, grey while its tier is ahead. Clicking a node opens its card
+below the tree, with what it does, what it costs and the Adopt button.
+
 | Innovation | Opens on becoming | Price | Effect |
 |---|---|---|---|
 | Online booking | Network airline | $400,000 once | every ticket earns 4% more (no agent's cut) |
@@ -2398,6 +2405,14 @@ hired for a **signing fee** (not refunded) and a **daily salary**
 (charged at rollover, cost category `executives`), for one lasting
 effect on a system already in the game. "Let go" stops the salary.
 Replacing a holder costs the new candidate's full fee.
+
+Head office shows the three chairs as **tiles**, each with its holder's
+portrait (or an empty chair), name and background, or how many
+candidates are available. Clicking a chair opens it below: the holder,
+then each candidate with a portrait, what they'd do and cost, and
+Appoint or why not yet. Portraits are flat cartoon faces drawn as SVG
+(`ui/portraits.ts`), one set of traits per candidate, the jacket in the
+chair's colour (COO teal, CFO amber, CCO violet).
 
 **The pool widens as NPS rises**: each chair has a journeyman open to
 anyone, a hire who needs a trailing network NPS of 15, and a star who

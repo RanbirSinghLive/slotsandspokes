@@ -343,16 +343,30 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
           if (justDragged) return;
           selectRoute(state, rotation.airports[0], rotation.airports[1]);
         });
-        for (const leg of rotation.legs) {
+        const within = (minute: number) => `${((minute - rotation.departMinute) / (rotation.arriveMinute - rotation.departMinute)) * 100}%`;
+        rotation.legs.forEach((leg, i) => {
           const block = document.createElement('div');
           block.className = 'timeline-leg';
-          block.style.left = `${((leg.departMinute - rotation.departMinute) / (rotation.arriveMinute - rotation.departMinute)) * 100}%`;
+          block.style.left = within(leg.departMinute);
           block.style.width = `${(leg.blockMinutes / (rotation.arriveMinute - rotation.departMinute)) * 100}%`;
-          block.textContent = leg.dest;
           span.append(block);
-        }
+          // Where the plane waits between this flight and the one before: the chain reads ALB ▬ LGA ▬ ALB.
+          if (i > 0) {
+            const before = rotation.legs[i - 1];
+            span.append(groundLabel(before.dest, within((before.departMinute + before.blockMinutes + leg.departMinute) / 2)));
+          }
+        });
         span.append(removeButtonFor(rotation, state));
         track.append(span);
+      }
+      // The base in each wait between rotations, where another one could drop in.
+      if (aircraft.baseAirport) {
+        let free = start;
+        for (const rotation of [...own].sort((a, b) => a.departMinute - b.departMinute)) {
+          if (rotation.departMinute - free >= BASE_LABEL_MIN_GAP) track.append(groundLabel(aircraft.baseAirport, at((free + rotation.departMinute) / 2), true));
+          free = rotation.arriveMinute;
+        }
+        if (end - free >= BASE_LABEL_MIN_GAP) track.append(groundLabel(aircraft.baseAirport, at((free + end) / 2), true));
       }
       const now = document.createElement('div');
       now.className = 'timeline-now';
@@ -362,6 +376,18 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
     }
   }
   return rows;
+}
+
+/** A wait at base shorter than this has no room to name it. */
+const BASE_LABEL_MIN_GAP = 45;
+
+/** An airport's code in white, centred at `left`: where the plane is on the ground. */
+function groundLabel(iata: string, left: string, atBase = false): HTMLElement {
+  const label = document.createElement('span');
+  label.className = atBase ? 'timeline-ground is-base' : 'timeline-ground';
+  label.style.left = left;
+  label.textContent = iata;
+  return label;
 }
 
 // --- Dragging a rotation ----------------------------------------------------
