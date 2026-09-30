@@ -94,6 +94,13 @@ the owner:
   YYZ to $21.4M and YHZ busts rose to 15/18, so room stays at 100%. The
   big-home ease that's left belongs with the long-standing "too easy
   past the start" (a late-game cost of size), not with slots.
+- **Balance pass, step 4 (cost of size, owner: "do both"):** overhead
+  grows with the cube of planes past 15 ($80 × extra³) on top of the
+  square, and rivals come looking more often at a big airline (activity
+  × 1 + (planes − 12)/10). 18 seeds a home, steady: YUL $10.8M (2/18
+  busts), YYZ $40.6M, PHL $66.7M, YHZ 13/18 busts; big homes stop at
+  11–13 planes instead of 19–20. Against before the project: YUL
+  $17.2M, YYZ $36.6M, PHL $56.9M, YHZ ~12/18.
 - Re-timing packs each rotation into the earliest start with room
   (`roomyStart()`), and the headless hub review uses `styleAdvice()`, not
   the whole Plan hub: a PHL year runs in 16 s (56 s with the whole plan).

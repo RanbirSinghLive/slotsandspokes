@@ -356,7 +356,12 @@ are costed from the same numbers.
 at rollover (`todayCostByCategory.overhead`). One plane pays $75, five
 $1,875, eighteen $24,300, so each plane adds more than the last: it
 barely touches a small start and bites a big airline, which a uniform
-cost couldn't do without hurting a one-plane start more. The ring's
+cost couldn't do without hurting a one-plane start more. **Past 15
+planes** it grows faster: $80 × (planes − 15)³ on top (`LARGE_FLEET_PLANES`),
+nothing below it, $26,460 at eighteen, $64,000 at twenty-five. That is
+the cost of being big: with it (and rivals drawn to a big airline,
+below) the steady player's big homes stop at 11–13 planes, where the
+next one no longer pays, instead of 19–20. The ring's
 lease hint says what the next plane adds; the route view shares it
 across routes by their flying minutes (`sim/routeCosts.ts`). Rivals
 don't pay it.
@@ -917,8 +922,13 @@ most when it lands on its route (Montréal busts 1 → 4 of 6, late in the
 year; Boston 0 → 2); careful airlines barely notice.
 
 **Pressure grows without a ceiling.** `pressureFactor()` is
-`1 + day / 90`: 1 on day 0, 2 on day 90, about 5 after a year. It
-multiplies every growth chance below.
+`1 + day / 90`: 1 on day 0, 2 on day 90, about 5 after a year; and a
+big airline draws more, as a loud signal of profit: × `1 + (planes −
+12) / 10` past 12 planes (twice as much at 22). It multiplies every
+growth chance below. Moats still discount what a rival sees on any one
+market; this is how often they come looking. Set with the large-fleet
+overhead on 18 seeds a home: Philadelphia's year fell from $95M to $67M
+(it was $57M before hubs could grow off-peak), Toronto stayed at $41M.
 
 **Existing rivals grow, then level off.** Each rival airline has a daily
 chance to open one new route next to its own network, within 850 nm,

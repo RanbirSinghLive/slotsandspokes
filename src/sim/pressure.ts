@@ -134,10 +134,23 @@ export const FREQUENCY_GROWTH_PROBABILITY_PER_DAY = 0.008;
 /** Days after which rival activity has doubled. */
 export const PRESSURE_RAMP_DAYS = 90;
 
-/** 1 on day 0, 2 at PRESSURE_RAMP_DAYS, and so on without a ceiling. */
+/** A fleet this big starts drawing rivals' attention, beyond what time alone brings. */
+export const ATTENTION_FROM_PLANES = 12;
+/** Each this many planes beyond it adds as much again to rival activity. */
+export const ATTENTION_PER_PLANES = 10;
+
+/**
+ * How active rivals are: 1 on day 0, 2 at PRESSURE_RAMP_DAYS, and so on
+ * without a ceiling; and more again for a big airline, since profit is a
+ * signal rivals read and a big network is the loudest one (CLAUDE.md):
+ * each ATTENTION_PER_PLANES planes past ATTENTION_FROM_PLANES adds as much
+ * again. Moats still discount what a rival sees on any one market
+ * (sim/attractiveness.ts); this is how often they come looking.
+ */
 export function pressureFactor(state: SimState): number {
   const day = dayIndex(state);
-  return 1 + day / PRESSURE_RAMP_DAYS;
+  const size = Math.max(0, state.aircraft.length - ATTENTION_FROM_PLANES) / ATTENTION_PER_PLANES;
+  return (1 + day / PRESSURE_RAMP_DAYS) * (1 + size);
 }
 
 /**
