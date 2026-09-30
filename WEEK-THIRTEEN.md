@@ -83,6 +83,17 @@ the owner:
   seeds): YUL $3.0M (1/6), YYZ $35.9M, BOS $78.0M (1/6), PHL $101.3M,
   LHR $116.2M, YHZ $0.7M (3/6). **Still open:** the biggest homes (BOS,
   PHL, LHR) run about half again richer than before the project.
+- **Balance pass, step 3 (big homes):** a Philadelphia airline at day
+  200 is bigger, not richer per flight: 126 legs and 24.5 planes against
+  76 and 15.3 before the project, the same 67% load factor and the same
+  rivals, and so 2.2× the connecting passengers (they grow with the
+  square of a hub's size). Before, its hub filled at the peak and growth
+  stopped; now it keeps growing off-peak, which is what the owner asked
+  for ("airports fill up too soon"). Less hourly room isn't a targeted
+  lever: at 80%, 18 seeds a home, PHL fell to $49.8M but YUL to $7.9M,
+  YYZ to $21.4M and YHZ busts rose to 15/18, so room stays at 100%. The
+  big-home ease that's left belongs with the long-standing "too easy
+  past the start" (a late-game cost of size), not with slots.
 - Re-timing packs each rotation into the earliest start with room
   (`roomyStart()`), and the headless hub review uses `styleAdvice()`, not
   the whole Plan hub: a PHL year runs in 16 s (56 s with the whole plan).
