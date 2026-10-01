@@ -315,11 +315,13 @@ function buildFare(state: SimState, a: string, b: string, changed: () => void): 
     settings.fareIsOverridden ? 'by hand' : settings.fareStance ? (STANCES.find((s) => s.stance === settings.fareStance)?.name ?? '') : 'policy';
   const fareValue = line('', 'inspector-line hill-readout');
   const redrawFare = () => {
-    const top = hill?.peak;
-    const here = hill ? marginAt(hill, settings.fare) : 0;
+    const range = hill?.peakRange;
+    const flown = hill?.observations.length ?? 0;
+    const atTop = range && settings.fare >= range.low && settings.fare <= range.high;
     fareValue.textContent =
       `$${settings.fare} · ${pricedBy()}` +
-      (top && top.fare !== settings.fare ? ` · top of the hill $${top.fare}${top.margin - here >= 1 ? `, ${signedMoney(top.margin - here)}/day more` : ''}` : ' · at the top');
+      (range ? (atTop ? ' · the top could be here' : ` · top probably $${range.low}${range.high > range.low ? `–${range.high}` : ''}`) : '') +
+      ` · ${flown} day${flown === 1 ? '' : 's'} flown lately`;
     fareValue.classList.toggle('lever-value--overridden', settings.fareIsOverridden);
   };
   const setFare = (fare: number) => {
@@ -516,9 +518,13 @@ function drawHill(
   setFare: (fare: number) => void,
   done: () => void,
 ): { element: HTMLElement; moveBall: () => void } {
-  // Scaled to the hill's own range, so its shape shows even on a route
-  // losing money at every fare; the zero line is drawn when it's inside.
-  const margins = hill.points.map((p) => p.margin);
+  // Scaled to the hill's own range (band and days flown included), so its
+  // shape shows even on a route losing money at every fare; the zero line
+  // is drawn when it's inside.
+  const margins = [
+    ...hill.points.flatMap((p) => [p.margin + p.uncertainty, p.margin - p.uncertainty]),
+    ...hill.observations.filter((o) => o.fare >= low && o.fare <= high).map((o) => o.margin),
+  ];
   const highest = Math.max(...margins);
   const lowest = Math.min(...margins);
   const pad = Math.max(1, (highest - lowest) * 0.08);
@@ -550,15 +556,28 @@ function drawHill(
 
   if (bottom < 0 && top > 0) root.append(svg('line', { x1: 0, x2: HILL_WIDTH, y1: y(0), y2: y(0), class: 'hill-zero' }));
 
+  // The band: how unsure the airline is at each fare.
+  const upper = hill.points.map((p) => `${x(p.fare).toFixed(1)},${y(p.margin + p.uncertainty).toFixed(1)}`);
+  const lower = [...hill.points].reverse().map((p) => `${x(p.fare).toFixed(1)},${y(p.margin - p.uncertainty).toFixed(1)}`);
+  root.append(svg('path', { d: `M${upper.join(' L')} L${lower.join(' L')} Z`, class: 'hill-band' }));
   const linePoints = hill.points.map((p) => `${x(p.fare).toFixed(1)},${y(p.margin).toFixed(1)}`);
-  root.append(svg('path', { d: `M${linePoints[0]} L${linePoints.join(' L')} L${HILL_WIDTH},${y(bottom)} L0,${y(bottom)} Z`, class: 'hill-area' }));
   root.append(svg('polyline', { points: linePoints.join(' '), class: 'hill-line' }));
 
-  // The top of the hill.
+  // The days actually flown: what they really made.
+  for (const day of hill.observations) {
+    if (day.fare < low || day.fare > high) continue;
+    root.append(svg('circle', { cx: x(day.fare), cy: y(day.margin), r: 1.8, class: 'hill-day' }));
+  }
+
+  // The top: a best guess, with where it could be.
   const peak = hill.peak;
+  const range = hill.peakRange;
+  if (range.high > range.low) {
+    root.append(svg('rect', { x: x(range.low), y: 1, width: Math.max(2, x(range.high) - x(range.low)), height: 3, rx: 1.5, class: 'hill-peak-range' }));
+  }
   root.append(svg('circle', { cx: x(peak.fare), cy: y(peak.margin), r: 3, class: 'hill-peak' }));
-  const peakLabel = svg('text', { x: Math.min(HILL_WIDTH - 40, Math.max(2, x(peak.fare) - 18)), y: Math.max(10, y(peak.margin) - 6), class: 'hill-peak-label' });
-  peakLabel.textContent = `top $${peak.fare} · ${signedMoney(peak.margin)}/day`;
+  const peakLabel = svg('text', { x: Math.min(HILL_WIDTH - 60, Math.max(2, x(peak.fare) - 18)), y: Math.max(12, y(peak.margin) - 6), class: 'hill-peak-label' });
+  peakLabel.textContent = range.high > range.low ? `top $${range.low}–${range.high}?` : `top $${peak.fare}`;
   root.append(peakLabel);
 
   // Rivals' fares.

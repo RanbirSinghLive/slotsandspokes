@@ -1439,18 +1439,31 @@ button are the repair path.
 ## A route's fare (`src/ui/inspector/route.ts`, rules in `src/sim/pricing.ts`)
 
 A route's own lever lives in its route view, under **Fare**:
-- **The revenue hill** (`sim/revenueHill.ts`). The market's margin a day
-  across the fare range, from the game's own forecast
-  (`summarizeMarket()` at 25 fares, smoothed over neighbours since whole
-  passengers make a thin market's curve saw), drawn as a hill: the top
-  marked with its fare and margin, the going rate on the axis, rivals'
-  fares as flags, and the stretch where a fare would invite rivals in
-  (full and over 1.1× the going rate, `sim/rivalResponse.ts`) shaded
-  amber. The fare is a ball on it: dragging it (or the arrow keys)
+- **The revenue hill** (`sim/revenueHill.ts`): the market's margin a day
+  across the fare range **as the airline has learned it**. Markets are
+  learned by flying, so it's an estimate:
+  - **dots** are the days flown in the last 14 (the fare that day, the
+    margin really made, `SimState.fareHistoryByMarket` beside the margin
+    history);
+  - **the band** is how unsure the airline is at each fare: 35% of the
+    hill's height at a fare never flown, narrowing with each day flown
+    within 6% of the going rate of it (as 1/√(1 + days)); older days
+    drop out, so when the market moves the band widens again. A
+    revenue-management CCO halves it (`executiveFareEstimateMultiplier()`);
+  - **the estimate** in the band is the game's forecast
+    (`summarizeMarket()` at 25 fares, smoothed) plus an error as big as
+    the uncertainty there, a smooth wave fixed per market: right where
+    you've flown, steadily wrong where you haven't;
+  - **the top** is a best guess and a range, the fares whose estimate
+    plus half its band beats the best one's less half ("top probably
+    $397–450").
+
+  The going rate is on the axis, rivals' fares are flags, and the
+  stretch where a fare would invite rivals in (full and over 1.1× the
+  going rate, `sim/rivalResponse.ts`, a known rule) is shaded amber. The
+  fare is a ball on the estimate: dragging it (or the arrow keys)
   prices the market by hand (`setHandFare()`), which takes it off the
-  policy and off any stance; the line under it says how far the top is
-  ("top of the hill $295, +$184/day more"). **Back to policy** puts it
-  back. The range is half to one and a half times the policy fare,
+  policy and off any stance. **Back to policy** puts it back. The range is half to one and a half times the policy fare,
   stretched to include the current fare.
 - **Who flies it** (`sim/marketCharacter.ts`): the city pair's character
   in a word and a bar of business, leisure and VFR (see Market

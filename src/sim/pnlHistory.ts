@@ -41,6 +41,11 @@ export function recordDailyPnlHistory(state: SimState): void {
     state.costHistoryByMarket[key] ??= [];
     pushCapped(state.revenueHistoryByMarket[key], state.todayRevenueByMarket[key] ?? 0);
     pushCapped(state.costHistoryByMarket[key], state.todayCostByMarket[key] ?? 0);
+    // The fare the day flew at, for the learned revenue hill (sim/revenueHill.ts).
+    const fares = ((state.fareHistoryByMarket ??= {})[key] ??= []);
+    // A market flown before fares were kept: pad (−1, "not known") so its fares line up with its margins.
+    while (fares.length < state.revenueHistoryByMarket[key].length - 1) fares.push(-1);
+    pushCapped(fares, state.routeSettings[key]?.fare ?? -1);
   }
 
   // The running totals the year one report reads (sim/yearReport.ts):

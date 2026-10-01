@@ -407,6 +407,14 @@ export type SimState = {
    * (sim/yearReport.ts) needs the whole year. Optional: made on first use.
    */
   marketTotals?: Record<string, { revenue: number; cost: number; passengers: number }>;
+  /**
+   * Each market's base fare on each finished day, in step with
+   * `revenueHistoryByMarket` (sim/pnlHistory.ts): what the learned revenue
+   * hill (sim/revenueHill.ts) plots the days' margins against. Optional:
+   * made on first use, so an older save starts learning from now. −1 is a
+   * day whose fare wasn't kept.
+   */
+  fareHistoryByMarket?: Record<string, number[]>;
   /** The day `marketTotals` began: 1 for a game started with them, later for a save from before them. */
   marketTotalsSinceDay?: number;
   todayCostByMarket: Record<string, number>;

@@ -194,6 +194,11 @@ export function executiveYieldMultiplier(state: SimState): number {
   return effectOf(state, 'revenue')?.yieldMultiplier ?? 1;
 }
 
+/** A revenue-management CCO's analysts read a market better: the revenue hill's band (sim/revenueHill.ts) is this wide. */
+export function executiveFareEstimateMultiplier(state: SimState): number {
+  return effectOf(state, 'revenue') ? 0.5 : 1;
+}
+
 /** What an effect does, in words, for the Head office view. */
 export function describeEffect(effect: ExecutiveEffect): string {
   const percent = (factor: number) => `${Math.round(Math.abs(1 - factor) * 100)}%`;
@@ -215,7 +220,7 @@ export function describeEffect(effect: ExecutiveEffect): string {
     case 'connections':
       return `Connecting pax +${percent(effect.connectingMultiplier)}`;
     case 'revenue':
-      return `Yield +${percent(effect.yieldMultiplier)}`;
+      return `Yield +${percent(effect.yieldMultiplier)} · fare estimates twice as sharp`;
     case 'fleet-programmes':
       return `Deliveries −${percent(effect.deliveryMultiplier)} · returns −${percent(effect.returnMultiplier)} time`;
   }

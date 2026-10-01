@@ -126,6 +126,12 @@ even 18 seeds swing a median by half on near-identical rules (every-seat
 Flex, meant to equal slice 1, read YYZ $30.9M against $20.2M), so
 balance reads are rough.
 
+**Step 4 built:** the learned hill (dots of days flown, a band that
+narrows near them and goes stale after 14 days, the estimate wrong
+where untried, the top as a range; the revenue-management CCO halves
+the band). On a steady YUL game at day 60 the tops read LGA–YUL
+$397–450, YUL–YYZ $444–470, YOW–YUL $209–341.
+
 ## Decisions for the owner
 
 1. The airport tags: a first pass covers every airport in the data; the
