@@ -98,9 +98,8 @@ export type SeatSaleInput = {
   mix: Record<SegmentName, number>;
   /** A segment's booking share at a price (sim/choiceModel.ts's segmentShareAt()). */
   shareAt: (segment: SegmentName, price: number) => number;
-  /** Connecting passengers for this flight: booked through the network, they take seats first, at `connectingFare`. */
+  /** Connecting passengers for this flight: booked through the network, they take seats first, cheapest class first. */
   connecting: number;
-  connectingFare: number;
   /** Passengers waiting from earlier full flights on the market, who take spare seats at the base fare. */
   recapturable: number;
   classes: FareClassSettings;
@@ -118,14 +117,18 @@ export function sellSeats(input: SeatSaleInput): SeatSale {
   let fares = 0;
   let passengers = 0;
 
-  // Connecting passengers first, at the base fare: from Flex, then Full, then Saver.
+  // Connecting passengers first, booked early through the network: the
+  // cheapest class still open, at its price. So a through trip is built
+  // from cheap seats where they're open, and the split decides what a
+  // connection pays.
   let connecting = Math.min(input.connecting, input.seats);
-  for (const fareClass of ['flex', 'full', 'saver'] as FareClass[]) {
+  for (const fareClass of CLASS_ORDER) {
     const take = Math.min(left[fareClass], connecting);
     left[fareClass] -= take;
     connecting -= take;
     passengers += take;
-    fares += take * input.connectingFare;
+    fares += take * price(fareClass);
+    tally.sold[fareClass] += take;
   }
 
   // Then each segment in booking order, cheapest open class first.

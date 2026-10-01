@@ -162,6 +162,25 @@ Balance (18 seeds, steady), with cabins against without:
 About two cabins fitted per airline on the big homes: no runaway edge,
 inside the noise.
 
+**Step 7 built:** connecting passengers book the cheapest open class
+(Saver, then Flex, then Full) at its price, in place of the full base
+fare (`CONNECTING_FARE_SHARE` is gone). This is the through-fare
+correction parked in slice 1. Balance (18 seeds, steady), against step 6:
+
+| Home | Step 7 | Step 6 |
+|---|---|---|
+| YUL | $15.5M, 1/18 busts | $10.6M, 3/18 |
+| YYZ | $35.5M, 0/18 | $29.9M, 0/18 |
+| PHL | $67.6M, 0/18 | $46.9M, 0/18 |
+| YHZ | 16/18 busts | 9/18 |
+
+No bust wave, unlike the flat 60% cut. Connections no longer take Flex
+seats ahead of local passengers, and the headless player's weekly Saver
+tuning now meets them too. Halifax has read 9–16 busts this week and
+stays the open problem.
+
+**Stage 2 is complete.**
+
 ## Decisions for the owner
 
 1. The airport tags: a first pass covers every airport in the data; the

@@ -2016,8 +2016,10 @@ sells as three classes: **Saver** at 75%, **Flex** at 100%, **Full** at
 20%, 60% and 20% until set). Each flight sells in one pass
 (`sellSeats()`), no booking simulation:
 
-1. Connecting passengers take seats first (Flex, then Full, then Saver)
-   at the base fare: they're already booked through the network.
+1. Connecting passengers take seats first, booked early through the
+   network: the cheapest class still open, at its price (Saver, then
+   Flex, then Full). So the split sets what a connection pays on each
+   leg: a hub with Saver open sells its through trips cheap.
 2. Then each segment in the order it books: **leisure** (planning ahead),
    **VFR**, **business** (late). Each takes the cheapest class with
    seats left, as many as are willing at its price
@@ -2323,14 +2325,13 @@ connecting next to nothing: the steady player went bust at Montréal
 in 3 games of 6, against none with the frequency base.
 
 **They ride both legs.** Each flow is added to the demand of both routes
-it uses (`connectingDemandOnMarket()`), where it books seats and pays
-each leg's fare. That's a fiction (a real A–hub–B ticket costs about the
-A–B going rate, split across two flights), but the economy is balanced
-on it: paying 60% of each leg's fare (`CONNECTING_FARE_SHARE`), the
-steady player went bust in 13–15 years of 18; at 85% in 5–6; at the
-full fare in 1–2. So it's the full fare until revenue management lets a
-connecting passenger take a cheaper fare class. A full flight's seats go
-to local and connecting passengers in proportion to who booked. **They react to price** like local passengers
+it uses (`connectingDemandOnMarket()`), where it books seats before
+local passengers do and pays each leg's cheapest open fare class
+(Fare classes, above). So a through trip costs what the hub's seat
+splits make it: Saver on both legs where Saver is open, more where it
+has sold out. A flat cut to 60% of each leg's fare sent the steady
+player bust in 13–15 years of 18. Booking the cheaper classes doesn't
+(WEEK-FOURTEEN.md, stage 2). **They react to price** like local passengers
 (`economy.ts`'s `connectingPriceResponse()`): a route's connecting demand
 is scaled by its booking share at its fare over its share at the going
 rate, capped at 1.5× for pricing under it, so an over-priced hub
