@@ -1,5 +1,5 @@
 import { dayIndex } from '../sim/clock';
-import { FARE_POLICY_MAX, FARE_POLICY_MIN, pricingSummary, setFarePolicy } from '../sim/pricing';
+import { FARE_POLICY_MAX, FARE_POLICY_MIN, pricingSummary, putAllOnPolicy, setFarePolicy } from '../sim/pricing';
 import { networkHill } from '../sim/revenueHill';
 import type { SimState } from '../sim/state';
 import { money } from './format';
@@ -36,7 +36,19 @@ function rebuild(state: SimState): void {
   const hill = networkHill(state);
   chartEl.replaceChildren();
   if (!hill || hill.policyRoutes === 0) {
-    statusEl.textContent = hill ? `0 routes on policy · ${hill.byHand.routes} priced in their route view` : 'No routes yet';
+    // The hill only adds up routes on the policy: with none, offer to put them back.
+    statusEl.textContent = hill ? `0 routes on policy · ${hill.byHand.routes} priced by hand or on a stance` : 'No routes yet';
+    if (hill) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'lever-reset';
+      button.textContent = `Put ${hill.byHand.routes} route${hill.byHand.routes === 1 ? '' : 's'} on policy`;
+      button.addEventListener('click', () => {
+        putAllOnPolicy(state);
+        rebuild(state);
+      });
+      chartEl.append(button);
+    }
     return;
   }
   const setLevel = (level: number) => {

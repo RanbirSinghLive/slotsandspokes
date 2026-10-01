@@ -130,6 +130,10 @@ export function setFarePolicy(state: SimState, multiplier: number): void {
   applyFarePolicy(state);
 }
 
+/** Put every market flown today back on the fare policy, clearing hand fares and stances. */
+export function putAllOnPolicy(state: SimState): void {
+  for (const leg of state.schedule) setFareStance(state, leg.origin, leg.dest, null);
+}
 
 /** How the markets flown today are priced: by policy, by a stance, or by hand. */
 export function pricingSummary(state: SimState): { policy: number; stance: number; hand: number } {
