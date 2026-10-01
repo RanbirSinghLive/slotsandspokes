@@ -13,6 +13,7 @@ import { rollCompetitorRouteOpenings, rollCompetitorFrequencyGrowth, rollRivalEn
 import { bookingPerks, runningCostForDay } from './innovations';
 import { rollDailyFleet } from './fleetTiming';
 import { rollDailyRebases } from './rebase';
+import { addTally, emptyTally } from './fareClasses';
 import { networkOverheadPerDay } from './overhead';
 import { rollDailyMarketDemand, actualDailyDemand } from './marketDemand';
 import { revealReach } from './reach';
@@ -173,6 +174,9 @@ export function step(state: SimState): void {
     state.completedToday = [];
     state.cancelledToday = [];
     state.retimedToday = [];
+    // Yesterday's fare-class sales, for the route view (sim/fareClasses.ts).
+    state.yesterdayFareClasses = state.todayFareClasses ?? {};
+    state.todayFareClasses = {};
     state.todayLegResults = {};
     state.todayRevenue = 0;
     state.todayCost = 0;
@@ -521,7 +525,9 @@ export function step(state: SimState): void {
               departMinute: state.schedule.find((leg) => leg.legId === flight.legId)?.departMinute ?? homeMinuteOfDay(state, flight.scheduledDepartMinute),
               marketDepartMinutes: marketDepartMinutes(flight.origin, flight.dest, state.schedule),
             },
+            state.routeSettings[key]?.fareClasses,
           );
+          addTally(((state.todayFareClasses ??= {})[key] ??= emptyTally()), result.fareClasses);
           state.spilloverByMarket[key] = spilloverAvailable + result.spilloverDelta;
           flightPassengers = result.pax;
           flightSeats = type.seats;

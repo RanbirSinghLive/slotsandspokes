@@ -116,6 +116,16 @@ lease only; rivals never fail.
 7. **Connecting passengers book the cheaper classes**, which is where
    the through-fare correction parked in slice 1 belongs.
 
+**Stage 2 status:** steps 1–3 built. Fare classes in the sim
+(`sim/fareClasses.ts`, through `flightResult()`), the seat-map bar and
+yesterday's line in the route view, the headless player tuning Saver
+weekly. Balance (18 seeds, steady, default 20/60/20): YUL $12.2M (1/18
+busts), YYZ $42.1M (1/18), PHL $53.5M, YHZ 13/18; against week
+thirteen's end YUL $10.8M, YYZ $40.6M, PHL $66.7M, YHZ 13/18. A finding:
+even 18 seeds swing a median by half on near-identical rules (every-seat
+Flex, meant to equal slice 1, read YYZ $30.9M against $20.2M), so
+balance reads are rough.
+
 ## Decisions for the owner
 
 1. The airport tags: a first pass covers every airport in the data; the

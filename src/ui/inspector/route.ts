@@ -7,7 +7,8 @@ import { money } from '../format';
 import { RIVAL_SQUEEZED_RESPITE_DAYS } from '../../sim/pressure';
 import { brandInWords, formatNps, marketNps, networkNps } from '../../sim/nps';
 import { rivalYieldFactor } from '../../sim/pressure';
-import { policyFare, setFareStance, setHandFare } from '../../sim/pricing';
+import { policyFare, setFareClasses, setFareStance, setHandFare } from '../../sim/pricing';
+import { CLASS_NAMES, CLASS_ORDER, CLASS_PRICE, DEFAULT_FARE_CLASSES, type FareClassTally } from '../../sim/fareClasses';
 import { demandAgainstSeats, marketSize } from '../../sim/marketSize';
 import { summarizeMarket } from '../../sim/marketSummary';
 import { formatLoadFactor, marketLoadFactor } from '../../sim/loadFactor';
@@ -351,7 +352,7 @@ function buildFare(state: SimState, a: string, b: string, changed: () => void): 
 
   redrawFare();
   redrawEconomics();
-  return [...nodes, economics, fixedCosts];
+  return [...nodes, economics, fixedCosts, ...buildSeatSplit(state, a, b, changed, redrawEconomics)];
 }
 
 /**
@@ -376,6 +377,103 @@ function characterLine(a: string, b: string): HTMLElement {
   const wrap = document.createElement('div');
   wrap.append(row, bar);
   return wrap;
+}
+
+/** A tally's numbers in a line: what sold in each class and what happened to people. */
+function describeTally(tally: FareClassTally, perFlight = false): string {
+  const n = (value: number) => Math.round(value);
+  const parts = CLASS_ORDER.map((fareClass) => `${CLASS_NAMES[fareClass]} ${n(tally.sold[fareClass])}`);
+  if (tally.saverSoldOut > 0 && perFlight === false) parts.push(`Saver sold out ${tally.saverSoldOut}/${tally.flights}`);
+  if (n(tally.boughtUp) > 0) parts.push(`${n(tally.boughtUp)} bought up`);
+  if (n(tally.diluted) > 0) parts.push(`${n(tally.diluted)} business paid Saver`);
+  if (n(tally.businessTurnedAway) > 0) parts.push(`${n(tally.businessTurnedAway)} business turned away`);
+  return parts.join(' · ');
+}
+
+/**
+ * The route's seats split between fare classes (sim/fareClasses.ts), as a
+ * seat-map bar with two handles: drag them to move the Saver–Flex and
+ * Flex–Full lines. Under it, each class's share and price, what the split
+ * would sell today (the forecast, live as you drag), and what it sold
+ * yesterday.
+ */
+function buildSeatSplit(state: SimState, a: string, b: string, changed: () => void, redrawEconomics: () => void): HTMLElement[] {
+  const key = marketKey(a, b);
+  const settings = state.routeSettings[key];
+  if (!settings) return [];
+  const split = () => settings.fareClasses ?? DEFAULT_FARE_CLASSES;
+  const heading = document.createElement('h2');
+  heading.append(
+    'Seats by fare ',
+    info(
+      'Every flight sells three fares from the route\'s base fare: Saver (75%), Flex (100%) and Full (140%), each with its share of the seats. Leisure travellers book first and take the cheapest open; VFR next; business last. When a class sells out, those willing to pay the next one buy up. A Saver still open when business books is sold to people who would have paid Full; held back too long, seats fly empty. Drag the lines to move the split.',
+    ),
+  );
+  const bar = document.createElement('div');
+  bar.className = 'seat-split';
+  const parts = CLASS_ORDER.map((fareClass) => {
+    const part = document.createElement('span');
+    part.className = `seat-split-${fareClass}`;
+    bar.append(part);
+    return part;
+  });
+  const handles = [0, 1].map((i) => {
+    const handle = document.createElement('span');
+    handle.className = 'seat-split-handle';
+    handle.dataset.handle = String(i);
+    bar.append(handle);
+    return handle;
+  });
+  const legend = line('', 'inspector-line seat-split-legend');
+  const forecast = line('', 'inspector-line seat-split-forecast');
+  const yesterday = state.yesterdayFareClasses?.[key];
+  const past = line(yesterday && yesterday.flights > 0 ? `Yesterday · ${describeTally(yesterday)}` : 'Yesterday · not flown yet', 'inspector-line seat-split-yesterday');
+
+  const redraw = () => {
+    const { saverShare, flexShare } = split();
+    const shares = [saverShare, flexShare, Math.max(0, 1 - saverShare - flexShare)];
+    parts.forEach((part, i) => (part.style.width = `${shares[i] * 100}%`));
+    handles[0].style.left = `${saverShare * 100}%`;
+    handles[1].style.left = `${(saverShare + flexShare) * 100}%`;
+    legend.textContent = CLASS_ORDER.map((fareClass, i) => `${CLASS_NAMES[fareClass]} ${Math.round(shares[i] * 100)}% $${Math.round(settings.fare * CLASS_PRICE[fareClass])}`).join(' · ');
+    forecast.textContent = `Would sell today · ${describeTally(summarizeMarket(a, b, state, settings).fareClasses, true)}`;
+  };
+
+  let dragging: number | null = null;
+  const shareFromPointer = (event: PointerEvent) => {
+    const rect = bar.getBoundingClientRect();
+    return (event.clientX - rect.left) / Math.max(1, rect.width);
+  };
+  bar.addEventListener('pointerdown', (event) => {
+    const at = shareFromPointer(event);
+    const { saverShare, flexShare } = split();
+    // The nearer line is the one being moved.
+    dragging = Math.abs(at - saverShare) <= Math.abs(at - (saverShare + flexShare)) ? 0 : 1;
+    try {
+      bar.setPointerCapture(event.pointerId);
+    } catch {
+      // Moves still arrive while the pointer stays over the bar.
+    }
+  });
+  bar.addEventListener('pointermove', (event) => {
+    if (dragging === null) return;
+    const at = Math.max(0, Math.min(1, shareFromPointer(event)));
+    const { saverShare, flexShare } = split();
+    const flexEnd = saverShare + flexShare;
+    if (dragging === 0) setFareClasses(state, a, b, Math.min(at, flexEnd), flexEnd - Math.min(at, flexEnd));
+    else setFareClasses(state, a, b, saverShare, Math.max(0, at - saverShare));
+    redraw();
+    redrawEconomics();
+  });
+  const finish = () => {
+    if (dragging === null) return;
+    dragging = null;
+    changed();
+  };
+  bar.addEventListener('pointerup', finish);
+  bar.addEventListener('pointercancel', finish);
+  redraw();
+  return [heading, bar, legend, forecast, past];
 }
 
 /** The hill's margin at a fare, read off between its sampled points. */

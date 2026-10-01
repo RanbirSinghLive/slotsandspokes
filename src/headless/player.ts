@@ -3,6 +3,7 @@ import { contractOn, contractsOf, performanceFactor } from '../sim/contracts';
 import airportsData from '../../data/airports.json';
 import { inboundAt } from '../sim/fleetTiming';
 import { styleAdvice } from '../sim/hubPlanner';
+import { DEFAULT_FARE_CLASSES } from '../sim/fareClasses';
 import { airportHours, averageHourLoad } from '../sim/hours';
 import { lastWeekMargin } from '../sim/pnlHistory';
 import { AIRCRAFT_CLASSES, classByCode } from '../sim/aircraftClasses';
@@ -22,7 +23,7 @@ import { cashNeededToLease } from '../sim/leasing';
 import { overheadAddedByNextPlane, overheadSavedByOneFewer } from '../sim/overhead';
 import * as actions from '../sim/playerActions';
 import { forecastStance } from '../sim/fareForecast';
-import { setFareStance } from '../sim/pricing';
+import { setFareClasses, setFareStance } from '../sim/pricing';
 import { applyRotation, planRotation, type RotationPlan, type RotationStop } from '../sim/rotations';
 import { isAircraftTypeAllowedAt, legsServingMarket, marketKey, recommendedFare } from '../sim/schedule';
 import type { FareStance, SimState } from '../sim/state';
@@ -337,12 +338,49 @@ function steadyPlayer(kind: 'steady' | 'sitter' | 'bold'): Player {
         ...keepCrews(state, memory),
         ...pickStances(state, memory),
         ...runHomeHub(state),
+        ...tuneFareClasses(state),
         ...adoptInnovations(state),
         ...(kind === 'steady' ? hedgeWhenCheap(state) : []),
         ...(kind === 'steady' ? hireExecutives(state) : []),
       ];
     },
   };
+}
+
+// --- Fare classes --------------------------------------------------------
+
+/** How often the player looks at each route's seat split, in days. */
+const FARE_CLASS_REVIEW_DAYS = 7;
+/** How far one look moves Saver's share. */
+const FARE_CLASS_STEP = 0.05;
+const MIN_SAVER_SHARE = 0.1;
+const MAX_SAVER_SHARE = 0.5;
+
+/**
+ * Once a week, each route's Saver seats (sim/fareClasses.ts) from what
+ * sold yesterday: fewer where Saver sold out on most flights and business
+ * travellers were turned away (they'd have paid more), more where planes
+ * flew with seats to spare and Saver never sold out (cheap seats fill
+ * them). A player who reads the seat bar's yesterday line; balance numbers
+ * describe one who uses it.
+ */
+function tuneFareClasses(state: SimState): string[] {
+  if (dayIndex(state) % FARE_CLASS_REVIEW_DAYS !== 3) return [];
+  const log: string[] = [];
+  for (const [key, tally] of Object.entries(state.yesterdayFareClasses ?? {})) {
+    const settings = state.routeSettings[key];
+    if (!settings || tally.flights === 0) continue;
+    const { saverShare, flexShare } = settings.fareClasses ?? DEFAULT_FARE_CLASSES;
+    const soldOutMostly = tally.saverSoldOut / tally.flights >= 0.5;
+    let next = saverShare;
+    if (soldOutMostly && tally.businessTurnedAway >= 1) next = Math.max(MIN_SAVER_SHARE, saverShare - FARE_CLASS_STEP);
+    else if (tally.saverSoldOut === 0 && tally.businessTurnedAway < 1) next = Math.min(MAX_SAVER_SHARE, saverShare + FARE_CLASS_STEP);
+    if (Math.abs(next - saverShare) < 1e-9) continue;
+    const [a, b] = key.split('-');
+    setFareClasses(state, a, b, next, flexShare + (saverShare - next));
+    log.push(`${key} Saver ${Math.round(saverShare * 100)}% → ${Math.round(next * 100)}%.`);
+  }
+  return log;
 }
 
 // --- The home hub ------------------------------------------------------

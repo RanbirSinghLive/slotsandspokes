@@ -1992,6 +1992,53 @@ and the boost was just a flat 3× everywhere.
 
 ---
 
+## Fare classes (`src/sim/fareClasses.ts`)
+
+Revenue management. A route's base fare (the ball on the revenue hill)
+sells as three classes: **Saver** at 75%, **Flex** at 100%, **Full** at
+140%, each a share of the seats at the load-factor ceiling
+(`RouteSettings.fareClasses`, Saver's and Flex's shares, Full the rest;
+20%, 60% and 20% until set). Each flight sells in one pass
+(`sellSeats()`), no booking simulation:
+
+1. Connecting passengers take seats first (Flex, then Full, then Saver)
+   at the base fare: they're already booked through the network.
+2. Then each segment in the order it books: **leisure** (planning ahead),
+   **VFR**, **business** (late). Each takes the cheapest class with
+   seats left, as many as are willing at its price
+   (`segmentShareAt()`, the choice model for that one segment), then
+   moves up a class: those taking a dearer class because a cheaper one
+   sold out are **buy-ups**. Business travellers who find Saver still
+   open pay it: **dilution**.
+3. A full plane spills whoever still wanted a seat (to the market's
+   recapture pool, as before); a segment arriving to a full plane counts
+   those willing at the base fare. Spare seats take waiting passengers
+   at the base fare.
+
+So Saver fills seats with leisure travellers who'd never pay Flex, but
+every Saver seat still open when business books is sold to someone who
+would have paid more; held back too far, seats fly empty. Business
+travellers barely notice price (93% still book at 1.4× on a business
+trunk), so on a full route closing Saver earns about 8% more; on a thin
+one it leaves seats empty. With every seat Flex the result is exactly
+the single fare it replaced.
+
+The route view's **Seats by fare** bar has the three classes and two
+handles to drag the Saver–Flex and Flex–Full lines (`setFareClasses()`,
+5% steps); under it each class's share and price, what the split would
+sell today (the forecast, live), and **yesterday**
+(`SimState.yesterdayFareClasses`): sold by class, Saver sold out on how
+many flights, buy-ups, business paying Saver, business turned away.
+
+The headless player looks at each route's yesterday weekly: Saver down
+5 points where it sold out on most flights and business was turned
+away, up 5 where planes had seats to spare and Saver never sold out
+(10–50%). Starting at 20% Saver, on 18 seeds a home: YUL $12.2M (1/18
+busts), YYZ $42.1M, PHL $53.5M, YHZ 13/18; from 30%, Toronto made $30M
+and Halifax went bust 16/18.
+
+---
+
 ## Market character (`src/sim/marketCharacter.ts`)
 
 Who flies a city pair. Each airport is scored 0–2 for how strongly it

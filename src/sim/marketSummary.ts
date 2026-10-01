@@ -1,6 +1,7 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { flightResult, LOAD_FACTOR, type EconomyAircraftType } from './economy';
 import { trafficShare } from './choiceModel';
+import { addTally, emptyTally, type FareClassTally } from './fareClasses';
 import { actualDailyDemand } from './marketDemand';
 import { connectingDemandOnMarket } from './hubs';
 import { airlineFuelPrice } from './fuelPrice';
@@ -38,6 +39,8 @@ export type MarketSummary = {
   totalSeats: number;
   /** Seats a day this market can actually fill, at the load-factor ceiling — what `pax` is capped at. */
   seatCeiling: number;
+  /** How the day's seats would sell, by fare class (sim/fareClasses.ts). */
+  fareClasses: FareClassTally;
 };
 
 /**
@@ -98,6 +101,7 @@ export function summarizeMarket(
   };
   const perks = bookingPerks(state, origin, dest);
   const departures = legs.map((leg) => leg.departMinute);
+  const fareClasses = emptyTally();
   for (const leg of legs) {
     const type = aircraftTypeForLeg(leg, state);
     const result = flightResult(
@@ -113,7 +117,9 @@ export function summarizeMarket(
       previewSpillover,
       perks,
       { departMinute: leg.departMinute, marketDepartMinutes: departures },
+      routeSettings.fareClasses,
     );
+    addTally(fareClasses, result.fareClasses);
     previewSpillover += result.spilloverDelta;
     pax += result.pax;
     revenue += result.revenue;
@@ -143,5 +149,5 @@ export function summarizeMarket(
   // pull share away here.
   const share = freq > 0 ? trafficShare(routeSettings.fare, freq, origin, dest, state.competitorRoutes, perks.brandEdge, departures) : 1;
 
-  return { freq, pax, revenue, cost, margin, seatCapped, share, totalSeats, seatCeiling: totalSeatCeiling };
+  return { freq, pax, revenue, cost, margin, seatCapped, share, totalSeats, seatCeiling: totalSeatCeiling, fareClasses };
 }

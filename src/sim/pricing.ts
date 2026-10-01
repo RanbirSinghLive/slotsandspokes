@@ -105,6 +105,25 @@ export function setHandFare(state: SimState, origin: string, dest: string, fare:
   settings.fareStance = null;
 }
 
+/** The least of a plane any fare class can be set to: a class can be closed (0), but a split under this rounds to it. */
+const MIN_CLASS_SHARE = 0.05;
+
+/**
+ * Split a route's seats between fare classes (sim/fareClasses.ts): Saver's
+ * and Flex's shares of the seats, rounded to 5%, Full taking what's left.
+ * Either can be closed; together they can't be more than every seat.
+ */
+export function setFareClasses(state: SimState, origin: string, dest: string, saverShare: number, flexShare: number): void {
+  const settings = state.routeSettings[marketKey(origin, dest)];
+  if (!settings) return;
+  const round = (share: number) => {
+    const rounded = Math.round(Math.max(0, Math.min(1, share)) * 20) / 20;
+    return rounded < MIN_CLASS_SHARE ? 0 : rounded;
+  };
+  const saver = round(saverShare);
+  settings.fareClasses = { saverShare: saver, flexShare: Math.min(1 - saver, round(flexShare)) };
+}
+
 /** Set the airline-wide fare policy (clamped to its range) and re-price every market that follows it. */
 export function setFarePolicy(state: SimState, multiplier: number): void {
   state.farePolicyMultiplier = Math.min(FARE_POLICY_MAX, Math.max(FARE_POLICY_MIN, multiplier));

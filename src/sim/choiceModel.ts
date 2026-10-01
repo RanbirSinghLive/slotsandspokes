@@ -212,6 +212,27 @@ export function bookingShare(
 }
 
 /**
+ * One segment's booking share on this market at a fare: of that segment's
+ * demand, the fraction that books you rather than a rival or staying
+ * home. What fare classes (sim/fareClasses.ts) ask of each segment at
+ * each class's price; bookingShare() is these blended by the market's mix.
+ */
+export function segmentShareAt(
+  segmentName: SegmentName,
+  fare: number,
+  legsServingMarket: number,
+  originIata: string,
+  destIata: string,
+  competitorRoutes: CompetitorOffering[],
+  brandEdge: number,
+  departMinutes?: number[],
+): number {
+  const segment = SEGMENTS.find((s) => s.name === segmentName)!;
+  const marketCompetitors = competitorsServingMarket(originIata, destIata, competitorRoutes);
+  return segmentBookingShare(segment, fare, legsServingMarket, marketCompetitors, recommendedFare(originIata, destIata), brandEdge, departMinutes);
+}
+
+/**
  * Your conventional "market share" of this route: of the people who
  * actually travel this market (direct flights only — connecting
  * itineraries aren't modeled, per WEEK-TWO.md decision 1, so this can't

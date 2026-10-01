@@ -1,4 +1,5 @@
-import { bookingShare } from './choiceModel';
+import { bookingShare, segmentShareAt } from './choiceModel';
+import { DEFAULT_FARE_CLASSES, sellSeats, type FareClassSettings, type FareClassTally } from './fareClasses';
 import { marketMix } from './marketCharacter';
 import { flightDemandShare } from './timeOfDay';
 import { recommendedFare } from './schedule';
@@ -41,6 +42,8 @@ export type FlightResult = {
    * without recomputing the formula itself.
    */
   costBreakdown: CostBreakdown;
+  /** How the flight's seats sold, class by class (sim/fareClasses.ts). */
+  fareClasses: FareClassTally;
 };
 
 // Deliberately crude: no flight sells more than this fraction of its
@@ -238,40 +241,31 @@ export function flightResult(
    * (sim/timeOfDay.ts). Without it, flights split the market evenly.
    */
   timing?: { departMinute: number; marketDepartMinutes: number[] },
+  /** The route's seat split between fare classes (sim/fareClasses.ts); the default when it hasn't been set. */
+  fareClasses?: FareClassSettings,
 ): FlightResult {
   const demandPerFlight = timing
     ? marketDailyDemand * flightDemandShare(timing.departMinute, timing.marketDepartMinutes, marketMix(leg.origin, leg.dest))
     : marketDailyDemand / legsServingMarket;
-  const share = bookingShare(fare, legsServingMarket, leg.origin, leg.dest, competitorRoutes, perks.brandEdge, timing?.marketDepartMinutes);
   const connecting = connectingDailyDemand * connectingPriceResponse(fare, legsServingMarket, leg.origin, leg.dest, competitorRoutes, perks.brandEdge);
-  const localBooked = demandPerFlight * share;
-  const connectingBooked = connecting / legsServingMarket;
-  const bookedDemand = localBooked + connectingBooked;
   const seatCeiling = Math.round(type.seats * LOAD_FACTOR);
-  const roundedBooked = Math.round(bookedDemand);
-
-  let pax: number;
-  let spilloverDelta: number;
-  let spilled = 0;
-  let recaptured = 0;
-  if (roundedBooked > seatCeiling) {
-    pax = seatCeiling;
-    spilled = roundedBooked - seatCeiling;
-    spilloverDelta = Math.round(spilled * perks.recaptureRate);
-  } else {
-    const spareCapacity = seatCeiling - roundedBooked;
-    recaptured = Math.min(spareCapacity, spilloverAvailable);
-    pax = roundedBooked + recaptured;
-    spilloverDelta = -recaptured;
-  }
-
+  // The seats sold class by class, in booking order (sim/fareClasses.ts).
+  const sale = sellSeats({
+    seats: seatCeiling,
+    baseFare: fare,
+    demand: demandPerFlight,
+    mix: marketMix(leg.origin, leg.dest),
+    shareAt: (segment, price) =>
+      segmentShareAt(segment, price, legsServingMarket, leg.origin, leg.dest, competitorRoutes, perks.brandEdge, timing?.marketDepartMinutes),
+    connecting: connecting / legsServingMarket,
+    connectingFare: fare * CONNECTING_FARE_SHARE,
+    recapturable: spilloverAvailable,
+    classes: fareClasses ?? DEFAULT_FARE_CLASSES,
+  });
+  const pax = Math.round(sale.passengers);
+  const spilloverDelta = sale.spilled > 0 ? Math.round(sale.spilled * perks.recaptureRate) : -Math.round(sale.recaptured);
   const yieldFactor = rivalYieldFactor(leg.origin, leg.dest, legsServingMarket, competitorRoutes);
-  // Connecting passengers pay their share of a through fare, not this
-  // leg's local fare (CONNECTING_FARE_SHARE); a full flight's seats go to
-  // local and connecting passengers in proportion to who booked.
-  const connectingPax = bookedDemand > 0 ? Math.min(pax, (pax - recaptured) * (connectingBooked / bookedDemand)) : 0;
-  const farePaid = (pax - connectingPax) + connectingPax * CONNECTING_FARE_SHARE;
-  const revenue = farePaid * fare * yieldFactor * perks.yieldMultiplier;
+  const revenue = sale.fares * yieldFactor * perks.yieldMultiplier;
   const costBreakdown = legCostBreakdown(leg.blockMinutes, type, fuelPriceIndex, fuelEfficiencyMultiplier);
   const cost = costBreakdown.fuel + costBreakdown.blockNonFuel + costBreakdown.departure;
   return {
@@ -281,5 +275,6 @@ export function flightResult(
     margin: revenue - cost,
     spilloverDelta,
     costBreakdown,
+    fareClasses: sale.tally,
   };
 }

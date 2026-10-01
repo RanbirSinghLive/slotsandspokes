@@ -1,3 +1,4 @@
+import type { FareClassSettings, FareClassTally } from './fareClasses';
 import aircraftTypesData from '../../data/aircraft-types.json';
 import type { Shock } from './shocks';
 import { startingSimMinute } from './clock';
@@ -151,6 +152,12 @@ export type RouteSettings = {
    * existed, which reads the same as null.
    */
   fareStance?: FareStance | null;
+  /**
+   * How the route's seats split between fare classes (sim/fareClasses.ts):
+   * Saver's and Flex's shares, Full the rest. Missing reads as
+   * DEFAULT_FARE_CLASSES, so older saves sell as a new route does.
+   */
+  fareClasses?: FareClassSettings;
   /**
    * Extra scheduled ground time after every flight on this market, on top
    * of MIN_TURN_MINUTES (sim/turnBuffer.ts). Slack that soaks up a late
@@ -389,6 +396,10 @@ export type SimState = {
    * keep a single flight's numbers free of them.
    */
   todayRevenueByMarket: Record<string, number>;
+  /** How each market's seats sold today, by fare class (sim/fareClasses.ts). Reset at rollover into `yesterdayFareClasses`. Optional: made on first use. */
+  todayFareClasses?: Record<string, FareClassTally>;
+  /** The last finished day's fare-class sales by market, for the route view's readout. */
+  yesterdayFareClasses?: Record<string, FareClassTally>;
   /**
    * Every market's revenue, cost and passengers since it was first flown,
    * added up at each rollover (sim/pnlHistory.ts): the per-market history

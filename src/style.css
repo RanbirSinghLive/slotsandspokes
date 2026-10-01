@@ -3969,3 +3969,55 @@ button.ops-item:hover {
 .mix-bar-vfr {
   background: #5ed6c8;
 }
+
+/* A route's seats split between fare classes (ui/inspector/route.ts). */
+.seat-split {
+  position: relative;
+  display: flex;
+  height: 16px;
+  margin: 4px 0 4px;
+  border-radius: 4px;
+  overflow: visible;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.seat-split > span:not(.seat-split-handle) {
+  display: block;
+  height: 100%;
+}
+
+.seat-split-saver {
+  background: #5ed6c8;
+  border-radius: 4px 0 0 4px;
+}
+
+.seat-split-flex {
+  background: #8a93a6;
+}
+
+.seat-split-full {
+  background: #ffd166;
+  border-radius: 0 4px 4px 0;
+}
+
+.seat-split-handle {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 4px;
+  margin-left: -2px;
+  background: #fff;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px #0a0c12;
+  pointer-events: none;
+}
+
+.seat-split-forecast {
+  color: #9aa3b8;
+}
+
+.seat-split-yesterday {
+  color: #c8d0e0;
+  margin-bottom: 8px;
+}
