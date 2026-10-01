@@ -386,6 +386,7 @@ function characterLine(a: string, b: string): HTMLElement {
 function describeTally(tally: FareClassTally, perFlight = false): string {
   const n = (value: number) => Math.round(value);
   const parts = CLASS_ORDER.map((fareClass) => `${CLASS_NAMES[fareClass]} ${n(tally.sold[fareClass])}`);
+  if (n(tally.cabinSold ?? 0) > 0) parts.unshift(`Business cabin ${n(tally.cabinSold ?? 0)}`);
   if (tally.saverSoldOut > 0 && perFlight === false) parts.push(`Saver sold out ${tally.saverSoldOut}/${tally.flights}`);
   if (n(tally.boughtUp) > 0) parts.push(`${n(tally.boughtUp)} bought up`);
   if (n(tally.diluted) > 0) parts.push(`${n(tally.diluted)} business paid Saver`);

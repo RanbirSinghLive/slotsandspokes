@@ -339,6 +339,7 @@ function steadyPlayer(kind: 'steady' | 'sitter' | 'bold'): Player {
         ...pickStances(state, memory),
         ...runHomeHub(state),
         ...tuneFareClasses(state),
+        ...refitCabins(state),
         ...adoptInnovations(state),
         ...(kind === 'steady' ? hedgeWhenCheap(state) : []),
         ...(kind === 'steady' ? hireExecutives(state) : []),
@@ -381,6 +382,36 @@ function tuneFareClasses(state: SimState): string[] {
     log.push(`${key} Saver ${Math.round(saverShare * 100)}% → ${Math.round(next * 100)}%.`);
   }
   return log;
+}
+
+// --- Cabins ------------------------------------------------------------
+
+/** How often the player looks at its planes' cabins, in days. */
+const CABIN_REVIEW_DAYS = 7;
+/** A refit has to pay for itself, and the days out of service, within this many days of its forecast gain. */
+const CABIN_PAYBACK_DAYS = 45;
+/** Out of service costs about this many times the refit's price again. */
+const CABIN_DOWNTIME_FACTOR = 0.5;
+
+/**
+ * Once a week, refit the one plane whose cabin change (sim/cabins.ts)
+ * pays back fastest, when it pays back within CABIN_PAYBACK_DAYS and the
+ * airline has three refits' cash on hand: one at a time, so the fleet is
+ * never short more than a plane.
+ */
+function refitCabins(state: SimState): string[] {
+  if (dayIndex(state) % CABIN_REVIEW_DAYS !== 5) return [];
+  if (state.aogs.some((event) => event.refitTo) || state.aircraft.some((a) => a.refitPending)) return [];
+  let best: { tail: string; to: 'economy' | 'business'; worth: number } | null = null;
+  for (const aircraft of state.aircraft) {
+    const option = actions.refitOptionFor(state, aircraft.tail);
+    if (!option || option.blocked || state.cash < 3 * option.cost) continue;
+    const worth = option.gainPerDay * CABIN_PAYBACK_DAYS - option.cost * (1 + CABIN_DOWNTIME_FACTOR);
+    if (worth > 0 && (!best || worth > best.worth)) best = { tail: aircraft.tail, to: option.to, worth };
+  }
+  if (!best) return [];
+  const result = actions.orderRefit(state, best.tail, best.to);
+  return result.ok ? [result.message] : [];
 }
 
 // --- The home hub ------------------------------------------------------

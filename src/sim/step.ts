@@ -1,3 +1,4 @@
+import { cabinLayout, cabinOf } from './cabins';
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { flightResult, type EconomyAircraftType } from './economy';
 import { MIN_TURN_MINUTES, legsServingMarket, marketDepartMinutes, marketKey, type ScheduleLeg } from './schedule';
@@ -526,13 +527,15 @@ export function step(state: SimState): void {
               marketDepartMinutes: marketDepartMinutes(flight.origin, flight.dest, state.schedule),
             },
             state.routeSettings[key]?.fareClasses,
+            cabinOf(aircraft),
           );
           addTally(((state.todayFareClasses ??= {})[key] ??= emptyTally()), result.fareClasses);
           state.spilloverByMarket[key] = spilloverAvailable + result.spilloverDelta;
           flightPassengers = result.pax;
-          flightSeats = type.seats;
+          const layout = cabinLayout(type.seats, cabinOf(aircraft));
+          flightSeats = layout.economy + layout.business;
           flightMargin = result.margin;
-          recordFlightLoad(state, key, result.pax, type.seats);
+          recordFlightLoad(state, key, result.pax, flightSeats);
           state.cash += result.margin;
           state.todayRevenue += result.revenue;
           state.todayCost += result.cost;

@@ -73,6 +73,10 @@ export type Aircraft = {
   returningOnDay?: number;
   /** Set while it ferries to another crew base (sim/rebase.ts). It flies nothing meanwhile, and joins `to` on `arrivesDay`. */
   rebase?: { from: string; to: string; arrivesDay: number };
+  /** A business cabin up front (sim/cabins.ts); absent, all economy. */
+  cabin?: 'business';
+  /** A refit ordered and paid for, starting the next morning it is at base (sim/cabins.ts). */
+  refitPending?: 'economy' | 'business';
 };
 
 /** How one leg went, once it has landed. */

@@ -46,6 +46,7 @@ import {
 import { cashNeededToLease, LEASE_RESERVE_DAYS, leaseRateFor, loadLeaseRates } from './leasing';
 import { inboundAt, orderLease } from './fleetTiming';
 import { rebaseOptions, rebasePlane, type RebaseOption } from './rebase';
+import { cabinGainPerDay, cabinOf, cancelRefit as cancelRefitRule, orderRefit as orderRefitRule, refitBlockedReason, refitCost, refitDays, type Cabin } from './cabins';
 import { commitRetime, planRetime, type RetimePlan } from './retime';
 import { daysUntilNextListing, listingsOf, returnBlockedReason, returnFee, returnLease, takeListing, type MarketListing } from './market';
 import { airlineCalled, classOpen, tierThatOpens } from './ladder';
@@ -572,6 +573,40 @@ export function rebasePlaneTo(state: SimState, tail: string, to: string): Outcom
   const typeCode = state.aircraft.find((a) => a.tail === tail)?.typeCode ?? '';
   const crewNote = crewAdvice(state, to, typeCode);
   return { ok: true, message: result.message + (crewNote ? ` · ${crewNote}` : '') };
+}
+
+// --- Cabins --------------------------------------------------------------------
+
+export type RefitOption = {
+  /** The cabin a refit would fit: the other one. */
+  to: Cabin;
+  cost: number;
+  days: number;
+  /** What the plane's markets would make a day with it, against now (sim/cabins.ts's forecast). */
+  gainPerDay: number;
+  blocked: string | null;
+};
+
+/** The refit on offer for a plane (sim/cabins.ts), or null for one that can't have a business cabin. */
+export function refitOptionFor(state: SimState, tail: string): RefitOption | null {
+  const aircraft = state.aircraft.find((a) => a.tail === tail);
+  if (!aircraft || refitDays(aircraft.typeCode) === 0) return null;
+  const to: Cabin = cabinOf(aircraft) === 'business' ? 'economy' : 'business';
+  return {
+    to,
+    cost: refitCost(aircraft),
+    days: refitDays(aircraft.typeCode),
+    gainPerDay: cabinGainPerDay(state, tail, to),
+    blocked: refitBlockedReason(state, aircraft, to),
+  };
+}
+
+export function orderRefit(state: SimState, tail: string, cabin: Cabin): Outcome<{ message: string }> {
+  return orderRefitRule(state, tail, cabin);
+}
+
+export function cancelRefit(state: SimState, tail: string): Outcome<{ message: string }> {
+  return cancelRefitRule(state, tail);
 }
 
 // --- Innovations --------------------------------------------------------------

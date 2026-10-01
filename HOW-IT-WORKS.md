@@ -2110,6 +2110,42 @@ Rivals have no times, so each counts as spread over the day.
 
 ---
 
+## Cabins (`src/sim/cabins.ts`)
+
+A plane is all economy, or has a **business cabin** up front (`Aircraft.cabin`).
+The cabin takes 8% of the seats as business seats. Each one takes the
+room of 2.5 economy seats, so a Narrowbody becomes 12 business plus 120
+economy (shown as "12J + 120Y"). A Propeller can't be fitted.
+
+Only business travellers buy the cabin. They book it before the
+economy classes (`sellSeats()` above), as many as are willing at its
+price: 2.2× the route's base fare (`CABIN_PRICE`). They value a business
+seat at 1.8× an economy one (`CABIN_VALUE`), so they weigh it like an
+economy fare of about 1.22× the base. The business travellers it doesn't
+take go on to the economy classes as before.
+
+So a cabin is a bet on a plane's routes. Where business travellers are
+many and the plane has room, it turns those who'd have paid Saver or
+Flex into 2.2× fares. On a full plane, the economy seats it took would
+have sold, and it can lose money.
+
+**A refit** changes the cabin either way. It is paid when ordered:
+10 days of the plane's lease. It starts the next morning the plane is
+on the ground at its base, and takes it out of service for 3 days
+(Regional), 4 (Narrowbody) or 6 (Widebody). Out of service it is an AOG
+with `refitTo` set: its rotations move to spare planes of its class at
+its base, what doesn't fit is cancelled, and it can't be expedited.
+A refit not yet started can be called off with the money back.
+
+The plane's view shows the cabin and a forecast for the refit
+(`cabinGainPerDay()`): the plane's markets through the game's own
+forecast, with the cabin swapped and then put back. The headless player
+reviews its cabins weekly. It refits the one plane whose forecast gain
+pays the refit and its days out back within 45 days, one plane at a
+time.
+
+---
+
 ## Fare policy (`src/sim/pricing.ts`)
 
 One airline-wide multiplier on `recommendedFare()` prices the whole

@@ -142,6 +142,26 @@ the routes on policy, the likely top, and what the routes priced by hand
 make against the policy fare. Both hills share one chart
 (`ui/hillChart.ts`).
 
+**Step 6 built:** cabins (`sim/cabins.ts`). A Regional, Narrowbody or
+Widebody can have a business cabin: 8% of its seats, each taking 2.5
+economy seats. Only business travellers buy it, at 2.2× the fare, and
+they value it at 1.8×. A refit costs 10 lease-days and takes the plane
+out for 3–6 days as a planned AOG. The plane's view shows a forecast for
+the refit, and the headless player refits one plane at a time when it
+pays back within 45 days. Probed on headless games, a cabin makes
++$2–14k a day on planes with room and loses $2–12k on full ones.
+Balance (18 seeds, steady), with cabins against without:
+
+| Home | With cabins | Without |
+|---|---|---|
+| YUL | $10.6M, 3/18 busts | $12.0M, 4/18 |
+| YYZ | $29.9M, 0/18 | $26.4M, 2/18 |
+| PHL | $46.9M, 0/18 | $70.2M, 1/18 |
+| YHZ | 9/18 busts | 12/18 |
+
+About two cabins fitted per airline on the big homes: no runaway edge,
+inside the noise.
+
 ## Decisions for the owner
 
 1. The airport tags: a first pass covers every airport in the data; the

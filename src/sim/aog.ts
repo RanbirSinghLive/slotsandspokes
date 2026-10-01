@@ -6,6 +6,7 @@ import { summarizeMarket } from './marketSummary';
 import { marketKey } from './schedule';
 import { aircraftUtilisation, rotationsForTail, type Rotation } from './utilisation';
 import { coverRotations } from './turnBuffer';
+import { refitDays } from './cabins';
 import type { Aircraft, SimState } from './state';
 
 /**
@@ -69,6 +70,8 @@ export type AogEvent = {
   coveredRotations: number;
   /** The ids those moved legs now have, so the flying can be handed back when it's repaired. */
   movedLegIds: string[];
+  /** A planned refit (sim/cabins.ts) rather than a breakdown: the cabin it has when it's back. It can't be expedited. */
+  refitTo?: 'economy' | 'business';
 };
 
 export function isAog(state: SimState, tail: string): boolean {
@@ -142,7 +145,13 @@ function coverGroundedPlanes(state: SimState): void {
 export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
   const repaired = state.aogs.filter((event) => event.returnsAtMinute <= dayStartMinute);
   state.aogs = state.aogs.filter((event) => event.returnsAtMinute > dayStartMinute);
-  for (const event of repaired) handBackFlying(state, event);
+  for (const event of repaired) {
+    const aircraft = state.aircraft.find((a) => a.tail === event.tail);
+    if (aircraft && event.refitTo === 'business') aircraft.cabin = 'business';
+    if (aircraft && event.refitTo === 'economy') delete aircraft.cabin;
+    handBackFlying(state, event);
+  }
+  startRefits(state, dayStartMinute);
 
   for (const aircraft of state.aircraft) {
     // Always draw, whatever the outcome below, so how many random numbers a
@@ -176,6 +185,25 @@ export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
   coverGroundedPlanes(state);
 }
 
+/** Refits ordered (sim/cabins.ts) start on a plane on the ground at its base, flying nothing else meanwhile. */
+function startRefits(state: SimState, dayStartMinute: number): void {
+  for (const aircraft of state.aircraft) {
+    if (!aircraft.refitPending || isAog(state, aircraft.tail) || aircraft.rebase) continue;
+    if (aircraft.status !== 'ground' || !aircraft.baseAirport || aircraft.atAirport !== aircraft.baseAirport) continue;
+    state.aogs.push({
+      tail: aircraft.tail,
+      base: aircraft.baseAirport,
+      fault: 'cabin refit',
+      returnsAtMinute: dayStartMinute + refitDays(aircraft.typeCode) * MINUTES_PER_DAY,
+      uncoveredRoutes: [],
+      coveredRotations: 0,
+      movedLegIds: [],
+      refitTo: aircraft.refitPending,
+    });
+    delete aircraft.refitPending;
+  }
+}
+
 /**
  * A repaired plane takes back the flying that was moved off it. Each moved
  * rotation is re-spread across its pool the same way cover spread it, and
@@ -202,7 +230,7 @@ export function daysUntilReturn(state: SimState, event: AogEvent): number {
 export function expediteCost(state: SimState, tail: string): number | null {
   const event = aogFor(state, tail);
   const aircraft = state.aircraft.find((a) => a.tail === tail);
-  if (!event || !aircraft || daysUntilReturn(state, event) <= 1) return null;
+  if (!event || !aircraft || event.refitTo || daysUntilReturn(state, event) <= 1) return null;
   return EXPEDITE_LEASE_DAYS_PER_DAY * aircraft.leaseCostPerDay;
 }
 

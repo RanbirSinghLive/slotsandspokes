@@ -30,6 +30,7 @@ export {
   previewRemoveRoute,
   previewTurnBuffer,
   returnOptions,
+  refitOptionFor,
   rebaseOptionsFor,
   planRetimeRotation,
   routeBase,
@@ -69,6 +70,14 @@ export function retimeRotation(state: SimState, legIds: string[], toTail: string
 
 export function rebasePlane(state: SimState, tail: string, to: string) {
   return afterChange(state, actions.rebasePlaneTo(state, tail, to));
+}
+
+export function orderRefit(state: SimState, tail: string, cabin: 'economy' | 'business') {
+  return afterChange(state, actions.orderRefit(state, tail, cabin));
+}
+
+export function cancelRefit(state: SimState, tail: string) {
+  return afterChange(state, actions.cancelRefit(state, tail));
 }
 
 export function clearPlane(state: SimState, tail: string) {

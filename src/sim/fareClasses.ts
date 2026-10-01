@@ -1,3 +1,4 @@
+import { CABIN_PRICE, CABIN_VALUE } from './cabins';
 import type { SegmentName } from './timeOfDay';
 
 /**
@@ -55,6 +56,8 @@ export type FareClassTally = {
   diluted: number;
   /** Business travellers who wanted a seat and found the plane full. */
   businessTurnedAway: number;
+  /** Seats sold in the business cabin (sim/cabins.ts). */
+  cabinSold?: number;
 };
 
 export function emptyTally(): FareClassTally {
@@ -68,6 +71,7 @@ export function addTally(into: FareClassTally, from: FareClassTally): void {
   into.boughtUp += from.boughtUp;
   into.diluted += from.diluted;
   into.businessTurnedAway += from.businessTurnedAway;
+  if (from.cabinSold) into.cabinSold = (into.cabinSold ?? 0) + from.cabinSold;
 }
 
 export type SeatSale = {
@@ -83,8 +87,10 @@ export type SeatSale = {
 };
 
 export type SeatSaleInput = {
-  /** Seats that can be sold: the plane's seats at the load-factor ceiling. */
+  /** Economy seats that can be sold: the plane's at the load-factor ceiling. */
   seats: number;
+  /** Business cabin seats that can be sold (sim/cabins.ts); none without a cabin. */
+  businessSeats?: number;
   baseFare: number;
   /** This flight's share of the market's demand (sim/timeOfDay.ts's split by hour). */
   demand: number;
@@ -108,6 +114,7 @@ export function sellSeats(input: SeatSaleInput): SeatSale {
   const price = (fareClass: FareClass) => input.baseFare * CLASS_PRICE[fareClass];
   const tally = emptyTally();
   tally.flights = 1;
+  let cabinLeft = Math.max(0, input.businessSeats ?? 0);
   let fares = 0;
   let passengers = 0;
 
@@ -129,6 +136,15 @@ export function sellSeats(input: SeatSaleInput): SeatSale {
     let booked = 0;
     let firstOpen: FareClass | null = null;
     let lastWilling = 0;
+    // Business travellers take the cabin first, as many as find it worth its price.
+    if (segment === 'business' && cabinLeft > 1e-9) {
+      const willing = pool * input.shareAt(segment, (input.baseFare * CABIN_PRICE) / CABIN_VALUE);
+      const take = Math.min(cabinLeft, willing);
+      cabinLeft -= take;
+      booked += take;
+      fares += take * input.baseFare * CABIN_PRICE;
+      tally.cabinSold = take;
+    }
     for (const fareClass of CLASS_ORDER) {
       if (left[fareClass] <= 1e-9) continue;
       firstOpen ??= fareClass;

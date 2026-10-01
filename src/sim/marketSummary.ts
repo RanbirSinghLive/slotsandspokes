@@ -1,3 +1,4 @@
+import { cabinLayout, cabinOf } from './cabins';
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { flightResult, LOAD_FACTOR, type EconomyAircraftType } from './economy';
 import { trafficShare } from './choiceModel';
@@ -104,6 +105,9 @@ export function summarizeMarket(
   const fareClasses = emptyTally();
   for (const leg of legs) {
     const type = aircraftTypeForLeg(leg, state);
+    const aircraft = state.aircraft.find((a) => a.tail === leg.tail);
+    const cabin = aircraft ? cabinOf(aircraft) : 'economy';
+    const layout = cabinLayout(type.seats, cabin);
     const result = flightResult(
       { origin: leg.origin, dest: leg.dest, blockMinutes: leg.blockMinutes },
       type,
@@ -118,6 +122,7 @@ export function summarizeMarket(
       perks,
       { departMinute: leg.departMinute, marketDepartMinutes: departures },
       routeSettings.fareClasses,
+      cabin,
     );
     addTally(fareClasses, result.fareClasses);
     previewSpillover += result.spilloverDelta;
@@ -125,8 +130,8 @@ export function summarizeMarket(
     revenue += result.revenue;
     cost += result.cost;
     margin += result.margin;
-    totalSeats += type.seats;
-    totalSeatCeiling += Math.round(type.seats * LOAD_FACTOR);
+    totalSeats += layout.economy + layout.business;
+    totalSeatCeiling += Math.round(layout.economy * LOAD_FACTOR) + Math.round(layout.business * LOAD_FACTOR);
   }
 
   // A market is "seat-capped" when every one of its flights is pinned at
