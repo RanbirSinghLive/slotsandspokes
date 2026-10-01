@@ -2212,13 +2212,14 @@ connecting next to nothing: the steady player went bust at Montréal
 in 3 games of 6, against none with the frequency base.
 
 **They ride both legs.** Each flow is added to the demand of both routes
-it uses (`connectingDemandOnMarket()`), where it books seats. **They pay
-a through fare**, not two local ones: on each leg a connecting passenger
-pays 60% of that leg's fare (`CONNECTING_FARE_SHARE`, `sim/economy.ts`),
-since an A–hub–B ticket costs about the A–B going rate, a little over one
-local fare, split across two flights. At the full fare on both legs a
-hub's connections were worth two local passengers each. A full flight's
-seats go to local and connecting passengers in proportion to who booked. **They react to price** like local passengers
+it uses (`connectingDemandOnMarket()`), where it books seats and pays
+each leg's fare. That's a fiction (a real A–hub–B ticket costs about the
+A–B going rate, split across two flights), but the economy is balanced
+on it: paying 60% of each leg's fare (`CONNECTING_FARE_SHARE`), the
+steady player went bust in 13–15 years of 18; at 85% in 5–6; at the
+full fare in 1–2. So it's the full fare until revenue management lets a
+connecting passenger take a cheaper fare class. A full flight's seats go
+to local and connecting passengers in proportion to who booked. **They react to price** like local passengers
 (`economy.ts`'s `connectingPriceResponse()`): a route's connecting demand
 is scaled by its booking share at its fare over its share at the going
 rate, capped at 1.5× for pricing under it, so an over-priced hub

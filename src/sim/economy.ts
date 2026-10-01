@@ -169,12 +169,16 @@ export function legCostBreakdown(
  */
 /**
  * What a connecting passenger pays on each leg, as a share of that leg's
- * fare. A through fare A–hub–B is about the A–B going rate, a little over
- * one local fare, split across two flights, so each leg gets well under
- * its own fare. At the full fare on both legs, a hub's connections were
- * worth two local passengers each (WEEK-FOURTEEN.md, slice 1).
+ * fare. A real through fare A–hub–B is about the A–B going rate split
+ * across two flights, so each leg would get well under its own fare. But
+ * the game's economy is balanced on connections paying the full fare on
+ * both legs: on 18 seeds a home the steady player went bust in 13–15
+ * years of 18 at 0.6, and in 5–6 at 0.85, against 1–2 at the full fare
+ * (WEEK-FOURTEEN.md, slice 1). So it stays at 1 until revenue management
+ * (stage 2) lets a connecting passenger take a cheaper fare class, which
+ * is where the correction belongs.
  */
-export const CONNECTING_FARE_SHARE = 0.6;
+export const CONNECTING_FARE_SHARE = 1;
 
 /** Pricing under the going rate wins connecting passengers too, but at most this many times as many. */
 const MAX_CONNECTING_PRICE_GAIN = 1.5;

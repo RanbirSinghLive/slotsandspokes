@@ -96,7 +96,33 @@ lease only; rivals never fail.
 
 ## Status
 
-*(Updated as slice 1 is built.)*
+**Slice 1 built** (commit 953d870 and after):
+
+- **Market character:** `data/airport-character.json` (every notable
+  airport scored 0–2 business, leisure, VFR) and
+  `sim/marketCharacter.ts` (business needs both ends, leisure one sunny
+  end, VFR a community at either end). The network's mix, weighted by
+  potential demand, is 21/50/29 against the 20/50/30 it replaced.
+  Toronto–Chicago is a business trunk, Toronto–Orlando a sun route,
+  Toronto–St. John's friends and family. In the choice model and
+  time-of-day demand; shown as a word and a bar in the route view.
+- **Widebody:** rate card $60k to $100k a day ($333 a seat against the
+  Narrowbody's $307): long-haul is a bet on 300 seats, not a sure thing.
+- **The revenue hill:** `sim/revenueHill.ts` (25 fares through the game's
+  forecast, smoothed) drawn in the route view in place of the slider:
+  the top marked, the going rate, rivals' flags, the amber stretch where
+  rivals answer, the fare a ball to drag.
+- **Through fares: tried and parked.** On 18 seeds a home, connecting
+  passengers paying 60% of each leg's fare sent the steady player bust
+  in 13–15 years of 18; 85% in 5–6; the full fare 1–2. The economy is
+  balanced on connections paying twice; the correction belongs in
+  stage 2, when a connecting passenger can take a cheaper fare class.
+- **Balance (18 seeds, steady, connections at full fare):** YUL $11.7M
+  (2/18 busts), YYZ $20.2M (1/18), PHL $58.6M, YHZ 14/18 busts; week
+  thirteen ended YUL $10.8M, YYZ $40.6M, PHL $66.7M, YHZ 13/18. Toronto
+  halves: it's the home best placed for long-haul, which no longer pays
+  by itself. The week-thirteen size costs stay (removing them didn't
+  rescue the through-fare runs and isn't needed without them).
 
 ## Playtest notes
 
