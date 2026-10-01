@@ -77,6 +77,45 @@ lease only; rivals never fail.
 5. **A balance pass**, 18 seeds a home (6 proved too noisy in week
    thirteen).
 
+## Stage 2: revenue management (owner: go, 2026-10-01)
+
+**Settled with the owner:**
+
+- **The hill is learned, not given.** Today it draws the game's exact
+  forecast, so the best fare is known before a day is flown, against
+  the game's rule that markets are learned by flying. It becomes what
+  the airline has measured: dots at the fares actually flown (the margin
+  really made), and between them an estimate band, wide where untried,
+  narrowing with days flown nearby, widening again when the market
+  shifts (a rival in or out, demand moving, a shock). The top is a best
+  guess with a range. A revenue-management CCO narrows the band.
+- **A network hill replaces the grey slider:** the same picture for the
+  airline, summed over every route on the network policy, the network
+  fare level the ball. Pricing a route by hand can beat it, and the
+  network hill says by how much ("+$4.2k/day from 6 routes by hand").
+  Stage 3's brand position becomes where that ball sits.
+
+**Build order:**
+
+1. **Fare classes in the sim:** a route's base fare sells as Saver
+   (75%), Flex (100%) and Full (140%), with seat limits on Saver and
+   Flex. Passengers book in order, leisure first, then VFR, then
+   business, each buying the cheapest class still open if willing at
+   its price; past a sold-out class some buy up and the rest spill or
+   don't fly. Business arriving to an open Saver pays Saver (dilution).
+   Worked out per flight in one pass (`sim/fareClasses.ts`), no booking
+   simulation.
+2. **The seat-map bar** in the route view: drag the Saver and Flex
+   limits; under it, yesterday ("Saver sold out on 4 of 6 · 31 bought
+   up · 12 business turned away · 9 business paid Saver").
+3. **The headless player's default** and a balance pass (18 seeds).
+4. **The learned hill.**
+5. **The network hill**, the grey slider gone.
+6. **Cabins:** a business cabin fitted to a plane, a few days out of
+   service to refit.
+7. **Connecting passengers book the cheaper classes**, which is where
+   the through-fare correction parked in slice 1 belongs.
+
 ## Decisions for the owner
 
 1. The airport tags: a first pass covers every airport in the data; the
