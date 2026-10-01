@@ -396,6 +396,8 @@ export type SimState = {
    * (sim/yearReport.ts) needs the whole year. Optional: made on first use.
    */
   marketTotals?: Record<string, { revenue: number; cost: number; passengers: number }>;
+  /** The day `marketTotals` began: 1 for a game started with them, later for a save from before them. */
+  marketTotalsSinceDay?: number;
   todayCostByMarket: Record<string, number>;
   /**
    * Rolling PNL_HISTORY_MAX_DAYS-day window of the two fields above, same

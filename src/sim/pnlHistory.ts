@@ -1,4 +1,5 @@
 import { marketKey } from './schedule';
+import { dayIndex } from './clock';
 import type { SimState } from './state';
 
 /**
@@ -44,6 +45,7 @@ export function recordDailyPnlHistory(state: SimState): void {
 
   // The running totals the year one report reads (sim/yearReport.ts):
   // every market that earned, cost or carried anything today.
+  if (!state.marketTotals) state.marketTotalsSinceDay = dayIndex(state);
   const totals = (state.marketTotals ??= {});
   const touched = new Set([...Object.keys(state.todayRevenueByMarket), ...Object.keys(state.todayCostByMarket), ...Object.keys(state.todayLoadByMarket ?? {})]);
   for (const key of touched) {

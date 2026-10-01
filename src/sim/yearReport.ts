@@ -37,6 +37,8 @@ export type YearReport = {
   worst: RouteResult | null;
   /** One line to share. */
   shareLine: string;
+  /** The day the passenger and route totals start from: after day 1 for a save from before they were kept. */
+  totalsSinceDay: number;
 };
 
 /** The shortest a route must have flown to count as best or worst: a new one hasn't had its chance. */
@@ -82,6 +84,7 @@ export function yearReport(state: SimState): YearReport {
     best: ranked[0] ?? null,
     worst: ranked.length > 1 ? ranked[ranked.length - 1] : null,
     shareLine: '',
+    totalsSinceDay: state.marketTotalsSinceDay ?? days,
   };
   report.shareLine =
     `Slots & Spokes · ${state.homeAirport} · day ${days}: ${short(state.cash)} cash, ${report.planes} plane${report.planes === 1 ? '' : 's'}, ` +

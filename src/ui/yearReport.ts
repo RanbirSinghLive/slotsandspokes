@@ -62,7 +62,7 @@ export function buildReportBody(state: SimState): HTMLElement {
     stat('planes', String(report.planes)),
     stat('routes', String(report.routes)),
     stat('flights/day', String(report.flightsPerDay)),
-    stat('passengers', report.passengers.toLocaleString()),
+    stat(report.totalsSinceDay > 1 ? `passengers since day ${report.totalsSinceDay}` : 'passengers', report.passengers.toLocaleString()),
     stat('on time', percent(report.onTime)),
     stat('completed', percent(report.completion)),
     stat('NPS', report.nps),

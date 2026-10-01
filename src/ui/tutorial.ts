@@ -1,4 +1,5 @@
 import type { SimState } from '../sim/state';
+import { select, type Selection } from './selection';
 
 /**
  * The first-run tutorial: a click-through over the real screen for a
@@ -26,7 +27,17 @@ type Step = {
   until?: (state: SimState, choosingHome: boolean) => boolean;
   /** Runs as the step starts: pause for reading, or run the clock to watch. */
   speed?: 0 | 1;
+  /** Opens what the step points at (a screen in the side panel) before it's shown. */
+  open?: () => void;
 };
+
+/** Open a screen in the side panel and bring a part of it into view, for a step that points inside it. */
+function openScreen(selection: Selection, scrollTo?: string): () => void {
+  return () => {
+    select(selection);
+    if (scrollTo) requestAnimationFrame(() => document.querySelector(scrollTo)?.scrollIntoView({ block: 'start' }));
+  };
+}
 
 const STEPS: Step[] = [
   {
@@ -43,7 +54,7 @@ const STEPS: Step[] = [
   },
   {
     title: 'Fly your first route',
-    text: 'Click your home airport to open its ring, choose Draw route, then click another airport and press ✓. The plane gets a day of flying between them.',
+    text: 'Click your home airport to open its ring, choose Draw route (with more than one type there, pick which), then click another airport and press ✓. The game times the flights for you.',
     target: '#map-surface',
     until: (state) => state.schedule.length > 0,
   },
@@ -68,13 +79,34 @@ const STEPS: Step[] = [
     target: '#rail',
   },
   {
+    title: 'The Schedule',
+    text: "Each plane's day, flight by flight, grouped by type; the airport between flights is where it waits on the ground. You never have to touch it. When you want to, drag a rotation left or right to move it in the day, or onto another plane of its type.",
+    target: '#rotations-section',
+    open: openScreen({ kind: 'fleet' }, '#rotations-section'),
+  },
+  {
+    title: 'Hours fill up',
+    text: "A busy airport fills at its peaks first (07:00, 17:00). A full hour takes no new flights, so the planner starts yours at the next hour with room. Peak flights carry more business travellers and cost more in slots; off-peak ones are cheap and mostly leisure. Click an airport to see its hours.",
+    target: '#rotations-section',
+  },
+  {
+    title: 'Crews and maintenance',
+    text: 'Crews are rated for one type and based where your planes are: hire them ahead of each new plane (or from an airport ring). Mtc shows any plane grounded by a fault (AOG), what it cancels, and the fleet\'s health.',
+    target: '#rail .rail-item[data-go="maintenance"]',
+  },
+  {
+    title: 'Head office',
+    text: 'Fuel and hedging, contracts, three executive chairs to fill (click one to meet its candidates), and the innovations each rung of the ladder opens, as a tree.',
+    target: '#rail .rail-item[data-go="headOffice"]',
+  },
+  {
     title: 'Aim for the next rung',
     text: 'Goals is a ladder of milestones. Meet them to become a bigger airline, and unlock bigger aircraft.',
     target: '#rail .rail-item[data-go="goals"]',
   },
   {
     title: 'Build something that lasts',
-    text: "Profit draws rivals, so every edge fades. Keep routes full and on time, grow before a rival copies you, and never let cash reach $0: that ends the airline. Good luck.",
+    text: "Profit draws rivals, so every edge fades, and the bigger you get the more come looking. Keep routes full and on time, grow before a rival copies you, and never let cash reach $0: that ends the airline. At day 365 you get your year one report. Good luck.",
   },
 ];
 
@@ -133,6 +165,7 @@ function show(next: number, direction: 1 | -1 = 1): void {
   }
   const step = steps[index];
   if (step.speed !== undefined) controls?.setSpeed(step.speed);
+  step.open?.();
 
   const count = document.createElement('div');
   count.className = 'tutorial-count';
