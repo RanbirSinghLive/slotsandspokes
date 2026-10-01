@@ -26,6 +26,8 @@ import { buildPoolRows } from '../poolBars';
 import * as ops from '../routeActions';
 import { rivalLinksOn } from './rival';
 import { contractOn, paymentShare, performanceFactor } from '../../sim/contracts';
+import { revenueHill, type RevenueHill } from '../../sim/revenueHill';
+import { marketCharacterWord, marketMix } from '../../sim/marketCharacter';
 
 /**
  * The inspector's view of one route (ui/inspector/inspector.ts): what
@@ -115,6 +117,7 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
       'A market\'s demand is built by flying it, over weeks, toward the size of the city pair. When demand exceeds seats, add a flight or a bigger plane; while it is still growing, extra flights fly emptier.',
     ),
   );
+  root.append(characterLine(a, b));
 
   const rivals = state.competitorRoutes.filter(
     (route) => (route.origin === a && route.dest === b) || (route.origin === b && route.dest === a),
@@ -273,10 +276,11 @@ function describeEconomics(state: SimState, a: string, b: string): { text: strin
 }
 
 /**
- * The market's lever: its fare (set by hand here, which takes it off the
- * policy and off any stance), with what a day looks like at it. Dragging
- * updates the numbers in place; the whole view rebuilds on release, so a
- * rebuild never takes the slider out from under the pointer.
+ * The market's lever: its fare, as a ball on the revenue hill (set by hand
+ * here, which takes it off the policy and off any stance), with what a day
+ * looks like at it. Dragging updates the numbers in place; the whole view
+ * rebuilds on release, so a rebuild never takes the ball out from under
+ * the pointer.
  */
 function buildFare(state: SimState, a: string, b: string, changed: () => void): HTMLElement[] {
   const settings = state.routeSettings[marketKey(a, b)];
@@ -300,52 +304,235 @@ function buildFare(state: SimState, a: string, b: string, changed: () => void): 
     fixedCosts.classList.toggle('is-over', fullyLosing);
   };
 
-  // Fare: centred on the policy fare, stretched to include the current
-  // fare if a stance has taken it outside that range.
+  // The hill's range: centred on the policy fare, stretched to include the
+  // current fare if a stance has taken it outside that range.
   const base = policyFare(state, a, b);
-  const fareSlider = document.createElement('input');
-  fareSlider.type = 'range';
-  fareSlider.step = String(FARE_STEP);
-  fareSlider.min = String(Math.min(roundToStep(base * FARE_MIN_FACTOR, FARE_STEP), settings.fare));
-  fareSlider.max = String(Math.max(roundToStep(base * FARE_MAX_FACTOR, FARE_STEP), settings.fare));
-  fareSlider.value = String(settings.fare);
-  fareSlider.setAttribute('aria-label', 'Fare');
-  const fareValue = document.createElement('span');
-  fareValue.className = 'lever-value';
+  const low = Math.min(roundToStep(base * FARE_MIN_FACTOR, FARE_STEP), settings.fare);
+  const high = Math.max(roundToStep(base * FARE_MAX_FACTOR, FARE_STEP), settings.fare);
+  const hill = revenueHill(state, a, b, low, high);
   const pricedBy = () =>
     settings.fareIsOverridden ? 'by hand' : settings.fareStance ? (STANCES.find((s) => s.stance === settings.fareStance)?.name ?? '') : 'policy';
+  const fareValue = line('', 'inspector-line hill-readout');
   const redrawFare = () => {
-    fareValue.textContent = `$${settings.fare} · ${pricedBy()}`;
+    const top = hill?.peak;
+    const here = hill ? marginAt(hill, settings.fare) : 0;
+    fareValue.textContent =
+      `$${settings.fare} · ${pricedBy()}` +
+      (top && top.fare !== settings.fare ? ` · top of the hill $${top.fare}${top.margin - here >= 1 ? `, ${signedMoney(top.margin - here)}/day more` : ''}` : ' · at the top');
     fareValue.classList.toggle('lever-value--overridden', settings.fareIsOverridden);
   };
-  fareSlider.addEventListener('input', () => {
-    setHandFare(state, a, b, Number(fareSlider.value));
+  const setFare = (fare: number) => {
+    const next = Math.min(high, Math.max(low, roundToStep(fare, FARE_STEP)));
+    if (next === settings.fare) return;
+    setHandFare(state, a, b, next);
+    moveBall?.();
     redrawFare();
     redrawEconomics();
-  });
-  fareSlider.addEventListener('change', changed);
-  const fareRow = document.createElement('div');
-  fareRow.className = 'inspector-lever';
-  const fareLabel = document.createElement('span');
-  fareLabel.className = 'lever-label';
-  fareLabel.textContent = 'Fare';
-  fareRow.append(fareLabel, fareSlider, fareValue);
+  };
+  let moveBall: (() => void) | null = null;
+  const nodes: HTMLElement[] = [heading];
+  if (hill) {
+    const drawn = drawHill(hill, low, high, () => settings.fare, setFare, changed);
+    moveBall = drawn.moveBall;
+    nodes.push(drawn.element);
+  }
+  nodes.push(fareValue);
   if (settings.fareIsOverridden || settings.fareStance) {
     const reset = document.createElement('button');
     reset.type = 'button';
     reset.className = 'lever-reset';
-    reset.textContent = 'Policy';
-    reset.title = `Back to the airline-wide fare policy ($${base})`;
+    reset.textContent = `Back to policy $${base}`;
     reset.addEventListener('click', () => {
       setFareStance(state, a, b, null);
       changed();
     });
-    fareRow.append(reset);
+    nodes.push(reset);
   }
 
   redrawFare();
   redrawEconomics();
-  return [heading, fareRow, economics, fixedCosts];
+  return [...nodes, economics, fixedCosts];
+}
+
+/**
+ * Who flies the city pair (sim/marketCharacter.ts): a word and a bar of
+ * business, leisure and VFR. Business travellers pay what it takes and
+ * want the peaks; leisure ones chase the fare; VFR sit between.
+ */
+function characterLine(a: string, b: string): HTMLElement {
+  const mix = marketMix(a, b);
+  const row = lineWithInfo(
+    `${marketCharacterWord(a, b)} · business ${Math.round(mix.business * 100)}% · leisure ${Math.round(mix.leisure * 100)}% · VFR ${Math.round(mix.vfr * 100)}%`,
+    'Who flies this city pair, from what each end draws: business travellers barely mind the fare but want peak departures and frequency; leisure travellers chase the fare; VFR (visiting friends and relatives) sit between. A business trunk rewards frequency and peak slots, a sun route a sharp fare.',
+  );
+  const bar = document.createElement('div');
+  bar.className = 'mix-bar';
+  for (const segment of ['business', 'leisure', 'vfr'] as const) {
+    const part = document.createElement('span');
+    part.className = `mix-bar-${segment}`;
+    part.style.width = `${mix[segment] * 100}%`;
+    bar.append(part);
+  }
+  const wrap = document.createElement('div');
+  wrap.append(row, bar);
+  return wrap;
+}
+
+/** The hill's margin at a fare, read off between its sampled points. */
+function marginAt(hill: RevenueHill, fare: number): number {
+  const points = hill.points;
+  if (fare <= points[0].fare) return points[0].margin;
+  for (let i = 1; i < points.length; i++) {
+    if (fare <= points[i].fare) {
+      const t = (fare - points[i - 1].fare) / Math.max(1, points[i].fare - points[i - 1].fare);
+      return points[i - 1].margin + t * (points[i].margin - points[i - 1].margin);
+    }
+  }
+  return points[points.length - 1].margin;
+}
+
+const HILL_WIDTH = 340;
+const HILL_HEIGHT = 92;
+const HILL_PAD_TOP = 16;
+const HILL_PAD_BOTTOM = 14;
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number>): SVGElementTagNameMap[K] {
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, String(value));
+  return el;
+}
+
+/**
+ * The revenue hill (sim/revenueHill.ts) as an SVG: the day's margin across
+ * the fare range as a filled hill, the zero line, the stretch where a fare
+ * would invite rivals in shaded amber, rivals' fares as flags, the top of
+ * the hill marked, and the fare as a ball on it. Drag the ball (or use the
+ * arrow keys) to set the fare by hand; letting go rebuilds the view.
+ */
+function drawHill(
+  hill: RevenueHill,
+  low: number,
+  high: number,
+  fareNow: () => number,
+  setFare: (fare: number) => void,
+  done: () => void,
+): { element: HTMLElement; moveBall: () => void } {
+  // Scaled to the hill's own range, so its shape shows even on a route
+  // losing money at every fare; the zero line is drawn when it's inside.
+  const margins = hill.points.map((p) => p.margin);
+  const highest = Math.max(...margins);
+  const lowest = Math.min(...margins);
+  const pad = Math.max(1, (highest - lowest) * 0.08);
+  const top = highest + pad;
+  const bottom = lowest - pad;
+  const span = Math.max(1, top - bottom);
+  const x = (fare: number) => ((fare - low) / Math.max(1, high - low)) * HILL_WIDTH;
+  const y = (margin: number) => HILL_PAD_TOP + ((top - margin) / span) * (HILL_HEIGHT - HILL_PAD_TOP - HILL_PAD_BOTTOM);
+
+  const root = svg('svg', { viewBox: `0 0 ${HILL_WIDTH} ${HILL_HEIGHT}`, class: 'revenue-hill', role: 'slider', tabindex: 0 });
+  root.setAttribute('aria-label', 'Fare');
+  root.setAttribute('aria-valuemin', String(low));
+  root.setAttribute('aria-valuemax', String(high));
+
+  // Where rivals would answer with flights.
+  let zoneStart: number | null = null;
+  hill.points.forEach((point, i) => {
+    const last = i === hill.points.length - 1;
+    if (point.invitesRivals && zoneStart === null) zoneStart = point.fare;
+    if ((!point.invitesRivals || last) && zoneStart !== null) {
+      const end = point.invitesRivals ? point.fare : hill.points[i - 1].fare;
+      root.append(svg('rect', { x: x(zoneStart), y: 0, width: Math.max(2, x(end) - x(zoneStart)), height: HILL_HEIGHT - HILL_PAD_BOTTOM, class: 'hill-rival-zone' }));
+      const label = svg('text', { x: x(zoneStart) + 3, y: HILL_HEIGHT - HILL_PAD_BOTTOM - 3, class: 'hill-zone-label' });
+      label.textContent = 'rivals answer';
+      root.append(label);
+      zoneStart = null;
+    }
+  });
+
+  if (bottom < 0 && top > 0) root.append(svg('line', { x1: 0, x2: HILL_WIDTH, y1: y(0), y2: y(0), class: 'hill-zero' }));
+
+  const linePoints = hill.points.map((p) => `${x(p.fare).toFixed(1)},${y(p.margin).toFixed(1)}`);
+  root.append(svg('path', { d: `M${linePoints[0]} L${linePoints.join(' L')} L${HILL_WIDTH},${y(bottom)} L0,${y(bottom)} Z`, class: 'hill-area' }));
+  root.append(svg('polyline', { points: linePoints.join(' '), class: 'hill-line' }));
+
+  // The top of the hill.
+  const peak = hill.peak;
+  root.append(svg('circle', { cx: x(peak.fare), cy: y(peak.margin), r: 3, class: 'hill-peak' }));
+  const peakLabel = svg('text', { x: Math.min(HILL_WIDTH - 40, Math.max(2, x(peak.fare) - 18)), y: Math.max(10, y(peak.margin) - 6), class: 'hill-peak-label' });
+  peakLabel.textContent = `top $${peak.fare} · ${signedMoney(peak.margin)}/day`;
+  root.append(peakLabel);
+
+  // Rivals' fares.
+  for (const rival of hill.rivals) {
+    if (rival.fare < low || rival.fare > high) continue;
+    root.append(svg('line', { x1: x(rival.fare), x2: x(rival.fare), y1: 2, y2: HILL_HEIGHT - HILL_PAD_BOTTOM, class: 'hill-rival' }));
+    const flag = svg('text', { x: x(rival.fare) + 2, y: 9, class: 'hill-rival-label' });
+    flag.textContent = rival.code;
+    root.append(flag);
+  }
+
+  // The fare axis: the range's ends and the going rate.
+  for (const [fare, text] of [
+    [low, `$${low}`],
+    [hill.goingRate, `going $${hill.goingRate}`],
+    [high, `$${high}`],
+  ] as const) {
+    if (fare < low || fare > high) continue;
+    const tick = svg('text', { x: x(fare), y: HILL_HEIGHT - 2, class: 'hill-axis' });
+    tick.setAttribute('text-anchor', fare === low ? 'start' : fare === high ? 'end' : 'middle');
+    tick.textContent = text;
+    root.append(tick);
+  }
+
+  const ball = svg('circle', { r: 6, class: 'hill-ball' });
+  root.append(ball);
+  const moveBall = () => {
+    const fare = fareNow();
+    ball.setAttribute('cx', String(x(fare)));
+    ball.setAttribute('cy', String(y(marginAt(hill, fare))));
+    ball.classList.toggle('is-risky', hill.points.some((p) => p.invitesRivals && Math.abs(p.fare - fare) <= (high - low) / 48));
+    root.setAttribute('aria-valuenow', String(fare));
+  };
+  moveBall();
+
+  const fareFromPointer = (event: PointerEvent) => {
+    const rect = root.getBoundingClientRect();
+    return low + ((event.clientX - rect.left) / Math.max(1, rect.width)) * (high - low);
+  };
+  let dragging = false;
+  root.addEventListener('pointerdown', (event) => {
+    dragging = true;
+    try {
+      root.setPointerCapture(event.pointerId);
+    } catch {
+      // Moves still arrive while the pointer stays over the hill.
+    }
+    setFare(fareFromPointer(event));
+  });
+  root.addEventListener('pointermove', (event) => {
+    if (dragging) setFare(fareFromPointer(event));
+  });
+  const finish = () => {
+    if (!dragging) return;
+    dragging = false;
+    done();
+  };
+  root.addEventListener('pointerup', finish);
+  root.addEventListener('pointercancel', finish);
+  root.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    setFare(fareNow() + (event.key === 'ArrowRight' ? FARE_STEP : -FARE_STEP));
+  });
+  root.addEventListener('keyup', (event) => {
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') done();
+  });
+
+  const wrap = document.createElement('div');
+  wrap.className = 'hill-wrap';
+  wrap.append(root);
+  return { element: wrap, moveBall };
 }
 
 const STANCES: { stance: FareStance; name: string }[] = [

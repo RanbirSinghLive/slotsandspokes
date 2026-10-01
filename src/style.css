@@ -3858,3 +3858,114 @@ button.ops-item:hover {
   border: 1px solid #e8c170;
   font-weight: 700;
 }
+
+/* The revenue hill (ui/inspector/route.ts, sim/revenueHill.ts): the day's
+   margin across the fare range, the fare a ball to drag on it. */
+.hill-wrap {
+  margin: 4px 0 2px;
+}
+
+.revenue-hill {
+  display: block;
+  width: 100%;
+  height: auto;
+  cursor: ew-resize;
+  touch-action: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.revenue-hill:focus-visible {
+  outline: 1px solid #ffd166;
+}
+
+.hill-area {
+  fill: rgba(94, 214, 200, 0.14);
+  stroke: none;
+}
+
+.hill-line {
+  fill: none;
+  stroke: #5ed6c8;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+
+.hill-zero {
+  stroke: rgba(255, 128, 128, 0.5);
+  stroke-dasharray: 3 3;
+}
+
+.hill-rival-zone {
+  fill: rgba(255, 179, 71, 0.1);
+}
+
+.hill-zone-label,
+.hill-axis,
+.hill-rival-label,
+.hill-peak-label {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 8px;
+}
+
+.hill-zone-label {
+  fill: #ffb347;
+}
+
+.hill-axis {
+  fill: #6b7694;
+}
+
+.hill-rival {
+  stroke: #ef7a95;
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+}
+
+.hill-rival-label {
+  fill: #ef7a95;
+}
+
+.hill-peak {
+  fill: #ffd166;
+}
+
+.hill-peak-label {
+  fill: #ffd166;
+}
+
+.hill-ball {
+  fill: #fff;
+  stroke: #0a0c12;
+  stroke-width: 2;
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.55));
+}
+
+.hill-ball.is-risky {
+  fill: #ffb347;
+}
+
+.hill-readout {
+  margin-bottom: 4px;
+}
+
+/* Who flies a city pair (ui/inspector/route.ts, sim/marketCharacter.ts). */
+.mix-bar {
+  display: flex;
+  height: 4px;
+  margin: 2px 0 8px;
+  overflow: hidden;
+  border-radius: 2px;
+}
+
+.mix-bar-business {
+  background: #9d8cf0;
+}
+
+.mix-bar-leisure {
+  background: #ffb347;
+}
+
+.mix-bar-vfr {
+  background: #5ed6c8;
+}

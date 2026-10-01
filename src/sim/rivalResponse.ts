@@ -27,7 +27,7 @@ import type { SimState } from './state';
  */
 
 /** A fare above this multiple of the going rate counts as expensive. */
-const EXPENSIVE_FARE_SHARE = 1.1;
+export const EXPENSIVE_FARE_SHARE = 1.1;
 /** Daily chance a rival responds on an expensive, full market: this much at the line... */
 const RESPONSE_CHANCE_BASE = 0.05;
 /** ...plus this much per unit of fare premium above it, capped. */

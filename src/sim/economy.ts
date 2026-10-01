@@ -1,4 +1,5 @@
-import { bookingShare, SEGMENT_SHARES } from './choiceModel';
+import { bookingShare } from './choiceModel';
+import { marketMix } from './marketCharacter';
 import { flightDemandShare } from './timeOfDay';
 import { recommendedFare } from './schedule';
 import { FUEL_SHARE_OF_BLOCK_HOUR_COST } from './fuel';
@@ -166,6 +167,15 @@ export function legCostBreakdown(
  *     earlier flight, still flying you rather than a competitor.
  * `pax` never exceeds the seat ceiling either way.
  */
+/**
+ * What a connecting passenger pays on each leg, as a share of that leg's
+ * fare. A through fare A–hub–B is about the A–B going rate, a little over
+ * one local fare, split across two flights, so each leg gets well under
+ * its own fare. At the full fare on both legs, a hub's connections were
+ * worth two local passengers each (WEEK-FOURTEEN.md, slice 1).
+ */
+export const CONNECTING_FARE_SHARE = 0.6;
+
 /** Pricing under the going rate wins connecting passengers too, but at most this many times as many. */
 const MAX_CONNECTING_PRICE_GAIN = 1.5;
 
@@ -226,11 +236,13 @@ export function flightResult(
   timing?: { departMinute: number; marketDepartMinutes: number[] },
 ): FlightResult {
   const demandPerFlight = timing
-    ? marketDailyDemand * flightDemandShare(timing.departMinute, timing.marketDepartMinutes, SEGMENT_SHARES)
+    ? marketDailyDemand * flightDemandShare(timing.departMinute, timing.marketDepartMinutes, marketMix(leg.origin, leg.dest))
     : marketDailyDemand / legsServingMarket;
   const share = bookingShare(fare, legsServingMarket, leg.origin, leg.dest, competitorRoutes, perks.brandEdge, timing?.marketDepartMinutes);
   const connecting = connectingDailyDemand * connectingPriceResponse(fare, legsServingMarket, leg.origin, leg.dest, competitorRoutes, perks.brandEdge);
-  const bookedDemand = demandPerFlight * share + connecting / legsServingMarket;
+  const localBooked = demandPerFlight * share;
+  const connectingBooked = connecting / legsServingMarket;
+  const bookedDemand = localBooked + connectingBooked;
   const seatCeiling = Math.round(type.seats * LOAD_FACTOR);
   const roundedBooked = Math.round(bookedDemand);
 
@@ -250,7 +262,12 @@ export function flightResult(
   }
 
   const yieldFactor = rivalYieldFactor(leg.origin, leg.dest, legsServingMarket, competitorRoutes);
-  const revenue = pax * fare * yieldFactor * perks.yieldMultiplier;
+  // Connecting passengers pay their share of a through fare, not this
+  // leg's local fare (CONNECTING_FARE_SHARE); a full flight's seats go to
+  // local and connecting passengers in proportion to who booked.
+  const connectingPax = bookedDemand > 0 ? Math.min(pax, (pax - recaptured) * (connectingBooked / bookedDemand)) : 0;
+  const farePaid = (pax - connectingPax) + connectingPax * CONNECTING_FARE_SHARE;
+  const revenue = farePaid * fare * yieldFactor * perks.yieldMultiplier;
   const costBreakdown = legCostBreakdown(leg.blockMinutes, type, fuelPriceIndex, fuelEfficiencyMultiplier);
   const cost = costBreakdown.fuel + costBreakdown.blockNonFuel + costBreakdown.departure;
   return {

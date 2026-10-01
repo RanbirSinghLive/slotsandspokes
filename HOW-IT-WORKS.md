@@ -1439,10 +1439,22 @@ button are the repair path.
 ## A route's fare (`src/ui/inspector/route.ts`, rules in `src/sim/pricing.ts`)
 
 A route's own lever lives in its route view, under **Fare**:
-- **Fare.** Dragging it prices the market by hand (`setHandFare()`),
-  which takes it off the policy and off any stance. **Policy** puts it
-  back. The slider spans half to one and a half times the policy fare,
+- **The revenue hill** (`sim/revenueHill.ts`). The market's margin a day
+  across the fare range, from the game's own forecast
+  (`summarizeMarket()` at 25 fares, smoothed over neighbours since whole
+  passengers make a thin market's curve saw), drawn as a hill: the top
+  marked with its fare and margin, the going rate on the axis, rivals'
+  fares as flags, and the stretch where a fare would invite rivals in
+  (full and over 1.1× the going rate, `sim/rivalResponse.ts`) shaded
+  amber. The fare is a ball on it: dragging it (or the arrow keys)
+  prices the market by hand (`setHandFare()`), which takes it off the
+  policy and off any stance; the line under it says how far the top is
+  ("top of the hill $295, +$184/day more"). **Back to policy** puts it
+  back. The range is half to one and a half times the policy fare,
   stretched to include the current fare.
+- **Who flies it** (`sim/marketCharacter.ts`): the city pair's character
+  in a word and a bar of business, leisure and VFR (see Market
+  character).
 - **A day at these settings**: passengers, how full, share, revenue,
   cost, margin, and whether **seats or demand is the limit**.
 - **After its share of fixed costs** (`sim/routeCosts.ts`): that margin
@@ -1681,7 +1693,15 @@ enforced.
 **Cash gate.** Leasing needs 30 days of the lease in cash
 (`LEASE_RESERVE_DAYS`), which is what unlocks the bigger classes as the
 airline earns: at 20-year prices about $79k for a Propeller, $306k for a
-Regional, $828k for a Narrowbody and $1.08M for a Widebody.
+Regional, $828k for a Narrowbody and $1.8M for a Widebody.
+
+**The Widebody pays per seat like the rest.** Its rate card is $100,000
+a day ($333 a seat, beside the Narrowbody's $307). At $60,000 it was the
+cheapest seat in the sky, so any long-haul route paid: a 20-year-old
+one cleared $20–40k a day across the Atlantic (`npm run lease`), and one
+steady Montréal year made $20.5M of its $30M on LHR–YUL. Now the best
+long-haul routes still pay and thin ones (Dallas–London, LA–Tokyo)
+lose: long-haul is a bet on filling 300 seats.
 
 **Returning a lease** (`returnLease()`) costs 14 days of it
 (`RETURN_FEE_LEASE_DAYS`) and puts the airframe back on the market for
@@ -1972,6 +1992,33 @@ and the boost was just a flat 3× everywhere.
 
 ---
 
+## Market character (`src/sim/marketCharacter.ts`)
+
+Who flies a city pair. Each airport is scored 0–2 for how strongly it
+draws business, leisure and VFR (visiting friends and relatives) travel
+(`data/airport-character.json`, hand-authored from public knowledge:
+Toronto business 2 and VFR 2, Orlando leisure 2, St. John's VFR 2). A
+pair's mix starts from a base (business 19%, leisure 46%, VFR 35%) and
+each segment's points multiply its weight by 1.45, then the three are
+scaled back to a whole. The points follow how each trip works: business
+needs business at both ends (the smaller end's score twice, the gap
+half), leisure needs one end worth going to (the sunnier end's score
+twice), VFR a community at either end (the stronger end's). So
+Toronto–Chicago is a business trunk (41% business), Toronto–Orlando a
+sun route (67% leisure), Toronto–St. John's friends and family (50%
+VFR). The base is set so the network's mix, weighted by potential
+demand, matches the one mix it replaced (it's 21/50/29 against
+20/50/30), so the balance moves by where the mix lands.
+
+The mix feeds the choice model in place of one mix for every market
+(each segment's booking share weighted by the pair's own mix,
+`sim/choiceModel.ts`), and time-of-day demand (a flight's share of its
+market by how well its hour suits that market's travellers). The route
+view shows it as a word ("Business trunk", "Sun and leisure", "Friends
+and family", "Business-leaning", "Mixed") and a three-colour bar.
+
+---
+
 ## Time of day (`src/sim/timeOfDay.ts`)
 
 When a flight leaves matters to who flies it. Each passenger segment
@@ -2165,8 +2212,13 @@ connecting next to nothing: the steady player went bust at Montréal
 in 3 games of 6, against none with the frequency base.
 
 **They ride both legs.** Each flow is added to the demand of both routes
-it uses (`connectingDemandOnMarket()`), where it books seats and pays
-fares like local traffic. **They react to price** like local passengers
+it uses (`connectingDemandOnMarket()`), where it books seats. **They pay
+a through fare**, not two local ones: on each leg a connecting passenger
+pays 60% of that leg's fare (`CONNECTING_FARE_SHARE`, `sim/economy.ts`),
+since an A–hub–B ticket costs about the A–B going rate, a little over one
+local fare, split across two flights. At the full fare on both legs a
+hub's connections were worth two local passengers each. A full flight's
+seats go to local and connecting passengers in proportion to who booked. **They react to price** like local passengers
 (`economy.ts`'s `connectingPriceResponse()`): a route's connecting demand
 is scaled by its booking share at its fare over its share at the going
 rate, capped at 1.5× for pricing under it, so an over-priced hub
