@@ -1507,8 +1507,10 @@ A rollover rebuild that arrives mid-drag waits for the release
 from under the pointer.
 
 The airline-wide **fare policy** is at the top of the Routes screen
-(`ui/farePolicy.ts`), with a count of how many markets follow it, how
-many are on a stance, and how many are priced by hand.
+(`ui/farePolicy.ts`): the network hill (below, under Fare policy), with
+the level, how many routes follow it, and what the routes priced by hand
+make against it. It is redrawn only when the day, the routes or the
+level change, and never mid-drag.
 
 ## Randomness (`src/sim/rng.ts`)
 
@@ -2111,7 +2113,7 @@ Rivals have no times, so each counts as spread over the day.
 ## Fare policy (`src/sim/pricing.ts`)
 
 One airline-wide multiplier on `recommendedFare()` prices the whole
-network (the slider at the top of the Routes screen, `setFarePolicy()`). A
+network (`setFarePolicy()`, 50–250%). A
 market can leave it two ways, both in its route view: a fare stance
 against its rivals (below), or a fare set by hand
 (`RouteSettings.fareIsOverridden`). A policy change re-prices everything
@@ -2121,6 +2123,19 @@ One number for the whole network, because per-market pricing was busy
 work that got *worse* the larger the network grew. Where it matters,
 against a rival who answers your fare, the stances make it a choice
 rather than a slider.
+
+**The network hill** (`networkHill()` in `sim/revenueHill.ts`) is how the
+level is set. It is the revenue hill for the whole airline: at each
+level from 50% to 250% in tenths, every route on the policy is priced at
+that share of its going rate, and the airline's learned estimates
+(`learnedMargins()`, the route view's revenue hill) are added up. Each route's
+band counts as an independent error, so the bands add as variances: a
+network of many routes knows its total better than any one route. A
+level is shaded where half or more of the policy routes would draw
+rivals in. The likely top is found the same way as on a route. The
+routes priced another way are left out of the hill, and the line under
+it says what they make a day against the policy fare: the money from
+diving into a route.
 
 ---
 

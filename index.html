@@ -156,11 +156,8 @@
       <!-- Sections kept here, hidden, until a screen adopts them (ui/inspector/dom.ts's adopt()). -->
       <div id="panel-parts" hidden>
           <section id="fare-policy-section">
-            <h2>Fare policy <button type="button" class="info-mark" aria-label="What this means" data-info="Prices every market from its recommended fare, so you set this once instead of per route. A market can instead follow a stance against its rivals, or be priced by hand, in its route view: click the route on the map.">i</button></h2>
-            <div class="lever-control">
-              <input type="range" id="fare-policy-slider" min="50" max="250" step="5" value="100" aria-label="Fare policy" />
-              <span class="lever-value" id="fare-policy-value"></span>
-            </div>
+            <h2>Fare policy <button type="button" class="info-mark" aria-label="What this means" data-info="Prices every route on it at a share of its going rate, so you set this once instead of per route. The hill is every policy route's margin a day added up at each level, as the airline has learned it: the band is how unsure it is, narrowing where routes have flown lately. Drag the ball to set the level. A market can instead follow a stance against its rivals, or be priced by hand, in its route view: click the route on the map.">i</button></h2>
+            <div id="fare-policy-hill"></div>
             <div id="fare-policy-status"></div>
           </section>
           <section id="market-section">

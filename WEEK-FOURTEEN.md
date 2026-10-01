@@ -132,6 +132,16 @@ where untried, the top as a range; the revenue-management CCO halves
 the band). On a steady YUL game at day 60 the tops read LGA–YUL
 $397–450, YUL–YYZ $444–470, YOW–YUL $209–341.
 
+**Step 5 built:** the network hill (`networkHill()` in
+`sim/revenueHill.ts`, drawn by `ui/farePolicy.ts`) in place of the grey
+slider. It shows every policy route's learned margin added up at each
+level from 50% to 250% of the going rate. The bands combine as
+independent errors, and a level is shaded where half the policy routes
+would draw rivals in. The level is a ball to drag. The line below gives
+the routes on policy, the likely top, and what the routes priced by hand
+make against the policy fare. Both hills share one chart
+(`ui/hillChart.ts`).
+
 ## Decisions for the owner
 
 1. The airport tags: a first pass covers every airport in the data; the
