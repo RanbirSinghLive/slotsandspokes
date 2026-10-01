@@ -2205,6 +2205,105 @@ button.ticker-item:hover {
   border-color: #ff8080;
 }
 
+/* The year one report (ui/yearReport.ts): a card over everything at day
+   365, the body of the game-over screen, and "Report so far". */
+.report-card {
+  width: min(460px, calc(100vw - 32px));
+  border-color: #ffd166;
+}
+
+.report-body {
+  margin: 4px 0 12px;
+}
+
+.report-headline {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.report-cash {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.report-gained.is-good,
+.report-route.is-good {
+  color: #7ed6a8;
+}
+
+.report-gained.is-bad,
+.report-route.is-bad {
+  color: #ff8080;
+}
+
+.report-standing {
+  margin: 2px 0 10px;
+  color: #c8d0e0;
+}
+
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.report-stat {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 7px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 5px;
+}
+
+.report-stat-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.report-stat-label {
+  font-size: 10px;
+  color: #8a93a6;
+}
+
+.report-fleet {
+  margin-bottom: 6px;
+  color: #9aa3b8;
+}
+
+.report-route {
+  margin-bottom: 3px;
+}
+
+.report-share {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 7px 9px;
+  font-size: 11px;
+  color: #c8d0e0;
+  background: rgba(255, 209, 102, 0.07);
+  border: 1px dashed rgba(255, 209, 102, 0.4);
+  border-radius: 5px;
+}
+
+.report-share span {
+  flex: 1;
+}
+
+.report-feedback {
+  align-self: center;
+  margin-right: auto;
+  color: #5ed6c8;
+}
+
 /* The Lessor strip in the Fleet tab (ui/market.ts). */
 #market-section {
   margin-bottom: 16px;

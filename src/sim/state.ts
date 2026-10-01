@@ -389,6 +389,13 @@ export type SimState = {
    * keep a single flight's numbers free of them.
    */
   todayRevenueByMarket: Record<string, number>;
+  /**
+   * Every market's revenue, cost and passengers since it was first flown,
+   * added up at each rollover (sim/pnlHistory.ts): the per-market history
+   * keeps only PNL_HISTORY_MAX_DAYS, and the year one report
+   * (sim/yearReport.ts) needs the whole year. Optional: made on first use.
+   */
+  marketTotals?: Record<string, { revenue: number; cost: number; passengers: number }>;
   todayCostByMarket: Record<string, number>;
   /**
    * Rolling PNL_HISTORY_MAX_DAYS-day window of the two fields above, same

@@ -1546,6 +1546,23 @@ measurable change from the pre-weather baseline. At most 10 plain
 objects, a handful of comparisons once a day; nowhere close to
 mattering next to everything else `step()` already does every minute.
 
+## The year one report (`src/sim/yearReport.ts`, `src/ui/yearReport.ts`)
+
+When the airline reaches day 365 the clock stops and a card shows its
+year: cash and what it gained since day 0, its standing on the ladder
+and milestones met, planes, routes, flights a day, passengers, on-time,
+completion and NPS, the fleet by type, the year's best and worst routes
+by total margin (each needs a week flown), and one line to share with a
+Copy button. "Keep flying" puts the clock back at its speed; the
+feedback form, pre-filled, is one click away, since it's the natural
+moment to ask. The same body is the game-over screen's, and the Game
+screen's **Report so far** shows it any day.
+
+The per-route history keeps only 30 days, so each route's revenue, cost
+and passengers are also added up at every rollover
+(`SimState.marketTotals`, `sim/pnlHistory.ts`). It's a read-out only:
+nothing in the game reads it back.
+
 ## The tutorial (`src/ui/tutorial.ts`)
 
 A first visit opens a welcome card: play the tutorial or skip it (and,

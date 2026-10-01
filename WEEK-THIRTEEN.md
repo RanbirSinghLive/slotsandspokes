@@ -268,8 +268,11 @@ little.
 
 ## Carried from week twelve
 
-- The browser pass; the year one report; the balance pass (steady
-  over-expands at thin homes); the performance check at 100×.
+- **Done:** the year one report (day 365, game over, and "Report so far").
+- The browser pass; the balance pass (steady over-expands at thin
+  homes); the performance check at 100×. In a steady YUL year one route
+  (LHR–YUL) made $20.5M of $30M: one long-haul route carrying the year
+  is worth a look.
 - Rename the other rival codes held by well-known airlines (AR, BR, MS,
   HX, NW, RX), if the owner wants.
 - Mobile as good as desktop; colour-blind red/green; changelog; `?`

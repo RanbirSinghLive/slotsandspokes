@@ -233,6 +233,7 @@
             <h2>About</h2>
             <div id="about-version"></div>
             <p class="about-feedback">New to it? <button type="button" id="about-tutorial-button">Play the tutorial</button></p>
+            <p class="about-feedback">How's the airline doing? <button type="button" id="about-report-button">Report so far</button></p>
             <p class="about-feedback">It's an alpha: what broke, confused or bored you is the most useful thing you can send. <button type="button" id="about-feedback-button">Send feedback</button></p>
             <h2>Credits</h2>
             <ul class="credits">
@@ -314,7 +315,8 @@
       <div class="modal-box modal-box--game-over">
         <h2>Insolvent</h2>
         <p id="game-over-reason"></p>
-        <div class="modal-actions">
+        <div id="game-over-report"></div>
+        <div class="modal-actions" id="game-over-actions">
           <button type="button" id="game-over-new-game">Start a new game</button>
         </div>
       </div>

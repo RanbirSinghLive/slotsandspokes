@@ -48,6 +48,10 @@ import { updateHudPnl } from './ui/hudPnl';
 import { updateAlerts } from './ui/alerts';
 import { updatePoolBars } from './ui/poolBars';
 import { setupGameOver, updateGameOver } from './ui/gameOver';
+import { showYearReport } from './ui/yearReport';
+
+/** The day the year one report shows (day 0 is the first). */
+const YEAR_ONE_DAY = 365;
 import { updateRunway } from './ui/runway';
 import { isInsolvent } from './sim/insolvency';
 import { setupGameControls } from './ui/gameControls';
@@ -447,6 +451,10 @@ document.querySelector('#rail-alpha')!.addEventListener('click', () => {
   if (panelHidden) setPanelHidden(false);
   select({ kind: 'game' });
 });
+// The report so far (ui/yearReport.ts), any time, from the Game screen.
+document.querySelector('#about-report-button')!.addEventListener('click', () => {
+  showYearReport(state, `Day ${dayIndex(state)} · report so far`);
+});
 // The tutorial (ui/tutorial.ts): offered on a first visit, and from the Game screen.
 document.querySelector('#about-tutorial-button')!.addEventListener('click', () => {
   select(NETWORK);
@@ -518,6 +526,17 @@ function tick(nowMs: number): void {
 
   const currentDay = dayIndex(state);
   if (currentDay !== lastSavedDay) {
+    // A year flown: stop the clock and show the year one report
+    // (ui/yearReport.ts), then carry on at the speed it had.
+    if (lastSavedDay < YEAR_ONE_DAY && currentDay >= YEAR_ONE_DAY && !isInsolvent(state)) {
+      const speedBefore = speedMultiplier;
+      speedMultiplier = 0;
+      speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === 0));
+      showYearReport(state, 'Year one', () => {
+        speedMultiplier = speedBefore;
+        speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === speedBefore));
+      });
+    }
     lastSavedDay = currentDay;
     saveState(state);
     // The day's numbers have moved (demand, the last-7-days bars, rival

@@ -41,6 +41,17 @@ export function recordDailyPnlHistory(state: SimState): void {
     pushCapped(state.revenueHistoryByMarket[key], state.todayRevenueByMarket[key] ?? 0);
     pushCapped(state.costHistoryByMarket[key], state.todayCostByMarket[key] ?? 0);
   }
+
+  // The running totals the year one report reads (sim/yearReport.ts):
+  // every market that earned, cost or carried anything today.
+  const totals = (state.marketTotals ??= {});
+  const touched = new Set([...Object.keys(state.todayRevenueByMarket), ...Object.keys(state.todayCostByMarket), ...Object.keys(state.todayLoadByMarket ?? {})]);
+  for (const key of touched) {
+    const total = (totals[key] ??= { revenue: 0, cost: 0, passengers: 0 });
+    total.revenue += state.todayRevenueByMarket[key] ?? 0;
+    total.cost += state.todayCostByMarket[key] ?? 0;
+    total.passengers += state.todayLoadByMarket?.[key]?.passengers ?? 0;
+  }
 }
 
 /** A market's own margin a day over the last week, or null with less than a week flown. */
