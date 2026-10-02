@@ -29,6 +29,9 @@ import { rivalLinksOn } from './rival';
 import { contractOn, paymentShare, performanceFactor } from '../../sim/contracts';
 import { revenueHill, type RevenueHill } from '../../sim/revenueHill';
 import { drawHillChart } from '../hillChart';
+import { fareWarOn, PEACE_LEVEL, WAR_LEVEL } from '../../sim/fareWars';
+import { rivalRouteDailyResult } from '../../sim/rivalEconomics';
+import { dayIndex } from '../../sim/clock';
 import { effectiveFareClasses, saleBlockedReason, saleMarginChangePerDay, saleDaysLeft, SALE_COOLDOWN_DAYS, SALE_DAYS, SALE_GROWTH, SALE_SAVER_PRICE } from '../../sim/seatSale';
 import { marketFareLevel } from '../../sim/fareStimulus';
 import { CROWDING_WINDOW_MINUTES, crowdingWeight } from '../../sim/timeOfDay';
@@ -179,6 +182,21 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
           : `Contract · pay ${Math.round(paymentShare(performance) * 100)}% · riders ${Math.round(contract.ridersPerDay * performance)}/${contract.ridersPerDay} · ends day ${contract.endsDay}`,
         'A route contract: see Head office for its terms. The riders and half the pay depend on on-time, completion and NPS against stricter bars than ordinary passengers; when it ends without renewal, this market\'s demand drops.',
         contract.status === 'active' && performance < 0.5 ? 'inspector-line is-warn' : 'inspector-line',
+      ),
+    );
+  }
+
+  // A fare war running here (sim/fareWars.ts).
+  const war = fareWarOn(state, marketKey(a, b));
+  if (war) {
+    const rivalRoute = rivals.find((route) => route.code === war.rival);
+    const yours = summarizeMarket(a, b, state, state.routeSettings[marketKey(a, b)]).margin;
+    const theirs = rivalRoute ? rivalRouteDailyResult(state, rivalRoute).margin : null;
+    root.append(
+      lineWithInfo(
+        `Fare war · vs ${war.rival} · day ${dayIndex(state) - war.startDay + 1} · you ${shortSigned(yours)}/day` + (theirs !== null ? ` · ${war.rival} ${shortSigned(theirs)}/day` : ''),
+        `You and ${war.rival} are both under ${Math.round(WAR_LEVEL * 100)}% of the going rate here. It ends when either of you prices back over ${Math.round(PEACE_LEVEL * 100)}%, or one of you leaves the route: a rival that keeps losing money closes its route.`,
+        'inspector-line is-over',
       ),
     );
   }

@@ -1,3 +1,4 @@
+import { rollDailyFareWars } from './fareWars';
 import { effectiveFareClasses } from './seatSale';
 import { rollDailyBrand } from './brand';
 import { ferryStrandedPlanes } from './ferry';
@@ -323,6 +324,7 @@ export function step(state: SimState): void {
     // a premium (sim/rivalResponse.ts).
     applyFarePolicy(state);
     rollDailyRivalFares(state);
+    rollDailyFareWars(state);
     rollRivalCapacityResponse(state, state.simMinute);
     // The lessor's delivery (sim/market.ts) comes *after* the rivals have
     // grown for the day. Rivals only ever act at rollover, so an airframe

@@ -245,6 +245,13 @@ doesn't lose money. On the one-seed headless year a single sale on day
 with the losses later from YUL–YYZ cancellations. One seed can't judge
 it; a balance read can.
 
+**Step 4 built:** `sim/fareWars.ts`, with ticker lines and a route
+banner. Checked on a copy of the owner's Chicago save: at 70% of the
+going rate on ORD–MSP, the five rivals cut from $440 toward $263 in six
+days, and a war started with MD.
+
+**Stage 3 is complete.** It hasn't had a balance read.
+
 ## Decisions for the owner
 
 1. The airport tags: a first pass covers every airport in the data; the

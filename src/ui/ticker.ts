@@ -14,6 +14,7 @@ import type { SimState } from '../sim/state';
 import { select, type Selection } from './selection';
 import { rivalsInSight } from '../sim/reach';
 import { contractsOf, SNAP_BACK_SHARE } from '../sim/contracts';
+import { WAR_LEVEL } from '../sim/fareWars';
 
 const tickerTrack = document.querySelector<HTMLDivElement>('#ticker-track')!;
 
@@ -450,6 +451,29 @@ function pollAogEvents(state: SimState): void {
   }
 }
 
+/** Fare wars starting and ending (sim/fareWars.ts), from the sim's log. */
+let seenFareWarEvents: Set<string> | null = null;
+
+function pollFareWarEvents(state: SimState): void {
+  const log = state.fareWarLog ?? [];
+  const id = (event: (typeof log)[number]) => `${event.key}|${event.rival}|${event.kind}|${event.day}`;
+  if (seenFareWarEvents === null) {
+    seenFareWarEvents = new Set(log.map(id));
+    return;
+  }
+  for (const event of log) {
+    if (seenFareWarEvents.has(id(event))) continue;
+    seenFareWarEvents.add(id(event));
+    const [a, b] = event.key.split('-');
+    const route = `${a}–${b}`;
+    const message =
+      event.kind === 'start'
+        ? `Fare war ${route} · vs ${event.rival} · both under ${Math.round(WAR_LEVEL * 100)}% of the going rate`
+        : `Fare war over ${route} · ${event.days}d · ${event.outcome}`;
+    pushEvent(state.simMinute, 'FARE', message, { kind: 'route', a, b });
+  }
+}
+
 /** Stranded planes ferried home empty (sim/ferry.ts): one line each, from the sim's log. */
 let lastFerryMinute: number | null = null;
 
@@ -638,6 +662,7 @@ export function updateTicker(state: SimState): void {
   pollPositionEvents(state);
   pollAogEvents(state);
   pollFerryEvents(state);
+  pollFareWarEvents(state);
   pollRivalFareEvents(state);
   pollMarketEvents(state);
   pollReachEvents(state);

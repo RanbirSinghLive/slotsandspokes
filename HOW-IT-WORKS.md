@@ -2194,6 +2194,28 @@ sale once a week, when the sale doesn't lose money while it runs.
 
 ---
 
+## Fare wars (`src/sim/fareWars.ts`)
+
+Rivals answer your fare every day (Fare response). A **fare war** is the
+name for when that turns into a fight. It starts on a market when your
+fare and a rival's are both under 85% of the going rate. It ends when
+either climbs back over 90% (the gap keeps one day from flickering it
+on and off), or when you or the rival stop flying the market. Rolled
+daily, after rivals set their fares. One war per market, against the
+first rival to cross the line.
+
+It changes no fare: it's the record. The ticker announces it
+("Fare war ORD–MSP · vs HX · both under 85% of the going rate") and its
+end, with how long it lasted and how it ended: you left, the rival
+left, or fares recovered. While it runs, the route view shows a banner
+with its day and each side's money a day. A rival that keeps losing
+money closes its route (sim/pressure.ts), so a war can be won. Wars
+come from a player who undercuts hard, or from a sale a rival answers.
+The steady headless player never prices under 90%, so it never starts
+one.
+
+---
+
 ## Cabins (`src/sim/cabins.ts`)
 
 A plane is all economy, or has a **business cabin** up front (`Aircraft.cabin`).

@@ -1,4 +1,5 @@
 import type { FareClassSettings, FareClassTally } from './fareClasses';
+import type { FareWar, FareWarEvent } from './fareWars';
 import aircraftTypesData from '../../data/aircraft-types.json';
 import type { Shock } from './shocks';
 import { startingSimMinute } from './clock';
@@ -536,6 +537,10 @@ export type SimState = {
    * cancellations are attributed to the right cause.
    */
   aogs: AogEvent[];
+  /** Fare wars running now (sim/fareWars.ts). Absent in an older save: none. */
+  fareWars?: FareWar[];
+  /** Fare wars started and ended, the latest few, for the ticker. */
+  fareWarLog?: FareWarEvent[];
   /** The network's fare level against the going rate, remembered over about 60 days (sim/brand.ts); absent means 100%. */
   brandLevel?: number;
   /** Stranded planes ferried home empty before the day starts (sim/ferry.ts), the latest few, for the ticker. */
