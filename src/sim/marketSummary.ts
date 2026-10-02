@@ -1,3 +1,4 @@
+import { crowdingWeight } from './timeOfDay';
 import { cabinLayout, cabinOf } from './cabins';
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { flightResult, LOAD_FACTOR, type EconomyAircraftType } from './economy';
@@ -120,7 +121,7 @@ export function summarizeMarket(
       state.competitorRoutes,
       previewSpillover,
       perks,
-      { departMinute: leg.departMinute, marketDepartMinutes: departures },
+      { departMinute: leg.departMinute, marketDepartMinutes: departures, crowding: crowdingWeight(leg, legs) },
       routeSettings.fareClasses,
       cabin,
     );

@@ -228,14 +228,14 @@ export function flightResult(
    * the market's hours count in the choice against rivals
    * (sim/timeOfDay.ts). Without it, flights split the market evenly.
    */
-  timing?: { departMinute: number; marketDepartMinutes: number[] },
+  timing?: { departMinute: number; marketDepartMinutes: number[]; crowding?: number },
   /** The route's seat split between fare classes (sim/fareClasses.ts); the default when it hasn't been set. */
   fareClasses?: FareClassSettings,
   /** The plane's cabin (sim/cabins.ts): a business cabin trades economy seats for business ones. */
   cabin: Cabin = 'economy',
 ): FlightResult {
   const demandPerFlight = timing
-    ? marketDailyDemand * flightDemandShare(timing.departMinute, timing.marketDepartMinutes, marketMix(leg.origin, leg.dest))
+    ? marketDailyDemand * flightDemandShare(timing.departMinute, timing.marketDepartMinutes, marketMix(leg.origin, leg.dest), timing.crowding)
     : marketDailyDemand / legsServingMarket;
   const connecting = connectingDailyDemand * connectingPriceResponse(fare, legsServingMarket, leg.origin, leg.dest, competitorRoutes, perks.brandEdge);
   const layout = cabinLayout(type.seats, cabin);

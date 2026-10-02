@@ -2109,8 +2109,16 @@ usable day scores 0.4 for everyone.
 - **A market's passengers split by hour.** Of the demand for the
   player's flights on a market, each flight gets a share weighted by
   how well its hour suits the whole mix (`flightDemandShare()`), so the
-  07:00 flight fills first and a 13:00 one carries fewer. Total demand
-  for the market doesn't change with timing.
+  07:00 flight fills first and a 13:00 one carries fewer.
+- **Crowded departures split their passengers.** A flight leaving
+  within an hour of another of yours on the same market, the same way
+  (`crowdingWeight()`, `CROWDING_WINDOW_MINUTES`), is wanted by the same
+  travellers. Its share is multiplied by 1 over (1 plus, for each such
+  neighbour, 1 − minutes apart / 60). Two at the same minute carry one
+  flight's passengers between them, two half an hour apart about 1⅓,
+  and two an hour apart two. So stacking flights loses passengers, and
+  spreading a route across the day pays. The route view says when a
+  route is crowded.
 - **Timing counts against rivals.** In the choice model
   (`sim/choiceModel.ts`), an offering's frequency is worth its flights
   times its **time fit** for that segment: how well its hours suit the

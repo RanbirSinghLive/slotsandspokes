@@ -29,6 +29,7 @@ import { rivalLinksOn } from './rival';
 import { contractOn, paymentShare, performanceFactor } from '../../sim/contracts';
 import { revenueHill, type RevenueHill } from '../../sim/revenueHill';
 import { drawHillChart } from '../hillChart';
+import { CROWDING_WINDOW_MINUTES, crowdingWeight } from '../../sim/timeOfDay';
 import { chartLegend } from '../chartLegend';
 import { marketCharacterWord, marketMix } from '../../sim/marketCharacter';
 
@@ -176,6 +177,10 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
     );
   }
 
+  // Your own departures stacked close together, the same way (sim/timeOfDay.ts's crowdingWeight()).
+  const crowdedLine = describeCrowding(state, a, b);
+  if (crowdedLine) root.append(crowdedLine);
+
   // A shock running now (sim/shocks.ts), if it touches this route.
   const shockLine = describeShock(state)?.onRoute(a, b);
   if (shockLine) root.append(line(shockLine, 'inspector-line is-warn'));
@@ -233,6 +238,28 @@ function describeRivalsView(state: SimState, a: string, b: string): HTMLElement 
       ? `${capitalise(draws.join(' and '))}; ${kept.join(', ')}, ${slots}. Turned-away passengers and a fat margin draw rivals; more flights, a hub feeding the route, and dear or full slots keep them out.`
       : `${capitalise(draws.join(' and '))}, but ${kept.join(', ')}, ${slots}.`;
   return lineWithInfo(text, why, table.perDay >= RIVALS_VIEW_WARN_PER_DAY ? 'inspector-line is-warn' : 'inspector-line');
+}
+
+/** A flight with less than this crowding weight counts as crowded in the readout. */
+const CROWDED_WEIGHT = 0.8;
+
+/**
+ * Departures crowding each other (sim/timeOfDay.ts's crowdingWeight()):
+ * how many of the route's flights leave within the window of another the
+ * same way, and the flights' worth of passengers that costs. Null when
+ * none do.
+ */
+function describeCrowding(state: SimState, a: string, b: string): HTMLElement | null {
+  const legs = state.schedule.filter((leg) => (leg.origin === a && leg.dest === b) || (leg.origin === b && leg.dest === a));
+  const weights = legs.map((leg) => crowdingWeight(leg, state.schedule));
+  const crowded = weights.filter((weight) => weight < CROWDED_WEIGHT).length;
+  if (crowded === 0) return null;
+  const lost = weights.reduce((sum, weight) => sum + (1 - weight), 0);
+  return lineWithInfo(
+    `Crowded · ${crowded} of ${legs.length} departures · −${lost.toFixed(1)} flights' worth of pax`,
+    `Your flights leaving within ${CROWDING_WINDOW_MINUTES} minutes of each other the same way are wanted by the same passengers, so they split them: two at the same minute carry one flight's worth between them. Spread them on the Gantt (Fleet).`,
+    'inspector-line is-warn',
+  );
 }
 
 /** Money on the table (a day) at which the rivals' view turns amber: enough to be worth a rival's while. */

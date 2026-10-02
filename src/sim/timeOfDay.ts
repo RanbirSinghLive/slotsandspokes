@@ -83,12 +83,39 @@ export function mixAppeal(hour: number, shares: Record<SegmentName, number>): nu
 
 /**
  * This flight's share of the demand for all of your flights on its market:
- * its hour's appeal to the passenger mix over the sum of every flight's.
- * `marketDepartMinutes` are all of your departures on the market, both
- * directions, this one included. Evenly split when there are none.
+ * its hour's appeal to the passenger mix over the sum of every flight's,
+ * times its `crowding` weight (crowdingWeight() below). `marketDepartMinutes`
+ * are all of your departures on the market, both directions, this one
+ * included. Evenly split when there are none.
  */
-export function flightDemandShare(departMinute: number, marketDepartMinutes: number[], shares: Record<SegmentName, number>): number {
-  if (marketDepartMinutes.length === 0) return 1;
+export function flightDemandShare(departMinute: number, marketDepartMinutes: number[], shares: Record<SegmentName, number>, crowding = 1): number {
+  if (marketDepartMinutes.length === 0) return crowding;
   const total = marketDepartMinutes.reduce((sum, minute) => sum + mixAppeal(hourOf(minute), shares), 0);
-  return total > 0 ? mixAppeal(hourOf(departMinute), shares) / total : 1 / marketDepartMinutes.length;
+  return crowding * (total > 0 ? mixAppeal(hourOf(departMinute), shares) / total : 1 / marketDepartMinutes.length);
+}
+
+/** Your own departures this close together, the same way on the same market, crowd each other. */
+export const CROWDING_WINDOW_MINUTES = 60;
+
+/**
+ * Crowding: a flight leaving close to another of yours, the same way on
+ * the same market, is wanted by the same passengers, so the two split one
+ * hour's travellers rather than each drawing its own. A flight's weight
+ * is 1 over (1 plus, for each such neighbour, how close it is: 1 at the
+ * same minute, nothing at CROWDING_WINDOW_MINUTES or more). Two at the same
+ * minute carry one flight's passengers between them; half an hour apart,
+ * about 1⅓ flights'; an hour apart, two. So spreading a route's
+ * departures across the day pays.
+ */
+export function crowdingWeight(
+  flight: { origin: string; dest: string; departMinute: number; legId?: string },
+  legs: { origin: string; dest: string; departMinute: number; legId: string }[],
+): number {
+  let crowd = 0;
+  for (const other of legs) {
+    if (other.origin !== flight.origin || other.dest !== flight.dest || other.legId === flight.legId) continue;
+    const apart = Math.abs(other.departMinute - flight.departMinute);
+    crowd += Math.max(0, 1 - apart / CROWDING_WINDOW_MINUTES);
+  }
+  return 1 / (1 + crowd);
 }

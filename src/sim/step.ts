@@ -1,3 +1,4 @@
+import { crowdingWeight } from './timeOfDay';
 import { cabinLayout, cabinOf } from './cabins';
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { flightResult, type EconomyAircraftType } from './economy';
@@ -522,10 +523,15 @@ export function step(state: SimState): void {
             state.competitorRoutes,
             spilloverAvailable,
             bookingPerks(state, flight.origin, flight.dest),
-            {
-              departMinute: state.schedule.find((leg) => leg.legId === flight.legId)?.departMinute ?? homeMinuteOfDay(state, flight.scheduledDepartMinute),
-              marketDepartMinutes: marketDepartMinutes(flight.origin, flight.dest, state.schedule),
-            },
+            (() => {
+              const scheduled = state.schedule.find((leg) => leg.legId === flight.legId);
+              const departMinute = scheduled?.departMinute ?? homeMinuteOfDay(state, flight.scheduledDepartMinute);
+              return {
+                departMinute,
+                marketDepartMinutes: marketDepartMinutes(flight.origin, flight.dest, state.schedule),
+                crowding: crowdingWeight({ origin: flight.origin, dest: flight.dest, departMinute, legId: flight.legId }, state.schedule),
+              };
+            })(),
             state.routeSettings[key]?.fareClasses,
             cabinOf(aircraft),
           );
