@@ -282,6 +282,18 @@ year from Montréal about 98% of nights are full checks, 1–2% are away
 after a cancellation strands the plane, a few are short, and one hold
 happens. It matters more once planes sleep out (step 3).
 
+**Step 3 built:** `sim/nightStops.ts`, with a Night stop section on the
+plane view (each option's network forecast and nightly cost, the
+contracted check to switch, the way home). In the headless games most
+planes can sleep out once their other flying moves later. The best
+option sampled cleared its cost by about $270 a day, so the player
+takes them rarely. In the owner's Chicago save the forecasts are large:
+C-R001 sleeping at DFW is +$16.1k a day against $1,730 a night. The
+forecast doesn't see curfew cancellations, so it's a hint, not a
+promise.
+
+**Stage 4 is complete.** It hasn't had a balance read.
+
 ## Decisions for the owner
 
 1. The airport tags: a first pass covers every airport in the data; the

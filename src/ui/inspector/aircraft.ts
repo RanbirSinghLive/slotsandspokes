@@ -15,6 +15,7 @@ import { select, selectRoute } from '../selection';
 import { linkToMap } from '../mapLink';
 import { REBASE_DAYS, REBASE_FEE_LEASE_DAYS } from '../../sim/rebase';
 import { CABIN_PRICE, cabinLayout, cabinOf } from '../../sim/cabins';
+import { CONTRACT_CHECK_PER_HOUR, contractCheckPerNight, hotelPerNight, nightStopStation } from '../../sim/nightStops';
 import { CREWS_PER_NEW_PLANE } from '../../sim/crews';
 
 /**
@@ -203,6 +204,8 @@ export function buildAircraftView(state: SimState, tail: string, changed: () => 
     root.append(list);
   }
 
+  const nightBlock = buildNightStop(state, tail, changed);
+  if (nightBlock) root.append(nightBlock);
   const cabinBlock = buildCabin(state, tail, changed);
   if (cabinBlock) root.append(cabinBlock);
   const rebaseBlock = buildRebase(state, tail, changed);
@@ -268,6 +271,65 @@ function buildDay(state: SimState, tail: string): HTMLElement {
     list.append(row);
   }
   return list;
+}
+
+/**
+ * Night stops (sim/nightStops.ts): where it sleeps and what a night costs,
+ * with the contracted line check to switch and a way home; or each
+ * out-and-back it could sleep at the far end of, with its forecast.
+ */
+function buildNightStop(state: SimState, tail: string, changed: () => void): HTMLElement | null {
+  const aircraft = state.aircraft.find((a) => a.tail === tail)!;
+  if (!aircraft.baseAirport) return null;
+  const station = nightStopStation(state, tail);
+  const options = station ? [] : ops.nightStopOptionsFor(state, tail);
+  if (!station && options.length === 0) return null;
+  const block = document.createElement('div');
+  block.className = 'inspector-return';
+  block.append(
+    heading(
+      'Night stop',
+      `Sleep the plane at the far end of an out-and-back: the flight home leaves there at 06:00, into the morning at base, and the flight out leaves after its last arrival. A night there costs the crew's hotel, and the line check: there's no hangar, so the night leaves a deferred item unless the check is contracted there ($${CONTRACT_CHECK_PER_HOUR} an hour of work). The forecast is the route's margin a day against now, before the night's costs.`,
+    ),
+  );
+  if (station) {
+    const contracted = aircraft.contractedLineCheck === true;
+    block.append(line(`Sleeps at ${station} · hotel ${money(hotelPerNight(state, aircraft))}/night` + (contracted ? ` · check ${money(contractCheckPerNight(state, aircraft))}/night` : ' · no check · deferred item nightly'), contracted ? 'inspector-line' : 'inspector-line is-warn'));
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'inspector-plan-hub';
+    toggle.textContent = contracted ? 'Skip the contracted check' : `Contract the check · ${money(contractCheckPerNight(state, aircraft))}/night`;
+    toggle.addEventListener('click', () => {
+      ops.setContractedCheck(state, tail, !contracted);
+      changed();
+    });
+    const home = document.createElement('button');
+    home.type = 'button';
+    home.className = 'inspector-plan-hub';
+    home.textContent = `Sleep at ${aircraft.baseAirport} again`;
+    home.addEventListener('click', () => {
+      const result = ops.endNightStop(state, tail);
+      if (!result.ok) home.textContent = result.reason;
+      else changed();
+    });
+    block.append(toggle, home);
+    return block;
+  }
+  for (const option of options) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'inspector-plan-hub';
+    button.disabled = !option.ok;
+    button.textContent = option.ok
+      ? `Sleep at ${option.station} · ${option.marginChangePerDay >= 0 ? '+' : '−'}${money(Math.abs(option.marginChangePerDay))}/day · ${money(option.costPerNight)}/night`
+      : `${option.station} · ${option.reason}`;
+    button.addEventListener('click', () => {
+      ops.startNightStop(state, tail, [option.morning!.legId, option.evening!.legId]);
+      changed();
+    });
+    block.append(button);
+  }
+  return block;
 }
 
 function seatsText(seats: number | undefined, cabin: 'economy' | 'business'): string {

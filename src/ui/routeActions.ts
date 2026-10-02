@@ -32,6 +32,7 @@ export {
   returnOptions,
   refitOptionFor,
   heavyCheckReadouts,
+  nightStopOptionsFor,
   rebaseOptionsFor,
   planRetimeRotation,
   routeBase,
@@ -71,6 +72,18 @@ export function retimeRotation(state: SimState, legIds: string[], toTail: string
 
 export function rebasePlane(state: SimState, tail: string, to: string) {
   return afterChange(state, actions.rebasePlaneTo(state, tail, to));
+}
+
+export function startNightStop(state: SimState, tail: string, legIds: string[]) {
+  return afterChange(state, actions.startNightStop(state, tail, legIds));
+}
+
+export function endNightStop(state: SimState, tail: string) {
+  return afterChange(state, actions.endNightStop(state, tail));
+}
+
+export function setContractedCheck(state: SimState, tail: string, on: boolean) {
+  return afterChange(state, actions.setContractedCheck(state, tail, on));
 }
 
 export function planHeavyCheck(state: SimState, tail: string, day: number) {

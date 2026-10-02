@@ -67,6 +67,8 @@ export function planRetime(state: SimState, legIds: string[], toTail: string, st
   if (to.baseAirport !== from.baseAirport) return fail(`${toTail} is based at ${to.baseAirport ?? 'no base'}`);
   if (to.returningOnDay !== undefined || to.rebase) return fail(`${toTail} is leaving the base`);
   if (toTail !== fromTail && state.aogs.some((event) => event.tail === toTail)) return fail(`${toTail} AOG`);
+  // Half of a night stop (sim/nightStops.ts) starts or ends away from base: it stays on its plane.
+  if (toTail !== fromTail && (legs[0].origin !== from.baseAirport || legs[legs.length - 1].dest !== from.baseAirport)) return fail('Part of a night stop · it stays on its plane');
 
   // Not while it's flying: a leg in the air, or some flown and some not.
   const airborne = new Set(state.activeFlights.map((flight) => flight.legId));
