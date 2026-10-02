@@ -450,6 +450,22 @@ function pollAogEvents(state: SimState): void {
   }
 }
 
+/** Stranded planes ferried home empty (sim/ferry.ts): one line each, from the sim's log. */
+let lastFerryMinute: number | null = null;
+
+function pollFerryEvents(state: SimState): void {
+  const log = state.ferryLog ?? [];
+  if (lastFerryMinute === null) {
+    lastFerryMinute = log.length > 0 ? log[log.length - 1].simMinute : -1;
+    return;
+  }
+  for (const ferry of log) {
+    if (ferry.simMinute <= lastFerryMinute) continue;
+    pushEvent(state.simMinute, 'FLEET', `${ferry.tail} ferried ${ferry.from}→${ferry.to} empty · ${shortMoney(ferry.cost)}`, { kind: 'aircraft', tail: ferry.tail });
+  }
+  if (log.length > 0) lastFerryMinute = Math.max(lastFerryMinute, log[log.length - 1].simMinute);
+}
+
 /**
  * The fleet market (sim/market.ts): airframes arriving at the lessor, and
  * rivals leasing from it — the "Trillium Air took the last Regional"
@@ -621,6 +637,7 @@ export function updateTicker(state: SimState): void {
   pollFleetEvents(state);
   pollPositionEvents(state);
   pollAogEvents(state);
+  pollFerryEvents(state);
   pollRivalFareEvents(state);
   pollMarketEvents(state);
   pollReachEvents(state);

@@ -2500,6 +2500,20 @@ joins, crews rated and joining against need, and any shortfall at an EIS.
 One click hires one crew; hold for more. Converting and releasing crews
 stay on the Crews screen, where the whole roster is in view.
 
+## Stranded planes (`src/sim/ferry.ts`)
+
+A plane can end the day away from base, for instance when the curfew
+cancels its last flight home, and sleep there. If one of its rotations
+leaves from where it is, it flies that and gets home that way. If none
+does, because the rotation that would have brought it home was moved to
+another plane or removed, it ferries home empty before 06:00. That costs
+one empty flight's block and departure costs, and the ticker reports it
+("C-P002 ferried DTW→ORD empty · $2.6k"). The check runs at the midnight
+rollover and every minute of the night, so a change made overnight is
+covered too. Until it ferries, the alert strip says it will.
+
+---
+
 ## Fleet timing (`src/sim/fleetTiming.ts`)
 
 Every change to the fleet takes time, so planes and crews are planned

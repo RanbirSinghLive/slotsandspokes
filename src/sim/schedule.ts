@@ -275,10 +275,8 @@ export function validateSchedule(legs: ScheduleLeg[], fleet: Aircraft[] = []): s
 
     const origins = new Set(tailLegs.map((leg) => leg.origin));
     if (!origins.has(aircraft.atAirport)) {
-      problems.push(
-        `${aircraft.tail} is sitting at ${aircraft.atAirport}, but none of its rotations ever depart from there -- it will never fly again. ` +
-          `Its rotations depart from ${[...origins].sort().join(', ')}. Remove them and draw new ones from ${aircraft.atAirport}.`,
-      );
+      // It ferries home empty before the day starts (sim/ferry.ts).
+      problems.push(`${aircraft.tail} at ${aircraft.atAirport} · no flight from there · ferries home to ${aircraft.baseAirport ?? 'base'} before 06:00`);
     }
   }
 

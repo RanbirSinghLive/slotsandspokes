@@ -534,6 +534,8 @@ export type SimState = {
    * cancellations are attributed to the right cause.
    */
   aogs: AogEvent[];
+  /** Stranded planes ferried home empty before the day starts (sim/ferry.ts), the latest few, for the ticker. */
+  ferryLog?: { tail: string; from: string; to: string; cost: number; simMinute: number }[];
   /** The shared lessor's shelf (sim/market.ts): what's listed and when the next of each class arrives. */
   market: MarketState;
   /** Each rival airline's fleet, one class code per plane, keyed by airline code (sim/market.ts). */

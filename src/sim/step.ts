@@ -1,3 +1,5 @@
+import { ferryStrandedPlanes } from './ferry';
+import { USABLE_DAY_START_MINUTE } from './utilisation';
 import { crowdingWeight } from './timeOfDay';
 import { cabinLayout, cabinOf } from './cabins';
 import aircraftTypesData from '../../data/aircraft-types.json';
@@ -151,6 +153,8 @@ export function step(state: SimState): void {
   // midnight (sim/clock.ts).
   const minuteOfDay = homeMinuteOfDay(state);
   const dayStart = state.simMinute - minuteOfDay;
+  // Through the night too, for a plane stranded by a change made overnight (midnight is the rollover's).
+  if (minuteOfDay > 0 && minuteOfDay < USABLE_DAY_START_MINUTE) ferryStrandedPlanes(state);
 
   if (minuteOfDay === 0) {
     // The trailing NPS (sim/nps.ts) takes in the day just flown, before
@@ -261,6 +265,8 @@ export function step(state: SimState): void {
     // pass so a tail already grounded for crew isn't grounded twice and
     // counted under two causes; before the cancellation count below, so
     // whatever couldn't be covered is counted as cancelled today.
+    // A plane stranded away from base with nothing to fly from there goes home empty (sim/ferry.ts).
+    ferryStrandedPlanes(state);
     rollDailyAogs(state, state.simMinute);
 
 
