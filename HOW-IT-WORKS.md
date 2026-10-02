@@ -2171,6 +2171,29 @@ Rivals have no times, so each counts as spread over the day.
 
 ---
 
+## Seat sales (`src/sim/seatSale.ts`)
+
+A short, loud price cut on one route, started from its route view. For
+7 days:
+
+- Saver sells at 50% of the fare instead of 75%, on at least 40% of the
+  seats, taken from Flex first (`effectiveFareClasses()`, used by real
+  flights and every forecast);
+- the market builds twice as fast (Market stimulation), as new
+  travellers try it;
+- rivals read your fare as 15% lower and answer it as a cut (Fare
+  response), so a sale can start a price war.
+
+A route can start one every 30 days, counted from the last one's start.
+The route view's button shows what a day of the sale makes against a
+normal day (`saleMarginChangePerDay()`, the game's forecast with the
+sale switched on and off). That's usually a loss on a full route and
+can be a gain on an empty one. It leaves out the growth, which pays
+later. The headless player puts its emptiest route under 55% full on
+sale once a week, when the sale doesn't lose money while it runs.
+
+---
+
 ## Cabins (`src/sim/cabins.ts`)
 
 A plane is all economy, or has a **business cabin** up front (`Aircraft.cabin`).

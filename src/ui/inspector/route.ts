@@ -29,6 +29,7 @@ import { rivalLinksOn } from './rival';
 import { contractOn, paymentShare, performanceFactor } from '../../sim/contracts';
 import { revenueHill, type RevenueHill } from '../../sim/revenueHill';
 import { drawHillChart } from '../hillChart';
+import { effectiveFareClasses, saleBlockedReason, saleMarginChangePerDay, saleDaysLeft, SALE_COOLDOWN_DAYS, SALE_DAYS, SALE_GROWTH, SALE_SAVER_PRICE } from '../../sim/seatSale';
 import { marketFareLevel } from '../../sim/fareStimulus';
 import { CROWDING_WINDOW_MINUTES, crowdingWeight } from '../../sim/timeOfDay';
 import { chartLegend } from '../chartLegend';
@@ -456,6 +457,8 @@ function buildSeatSplit(state: SimState, a: string, b: string, changed: () => vo
   const settings = state.routeSettings[key];
   if (!settings) return [];
   const split = () => settings.fareClasses ?? DEFAULT_FARE_CLASSES;
+  // As sold today: a seat sale's split while one runs (sim/seatSale.ts).
+  const selling = () => effectiveFareClasses(state, key);
   const heading = document.createElement('h2');
   heading.append(
     'Seats by fare ',
@@ -494,7 +497,7 @@ function buildSeatSplit(state: SimState, a: string, b: string, changed: () => vo
         CLASS_ORDER.map((fareClass, i) => ({
           mark: 'block' as const,
           color: CLASS_COLORS[fareClass],
-          label: `${CLASS_NAMES[fareClass]} ${Math.round(shares[i] * 100)}% · $${Math.round(settings.fare * CLASS_PRICE[fareClass])}`,
+          label: `${CLASS_NAMES[fareClass]} ${Math.round(shares[i] * 100)}% · $${Math.round(settings.fare * (fareClass === 'saver' && selling().saverPrice !== undefined ? selling().saverPrice! : CLASS_PRICE[fareClass]))}`,
         })),
       ),
     );
@@ -535,7 +538,32 @@ function buildSeatSplit(state: SimState, a: string, b: string, changed: () => vo
   bar.addEventListener('pointerup', finish);
   bar.addEventListener('pointercancel', finish);
   redraw();
-  return [heading, bar, legend, forecast, past];
+  return [heading, bar, legend, forecast, past, buildSale(state, a, b, changed)];
+}
+
+/** A seat sale (sim/seatSale.ts): the one running, or a button to start one, or when the next can. */
+function buildSale(state: SimState, a: string, b: string, changed: () => void): HTMLElement {
+  const key = marketKey(a, b);
+  const fare = state.routeSettings[key]?.fare ?? 0;
+  const left = saleDaysLeft(state, key);
+  const explain = `A seat sale: for ${SALE_DAYS} days Saver sells at ${Math.round(SALE_SAVER_PRICE * 100)}% of the fare on at least 40% of the seats, and the market builds ${SALE_GROWTH}× as fast while it runs. Rivals see it as a cut and may answer it. One every ${SALE_COOLDOWN_DAYS} days.`;
+  if (left !== null) return lineWithInfo(`Seat sale · ${left}d left · Saver $${Math.round(fare * SALE_SAVER_PRICE)}`, explain, 'inspector-line is-warn');
+  const blocked = saleBlockedReason(state, a, b);
+  const row = document.createElement('div');
+  row.className = 'inspector-line';
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'lever-reset';
+  button.textContent = `Seat sale · ${SALE_DAYS}d · Saver $${Math.round(fare * SALE_SAVER_PRICE)}`;
+  button.disabled = blocked !== null;
+  button.addEventListener('click', () => {
+    ops.startSeatSale(state, a, b);
+    changed();
+  });
+  const change = saleMarginChangePerDay(state, a, b);
+  row.append(button, blocked ? ` ${blocked} ` : ` ${shortSigned(change)}/day while on `, info(explain + ' The figure is what a day of the sale makes against a normal day, at today\'s demand, before the growth it brings.'));
+  if (!blocked && change < 0) row.classList.add('is-warn');
+  return row;
 }
 
 /** A route's revenue hill (sim/revenueHill.ts) on the shared chart, in fares. */

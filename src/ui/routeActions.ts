@@ -72,6 +72,10 @@ export function rebasePlane(state: SimState, tail: string, to: string) {
   return afterChange(state, actions.rebasePlaneTo(state, tail, to));
 }
 
+export function startSeatSale(state: SimState, a: string, b: string) {
+  return afterChange(state, actions.startSeatSale(state, a, b));
+}
+
 export function orderRefit(state: SimState, tail: string, cabin: 'economy' | 'business') {
   return afterChange(state, actions.orderRefit(state, tail, cabin));
 }

@@ -1,4 +1,6 @@
 import { currentPotentialDemand } from '../sim/marketDemand';
+import { marketLoadFactor } from '../sim/loadFactor';
+import { saleBlockedReason, saleMarginChangePerDay } from '../sim/seatSale';
 import { contractOn, contractsOf, performanceFactor } from '../sim/contracts';
 import airportsData from '../../data/airports.json';
 import { inboundAt } from '../sim/fleetTiming';
@@ -340,6 +342,7 @@ function steadyPlayer(kind: 'steady' | 'sitter' | 'bold'): Player {
         ...runHomeHub(state),
         ...tuneFareClasses(state),
         ...refitCabins(state),
+        ...runSeatSales(state),
         ...adoptInnovations(state),
         ...(kind === 'steady' ? hedgeWhenCheap(state) : []),
         ...(kind === 'steady' ? hireExecutives(state) : []),
@@ -382,6 +385,34 @@ function tuneFareClasses(state: SimState): string[] {
     log.push(`${key} Saver ${Math.round(saverShare * 100)}% → ${Math.round(next * 100)}%.`);
   }
   return log;
+}
+
+// --- Seat sales --------------------------------------------------------
+
+/** How often the player looks for a route to put on sale, in days. */
+const SALE_REVIEW_DAYS = 7;
+/** A route flying emptier than this over a week is one a sale might fill. */
+const SALE_LOAD_BELOW = 0.55;
+
+/**
+ * Once a week, a seven-day seat sale (sim/seatSale.ts) on the emptiest
+ * route flying under SALE_LOAD_BELOW full, if it can have one: the move a
+ * player makes to fill planes and build a thin market.
+ */
+function runSeatSales(state: SimState): string[] {
+  if (dayIndex(state) % SALE_REVIEW_DAYS !== 2) return [];
+  let emptiest: { a: string; b: string; load: number } | null = null;
+  for (const key of new Set(state.schedule.map((leg) => marketKey(leg.origin, leg.dest)))) {
+    const [a, b] = key.split('-');
+    const load = marketLoadFactor(state, a, b).factor;
+    if (load === null || load >= SALE_LOAD_BELOW || saleBlockedReason(state, a, b)) continue;
+    // Only a sale that doesn't lose money while it runs: its growth is the gain.
+    if (saleMarginChangePerDay(state, a, b) < 0) continue;
+    if (!emptiest || load < emptiest.load) emptiest = { a, b, load };
+  }
+  if (!emptiest) return [];
+  const result = actions.startSeatSale(state, emptiest.a, emptiest.b);
+  return result.ok ? [result.message] : [];
 }
 
 // --- Cabins ------------------------------------------------------------

@@ -162,6 +162,8 @@ export type RouteSettings = {
    * DEFAULT_FARE_CLASSES, so older saves sell as a new route does.
    */
   fareClasses?: FareClassSettings;
+  /** The route's last seat sale (sim/seatSale.ts): the day it started. Absent: never had one. */
+  sale?: { startDay: number };
   /**
    * Extra scheduled ground time after every flight on this market, on top
    * of MIN_TURN_MINUTES (sim/turnBuffer.ts). Slack that soaks up a late

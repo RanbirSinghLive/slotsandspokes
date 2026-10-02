@@ -1,3 +1,4 @@
+import { onSale, SALE_RIVAL_READ } from './seatSale';
 import { dayIndex } from './clock';
 import competitorsData from '../../data/competitors.json';
 import rivalPoolData from '../../data/rival-airlines.json';
@@ -454,7 +455,9 @@ export function rollDailyRivalFares(state: SimState): void {
   const playerFlies = new Set(state.schedule.map((leg) => marketKey(leg.origin, leg.dest)));
   for (const route of state.competitorRoutes) {
     const key = marketKey(route.origin, route.dest);
-    const playerFare = playerFlies.has(key) ? (state.routeSettings[key]?.fare ?? null) : null;
+    const listed = playerFlies.has(key) ? (state.routeSettings[key]?.fare ?? null) : null;
+    // A seat sale reads to a rival as a cut, so it can answer one (sim/seatSale.ts).
+    const playerFare = listed !== null && onSale(state, key) ? listed * (1 - SALE_RIVAL_READ) : listed;
     const target = rivalFareTarget(route, playerFare);
     const share = playerFare === null ? RIVAL_FARE_DRIFT_SHARE : RIVAL_FARE_ADJUST_SHARE;
     route.fare = Math.round(route.fare + (target - route.fare) * share);

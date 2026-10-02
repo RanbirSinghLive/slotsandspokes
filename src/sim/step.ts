@@ -1,3 +1,4 @@
+import { effectiveFareClasses } from './seatSale';
 import { rollDailyBrand } from './brand';
 import { ferryStrandedPlanes } from './ferry';
 import { USABLE_DAY_START_MINUTE } from './utilisation';
@@ -540,7 +541,7 @@ export function step(state: SimState): void {
                 crowding: crowdingWeight({ origin: flight.origin, dest: flight.dest, departMinute, legId: flight.legId }, state.schedule),
               };
             })(),
-            state.routeSettings[key]?.fareClasses,
+            effectiveFareClasses(state, key),
             cabinOf(aircraft),
           );
           addTally(((state.todayFareClasses ??= {})[key] ??= emptyTally()), result.fareClasses);

@@ -45,6 +45,7 @@ import {
 } from './innovations';
 import { cashNeededToLease, LEASE_RESERVE_DAYS, leaseRateFor, loadLeaseRates } from './leasing';
 import { inboundAt, orderLease } from './fleetTiming';
+import { startSeatSale as startSeatSaleRule } from './seatSale';
 import { rebaseOptions, rebasePlane, type RebaseOption } from './rebase';
 import { cabinGainPerDay, cabinOf, cancelRefit as cancelRefitRule, orderRefit as orderRefitRule, refitBlockedReason, refitCost, refitDays, type Cabin } from './cabins';
 import { commitRetime, planRetime, type RetimePlan } from './retime';
@@ -573,6 +574,13 @@ export function rebasePlaneTo(state: SimState, tail: string, to: string): Outcom
   const typeCode = state.aircraft.find((a) => a.tail === tail)?.typeCode ?? '';
   const crewNote = crewAdvice(state, to, typeCode);
   return { ok: true, message: result.message + (crewNote ? ` · ${crewNote}` : '') };
+}
+
+// --- Seat sales --------------------------------------------------------------
+
+/** Start a seven-day seat sale on a route (sim/seatSale.ts). */
+export function startSeatSale(state: SimState, a: string, b: string): Outcome<{ message: string }> {
+  return startSeatSaleRule(state, a, b);
 }
 
 // --- Cabins --------------------------------------------------------------------

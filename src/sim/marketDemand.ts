@@ -4,6 +4,7 @@ import { reliabilityDemandFactor, trailingMarketOtp } from './routeOtp';
 import { dailySeatsByMarket, hungerBoost, hungerByAirport } from './serviceLevel';
 import { executiveMarketBuildingMultiplier } from './executives';
 import { recessionFactor } from './shocks';
+import { onSale, SALE_GROWTH } from './seatSale';
 import { fareLevel, growthFromFare, offersByMarket, sizeFromFare, SIZE_MAX } from './fareStimulus';
 import type { SimState } from './state';
 
@@ -177,8 +178,10 @@ export function rollDailyMarketDemand(state: SimState): void {
         hungerBoost(hunger, origin, dest) *
         // A market-building CCO speeds every market up (sim/executives.ts).
         marketBuilding *
-        // Low fares build it faster, dear ones slower (sim/fareStimulus.ts).
-        growthFromFare(level);
+        // Low fares build it faster, dear ones slower (sim/fareStimulus.ts),
+        // and a seat sale brings new travellers to try it (sim/seatSale.ts).
+        growthFromFare(level) *
+        (onSale(state, key) ? SALE_GROWTH : 1);
       next = current + (target - current) * Math.min(1, rate);
     } else if (seatsOffered > 0) {
       // Unreliable enough to lose passengers: the same slide toward the

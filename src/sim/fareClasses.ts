@@ -30,7 +30,12 @@ export const CLASS_ORDER: FareClass[] = ['saver', 'flex', 'full'];
 export const CLASS_NAMES: Record<FareClass, string> = { saver: 'Saver', flex: 'Flex', full: 'Full' };
 
 /** A route's seat split: Saver's and Flex's shares of the seats; Full has the rest. */
-export type FareClassSettings = { saverShare: number; flexShare: number };
+export type FareClassSettings = {
+  saverShare: number;
+  flexShare: number;
+  /** Saver's price as a share of the fare, in place of CLASS_PRICE's, while a seat sale runs (sim/seatSale.ts). */
+  saverPrice?: number;
+};
 
 /**
  * Where a route starts until it's set: a fifth Saver, most Flex, a fifth
@@ -110,7 +115,8 @@ export function sellSeats(input: SeatSaleInput): SeatSale {
   const saverSeats = Math.max(0, Math.min(1, input.classes.saverShare)) * input.seats;
   const flexSeats = Math.max(0, Math.min(1 - Math.min(1, input.classes.saverShare), input.classes.flexShare)) * input.seats;
   const left: Record<FareClass, number> = { saver: saverSeats, flex: flexSeats, full: Math.max(0, input.seats - saverSeats - flexSeats) };
-  const price = (fareClass: FareClass) => input.baseFare * CLASS_PRICE[fareClass];
+  const price = (fareClass: FareClass) =>
+    input.baseFare * (fareClass === 'saver' && input.classes.saverPrice !== undefined ? input.classes.saverPrice : CLASS_PRICE[fareClass]);
   const tally = emptyTally();
   tally.flights = 1;
   let cabinLeft = Math.max(0, input.businessSeats ?? 0);

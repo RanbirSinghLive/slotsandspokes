@@ -1,15 +1,16 @@
+import { effectiveFareClasses } from './seatSale';
 import { crowdingWeight } from './timeOfDay';
 import { cabinLayout, cabinOf } from './cabins';
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { flightResult, LOAD_FACTOR, type EconomyAircraftType } from './economy';
 import { trafficShare } from './choiceModel';
-import { addTally, emptyTally, type FareClassTally } from './fareClasses';
+import { addTally, DEFAULT_FARE_CLASSES, emptyTally, type FareClassTally } from './fareClasses';
 import { actualDailyDemand } from './marketDemand';
 import { connectingDemandOnMarket } from './hubs';
 import { airlineFuelPrice } from './fuelPrice';
 import { bookingPerks } from './innovations';
 import type { RouteSettings, SimState } from './state';
-import type { ScheduleLeg } from './schedule';
+import { marketKey, type ScheduleLeg } from './schedule';
 import { contractRiders } from './contracts';
 
 // A market can be served by more than one gauge at once, so a summary
@@ -122,7 +123,7 @@ export function summarizeMarket(
       previewSpillover,
       perks,
       { departMinute: leg.departMinute, marketDepartMinutes: departures, crowding: crowdingWeight(leg, legs) },
-      routeSettings.fareClasses,
+      effectiveFareClasses(state, marketKey(origin, dest), routeSettings.fareClasses ?? DEFAULT_FARE_CLASSES),
       cabin,
     );
     addTally(fareClasses, result.fareClasses);

@@ -236,6 +236,15 @@ from $1.34M to $1.87M; no balance read yet.
 added to the name's edge in booking (`BookingPerks.positionEdge`). The
 Fare policy panel shows it. An old save starts at Mainline, 100%.
 
+**Step 3 built:** `sim/seatSale.ts` for the route action, the sale's seat
+split in flights and forecasts, doubled growth, and rivals reading it
+as a cut. The route view shows a sale's button with its forecast, and
+the headless player runs a sale on an empty route when the forecast
+doesn't lose money. On the one-seed headless year a single sale on day
+37 moved the game onto a different path ($1.86M without, $0.44M with),
+with the losses later from YUL–YYZ cancellations. One seed can't judge
+it; a balance read can.
+
 ## Decisions for the owner
 
 1. The airport tags: a first pass covers every airport in the data; the
