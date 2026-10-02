@@ -140,6 +140,59 @@ function packRotationAvoidingCollisions(
   return legs;
 }
 
+function tailIsEmptyNow(state: SimState, tail: string): boolean {
+  return !state.schedule.some((leg) => leg.tail === tail);
+}
+
+/** A stagger is only worth the plane's lost time when it opens the gaps to your other flights by this much. */
+const STAGGER_MIN_GAIN_MINUTES = 15;
+
+/**
+ * Where a new rotation starts so its departures fall between your other
+ * flights on the same markets rather than on top of them: the start, from
+ * `earliest` to one round of the rotation later, that leaves the most
+ * minutes to the nearest same-direction departure. Without it, a second
+ * plane on a route opened at 06:00 like the first and flew five minutes
+ * behind it all day, both chasing the same hour's passengers. A rotation
+ * is only appended after a plane's last one, so it's used for a plane's
+ * first rotation only, capped at one round: the plane loses less than a
+ * rotation's time, once. At a banked hub
+ * the waves set the times, so it starts where the wave says.
+ */
+function staggeredStart(state: SimState, airports: RotationStop[], cruiseKts: number | undefined, earliest: number, baseIata: string): number {
+  if (nextBankMinute(state, baseIata, earliest + COLLISION_NUDGE_MINUTES) !== earliest + COLLISION_NUDGE_MINUTES) return earliest;
+  const first = packRotation(airports, cruiseKts, earliest, state);
+  if (first.length === 0) return earliest;
+  const directions = new Set(first.map((leg) => `${leg.origin}>${leg.dest}`));
+  const others = state.schedule.filter((leg) => directions.has(`${leg.origin}>${leg.dest}`));
+  if (others.length === 0) return earliest;
+  const gapTo = (legs: PackedLeg[]) =>
+    Math.min(
+      ...legs.map((leg) =>
+        Math.min(
+          ...others.filter((other) => other.origin === leg.origin && other.dest === leg.dest).map((other) => Math.abs(other.departMinute - leg.departMinute)),
+          Infinity,
+        ),
+      ),
+    );
+  const last = first[first.length - 1];
+  const round = last.departMinute + last.blockMinutes - earliest;
+  let best = earliest;
+  let bestGap = gapTo(first);
+  const baseline = bestGap;
+  for (let start = earliest + COLLISION_NUDGE_MINUTES; start <= earliest + round; start += COLLISION_NUDGE_MINUTES) {
+    const legs = packRotation(airports, cruiseKts, start, state);
+    const end = legs[legs.length - 1];
+    if (end.departMinute + end.blockMinutes > USABLE_DAY_END_MINUTE) break;
+    const gap = gapTo(legs);
+    if (gap > bestGap) {
+      best = start;
+      bestGap = gap;
+    }
+  }
+  return bestGap >= baseline + STAGGER_MIN_GAIN_MINUTES ? best : earliest;
+}
+
 /**
  * How many usable minutes the aircraft based at `baseIata` still have
  * between them. Pooled per base rather than per tail because that is the
@@ -199,7 +252,9 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
   const type = aircraft ? aircraftTypesByCode.get(aircraft.typeCode) : undefined;
 
   // At a banked hub a rotation waits for the next wave (sim/hubStyle.ts).
-  const earliestStart = nextBankMinute(state, base.iata, rotationStartMinute(tail, state));
+  const firstFree = nextBankMinute(state, base.iata, rotationStartMinute(tail, state));
+  // Only a plane's first rotation is staggered: later ones pack on behind it, so the plane loses the stagger once, not every time.
+  const earliestStart = tailIsEmptyNow(state, tail) ? staggeredStart(state, rotationAirports, type?.cruiseKts, firstFree, base.iata) : firstFree;
   let legs = packRotationAvoidingCollisions(rotationAirports, type?.cruiseKts, earliestStart, state);
   const clockMinutes = legs.reduce(
     (total, leg) => total + legUtilisationMinutes(leg.blockMinutes, extraTurnMinutes(state, leg.origin, leg.dest)),

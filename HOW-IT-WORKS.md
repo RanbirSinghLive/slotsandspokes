@@ -1354,12 +1354,24 @@ already in the network.
 
 `packRotation()` walks the chain, giving each leg the running time and
 then advancing by its block time plus its turn (`scheduledTurnMinutes()`,
-which includes any turn buffer set on the route). The player never
-authors departure times.
+which includes any turn buffer set on the route). The planner picks the
+times; the player moves them afterwards on the Gantt (`sim/retime.ts`).
 
 `rotationStartMinute()` is 06:00 (`USABLE_DAY_START_MINUTE`) for a plane
 with no legs, otherwise its last arrival plus a turn, so rotations chain
-without double-booking. `packRotationAvoidingCollisions()` then shifts
+without double-booking. For a plane's first rotation,
+`staggeredStart()` may then start it later, by up to one round of the
+rotation, so its departures fall between your
+other flights in the same direction rather than on top of them. It
+takes the start that leaves the most minutes to the nearest one, if
+that opens the gap by 15 minutes or more. A second plane on a route
+then flies between the first plane's flights instead of five minutes
+behind them. Only the first rotation is staggered, and by at most one
+round, because a rotation is only added after a plane's last one: the
+plane gives up that time once. Staggering every rotation cost Montréal
+half its year on 18 seeds ($7.4M against $15.5M); the first alone,
+$13.0M. At a banked hub the waves set the start. The player can still
+drag the times on the Gantt. `packRotationAvoidingCollisions()` then shifts
 the whole rotation later in five-minute steps until no leg departs at the
 exact minute another plane already flies that market.
 
