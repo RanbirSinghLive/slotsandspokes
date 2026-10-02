@@ -308,6 +308,13 @@ none were forced, and the year ended at $99M. A night-stop redesign
 needs a forecast that sees the curfew and positioning, and shouldn't
 push a plane's other flying later.
 
+**Quick balance read** (`npm run quick`: 4 homes × 10 seeds, 3 min 48 s),
+saved as the reference (`balance-reference.json`) at the owner's word:
+YUL $11.0M (3/10 busts), YYZ $33.4M (0/10), PHL $68.7M (0/10), YHZ 9/10
+busts. Against the 18-seed read before stage 3 (YUL $17.7M, YYZ $36.2M,
+PHL $68.2M, YHZ 13/18), the big homes are back, with YUL the one still
+down.
+
 ## Decisions for the owner
 
 1. The airport tags: a first pass covers every airport in the data; the

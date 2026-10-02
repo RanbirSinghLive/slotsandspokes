@@ -14,7 +14,8 @@
     "airports": "tsx src/headless/buildAirports.ts",
     "homes": "tsx src/headless/buildHomeDifficulty.ts",
     "lakes": "tsx src/headless/buildLakes.ts",
-    "rivers": "tsx src/headless/buildRivers.ts"
+    "rivers": "tsx src/headless/buildRivers.ts",
+    "quick": "tsx src/headless/quickBalance.ts"
   },
   "devDependencies": {
     "@types/d3-geo": "^3.1.0",

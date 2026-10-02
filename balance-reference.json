@@ -1,0 +1,12 @@
+{
+  "savedAt": "2026-10-02T00:00:00.000Z",
+  "commit": "8ffbcb7",
+  "days": 365,
+  "seeds": 10,
+  "homes": {
+    "YUL": { "busts": 3, "games": 10, "median": 11000000, "planes": 11 },
+    "YYZ": { "busts": 0, "games": 10, "median": 33400000, "planes": 12 },
+    "PHL": { "busts": 0, "games": 10, "median": 68700000, "planes": 14 },
+    "YHZ": { "busts": 9, "games": 10, "median": -1000, "planes": 4 }
+  }
+}
