@@ -345,7 +345,6 @@ function steadyPlayer(kind: 'steady' | 'sitter' | 'bold'): Player {
         ...refitCabins(state),
         ...runSeatSales(state),
         ...planHeavyChecks(state),
-        ...takeNightStops(state),
         ...adoptInnovations(state),
         ...(kind === 'steady' ? hedgeWhenCheap(state) : []),
         ...(kind === 'steady' ? hireExecutives(state) : []),
@@ -388,34 +387,6 @@ function tuneFareClasses(state: SimState): string[] {
     log.push(`${key} Saver ${Math.round(saverShare * 100)}% → ${Math.round(next * 100)}%.`);
   }
   return log;
-}
-
-// --- Night stops --------------------------------------------------------
-
-/** How often the player looks for a night stop, in days. */
-const NIGHT_STOP_REVIEW_DAYS = 7;
-/** A night stop has to beat its nightly cost by this much a day. */
-const NIGHT_STOP_WORTH_PER_DAY = 500;
-
-/**
- * Once a week, the one night stop (sim/nightStops.ts) whose forecast gain
- * beats its hotel and contracted check by the most, if by
- * NIGHT_STOP_WORTH_PER_DAY or more. Kept with the check contracted, so it
- * doesn't wear the plane.
- */
-function takeNightStops(state: SimState): string[] {
-  if (dayIndex(state) % NIGHT_STOP_REVIEW_DAYS !== 4) return [];
-  let best: { tail: string; legIds: string[]; worth: number } | null = null;
-  for (const aircraft of state.aircraft) {
-    for (const option of actions.nightStopOptionsFor(state, aircraft.tail)) {
-      if (!option.ok || !option.morning || !option.evening) continue;
-      const worth = option.marginChangePerDay - option.costPerNight;
-      if (worth >= NIGHT_STOP_WORTH_PER_DAY && (!best || worth > best.worth)) best = { tail: aircraft.tail, legIds: [option.morning.legId, option.evening.legId], worth };
-    }
-  }
-  if (!best) return [];
-  const result = actions.startNightStop(state, best.tail, best.legIds);
-  return result.ok ? [result.message] : [];
 }
 
 // --- Maintenance checks ------------------------------------------------

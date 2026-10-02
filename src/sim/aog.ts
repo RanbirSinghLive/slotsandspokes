@@ -8,9 +8,6 @@ import { aircraftUtilisation, rotationsForTail, type Rotation } from './utilisat
 import { coverRotations } from './turnBuffer';
 import { refitDays } from './cabins';
 import { finishHeavyCheck, heavyChecksStarting, wornAge } from './mxChecks';
-import { nightStopStation } from './nightStops';
-import { ferryHome } from './ferry';
-import { dayIndex } from './clock';
 import type { Aircraft, SimState } from './state';
 
 /**
@@ -157,17 +154,10 @@ export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
     if (aircraft && event.refitTo === 'business') aircraft.cabin = 'business';
     if (aircraft && event.refitTo === 'economy') delete aircraft.cabin;
     if (aircraft && event.check) finishHeavyCheck(aircraft);
-    // A repair has it in the hangar for days: its deferred items are cleared too (sim/mxChecks.ts).
-    if (aircraft && !event.check && !event.refitTo) delete aircraft.deferredItems;
     handBackFlying(state, event);
   }
   startRefits(state, dayStartMinute);
-  // Heavy checks due today (sim/mxChecks.ts), grounded the same way. A
-  // plane sleeping at its night-stop station ferries home for it first.
-  for (const aircraft of state.aircraft) {
-    if (aircraft.heavyCheckDay === undefined || aircraft.heavyCheckDay > dayIndex(state)) continue;
-    if (aircraft.status === 'ground' && aircraft.atAirport === nightStopStation(state, aircraft.tail)) ferryHome(state, aircraft);
-  }
+  // Heavy checks due today (sim/mxChecks.ts), grounded the same way.
   for (const { aircraft, days, forced } of heavyChecksStarting(state)) {
     state.aogs.push({
       tail: aircraft.tail,
@@ -192,9 +182,7 @@ export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
     if (isAog(state, aircraft.tail) || state.groundedTails.includes(aircraft.tail)) continue;
     // Only a plane sitting at its base can go down there. A long-haul
     // aircraft still in the air at midnight is skipped until it lands.
-    // A plane sleeping at its night-stop station (sim/nightStops.ts) can go down there too.
-    const atNightStop = aircraft.atAirport !== null && aircraft.atAirport === nightStopStation(state, aircraft.tail);
-    if (aircraft.status !== 'ground' || !aircraft.baseAirport || (aircraft.atAirport !== aircraft.baseAirport && !atNightStop)) continue;
+    if (aircraft.status !== 'ground' || !aircraft.baseAirport || aircraft.atAirport !== aircraft.baseAirport) continue;
     // Nor one ferrying to another base (sim/rebase.ts).
     if (aircraft.rebase) continue;
     if (roll >= aogChance(state, aircraft)) continue;

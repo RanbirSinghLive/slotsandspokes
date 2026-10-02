@@ -2658,49 +2658,6 @@ an older save starts part-way through its interval, staggered by tail.
 
 ---
 
-## Night stops (`src/sim/nightStops.ts`)
-
-A plane can sleep at the far end of one of its out-and-backs instead of
-at base. The plane's view offers each out-and-back from base with a
-forecast. Taking one does three things:
-- the flight home leaves the station at 06:00, into the morning at base;
-- the plane's other flying moves later, whole, if it has to, to fit
-  behind it;
-- the flight out leaves after the plane's last arrival.
-
-All of it has to fit inside 06:00–22:00 with its turns and room in its
-hours. The forecast is the whole network's margin a day against now,
-because a flight into the hub first thing feeds connections on other
-routes (`sim/hubs.ts`).
-
-A night stop isn't a setting: it's the schedule's shape. A plane whose
-day ends at an outstation and starts there is on one
-(`nightStopStation()`). Every night there costs:
-- the crew's hotel: $200 a crew for a Propeller up to $900 for a
-  Widebody, for each crew it flies with;
-- the line check (Maintenance checks): there's no hangar, so the night
-  leaves a deferred item, unless the check is contracted at the station
-  for $300 an hour of the night's work. New night stops start with it
-  contracted; the plane's view switches it.
-
-**What else it changes:**
-- **Breakdowns:** a plane on a night stop can still break down there
-  overnight.
-- **Heavy checks:** it ferries home empty for one.
-- **Moving it:** its two halves can be retimed on the Gantt but not moved
-  to another plane.
-- **Bringing it home:** "Sleep at base again" turns it back into an
-  out-and-back after the evening flight.
-- **Deferred items** stop at 6, because a plane that never sleeps at base
-  can't be held. A breakdown repair clears them.
-- **The stranded-plane ferry** leaves alone a plane whose first flight of
-  the day leaves from where it sits.
-
-The headless player takes the best night stop each week whose forecast
-beats its nightly cost (with the check contracted) by $500 a day.
-
----
-
 ## Fleet timing (`src/sim/fleetTiming.ts`)
 
 Every change to the fleet takes time, so planes and crews are planned

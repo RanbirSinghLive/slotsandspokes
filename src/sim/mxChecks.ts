@@ -45,8 +45,6 @@ const CLEAR_SPARE_MINUTES = 120;
 export const DEFERRED_AGE_YEARS = 3;
 /** Deferred items at which the plane is held at base for a morning. */
 export const MX_HOLD_AT = 3;
-/** The most a plane carries: one that never sleeps at base can't be held, and stops wearing further here. */
-const MAX_DEFERRED = 6;
 export const HEAVY_INTERVAL_DAYS = 30;
 export const OVERDUE_GRACE_DAYS = 7;
 const HEAVY_DAYS: Record<string, number> = { PROP: 1, REGIONAL: 1, NARROWBODY: 2, WIDEBODY: 3 };
@@ -100,7 +98,7 @@ export type NightResult = 'checked' | 'cleared' | 'short' | 'away';
  * are in the hangar or in transit, and skip it. Also counts a flying day
  * toward the heavy check, and forces an overdue one.
  */
-export function rollNightlyChecks(state: SimState, dayStartMinute: number, contracted: Set<string> = new Set()): void {
+export function rollNightlyChecks(state: SimState, dayStartMinute: number): void {
   const today = dayIndex(state);
   const results: Record<string, NightResult> = {};
   for (const aircraft of state.aircraft) {
@@ -110,9 +108,7 @@ export function rollNightlyChecks(state: SimState, dayStartMinute: number, contr
     aircraft.daysSinceHeavyCheck = daysSinceHeavyCheck(aircraft) + 1;
 
     let result: NightResult;
-    // A night stop with a contracted check (sim/nightStops.ts) is checked where it sleeps.
-    const checkedHere = aircraft.atAirport === aircraft.baseAirport || contracted.has(aircraft.tail);
-    if (aircraft.status !== 'ground' || !aircraft.baseAirport || !checkedHere) {
+    if (aircraft.status !== 'ground' || !aircraft.baseAirport || aircraft.atAirport !== aircraft.baseAirport) {
       result = 'away';
     } else {
       const firstDeparture = dayStartMinute + Math.min(...legs.map((leg) => leg.departMinute));
@@ -120,7 +116,7 @@ export function rollNightlyChecks(state: SimState, dayStartMinute: number, contr
       const work = lineCheckMinutes(state, aircraft);
       result = night < work ? 'short' : night >= work + CLEAR_SPARE_MINUTES && deferredItems(aircraft) > 0 ? 'cleared' : 'checked';
     }
-    if (result === 'away' || result === 'short') aircraft.deferredItems = Math.min(MAX_DEFERRED, deferredItems(aircraft) + 1);
+    if (result === 'away' || result === 'short') aircraft.deferredItems = deferredItems(aircraft) + 1;
     if (result === 'cleared') {
       aircraft.deferredItems = deferredItems(aircraft) - 1;
       if (aircraft.deferredItems === 0) delete aircraft.deferredItems;
@@ -215,7 +211,6 @@ export function tonightCheck(state: SimState, tail: string): { night: number; wo
   const landing = projected.length > 0 ? projected[projected.length - 1].projectedArriveMinute : Math.max(dayStart + last.departMinute + last.blockMinutes, aircraft.status === 'ground' && legs.every((leg) => state.completedToday.includes(leg.legId) || state.cancelledToday.includes(leg.legId)) ? aircraft.groundSinceMinute : 0);
   const night = dayStart + MINUTES_PER_DAY + legs[0].departMinute - RELEASE_MINUTES - landing;
   const work = lineCheckMinutes(state, aircraft);
-  // A night stop with a contracted check is checked where it sleeps (sim/nightStops.ts).
-  const away = last.dest !== aircraft.baseAirport && !aircraft.contractedLineCheck;
+  const away = last.dest !== aircraft.baseAirport;
   return { night, work, away, short: !away && night < work };
 }

@@ -46,7 +46,6 @@ import {
 import { cashNeededToLease, LEASE_RESERVE_DAYS, leaseRateFor, loadLeaseRates } from './leasing';
 import { inboundAt, orderLease } from './fleetTiming';
 import { startSeatSale as startSeatSaleRule } from './seatSale';
-import { endNightStop as endNightStopRule, nightStopOptions, setContractedCheck as setContractedCheckRule, startNightStop as startNightStopRule, type NightStopPlan } from './nightStops';
 import { cancelHeavyCheck as cancelHeavyCheckRule, deferredItems, heavyCheckDays, heavyCheckDueIn, planHeavyCheck as planHeavyCheckRule } from './mxChecks';
 import { rebaseOptions, rebasePlane, type RebaseOption } from './rebase';
 import { cabinGainPerDay, cabinOf, cancelRefit as cancelRefitRule, orderRefit as orderRefitRule, refitBlockedReason, refitCost, refitDays, type Cabin } from './cabins';
@@ -576,25 +575,6 @@ export function rebasePlaneTo(state: SimState, tail: string, to: string): Outcom
   const typeCode = state.aircraft.find((a) => a.tail === tail)?.typeCode ?? '';
   const crewNote = crewAdvice(state, to, typeCode);
   return { ok: true, message: result.message + (crewNote ? ` · ${crewNote}` : '') };
-}
-
-// --- Night stops ------------------------------------------------------------
-
-/** Every out-and-back this plane could sleep at the far end of (sim/nightStops.ts), with its forecast. */
-export function nightStopOptionsFor(state: SimState, tail: string): NightStopPlan[] {
-  return nightStopOptions(state, tail);
-}
-
-export function startNightStop(state: SimState, tail: string, legIds: string[]): Outcome<{ message: string }> {
-  return startNightStopRule(state, tail, legIds);
-}
-
-export function endNightStop(state: SimState, tail: string): Outcome<{ message: string }> {
-  return endNightStopRule(state, tail);
-}
-
-export function setContractedCheck(state: SimState, tail: string, on: boolean): Outcome<{ message: string }> {
-  return setContractedCheckRule(state, tail, on);
 }
 
 // --- Maintenance checks ------------------------------------------------------

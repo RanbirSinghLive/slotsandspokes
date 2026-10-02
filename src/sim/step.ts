@@ -1,4 +1,3 @@
-import { chargeNightStops } from './nightStops';
 import { morningHolds, rollNightlyChecks, wornAge } from './mxChecks';
 import { rollDailyFareWars } from './fareWars';
 import { effectiveFareClasses } from './seatSale';
@@ -272,8 +271,7 @@ export function step(state: SimState): void {
     // counted under two causes; before the cancellation count below, so
     // whatever couldn't be covered is counted as cancelled today.
     // Last night's line checks, judged before anyone is ferried home (sim/mxChecks.ts).
-    // Night stops' hotels and contracted checks (sim/nightStops.ts), then the line checks.
-    rollNightlyChecks(state, state.simMinute, chargeNightStops(state));
+    rollNightlyChecks(state, state.simMinute);
     // A plane stranded away from base with nothing to fly from there goes home empty (sim/ferry.ts).
     ferryStrandedPlanes(state);
     rollDailyAogs(state, state.simMinute);
