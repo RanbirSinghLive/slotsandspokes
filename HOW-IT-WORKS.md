@@ -2551,6 +2551,26 @@ plus 2 for each plane of the class on its way, hiring them the day the
 plane is leased; a shortfall is met by retraining another class's spare
 crews first. Crews spare for 30 days go.
 
+### Sickness and readiness
+
+Each morning, before planes are crewed, every crew not already off has a
+chance to call in sick, for 1 to 3 days (most for one; drawn from the
+seeded stream). The chance is 2% a day on an easy roster, rising by up
+to 4 points as yesterday's shifts at its base ran from 8 hours toward
+the 13-hour limit (`sickChance()`). Sick crews fly nothing and cost no
+standby. So a base crewed to the legal minimum grounds a plane
+whenever anyone is ill (its flights cancel, cause "crew"), and reserve
+crews over the minimum cover them at standby cost: the same trade as
+spare aircraft time against AOGs. Overworking a small roster makes it
+sicker as well as tired, so the cheap roster is the fragile one.
+
+The Crews screen shows each class's readiness (`crewReadiness()`): off
+sick today, the reserve over the minimum, and the chance of at least
+one grounding in the next 7 days. Each crew counts as off on a day with
+its sick chance times the 1.6 days a sickness lasts on average. For six
+Propellers needing six crews: 6 crews, 74% a week; 7, 13%; 8, 1%. The
+headless player staffs for 5% (`crewsForRisk()`).
+
 ## The crew planning board (`src/ui/inspector/crews.ts`, read-out in `src/sim/crewPlan.ts`)
 
 The Crews screen reads like a crew planner's board. `crewPlan()` counts,

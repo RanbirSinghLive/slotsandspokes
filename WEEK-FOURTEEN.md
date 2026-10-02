@@ -252,6 +252,25 @@ days, and a war started with MD.
 
 **Stage 3 is complete.** It hasn't had a balance read.
 
+## Stage 4: running the operation (owner: go, 2026-10-02)
+
+**Build order:**
+
+1. **Crew sickness** (added by the owner): crews call in sick for 1–3
+   days, more often when worked hard. With fewer than the minimum fit, a
+   plane is grounded, so reserve crews buy completion at standby cost,
+   as spare aircraft time buys cover for AOGs.
+2. **Maintenance checks**: design in discussion with the owner.
+3. **Night stops**: planes that sleep at an outstation, for a morning
+   wave from the spokes.
+
+**Step 1 built:** `sim/crews.ts` (sickness rolled each morning on
+yesterday's roster strain; `crewReadiness()` for the weekly grounding
+risk). The Crews screen shows "Sick 0 · reserve 3 · grounding risk
+<1%/wk", and the headless player staffs for 5% a week. The one-seed
+headless year went from $0.44M to $23.0M: the extra random draws send
+it down a different path, and one seed can't judge it.
+
 ## Decisions for the owner
 
 1. The airport tags: a first pass covers every airport in the data; the

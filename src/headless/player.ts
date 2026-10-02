@@ -1,6 +1,7 @@
 import { currentPotentialDemand } from '../sim/marketDemand';
 import { marketLoadFactor } from '../sim/loadFactor';
 import { saleBlockedReason, saleMarginChangePerDay } from '../sim/seatSale';
+import { crewsForRisk } from '../sim/crews';
 import { contractOn, contractsOf, performanceFactor } from '../sim/contracts';
 import airportsData from '../../data/airports.json';
 import { inboundAt } from '../sim/fleetTiming';
@@ -1079,19 +1080,27 @@ function hireExecutives(state: SimState): string[] {
 
 /**
  * Keep each crew base's crews of each class at what that class's planes
- * need at ideal shifts, plus CREWS_PER_NEW_PLANE for each plane of the
+ * need at ideal shifts, with enough reserve for sickness to keep a week's
+ * grounding risk under CREW_GROUNDING_RISK, plus CREWS_PER_NEW_PLANE for each plane of the
  * class on its way, counting crews already joining. A shortfall is met by
  * retraining spare crews of another class first (cheaper), then hiring;
  * crews above target are let go once they've sat spare for
  * CREW_RELEASE_AFTER_DAYS.
  */
+/** The weekly chance of a crew grounding the player staffs for. */
+const CREW_GROUNDING_RISK = 0.05;
+
 function keepCrews(state: SimState, memory: Memory): string[] {
   const log: string[] = [];
   for (const iata of Object.keys(state.crewBases ?? {})) {
     const classes = actions.crewReadout(state, iata)?.classes ?? [];
     // Each class's target: its planes' need at ideal shifts, plus a full
     // day's crews for each plane of the class on its way.
-    const targets = classes.map((crew) => ({ crew, target: crew.ideal + CREWS_PER_NEW_PLANE * inboundAt(state, iata, crew.classCode).length }));
+    // ...and enough reserve to keep a week's crew-grounding risk under CREW_GROUNDING_RISK (sim/crews.ts's sickness).
+    const targets = classes.map((crew) => ({
+      crew,
+      target: crewsForRisk(state, iata, crew.classCode, CREW_GROUNDING_RISK, crew.ideal) + CREWS_PER_NEW_PLANE * inboundAt(state, iata, crew.classCode).length,
+    }));
     for (const { crew, target } of targets) {
       const key = `${iata}:${crew.classCode}`;
       let short = target - crew.crews - crew.arriving;

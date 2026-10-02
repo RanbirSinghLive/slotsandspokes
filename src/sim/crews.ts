@@ -1,6 +1,7 @@
 import { AIRCRAFT_CLASSES, classByCode } from './aircraftClasses';
 import { crewTrainingTimeFactor } from './innovations';
 import { dayIndex } from './clock';
+import { nextRandom } from './rng';
 import type { ScheduleLeg } from './schedule';
 import type { SimState } from './state';
 
@@ -35,6 +36,15 @@ import type { SimState } from './state';
  * TIGHT_TURN_MINUTES tires a crew as much as TIGHT_TURN_TIRING_MINUTES
  * more duty. The levers are ones already on the map: turn buffers, how
  * full a plane's day is, and how many crews its base has.
+ *
+ * **Sickness** (WEEK-FOURTEEN.md, stage 4). Each morning every crew not
+ * already off has a chance to call in sick, for 1 to MAX_SICK_DAYS days:
+ * SICK_BASE_CHANCE on an easy roster, rising by up to SICK_STRAIN_CHANCE
+ * as yesterday's shifts at its base ran from IDEAL_SHIFT_MINUTES towards
+ * LEGAL_SHIFT_MINUTES. Sick crews fly nothing, so a base crewed to the
+ * legal minimum grounds a plane whenever one is ill; reserve crews cover
+ * them at standby cost. Overworking a small roster makes it sicker as
+ * well as tired: the cheap roster is the fragile one.
  *
  * **Crew bases.** Basing a plane at an airport without one opens a base,
  * for CREW_BASE_FEE (sim/playerActions.ts's lease); it starts with no
@@ -89,6 +99,8 @@ export const STARTING_CREW_CLASS = 'PROP';
 export type CrewBase = {
   /** Crews rated for each aircraft class, by class code. */
   crewsByClass: Record<string, number>;
+  /** Crews off sick, counted in crewsByClass, and the day each batch is back. Absent in an older save: none. */
+  sick?: { classCode: string; count: number; backDay: number }[];
   /** Crews being recruited, and the day each batch starts. */
   hiring: { classCode: string; count: number; readyDay: number }[];
   /** Crews away retraining for another class (already out of `from`), and the day they're back. */
@@ -182,6 +194,77 @@ export function crewBases(state: SimState): Record<string, CrewBase> {
 export function crewsOf(base: CrewBase | undefined, classCode: string): number {
   // `?.` on crewsByClass too: a base from an older save lacks it until ensureCrewBases() runs.
   return base?.crewsByClass?.[classCode] ?? 0;
+}
+
+/** A crew's chance of calling in sick on an easy roster, a day. */
+export const SICK_BASE_CHANCE = 0.02;
+/** How much more likely, a day, when yesterday's shifts ran to the legal limit. */
+export const SICK_STRAIN_CHANCE = 0.04;
+/** A sickness lasts 1 to this many days, most of them short. */
+export const MAX_SICK_DAYS = 3;
+/** The average days a sickness lasts, for the readiness estimate. */
+const MEAN_SICK_DAYS = 1.6;
+
+/** Crews of this class off sick at a base today. */
+export function sickOf(base: CrewBase | undefined, classCode: string, today: number): number {
+  const sick = (base?.sick ?? []).filter((batch) => batch.classCode === classCode && batch.backDay > today).reduce((sum, batch) => sum + batch.count, 0);
+  return Math.min(sick, crewsOf(base, classCode));
+}
+
+/** How hard a base's crews of a class were worked yesterday: 0 at ideal shifts or shorter, 1 at the legal limit. */
+function rosterStrain(state: SimState, iata: string, classCode: string): number {
+  const crewsByTail = state.crewDay?.crewsByTail ?? {};
+  let duty = 0;
+  let crews = 0;
+  for (const aircraft of state.aircraft) {
+    if (aircraft.baseAirport !== iata || aircraft.typeCode !== classCode) continue;
+    const flying = crewsByTail[aircraft.tail] ?? 0;
+    if (flying <= 0) continue;
+    duty += dutyMinutes(state, aircraft.tail);
+    crews += flying;
+  }
+  if (crews === 0) return 0;
+  return Math.min(1, Math.max(0, (duty / crews - IDEAL_SHIFT_MINUTES) / (LEGAL_SHIFT_MINUTES - IDEAL_SHIFT_MINUTES)));
+}
+
+/** A crew of this class at this base's chance of calling in sick tomorrow, from today's roster. */
+export function sickChance(state: SimState, iata: string, classCode: string): number {
+  return SICK_BASE_CHANCE + SICK_STRAIN_CHANCE * rosterStrain(state, iata, classCode);
+}
+
+/** The chance more than `reserve` of `crews` are off on a day, each off with chance `p`. */
+function shortChance(crews: number, reserve: number, p: number): number {
+  if (reserve < 0) return 1;
+  let atMost = 0;
+  let term = (1 - p) ** crews; // none off
+  for (let k = 0; k <= Math.min(reserve, crews); k++) {
+    atMost += term;
+    term *= ((crews - k) / (k + 1)) * (p / (1 - p));
+  }
+  return Math.max(0, Math.min(1, 1 - atMost));
+}
+
+/**
+ * Readiness: crews of a class off sick today, the reserve over the legal
+ * minimum, and the chance of at least one plane grounded for want of crew
+ * in a week at this staffing. Each crew counts as off on a day with its
+ * sick chance times how long a sickness lasts.
+ */
+export function crewReadiness(state: SimState, iata: string, classCode: string, crews?: number): { sick: number; reserve: number; chance: number; weeklyRisk: number } {
+  const base = crewBases(state)[iata];
+  const have = crews ?? crewsOf(base, classCode);
+  const minimum = crewNeed(state, iata, classCode).minimum;
+  const chance = sickChance(state, iata, classCode);
+  const offOnADay = Math.min(0.5, chance * MEAN_SICK_DAYS);
+  const daily = minimum === 0 ? 0 : shortChance(have, have - minimum, offOnADay);
+  return { sick: sickOf(base, classCode, dayIndex(state)), reserve: have - minimum, chance, weeklyRisk: 1 - (1 - daily) ** 7 };
+}
+
+/** The fewest crews of a class that keep the weekly grounding risk at or under `risk`, no fewer than `floor`. */
+export function crewsForRisk(state: SimState, iata: string, classCode: string, risk: number, floor: number): number {
+  let crews = Math.max(floor, crewNeed(state, iata, classCode).minimum);
+  while (crews < floor + 20 && crewReadiness(state, iata, classCode, crews).weeklyRisk > risk) crews += 1;
+  return crews;
 }
 
 /** Crews of this class on their way to a base: hired, or retraining for it. */
@@ -343,12 +426,29 @@ export function rollDailyCrews(state: SimState): number {
     base.hiring = base.hiring.filter((b) => b.readyDay > today);
     base.retraining = base.retraining.filter((b) => b.readyDay > today);
 
+    // Sickness: who's back today, then who calls in, on yesterday's roster.
+    base.sick = (base.sick ?? []).filter((batch) => batch.backDay > today);
+    for (const cls of AIRCRAFT_CLASSES) {
+      const fit = crewsOf(base, cls.code) - sickOf(base, cls.code, today);
+      if (fit <= 0) continue;
+      const chance = sickChance(state, iata, cls.code);
+      for (let i = 0; i < fit; i++) {
+        const [roll, afterRoll] = nextRandom(state.rngSeed);
+        const [length, afterLength] = nextRandom(afterRoll);
+        state.rngSeed = afterLength;
+        if (roll >= chance) continue;
+        const days = 1 + Math.floor(length * length * MAX_SICK_DAYS);
+        base.sick.push({ classCode: cls.code, count: 1, backDay: today + days });
+      }
+    }
+
     for (const cls of AIRCRAFT_CLASSES) {
       const planes = state.aircraft
         .filter((aircraft) => aircraft.baseAirport === iata && aircraft.typeCode === cls.code)
         .map((aircraft) => ({ tail: aircraft.tail, duty: dutyMinutes(state, aircraft.tail) }))
         .filter((plane) => plane.duty > 0);
-      let left = crewsOf(base, cls.code);
+      // Sick crews fly nothing.
+      let left = crewsOf(base, cls.code) - sickOf(base, cls.code, today);
       // The minimum first, in fleet order, so which plane waits is stable.
       for (const plane of planes) {
         const minimum = crewsFor(plane.duty, LEGAL_SHIFT_MINUTES);

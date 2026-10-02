@@ -1,13 +1,13 @@
 import { dayIndex } from '../../sim/clock';
 import { crewPlan, type ClassPlan, type PlaneEntry } from '../../sim/crewPlan';
-import { CREWS_PER_NEW_PLANE, hireFee, hireLeadDays, retrainDays, retrainFee, standbyCost } from '../../sim/crews';
+import { CREWS_PER_NEW_PLANE, crewReadiness, hireFee, hireLeadDays, retrainDays, retrainFee, SICK_BASE_CHANCE, SICK_STRAIN_CHANCE, standbyCost } from '../../sim/crews';
 import type { SimState } from '../../sim/state';
 import { money } from '../format';
 import { linkToMap } from '../mapLink';
 import { planeIconElement } from '../planeIcons';
 import * as ops from '../routeActions';
 import { select } from '../selection';
-import { heading, line } from './dom';
+import { heading, line, lineWithInfo } from './dom';
 
 /**
  * The Crews screen as a crew planner's board (sim/crewPlan.ts): what's
@@ -258,6 +258,18 @@ function classRow(state: SimState, iata: string, c: ClassPlan, siblings: ClassPl
   if (c.entries.length > 0) parts.push(`✈ ${c.entries.length} EIS from day ${c.entries[0].day}`);
   for (const day of c.returningDays) parts.push(`↩ plane back day ${day} (${when(day, today)})`);
   row.append(line(parts.join(' · '), 'inspector-line crew-row-detail'));
+  // Readiness (sim/crews.ts): who's off sick, and the chance of a crew grounding this week.
+  if (c.minimum > 0) {
+    const ready = crewReadiness(state, iata, c.classCode);
+    const risk = Math.round(ready.weeklyRisk * 100);
+    row.append(
+      lineWithInfo(
+        `Sick ${ready.sick} · reserve ${Math.max(0, ready.reserve)} · grounding risk ${ready.weeklyRisk < 0.01 ? '<1' : risk}%/wk`,
+        `Crews call in sick for 1–3 days: about ${Math.round(SICK_BASE_CHANCE * 100)}% a crew a day on an easy roster, up to ${Math.round((SICK_BASE_CHANCE + SICK_STRAIN_CHANCE) * 100)}% when shifts run to the 13-hour limit (now ${(ready.chance * 100).toFixed(1)}%). Sick crews fly nothing: with fewer than the legal minimum fit, a plane is grounded and its flights cancel. Reserve crews over the minimum cover them, at standby cost. The risk is the chance of at least one grounding in the next 7 days at this staffing.`,
+        risk >= 25 ? 'inspector-line is-over' : risk >= 10 ? 'inspector-line is-warn' : 'inspector-line',
+      ),
+    );
+  }
 
   const buttons = document.createElement('div');
   buttons.className = 'crew-buttons';
