@@ -263,10 +263,12 @@ days, and a war started with MD.
 2. **Maintenance checks** (decided with the owner): the line check is a
    night at base, and a night away or too short leaves a deferred item.
    Items raise breakdowns and delays, and at 3 the plane is held for a
-   morning. Heavy checks every 30 flying days are planned groundings
-   from the Mtc screen.
+   morning. Heavy checks every 30 flying days are hangar work done at
+   night, grounding a plane only when it falls 7 days past due
+   (reworked with the owner after the balance read below).
 3. **Night stops**: planes that sleep at an outstation, for a morning
-   wave from the spokes.
+   wave from the spokes. Built, then reverted after the balance read
+   below; to be redesigned.
 
 **Step 1 built:** `sim/crews.ts` (sickness rolled each morning on
 yesterday's roster strain; `crewReadiness()` for the weekly grounding
@@ -281,6 +283,30 @@ table, and the headless player planning heavy checks. In one headless
 year from Montréal about 98% of nights are full checks, 1–2% are away
 after a cancellation strands the plane, a few are short, and one hold
 happens. It matters more once planes sleep out (step 3).
+
+**Balance read after stage 4** (18 seeds, steady):
+
+| Home | Before stage 3 | After stage 4, with night stops |
+|---|---|---|
+| YUL | $17.7M, 2 busts | $0.1M, 8 busts |
+| YYZ | $36.2M, 0 | $1.8M, 7 |
+| PHL | $68.2M, 0 | $17.9M, 3 |
+| ORD | $22.1M, 1 | $2.8M, 3 |
+| YHZ | 13 busts | 17 busts |
+
+A bisection on YUL and YYZ, 12 seeds each, found two causes:
+- **Heavy checks as planned groundings:** YYZ fell from $45.6M to
+  $16.2M. With pools near capacity, every check day cancelled flying,
+  and the player dropped its long routes and returned a Narrowbody.
+- **Night stops:** YYZ fell from $16.2M to $1.8M. Pushing a plane's day
+  later met the curfew, and its 06:00 station flight was often left
+  without a plane. The forecast saw neither.
+
+**Night stops were reverted, and heavy checks reworked as night work.**
+In one Toronto game the reworked checks finished 247 times at night,
+none were forced, and the year ended at $99M. A night-stop redesign
+needs a forecast that sees the curfew and positioning, and shouldn't
+push a plane's other flying later.
 
 ## Decisions for the owner
 
