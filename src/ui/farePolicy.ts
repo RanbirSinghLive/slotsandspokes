@@ -1,6 +1,8 @@
 import { dayIndex } from '../sim/clock';
 import { FARE_POLICY_MAX, FARE_POLICY_MIN, pricingSummary, putAllOnPolicy, setFarePolicy } from '../sim/pricing';
 import { networkHill } from '../sim/revenueHill';
+import { BRAND_DAYS, brandLevel, brandPosition, LOW_COST_LEVEL, networkFareLevelToday, PREMIUM_LEVEL } from '../sim/brand';
+import { info } from './inspector/dom';
 import type { SimState } from '../sim/state';
 import { money } from './format';
 import { drawHillChart } from './hillChart';
@@ -24,6 +26,28 @@ const statusEl = document.querySelector<HTMLDivElement>('#fare-policy-status')!;
 let drawnSignature = '';
 /** The back-to-policy button, kept under the status line and replaced on each rebuild. */
 let backButtonEl: HTMLButtonElement | null = null;
+/** The brand line (sim/brand.ts), kept under the status line. */
+let brandEl: HTMLDivElement | null = null;
+
+function renderBrand(state: SimState): void {
+  brandEl?.remove();
+  const today = networkFareLevelToday(state);
+  if (today === null) {
+    brandEl = null;
+    return;
+  }
+  const level = brandLevel(state);
+  const heading = today < level - 0.03 ? ' · moving cheaper' : today > level + 0.03 ? ' · moving dearer' : '';
+  brandEl = document.createElement('div');
+  brandEl.className = 'inspector-line';
+  brandEl.append(
+    `Brand ${brandPosition(state)} · ${percent(level)} · today ${percent(today)}${heading} `,
+    info(
+      `What the airline is known for, from what it charges: every flight's fare against its going rate, weighted by seats, remembered over about ${BRAND_DAYS} days. Under ${percent(LOW_COST_LEVEL)} it's Low-cost: leisure and VFR travellers prefer you to a rival, business travellers less. Over ${percent(PREMIUM_LEVEL)} it's Premium: the reverse. It takes months to build and months to move.`,
+    ),
+  );
+  statusEl.after(brandEl);
+}
 let dragging = false;
 
 const percent = (level: number) => `${Math.round(level * 100)}%`;
@@ -49,6 +73,7 @@ function backToPolicyButton(state: SimState, offPolicy: number): HTMLButtonEleme
 
 function rebuild(state: SimState): void {
   drawnSignature = signatureOf(state);
+  renderBrand(state);
   const hill = networkHill(state);
   chartEl.replaceChildren();
   backButtonEl?.remove();
@@ -59,7 +84,7 @@ function rebuild(state: SimState): void {
   }
   const offPolicy = hill.byHand.routes;
   backButtonEl = backToPolicyButton(state, offPolicy);
-  if (backButtonEl) statusEl.after(backButtonEl);
+  if (backButtonEl) (brandEl ?? statusEl).after(backButtonEl);
   if (hill.policyRoutes === 0) {
     statusEl.textContent = 'No routes on policy';
     return;

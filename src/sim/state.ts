@@ -534,6 +534,8 @@ export type SimState = {
    * cancellations are attributed to the right cause.
    */
   aogs: AogEvent[];
+  /** The network's fare level against the going rate, remembered over about 60 days (sim/brand.ts); absent means 100%. */
+  brandLevel?: number;
   /** Stranded planes ferried home empty before the day starts (sim/ferry.ts), the latest few, for the ticker. */
   ferryLog?: { tail: string; from: string; to: string; cost: number; simMinute: number }[];
   /** The shared lessor's shelf (sim/market.ts): what's listed and when the next of each class arrives. */

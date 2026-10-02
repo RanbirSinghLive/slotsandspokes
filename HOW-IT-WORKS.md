@@ -1737,6 +1737,30 @@ lose: long-haul is a bet on filling 300 seats.
 anyone. It is refused while the plane still has flights, is grounded by
 an AOG, or is in the air.
 
+## Brand position (`src/sim/brand.ts`)
+
+What the airline is known for, from what it charges. Each day the
+network's fare level is measured: every leg's seats at its market's
+fare, over the same seats at the going rate. The brand remembers it,
+moving 1/60 of the way to today's level each day (`state.brandLevel`,
+100% until the airline flies), so it takes months to build and months
+to move.
+
+| Position | Level | Effect against rivals |
+|---|---|---|
+| Low-cost | under 90% | leisure and VFR prefer you, business less |
+| Mainline | 90–115% | neither |
+| Premium | over 115% | business prefers you, leisure and VFR less |
+
+The pull grows smoothly with distance from 100% and is full 25 points
+away: 0.2 of booking utility for leisure, 0.14 for VFR, and the opposite
+sign for business, about what 25 NPS points do. It counts only against
+rivals, like NPS: a name takes travellers from other airlines, it
+doesn't make more people fly. The Fare policy panel shows it ("Brand
+Mainline · 100% · today 150% · moving dearer").
+
+---
+
 ## NPS and the quality loop (`src/sim/nps.ts`)
 
 Two different things that are easy to confuse:

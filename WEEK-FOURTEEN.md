@@ -232,6 +232,10 @@ carried (booking order stands in).
 growing a market or holding it back. The one-seed headless year went
 from $1.34M to $1.87M; no balance read yet.
 
+**Step 2 built:** `sim/brand.ts`, rolled daily. The position's pull is
+added to the name's edge in booking (`BookingPerks.positionEdge`). The
+Fare policy panel shows it. An old save starts at Mainline, 100%.
+
 ## Decisions for the owner
 
 1. The airport tags: a first pass covers every airport in the data; the

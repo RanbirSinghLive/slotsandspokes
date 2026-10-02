@@ -248,7 +248,7 @@ export function flightResult(
     demand: demandPerFlight,
     mix: marketMix(leg.origin, leg.dest),
     shareAt: (segment, price) =>
-      segmentShareAt(segment, price, legsServingMarket, leg.origin, leg.dest, competitorRoutes, perks.brandEdge, timing?.marketDepartMinutes),
+      segmentShareAt(segment, price, legsServingMarket, leg.origin, leg.dest, competitorRoutes, perks.brandEdge + perks.positionEdge[segment], timing?.marketDepartMinutes),
     connecting: connecting / legsServingMarket,
     recapturable: spilloverAvailable,
     classes: fareClasses ?? DEFAULT_FARE_CLASSES,

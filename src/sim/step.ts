@@ -1,3 +1,4 @@
+import { rollDailyBrand } from './brand';
 import { ferryStrandedPlanes } from './ferry';
 import { USABLE_DAY_START_MINUTE } from './utilisation';
 import { crowdingWeight } from './timeOfDay';
@@ -334,6 +335,7 @@ export function step(state: SimState): void {
     // toward the floor where they aren't. Same daily cadence as the rolls
     // above, but unlike them entirely deterministic — no random draws.
     rollDailyMarketDemand(state);
+    rollDailyBrand(state);
     // Contracts (sim/contracts.ts): starts, payments, endings
     // and their snap-back, after the markets have grown for the day so a
     // snap-back isn't regrown before anyone sees it.

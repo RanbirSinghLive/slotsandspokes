@@ -2,6 +2,8 @@ import { RECAPTURE_RATE } from './economy';
 import { executiveYieldMultiplier } from './executives';
 import { airlineCalled, LADDER, tiersClimbed } from './ladder';
 import { brandEdge } from './nps';
+import { positionEdge } from './brand';
+import type { SegmentName } from './timeOfDay';
 import type { SimState } from './state';
 
 /**
@@ -163,6 +165,8 @@ export function adoptInnovation(state: SimState, id: InnovationId): { ok: true; 
 export type BookingPerks = {
   /** How far its NPS here pulls passengers from a typical rival, in booking utility. */
   brandEdge: number;
+  /** How much more each segment prefers it to a rival for its brand position (sim/brand.ts). */
+  positionEdge: Record<SegmentName, number>;
   /** Multiplies every ticket's revenue. */
   yieldMultiplier: number;
   /** Share of turned-away passengers who wait for a later flight. */
@@ -172,6 +176,7 @@ export type BookingPerks = {
 export function bookingPerks(state: SimState, origin: string, dest: string): BookingPerks {
   return {
     brandEdge: brandEdge(state, origin, dest),
+    positionEdge: positionEdge(state),
     // Online booking, and a revenue-management CCO (sim/executives.ts).
     yieldMultiplier: (isAdopted(state, 'online-booking') ? DIRECT_BOOKING_YIELD : 1) * executiveYieldMultiplier(state),
     recaptureRate: isAdopted(state, 'loyalty-scheme') ? LOYALTY_RECAPTURE_RATE : RECAPTURE_RATE,
