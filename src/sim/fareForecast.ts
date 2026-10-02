@@ -36,6 +36,8 @@ const MIN_RESPONSE_CHANCE = 0.001;
 
 export type RivalOutlook = {
   airline: string;
+  /** Its two-letter code, for a short line. */
+  code: string;
   /** Its fare once the war has settled. */
   fare: number;
   /** What its route makes a day at that fare. */
@@ -118,6 +120,7 @@ export function forecastStance(state: SimState, origin: string, dest: string, st
     margin: summarizeMarket(origin, dest, work, workSettings, connecting).margin,
     rivals: onMarket.map((route) => ({
       airline: route.airline,
+      code: route.code,
       fare: route.fare,
       margin: rivalRouteDailyResult(work, route).margin,
       closesInDays: closesIn.get(route) ?? null,

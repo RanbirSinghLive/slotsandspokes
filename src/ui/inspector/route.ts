@@ -29,6 +29,7 @@ import { rivalLinksOn } from './rival';
 import { contractOn, paymentShare, performanceFactor } from '../../sim/contracts';
 import { revenueHill, type RevenueHill } from '../../sim/revenueHill';
 import { drawHillChart } from '../hillChart';
+import { chartLegend } from '../chartLegend';
 import { marketCharacterWord, marketMix } from '../../sim/marketCharacter';
 
 /**
@@ -47,6 +48,13 @@ export type RouteView = {
 
 function signedMoney(amount: number): string {
   return `${amount < 0 ? '−' : '+'}${money(Math.abs(amount))}`;
+}
+
+/** Signed and short for a dense line: +$617, −$8.7k, +$12k. */
+function shortSigned(amount: number): string {
+  const size = Math.abs(amount);
+  const text = size >= 10_000 ? `$${Math.round(size / 1000)}k` : size >= 1000 ? `$${(size / 1000).toFixed(1)}k` : `$${Math.round(size)}`;
+  return `${amount < 0 ? '−' : '+'}${text}`;
 }
 
 /**
@@ -98,8 +106,8 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   const brand = brandInWords(state, a, b, state.competitorRoutes);
   root.append(
     lineWithInfo(
-      `NPS ${formatNps(marketNps(state, a, b))} · airline ${formatNps(networkNps(state))}${brand ? ` · ${brand}` : ''}`,
-      'Net Promoter Score: how passengers rate you here over about the last month. Late flights, old planes and fares above the rivals\' pull it down. Against a rival, the better name wins some of the other\'s passengers.',
+      `NPS ${formatNps(marketNps(state, a, b))}${brand ? ` · ${brand}` : ''}`,
+      `Net Promoter Score: how passengers rate you here over about the last month (airline-wide ${formatNps(networkNps(state))}). Late flights, old planes and fares above the rivals' pull it down. Against a rival, the better name wins some of the other's passengers.`,
     ),
   );
 
@@ -113,13 +121,13 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   const fillWords = load.factor === null ? ` · ${fill.words}` : '';
   root.append(
     lineWithInfo(
-      `${marketSize(state, a, b)} market · ${readout.seatsPerFlight} seats/flight${fillWords}` +
+      `${marketSize(state, a, b)} market · ${marketCharacterWord(a, b)}${fillWords}` +
         (short ? ' · demand exceeds seats' : '') +
         (fill.thin ? ' · still growing' : ''),
-      'A market\'s demand is built by flying it, over weeks, toward the size of the city pair. When demand exceeds seats, add a flight or a bigger plane; while it is still growing, extra flights fly emptier.',
+      `A market's demand is built by flying it, over weeks, toward the size of the city pair (${readout.seatsPerFlight} seats a flight now). When demand exceeds seats, add a flight or a bigger plane; while it is still growing, extra flights fly emptier. The bar is who flies it: business travellers barely mind the fare but want peak departures and frequency; leisure travellers chase the fare; VFR (visiting friends and relatives) sit between. A business trunk rewards frequency and peak slots, a sun route a sharp fare.`,
     ),
   );
-  root.append(characterLine(a, b));
+  root.append(...characterBar(a, b));
 
   const rivals = state.competitorRoutes.filter(
     (route) => (route.origin === a && route.dest === b) || (route.origin === b && route.dest === a),
@@ -133,7 +141,7 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
     rivalsLine.append(
       'Rivals ',
       ...rivalLinksOn(state, a, b),
-      ` · you $${(state.routeSettings[marketKey(a, b)]?.fare ?? 0).toLocaleString()}` + (cut > 0 ? ` · your fares −${cut}%` : ''),
+      cut > 0 ? ` · your fares −${cut}%` : '',
     );
     if (cut > 0) rivalsLine.append(' ', info('Rival flights on a market pull your fares down. More flights of your own reduce the cut.'));
     root.append(rivalsLine);
@@ -249,7 +257,7 @@ function roundToStep(value: number, step: number): number {
  * share of slot fees at each end and of its planes' class leases
  * (sim/routeCosts.ts), and the margin once they're paid.
  */
-function describeEconomics(state: SimState, a: string, b: string): { text: string; losing: boolean; fixed: string; fixedDetail: string; fullyLosing: boolean } {
+function describeEconomics(state: SimState, a: string, b: string): { text: string; detail: string; losing: boolean; fixed: string; fixedDetail: string; fullyLosing: boolean } {
   const settings = state.routeSettings[marketKey(a, b)];
   const summary = summarizeMarket(a, b, state, settings);
   const load = summary.totalSeats > 0 ? summary.pax / summary.totalSeats : 0;
@@ -260,14 +268,18 @@ function describeEconomics(state: SimState, a: string, b: string): { text: strin
     (entry) => `${entry.className} ${money(entry.perDay)} (${Math.round(entry.share * 100)}% of the class's flying, which uses ${Math.round(entry.poolUse * 100)}% of its day)`,
   );
   return {
-    text:
-      `Per day · ${summary.pax} pax · LF ${Math.round(load * 100)}% · share ${Math.round(summary.share * 100)}% · ` +
-      `rev ${money(summary.revenue)} · cost ${money(summary.cost)} · margin ${signedMoney(summary.margin)} · ` +
-      (summary.seatCapped ? 'seat-capped' : 'demand-capped'),
+    text: `Today at this fare · ${summary.pax} pax · LF ${Math.round(load * 100)}% · ${signedMoney(summary.margin)}/day`,
+    detail:
+      `The game's forecast for a day at these settings: revenue ${money(summary.revenue)}, flying costs ${money(summary.cost)}, ` +
+      `${Math.round(summary.share * 100)}% of the market's passengers. ` +
+      (summary.seatCapped
+        ? 'Seat-capped: more want to fly than there are seats, so a higher fare loses passengers nobody could carry.'
+        : 'Demand-capped: there are seats to spare, so a higher fare loses real passengers.'),
     losing: summary.margin < 0,
     fixed:
-      `Fully costed ${signedMoney(fullMargin)}/day · slots ${money(costs.slotsPerDay)} · lease ${money(costs.leasePerDay)} · overhead ${money(costs.overheadPerDay)}`,
+      `After lease, slots, overhead · ${signedMoney(fullMargin)}/day`,
     fixedDetail:
+      `Lease ${money(costs.leasePerDay)}, slots ${money(costs.slotsPerDay)}, overhead ${money(costs.overheadPerDay)} a day. ` +
       (slotParts.length > 0 ? `Slots: ${slotParts.join(', ')}. ` : '') +
       (leaseParts.length > 0 ? `Lease: ${leaseParts.join('; ')}. ` : '') +
       'Slot fees, leases and network overhead are paid airline-wide each midnight. Slot fees are shared by each airport\'s movements; ' +
@@ -291,15 +303,20 @@ function buildFare(state: SimState, a: string, b: string, changed: () => void): 
   const heading = document.createElement('h2');
   heading.textContent = 'Fare';
 
+  // Both lines keep their (i) while dragging redraws their text.
   const economics = line('');
+  const economicsText = document.createElement('span');
+  const economicsInfo = info('');
+  economics.append(economicsText, ' ', economicsInfo);
   // The fully costed line keeps its (i) while the slider redraws its text.
   const fixedCosts = line('');
   const fixedText = document.createElement('span');
   const fixedInfo = info('');
   fixedCosts.append(fixedText, ' ', fixedInfo);
   const redrawEconomics = () => {
-    const { text, losing, fixed, fixedDetail, fullyLosing } = describeEconomics(state, a, b);
-    economics.textContent = text;
+    const { text, detail, losing, fixed, fixedDetail, fullyLosing } = describeEconomics(state, a, b);
+    economicsText.textContent = text;
+    economicsInfo.dataset.info = detail;
     economics.classList.toggle('is-over', losing);
     fixedText.textContent = fixed;
     fixedInfo.dataset.info = fixedDetail;
@@ -321,8 +338,8 @@ function buildFare(state: SimState, a: string, b: string, changed: () => void): 
     const atTop = range && settings.fare >= range.low && settings.fare <= range.high;
     fareValue.textContent =
       `$${settings.fare} · ${pricedBy()}` +
-      (range ? (atTop ? ' · the top could be here' : ` · top probably $${range.low}${range.high > range.low ? `–${range.high}` : ''}`) : '') +
-      ` · ${flown} day${flown === 1 ? '' : 's'} flown lately`;
+      (range ? (atTop ? ' · at the top' : ` · top $${range.low}${range.high > range.low ? `–${range.high}` : ''}`) : '') +
+      ` · ${flown}d flown`;
     fareValue.classList.toggle('lever-value--overridden', settings.fareIsOverridden);
   };
   const setFare = (fare: number) => {
@@ -359,16 +376,11 @@ function buildFare(state: SimState, a: string, b: string, changed: () => void): 
 }
 
 /**
- * Who flies the city pair (sim/marketCharacter.ts): a word and a bar of
- * business, leisure and VFR. Business travellers pay what it takes and
- * want the peaks; leisure ones chase the fare; VFR sit between.
+ * Who flies the city pair (sim/marketCharacter.ts), as a bar of business,
+ * leisure and VFR with its key; the market line above names it.
  */
-function characterLine(a: string, b: string): HTMLElement {
+function characterBar(a: string, b: string): HTMLElement[] {
   const mix = marketMix(a, b);
-  const row = lineWithInfo(
-    `${marketCharacterWord(a, b)} · business ${Math.round(mix.business * 100)}% · leisure ${Math.round(mix.leisure * 100)}% · VFR ${Math.round(mix.vfr * 100)}%`,
-    'Who flies this city pair, from what each end draws: business travellers barely mind the fare but want peak departures and frequency; leisure travellers chase the fare; VFR (visiting friends and relatives) sit between. A business trunk rewards frequency and peak slots, a sun route a sharp fare.',
-  );
   const bar = document.createElement('div');
   bar.className = 'mix-bar';
   for (const segment of ['business', 'leisure', 'vfr'] as const) {
@@ -377,20 +389,26 @@ function characterLine(a: string, b: string): HTMLElement {
     part.style.width = `${mix[segment] * 100}%`;
     bar.append(part);
   }
-  const wrap = document.createElement('div');
-  wrap.append(row, bar);
-  return wrap;
+  const key = chartLegend([
+    { mark: 'block', color: '#9d8cf0', label: `business ${Math.round(mix.business * 100)}%` },
+    { mark: 'block', color: '#ffb347', label: `leisure ${Math.round(mix.leisure * 100)}%` },
+    { mark: 'block', color: '#5ed6c8', label: `VFR ${Math.round(mix.vfr * 100)}%` },
+  ]);
+  return [bar, key];
 }
+
+/** The seat bar's colours (style.css's .seat-split-*), for its key. */
+const CLASS_COLORS: Record<string, string> = { saver: '#5ed6c8', flex: '#8a93a6', full: '#ffd166' };
 
 /** A tally's numbers in a line: what sold in each class and what happened to people. */
 function describeTally(tally: FareClassTally, perFlight = false): string {
   const n = (value: number) => Math.round(value);
   const parts = CLASS_ORDER.map((fareClass) => `${CLASS_NAMES[fareClass]} ${n(tally.sold[fareClass])}`);
-  if (n(tally.cabinSold ?? 0) > 0) parts.unshift(`Business cabin ${n(tally.cabinSold ?? 0)}`);
-  if (tally.saverSoldOut > 0 && perFlight === false) parts.push(`Saver sold out ${tally.saverSoldOut}/${tally.flights}`);
-  if (n(tally.boughtUp) > 0) parts.push(`${n(tally.boughtUp)} bought up`);
-  if (n(tally.diluted) > 0) parts.push(`${n(tally.diluted)} business paid Saver`);
-  if (n(tally.businessTurnedAway) > 0) parts.push(`${n(tally.businessTurnedAway)} business turned away`);
+  if (n(tally.cabinSold ?? 0) > 0) parts.unshift(`J ${n(tally.cabinSold ?? 0)}`);
+  if (tally.saverSoldOut > 0 && perFlight === false) parts.push(`Saver out ${tally.saverSoldOut}/${tally.flights}`);
+  if (n(tally.boughtUp) > 0) parts.push(`${n(tally.boughtUp)} up`);
+  if (n(tally.diluted) > 0) parts.push(`${n(tally.diluted)} biz on Saver`);
+  if (n(tally.businessTurnedAway) > 0) parts.push(`${n(tally.businessTurnedAway)} biz lost`);
   return parts.join(' · ');
 }
 
@@ -428,10 +446,10 @@ function buildSeatSplit(state: SimState, a: string, b: string, changed: () => vo
     bar.append(handle);
     return handle;
   });
-  const legend = line('', 'inspector-line seat-split-legend');
+  const legend = document.createElement('div');
   const forecast = line('', 'inspector-line seat-split-forecast');
   const yesterday = state.yesterdayFareClasses?.[key];
-  const past = line(yesterday && yesterday.flights > 0 ? `Yesterday · ${describeTally(yesterday)}` : 'Yesterday · not flown yet', 'inspector-line seat-split-yesterday');
+  const past = line(yesterday && yesterday.flights > 0 ? `Yesterday · ${describeTally(yesterday)}` : 'Yesterday · not flown', 'inspector-line seat-split-yesterday');
 
   const redraw = () => {
     const { saverShare, flexShare } = split();
@@ -439,8 +457,16 @@ function buildSeatSplit(state: SimState, a: string, b: string, changed: () => vo
     parts.forEach((part, i) => (part.style.width = `${shares[i] * 100}%`));
     handles[0].style.left = `${saverShare * 100}%`;
     handles[1].style.left = `${(saverShare + flexShare) * 100}%`;
-    legend.textContent = CLASS_ORDER.map((fareClass, i) => `${CLASS_NAMES[fareClass]} ${Math.round(shares[i] * 100)}% $${Math.round(settings.fare * CLASS_PRICE[fareClass])}`).join(' · ');
-    forecast.textContent = `Would sell today · ${describeTally(summarizeMarket(a, b, state, settings).fareClasses, true)}`;
+    legend.replaceChildren(
+      chartLegend(
+        CLASS_ORDER.map((fareClass, i) => ({
+          mark: 'block' as const,
+          color: CLASS_COLORS[fareClass],
+          label: `${CLASS_NAMES[fareClass]} ${Math.round(shares[i] * 100)}% · $${Math.round(settings.fare * CLASS_PRICE[fareClass])}`,
+        })),
+      ),
+    );
+    forecast.textContent = `Today · ${describeTally(summarizeMarket(a, b, state, settings).fareClasses, true)}`;
   };
 
   let dragging: number | null = null;
@@ -504,6 +530,7 @@ function drawHill(
     done,
     step: FARE_STEP,
     ariaLabel: 'Fare',
+    valueLabel: 'your fare',
   });
 }
 
@@ -516,12 +543,12 @@ const STANCES: { stance: FareStance; name: string }[] = [
 /** One stance's forecast in a line: your fare and margin, then each rival's. */
 function describeForecast(forecast: StanceForecast): string {
   const rivals = forecast.rivals.map((rival) => {
-    const adds = rival.flightsAdded >= 0.5 ? ` · +${Math.round(rival.flightsAdded)}/day` : '';
-    const gone = rival.closesInDays !== null ? ` · exits ~${rival.closesInDays}d, then ${RIVAL_SQUEEZED_RESPITE_DAYS}d clear` : '';
-    return `${rival.airline} $${rival.fare} ${signedMoney(rival.margin)}/day${adds}${gone}`;
+    const adds = rival.flightsAdded >= 0.5 ? ` +${Math.round(rival.flightsAdded)} flt` : '';
+    const gone = rival.closesInDays !== null ? ` exits ~${rival.closesInDays}d` : '';
+    return `${rival.code} $${rival.fare}${adds}${gone}`;
   });
-  const response = forecast.responseChance > 0 ? ` · ${Math.round(forecast.responseChance * 100)}%/day they add a flight` : '';
-  return `You $${forecast.fare} ${signedMoney(forecast.margin)}/day · ${rivals.join('; ')}${response}`;
+  const response = forecast.responseChance > 0 ? ` · ${Math.round(forecast.responseChance * 100)}%/day new flight` : '';
+  return `$${forecast.fare} · ${shortSigned(forecast.margin)}/day · ${rivals.join(' · ')}${response}`;
 }
 
 /**
@@ -543,10 +570,10 @@ function buildStances(state: SimState, a: string, b: string, changed: () => void
   const current = STANCES.find((s) => s.stance === settings.fareStance);
   const heading = document.createElement('div');
   heading.className = 'stance-heading';
-  heading.textContent = `Vs rivals · ${current ? current.name : settings.fareIsOverridden ? 'by hand' : 'policy'} · $${settings.fare}`;
+  heading.textContent = `Vs rivals · ${current ? current.name : settings.fareIsOverridden ? 'by hand' : 'policy'}`;
   heading.append(
     ' ',
-    info('A stance re-prices this market against its rivals every day. Each row is where it would settle if nothing else changes: your fare and margin, then each rival\'s, the flights it would add, and whether it would pull out.'),
+    info(`A stance re-prices this market against its rivals every day. Each row is where it would settle if nothing else changes: your fare and margin a day, then each rival's fare, the flights it would add (flt), and when it would pull out (after which the market stays clear of it for ${RIVAL_SQUEEZED_RESPITE_DAYS} days).`),
   );
   block.append(heading);
 
@@ -569,17 +596,6 @@ function buildStances(state: SimState, a: string, b: string, changed: () => void
     block.append(row);
   }
 
-  if (current) {
-    const off = document.createElement('button');
-    off.type = 'button';
-    off.className = 'stance-off';
-    off.textContent = 'Back to fare policy';
-    off.addEventListener('click', () => {
-      setFareStance(state, a, b, null);
-      changed();
-    });
-    block.append(off);
-  }
   return block;
 }
 

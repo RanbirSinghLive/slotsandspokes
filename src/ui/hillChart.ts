@@ -9,6 +9,8 @@
  * set it; letting go calls `done`.
  */
 
+import { chartLegend, type LegendItem } from './chartLegend';
+
 export type ChartPoint = { x: number; margin: number; uncertainty: number; invites: boolean };
 
 export type HillChartOptions = {
@@ -27,6 +29,8 @@ export type HillChartOptions = {
   done: () => void;
   step: number;
   ariaLabel: string;
+  /** What the ball is, in the legend ("your fare"). */
+  valueLabel: string;
 };
 
 const WIDTH = 340;
@@ -81,9 +85,6 @@ export function drawHillChart(o: HillChartOptions): { element: HTMLElement; move
     if ((!point.invites || last) && zoneStart !== null) {
       const end = point.invites ? point.x : o.points[i - 1].x;
       root.append(svg('rect', { x: x(zoneStart), y: 0, width: Math.max(2, x(end) - x(zoneStart)), height: HEIGHT - PAD_BOTTOM, class: 'hill-rival-zone' }));
-      const label = svg('text', { x: x(zoneStart) + 3, y: HEIGHT - PAD_BOTTOM - 3, class: 'hill-zone-label' });
-      label.textContent = 'rivals answer';
-      root.append(label);
       zoneStart = null;
     }
   });
@@ -175,8 +176,19 @@ export function drawHillChart(o: HillChartOptions): { element: HTMLElement; move
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') o.done();
   });
 
+  // The key: only the marks this hill draws.
+  const legend: LegendItem[] = [
+    { mark: 'ball', color: '#fff', label: o.valueLabel },
+    { mark: 'dash', color: '#5ed6c8', label: 'margin/day, estimated' },
+    { mark: 'band', color: 'rgba(94, 214, 200, 0.3)', label: 'how unsure' },
+  ];
+  if (o.observations.some((d) => d.x >= o.low && d.x <= o.high)) legend.push({ mark: 'dot', color: '#fff', label: 'days flown' });
+  legend.push({ mark: 'block', color: '#ffd166', label: 'likely top' });
+  if (o.points.some((p) => p.invites)) legend.push({ mark: 'block', color: 'rgba(255, 179, 71, 0.4)', label: 'rivals answer' });
+  if (o.flags.some((f) => f.x >= o.low && f.x <= o.high)) legend.push({ mark: 'flag', color: '#ef7a95', label: 'rival fares' });
+
   const wrap = document.createElement('div');
   wrap.className = 'hill-wrap';
-  wrap.append(root);
+  wrap.append(root, chartLegend(legend));
   return { element: wrap, moveBall };
 }

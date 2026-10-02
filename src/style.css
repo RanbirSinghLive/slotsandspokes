@@ -4033,3 +4033,64 @@ button.ops-item:hover {
 .hill-peak-range {
   fill: rgba(255, 209, 102, 0.55);
 }
+
+/* A chart's key (ui/chartLegend.ts): swatches in the chart's colours. */
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin: 2px 0 6px;
+  color: #9aa3b8;
+  font-size: 11px;
+}
+
+.chart-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.chart-legend-swatch {
+  display: inline-block;
+  flex: none;
+  width: 12px;
+  height: 8px;
+}
+
+.chart-legend-swatch.is-line {
+  height: 0;
+  border-top: 2px solid var(--swatch);
+}
+
+.chart-legend-swatch.is-dash {
+  height: 0;
+  border-top: 2px dashed var(--swatch);
+}
+
+.chart-legend-swatch.is-band,
+.chart-legend-swatch.is-block {
+  background: var(--swatch);
+  border-radius: 2px;
+}
+
+.chart-legend-swatch.is-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--swatch);
+}
+
+.chart-legend-swatch.is-ball {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--swatch);
+  box-shadow: 0 0 0 1px #0a0c12, 0 0 3px rgba(255, 255, 255, 0.5);
+}
+
+.chart-legend-swatch.is-flag {
+  width: 0;
+  height: 10px;
+  border-left: 1px dashed var(--swatch);
+}

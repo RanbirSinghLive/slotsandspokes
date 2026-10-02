@@ -22,6 +22,8 @@ const chartEl = document.querySelector<HTMLDivElement>('#fare-policy-hill')!;
 const statusEl = document.querySelector<HTMLDivElement>('#fare-policy-status')!;
 
 let drawnSignature = '';
+/** The back-to-policy button, kept under the status line and replaced on each rebuild. */
+let backButtonEl: HTMLButtonElement | null = null;
 let dragging = false;
 
 const percent = (level: number) => `${Math.round(level * 100)}%`;
@@ -31,24 +33,35 @@ function signatureOf(state: SimState): string {
   return `${dayIndex(state)}|${policy}|${stance}|${hand}|${state.schedule.length}|${state.farePolicyMultiplier}`;
 }
 
+/** Every route off the policy (by hand or on a stance) back on it, in one press. Null when none are off. */
+function backToPolicyButton(state: SimState, offPolicy: number): HTMLButtonElement | null {
+  if (offPolicy === 0) return null;
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'lever-reset';
+  button.textContent = `Put all routes back on policy · ${offPolicy} off`;
+  button.addEventListener('click', () => {
+    putAllOnPolicy(state);
+    rebuild(state);
+  });
+  return button;
+}
+
 function rebuild(state: SimState): void {
   drawnSignature = signatureOf(state);
   const hill = networkHill(state);
   chartEl.replaceChildren();
-  if (!hill || hill.policyRoutes === 0) {
-    // The hill only adds up routes on the policy: with none, offer to put them back.
-    statusEl.textContent = hill ? `0 routes on policy · ${hill.byHand.routes} priced by hand or on a stance` : 'No routes yet';
-    if (hill) {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'lever-reset';
-      button.textContent = `Put ${hill.byHand.routes} route${hill.byHand.routes === 1 ? '' : 's'} on policy`;
-      button.addEventListener('click', () => {
-        putAllOnPolicy(state);
-        rebuild(state);
-      });
-      chartEl.append(button);
-    }
+  backButtonEl?.remove();
+  backButtonEl = null;
+  if (!hill) {
+    statusEl.textContent = 'No routes yet';
+    return;
+  }
+  const offPolicy = hill.byHand.routes;
+  backButtonEl = backToPolicyButton(state, offPolicy);
+  if (backButtonEl) statusEl.after(backButtonEl);
+  if (hill.policyRoutes === 0) {
+    statusEl.textContent = 'No routes on policy';
     return;
   }
   const setLevel = (level: number) => {
@@ -77,6 +90,7 @@ function rebuild(state: SimState): void {
     },
     step: LEVEL_STEP,
     ariaLabel: 'Fare policy',
+    valueLabel: 'policy level',
   });
   chartEl.append(drawn.element);
 
@@ -84,12 +98,9 @@ function rebuild(state: SimState): void {
     const level = state.farePolicyMultiplier;
     const { low, high } = hill.peakRange;
     const atTop = level >= low - 1e-9 && level <= high + 1e-9;
-    const top = atTop ? 'the top could be here' : `top probably ${percent(low)}${high > low ? `–${percent(high)}` : ''}`;
-    const byHand =
-      hill.byHand.routes > 0
-        ? ` · ${hill.byHand.gainPerDay >= 0 ? '+' : '−'}${money(Math.abs(hill.byHand.gainPerDay))}/day from ${hill.byHand.routes} priced by hand`
-        : '';
-    statusEl.textContent = `${percent(level)} · ${hill.policyRoutes} route${hill.policyRoutes === 1 ? '' : 's'} on policy · ${top}${byHand}`;
+    const top = atTop ? 'at the top' : `top ${percent(low)}${high > low ? `–${percent(high)}` : ''}`;
+    const byHand = offPolicy > 0 ? ` · off policy ${hill.byHand.gainPerDay >= 0 ? '+' : '−'}${money(Math.abs(hill.byHand.gainPerDay))}/day` : '';
+    statusEl.textContent = `${percent(level)} · ${hill.policyRoutes} route${hill.policyRoutes === 1 ? '' : 's'} · ${top}${byHand}`;
   };
   renderStatus();
 }

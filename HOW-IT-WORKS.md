@@ -1509,8 +1509,10 @@ from under the pointer.
 The airline-wide **fare policy** is at the top of the Routes screen
 (`ui/farePolicy.ts`): the network hill (below, under Fare policy), with
 the level, how many routes follow it, and what the routes priced by hand
-make against it. It is redrawn only when the day, the routes or the
-level change, and never mid-drag.
+make against it, and a button that puts every route back on the
+policy. It is redrawn only when the day, the routes or the level
+change, and never mid-drag. Each chart in the route view has a key of
+swatches under it (`ui/chartLegend.ts`).
 
 ## Randomness (`src/sim/rng.ts`)
 
