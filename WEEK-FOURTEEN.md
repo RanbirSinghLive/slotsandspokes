@@ -181,6 +181,20 @@ stays the open problem.
 
 **Stage 2 is complete.**
 
+**After stage 2, from the owner's playtest (a Chicago game bust on day
+51):**
+
+- **The route view:** shorter lines with the detail in the (i) marks; a
+  key under each chart; one "Put all routes back on policy" button.
+- **The planner** staggers a new plane's first rotation between the
+  route's other flights. Staggering every rotation cost Montréal half
+  its year on 18 seeds ($7.4M against $15.5M); the first rotation
+  alone, $13.0M.
+- **Crowding:** your own flights within an hour of each other, the same
+  way, split one hour's passengers (`crowdingWeight()`), so spreading a
+  route pays. It hasn't had a balance read.
+- **A resumed game starts paused.**
+
 ## Decisions for the owner
 
 1. The airport tags: a first pass covers every airport in the data; the
