@@ -2657,8 +2657,10 @@ the cancellations cost Toronto most of its year on 18 seeds.
 - **The Mtc screen's Checks list:** each plane's items as pips, when its
   heavy check is due and the hours done toward it ("heavy 8/12h · due
   5d"), and last night's check.
-- **The Gantt:** each plane's label carries tonight's check as the day is
-  going ("☾✓", "☾−40m" short, "☾✗" away). It works from the projected
+- **The Gantt:** a key above the rows explains the night cell, and each
+  plane's label carries tonight's check as the day is going ("☾✓",
+  "☾−40m" short, "☾✗" away). The plane's own view says the same in words
+  ("Tonight ☾✓ · 9h 24m at base for 4h 24m of work · heavy due 11d"). It works from the projected
   rest of the day, so a late afternoon shows tonight getting shorter.
 
 ---

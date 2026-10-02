@@ -4109,3 +4109,11 @@ button.ops-item:hover {
 .timeline-night.is-hold {
   color: #ff8080;
 }
+
+/* The key to the Gantt's night cells (ui/panels.ts). */
+.timeline-key {
+  grid-column: 1 / -1;
+  margin: 2px 0 4px;
+  color: #6b7694;
+  font-size: 11px;
+}

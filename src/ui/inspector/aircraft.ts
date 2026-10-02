@@ -15,6 +15,7 @@ import { select, selectRoute } from '../selection';
 import { linkToMap } from '../mapLink';
 import { REBASE_DAYS, REBASE_FEE_LEASE_DAYS } from '../../sim/rebase';
 import { CABIN_PRICE, cabinLayout, cabinOf } from '../../sim/cabins';
+import { DEFERRED_AGE_YEARS, deferredItems, HEAVY_INTERVAL_DAYS, heavyBankedMinutes, heavyCheckDueIn, heavyCheckOpen, heavyCheckWorkMinutes, MX_HOLD_AT, tonightCheck } from '../../sim/mxChecks';
 import { CREWS_PER_NEW_PLANE } from '../../sim/crews';
 
 /**
@@ -171,6 +172,23 @@ export function buildAircraftView(state: SimState, tail: string, changed: () => 
     now.classList.add(aog.refitTo ? 'is-warn' : 'is-over');
   }
   root.append(now);
+  // Tonight's line check and the heavy check (sim/mxChecks.ts), in words.
+  const tonight = tonightCheck(state, tail);
+  if (tonight && plane) {
+    const deferred = deferredItems(plane);
+    const hours = (minutes: number) => `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`;
+    const text = tonight.away
+      ? 'Tonight ☾✗ · away from base · no line check'
+      : `Tonight ☾${tonight.short ? `−${tonight.work - tonight.night}m` : '✓'} · ${hours(tonight.night)} at base for ${hours(tonight.work)} of work`;
+    const heavy = heavyCheckOpen(plane) ? ` · heavy ${Math.round(heavyBankedMinutes(plane) / 6) / 10}/${heavyCheckWorkMinutes(plane.typeCode) / 60}h` : ` · heavy due ${heavyCheckDueIn(plane)}d`;
+    root.append(
+      lineWithInfo(
+        text + heavy + (deferred > 0 ? ` · ${'●'.repeat(Math.min(deferred, MX_HOLD_AT))} ${deferred} deferred` : ''),
+        `The line check: each night at base the plane needs hangar work, more for more flights a day, between landing and an hour before its first departure. ☾✓ means tonight has time for it, ☾−40m that it's that much short, ☾✗ that the plane sleeps away. A short or missed check leaves a deferred item (●): each wears the plane like ${DEFERRED_AGE_YEARS} more years, and at ${MX_HOLD_AT} it's held at base a morning. The heavy check is hangar work every ${HEAVY_INTERVAL_DAYS} flying days, done from the spare hours of nights at base. The Mtc screen lists every plane's.`,
+        tonight.away || tonight.short || deferred >= MX_HOLD_AT - 1 ? 'inspector-line is-warn' : 'inspector-line',
+      ),
+    );
+  }
 
   const use = aircraftUtilisation(state, tail);
   const useLine = lineWithInfo(`${Math.round(use.share * 100)}% of day · ${use.legs} legs`, 'The share of the usable day, 06:00–22:00 home time, its flying and turns take up. Over 100% cannot be flown.');

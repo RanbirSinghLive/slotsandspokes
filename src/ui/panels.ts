@@ -279,6 +279,11 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
   hoursStrip.className = 'timeline-hours';
   timelineHours = { label: hoursLabel, strip: hoursStrip, at, width };
   const rows: HTMLElement[] = [document.createElement('span'), axis, hoursLabel, hoursStrip];
+  // The key to the night cell beside each plane (sim/mxChecks.ts).
+  const key = document.createElement('div');
+  key.className = 'timeline-key';
+  key.textContent = `☾ tonight's line check at base: ✓ time for it · −40m short by · ✗ away from base · ● deferred items (${MX_HOLD_AT} holds the plane a morning)`;
+  rows.push(key);
 
   for (const cls of AIRCRAFT_CLASSES) {
     const planes = state.aircraft.filter((aircraft) => aircraft.typeCode === cls.code);
@@ -554,6 +559,7 @@ function cancelDrag(): void {
 
 function finishDrag(): void {
   if (!drag) return;
+  const moved = drag.moved;
   drag.span.removeEventListener('pointermove', onDragMove);
   drag.span.removeEventListener('pointerup', onDragEnd);
   drag.span.removeEventListener('pointercancel', cancelDrag);
@@ -570,6 +576,8 @@ function finishDrag(): void {
     timelineHours.label.textContent = '';
     timelineHours.strip.replaceChildren();
   }
+  // A drag took every hover tip away; a rebuild puts them back, refused drop or not.
+  if (moved) rebuildTimeline();
 }
 
 window.addEventListener('keydown', (event) => {
@@ -663,7 +671,7 @@ function updateNightCells(state: SimState, force = false): void {
     cell.title =
       (tonight.away
         ? 'Tonight away from base: no line check, so a deferred item.'
-        : `Tonight at base: ${Math.floor(tonight.night / 60)}h ${tonight.night % 60}m in the hangar for ${Math.round(tonight.work / 6) / 10}h of work` +
+        : `Tonight at base: ${Math.floor(tonight.night / 60)}h ${String(tonight.night % 60).padStart(2, '0')}m in the hangar for ${Math.floor(tonight.work / 60)}h ${String(tonight.work % 60).padStart(2, '0')}m of work` +
           (tonight.short ? ', so the check is cut short: a deferred item.' : '.')) +
       (deferred > 0 ? ` ${deferred} deferred item${deferred === 1 ? '' : 's'} (●): at ${MX_HOLD_AT}, held at base for a morning.` : '');
   }
