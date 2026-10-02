@@ -1,4 +1,4 @@
-import { dayIndex, dayStartMinute } from './clock';
+import { dayStartMinute } from './clock';
 import { projectRestOfDay } from './cascade';
 import { rotationsForTail } from './utilisation';
 import type { Aircraft, SimState } from './state';
@@ -21,13 +21,15 @@ import type { Aircraft, SimState } from './state';
  * plane is held at base the next morning: its first rotation is cancelled
  * ("MX hold") while the items are cleared.
  *
- * **The heavy check** comes due every HEAVY_INTERVAL_DAYS days the plane
- * flies, and takes it out of service for its class's HEAVY_DAYS. It's
- * planned from the Mtc screen for a start day and runs like an AOG: its
- * rotations move to spare planes of its class at its base, and what
- * doesn't fit is cancelled. Not started within OVERDUE_GRACE_DAYS of
- * coming due, it's forced, for twice as long. It clears every deferred
- * item.
+ * **The heavy check** is HEAVY_WORK_MINUTES of hangar work every
+ * HEAVY_INTERVAL_DAYS days the plane flies, done at night: from
+ * HEAVY_WINDOW_DAYS before it's due, whatever each night at base has left
+ * after the line check goes toward it. Done, it clears every deferred
+ * item. A plane with long nights finishes it in two or three without
+ * missing a flight; one flown hard from first light to curfew makes slow
+ * progress; nights away make none. Only a plane OVERDUE_GRACE_DAYS past
+ * due is grounded for it, as an AOG (sim/aog.ts), until the work left is
+ * done. So the lever is the shape of the plane's day, not a date.
  */
 
 /** Hangar minutes a night, by class: a base, and more per cycle flown. */
@@ -46,8 +48,11 @@ export const DEFERRED_AGE_YEARS = 3;
 /** Deferred items at which the plane is held at base for a morning. */
 export const MX_HOLD_AT = 3;
 export const HEAVY_INTERVAL_DAYS = 30;
+/** The heavy check's work starts being done this many days before it's due. */
+export const HEAVY_WINDOW_DAYS = 10;
 export const OVERDUE_GRACE_DAYS = 7;
-const HEAVY_DAYS: Record<string, number> = { PROP: 1, REGIONAL: 1, NARROWBODY: 2, WIDEBODY: 3 };
+/** Hangar minutes a heavy check takes, by class. */
+const HEAVY_WORK_MINUTES: Record<string, number> = { PROP: 480, REGIONAL: 600, NARROWBODY: 720, WIDEBODY: 960 };
 
 const MINUTES_PER_DAY = 1440;
 
@@ -66,8 +71,18 @@ export function wornAge(aircraft: Aircraft): number {
   return aircraft.ageYears + DEFERRED_AGE_YEARS * deferredItems(aircraft);
 }
 
-export function heavyCheckDays(typeCode: string): number {
-  return HEAVY_DAYS[typeCode] ?? 1;
+export function heavyCheckWorkMinutes(typeCode: string): number {
+  return HEAVY_WORK_MINUTES[typeCode] ?? HEAVY_WORK_MINUTES.PROP;
+}
+
+/** Hangar minutes done toward the heavy check this time round. */
+export function heavyBankedMinutes(aircraft: Aircraft): number {
+  return aircraft.heavyBankedMinutes ?? 0;
+}
+
+/** Whether nights at base count toward the heavy check yet. */
+export function heavyCheckOpen(aircraft: Aircraft): boolean {
+  return heavyCheckDueIn(aircraft) <= HEAVY_WINDOW_DAYS;
 }
 
 /**
@@ -99,7 +114,6 @@ export type NightResult = 'checked' | 'cleared' | 'short' | 'away';
  * toward the heavy check, and forces an overdue one.
  */
 export function rollNightlyChecks(state: SimState, dayStartMinute: number): void {
-  const today = dayIndex(state);
   const results: Record<string, NightResult> = {};
   for (const aircraft of state.aircraft) {
     const legs = state.schedule.filter((leg) => leg.tail === aircraft.tail);
@@ -115,6 +129,11 @@ export function rollNightlyChecks(state: SimState, dayStartMinute: number): void
       const night = firstDeparture - RELEASE_MINUTES - aircraft.groundSinceMinute;
       const work = lineCheckMinutes(state, aircraft);
       result = night < work ? 'short' : night >= work + CLEAR_SPARE_MINUTES && deferredItems(aircraft) > 0 ? 'cleared' : 'checked';
+      // What the night has left after the line check goes toward the heavy check, once it's open.
+      if (heavyCheckOpen(aircraft) && night > work) {
+        aircraft.heavyBankedMinutes = heavyBankedMinutes(aircraft) + Math.round(night - work);
+        if (heavyBankedMinutes(aircraft) >= heavyCheckWorkMinutes(aircraft.typeCode)) finishHeavyCheck(aircraft);
+      }
     }
     if (result === 'away' || result === 'short') aircraft.deferredItems = deferredItems(aircraft) + 1;
     if (result === 'cleared') {
@@ -123,11 +142,6 @@ export function rollNightlyChecks(state: SimState, dayStartMinute: number): void
     }
     results[aircraft.tail] = result;
 
-    // Overdue past the grace: forced, whatever was planned.
-    if (heavyCheckDueIn(aircraft) <= -OVERDUE_GRACE_DAYS && !aircraft.heavyCheckForced) {
-      aircraft.heavyCheckDay = today;
-      aircraft.heavyCheckForced = true;
-    }
   }
   state.lastNightChecks = results;
 }
@@ -150,48 +164,23 @@ export function morningHolds(state: SimState): { tail: string; legIds: string[] 
   return holds;
 }
 
-/** Why the heavy check can't be planned to start on `day`, or null. */
-export function heavyCheckBlockedReason(state: SimState, aircraft: Aircraft, day: number): string | null {
-  if (aircraft.heavyCheckForced) return 'Overdue · forced';
-  if (state.aogs.some((event) => event.tail === aircraft.tail)) return 'Out of service';
-  if (day <= dayIndex(state)) return 'Pick a day from tomorrow';
-  return null;
-}
-
-/** Plan the heavy check to start on `day` (from tomorrow), or move it. */
-export function planHeavyCheck(state: SimState, tail: string, day: number): { ok: true; message: string } | { ok: false; reason: string } {
-  const aircraft = state.aircraft.find((a) => a.tail === tail);
-  if (!aircraft) return { ok: false, reason: 'No such plane.' };
-  const blocked = heavyCheckBlockedReason(state, aircraft, day);
-  if (blocked) return { ok: false, reason: blocked };
-  aircraft.heavyCheckDay = day;
-  return { ok: true, message: `${tail} heavy check day ${day} · ${heavyCheckDays(aircraft.typeCode)}d` };
-}
-
-export function cancelHeavyCheck(state: SimState, tail: string): { ok: true; message: string } | { ok: false; reason: string } {
-  const aircraft = state.aircraft.find((a) => a.tail === tail);
-  if (!aircraft || aircraft.heavyCheckDay === undefined) return { ok: false, reason: 'Nothing planned.' };
-  if (aircraft.heavyCheckForced) return { ok: false, reason: 'Overdue · forced' };
-  delete aircraft.heavyCheckDay;
-  return { ok: true, message: `${tail} heavy check unplanned` };
-}
-
-/** Heavy checks starting this morning, from sim/aog.ts's morning pass: how long each takes. */
-export function heavyChecksStarting(state: SimState): { aircraft: Aircraft; days: number; forced: boolean }[] {
-  const today = dayIndex(state);
+/**
+ * Heavy checks overdue past the grace, from sim/aog.ts's morning pass:
+ * each plane at base is grounded for the work it has left, in whole days.
+ */
+export function forcedHeavyChecks(state: SimState): { aircraft: Aircraft; days: number }[] {
   return state.aircraft
-    .filter((aircraft) => aircraft.heavyCheckDay !== undefined && aircraft.heavyCheckDay <= today)
+    .filter((aircraft) => heavyCheckDueIn(aircraft) <= -OVERDUE_GRACE_DAYS)
     .filter((aircraft) => aircraft.status === 'ground' && aircraft.atAirport === aircraft.baseAirport && !aircraft.rebase)
     .filter((aircraft) => !state.aogs.some((event) => event.tail === aircraft.tail))
-    .map((aircraft) => ({ aircraft, days: heavyCheckDays(aircraft.typeCode) * (aircraft.heavyCheckForced ? 2 : 1), forced: aircraft.heavyCheckForced === true }));
+    .map((aircraft) => ({ aircraft, days: Math.max(1, Math.ceil((heavyCheckWorkMinutes(aircraft.typeCode) - heavyBankedMinutes(aircraft)) / MINUTES_PER_DAY)) }));
 }
 
 /** A heavy check done: the interval starts again and every deferred item is cleared. */
 export function finishHeavyCheck(aircraft: Aircraft): void {
   aircraft.daysSinceHeavyCheck = 0;
   delete aircraft.deferredItems;
-  delete aircraft.heavyCheckDay;
-  delete aircraft.heavyCheckForced;
+  delete aircraft.heavyBankedMinutes;
 }
 
 /**

@@ -2637,24 +2637,29 @@ for breakdowns and mechanical delays (`wornAge()`). At 3 the plane is
 held at base that morning: its first rotation is cancelled (cause
 "Maintenance hold", the ticker's "MX hold") and the items are cleared.
 
-**The heavy check** comes due every 30 days the plane flies. It takes
-the plane out at base for 1 day (Propeller, Regional), 2 (Narrowbody) or
-3 (Widebody), as an AOG: its rotations move to spare planes of its
-class there, and what doesn't fit cancels. It can't be expedited. It's
-planned from the Mtc screen for a start day. Seven days overdue it's
-forced, for twice as long. It clears every deferred item. A plane from
-an older save starts part-way through its interval, staggered by tail.
+**The heavy check** is hangar work every 30 days the plane flies:
+8 hours for a Propeller, 10 for a Regional, 12 for a Narrowbody, 16 for
+a Widebody. It's done at night. From 10 days before it's due, whatever
+each night at base has left after the line check goes toward it
+(`heavyBankedMinutes`). When the work is done, the interval starts
+again and every deferred item is cleared. A plane with long nights
+finishes in two or three without missing a flight; one flown from first
+light to the curfew makes slow progress; nights away make none. Only a
+plane 7 days past due is grounded for it, as an AOG with its flying
+moved to spare planes, until the work left is done. A plane from an
+older save starts part-way through its interval, staggered by tail.
+
+An earlier version took every plane out for 1–3 days every 30 days. A
+fleet flown near capacity had no spare planes to take its flying, so
+the cancellations cost Toronto most of its year on 18 seeds.
 
 **What you see:**
 - **The Mtc screen's Checks list:** each plane's items as pips, when its
-  heavy check is due, last night's check, and a button to check it from
-  tomorrow. Each check says whether its pool covers it or roughly how
-  many hours of flying it would cancel.
+  heavy check is due and the hours done toward it ("heavy 8/12h · due
+  5d"), and last night's check.
 - **The Gantt:** each plane's label carries tonight's check as the day is
   going ("☾✓", "☾−40m" short, "☾✗" away). It works from the projected
   rest of the day, so a late afternoon shows tonight getting shorter.
-- **The headless player** plans each heavy check 2 days before it's due,
-  one plane per pool at a time.
 
 ---
 

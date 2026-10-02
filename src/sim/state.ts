@@ -82,10 +82,8 @@ export type Aircraft = {
   deferredItems?: number;
   /** Flying days since the last heavy check (sim/mxChecks.ts). Absent: staggered by tail. */
   daysSinceHeavyCheck?: number;
-  /** The day its planned heavy check starts. */
-  heavyCheckDay?: number;
-  /** Set when the check was forced for being overdue: it takes twice as long. */
-  heavyCheckForced?: boolean;
+  /** Hangar minutes done at night toward its heavy check this time round (sim/mxChecks.ts). */
+  heavyBankedMinutes?: number;
 };
 
 /** How one leg went, once it has landed. */

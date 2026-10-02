@@ -2,8 +2,7 @@ import { AIRCRAFT_CLASSES } from '../../sim/aircraftClasses';
 import { aogChance, aogFor, daysUntilReturn, expediteCost, expediteRepair } from '../../sim/aog';
 import { ageDelayParameters } from '../../sim/delays';
 import { USEFUL_LIFE_YEARS } from '../../sim/leasing';
-import { DEFERRED_AGE_YEARS, HEAVY_INTERVAL_DAYS, MX_HOLD_AT, OVERDUE_GRACE_DAYS, wornAge } from '../../sim/mxChecks';
-import { dayIndex } from '../../sim/clock';
+import { DEFERRED_AGE_YEARS, HEAVY_INTERVAL_DAYS, HEAVY_WINDOW_DAYS, MX_HOLD_AT, OVERDUE_GRACE_DAYS, wornAge } from '../../sim/mxChecks';
 import * as ops from '../routeActions';
 import type { SimState } from '../../sim/state';
 import { money } from '../format';
@@ -70,7 +69,7 @@ export function buildMaintenanceView(state: SimState, changed: () => void): HTML
     }
   }
 
-  root.append(...buildChecks(state, changed));
+  root.append(...buildChecks(state));
 
   root.append(
     heading(
@@ -115,19 +114,18 @@ const NIGHT_WORDS: Record<string, string> = { checked: 'checked', cleared: 'clea
 
 /**
  * Checks (sim/mxChecks.ts): every plane's deferred items, last night's
- * line check, and its heavy check, due or planned, with a button to plan
- * it for tomorrow (or call it off) and whether its pool covers it.
+ * line check, and its heavy check: when it's due, and the hours done at
+ * night toward it.
  */
-function buildChecks(state: SimState, changed: () => void): HTMLElement[] {
+function buildChecks(state: SimState): HTMLElement[] {
   const nodes: HTMLElement[] = [
     heading(
       'Checks',
-      `Line check: every night at base, the plane gets its hangar work, longer for more flights a day. A night away from base, or too short for the work, leaves a deferred item (●); a long night clears one. Each item wears the plane like ${DEFERRED_AGE_YEARS} more years: more breakdowns and mechanical delays. At ${MX_HOLD_AT} it's held at base for a morning and its first rotation is cancelled. Heavy check: every ${HEAVY_INTERVAL_DAYS} flying days, a day or more out of service at base, its flying moved to spare planes of its class there. Plan it here; ${OVERDUE_GRACE_DAYS} days overdue it's forced, for twice as long. It clears every item.`,
+      `Line check: every night at base, the plane gets its hangar work, longer for more flights a day. A night away from base, or too short for the work, leaves a deferred item (●); a long night clears one. Each item wears the plane like ${DEFERRED_AGE_YEARS} more years: more breakdowns and mechanical delays. At ${MX_HOLD_AT} it's held at base for a morning and its first rotation is cancelled. Heavy check: every ${HEAVY_INTERVAL_DAYS} flying days, 8–16 hours of hangar work, done at night: from ${HEAVY_WINDOW_DAYS} days before it's due, each night at base puts its spare hours after the line check toward it. Long nights finish it without missing a flight; a day flown from first light to curfew makes slow progress. ${OVERDUE_GRACE_DAYS} days overdue, the plane is grounded until it's done. It clears every item.`,
     ),
   ];
   const readouts = ops.heavyCheckReadouts(state);
   if (readouts.length === 0) return [...nodes, line('No aircraft')];
-  const today = dayIndex(state);
   const list = document.createElement('div');
   list.className = 'inspector-rows';
   for (const plane of readouts) {
@@ -137,35 +135,17 @@ function buildChecks(state: SimState, changed: () => void): HTMLElement[] {
     name.append(planeIconElement(plane.typeCode), ` ${plane.tail} ${pips(plane.deferred)}`);
     const detail = document.createElement('span');
     detail.className = 'inspector-row-detail';
-    const due = plane.dueIn > 0 ? `heavy due ${plane.dueIn}d` : `heavy ${-plane.dueIn}d overdue`;
     const night = plane.lastNight ? ` · night ${NIGHT_WORDS[plane.lastNight]}` : '';
-    detail.append(`${due}${night} `);
-    if (plane.inCheck) {
-      detail.append('· in check');
-    } else if (plane.plannedDay !== null) {
-      const cover = plane.uncoveredHours > 0 ? ` · ~${plane.uncoveredHours}h CNX` : ' · covered';
-      detail.append(`· day ${plane.plannedDay}${plane.forced ? ' forced' : ''} · ${plane.days}d${cover} `);
-      if (!plane.forced) detail.append(actionButton('Unplan', () => ops.cancelHeavyCheck(state, plane.tail), changed));
-    } else {
-      const cover = plane.uncoveredHours > 0 ? `~${plane.uncoveredHours}h CNX` : 'covered';
-      detail.append(actionButton(`Check tomorrow · ${plane.days}d · ${cover}`, () => ops.planHeavyCheck(state, plane.tail, today + 1), changed));
-    }
+    const heavy = plane.inCheck
+      ? 'heavy check · grounded'
+      : plane.open
+        ? `heavy ${plane.bankedHours}/${plane.workHours}h · ${plane.dueIn > 0 ? `due ${plane.dueIn}d` : `${-plane.dueIn}d overdue`}`
+        : `heavy due ${plane.dueIn}d`;
+    detail.textContent = heavy + night;
     if (plane.deferred >= MX_HOLD_AT - 1 || plane.dueIn <= 0) detail.classList.add('is-warn');
     row.append(name, detail);
     list.append(row);
   }
   nodes.push(list);
   return nodes;
-}
-
-function actionButton(label: string, run: () => unknown, changed: () => void): HTMLButtonElement {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'lever-reset';
-  button.textContent = label;
-  button.addEventListener('click', () => {
-    run();
-    changed();
-  });
-  return button;
 }

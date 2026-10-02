@@ -46,7 +46,7 @@ import {
 import { cashNeededToLease, LEASE_RESERVE_DAYS, leaseRateFor, loadLeaseRates } from './leasing';
 import { inboundAt, orderLease } from './fleetTiming';
 import { startSeatSale as startSeatSaleRule } from './seatSale';
-import { cancelHeavyCheck as cancelHeavyCheckRule, deferredItems, heavyCheckDays, heavyCheckDueIn, planHeavyCheck as planHeavyCheckRule } from './mxChecks';
+import { deferredItems, heavyBankedMinutes, heavyCheckDueIn, heavyCheckOpen, heavyCheckWorkMinutes } from './mxChecks';
 import { rebaseOptions, rebasePlane, type RebaseOption } from './rebase';
 import { cabinGainPerDay, cabinOf, cancelRefit as cancelRefitRule, orderRefit as orderRefitRule, refitBlockedReason, refitCost, refitDays, type Cabin } from './cabins';
 import { commitRetime, planRetime, type RetimePlan } from './retime';
@@ -58,7 +58,7 @@ import { applyRotation, candidateTailsAt, planRotation, type RotationPlan, type 
 import { isAircraftTypeAllowedAt, legsServingMarket, marketKey } from './schedule';
 import type { SimState } from './state';
 import { applyTurnBufferChange, planTurnBufferChange } from './turnBuffer';
-import { aircraftUtilisation, allRotations, USABLE_DAY_MINUTES, utilisationPools, type PoolEffect, type Rotation } from './utilisation';
+import { allRotations, type PoolEffect, type Rotation } from './utilisation';
 
 /**
  * What a player can do to the network, as plain operations on `SimState`
@@ -585,46 +585,31 @@ export type HeavyCheckReadout = {
   base: string | null;
   deferred: number;
   dueIn: number;
-  days: number;
-  plannedDay: number | null;
-  forced: boolean;
+  /** Whether nights at base are counting toward it yet. */
+  open: boolean;
+  bankedHours: number;
+  workHours: number;
+  /** Grounded for it, having gone too far overdue. */
   inCheck: boolean;
-  /** How many hours of its flying its pool can't absorb while it's out: 0 means covered. */
-  uncoveredHours: number;
   lastNight: 'checked' | 'cleared' | 'short' | 'away' | null;
 };
 
 /** Every plane's checks (sim/mxChecks.ts), for the Mtc screen, soonest due first. */
 export function heavyCheckReadouts(state: SimState): HeavyCheckReadout[] {
   return state.aircraft
-    .map((aircraft) => {
-      const pool = aircraft.baseAirport ? utilisationPools(state, aircraft.baseAirport).find((p) => p.code === aircraft.typeCode) : undefined;
-      // Out, it adds no day to its pool, and its flying still needs doing.
-      const spareWhileOut = pool ? pool.capacityMinutes - USABLE_DAY_MINUTES - pool.usedMinutes : 0;
-      return {
-        tail: aircraft.tail,
-        typeCode: aircraft.typeCode,
-        base: aircraft.baseAirport,
-        deferred: deferredItems(aircraft),
-        dueIn: heavyCheckDueIn(aircraft),
-        days: heavyCheckDays(aircraft.typeCode) * (aircraft.heavyCheckForced ? 2 : 1),
-        plannedDay: aircraft.heavyCheckDay ?? null,
-        forced: aircraft.heavyCheckForced === true,
-        inCheck: state.aogs.some((event) => event.tail === aircraft.tail && event.check),
-        // No more than its own flying: an idle plane's check cancels nothing.
-        uncoveredHours: Math.round(Math.min(aircraftUtilisation(state, aircraft.tail).share * USABLE_DAY_MINUTES, Math.max(0, -spareWhileOut)) / 60),
-        lastNight: state.lastNightChecks?.[aircraft.tail] ?? null,
-      };
-    })
+    .map((aircraft) => ({
+      tail: aircraft.tail,
+      typeCode: aircraft.typeCode,
+      base: aircraft.baseAirport,
+      deferred: deferredItems(aircraft),
+      dueIn: heavyCheckDueIn(aircraft),
+      open: heavyCheckOpen(aircraft),
+      bankedHours: Math.round((heavyBankedMinutes(aircraft) / 60) * 10) / 10,
+      workHours: heavyCheckWorkMinutes(aircraft.typeCode) / 60,
+      inCheck: state.aogs.some((event) => event.tail === aircraft.tail && event.check),
+      lastNight: state.lastNightChecks?.[aircraft.tail] ?? null,
+    }))
     .sort((a, b) => a.dueIn - b.dueIn);
-}
-
-export function planHeavyCheck(state: SimState, tail: string, day: number): Outcome<{ message: string }> {
-  return planHeavyCheckRule(state, tail, day);
-}
-
-export function cancelHeavyCheck(state: SimState, tail: string): Outcome<{ message: string }> {
-  return cancelHeavyCheckRule(state, tail);
 }
 
 // --- Seat sales --------------------------------------------------------------
