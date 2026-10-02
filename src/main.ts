@@ -926,3 +926,11 @@ if (choosingHome) {
     speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === 1));
   });
 }
+
+// A resumed game starts paused: a reload, a loaded save or an imported
+// one should never fly days the player didn't watch. Space or 1× resumes
+// it, at 1×.
+if (savedState !== null) {
+  speedMultiplier = 0;
+  speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === 0));
+}
