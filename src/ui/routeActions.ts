@@ -31,6 +31,7 @@ export {
   previewTurnBuffer,
   returnOptions,
   refitOptionFor,
+  heavyCheckReadouts,
   rebaseOptionsFor,
   planRetimeRotation,
   routeBase,
@@ -70,6 +71,14 @@ export function retimeRotation(state: SimState, legIds: string[], toTail: string
 
 export function rebasePlane(state: SimState, tail: string, to: string) {
   return afterChange(state, actions.rebasePlaneTo(state, tail, to));
+}
+
+export function planHeavyCheck(state: SimState, tail: string, day: number) {
+  return afterChange(state, actions.planHeavyCheck(state, tail, day));
+}
+
+export function cancelHeavyCheck(state: SimState, tail: string) {
+  return afterChange(state, actions.cancelHeavyCheck(state, tail));
 }
 
 export function startSeatSale(state: SimState, a: string, b: string) {

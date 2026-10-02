@@ -1,3 +1,4 @@
+import { deferredItems, MX_HOLD_AT, tonightCheck } from '../sim/mxChecks';
 import { planRetimeRotation, removeRotation as removeRotationFromSchedule, retimeRotation } from '../sim/playerActions';
 import type { RetimePlan } from '../sim/retime';
 import { airportHours, FIRST_OPEN_HOUR, freeInHour, OPEN_HOURS } from '../sim/hours';
@@ -231,6 +232,7 @@ function renderRotations(state: SimState): void {
 
   rotationsEmptyEl.hidden = rotations.length > 0;
   rotationsTimelineEl.replaceChildren(...(rotations.length > 0 ? buildTimeline(state, rotations) : []));
+  updateNightCells(state, true);
 }
 
 /** Rebuild now, whatever the signature says: a group folded or unfolded, a move made. */
@@ -319,6 +321,11 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
       shareEl.className = 'timeline-share';
       shareEl.textContent = `${Math.round(share * 100)}%`;
       plane.append(shareEl);
+      // Tonight's line check and deferred items (sim/mxChecks.ts), kept live by updateNightCells().
+      const nightEl = document.createElement('span');
+      nightEl.className = 'timeline-night';
+      nightEl.dataset.tail = aircraft.tail;
+      plane.append(nightEl);
       plane.title = `${cls.name} ${aircraft.tail} · ${aircraft.baseAirport ?? 'no base'} · ${Math.round(share * 100)}% of its day`;
       plane.addEventListener('click', () => select({ kind: 'aircraft', tail: aircraft.tail }));
 
@@ -626,7 +633,44 @@ function removeButtonFor(rotation: Rotation, state: SimState): HTMLButtonElement
 let timelineWindow: { start: number; end: number } | null = null;
 
 /** Move every row's now line to the current home-local time: cheap, so it runs every frame. */
+/** The sim minute the night cells were last worked out at: they move with delays, so every NIGHT_REFRESH_MINUTES is enough. */
+let nightCellsMinute = -Infinity;
+const NIGHT_REFRESH_MINUTES = 15;
+
+/**
+ * Each plane's night cell: ☾ and tonight's check as the day is going
+ * (checked, short by so many minutes, or away from base), then its
+ * deferred items as pips. Its tooltip says what that means.
+ */
+function updateNightCells(state: SimState, force = false): void {
+  if (!force && Math.abs(state.simMinute - nightCellsMinute) < NIGHT_REFRESH_MINUTES) return;
+  nightCellsMinute = state.simMinute;
+  for (const cell of rotationsTimelineEl.querySelectorAll<HTMLElement>('.timeline-night')) {
+    const tail = cell.dataset.tail!;
+    const aircraft = state.aircraft.find((a) => a.tail === tail);
+    const tonight = tonightCheck(state, tail);
+    const deferred = aircraft ? deferredItems(aircraft) : 0;
+    const pips = deferred > 0 ? ' ' + '●'.repeat(Math.min(deferred, MX_HOLD_AT)) : '';
+    if (!tonight) {
+      cell.textContent = pips;
+      cell.className = 'timeline-night';
+      cell.title = '';
+      continue;
+    }
+    const status = tonight.away ? '☾✗' : tonight.short ? `☾−${tonight.work - tonight.night}m` : '☾✓';
+    cell.textContent = status + pips;
+    cell.className = `timeline-night${tonight.away || tonight.short ? ' is-short' : ''}${deferred >= MX_HOLD_AT - 1 ? ' is-hold' : ''}`;
+    cell.title =
+      (tonight.away
+        ? 'Tonight away from base: no line check, so a deferred item.'
+        : `Tonight at base: ${Math.floor(tonight.night / 60)}h ${tonight.night % 60}m in the hangar for ${Math.round(tonight.work / 6) / 10}h of work` +
+          (tonight.short ? ', so the check is cut short: a deferred item.' : '.')) +
+      (deferred > 0 ? ` ${deferred} deferred item${deferred === 1 ? '' : 's'} (●): at ${MX_HOLD_AT}, held at base for a morning.` : '');
+  }
+}
+
 function updateTimelineNow(state: SimState): void {
+  updateNightCells(state);
   if (!timelineWindow) return;
   const minute = minuteOfDay(state);
   const inside = minute >= timelineWindow.start && minute <= timelineWindow.end;

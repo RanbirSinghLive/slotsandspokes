@@ -344,6 +344,7 @@ function steadyPlayer(kind: 'steady' | 'sitter' | 'bold'): Player {
         ...tuneFareClasses(state),
         ...refitCabins(state),
         ...runSeatSales(state),
+        ...planHeavyChecks(state),
         ...adoptInnovations(state),
         ...(kind === 'steady' ? hedgeWhenCheap(state) : []),
         ...(kind === 'steady' ? hireExecutives(state) : []),
@@ -384,6 +385,35 @@ function tuneFareClasses(state: SimState): string[] {
     const [a, b] = key.split('-');
     setFareClasses(state, a, b, next, flexShare + (saverShare - next));
     log.push(`${key} Saver ${Math.round(saverShare * 100)}% → ${Math.round(next * 100)}%.`);
+  }
+  return log;
+}
+
+// --- Maintenance checks ------------------------------------------------
+
+/** A heavy check is planned once it's due within this many days. */
+const PLAN_CHECK_WITHIN_DAYS = 2;
+
+/**
+ * Plan each heavy check (sim/mxChecks.ts) as it comes due, for the first
+ * day from tomorrow when no other plane of its class at its base is out
+ * for one, so its pool covers one plane at a time. Never lets one go
+ * overdue into a forced check.
+ */
+function planHeavyChecks(state: SimState): string[] {
+  const log: string[] = [];
+  const today = dayIndex(state);
+  const readouts = actions.heavyCheckReadouts(state);
+  for (const plane of readouts) {
+    if (plane.plannedDay !== null || plane.forced || plane.inCheck || plane.dueIn > PLAN_CHECK_WITHIN_DAYS) continue;
+    const pool = readouts.filter((other) => other.tail !== plane.tail && other.base === plane.base && other.typeCode === plane.typeCode);
+    for (let day = today + 1; day <= today + 14; day++) {
+      const clash = pool.some((other) => other.inCheck ? day < today + other.days : other.plannedDay !== null && Math.abs(other.plannedDay - day) < Math.max(other.days, plane.days));
+      if (clash) continue;
+      const result = actions.planHeavyCheck(state, plane.tail, day);
+      if (result.ok) log.push(result.message);
+      break;
+    }
   }
   return log;
 }

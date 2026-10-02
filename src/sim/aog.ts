@@ -7,6 +7,7 @@ import { marketKey } from './schedule';
 import { aircraftUtilisation, rotationsForTail, type Rotation } from './utilisation';
 import { coverRotations } from './turnBuffer';
 import { refitDays } from './cabins';
+import { finishHeavyCheck, heavyChecksStarting, wornAge } from './mxChecks';
 import type { Aircraft, SimState } from './state';
 
 /**
@@ -72,6 +73,8 @@ export type AogEvent = {
   movedLegIds: string[];
   /** A planned refit (sim/cabins.ts) rather than a breakdown: the cabin it has when it's back. It can't be expedited. */
   refitTo?: 'economy' | 'business';
+  /** A heavy check (sim/mxChecks.ts) rather than a breakdown. It can't be expedited. */
+  check?: boolean;
 };
 
 export function isAog(state: SimState, tail: string): boolean {
@@ -83,7 +86,8 @@ export function aogFor(state: SimState, tail: string): AogEvent | undefined {
 }
 
 function effectiveAge(state: SimState, aircraft: Aircraft): number {
-  return aircraft.ageYears * MAINTENANCE_AGE_FACTOR * executiveMaintenanceMultiplier(state);
+  // Deferred items wear it like extra years (sim/mxChecks.ts).
+  return wornAge(aircraft) * MAINTENANCE_AGE_FACTOR * executiveMaintenanceMultiplier(state);
 }
 
 /** Today's chance this plane goes AOG. Exported for the dev tools and any readout that wants to explain it. */
@@ -149,9 +153,23 @@ export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
     const aircraft = state.aircraft.find((a) => a.tail === event.tail);
     if (aircraft && event.refitTo === 'business') aircraft.cabin = 'business';
     if (aircraft && event.refitTo === 'economy') delete aircraft.cabin;
+    if (aircraft && event.check) finishHeavyCheck(aircraft);
     handBackFlying(state, event);
   }
   startRefits(state, dayStartMinute);
+  // Heavy checks due today (sim/mxChecks.ts), grounded the same way.
+  for (const { aircraft, days, forced } of heavyChecksStarting(state)) {
+    state.aogs.push({
+      tail: aircraft.tail,
+      base: aircraft.baseAirport!,
+      fault: forced ? 'heavy check overdue' : 'heavy check',
+      returnsAtMinute: dayStartMinute + days * MINUTES_PER_DAY,
+      uncoveredRoutes: [],
+      coveredRotations: 0,
+      movedLegIds: [],
+      check: true,
+    });
+  }
 
   for (const aircraft of state.aircraft) {
     // Always draw, whatever the outcome below, so how many random numbers a
@@ -230,7 +248,7 @@ export function daysUntilReturn(state: SimState, event: AogEvent): number {
 export function expediteCost(state: SimState, tail: string): number | null {
   const event = aogFor(state, tail);
   const aircraft = state.aircraft.find((a) => a.tail === tail);
-  if (!event || !aircraft || event.refitTo || daysUntilReturn(state, event) <= 1) return null;
+  if (!event || !aircraft || event.refitTo || event.check || daysUntilReturn(state, event) <= 1) return null;
   return EXPEDITE_LEASE_DAYS_PER_DAY * aircraft.leaseCostPerDay;
 }
 

@@ -4094,3 +4094,18 @@ button.ops-item:hover {
   height: 10px;
   border-left: 1px dashed var(--swatch);
 }
+
+/* Tonight's line check on a Gantt row (ui/panels.ts, sim/mxChecks.ts). */
+.timeline-night {
+  margin-left: 4px;
+  color: #6b7694;
+  font-variant-numeric: tabular-nums;
+}
+
+.timeline-night.is-short {
+  color: #ffb347;
+}
+
+.timeline-night.is-hold {
+  color: #ff8080;
+}

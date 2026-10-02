@@ -78,6 +78,14 @@ export type Aircraft = {
   cabin?: 'business';
   /** A refit ordered and paid for, starting the next morning it is at base (sim/cabins.ts). */
   refitPending?: 'economy' | 'business';
+  /** Line checks missed or cut short and not yet made up (sim/mxChecks.ts). Absent: none. */
+  deferredItems?: number;
+  /** Flying days since the last heavy check (sim/mxChecks.ts). Absent: staggered by tail. */
+  daysSinceHeavyCheck?: number;
+  /** The day its planned heavy check starts. */
+  heavyCheckDay?: number;
+  /** Set when the check was forced for being overdue: it takes twice as long. */
+  heavyCheckForced?: boolean;
 };
 
 /** How one leg went, once it has landed. */
@@ -537,6 +545,10 @@ export type SimState = {
    * cancellations are attributed to the right cause.
    */
   aogs: AogEvent[];
+  /** Planes held at base this morning for their deferred items (sim/mxChecks.ts), for the ticker. */
+  mxHoldsToday?: string[];
+  /** How each flying plane's line check went last night (sim/mxChecks.ts), by tail. */
+  lastNightChecks?: Record<string, 'checked' | 'cleared' | 'short' | 'away'>;
   /** Fare wars running now (sim/fareWars.ts). Absent in an older save: none. */
   fareWars?: FareWar[];
   /** Fare wars started and ended, the latest few, for the ticker. */
@@ -565,7 +577,7 @@ export type SimState = {
    * was due (stranded by an earlier disruption); optional so older saves
    * load, absent meaning none.
    */
-  cancellationsByCause: { crew: number; mechanical: number; weather: number; curfew: number; position?: number };
+  cancellationsByCause: { crew: number; mechanical: number; weather: number; curfew: number; position?: number; maintenance?: number };
   /**
    * Cancellations: legs that should have operated today and
    * didn't. `flightsScheduled*` counts what was on the books, so

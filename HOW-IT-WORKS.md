@@ -2616,6 +2616,48 @@ covered too. Until it ferries, the alert strip says it will.
 
 ---
 
+## Maintenance checks (`src/sim/mxChecks.ts`)
+
+**The line check is the night at base.** Judged at midnight for every
+plane that flies:
+- **The work:** a base amount plus more per flight on its day (a
+  Propeller needs 2h plus 24 min a cycle; a Widebody 4h plus 36 min).
+- **The night:** from its landing to an hour before its first
+  departure.
+
+A plane that sleeps away from base, or whose night is shorter than the
+work, carries a **deferred item** (●). A night with 2h to spare after
+the work clears one. Planes on an AOG, a refit, a heavy check or a ferry
+skip it. The 22:00 curfew keeps nights at base long, so items come
+mostly from planes stranded away and, once planes sleep out, from night
+stops.
+
+**Deferred items wear the plane.** Each counts as 3 more years of age
+for breakdowns and mechanical delays (`wornAge()`). At 3 the plane is
+held at base that morning: its first rotation is cancelled (cause
+"Maintenance hold", the ticker's "MX hold") and the items are cleared.
+
+**The heavy check** comes due every 30 days the plane flies. It takes
+the plane out at base for 1 day (Propeller, Regional), 2 (Narrowbody) or
+3 (Widebody), as an AOG: its rotations move to spare planes of its
+class there, and what doesn't fit cancels. It can't be expedited. It's
+planned from the Mtc screen for a start day. Seven days overdue it's
+forced, for twice as long. It clears every deferred item. A plane from
+an older save starts part-way through its interval, staggered by tail.
+
+**What you see:**
+- **The Mtc screen's Checks list:** each plane's items as pips, when its
+  heavy check is due, last night's check, and a button to check it from
+  tomorrow. Each check says whether its pool covers it or roughly how
+  many hours of flying it would cancel.
+- **The Gantt:** each plane's label carries tonight's check as the day is
+  going ("☾✓", "☾−40m" short, "☾✗" away). It works from the projected
+  rest of the day, so a late afternoon shows tonight getting shorter.
+- **The headless player** plans each heavy check 2 days before it's due,
+  one plane per pool at a time.
+
+---
+
 ## Fleet timing (`src/sim/fleetTiming.ts`)
 
 Every change to the fleet takes time, so planes and crews are planned

@@ -260,7 +260,11 @@ days, and a war started with MD.
    days, more often when worked hard. With fewer than the minimum fit, a
    plane is grounded, so reserve crews buy completion at standby cost,
    as spare aircraft time buys cover for AOGs.
-2. **Maintenance checks**: design in discussion with the owner.
+2. **Maintenance checks** (decided with the owner): the line check is a
+   night at base, and a night away or too short leaves a deferred item.
+   Items raise breakdowns and delays, and at 3 the plane is held for a
+   morning. Heavy checks every 30 flying days are planned groundings
+   from the Mtc screen.
 3. **Night stops**: planes that sleep at an outstation, for a morning
    wave from the spokes.
 
@@ -270,6 +274,13 @@ risk). The Crews screen shows "Sick 0 · reserve 3 · grounding risk
 <1%/wk", and the headless player staffs for 5% a week. The one-seed
 headless year went from $0.44M to $23.0M: the extra random draws send
 it down a different path, and one seed can't judge it.
+
+**Step 2 built:** `sim/mxChecks.ts`, the Mtc screen's Checks list, the
+Gantt's night cell, the MX hold in the ticker and the cancellation
+table, and the headless player planning heavy checks. In one headless
+year from Montréal about 98% of nights are full checks, 1–2% are away
+after a cancellation strands the plane, a few are short, and one hold
+happens. It matters more once planes sleep out (step 3).
 
 ## Decisions for the owner
 

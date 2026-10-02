@@ -451,6 +451,24 @@ function pollAogEvents(state: SimState): void {
   }
 }
 
+/** Planes held at base for a morning (sim/mxChecks.ts): one line each, the morning it happens. */
+let seenMxHolds: string | null = null;
+
+function pollMxHoldEvents(state: SimState): void {
+  const holds = state.mxHoldsToday ?? [];
+  const id = `${Math.floor(state.simMinute / 1440)}|${holds.join(',')}`;
+  if (seenMxHolds === null || holds.length === 0) {
+    seenMxHolds = id;
+    return;
+  }
+  if (id === seenMxHolds) return;
+  seenMxHolds = id;
+  for (const tail of holds) {
+    const base = state.aircraft.find((a) => a.tail === tail)?.baseAirport ?? '';
+    pushEvent(state.simMinute, 'AOG', `MX hold ${base} · ${tail} · deferred items · first rotation CNX`, { kind: 'maintenance' });
+  }
+}
+
 /** Fare wars starting and ending (sim/fareWars.ts), from the sim's log. */
 let seenFareWarEvents: Set<string> | null = null;
 
@@ -663,6 +681,7 @@ export function updateTicker(state: SimState): void {
   pollAogEvents(state);
   pollFerryEvents(state);
   pollFareWarEvents(state);
+  pollMxHoldEvents(state);
   pollRivalFareEvents(state);
   pollMarketEvents(state);
   pollReachEvents(state);

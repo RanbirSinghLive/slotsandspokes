@@ -1,3 +1,4 @@
+import { morningHolds, rollNightlyChecks, wornAge } from './mxChecks';
 import { rollDailyFareWars } from './fareWars';
 import { effectiveFareClasses } from './seatSale';
 import { rollDailyBrand } from './brand';
@@ -182,6 +183,7 @@ export function step(state: SimState): void {
 
     state.completedToday = [];
     state.cancelledToday = [];
+    state.mxHoldsToday = [];
     state.retimedToday = [];
     // Yesterday's fare-class sales, for the route view (sim/fareClasses.ts).
     state.yesterdayFareClasses = state.todayFareClasses ?? {};
@@ -268,9 +270,21 @@ export function step(state: SimState): void {
     // pass so a tail already grounded for crew isn't grounded twice and
     // counted under two causes; before the cancellation count below, so
     // whatever couldn't be covered is counted as cancelled today.
+    // Last night's line checks, judged before anyone is ferried home (sim/mxChecks.ts).
+    rollNightlyChecks(state, state.simMinute);
     // A plane stranded away from base with nothing to fly from there goes home empty (sim/ferry.ts).
     ferryStrandedPlanes(state);
     rollDailyAogs(state, state.simMinute);
+    // Planes with too many deferred items are held at base this morning: their first rotation cancels.
+    for (const hold of morningHolds(state)) {
+      for (const legId of hold.legIds) {
+        const leg = state.schedule.find((l) => l.legId === legId);
+        if (!leg) continue;
+        state.cancelledToday.push(legId);
+        recordCancellation(state, leg, 'maintenance');
+      }
+      (state.mxHoldsToday ??= []).push(hold.tail);
+    }
 
 
     // Cancellations. Everything on the schedule that has an aircraft is a
@@ -282,6 +296,8 @@ export function step(state: SimState): void {
       if (!state.aircraft.some((a) => a.tail === leg.tail)) continue; // no aircraft assigned — not really scheduled
       state.todayFlightsScheduled += 1;
       state.flightsScheduledTotal += 1;
+      // Already cancelled this morning (a maintenance hold): counted once.
+      if (state.cancelledToday.includes(leg.legId)) continue;
 
       // Three causes, checked in the order they'd actually stop a flight:
       // no crew to fly it, no serviceable aircraft, or nowhere to fly it
@@ -424,7 +440,8 @@ export function step(state: SimState): void {
     const weatherAtOrigin = !!state.weatherByAirport[leg.origin];
     const [delayBreakdown, nextSeed] = rollTotalDelayMinutes(
       state.rngSeed,
-      aircraft.ageYears,
+      // Deferred maintenance items wear it like extra years (sim/mxChecks.ts).
+      wornAge(aircraft),
       weatherAtOrigin,
       lateAtDepartureMinutes,
       // Congestion is judged at the busier of the two ends, each in the
