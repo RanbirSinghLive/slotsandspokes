@@ -195,6 +195,43 @@ stays the open problem.
   route pays. It hasn't had a balance read.
 - **A resumed game starts paused.**
 
+## Stage 3: brand and pricing moments (owner: go, 2026-10-02)
+
+Today a fare only splits a market; it never grows one. Your name only
+moves NPS. Fare wars happen every day, a quarter of the gap at a time,
+and nobody sees them. Stage 3 makes price a strategy with consequences
+you can watch.
+
+**Build order:**
+
+1. **Low fares grow markets.** A market's growth and its ceiling follow
+   the fares flown on it, seat-weighted across you and your rivals,
+   against the going rate. Cheap fares build it faster and bigger (up
+   to 1.3× its potential); dear ones slow it and shrink it (to 0.8×).
+   Market demand belongs to everyone who flies it, so a market built
+   cheaply is one a rival can enter and share.
+2. **Brand position.** Where the network hill's ball sits, averaged
+   over about 60 days: Low-cost (under 90% of the going rate), Mainline,
+   or Premium (over 115%). Low-cost wins leisure and VFR travellers and
+   loses business ones; Premium the reverse. It's slow to build and slow
+   to move, so it's a moat, and a brand card shows it.
+3. **Seat sales.** A route action: for 7 days Saver sells at half the
+   fare and has at least 40% of the seats, and the market grows twice
+   as fast. A route can run one every 30 days. Rivals may answer it.
+4. **Fare wars as events.** When you and a rival keep cutting below
+   each other, a war starts. It shows in the ticker and as a banner on
+   the route, with the days so far and each side's money a day. It ends
+   when fares settle or one side leaves.
+
+**Defaults chosen, for the owner to change:** brand from the ball, not
+picked; seat sales per route, not network-wide; booking curves stay
+carried (booking order stands in).
+
+**Step 1 built:** `sim/fareStimulus.ts`, in market growth
+(`sim/marketDemand.ts`), with the route view saying when fares are
+growing a market or holding it back. The one-seed headless year went
+from $1.34M to $1.87M; no balance read yet.
+
 ## Decisions for the owner
 
 1. The airport tags: a first pass covers every airport in the data; the

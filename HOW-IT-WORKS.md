@@ -1920,6 +1920,19 @@ Actual demand is a property of the **market**, not of any airline —
 everyone flying it grows it, everyone serving it draws from the same
 pool. Stimulation is a public good.
 
+**Low fares grow markets** (`src/sim/fareStimulus.ts`). How a market
+grows also follows the fares flown on it: everyone's, yours and your
+rivals', weighted by seats, as a share of the going rate (the "fare
+level"). Growth speed is the level to the power −2, held between 0.4×
+and 2.5×: 80% of the going rate builds about 1.6× as fast, 120% about
+0.7×. Where the market settles is its potential times
+1 + 0.8 × (1 − level), held between 0.8× and 1.3×: 70% settles 1.24×
+bigger, 125% settles 0.8×. A market priced dear shrinks toward its
+smaller size as it is flown. The route view says "low fares growing
+it" under 90% and "fares holding it back" over 110%. Because the market
+is everyone's, one built on cheap fares is one a rival can enter and
+share: building it is an investment, not a moat.
+
 **The ladder** (`src/sim/ladder.ts`, the Goals view in
 `src/ui/inspector/goals.ts`): tiers of milestones, each naming an edge or
 moat. A tier is climbed when enough of its milestones are met, and only

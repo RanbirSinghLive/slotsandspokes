@@ -29,6 +29,7 @@ import { rivalLinksOn } from './rival';
 import { contractOn, paymentShare, performanceFactor } from '../../sim/contracts';
 import { revenueHill, type RevenueHill } from '../../sim/revenueHill';
 import { drawHillChart } from '../hillChart';
+import { marketFareLevel } from '../../sim/fareStimulus';
 import { CROWDING_WINDOW_MINUTES, crowdingWeight } from '../../sim/timeOfDay';
 import { chartLegend } from '../chartLegend';
 import { marketCharacterWord, marketMix } from '../../sim/marketCharacter';
@@ -120,12 +121,16 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   // Once the route has flown, its load factor above says how full it is;
   // the forecast in words is only for a route with no record yet.
   const fillWords = load.factor === null ? ` · ${fill.words}` : '';
+  // What the fares flown here do to its growth (sim/fareStimulus.ts).
+  const level = marketFareLevel(state, a, b);
+  const fareGrowth = level === null ? '' : level < 0.9 ? ' · low fares growing it' : level > 1.1 ? ' · fares holding it back' : '';
   root.append(
     lineWithInfo(
       `${marketSize(state, a, b)} market · ${marketCharacterWord(a, b)}${fillWords}` +
         (short ? ' · demand exceeds seats' : '') +
-        (fill.thin ? ' · still growing' : ''),
-      `A market's demand is built by flying it, over weeks, toward the size of the city pair (${readout.seatsPerFlight} seats a flight now). When demand exceeds seats, add a flight or a bigger plane; while it is still growing, extra flights fly emptier. The bar is who flies it: business travellers barely mind the fare but want peak departures and frequency; leisure travellers chase the fare; VFR (visiting friends and relatives) sit between. A business trunk rewards frequency and peak slots, a sun route a sharp fare.`,
+        (fill.thin ? ' · still growing' : '') +
+        fareGrowth,
+      `A market's demand is built by flying it, over weeks, toward the size of the city pair (${readout.seatsPerFlight} seats a flight now). When demand exceeds seats, add a flight or a bigger plane; while it is still growing, extra flights fly emptier. Fares grow it too: everyone's fares here, weighted by seats${level === null ? '' : ` (now ${Math.round(level * 100)}% of the going rate)`}. Cheap fares build it faster and up to 1.3× its usual size; dear ones slow it and settle it smaller. The market is everyone's, so one built cheaply is one a rival can share. The bar is who flies it: business travellers barely mind the fare but want peak departures and frequency; leisure travellers chase the fare; VFR (visiting friends and relatives) sit between. A business trunk rewards frequency and peak slots, a sun route a sharp fare.`,
     ),
   );
   root.append(...characterBar(a, b));

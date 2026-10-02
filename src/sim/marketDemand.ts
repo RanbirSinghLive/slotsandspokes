@@ -4,6 +4,7 @@ import { reliabilityDemandFactor, trailingMarketOtp } from './routeOtp';
 import { dailySeatsByMarket, hungerBoost, hungerByAirport } from './serviceLevel';
 import { executiveMarketBuildingMultiplier } from './executives';
 import { recessionFactor } from './shocks';
+import { fareLevel, growthFromFare, offersByMarket, sizeFromFare, SIZE_MAX } from './fareStimulus';
 import type { SimState } from './state';
 
 /**
@@ -145,6 +146,8 @@ export function rollDailyMarketDemand(state: SimState): void {
   const hunger = hungerByAirport(state, seatsByMarket);
   const multiplier = potentialMultiplier(state);
   const marketBuilding = executiveMarketBuildingMultiplier(state);
+  // The fares flown on each market, for how fast it builds and where it settles (sim/fareStimulus.ts).
+  const offers = offersByMarket(state);
 
   for (const { origin, dest, key, basePotential } of MARKET_PAIR_TABLE) {
     // currentPotentialDemand(), from the pair's precomputed potential.
@@ -153,6 +156,9 @@ export function rollDailyMarketDemand(state: SimState): void {
     const current = state.marketDemand[key] ?? floor;
 
     const seatsOffered = seatsByMarket.get(key) ?? 0;
+    const level = seatsOffered > 0 ? fareLevel(origin, dest, offers.get(key) ?? []) : null;
+    // Low fares build a market bigger than its potential; dear ones settle it smaller.
+    const target = potential * sizeFromFare(level);
 
     // How reliably the player has flown this market lately (sim/routeOtp.ts):
     // above the neutral line it speeds growth up, below it slows growth,
@@ -170,8 +176,10 @@ export function rollDailyMarketDemand(state: SimState): void {
         // A route to places nobody serves builds faster (sim/serviceLevel.ts).
         hungerBoost(hunger, origin, dest) *
         // A market-building CCO speeds every market up (sim/executives.ts).
-        marketBuilding;
-      next = current + (potential - current) * rate;
+        marketBuilding *
+        // Low fares build it faster, dear ones slower (sim/fareStimulus.ts).
+        growthFromFare(level);
+      next = current + (target - current) * Math.min(1, rate);
     } else if (seatsOffered > 0) {
       // Unreliable enough to lose passengers: the same slide toward the
       // floor an abandoned market gets, at up to the same speed.
@@ -186,7 +194,7 @@ export function rollDailyMarketDemand(state: SimState): void {
     // A market sitting exactly at its floor isn't stored: actualDailyDemand()
     // reads a missing key as the floor, so the save holds only markets
     // someone has moved, not one entry for every pair on the map.
-    const clamped = Math.min(potential, Math.max(floor, next));
+    const clamped = Math.min(potential * SIZE_MAX, Math.max(floor, next));
     if (clamped === floor) delete state.marketDemand[key];
     else state.marketDemand[key] = clamped;
   }
