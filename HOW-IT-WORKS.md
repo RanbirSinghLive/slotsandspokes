@@ -2810,7 +2810,12 @@ the cancellations cost Toronto most of its year on 18 seeds.
   items as slots filling toward the hold, the hours banked, last night's
   check, and its age, life, tech and AOG figures. Display only: the
   standing is worked out in `ui/inspector/maintenance.ts` from the same
-  readouts.
+  readouts. Planes are grouped by type, each group folding shut with its
+  planes' lamps still showing. Above the board, a **Hangar** row has a bay
+  for each plane in its heavy check (days until it's out) and a dashed bay
+  for each whose check window is open or overdue, and **Heavy checks due**
+  puts every plane's due date on one 30-day axis so a bunching fleet
+  shows as a cluster.
 - **The Gantt:** a key above the rows explains the night cell, and each
   plane's label carries tonight's check as the day is going ("☾✓", "☾c" contracted,
   "☾−40m" short, "☾✗" away). The plane's own view says the same in words
