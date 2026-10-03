@@ -151,7 +151,19 @@ every one of the 17,000 city pairs is walked every midnight.
 - **Weather by hemisphere** (the owner's call): southern storm seasons
   six months on, and no snow nearer the equator than 30° north or 40°
   south (none in Singapore, Miami or Sydney; some in Christchurch).
-- **Step 3, the two quick reads,** waiting on the owner.
+- **The two quick reads** (against the stage 4 reference, after the
+  weather fix):
+
+  | Home | Summer start | Winter start |
+  |---|---|---|
+  | YUL | $16.0M, 2/10 bust | $3.8M, 1/10 bust |
+  | YYZ | $48.5M, 1/10 bust | $54.8M, 0/10 bust |
+  | PHL | $74.1M, 0/10 bust | $92.5M, 0/10 bust |
+  | YHZ | −$2k, 7/10 bust | $44k, 5/10 bust |
+
+  Winter doesn't play harder: fewer busts (6 against 10), and the
+  medians split both ways within the read's noise. Per decision 4, the
+  picker offers the two as different openings, not easy and hard.
 
 ### Stage 3: the picker
 
