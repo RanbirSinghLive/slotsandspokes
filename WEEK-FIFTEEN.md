@@ -114,7 +114,15 @@ every one of the 17,000 city pairs is walked every midnight.
 - **One-seed headless years** from Montréal: $1.8M before, $38.3M with
   the world open, then just bust with the new rivals (their draws change
   the path). The quick read after the ratings will say more.
-- **Step 5, home ratings,** is a long run, waiting on the owner.
+- **Home ratings:** 404 homes rated (169 before): 240 Standard, 54 Hard,
+  110 Brutal. The big world hubs mostly rate Standard; islands and thin
+  homes stay Brutal. Most homes rated before got easier with more places
+  to fly (Rome, Naples, Stockholm, Málaga, Omaha Brutal to Standard).
+- **Quick read with the world open** (against the stage 4 reference):
+  Montréal $18.2M, 1/10 bust (was $11.0M, 3/10); Toronto $55.3M (was
+  $33.4M); Philadelphia $69.7M (was $68.7M); Halifax 7/10 bust (was 9/10).
+  The read now takes about 11 minutes (6 before), probably the headless player's
+  planning searches more airports.
 
 ### Stage 2: a start worth choosing
 
