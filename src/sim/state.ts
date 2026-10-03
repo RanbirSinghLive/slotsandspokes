@@ -172,6 +172,12 @@ export type RouteSettings = {
    * DEFAULT_FARE_CLASSES, so older saves sell as a new route does.
    */
   fareClasses?: FareClassSettings;
+  /**
+   * Whether the split was set by hand, rather than following the
+   * airline-wide seat policy (`SimState.fareClassPolicy`, sim/pricing.ts).
+   * Missing reads as false.
+   */
+  fareClassesByHand?: boolean;
   /** The route's last seat sale (sim/seatSale.ts): the day it started. Absent: never had one. */
   sale?: { startDay: number };
   /**
@@ -513,6 +519,8 @@ export type SimState = {
    * the same slider-drag repeated once per market.
    */
   farePolicyMultiplier: number;
+  /** The seat split new routes and routes not set by hand use (sim/pricing.ts). Missing reads as DEFAULT_FARE_CLASSES. */
+  fareClassPolicy?: FareClassSettings;
   /**
    * The executives (sim/executives.ts): three chairs, each empty or held
    * by one appointment.

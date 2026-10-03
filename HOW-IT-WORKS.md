@@ -2148,6 +2148,15 @@ sell today (the forecast, live), and **yesterday**
 (`SimState.yesterdayFareClasses`): sold by class, Saver sold out on how
 many flights, buy-ups, business paying Saver, business turned away.
 
+An airline-wide **seat policy** (`SimState.fareClassPolicy`, default
+20% Saver · 60% Flex) sits under the fare hill on the Routes screen, the
+same bar: dragging it gives that split to every route not set by hand
+(`setFareClassPolicy()`), and new routes open on it. Moving a route's own
+lines sets it by hand (`RouteSettings.fareClassesByHand`) and takes it off
+the policy; the route view's "Put seats back on policy" and the Routes
+screen's "Put all seats back on policy" return it. The headless player's
+weekly Saver tuning is by hand.
+
 The headless player looks at each route's yesterday weekly: Saver down
 5 points where it sold out on most flights and business was turned
 away, up 5 where planes had seats to spare and Saver never sold out
