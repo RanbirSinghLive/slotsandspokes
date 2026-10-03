@@ -11,8 +11,8 @@ goes in HOW-IT-WORKS.md, and why it changed goes in the commit message.
 ## What this project is
 
 airgame is a browser-based airline network simulator. The player picks a home
-city from 185 airports (densest in eastern Canada and the US, with
-Europe's main cities and world hubs beyond), starts with one leased propeller, and grows an airline
+city from 480 airports on every continent (densest in eastern Canada
+and the US), starts with one leased propeller, and grows an airline
 against rival carriers. The core loop is: draw routes on the map → watch the
 days run → read the P&L → adjust.
 

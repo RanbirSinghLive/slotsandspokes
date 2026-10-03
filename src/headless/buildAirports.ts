@@ -42,8 +42,8 @@ import { fileURLToPath } from 'node:url';
  * doesn't take Ciudad Juárez, nor Singapore Johor Bahru.
  *
  * **Which airports.** The hand-kept list below (AIRPORTS), then a
- * fill-out of the US and Canada from every large or medium airport with
- * scheduled service (FILL_COUNTRIES), FILL_ADDED_COUNT of them. The main hubs in FILL_HUBS go first, so a metro
+ * fill-out, region by region (REGIONS), from every large or medium airport
+ * with scheduled service. Each region's main hubs go first, so a metro
  * with two big airports keeps the one people know (San Francisco, not
  * Oakland). After them, airports are added one at a time, each time the
  * one that would take the most people not already nearer another airport
@@ -153,14 +153,6 @@ const AIRPORTS: [iata: string, name: string][] = [
 ];
 
 /**
- * The fill-out: which countries, and how many airports it adds (the hubs
- * in FILL_HUBS included). A count to add rather than a total for the map,
- * so adding to the hand-kept list elsewhere (Europe) doesn't take airports
- * away from North America.
- */
-const FILL_COUNTRIES = ['US', 'CA'];
-const FILL_ADDED_COUNT = 111;
-/**
  * The closest two airports on the map may be. A little over
  * sim/demand.ts's MIN_MARKET_NM (30 nm, 56 km), so every pair of airports
  * has a market. It also makes each big metro one airport: Newark, JFK,
@@ -169,41 +161,217 @@ const FILL_ADDED_COUNT = 111;
 const METRO_SEPARATION_KM = 60;
 
 /**
- * Main hubs, chosen before the ranked fill-out and named by hand. The
- * other fill-out airports are named after OurAirports' municipality
- * ("Boise"), which reads well for most of them.
+ * The fill-out, region by region, in this order. Each region names its
+ * main hubs (chosen first, named by hand) and how many airports it adds
+ * in all, hubs included; then the catchment fill (see "Which airports"
+ * above) adds the rest from its scheduled large and medium airports.
+ *
+ * A region is a set of countries: `countries` lists them, or `continent`
+ * takes every country OurAirports puts on that continent, less `except`.
+ * North America comes first and is unchanged from when it was the only
+ * fill-out, so the US and Canada keep their airports as other regions
+ * are added: catchments never cross a border, and no region before it
+ * can crowd it.
+ *
+ * Ukraine is left out while its airspace is closed to scheduled flights.
  */
-const FILL_HUBS: [iata: string, name: string][] = [
-  ['SFO', 'San Francisco'],
-  ['IAH', 'Houston Intercontinental'],
-  ['SEA', 'Seattle–Tacoma'],
-  ['DEN', 'Denver'],
-  ['MSP', 'Minneapolis–St Paul'],
-  ['PHX', 'Phoenix Sky Harbor'],
-  ['LAS', 'Las Vegas'],
-  ['SAN', 'San Diego'],
-  ['MCO', 'Orlando'],
-  ['CLT', 'Charlotte'],
-  ['SLC', 'Salt Lake City'],
-  ['PDX', 'Portland, Oregon'],
-  ['STL', 'St. Louis'],
-  ['MCI', 'Kansas City'],
-  ['TPA', 'Tampa'],
-  ['AUS', 'Austin'],
-  ['SAT', 'San Antonio'],
-  ['MSY', 'New Orleans'],
-  ['BNA', 'Nashville'],
-  ['CLE', 'Cleveland'],
-  ['PIT', 'Pittsburgh'],
-  ['CVG', 'Cincinnati'],
-  ['CMH', 'Columbus'],
-  ['IND', 'Indianapolis'],
-  ['RDU', 'Raleigh–Durham'],
-  ['HNL', 'Honolulu'],
-  ['YYC', 'Calgary'],
-  ['YEG', 'Edmonton'],
-  ['YWG', 'Winnipeg'],
+type Region = {
+  name: string;
+  countries?: string[];
+  continent?: string;
+  except?: string[];
+  count: number;
+  hubs: [iata: string, name: string][];
+};
+
+const MIDDLE_EAST = ['AE', 'QA', 'SA', 'KW', 'BH', 'OM', 'IL', 'JO', 'LB', 'IQ', 'IR'];
+
+const REGIONS: Region[] = [
+  {
+    name: 'North America',
+    countries: ['US', 'CA'],
+    count: 111,
+    hubs: [
+      ['SFO', 'San Francisco'],
+      ['IAH', 'Houston Intercontinental'],
+      ['SEA', 'Seattle–Tacoma'],
+      ['DEN', 'Denver'],
+      ['MSP', 'Minneapolis–St Paul'],
+      ['PHX', 'Phoenix Sky Harbor'],
+      ['LAS', 'Las Vegas'],
+      ['SAN', 'San Diego'],
+      ['MCO', 'Orlando'],
+      ['CLT', 'Charlotte'],
+      ['SLC', 'Salt Lake City'],
+      ['PDX', 'Portland, Oregon'],
+      ['STL', 'St. Louis'],
+      ['MCI', 'Kansas City'],
+      ['TPA', 'Tampa'],
+      ['AUS', 'Austin'],
+      ['SAT', 'San Antonio'],
+      ['MSY', 'New Orleans'],
+      ['BNA', 'Nashville'],
+      ['CLE', 'Cleveland'],
+      ['PIT', 'Pittsburgh'],
+      ['CVG', 'Cincinnati'],
+      ['CMH', 'Columbus'],
+      ['IND', 'Indianapolis'],
+      ['RDU', 'Raleigh–Durham'],
+      ['HNL', 'Honolulu'],
+      ['YYC', 'Calgary'],
+      ['YEG', 'Edmonton'],
+      ['YWG', 'Winnipeg'],
+    ],
+  },
+  {
+    name: 'Mexico, Central America and the Caribbean',
+    continent: 'NA',
+    except: ['US', 'CA', 'GL', 'PM', 'BM'],
+    count: 25,
+    hubs: [
+      ['CUN', 'Cancún'],
+      ['GDL', 'Guadalajara'],
+      ['MTY', 'Monterrey'],
+      ['PTY', 'Panama City'],
+      ['SJO', 'San José, Costa Rica'],
+      ['SJU', 'San Juan'],
+      ['HAV', 'Havana'],
+      ['PUJ', 'Punta Cana'],
+      ['MBJ', 'Montego Bay'],
+      ['NAS', 'Nassau'],
+    ],
+  },
+  {
+    name: 'South America',
+    continent: 'SA',
+    count: 25,
+    hubs: [
+      ['BOG', 'Bogotá'],
+      ['LIM', 'Lima'],
+      ['SCL', 'Santiago'],
+      ['EZE', 'Buenos Aires Ezeiza'],
+      ['GIG', 'Rio de Janeiro Galeão'],
+      ['BSB', 'Brasília'],
+      ['UIO', 'Quito'],
+      ['MDE', 'Medellín'],
+    ],
+  },
+  {
+    name: 'Europe',
+    continent: 'EU',
+    countries: ['TR', 'CY'],
+    except: ['UA'],
+    count: 80,
+    hubs: [
+      ['SVO', 'Moscow Sheremetyevo'],
+      ['LED', 'St Petersburg'],
+      ['OTP', 'Bucharest'],
+      ['SOF', 'Sofia'],
+      ['BEG', 'Belgrade'],
+      ['ZAG', 'Zagreb'],
+      ['KRK', 'Kraków'],
+      ['BGO', 'Bergen'],
+      ['GOT', 'Gothenburg'],
+      ['SVQ', 'Seville'],
+      ['VLC', 'Valencia'],
+      ['STR', 'Stuttgart'],
+      ['BLQ', 'Bologna'],
+      ['CTA', 'Catania'],
+      ['AYT', 'Antalya'],
+      ['LCA', 'Larnaca'],
+      ['RIX', 'Riga'],
+      ['VNO', 'Vilnius'],
+    ],
+  },
+  {
+    name: 'Middle East',
+    countries: MIDDLE_EAST,
+    count: 20,
+    hubs: [
+      ['DOH', 'Doha'],
+      ['AUH', 'Abu Dhabi'],
+      ['RUH', 'Riyadh'],
+      ['JED', 'Jeddah'],
+      ['TLV', 'Tel Aviv'],
+      ['AMM', 'Amman'],
+      ['KWI', 'Kuwait'],
+      ['MCT', 'Muscat'],
+    ],
+  },
+  {
+    name: 'Asia',
+    continent: 'AS',
+    except: [...MIDDLE_EAST, 'TR', 'CY'],
+    count: 100,
+    hubs: [
+      ['ICN', 'Seoul Incheon'],
+      ['PEK', 'Beijing Capital'],
+      ['PVG', 'Shanghai Pudong'],
+      ['CAN', 'Guangzhou'],
+      ['HKG', 'Hong Kong'],
+      ['TPE', 'Taipei Taoyuan'],
+      ['KIX', 'Osaka Kansai'],
+      ['BKK', 'Bangkok Suvarnabhumi'],
+      ['KUL', 'Kuala Lumpur'],
+      ['CGK', 'Jakarta'],
+      ['MNL', 'Manila'],
+      ['DEL', 'Delhi'],
+      ['BOM', 'Mumbai'],
+      ['BLR', 'Bengaluru'],
+      ['MAA', 'Chennai'],
+      ['SGN', 'Ho Chi Minh City'],
+      ['HAN', 'Hanoi'],
+      ['CTU', 'Chengdu'],
+      ['DPS', 'Bali Denpasar'],
+      ['CMB', 'Colombo'],
+      ['DAC', 'Dhaka'],
+      ['KHI', 'Karachi'],
+    ],
+  },
+  {
+    name: 'Africa',
+    continent: 'AF',
+    count: 25,
+    hubs: [
+      ['CAI', 'Cairo'],
+      ['ADD', 'Addis Ababa'],
+      ['NBO', 'Nairobi'],
+      ['LOS', 'Lagos'],
+      ['CMN', 'Casablanca'],
+      ['CPT', 'Cape Town'],
+      ['ALG', 'Algiers'],
+      ['TUN', 'Tunis'],
+      ['ACC', 'Accra'],
+      ['DAR', 'Dar es Salaam'],
+    ],
+  },
+  {
+    name: 'Oceania',
+    continent: 'OC',
+    count: 20,
+    hubs: [
+      ['SYD', 'Sydney'],
+      ['MEL', 'Melbourne'],
+      ['BNE', 'Brisbane'],
+      ['PER', 'Perth'],
+      ['ADL', 'Adelaide'],
+      ['AKL', 'Auckland'],
+      ['CHC', 'Christchurch'],
+      ['NAN', 'Nadi'],
+    ],
+  },
 ];
+
+/**
+ * A metro's second airport, left off the map although it's further than
+ * METRO_SEPARATION_KM from the first: it would take the city's people
+ * from the airport everyone knows. Sabiha Gökçen, on Istanbul's Asian
+ * side, is nearer most of the city than Istanbul Airport is.
+ */
+const SECOND_AIRPORTS = new Set(['SAW']);
+
+/** Every hub's hand-written name, by IATA. */
+const HUB_NAMES = new Map(REGIONS.flatMap((region) => region.hubs));
 
 /**
  * Names for fill-out airports whose municipality reads badly: a city that
@@ -385,7 +553,7 @@ function placesServing(allPlaces: Place[], airports: AirportPoint[]): Place[] {
  * The fill-out airports, in the order they're added. `alreadyChosen` is
  * the hand-kept list; see "Which airports" at the top of the file.
  */
-function chooseFillAirports(alreadyChosen: AirportPoint[], candidates: AirportPoint[], places: Place[]): AirportPoint[] {
+function chooseFillAirports(region: Region, alreadyChosen: AirportPoint[], candidates: AirportPoint[], places: Place[]): AirportPoint[] {
   const grid = new PlaceGrid();
   for (const place of places) grid.add(place);
   // For every place, how far it is to the nearest airport chosen so far
@@ -415,16 +583,16 @@ function chooseFillAirports(alreadyChosen: AirportPoint[], candidates: AirportPo
     claim(airport);
   };
 
-  for (const [iata] of FILL_HUBS) {
+  for (const [iata] of region.hubs) {
     const hub = candidates.find((c) => c.iata === iata);
-    if (!hub) throw new Error(`${iata} is in FILL_HUBS but not a scheduled large or medium airport in ${FILL_COUNTRIES.join('/')}`);
-    if (tooClose(hub)) throw new Error(`${iata} is in FILL_HUBS but within ${METRO_SEPARATION_KM} km of an airport already on the map`);
+    if (!hub) throw new Error(`${iata} is a ${region.name} hub but not one of its scheduled large or medium airports`);
+    if (tooClose(hub)) throw new Error(`${iata} is a ${region.name} hub but within ${METRO_SEPARATION_KM} km of an airport already on the map`);
     add(hub);
   }
 
   for (const tier of [true, false]) {
     let remaining = candidates.filter((c) => c.large === tier && !chosen.includes(c));
-    while (added.length < FILL_ADDED_COUNT) {
+    while (added.length < region.count) {
       remaining = remaining.filter((c) => !tooClose(c));
       if (remaining.length === 0) break;
       let best = remaining[0];
@@ -449,8 +617,8 @@ function chooseFillAirports(alreadyChosen: AirportPoint[], candidates: AirportPo
  * "Providence/Warwick").
  */
 function fillName(iata: string, row: string[], column: (name: string) => number): string {
-  const hub = FILL_HUBS.find(([code]) => code === iata);
-  if (hub) return hub[1];
+  const hub = HUB_NAMES.get(iata);
+  if (hub) return hub;
   if (FILL_NAMES[iata]) return FILL_NAMES[iata];
   return (row[column('municipality')] || row[column('name')]).split(/[,/]/)[0].trim();
 }
@@ -492,16 +660,27 @@ async function main(): Promise<void> {
     .filter((place) => place.population > 0);
 
   const handKept = AIRPORTS.map(([iata, name]) => pointOf(iata, name));
-  const candidates = [...byIata.values()]
-    .filter(
-      (row) =>
-        FILL_COUNTRIES.includes(row[column('iso_country')]) &&
-        ['large_airport', 'medium_airport'].includes(row[column('type')]) &&
-        row[column('scheduled_service')] === 'yes' &&
-        !handKept.some((airport) => airport.iata === row[column('iata_code')]),
-    )
-    .map((row) => pointOf(row[column('iata_code')], fillName(row[column('iata_code')], row, column)));
-  const points = [...handKept, ...chooseFillAirports(handKept, candidates, placesServing(allPlaces, [...handKept, ...candidates]))];
+  const inRegion = (region: Region, row: string[]) => {
+    const country = row[column('iso_country')];
+    if (region.except?.includes(country)) return false;
+    return (region.countries?.includes(country) ?? false) || (region.continent !== undefined && row[column('continent')] === region.continent);
+  };
+  const points = [...handKept];
+  for (const region of REGIONS) {
+    const candidates = [...byIata.values()]
+      .filter(
+        (row) =>
+          inRegion(region, row) &&
+          ['large_airport', 'medium_airport'].includes(row[column('type')]) &&
+          row[column('scheduled_service')] === 'yes' &&
+          !SECOND_AIRPORTS.has(row[column('iata_code')]) &&
+          !points.some((airport) => airport.iata === row[column('iata_code')]),
+      )
+      .map((row) => pointOf(row[column('iata_code')], fillName(row[column('iata_code')], row, column)));
+    const added = chooseFillAirports(region, points, candidates, placesServing(allPlaces, [...points, ...candidates]));
+    console.log(`${region.name}: ${added.length} added`);
+    points.push(...added);
+  }
 
   // Every place to the nearest airport in its own country, within reach.
   const places = placesServing(allPlaces, points);
