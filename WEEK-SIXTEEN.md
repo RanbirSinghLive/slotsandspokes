@@ -12,7 +12,7 @@ the 74-airport top-up; the weekly balance read (pre-approved, Sundays)
 will say whether that moved anything. Desktop is the target: the
 browser and mobile pass is dropped.
 
-**Status:** stages 1–2 built (stage 1's read skipped at the owner's word); stage 2's quick read next.
+**Status:** stages 1–2 built and read; Montréal's drop waiting on the owner.
 
 ---
 
@@ -156,6 +156,14 @@ early game; bases and night stops are the mid-game's next layer.
   cancellations by curfew and position barely moved (456 against 430,
   151 against 122); contracted checks added about $212,000. The year:
   $11.1M before, $4.4M after, one seed.
+- **Quick read** (summer, against the 8c6e9dc reference, which is from
+  before the 74-airport top-up and stage 1 too): YUL $7.2M, 1/10 bust
+  (was $16.0M, 2/10); YYZ $53.2M, 0/10 (was $48.5M, 1/10); PHL $86.3M,
+  0/10 (was $74.1M); YHZ 7/10 bust (was 7/10). The first try gave NaN
+  cash at YYZ and PHL: re-pricing a dragged flight's slot set its own
+  pair aside twice, so at an airport only that plane flies the count
+  went negative (fixed, with a floor in `nextSlotFees()`). Montréal's
+  drop is beyond the read's noise; the others are up.
 
 ### Stage 3: thin homes
 

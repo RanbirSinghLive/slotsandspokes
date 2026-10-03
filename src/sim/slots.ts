@@ -110,7 +110,8 @@ export function nextSlotFees(
     const movements = dailyMovementsAt(state, iata) + extraMovements + i * MOVEMENTS_PER_PAIR;
     if (free - i * MOVEMENTS_PER_PAIR < MOVEMENTS_PER_PAIR) {
       fees.push(null);
-    } else if (movements === 0) {
+    } else if (movements <= 0) {
+      // None left once this pair is set aside: the first pair is free.
       fees.push(0);
     } else {
       const relative = movements / Math.max(average, 1);

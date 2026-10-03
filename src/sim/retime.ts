@@ -177,7 +177,8 @@ export function planRetime(state: SimState, legIds: string[], toTail: string, st
     const oldHour = hourOf(before.departMinute);
     const newHour = hourOf(leg.departMinute);
     if (oldHour === newHour) continue;
-    repriced.push({ iata: before.origin, oldFee: slotFeeAt(without, before.origin, oldHour), newFee: slotFeeAt(without, before.origin, newHour) });
+    // Priced on the whole schedule less its own pair (slotFeeAt's −2), not on `without`, which has already set it aside.
+    repriced.push({ iata: before.origin, oldFee: slotFeeAt(state, before.origin, oldHour), newFee: slotFeeAt(state, before.origin, newHour) });
   }
   const slotFeeChangePerDay = repriced.reduce((sum, r) => sum + r.newFee - r.oldFee, 0);
 
