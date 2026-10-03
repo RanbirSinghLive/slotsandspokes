@@ -812,7 +812,7 @@ any lens.
    just above already had to be: a snapshot built once silently stops
    reflecting reality the moment the underlying data can change, and
    since week four it can.
-5. `aircraft.ts` — one triangle per active flight. Position comes from
+5. `aircraft.ts` — one filled silhouette per active flight (a different plane shape for each of the four classes). Position comes from
    `d3.geoInterpolate(origin, dest)(t)` at the *current fractional* simulated
    minute — not interpolated tick-to-tick, recomputed fresh every frame, so
    it stays smooth at any speed and freezes exactly when paused. Heading
