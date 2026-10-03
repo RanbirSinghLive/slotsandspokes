@@ -4297,3 +4297,313 @@ button.ops-item:hover {
   color: #6b7694;
   font-size: 11px;
 }
+
+/* The Maintenance screen's release-to-service board (ui/inspector/maintenance.ts):
+   a standing strip and a tech-log card per plane. Teal serviceable, amber
+   watch, red action or grounded, blue in the hangar. */
+.mx-lamp {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+}
+
+.mx-ok { color: #5ed6c8; }
+.mx-watch { color: #ffb347; }
+.mx-due, .mx-aog { color: #ff8080; }
+.mx-check { color: #8ab4ff; }
+
+.mx-strip {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  margin: 4px 0 6px;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.mx-strip-seg {
+  background: currentColor;
+  min-width: 6px;
+}
+
+.mx-strip-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-bottom: 10px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  color: #9aa3b8;
+}
+
+.mx-strip-key .mx-lamp {
+  width: 6px;
+  height: 6px;
+  box-shadow: none;
+}
+
+.mx-strip-tech {
+  margin-left: auto;
+  color: #cdd3e0;
+}
+
+.mx-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mx-card {
+  display: block;
+  width: 100%;
+  padding: 7px 9px 8px;
+  font: inherit;
+  text-align: left;
+  color: #cdd3e0;
+  background: #0e1016;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 3px solid currentColor;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.mx-card:hover {
+  background: #171b26;
+}
+
+.mx-card-ok { border-left-color: #5ed6c8; }
+.mx-card-watch { border-left-color: #ffb347; }
+.mx-card-due, .mx-card-aog { border-left-color: #ff8080; }
+.mx-card-check { border-left-color: #8ab4ff; }
+
+.mx-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.mx-card-who {
+  display: flex;
+  align-items: center;
+  color: #e6e9f2;
+}
+
+.mx-card-who .mx-lamp { flex: none; }
+
+.mx-card-who .plane-icon { margin-right: 4px; }
+
+.mx-card-standing {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.mx-text-ok { color: #5ed6c8; }
+.mx-text-watch { color: #ffb347; }
+.mx-text-due, .mx-text-aog { color: #ff8080; }
+.mx-text-check { color: #8ab4ff; }
+
+/* The heavy-check clock: days since the last check across, the window where
+   nights bank hours tinted amber, the grace beyond the due mark hatched red. */
+.mx-clock {
+  position: relative;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.mx-clock-window,
+.mx-clock-grace,
+.mx-clock-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.mx-clock-window { background: rgba(255, 179, 71, 0.22); }
+
+.mx-clock-grace {
+  background: repeating-linear-gradient(135deg, rgba(255, 128, 128, 0.4) 0 3px, rgba(255, 128, 128, 0.1) 3px 6px);
+}
+
+.mx-clock-fill {
+  left: 0;
+  background: #cdd3e0;
+  opacity: 0.75;
+  border-radius: 4px 0 0 4px;
+}
+
+.mx-card-ok .mx-clock-fill { background: #5ed6c8; }
+.mx-card-watch .mx-clock-fill { background: #ffb347; }
+.mx-card-due .mx-clock-fill, .mx-card-aog .mx-clock-fill { background: #ff8080; }
+
+.mx-clock-due {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: #fff;
+}
+
+.mx-card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 5px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  color: #9aa3b8;
+}
+
+.mx-items {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mx-slots { display: inline-flex; gap: 3px; }
+
+.mx-slot {
+  width: 12px;
+  height: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+}
+
+.mx-slot.is-filled { background: #ffb347; border-color: #ffb347; }
+.mx-slot.is-held { background: #ff8080; border-color: #ff8080; }
+
+/* Wear: how much of its useful life the airframe has used. */
+.mx-wear {
+  height: 3px;
+  margin-top: 6px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 2px;
+}
+
+.mx-wear-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #5ed6c8, #ffb347 70%, #ff8080);
+  background-size: 100vw 100%;
+  border-radius: 2px;
+}
+
+.mx-dials {
+  margin-top: 4px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  color: #9aa3b8;
+}
+
+/* A grounded plane's row in the AOG list: a red edge and tint. */
+.mx-aog-row {
+  padding-left: 8px;
+  border-left: 3px solid #ff8080;
+  background: rgba(255, 128, 128, 0.06);
+}
+
+.mx-card-status {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.mx-card-night {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 10px;
+  color: #7c869c;
+}
+
+/* The hangar bays and the heavy-check due axis (ui/inspector/maintenance.ts). */
+.mx-bays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 6px;
+}
+
+.mx-bay {
+  min-width: 82px;
+  padding: 5px 8px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  border-radius: 4px;
+  border: 1px dashed rgba(255, 179, 71, 0.6);
+  color: #ffb347;
+}
+
+.mx-bay.is-working {
+  border: 1px solid #8ab4ff;
+  color: #8ab4ff;
+  background: repeating-linear-gradient(135deg, rgba(138, 180, 255, 0.18) 0 4px, rgba(138, 180, 255, 0.05) 4px 8px);
+}
+
+.mx-bay.is-late {
+  border-color: rgba(255, 128, 128, 0.7);
+  color: #ff8080;
+}
+
+.mx-bay-tail { color: #e6e9f2; }
+
+.mx-axis {
+  position: relative;
+  margin: 8px 22px 0 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.mx-axis-window {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(255, 179, 71, 0.14);
+}
+
+.mx-marker {
+  position: absolute;
+  transform: translateX(-50%);
+  padding: 0 5px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 10px;
+  line-height: 15px;
+  color: #0e1016;
+  background: #5ed6c8;
+  border-radius: 8px;
+  cursor: default;
+}
+
+.mx-marker.is-open { background: #ffb347; }
+.mx-marker.is-late { background: #ff8080; }
+
+.mx-axis-ticks {
+  position: relative;
+  height: 16px;
+  margin: 2px 22px 8px 14px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 10px;
+  color: #7c869c;
+}
+
+.mx-axis-tick {
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+.mx-group-lamps {
+  display: inline-flex;
+  margin-left: auto;
+}
+
+.mx-group-lamps .mx-lamp {
+  width: 6px;
+  height: 6px;
+  margin: 0 0 0 4px;
+  box-shadow: none;
+}
