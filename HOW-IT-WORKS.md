@@ -1196,6 +1196,10 @@ screen, known airport, your planes, rivals on the map and your routes
 word start, which beats anywhere; the arrow keys and Enter pick, Esc
 closes. Keys typed into it never reach the lens or the route builder.
 
+**The shortcuts card** (`ui/shortcuts.ts`): `?` opens a card listing every
+keyboard shortcut; `?` again or Esc closes it. It does nothing while typing
+in a field or while the home picker is open.
+
 **Linking the panel to the map** (`ui/mapLink.ts`): hovering a row that
 points at something (a route in any list, an airport, a plane, a rival,
 a rotation on the timeline, a where-to-fly suggestion) marks it on the
