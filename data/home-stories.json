@@ -1,0 +1,308 @@
+{
+  "_about": "Featured homes for the new-game picker (ui/homePicker.ts), with their stories. Hand-written from public knowledge for the owner to edit. `region` is the picker's grouping; `world` is why the airport matters in the real world; `game` is why it's worth playing here, from the game's data.",
+  "YUL": {
+    "region": "North America",
+    "world": "Montréal-Trudeau grew as the French-speaking hub of eastern Canada, once the country's largest city and still its third-busiest airport. It links Quebec to Europe and the Caribbean, and its transatlantic traffic is far larger than its domestic neighbours suggest.",
+    "game": "A catchment of 3.8 million, strong business demand and decent leisure and family travel. Twenty-six airports are in propeller range, so the opening is a dense short-haul web. Trillium Air already flies to Toronto, and Capital Wings flies Ottawa–Montréal."
+  },
+  "YYZ": {
+    "region": "North America",
+    "world": "Toronto Pearson is Canada's busiest airport, built up beside the country's largest city and financial centre. It is the main connecting point for the whole country and a major gateway for immigrant communities, which keeps long-haul traffic to South Asia, the Caribbean and Europe heavy.",
+    "game": "The biggest catchment in Canada at 6.5 million, with strong business and family travel. Thirty-four airports sit within propeller range, so there is plenty to fly from day one. Trillium Air holds the Montréal and Ottawa routes, so pick a gap."
+  },
+  "YVR": {
+    "region": "North America",
+    "world": "Vancouver sits between the Pacific and the Coast Mountains, and its airport is Canada's main gateway to Asia and the Pacific. Flights over the pole and across the ocean connect it to East Asia, while Alaska and the US west coast lie close by.",
+    "game": "A catchment of 2.4 million with moderate business and family traffic. Only nine airports are in propeller range, with mountains and water to cross. It is a thin start with few neighbours, and the slow route to growth is the hard part."
+  },
+  "YHZ": {
+    "region": "North America",
+    "world": "Halifax is the largest city in Atlantic Canada, a port with a long naval and shipping history. Its airport serves Nova Scotia and is the nearest major North American airport to Europe, so it has long been a refuelling and diversion point.",
+    "game": "A small catchment of 0.7 million with some family travel. Eleven airports are within reach, mostly across the Maritimes and Newfoundland. This is a lean opening where margins are thin and every route has to earn its place. Bluenose Regional already flies Halifax–Québec City."
+  },
+  "LGA": {
+    "region": "North America",
+    "world": "LaGuardia opened in 1939 as New York's close-in airport, a short ride from Midtown. A perimeter rule limits most flights to about 1,500 miles, so it works as a short-haul business airport for the Northeast, the Midwest and Florida.",
+    "game": "A catchment of 13.5 million, with strong business and some leisure demand. Twenty-nine airports are in propeller range. It is a big-city short-haul market where frequency matters, and demand is deep."
+  },
+  "BOS": {
+    "region": "North America",
+    "world": "Boston Logan sits across the harbour from downtown, serving a region of universities, hospitals and finance. It has long been the closest big US airport to Europe, so transatlantic flights are a large part of its traffic.",
+    "game": "A catchment of 3.4 million with strong business demand. Twenty-five airports are in propeller range across New England and the Northeast corridor. It is a good short-haul web for a business market that rewards frequent departures."
+  },
+  "DCA": {
+    "region": "North America",
+    "world": "Reagan National sits on the Potomac a few minutes from the Capitol. A perimeter rule and a cap on slots keep it a short-haul airport, serving government officials, lobbyists, contractors and consultants travelling around the east coast.",
+    "game": "A catchment of 5.5 million with strong business demand. Thirty-seven airports lie within propeller range, one of the densest webs on the list. It is a short-haul business market where frequency and timing pay."
+  },
+  "ORD": {
+    "region": "North America",
+    "world": "Chicago O'Hare was built on a wartime factory site and became the busiest airport in the world in the 1960s and 1970s. As a classic connecting hub in the middle of the country, it was the model for the hub-and-spoke system.",
+    "game": "A catchment of 7.7 million, strong business demand and some family travel. Twenty-eight airports are in propeller range across the Midwest. Big city, flat land and many neighbours make this one of the more forgiving openings."
+  },
+  "ATL": {
+    "region": "North America",
+    "world": "Atlanta grew from a railway junction into the South's main airline hub, and its airport was the busiest in the world for most of the past quarter century. Connecting traffic dominates, with most passengers never leaving the terminal.",
+    "game": "A catchment of 2.4 million, small for a hub, with moderate business demand. Twenty-four airports are in propeller range. A modest local market with a large web around it means you win through connections rather than local demand."
+  },
+  "MIA": {
+    "region": "North America",
+    "world": "Miami is the airline gateway between the United States and Latin America and the Caribbean, and a major cruise port. Its airport carries large cargo volumes and many flights to cities across the Americas that were hard to reach otherwise.",
+    "game": "A catchment of 3.7 million with the strongest leisure and family travel ratings. Only ten airports are in propeller range, mostly Florida and the Caribbean. It is a leisure market that rewards a sharp fare, but water limits your growth."
+  },
+  "DFW": {
+    "region": "North America",
+    "world": "Dallas/Fort Worth opened in 1974 on a site between two cities, and covers more land than Manhattan. It became a giant hub on the strength of central location, cheap land and a deregulated airline industry.",
+    "game": "A catchment of 6.5 million with moderate business demand. Only ten airports are within propeller range across a very large region. It is a big city with few neighbours, and the early distances are long."
+  },
+  "DEN": {
+    "region": "North America",
+    "world": "Denver's airport sits far out on the plains, built in 1995 to replace a congested city field. It is the main hub of the Mountain West, with ski traffic in winter and a useful midpoint between the coasts.",
+    "game": "A catchment of 2.9 million with moderate business and leisure demand. Only five airports are in propeller range, among the fewest of any featured home. It is isolated, so growth means longer routes and patience."
+  },
+  "SEA": {
+    "region": "North America",
+    "world": "Seattle-Tacoma serves the Pacific Northwest, home to major software and aircraft makers. Its airport is the main US gateway to Alaska and has grown as a route to Asia across the north Pacific.",
+    "game": "A catchment of 3.8 million with moderate business demand. Nine airports are in propeller range, split by mountains and water. A decent city with limited neighbours makes this a slow, careful start."
+  },
+  "LAX": {
+    "region": "North America",
+    "world": "Los Angeles International sits on the coast of the largest city in the western US. It is the leading US airport for Pacific traffic and a gateway for Hollywood, tourism and large Asian and Latin American communities.",
+    "game": "A catchment of 7.6 million with business, leisure and family demand all above ordinary. Thirteen airports are in propeller range. It is a large mixed market with a limited short-haul web, so the right route choice matters."
+  },
+  "SFO": {
+    "region": "North America",
+    "world": "San Francisco International sits on the bay, serving Silicon Valley and the technology industry. Fog and closely spaced runways make delays common, and the airport is a major gateway to East Asia.",
+    "game": "A catchment of 5.6 million with strong business demand and some family travel. Eleven airports are in propeller range. It is a rich business market with few neighbours, so yield matters more than volume."
+  },
+  "HNL": {
+    "region": "North America",
+    "world": "Honolulu is the main airport of Hawaii, in the middle of the Pacific. Tourism from the mainland and Japan has driven its growth, and inter-island flights link the islands, with the nearest mainland airports thousands of kilometres away.",
+    "game": "A catchment of 1.4 million with the strongest leisure rating. Only three airports are in propeller range, all on the islands. It is an island with nowhere to go, and a small propeller network can only grow slowly."
+  },
+  "MEX": {
+    "region": "Latin America & Caribbean",
+    "world": "Mexico City sits in a high basin, with one of the largest metropolitan areas on Earth. Its airport is the centre of Mexican aviation and the main connecting point to Latin America, and it is crowded enough that a second airport was opened.",
+    "game": "A catchment of 16.6 million with strong family travel and some business demand. Only six airports are in propeller range, so it is a huge city with few neighbours. Coralina Air flies Cancún and Guadalajara."
+  },
+  "MTY": {
+    "region": "Latin America & Caribbean",
+    "world": "Monterrey is Mexico's industrial capital, home to steel, cement and brewing firms. Its location near the Texas border makes it the country's main business link to the United States.",
+    "game": "A catchment of 3.3 million with strong business demand and some family travel. Ten airports are in propeller range. It is a business market that rewards frequent service across northern Mexico and the border."
+  },
+  "CUN": {
+    "region": "Latin America & Caribbean",
+    "world": "Cancún was planned in the 1970s as a resort on a nearly empty stretch of Caribbean coast. Its airport grew with it, and now handles millions of beach visitors from North America and Europe.",
+    "game": "A catchment of 1.1 million with the strongest leisure rating. Only three airports are in propeller range, so there are few places to start. It is a leisure market that rewards a sharp fare. Coralina Air flies Mexico City."
+  },
+  "HAV": {
+    "region": "Latin America & Caribbean",
+    "world": "Havana's José Martí airport serves the capital of the largest Caribbean island. Decades of political isolation shaped its air links, and it remains a main entry point for tourists, family visitors and the Cuban diaspora.",
+    "game": "A catchment of 3.0 million with strong leisure and some family travel. Eleven airports are in propeller range across the island and nearby coasts. It is a leisure market with a fair web, but money comes slowly."
+  },
+  "SJU": {
+    "region": "Latin America & Caribbean",
+    "world": "San Juan's Luis Muñoz Marín airport is the main air link for Puerto Rico, a US territory. It carries mainland tourists, a large family travel market and a connecting role to the eastern Caribbean.",
+    "game": "A catchment of 1.7 million with strong family travel and some leisure demand. Four airports are in propeller range, so it is an island with limited neighbours. Coralina Air flies to Santo Domingo."
+  },
+  "PTY": {
+    "region": "Latin America & Caribbean",
+    "world": "Panama City's Tocumen airport grew as a connecting point between North and South America, on a narrow strip of land beside the canal. Its location lets one hub reach cities across the whole region.",
+    "game": "A catchment of 1.2 million with strong business demand and some leisure. Three airports are in propeller range, so the start is thin. Coralina Air already flies Panama City to San José."
+  },
+  "GRU": {
+    "region": "South America",
+    "world": "São Paulo-Guarulhos serves the largest city in the southern hemisphere, the financial and industrial centre of Brazil. It is the main international gateway for the country and a major connecting point for South America.",
+    "game": "A catchment of 16.3 million with moderate business and family travel. Only four airports are in propeller range, so this is a big city with few neighbours. The opening is slow because the distances are long."
+  },
+  "GIG": {
+    "region": "South America",
+    "world": "Rio de Janeiro-Galeão serves Brazil's most famous beach city, once the capital. It is a major leisure gateway, with Carnival, beaches and mountain scenery drawing visitors from around the world.",
+    "game": "A catchment of 10.4 million with the strongest leisure rating and some business demand. Four airports are in propeller range. It is a big leisure market that rewards a sharp fare. Pampas Air flies Brasília."
+  },
+  "BOG": {
+    "region": "South America",
+    "world": "Bogotá sits at about 2,600 metres in the Andes, and its airport is the centre of Colombian aviation. Mountains made roads slow, so flying became the normal way to travel between cities, and it is a growing connecting point for South America.",
+    "game": "A catchment of 8.7 million with strong business demand and some family travel. Three airports are in propeller range, so the opening is thin. Andina Express flies Medellín and Quito."
+  },
+  "MDE": {
+    "region": "South America",
+    "world": "Medellín lies in a valley in the Andes, and its main international airport was built on a ridge above the city. It is a centre of textiles, flowers and a growing technology sector, and it has become a popular destination.",
+    "game": "A catchment of 2.9 million with moderate business and leisure demand. Four airports are in propeller range. A medium city in the mountains means careful routing. Andina Express already flies the Bogotá route."
+  },
+  "LHR": {
+    "region": "Europe",
+    "world": "Heathrow opened as an airport in the 1940s west of London and has been the busiest in Europe for decades. It has two runways and almost no room for more, so slots there are extremely valuable.",
+    "game": "A catchment of 13.1 million with strong business demand and good leisure and family travel. Twenty-six airports are in propeller range. It is a dense market and a crowded one. Albion Regional flies Manchester and Edinburgh, and Lowlands Air flies Amsterdam."
+  },
+  "CDG": {
+    "region": "Europe",
+    "world": "Paris Charles de Gaulle opened in 1974 north of the city, designed with a ring of terminals around a main hub. It is the centre of French aviation and a connecting point for Africa and the Middle East.",
+    "game": "A catchment of 8.3 million with strong business demand and some leisure. Thirty-eight airports are in propeller range across a dense European web. Lowlands Air flies the Amsterdam route."
+  },
+  "AMS": {
+    "region": "Europe",
+    "world": "Amsterdam Schiphol lies partly below sea level on reclaimed land, and its airport is a long-standing connecting hub. A small home market feeds a large network, built on location and a strong transfer product.",
+    "game": "A catchment of 7.5 million with moderate business and leisure demand. Thirty-five airports are in propeller range. Lowlands Air flies to London and Paris from here, so the opening is a dense web with an incumbent."
+  },
+  "FRA": {
+    "region": "Europe",
+    "world": "Frankfurt sits near the centre of Germany and Europe's rail and road network. Its airport is the largest hub in the country and a major cargo centre, supported by the nearby financial district.",
+    "game": "A catchment of 4.8 million with strong business demand. Forty-two airports are in propeller range, the most of any hub except Munich and Zurich. Rhine Express flies to Munich. A business market rewards frequent departures."
+  },
+  "MUC": {
+    "region": "Europe",
+    "world": "Munich's airport opened in 1992 northeast of the city, replacing a crowded field in the suburbs. It serves a wealthy region of manufacturing and is the second hub of Germany.",
+    "game": "A catchment of 3.6 million with moderate business demand. Forty-six airports are in propeller range, the densest web of the featured homes. Rhine Express flies Frankfurt. Short sectors are everywhere, so scheduling is the skill."
+  },
+  "ZRH": {
+    "region": "Europe",
+    "world": "Zurich's airport serves a small, rich country in the middle of Europe. Banking, pharmaceuticals and mountain tourism make it one of the highest-yielding airports on the continent for its size.",
+    "game": "A catchment of 2.8 million with strong business demand. Forty-three airports are in propeller range, an unusually dense web for a smaller city. No rival is tied to it, so a business market that rewards frequency is open."
+  },
+  "MAD": {
+    "region": "Europe",
+    "world": "Madrid-Barajas is the main connecting point between Europe and Latin America, backed by shared language and long ties. It sits on a high plateau in the centre of Spain, far from the coast.",
+    "game": "A catchment of 5.9 million with moderate business and family travel. Thirteen airports are in propeller range. Meseta Air flies to Barcelona and Lisbon, so the incumbent is close."
+  },
+  "LIS": {
+    "region": "Europe",
+    "world": "Lisbon sits on the Atlantic coast at the western edge of Europe, with historic links to Brazil and Africa. Its airport is close to the city centre and handles a growing share of tourist traffic.",
+    "game": "A catchment of 2.6 million with some leisure and family travel. Seven airports are in propeller range. It is a modest market at the edge of the map. Meseta Air flies from Madrid."
+  },
+  "FCO": {
+    "region": "Europe",
+    "world": "Rome Fiumicino was built on coastal marshland in the 1960s to serve the Italian capital. It is Italy's largest airport, carrying tourists, pilgrims and visitors to one of the most visited cities in the world.",
+    "game": "A catchment of 4.1 million with some leisure demand. Twenty-one airports are in propeller range. It is a decent web in a leisure-leaning city, and a sharp fare helps."
+  },
+  "CPH": {
+    "region": "Europe",
+    "world": "Copenhagen's Kastrup airport lies on an island in the Øresund, close to the bridge to Sweden. It is the main hub of Scandinavia, with flights across the Nordic countries and connecting traffic to the rest of Europe.",
+    "game": "A catchment of 2.2 million with moderate business demand. Twenty-six airports are in propeller range across Scandinavia and northern Europe. It is a solid short-haul web without a clear rival."
+  },
+  "DUB": {
+    "region": "Europe",
+    "world": "Dublin is the capital of an island nation and a base for cheap short-haul flying. Its airport has strong ties to Britain, North America and large Irish communities abroad, and is one of the few airports outside North America with US border preclearance.",
+    "game": "A catchment of 1.9 million with strong family travel and some leisure. Ten airports are in propeller range, mostly across the Irish Sea. A small island market is hard to grow. Albion Regional flies Manchester."
+  },
+  "ATH": {
+    "region": "Europe",
+    "world": "Athens' airport opened in 2001 for the Olympic Games, east of the city. Greece depends on island tourism, and the airport links the capital to the Aegean, and many European summer visitors pass through it.",
+    "game": "A catchment of 2.6 million with strong leisure and some family travel. Eight airports are in propeller range, so options are few. A leisure market rewards a sharp fare, particularly in summer."
+  },
+  "IST": {
+    "region": "Europe",
+    "world": "Istanbul straddles Europe and Asia, and its new airport opened in 2018 to replace a crowded older one. Geography allows one hub to reach a large number of countries within a few hours of flying.",
+    "game": "A catchment of 16.0 million with moderate business and family travel. Thirteen airports are in propeller range. It is a very large city whose neighbours are spread out."
+  },
+  "DXB": {
+    "region": "Middle East",
+    "world": "Dubai grew from a trading port into a global hub in a few decades, with an airport planned as the centre of the city's economy. Its position lets one hub link Europe, Asia and Africa within a day.",
+    "game": "A catchment of 6.1 million with strong business demand and some leisure. Only five airports are in propeller range. It is a big, rich city with few neighbours. Sahra Airways flies Doha and Muscat."
+  },
+  "DOH": {
+    "region": "Middle East",
+    "world": "Doha's Hamad International opened in 2014 on reclaimed land, replacing an older airport in the city. Qatar built it as a connecting hub for long-haul traffic between East and West.",
+    "game": "A catchment of 1.0 million with strong business demand. Eight airports are in propeller range around the Gulf. It is a small home market, and Sahra Airways already flies from Dubai."
+  },
+  "RUH": {
+    "region": "Middle East",
+    "world": "Riyadh is the capital of Saudi Arabia and sits in the central desert, far from the coast. King Khalid airport serves government, oil business and pilgrim traffic that passes on to Jeddah and Mecca.",
+    "game": "A catchment of 4.3 million with strong business demand. Four airports are in propeller range, so the start is thin. Sahra Airways flies to Jeddah."
+  },
+  "TLV": {
+    "region": "Middle East",
+    "world": "Tel Aviv's Ben Gurion airport is Israel's main gateway, built with strict security and a high share of international traffic. The country is small, so most air travel goes abroad.",
+    "game": "A catchment of 5.0 million with strong business demand and some leisure. Nine airports are in propeller range. It is a business market with few domestic neighbours and no rival tied to it."
+  },
+  "CAI": {
+    "region": "Middle East",
+    "world": "Cairo is the largest city in the Arab world and sits on the Nile, with a long history as a crossroads of Africa, Asia and Europe. Its airport serves tourism to Pharaonic and Red Sea sites and a large business community.",
+    "game": "A catchment of 12.4 million with strong business and leisure demand. Five airports are in propeller range, so it is a big market with few neighbours. A good mix of travel purposes gives you options."
+  },
+  "LOS": {
+    "region": "Africa",
+    "world": "Lagos is Nigeria's largest city and commercial capital, one of the largest in Africa. Its airport is a busy connecting point for West Africa, and the economy runs on trade, oil and a large business community.",
+    "game": "A catchment of 16.1 million with strong business and family demand. Four airports are in propeller range, so it is a big city with few neighbours. Savanna Air flies to Accra."
+  },
+  "NBO": {
+    "region": "Africa",
+    "world": "Nairobi lies on the edge of the Great Rift Valley, and Jomo Kenyatta airport is the main hub of East Africa. Safari tourism, flower exports and regional trade all pass through it.",
+    "game": "A catchment of 6.8 million with strong business demand and some leisure. Three airports are in propeller range, so the start is thin. Savanna Air flies Dar es Salaam."
+  },
+  "CMN": {
+    "region": "Africa",
+    "world": "Casablanca is Morocco's economic capital and its airport, Mohammed V, is the country's main hub. Its location in the northwest corner of Africa makes it a link to Europe, West Africa and the Atlantic.",
+    "game": "A catchment of 4.9 million with strong business demand and some leisure. Four airports are in propeller range, so options are limited. No rival is tied to it."
+  },
+  "ACC": {
+    "region": "Africa",
+    "world": "Accra is the capital of Ghana, on the Gulf of Guinea. Kotoka airport serves a stable, growing economy and a large Ghanaian diaspora, with regular flights to Europe, the Gulf and other African capitals.",
+    "game": "A catchment of 3.6 million with strong family travel. Three airports are in propeller range. It is a small start, and Savanna Air flies from Lagos."
+  },
+  "HND": {
+    "region": "Asia",
+    "world": "Tokyo Haneda sits on Tokyo Bay, close to the city centre, and handles most domestic traffic in Japan. The Tokyo-Sapporo and Tokyo-Fukuoka routes are among the busiest in the world.",
+    "game": "A catchment of 24.8 million with strong business demand. Five airports are in propeller range, so it is a huge city with few neighbours. Distances are long, and the market is rich."
+  },
+  "KIX": {
+    "region": "Asia",
+    "world": "Kansai International opened in 1994 on an artificial island in Osaka Bay, built to avoid noise at the old city airport. It serves the Osaka-Kyoto region and is a major gateway for tourists visiting Japan.",
+    "game": "A catchment of 11.2 million with the strongest leisure rating and some business demand. Nine airports are in propeller range. Leisure rewards a sharp fare. Jade Orient flies Seoul."
+  },
+  "PVG": {
+    "region": "Asia",
+    "world": "Shanghai Pudong opened in 1999 on the eastern coast of China as the main international airport of the country's financial centre. It links the Yangtze River Delta to the world and anchors a high-speed rail region.",
+    "game": "A catchment of 27.5 million, the largest on the list, with strong business demand. Eleven airports are in propeller range. Jade Orient flies Beijing and Guangzhou, so expect a rival."
+  },
+  "PEK": {
+    "region": "Asia",
+    "world": "Beijing Capital opened in 1958, and for decades was the main gateway to China. Newer Daxing airport now shares traffic, but Capital remains the main hub for politics and government business.",
+    "game": "A catchment of 20.0 million with strong business demand and some leisure. Eleven airports are in propeller range. It is a huge capital market with a rival, as Jade Orient flies to Shanghai."
+  },
+  "CAN": {
+    "region": "Asia",
+    "world": "Guangzhou Baiyun serves the main city of China's southern manufacturing region, the Pearl River Delta. Trade fairs, factories and exports make it a major hub for business travel and cargo.",
+    "game": "A catchment of 20.7 million with strong business demand. Nine airports are in propeller range. It is a big manufacturing market. Jade Orient flies Shanghai."
+  },
+  "HKG": {
+    "region": "Asia",
+    "world": "Hong Kong's Chek Lap Kok airport opened in 1998 on an artificial island north of Lantau, replacing Kai Tak. The city is a financial centre and a connecting hub between China and the rest of the world.",
+    "game": "A catchment of 8.6 million with strong business demand and some leisure. Nine airports are in propeller range. Jade Orient flies Taipei."
+  },
+  "TPE": {
+    "region": "Asia",
+    "world": "Taipei Taoyuan serves Taiwan, an island with a major electronics industry. It is a key link between China, Japan and the Americas, and a connecting point across the western Pacific.",
+    "game": "A catchment of 9.9 million with strong business demand and some leisure. Ten airports are in propeller range. It is a business market in a tight region. Jade Orient flies Hong Kong."
+  },
+  "ICN": {
+    "region": "Asia",
+    "world": "Seoul Incheon opened in 2001 on an island west of the city and has grown into one of the busiest hubs in Asia. Its location lets it connect North America with China, Japan and Southeast Asia.",
+    "game": "A catchment of 16.0 million with strong business demand and some leisure. Nine airports are in propeller range. Jade Orient flies Osaka."
+  },
+  "SIN": {
+    "region": "Asia",
+    "world": "Singapore is a city-state at the tip of the Malay Peninsula, on one of the busiest shipping lanes in the world. Changi airport is a long-time connecting hub between Asia, Europe and Australia.",
+    "game": "A catchment of 5.6 million with strong business demand. Only three airports are in propeller range, so it is a rich city with nowhere to go. Monsoon Air flies Kuala Lumpur and Bangkok."
+  },
+  "KUL": {
+    "region": "Asia",
+    "world": "Kuala Lumpur International opened in 1998 south of the Malaysian capital, in a planned corridor of technology parks. It is a low-cost hub for Southeast Asia and sits next to Singapore.",
+    "game": "A catchment of 8.3 million with strong business demand and some leisure. Three airports are in propeller range. It is a thin start in a crowded region. Monsoon Air flies Singapore."
+  },
+  "DEL": {
+    "region": "Asia",
+    "world": "Delhi's Indira Gandhi airport serves the Indian capital and its surrounding region of tens of millions. Domestic air travel has grown fast, making it among the busiest airports in the country.",
+    "game": "A catchment of 15.6 million with strong business and family demand. Seven airports are in propeller range. It is a big market with moderate neighbours. Monsoon Air flies Mumbai and Bengaluru."
+  },
+  "BOM": {
+    "region": "Asia",
+    "world": "Mumbai is India's financial capital, with two crossing runways that can't be used at once, so it runs as one of the world's busiest single-runway airports. Business, film and trade keep it crowded, and its runway is a bottleneck.",
+    "game": "A catchment of 16.5 million with strong business and family demand. Five airports are in propeller range. Monsoon Air flies Delhi, so it is a large market with a rival."
+  },
+  "BNE": {
+    "region": "Oceania",
+    "world": "Brisbane is the capital of Queensland and sits on a river near the Gold Coast. Its airport serves the east of Australia, with growing links to Asia and New Zealand, and a gateway to the Great Barrier Reef.",
+    "game": "A catchment of 3.2 million with some business and leisure demand. Four airports are in propeller range, across long distances. Southern Cross Air flies Sydney, so the start is slow."
+  }
+}

@@ -13,7 +13,7 @@ game map. The quick balance read (`npm run quick`, 4 homes × 10 seeds)
 has a saved reference from after week fourteen's stage 4; stage 5 is
 below it (Montréal $2.1M against $11.0M).
 
-**Status:** decided with the owner; stages 0–1 built, stage 2 under way.
+**Status:** decided with the owner; stages 0–2 built, stage 3's first pass built.
 
 ---
 
@@ -167,6 +167,20 @@ every one of the 17,000 city pairs is walked every midnight.
   summer read is the new reference.
 
 ### Stage 3: the picker
+
+**Stage 3 built (first pass):**
+- **The world map** with 61 featured homes, the roving cursor, the
+  story panel, the start date with a note per hemisphere, Start, and
+  "Select a different airport" (the old list, with "Back to the map").
+- **The stories** were drafted by a Sonnet helper from the data and
+  public knowledge, then checked: every rival named matches
+  `data/competitors.json`; three real-world facts corrected (Montréal is
+  Canada's third-busiest airport; Mumbai's crossing runways; Dublin's
+  preclearance). The rest is for the owner to edit.
+- **Thin regions:** Sydney, Melbourne, Johannesburg, Buenos Aires,
+  Santiago, Lima, Cape Town, Bangkok, Jakarta and Manila can't be homes:
+  each has fewer than three airports within a propeller's 380 nm.
+  Oceania's only featured home is Brisbane.
 
 1. **A flat world map** for choosing: the whole world in one view,
    styled flatter than the game map (no relief, muted land, the

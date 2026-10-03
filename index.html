@@ -278,18 +278,36 @@
         <p id="hub-planner-notice" class="hub-planner-notice"></p>
       </div>
     </div>
+    <div id="home-world" hidden>
+      <canvas id="home-world-map"></canvas>
+      <h2 class="home-world-title">Choose your home</h2>
+      <div id="home-world-panel">
+        <div id="home-world-story"></div>
+        <div class="home-world-actions">
+          <div class="home-season">
+            <span class="home-season-label">Start</span>
+            <button type="button" data-season="summer">1 May</button>
+            <button type="button" data-season="winter">1 Nov</button>
+          </div>
+          <div id="home-world-season-note" class="home-world-season-note"></div>
+          <button type="button" id="home-world-start" class="home-world-start" disabled>Start</button>
+          <button type="button" id="home-world-other" class="home-world-other">Select a different airport</button>
+        </div>
+      </div>
+    </div>
     <div id="home-picker-modal" class="modal-overlay" hidden>
       <div class="modal-box modal-box--home">
-        <h2>Choose your home city</h2>
+        <h2>Every home city</h2>
         <p>
           You start with one propeller plane based here. A propeller flies
           about <span id="home-picker-range"></span> nm, so the cities listed
           are the ones with neighbours to fly to.
         </p>
-        <div id="home-picker-season" class="home-season">
+        <div class="home-season">
           <span class="home-season-label">Start</span>
-          <button type="button" data-season="summer">Summer · 1 May</button>
-          <button type="button" data-season="winter">Winter · 1 Nov</button>
+          <button type="button" data-season="summer">1 May</button>
+          <button type="button" data-season="winter">1 Nov</button>
+          <button type="button" id="home-picker-back" class="home-picker-back">Back to the map</button>
         </div>
         <div id="home-picker-list"></div>
       </div>

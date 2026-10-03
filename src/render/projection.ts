@@ -94,3 +94,27 @@ export function fitProjection(width: number, height: number, home: { lon: number
     [width, height],
   ]);
 }
+
+/**
+ * Fit the whole inhabited world into a `width` x `height` canvas, kept
+ * `inset` pixels in from each edge: the new-game picker's view
+ * (ui/homePicker.ts), drawn through this same projection, as every map in
+ * the game is.
+ */
+export function fitWorld(width: number, height: number, inset: { top: number; right: number; bottom: number; left: number }): void {
+  // Two corners, not a ring: a ring 350° wide is ambiguous on a sphere, but
+  // two points' projected bounds are just the box between them. Antarctica
+  // and the far Arctic are left off; no airport is there.
+  projection.fitExtent(
+    [
+      [inset.left, inset.top],
+      [width - inset.right, height - inset.bottom],
+    ],
+    { type: 'MultiPoint', coordinates: [[-170, 72], [180, -50]] },
+  );
+  baselineScale = projection.scale();
+  projection.clipExtent([
+    [0, 0],
+    [width, height],
+  ]);
+}

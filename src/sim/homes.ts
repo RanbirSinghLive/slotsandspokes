@@ -49,6 +49,13 @@ export type HomeOption = {
   difficulty: HomeDifficulty | null;
 };
 
+/** The airports a starting propeller can fly a market to from `iata`. */
+export function homeNeighbours(iata: string): string[] {
+  return airports
+    .filter((other) => other.iata !== iata && marketDistanceNm(iata, other.iata) <= PROPELLER_RANGE_NM && potentialDailyDemand(iata, other.iata) > 0)
+    .map((other) => other.iata);
+}
+
 /** Every city the player may start from, biggest first. */
 export function homeOptions(): HomeOption[] {
   return airports
@@ -56,12 +63,7 @@ export function homeOptions(): HomeOption[] {
       iata: airport.iata,
       name: airport.name,
       population: airport.population,
-      neighbours: airports.filter(
-        (other) =>
-          other.iata !== airport.iata &&
-          marketDistanceNm(airport.iata, other.iata) <= PROPELLER_RANGE_NM &&
-          potentialDailyDemand(airport.iata, other.iata) > 0,
-      ).length,
+      neighbours: homeNeighbours(airport.iata).length,
       difficulty: difficultyByIata.get(airport.iata) ?? null,
     }))
     .filter((option) => option.neighbours >= MIN_NEIGHBOURS)

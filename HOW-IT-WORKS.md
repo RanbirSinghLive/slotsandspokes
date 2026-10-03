@@ -174,11 +174,25 @@ mid-game's, and would make a rating about luck rather than the city. What makes 
 crosses while its first routes build demand, which nothing on the map
 predicts well: Philadelphia has some of the biggest markets there are,
 but its best routes are short hops where a fare barely covers a
-departure. Of 169 cities, 68 are Standard (Montréal, Toronto, Boston,
-London, O'Hare), 33 Hard (Philadelphia, Madrid), 68 Brutal (Halifax, Los
-Angeles). The home picker groups cities by it, easiest first, so a new
-player finds a fair start at the top and a veteran can pick a hard one.
-Re-run it after a change to costs, fares or demand.
+departure. Of 404 cities, 240 are Standard (Montréal, Toronto, London,
+Shanghai, São Paulo), 54 Hard (Philadelphia, Mexico City, Cairo), 110
+Brutal (Halifax, Moscow, the islands). Re-run it after a change to costs,
+fares or demand.
+
+**The home picker** (`ui/homePicker.ts`, `render/pickerMap.ts`) opens a
+new game on a flat world map, the one shared projection fitted to the
+whole world. The featured homes (`data/home-stories.json`, about 60,
+hand-written stories for the owner to edit) are bright dots; every other
+airport is a faint one. The cursor snaps to the nearest featured home
+within 70 px, lifting it with its name, its rating and lines to the
+airports its starting propeller reaches (`homeNeighbours()`), and its
+story fills the panel along the bottom: what made it matter in the real
+world, and what makes it worth playing here. A click chooses it; Start
+begins. A featured home must still be pickable: the stories file can't
+add one. "Select a different airport" opens every home in a list,
+grouped by rating, easiest first, where a click starts at once. Both
+share the start date, 1 May or 1 November, with a line on what it opens
+into for that home's hemisphere.
 
 ## The tick (`src/sim/step.ts`)
 
