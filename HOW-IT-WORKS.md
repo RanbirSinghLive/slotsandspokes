@@ -194,7 +194,12 @@ airports its starting propeller reaches (`homeNeighbours()`), and its
 story fills the panel along the bottom: what made it matter in the real
 world, and what makes it worth playing here. A click chooses it; Start
 begins. A featured home must still be pickable: the stories file can't
-add one. "Select a different airport" opens every home in a list,
+add one. A Hard or Brutal home also says why, from the data
+(`homeReasons()`): only a few airports in reach; its biggest market a
+short hop under 100 nm (a day of them runs late and tires the crews,
+and a market flown unreliably shrinks); under 2,000 a day of demand to
+airports at least 150 nm away; a seeded rival on its biggest market.
+"Select a different airport" opens every home in a list,
 grouped by rating, easiest first, where a click starts at once. Both
 share the start date, 1 May or 1 November, with a line on what it opens
 into for that home's hemisphere.

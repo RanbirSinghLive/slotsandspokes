@@ -167,6 +167,31 @@ early game; bases and night stops are the mid-game's next layer.
 
 ### Stage 3: thin homes
 
+**What makes a home thin** (measured on the 516 rated homes):
+- **Little demand at a paying distance.** Counting airports in reach at
+  least 150 nm away, the median Standard home has about 21,000 a day of
+  potential demand, Hard 5,400, Brutal 2,200; 28 of the 30 homes under
+  500 a day are Brutal.
+- **Short hops, operationally.** On paper a short hop pays: Manila–Clark
+  (49 nm) breaks even 29% full, against 39% for Montréal–LaGuardia. But
+  the rating's starter fills a Propeller's day with them, about 14
+  takeoffs, and on-time falls to 16–23%. A market flown that unreliably
+  shrinks (sim/marketDemand.ts's reliability term), so Manila–Clark went
+  from 72 a day to 63 in ten days against a potential of 74,000.
+- **The rating bot's opening, not only the city.** The starter opens on
+  the biggest market whatever its distance. Ranking it by forecast
+  margin per hour didn't help (on day 0 every market forecasts a loss;
+  at full planes short hops win per hour), so it was reverted. The
+  steady player lasts 90 days almost everywhere (Halifax too), so a
+  90-day steady rating would call nearly every home Standard.
+
+**Built:** `homeReasons()` (sim/homes.ts), shown in the picker's story
+panel ("Why hard · only 3 in reach · biggest market a short hop · NTL 77
+nm · small markets beyond 150 nm") and as the list row's hover text.
+It explains 128 of 145 Brutal homes and 50 of 88 Hard.
+
+**Open:** how the ratings should be measured, with the owner.
+
 145 of 516 homes are Brutal, among them Sydney, Melbourne, Buenos Aires,
 Lima, Manila and Ho Chi Minh City, and the picker features them. To be
 decided with the owner once stages 1–2 are in: what makes a home thin

@@ -1,6 +1,6 @@
 import homeStoriesData from '../../data/home-stories.json';
 import type { StartSeason } from '../sim/clock';
-import { homeNeighbours, PROPELLER_RANGE_NM, type HomeDifficulty, type HomeOption } from '../sim/homes';
+import { homeNeighbours, homeReasons, PROPELLER_RANGE_NM, type HomeDifficulty, type HomeOption } from '../sim/homes';
 import { drawPickerMap, type PickerPoint, type PickerView } from '../render/pickerMap';
 import { airports } from '../render/airports';
 import { fitWorld, projection } from '../render/projection';
@@ -95,6 +95,13 @@ function textEl(tag: string, className: string, text: string): HTMLElement {
   return el;
 }
 
+/** Why a Hard or Brutal home is one, in a line (sim/homes.ts's homeReasons()); null for a Standard home or one with no reason found. */
+function whyHard(option: HomeOption): string | null {
+  if (option.difficulty !== 'Hard' && option.difficulty !== 'Brutal') return null;
+  const reasons = homeReasons(option.iata);
+  return reasons.length > 0 ? `Why hard · ${reasons.join(' · ')}` : null;
+}
+
 /** The story along the bottom: the home under the cursor, else the one chosen, else a hint. */
 function showStory(): void {
   const home = lifted ?? pinned;
@@ -105,6 +112,7 @@ function showStory(): void {
     storyEl.replaceChildren(
       textEl('div', 'home-world-name', `${option.iata} · ${option.name}`),
       textEl('div', 'home-world-facts', [story.region, option.difficulty ?? 'Unrated', `${option.neighbours} within reach`, `${millions(option.population)} catchment`].join(' · ')),
+      ...(whyHard(option) ? [textEl('div', 'home-world-why', whyHard(option)!)] : []),
       textEl('p', 'home-world-text', story.world),
       textEl('p', 'home-world-text home-world-text--game', story.game),
     );
@@ -216,6 +224,8 @@ function optionButton(option: HomeOption): HTMLButtonElement {
     textEl('span', 'home-option-name', option.name),
     textEl('span', 'home-option-reach', `${option.neighbours} within reach`),
   );
+  const why = whyHard(option);
+  if (why) button.title = why;
   button.addEventListener('click', () => start(option.iata));
   return button;
 }

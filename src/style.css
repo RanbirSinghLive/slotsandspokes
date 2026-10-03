@@ -2084,6 +2084,13 @@ button.ticker-item:hover {
   font-size: 12px;
 }
 
+/* Why a Hard or Brutal home is one (sim/homes.ts's homeReasons()). */
+.home-world-why {
+  margin-top: 2px;
+  color: #ffb36b;
+  font-size: 12px;
+}
+
 .home-world-text {
   margin: 8px 0 0;
   max-width: 78ch;

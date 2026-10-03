@@ -3,6 +3,7 @@ import { STARTING_CREW_CLASS, STARTING_CREWS } from './crews';
 import { placeHomeRival } from './competitors';
 import { ensureRivalFleets } from './market';
 import homeDifficultyData from '../../data/home-difficulty.json';
+import competitorsData from '../../data/competitors.json';
 import { AIRCRAFT_CLASSES } from './aircraftClasses';
 import { marketDistanceNm, potentialDailyDemand } from './demand';
 import { START_DAY_OF_YEAR, startingSimMinute, type StartSeason } from './clock';
@@ -54,6 +55,40 @@ export function homeNeighbours(iata: string): string[] {
   return airports
     .filter((other) => other.iata !== iata && marketDistanceNm(iata, other.iata) <= PROPELLER_RANGE_NM && potentialDailyDemand(iata, other.iata) > 0)
     .map((other) => other.iata);
+}
+
+/** A hop this short means a takeoff every hour or so: a day of them runs late and tires its crews. */
+const SHORT_HOP_NM = 100;
+/** Demand a day to airports in reach at least PAYING_NM away below which a home's markets are small. */
+const SMALL_MARKETS_DEMAND = 2_000;
+const PAYING_NM = 150;
+/** As few airports in reach as this makes the opening narrow. */
+const FEW_NEIGHBOURS = 4;
+
+const seededRivals = competitorsData as { airline: string; origin: string; dest: string }[];
+
+/**
+ * Why a home is a hard start, from the data, for the picker
+ * (ui/homePicker.ts): few airports in reach; its biggest market a short
+ * hop (a day of them runs late and tires the crews, and a market flown
+ * unreliably shrinks, sim/marketDemand.ts); small markets at a paying
+ * distance; a seeded rival already on its biggest market. Empty for a
+ * home with none of these.
+ */
+export function homeReasons(iata: string): string[] {
+  const neighbours = homeNeighbours(iata);
+  if (neighbours.length === 0) return [];
+  const byDemand = [...neighbours].sort((a, b) => potentialDailyDemand(iata, b) - potentialDailyDemand(iata, a));
+  const biggest = byDemand[0];
+  const reasons: string[] = [];
+  if (neighbours.length <= FEW_NEIGHBOURS) reasons.push(`only ${neighbours.length} in reach`);
+  const biggestNm = Math.round(marketDistanceNm(iata, biggest));
+  if (biggestNm < SHORT_HOP_NM) reasons.push(`biggest market a short hop · ${biggest} ${biggestNm} nm`);
+  const paying = neighbours.filter((other) => marketDistanceNm(iata, other) >= PAYING_NM).reduce((total, other) => total + potentialDailyDemand(iata, other), 0);
+  if (paying < SMALL_MARKETS_DEMAND) reasons.push('small markets beyond 150 nm');
+  const rival = seededRivals.find((route) => (route.origin === iata && route.dest === biggest) || (route.dest === iata && route.origin === biggest));
+  if (rival) reasons.push(`${rival.airline} on ${biggest}`);
+  return reasons;
 }
 
 /** Every city the player may start from, biggest first. */
