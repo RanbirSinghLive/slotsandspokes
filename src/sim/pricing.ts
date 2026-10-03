@@ -1,4 +1,5 @@
 import { recommendedFare, marketKey } from './schedule';
+import { DEFAULT_FARE_CLASSES, type FareClassSettings } from './fareClasses';
 import type { FareStance, SimState } from './state';
 
 /**
@@ -108,20 +109,62 @@ export function setHandFare(state: SimState, origin: string, dest: string, fare:
 /** The least of a plane any fare class can be set to: a class can be closed (0), but a split under this rounds to it. */
 const MIN_CLASS_SHARE = 0.05;
 
-/**
- * Split a route's seats between fare classes (sim/fareClasses.ts): Saver's
- * and Flex's shares of the seats, rounded to 5%, Full taking what's left.
- * Either can be closed; together they can't be more than every seat.
- */
-export function setFareClasses(state: SimState, origin: string, dest: string, saverShare: number, flexShare: number): void {
-  const settings = state.routeSettings[marketKey(origin, dest)];
-  if (!settings) return;
+/** A seat split with each share rounded to 5%, and together no more than every seat. */
+function roundedSplit(saverShare: number, flexShare: number): FareClassSettings {
   const round = (share: number) => {
     const rounded = Math.round(Math.max(0, Math.min(1, share)) * 20) / 20;
     return rounded < MIN_CLASS_SHARE ? 0 : rounded;
   };
   const saver = round(saverShare);
-  settings.fareClasses = { saverShare: saver, flexShare: Math.min(1 - saver, round(flexShare)) };
+  return { saverShare: saver, flexShare: Math.min(1 - saver, round(flexShare)) };
+}
+
+/**
+ * Split a route's seats between fare classes (sim/fareClasses.ts): Saver's
+ * and Flex's shares, Full taking what's left. Either can be closed. Sets
+ * the route's split by hand: it stops following the airline-wide seat
+ * policy (setFareClassPolicy()).
+ */
+export function setFareClasses(state: SimState, origin: string, dest: string, saverShare: number, flexShare: number): void {
+  const settings = state.routeSettings[marketKey(origin, dest)];
+  if (!settings) return;
+  settings.fareClasses = roundedSplit(saverShare, flexShare);
+  settings.fareClassesByHand = true;
+}
+
+/** The airline-wide seat split every route not set by hand follows. */
+export function fareClassPolicy(state: SimState): FareClassSettings {
+  return state.fareClassPolicy ?? DEFAULT_FARE_CLASSES;
+}
+
+/** Set the airline-wide seat split and give it to every route not set by hand. */
+export function setFareClassPolicy(state: SimState, saverShare: number, flexShare: number): void {
+  state.fareClassPolicy = roundedSplit(saverShare, flexShare);
+  for (const settings of Object.values(state.routeSettings)) {
+    if (!settings.fareClassesByHand) settings.fareClasses = { ...state.fareClassPolicy };
+  }
+}
+
+/** Every route's seat split set by hand back on the seat policy, in one press. */
+export function putAllSeatsOnPolicy(state: SimState): void {
+  for (const settings of Object.values(state.routeSettings)) settings.fareClassesByHand = false;
+  setFareClassPolicy(state, fareClassPolicy(state).saverShare, fareClassPolicy(state).flexShare);
+}
+
+/** One route's seat split back on the seat policy. */
+export function putSeatsOnPolicy(state: SimState, origin: string, dest: string): void {
+  const settings = state.routeSettings[marketKey(origin, dest)];
+  if (!settings) return;
+  settings.fareClassesByHand = false;
+  settings.fareClasses = { ...fareClassPolicy(state) };
+}
+
+/** How many routes flown today have their seat split set by hand, of how many. */
+export function seatPolicySummary(state: SimState): { byHand: number; routes: number } {
+  const keys = new Set(state.schedule.map((leg) => marketKey(leg.origin, leg.dest)));
+  let byHand = 0;
+  for (const key of keys) if (state.routeSettings[key]?.fareClassesByHand) byHand++;
+  return { byHand, routes: keys.size };
 }
 
 /** Set the airline-wide fare policy (clamped to its range) and re-price every market that follows it. */
