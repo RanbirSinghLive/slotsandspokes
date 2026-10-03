@@ -2,7 +2,7 @@ import { onSale, SALE_RIVAL_READ } from './seatSale';
 import { dayIndex } from './clock';
 import competitorsData from '../../data/competitors.json';
 import rivalPoolData from '../../data/rival-airlines.json';
-import { potentialDailyDemand, ALL_MARKET_PAIRS, marketDistanceNm, pairsTouching } from './demand';
+import { potentialDailyDemand, marketDistanceNm, pairsTouching } from './demand';
 import { marketKey, recommendedFare } from './schedule';
 import { nextRandom } from './rng';
 import { networkAirports } from './reach';
@@ -284,11 +284,11 @@ export function rollRivalEntry(state: SimState, dayStartMinute: number): void {
 
   const known = new Set(state.knownAirports);
   const network = networkAirports(state);
-  const candidates = ALL_MARKET_PAIRS.filter(
+  // Pairs touching the network, found by airport (sim/demand.ts's pairsTouching()).
+  const candidates = pairsTouching(network).filter(
     ([a, b]) =>
       known.has(a) &&
       known.has(b) &&
-      (network.has(a) || network.has(b)) &&
       marketDistanceNm(a, b) <= COMPETITOR_MAX_ROUTE_NM &&
       potentialDailyDemand(a, b) > 0 &&
       !inRespite(state, a, b),
@@ -351,9 +351,8 @@ export function placeHomeRival(state: SimState): void {
   const home = state.homeAirport;
   const served = new Set(state.competitorRoutes.map((route) => marketKey(route.origin, route.dest)));
   const known = new Set(state.knownAirports);
-  const markets = ALL_MARKET_PAIRS.filter(
+  const markets = pairsTouching([home]).filter(
     ([a, b]) =>
-      (a === home || b === home) &&
       known.has(a) &&
       known.has(b) &&
       !served.has(marketKey(a, b)) &&
