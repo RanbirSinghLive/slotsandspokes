@@ -346,6 +346,11 @@ February and −7% in July; Toronto–Chicago −3% in January and +10% in
 July. The one-seed headless year from Montréal went from $3.2M to bust
 (−$31k); no balance read yet.
 
+**Step 2 built:** `sim/demandEvents.ts`, announced in the ticker and on
+the route view, multiplying the day's seasonal factors. One headless
+Toronto year had 17, from a LaGuardia film festival to an Ottawa
+all-star game.
+
 ## Decisions for the owner
 
 1. The airport tags: a first pass covers every airport in the data; the

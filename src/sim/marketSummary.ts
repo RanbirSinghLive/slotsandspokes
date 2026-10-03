@@ -1,4 +1,4 @@
-import { seasonFactors } from './seasons';
+import { demandFactors } from './demandEvents';
 import { effectiveFareClasses } from './seatSale';
 import { crowdingWeight } from './timeOfDay';
 import { cabinLayout, cabinOf } from './cabins';
@@ -105,7 +105,8 @@ export function summarizeMarket(
   };
   const perks = bookingPerks(state, origin, dest);
   const departures = legs.map((leg) => leg.departMinute);
-  const season = seasonFactors(state, origin, dest);
+  // The season and any event at either end (sim/seasons.ts, sim/demandEvents.ts).
+  const season = demandFactors(state, origin, dest);
   const fareClasses = emptyTally();
   for (const leg of legs) {
     const type = aircraftTypeForLeg(leg, state);

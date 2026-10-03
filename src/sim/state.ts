@@ -1,5 +1,6 @@
 import type { FareClassSettings, FareClassTally } from './fareClasses';
 import type { FareWar, FareWarEvent } from './fareWars';
+import type { DemandEvent } from './demandEvents';
 import aircraftTypesData from '../../data/aircraft-types.json';
 import type { Shock } from './shocks';
 import { startingSimMinute } from './clock';
@@ -547,6 +548,8 @@ export type SimState = {
   mxHoldsToday?: string[];
   /** How each flying plane's line check went last night (sim/mxChecks.ts), by tail. */
   lastNightChecks?: Record<string, 'checked' | 'cleared' | 'short' | 'away'>;
+  /** Demand events announced or running (sim/demandEvents.ts). Absent in an older save: none. */
+  demandEvents?: DemandEvent[];
   /** Fare wars running now (sim/fareWars.ts). Absent in an older save: none. */
   fareWars?: FareWar[];
   /** Fare wars started and ended, the latest few, for the ticker. */

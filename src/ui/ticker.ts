@@ -2,7 +2,7 @@ import { airlineCalled, classOpen, LADDER, milestoneById, tiersClimbed } from '.
 import { rivalTiersClimbed } from '../sim/rivalLadder';
 import { pluralClassName } from '../sim/aircraftClasses';
 import { classByCode } from '../sim/aircraftClasses';
-import { shortMoney } from './format';
+import { gameDate, shortMoney } from './format';
 import { RIVAL_CLOSE_AFTER_LOSING_DAYS, RIVAL_SQUEEZED_RESPITE_DAYS } from '../sim/pressure';
 import { activeHedge } from '../sim/fuelPrice';
 import { activeShock, describeShock, shockEndedLine, type Shock } from '../sim/shocks';
@@ -15,6 +15,7 @@ import { select, type Selection } from './selection';
 import { rivalsInSight } from '../sim/reach';
 import { contractsOf, SNAP_BACK_SHARE } from '../sim/contracts';
 import { WAR_LEVEL } from '../sim/fareWars';
+import { eventDraws } from '../sim/demandEvents';
 
 const tickerTrack = document.querySelector<HTMLDivElement>('#ticker-track')!;
 
@@ -31,7 +32,7 @@ const PIXELS_PER_SECOND = 60;
  * ("AOG YUL · C-P002 · hydraulics · back 3d"). Kept apart from the text so
  * the ticker can style it on its own.
  */
-type TickerTag = 'AOG' | 'CNX' | 'CREW' | 'FLEET' | 'LESSOR' | 'RIVAL' | 'FARE' | 'FUEL' | 'SHOCK' | 'WX' | 'GOAL' | 'REACH' | 'CONTRACT';
+type TickerTag = 'AOG' | 'CNX' | 'CREW' | 'FLEET' | 'LESSOR' | 'RIVAL' | 'FARE' | 'FUEL' | 'SHOCK' | 'WX' | 'GOAL' | 'REACH' | 'CONTRACT' | 'EVENT';
 
 /**
  * A line, and the inspector view that explains it, when one does: clicking
@@ -451,6 +452,25 @@ function pollAogEvents(state: SimState): void {
   }
 }
 
+/** Demand events (sim/demandEvents.ts): each announced once, highlighted, as notice to act on. */
+let seenDemandEvents: Set<string> | null = null;
+
+function pollDemandEvents(state: SimState): void {
+  const events = state.demandEvents ?? [];
+  const id = (event: (typeof events)[number]) => `${event.iata}|${event.startDay}`;
+  if (seenDemandEvents === null) {
+    seenDemandEvents = new Set(events.map(id));
+    return;
+  }
+  for (const event of events) {
+    if (seenDemandEvents.has(id(event))) continue;
+    seenDemandEvents.add(id(event));
+    const days = event.endDay - event.startDay + 1;
+    const draws = eventDraws(event.kind).map((segment) => (segment === 'vfr' ? 'VFR' : segment)).join(' and ');
+    pushEvent(state.simMinute, 'EVENT', `${event.iata} ${event.name} · ${gameDate(event.startDay)} · ${days}d · ${draws} +${Math.round(event.lift * 100)}%`, { kind: 'airport', iata: event.iata }, true);
+  }
+}
+
 /** Planes held at base for a morning (sim/mxChecks.ts): one line each, the morning it happens. */
 let seenMxHolds: string | null = null;
 
@@ -682,6 +702,7 @@ export function updateTicker(state: SimState): void {
   pollFerryEvents(state);
   pollFareWarEvents(state);
   pollMxHoldEvents(state);
+  pollDemandEvents(state);
   pollRivalFareEvents(state);
   pollMarketEvents(state);
   pollReachEvents(state);

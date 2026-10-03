@@ -2244,6 +2244,30 @@ seasons only.
 
 ---
 
+## Demand events (`src/sim/demandEvents.ts`)
+
+A festival, a conference or a championship final at a city lifts every
+market touching it for 2–5 days. Each is announced 10–21 days ahead, in
+the ticker (highlighted, tagged EVENT) and on each route it touches. It's
+notice to add a flight, bring a bigger plane or raise the fare. Rivals
+don't plan for them.
+
+One may be announced each day, with a 1-in-20 chance, from the seeded
+stream (always the same draws, so the day's other rolls don't shift).
+It's at an airport the airline knows, weighted by population, with at
+most three announced or running at once: about 17 a year.
+
+| Kind | Draws |
+|---|---|
+| Festival | leisure and VFR |
+| Conference | business |
+| Final | leisure |
+
+Each lifts its segments by 40–100%. That multiplies the day's seasonal
+factors (`demandFactors()`): today's travellers, not the market's growth.
+
+---
+
 ## Cabins (`src/sim/cabins.ts`)
 
 A plane is all economy, or has a **business cabin** up front (`Aircraft.cabin`).

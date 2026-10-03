@@ -30,6 +30,8 @@ import { contractOn, paymentShare, performanceFactor } from '../../sim/contracts
 import { revenueHill, type RevenueHill } from '../../sim/revenueHill';
 import { drawHillChart } from '../hillChart';
 import { isSunRoute, marketSeasonOutlook } from '../../sim/seasons';
+import { eventDraws, eventRunning, eventsOn } from '../../sim/demandEvents';
+import { gameDate } from '../format';
 import { fareWarOn, PEACE_LEVEL, WAR_LEVEL } from '../../sim/fareWars';
 import { rivalRouteDailyResult } from '../../sim/rivalEconomics';
 import { dayIndex } from '../../sim/clock';
@@ -140,6 +142,19 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   );
   root.append(...characterBar(a, b));
   root.append(seasonLine(state, a, b));
+  for (const event of eventsOn(state, a, b)) {
+    const running = eventRunning(state, event);
+    const today = dayIndex(state);
+    const when = running ? `now · ${event.endDay - today + 1}d left` : `${gameDate(event.startDay)} · in ${event.startDay - today}d · ${event.endDay - event.startDay + 1}d`;
+    const draws = eventDraws(event.kind).map((segment) => (segment === 'vfr' ? 'VFR' : segment)).join(' and ');
+    root.append(
+      lineWithInfo(
+        `Event ${event.iata} ${event.name} · ${when} · ${draws} +${Math.round(event.lift * 100)}%`,
+        'A demand event at one end: while it runs, every market touching that city has this many more of these travellers wanting to fly. Rivals don\'t plan for it, so a flight added, a bigger plane or a higher fare ahead of it is yours to take.',
+        'inspector-line is-warn',
+      ),
+    );
+  }
 
   const rivals = state.competitorRoutes.filter(
     (route) => (route.origin === a && route.dest === b) || (route.origin === b && route.dest === a),

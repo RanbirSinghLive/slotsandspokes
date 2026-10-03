@@ -18,3 +18,12 @@ export function shortMoney(amount: number): string {
   if (size >= 1_000) return `${sign}$${Math.round(size / 1_000)}k`;
   return `${sign}$${Math.round(size)}`;
 }
+
+const GAME_START_UTC_MS = Date.UTC(2027, 0, 1);
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** A game day as a short date: day 0 is 1 January 2027 (main.ts's clock), so day 133 is "May 14". */
+export function gameDate(day: number): string {
+  const date = new Date(GAME_START_UTC_MS + day * 86_400_000);
+  return `${MONTH_NAMES[date.getUTCMonth()]} ${date.getUTCDate()}`;
+}

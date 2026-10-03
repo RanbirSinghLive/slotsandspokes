@@ -1908,6 +1908,11 @@ button.ticker-item:hover {
   background: #7fd88f;
 }
 
+/* Demand events: violet, a date to plan for (sim/demandEvents.ts). */
+.ticker-tag--event {
+  background: #b9a6ff;
+}
+
 /* Contracts: gold, money that comes with terms. */
 .ticker-tag--contract {
   background: #e8c170;

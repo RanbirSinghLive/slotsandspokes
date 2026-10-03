@@ -1,4 +1,4 @@
-import { seasonFactors } from './seasons';
+import { demandFactors, rollDailyDemandEvents } from './demandEvents';
 import { morningHolds, rollNightlyChecks, wornAge } from './mxChecks';
 import { rollDailyFareWars } from './fareWars';
 import { effectiveFareClasses } from './seatSale';
@@ -356,6 +356,7 @@ export function step(state: SimState): void {
     // above, but unlike them entirely deterministic — no random draws.
     rollDailyMarketDemand(state);
     rollDailyBrand(state);
+    rollDailyDemandEvents(state);
     // Contracts (sim/contracts.ts): starts, payments, endings
     // and their snap-back, after the markets have grown for the day so a
     // snap-back isn't regrown before anyone sees it.
@@ -559,7 +560,7 @@ export function step(state: SimState): void {
                 departMinute,
                 marketDepartMinutes: marketDepartMinutes(flight.origin, flight.dest, state.schedule),
                 crowding: crowdingWeight({ origin: flight.origin, dest: flight.dest, departMinute, legId: flight.legId }, state.schedule),
-                season: seasonFactors(state, flight.origin, flight.dest),
+                season: demandFactors(state, flight.origin, flight.dest),
               };
             })(),
             effectiveFareClasses(state, key),
