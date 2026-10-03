@@ -13,7 +13,7 @@ game map. The quick balance read (`npm run quick`, 4 homes × 10 seeds)
 has a saved reference from after week fourteen's stage 4; stage 5 is
 below it (Montréal $2.1M against $11.0M).
 
-**Status:** decided with the owner; stage 0 under way.
+**Status:** decided with the owner; stages 0–1 built, stage 2 under way.
 
 ---
 
@@ -138,6 +138,20 @@ every one of the 17,000 city pairs is walked every midnight.
 3. **Balance, after this stage:** a quick read with summer starts as the
    new reference, and one with winter starts, to see whether and how
    much harder it plays. The headless runner starts summer by default.
+
+**Stage 2, steps 1–2 built:**
+- **The choice:** "Start · Summer · 1 May | Winter · 1 Nov" above the
+  home list, summer lit unless changed.
+- **One start day:** `state.startDayOfYear` (sim/clock.ts) feeds the
+  seasons, the weather, the terminator and every date on the page. Every
+  year is 365 days. An old save reads as 1 January (the owner's Toronto
+  game still says Jan 25, 2027).
+- **Headless:** games start in summer; `npm run quick -- --winter` plays
+  winter starts.
+- **Found on the way, not fixed:** the weather's seasons are northern and
+  global. Every airport gets summer thunderstorms and winter snowstorms
+  on the same dates, Singapore and Sydney included.
+- **Step 3, the two quick reads,** waiting on the owner.
 
 ### Stage 3: the picker
 

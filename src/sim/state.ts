@@ -3,7 +3,7 @@ import type { FareWar, FareWarEvent } from './fareWars';
 import type { DemandEvent } from './demandEvents';
 import aircraftTypesData from '../../data/aircraft-types.json';
 import type { Shock } from './shocks';
-import { startingSimMinute } from './clock';
+import { START_DAY_OF_YEAR, startingSimMinute } from './clock';
 import type { ScheduleLeg } from './schedule';
 import { leaseAircraft } from './leasing';
 import { revealReach } from './reach';
@@ -187,6 +187,8 @@ export type RouteSettings = {
 export type SimState = {
   simMinute: number;
   /** The airport the player chose to start from (sim/homes.ts). The map centres on it. */
+  /** The calendar date day 0 fell on, in days after 1 January (sim/clock.ts): 120 for a summer start. Missing in a save from before the choice, which started on 1 January. */
+  startDayOfYear?: number;
   homeAirport: string;
   /**
    * Airports the player can see and use (fog by reach, sim/reach.ts).
@@ -664,6 +666,8 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     // Home midnight, not UTC midnight: the airline's day runs on home time
     // (sim/clock.ts). chooseHome() resets it when the player picks a city.
     simMinute: startingSimMinute(homeIata),
+    // A summer start until chooseHome() sets the season the player picked.
+    startDayOfYear: START_DAY_OF_YEAR.summer,
     homeAirport: homeIata,
     knownAirports: [],
     cash: STARTING_CASH,

@@ -467,7 +467,7 @@ function pollDemandEvents(state: SimState): void {
     seenDemandEvents.add(id(event));
     const days = event.endDay - event.startDay + 1;
     const draws = eventDraws(event.kind).map((segment) => (segment === 'vfr' ? 'VFR' : segment)).join(' and ');
-    pushEvent(state.simMinute, 'EVENT', `${event.iata} ${event.name} · ${gameDate(event.startDay)} · ${days}d · ${draws} +${Math.round(event.lift * 100)}%`, { kind: 'airport', iata: event.iata }, true);
+    pushEvent(state.simMinute, 'EVENT', `${event.iata} ${event.name} · ${gameDate(state, event.startDay)} · ${days}d · ${draws} +${Math.round(event.lift * 100)}%`, { kind: 'airport', iata: event.iata }, true);
   }
 }
 

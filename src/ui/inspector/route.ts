@@ -145,7 +145,7 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   for (const event of eventsOn(state, a, b)) {
     const running = eventRunning(state, event);
     const today = dayIndex(state);
-    const when = running ? `now · ${event.endDay - today + 1}d left` : `${gameDate(event.startDay)} · in ${event.startDay - today}d · ${event.endDay - event.startDay + 1}d`;
+    const when = running ? `now · ${event.endDay - today + 1}d left` : `${gameDate(state, event.startDay)} · in ${event.startDay - today}d · ${event.endDay - event.startDay + 1}d`;
     const draws = eventDraws(event.kind).map((segment) => (segment === 'vfr' ? 'VFR' : segment)).join(' and ');
     root.append(
       lineWithInfo(

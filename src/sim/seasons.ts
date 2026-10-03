@@ -1,14 +1,15 @@
 import airportsData from '../../data/airports.json';
 import airportCharacter from '../../data/airport-character.json';
-import { dayIndex } from './clock';
+import { calendarDayOfYear, DAYS_PER_YEAR } from './clock';
 import { marketMix } from './marketCharacter';
 import type { SimState } from './state';
 import type { SegmentName } from './timeOfDay';
 
 /**
  * Seasons (WEEK-FOURTEEN.md, stage 5): how many of each segment want to
- * fly, through the year. Day 0 of the game is 1 January, and the year
- * repeats every 365 days, as the weather's does (sim/weather.ts).
+ * fly, through the year. The calendar starts on the date the player
+ * chose (sim/clock.ts), and the year repeats every 365 days, as the
+ * weather's does (sim/weather.ts).
  *
  * Each segment's demand is 1 on an ordinary day, raised or lowered by a
  * few bumps around the calendar (a bump's height at its day, fading over
@@ -37,8 +38,6 @@ import type { SegmentName } from './timeOfDay';
 
 /** A rise or fall around a day. A holiday stays on its date in both hemispheres; a season's bump moves six months south of the equator. */
 type Bump = { day: number; width: number; size: number; holiday?: true };
-
-const DAYS_PER_YEAR = 365;
 
 const CURVES: Record<SegmentName | 'sunLeisure', Bump[]> = {
   leisure: [
@@ -123,8 +122,9 @@ export function seasonFactorsOn(a: string, b: string, dayOfYear: number): Record
   };
 }
 
+/** Today's day of the calendar year, 0 being 1 January (sim/clock.ts): the game starts on the date the player chose. */
 export function dayOfYear(state: SimState): number {
-  return ((dayIndex(state) % DAYS_PER_YEAR) + DAYS_PER_YEAR) % DAYS_PER_YEAR;
+  return calendarDayOfYear(state);
 }
 
 /** Today's seasonal factors for a market's segments. */

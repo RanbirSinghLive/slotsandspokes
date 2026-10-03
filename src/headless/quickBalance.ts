@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import type { StartSeason } from '../sim/clock';
 import { type GameSpec } from './balanceGame';
 import { playGames, workersFor } from './parallel';
 
@@ -12,6 +13,7 @@ import { playGames, workersFor } from './parallel';
  *   npm run quick                  # play, and compare with the saved reference
  *   npm run quick -- --save        # play, and make this the reference
  *   npm run quick -- --save-last   # make the last run the reference, without playing again
+ *   npm run quick -- --winter      # start every game on 1 November instead of 1 May
  *
  * Ten seeds is rougher than the full report: a home's median can move by
  * a third between seeds on the same rules, so read a change as real when
@@ -24,6 +26,7 @@ import { playGames, workersFor } from './parallel';
 const HOMES = ['YUL', 'YYZ', 'PHL', 'YHZ'];
 const SEEDS = Array.from({ length: 10 }, (_, i) => i + 1);
 const DAYS = 365;
+const SEASON: StartSeason = process.argv.includes('--winter') ? 'winter' : 'summer';
 
 type HomeResult = { busts: number; games: number; median: number; planes: number };
 
@@ -55,7 +58,7 @@ function median(values: number[]): number {
   return sorted.length % 2 === 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
-const specs: GameSpec[] = HOMES.flatMap((home) => SEEDS.map((seed) => ({ home, seed, player: 'steady' as const, days: DAYS })));
+const specs: GameSpec[] = HOMES.flatMap((home) => SEEDS.map((seed) => ({ home, seed, player: 'steady' as const, days: DAYS, season: SEASON })));
 const workers = workersFor(specs.length, process.argv);
 const started = Date.now();
 const results = await playGames(specs, workers);
@@ -74,7 +77,7 @@ for (const home of HOMES) {
 
 const reference: Record<string, HomeResult> | null = existsSync(referencePath) ? JSON.parse(readFileSync(referencePath, 'utf8')).homes : null;
 console.log('');
-console.log(`  Quick balance · steady player · ${DAYS} days · ${SEEDS.length} seeds a home${reference ? ' · against the reference' : ''}`);
+console.log(`  Quick balance · steady player · ${SEASON} start · ${DAYS} days · ${SEEDS.length} seeds a home${reference ? ' · against the reference' : ''}`);
 console.log('');
 for (const home of HOMES) {
   const r = now[home];
@@ -85,7 +88,7 @@ for (const home of HOMES) {
 console.log('');
 console.log(`  ${results.length} games in ${Math.round((Date.now() - started) / 1000)} s, ${workers} at a time.`);
 
-const record = JSON.stringify({ savedAt: new Date().toISOString(), days: DAYS, seeds: SEEDS.length, homes: now }, null, 2) + '\n';
+const record = JSON.stringify({ savedAt: new Date().toISOString(), season: SEASON, days: DAYS, seeds: SEEDS.length, homes: now }, null, 2) + '\n';
 writeFileSync(lastPath, record);
 if (process.argv.includes('--save')) {
   writeFileSync(referencePath, record);

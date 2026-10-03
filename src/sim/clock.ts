@@ -50,6 +50,29 @@ export function dayIndex(state: SimState, minute: number = state.simMinute): num
 }
 
 /**
+ * The calendar (WEEK-FIFTEEN.md, stage 2). A game starts on the date the
+ * player chose, `state.startDayOfYear` days after 1 January; a save from
+ * before the choice has none and started on 1 January. The year is always
+ * 365 days, so day-of-year sums stay simple and the seasons repeat
+ * exactly.
+ */
+export const DAYS_PER_YEAR = 365;
+
+/** The two starts on offer: summer opens 1 May, winter 1 November. */
+export type StartSeason = 'summer' | 'winter';
+export const START_DAY_OF_YEAR: Record<StartSeason, number> = { summer: 120, winter: 304 };
+
+/** Days since 1 January of the first calendar year, for a game day: the start date plus the days played. */
+export function calendarDay(state: SimState, day: number = dayIndex(state)): number {
+  return (state.startDayOfYear ?? 0) + day;
+}
+
+/** The day of the calendar year (0 is 1 January) a game day falls on. */
+export function calendarDayOfYear(state: SimState, day: number = dayIndex(state)): number {
+  return ((calendarDay(state, day) % DAYS_PER_YEAR) + DAYS_PER_YEAR) % DAYS_PER_YEAR;
+}
+
+/**
  * Where a new game's clock starts: home-local midnight on day 0, so the
  * very first step() is a day rollover, exactly as it was when every game
  * started at UTC midnight. West of London that is a few hours after UTC

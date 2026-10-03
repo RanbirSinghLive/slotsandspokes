@@ -1,3 +1,4 @@
+import type { StartSeason } from '../sim/clock';
 import { isInsolvent } from '../sim/insolvency';
 import { tiersClimbed } from '../sim/ladder';
 import { marketKey } from '../sim/schedule';
@@ -13,7 +14,8 @@ import { createPlayer, type PlayerKind } from './player';
 
 const MINUTES_PER_DAY = 1440;
 
-export type GameSpec = { home: string; seed: number; player: PlayerKind; days: number };
+/** `season` is the start (sim/clock.ts): summer unless given. */
+export type GameSpec = { home: string; seed: number; player: PlayerKind; days: number; season?: StartSeason };
 
 export type RunResult = {
   home: string;
@@ -30,9 +32,9 @@ export type RunResult = {
 };
 
 /** One game, the same way run.ts plays it: stop at $0, checked every minute, as the browser does. */
-export function playOne({ home, seed, player: kind, days }: GameSpec): RunResult {
+export function playOne({ home, seed, player: kind, days, season }: GameSpec): RunResult {
   const player = createPlayer(kind);
-  const state = startHeadlessGame(home, seed, player);
+  const state = startHeadlessGame(home, seed, player, season);
   let bustDay: number | null = null;
   for (let day = 1; day <= days && bustDay === null; day++) {
     for (let minute = 0; minute < MINUTES_PER_DAY; minute++) {

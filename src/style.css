@@ -2010,6 +2010,36 @@ button.ticker-item:hover {
   max-height: 80vh;
 }
 
+/* The start season (ui/homePicker.ts): two buttons, the chosen one lit. */
+.home-season {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+
+.home-season-label {
+  color: #6b7694;
+  font-size: 12px;
+  margin-right: 4px;
+}
+
+.home-season button {
+  padding: 5px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  color: #cdd3e0;
+  background: #171b26;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.home-season button.active {
+  color: #ffd166;
+  border-color: rgba(255, 209, 102, 0.6);
+}
+
 #home-picker-list {
   display: grid;
   gap: 6px;

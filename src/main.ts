@@ -23,6 +23,7 @@ import { showCompetitionTooltip, hideCompetitionTooltip } from './ui/competition
 import { createNewGameState, type SimState } from './sim/state';
 import { chooseHome, homeOptions } from './sim/homes';
 import { showHomePicker } from './ui/homePicker';
+import { gameDateWithYear } from './ui/format';
 import { setAirportFilter, visibleAirports, type AirportFilter } from './ui/airportFilter';
 import { step } from './sim/step';
 import { updatePanel, renderScheduleWarnings, scheduleProblems, PANEL_WIDTH_PX, setScheduleClock } from './ui/panels';
@@ -276,7 +277,7 @@ function render(nowMs: number = performance.now()): void {
   syncCompetitorAirlineChips();
   ctx.clearRect(0, 0, cssWidth, cssHeight);
   drawBasemap(ctx);
-  drawTerminator(ctx, latestFractionalMinute);
+  drawTerminator(ctx, latestFractionalMinute, state.startDayOfYear ?? 0);
   drawFog(ctx, state);
 
   // Demand draws first (a background of all 45 possible markets, sized
@@ -387,24 +388,8 @@ function markRoutesOf(target: Selection): void {
   }
 }
 
-const MINUTES_PER_DAY = 1440;
-
-// simMinute 0 is fixed at January 1, 2027, so the clock shows a real
-// calendar date. `Date` only ever appears
-// here, in display code, never in sim/: this is exactly the same "local
-// time exists only for display" rule CLAUDE.md already applies to each
-// airport's UTC offset, just for calendar dates instead of clock time —
-// step() itself still knows nothing but simMinute.
-const SIMULATION_START_UTC_MS = Date.UTC(2027, 0, 1);
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
 function pad(n: number): string {
   return String(n).padStart(2, '0');
-}
-
-function formatCalendarDate(dayIndex: number): string {
-  const date = new Date(SIMULATION_START_UTC_MS + dayIndex * MINUTES_PER_DAY * 60_000);
-  return `${MONTH_NAMES[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
 }
 
 /** −240 → "UTC−4", 330 → "UTC+5:30". */
@@ -422,7 +407,7 @@ function updateClock(state: SimState): void {
   const localMinute = homeMinuteOfDay(state);
   const hours = Math.floor(localMinute / 60);
   const minutes = localMinute % 60;
-  clockEl.textContent = `${formatCalendarDate(dayIndex(state))} · ${pad(hours)}:${pad(minutes)} ${state.homeAirport} time`;
+  clockEl.textContent = `${gameDateWithYear(state, dayIndex(state))} · ${pad(hours)}:${pad(minutes)} ${state.homeAirport} time`;
   clockEl.title = `Local time at your home airport, ${state.homeAirport} (${formatUtcOffset(homeUtcOffsetMinutes(state))}). Every schedule time in the game uses this clock.`;
 }
 
@@ -916,8 +901,8 @@ document.querySelector('#zoom-home')!.addEventListener('click', () => resize());
 if (choosingHome) {
   speedMultiplier = 0;
   speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === 0));
-  showHomePicker(homeOptions(), (iata) => {
-    chooseHome(state, iata);
+  showHomePicker(homeOptions(), (iata, season) => {
+    chooseHome(state, iata, season);
     saveState(state);
     choosingHome = false;
     resize();

@@ -175,7 +175,7 @@ export function buildAircraftView(state: SimState, tail: string, changed: () => 
   // A seasonal lease (sim/seasonalLease.ts) goes back by itself.
   if (plane?.seasonalUntilDay !== undefined && plane.returningOnDay === undefined) {
     const left = plane.seasonalUntilDay - dayIndex(state);
-    root.append(line(`Seasonal lease · back to the lessor ${gameDate(plane.seasonalUntilDay)} (${Math.max(0, left)}d) · its flights come off then`, 'inspector-line is-warn'));
+    root.append(line(`Seasonal lease · back to the lessor ${gameDate(state, plane.seasonalUntilDay)} (${Math.max(0, left)}d) · its flights come off then`, 'inspector-line is-warn'));
   }
   // Tonight's line check and the heavy check (sim/mxChecks.ts), in words.
   const tonight = tonightCheck(state, tail);

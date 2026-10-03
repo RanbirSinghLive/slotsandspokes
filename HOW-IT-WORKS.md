@@ -25,8 +25,18 @@ Rival pressure, Airports, Connecting passengers and hub styles** and
 
 Everything in `src/sim/` measures time as `simMinute`: an integer count of
 minutes since the start of day 0, UTC. There is no `Date` object anywhere in
-the simulation; `main.ts` uses one only to format the calendar date
-(`simMinute` 0 is January 1, 2027).
+the simulation.
+
+**The calendar starts in the season the player picks** (`sim/clock.ts`):
+summer from 1 May 2027, or winter from 1 November 2027, chosen above the
+list of homes. `state.startDayOfYear` is day 0's date in days after
+1 January (120 or 304), and `calendarDayOfYear()` is the one answer to
+"what day of the year is it" for the seasons, the weather and the
+day/night terminator. Every year is 365 days, with no 29 February, so the
+date on the clock (`ui/format.ts`) always matches the season being played.
+A save from before the choice has no start day and plays on from
+1 January. The headless runner starts in summer;
+`npm run quick -- --winter` starts every game in winter.
 
 **The airline's day runs on home time** (`sim/clock.ts`). Where one day
 ends and the next begins is home midnight, not UTC midnight: the
@@ -2235,8 +2245,8 @@ one.
 
 ## Seasons (`src/sim/seasons.ts`)
 
-Day 0 is 1 January, and the year repeats every 365 days, as the
-weather's does. Each segment's demand is 1 on an ordinary day, raised or
+The calendar starts on the date the player chose (see Time), and the
+year repeats every 365 days, as the weather's does. Each segment's demand is 1 on an ordinary day, raised or
 lowered by bumps around the calendar (a height at a day, fading over
 about a width either side):
 

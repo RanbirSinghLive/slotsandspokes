@@ -5,7 +5,7 @@ import { ensureRivalFleets } from './market';
 import homeDifficultyData from '../../data/home-difficulty.json';
 import { AIRCRAFT_CLASSES } from './aircraftClasses';
 import { marketDistanceNm, potentialDailyDemand } from './demand';
-import { startingSimMinute } from './clock';
+import { START_DAY_OF_YEAR, startingSimMinute, type StartSeason } from './clock';
 import { revealReach } from './reach';
 import { createStartingFleet, type SimState } from './state';
 import { makeOffers } from './contracts';
@@ -72,8 +72,10 @@ export function homeOptions(): HomeOption[] {
  * Start the game from `iata`. Only meant for the very start: it replaces
  * the fleet, so calling it once routes are flying would strand them.
  */
-export function chooseHome(state: SimState, iata: string): void {
+export function chooseHome(state: SimState, iata: string, season: StartSeason = 'summer'): void {
   state.homeAirport = iata;
+  // The calendar starts on the chosen season's date (sim/clock.ts).
+  state.startDayOfYear = START_DAY_OF_YEAR[season];
   // The airline's day runs on home time (sim/clock.ts), so the clock
   // starts at home midnight rather than UTC midnight.
   state.simMinute = startingSimMinute(iata);

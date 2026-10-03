@@ -1,3 +1,4 @@
+import type { StartSeason } from '../sim/clock';
 import { PROPELLER_RANGE_NM, type HomeDifficulty, type HomeOption } from '../sim/homes';
 
 /**
@@ -9,6 +10,10 @@ import { PROPELLER_RANGE_NM, type HomeDifficulty, type HomeOption } from '../sim
  * Cities are grouped by how hard a start they are (sim/homes.ts), easiest
  * first, so a new player finds a fair start at the top and a veteran can
  * go looking for a hard one.
+ *
+ * Above the list, the season to start in (sim/clock.ts): summer from
+ * 1 May, or winter from 1 November. Summer is picked unless the player
+ * changes it.
  */
 
 const GROUPS: { difficulty: HomeDifficulty | null; title: string; note: string }[] = [
@@ -21,9 +26,23 @@ const GROUPS: { difficulty: HomeDifficulty | null; title: string; note: string }
 const modalEl = document.querySelector<HTMLDivElement>('#home-picker-modal')!;
 const rangeEl = document.querySelector<HTMLElement>('#home-picker-range')!;
 const listEl = document.querySelector<HTMLDivElement>('#home-picker-list')!;
+const seasonButtons = document.querySelectorAll<HTMLButtonElement>('#home-picker-season [data-season]');
+
+let chosenSeason: StartSeason = 'summer';
+
+function showSeason(): void {
+  seasonButtons.forEach((button) => button.classList.toggle('active', button.dataset.season === chosenSeason));
+}
+
+seasonButtons.forEach((button) =>
+  button.addEventListener('click', () => {
+    chosenSeason = button.dataset.season as StartSeason;
+    showSeason();
+  }),
+);
 
 /** One city's row: its code, name and reach. Choosing it starts the game there. */
-function optionButton(option: HomeOption, onChoose: (iata: string) => void): HTMLButtonElement {
+function optionButton(option: HomeOption, onChoose: (iata: string, season: StartSeason) => void): HTMLButtonElement {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'home-option';
@@ -43,13 +62,14 @@ function optionButton(option: HomeOption, onChoose: (iata: string) => void): HTM
   button.append(code, name, reach);
   button.addEventListener('click', () => {
     modalEl.hidden = true;
-    onChoose(option.iata);
+    onChoose(option.iata, chosenSeason);
   });
   return button;
 }
 
-export function showHomePicker(options: HomeOption[], onChoose: (iata: string) => void): void {
+export function showHomePicker(options: HomeOption[], onChoose: (iata: string, season: StartSeason) => void): void {
   rangeEl.textContent = String(PROPELLER_RANGE_NM);
+  showSeason();
   const sections: HTMLElement[] = [];
   for (const group of GROUPS) {
     const inGroup = options.filter((option) => option.difficulty === group.difficulty);

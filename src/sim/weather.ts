@@ -1,5 +1,5 @@
 import { inStormSeason, STORM_SEASON_MULTIPLIER, STORM_SEVERITY_MULTIPLIER } from './shocks';
-import { dayIndex } from './clock';
+import { calendarDayOfYear, dayIndex } from './clock';
 import airportsData from '../../data/airports.json';
 import { greatCircleDistanceNm } from './geo';
 import { nextRandom } from './rng';
@@ -157,7 +157,7 @@ export function rollDailyWeather(state: SimState, dayStartMinute: number): void 
     }
   }
 
-  const dayOfYear = dayIndex(state, dayStartMinute) % 365;
+  const dayOfYear = calendarDayOfYear(state, dayIndex(state, dayStartMinute));
   const season = seasonalKind(dayOfYear);
 
   for (const airport of airports) {

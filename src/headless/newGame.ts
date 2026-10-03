@@ -1,3 +1,4 @@
+import type { StartSeason } from '../sim/clock';
 import { chooseHome } from '../sim/homes';
 import { createNewGameState, type SimState } from '../sim/state';
 import type { Player } from './player';
@@ -14,11 +15,12 @@ import type { Player } from './player';
  * runner then calls its playDay() at every rollover.
  *
  * The seed is always passed in, never left to createNewGameState()'s
- * Date.now() default, so a headless run is repeatable.
+ * Date.now() default, so a headless run is repeatable. A game starts in
+ * summer, as the picker does unless the player changes it.
  */
-export function startHeadlessGame(homeIata: string, seed: number, player: Player): SimState {
+export function startHeadlessGame(homeIata: string, seed: number, player: Player, season: StartSeason = 'summer'): SimState {
   const state = createNewGameState(seed, homeIata);
-  chooseHome(state, homeIata);
+  chooseHome(state, homeIata, season);
   player.open(state);
   return state;
 }
