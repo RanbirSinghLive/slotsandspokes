@@ -1,3 +1,4 @@
+import { seasonFactors } from './seasons';
 import { effectiveFareClasses } from './seatSale';
 import { crowdingWeight } from './timeOfDay';
 import { cabinLayout, cabinOf } from './cabins';
@@ -104,6 +105,7 @@ export function summarizeMarket(
   };
   const perks = bookingPerks(state, origin, dest);
   const departures = legs.map((leg) => leg.departMinute);
+  const season = seasonFactors(state, origin, dest);
   const fareClasses = emptyTally();
   for (const leg of legs) {
     const type = aircraftTypeForLeg(leg, state);
@@ -122,7 +124,7 @@ export function summarizeMarket(
       state.competitorRoutes,
       previewSpillover,
       perks,
-      { departMinute: leg.departMinute, marketDepartMinutes: departures, crowding: crowdingWeight(leg, legs) },
+      { departMinute: leg.departMinute, marketDepartMinutes: departures, crowding: crowdingWeight(leg, legs), season },
       effectiveFareClasses(state, marketKey(origin, dest), routeSettings.fareClasses ?? DEFAULT_FARE_CLASSES),
       cabin,
     );

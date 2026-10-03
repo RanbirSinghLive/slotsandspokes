@@ -2216,6 +2216,34 @@ one.
 
 ---
 
+## Seasons (`src/sim/seasons.ts`)
+
+Day 0 is 1 January, and the year repeats every 365 days, as the
+weather's does. Each segment's demand is 1 on an ordinary day, raised or
+lowered by bumps around the calendar (a height at a day, fading over
+about a width either side):
+
+| Segment | Up | Down |
+|---|---|---|
+| Leisure | mid-July +25%, Christmas +20% | late January −15%, November −8% |
+| Leisure on a sun route | mid-February +35%, Christmas +20% | summer −15% |
+| Business | autumn +5% | August −25%, the holidays −40% |
+| VFR | Christmas +45%, summer +15% | — |
+
+A **sun route** has one end south of 30.5° with a leisure score of 1 or
+more, and the other north of 38° (Toronto–Orlando, not Toronto–Chicago).
+
+The factors scale each segment's share of the travellers who want to
+fly today, in every flight and forecast (`flightResult()`'s
+`timing.season`). So the revenue hill, sale and stance forecasts move
+through the year. They don't touch market growth: a quiet August
+doesn't shrink the market. Across the year a market averages close to
+an ordinary day. The route view gives its year in a line ("Season −6%
+now · peak +13% mid-Jul · low −6% late-Jan"). Northern-hemisphere
+seasons only.
+
+---
+
 ## Cabins (`src/sim/cabins.ts`)
 
 A plane is all economy, or has a **business cabin** up front (`Aircraft.cabin`).

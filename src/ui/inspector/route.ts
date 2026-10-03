@@ -29,6 +29,7 @@ import { rivalLinksOn } from './rival';
 import { contractOn, paymentShare, performanceFactor } from '../../sim/contracts';
 import { revenueHill, type RevenueHill } from '../../sim/revenueHill';
 import { drawHillChart } from '../hillChart';
+import { isSunRoute, marketSeasonOutlook } from '../../sim/seasons';
 import { fareWarOn, PEACE_LEVEL, WAR_LEVEL } from '../../sim/fareWars';
 import { rivalRouteDailyResult } from '../../sim/rivalEconomics';
 import { dayIndex } from '../../sim/clock';
@@ -138,6 +139,7 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
     ),
   );
   root.append(...characterBar(a, b));
+  root.append(seasonLine(state, a, b));
 
   const rivals = state.competitorRoutes.filter(
     (route) => (route.origin === a && route.dest === b) || (route.origin === b && route.dest === a),
@@ -446,6 +448,27 @@ function characterBar(a: string, b: string): HTMLElement[] {
     { mark: 'block', color: '#5ed6c8', label: `VFR ${Math.round(mix.vfr * 100)}%` },
   ]);
   return [bar, key];
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTH_STARTS = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+
+/** A day of the year as people say it: "mid-Feb", "late Dec". */
+function dayInWords(day: number): string {
+  let month = 0;
+  while (month < 11 && day >= MONTH_STARTS[month + 1]) month += 1;
+  const into = day - MONTH_STARTS[month];
+  return `${into < 10 ? 'early' : into < 20 ? 'mid' : 'late'}-${MONTHS[month]}`;
+}
+
+/** Where this market is in its year (sim/seasons.ts): today against an ordinary day, and its busiest and quietest. */
+function seasonLine(state: SimState, a: string, b: string): HTMLElement {
+  const year = marketSeasonOutlook(state, a, b);
+  const pct = (level: number) => `${level >= 1 ? '+' : '−'}${Math.round(Math.abs(level - 1) * 100)}%`;
+  return lineWithInfo(
+    `Season ${pct(year.now)} now · peak ${pct(year.peak)} ${dayInWords(year.peakDay)} · low ${pct(year.low)} ${dayInWords(year.lowDay)}` + (isSunRoute(a, b) ? ' · sun route' : ''),
+    'How many want to fly this market today against an ordinary day, from the calendar: leisure travellers peak in July and at Christmas, business travellers dip in August and over the holidays, VFR peak at Christmas and in summer. On a sun route (a warm end and a cold one) leisure peaks January to March instead. The busier the season, the fuller the planes at a fare, so the revenue hill and the forecasts move with it: add capacity or raise the fare ahead of a peak, and trim ahead of a low.',
+  );
 }
 
 /** The seat bar's colours (style.css's .seat-split-*), for its key. */

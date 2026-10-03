@@ -1,3 +1,4 @@
+import type { SegmentName } from './timeOfDay';
 import { bookingShare, segmentShareAt } from './choiceModel';
 import { cabinLayout, type Cabin } from './cabins';
 import { DEFAULT_FARE_CLASSES, sellSeats, type FareClassSettings, type FareClassTally } from './fareClasses';
@@ -196,6 +197,12 @@ export function connectingPriceResponse(
   return atGoingRate > 0 ? Math.min(MAX_CONNECTING_PRICE_GAIN, atFare / atGoingRate) : 1;
 }
 
+/** A market's mix scaled by today's seasonal factors: no longer summing to 1, since a season brings more or fewer travellers. */
+function seasonalMix(mix: Record<SegmentName, number>, season: Record<SegmentName, number> | undefined): Record<SegmentName, number> {
+  if (!season) return mix;
+  return { business: mix.business * season.business, leisure: mix.leisure * season.leisure, vfr: mix.vfr * season.vfr };
+}
+
 export function flightResult(
   leg: EconomyLeg,
   type: EconomyAircraftType,
@@ -228,7 +235,7 @@ export function flightResult(
    * the market's hours count in the choice against rivals
    * (sim/timeOfDay.ts). Without it, flights split the market evenly.
    */
-  timing?: { departMinute: number; marketDepartMinutes: number[]; crowding?: number },
+  timing?: { departMinute: number; marketDepartMinutes: number[]; crowding?: number; season?: Record<SegmentName, number> },
   /** The route's seat split between fare classes (sim/fareClasses.ts); the default when it hasn't been set. */
   fareClasses?: FareClassSettings,
   /** The plane's cabin (sim/cabins.ts): a business cabin trades economy seats for business ones. */
@@ -246,7 +253,8 @@ export function flightResult(
     businessSeats: Math.round(layout.business * LOAD_FACTOR),
     baseFare: fare,
     demand: demandPerFlight,
-    mix: marketMix(leg.origin, leg.dest),
+    // The season scales how many of each segment want to fly today (sim/seasons.ts).
+    mix: seasonalMix(marketMix(leg.origin, leg.dest), timing?.season),
     shareAt: (segment, price) =>
       segmentShareAt(segment, price, legsServingMarket, leg.origin, leg.dest, competitorRoutes, perks.brandEdge + perks.positionEdge[segment], timing?.marketDepartMinutes),
     connecting: connecting / legsServingMarket,

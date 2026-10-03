@@ -315,6 +315,37 @@ busts. Against the 18-seed read before stage 3 (YUL $17.7M, YYZ $36.2M,
 PHL $68.2M, YHZ 13/18), the big homes are back, with YUL the one still
 down.
 
+## Stage 5: rhythm (owner: go, 2026-10-02)
+
+A year today is flat: every day's demand is the same but for slow
+growth and shocks. Stage 5 gives it a shape the player plans around.
+
+**Build order:**
+
+1. **Seasons.** Each segment's demand follows the calendar:
+   - leisure peaks in July and at Christmas;
+   - business dips in August and over the holidays;
+   - VFR peaks at Christmas and in summer;
+   - a sun route (a warm end and a cold one) flips leisure: it peaks
+     January to March and dips in summer.
+   It scales the passengers who want to fly, not the market's growth,
+   so every forecast (the revenue hill, seat sales, the stance rows)
+   moves with it. The route view says where its market is in the year.
+2. **Demand events**, announced ahead: a festival, a conference or a
+   final at a city lifts its markets for a few days. It's notice to add
+   capacity or raise the fare before rivals do.
+3. **Seasonal capacity**: a short lease for the peak, dearer a day than
+   a standing one and returned by itself at the season's end.
+
+**Defaults chosen, for the owner to change:** moderate swings (about
+±20–40% by segment); seasons for the northern hemisphere only.
+
+**Step 1 built:** `sim/seasons.ts`, applied to each flight's segments,
+with a season line on the route view. Toronto–Orlando runs +23% in
+February and −7% in July; Toronto–Chicago −3% in January and +10% in
+July. The one-seed headless year from Montréal went from $3.2M to bust
+(−$31k); no balance read yet.
+
 ## Decisions for the owner
 
 1. The airport tags: a first pass covers every airport in the data; the

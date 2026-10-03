@@ -1,3 +1,4 @@
+import { seasonFactors } from './seasons';
 import { morningHolds, rollNightlyChecks, wornAge } from './mxChecks';
 import { rollDailyFareWars } from './fareWars';
 import { effectiveFareClasses } from './seatSale';
@@ -558,6 +559,7 @@ export function step(state: SimState): void {
                 departMinute,
                 marketDepartMinutes: marketDepartMinutes(flight.origin, flight.dest, state.schedule),
                 crowding: crowdingWeight({ origin: flight.origin, dest: flight.dest, departMinute, legId: flight.legId }, state.schedule),
+                season: seasonFactors(state, flight.origin, flight.dest),
               };
             })(),
             effectiveFareClasses(state, key),
