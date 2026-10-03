@@ -2802,9 +2802,15 @@ fleet flown near capacity had no spare planes to take its flying, so
 the cancellations cost Toronto most of its year on 18 seeds.
 
 **What you see:**
-- **The Mtc screen's Checks list:** each plane's items as pips, when its
-  heavy check is due and the hours done toward it ("heavy 8/12h · due
-  5d"), and last night's check.
+- **The Mtc screen's Fleet board:** a strip of how many planes are
+  serviceable, on watch, due for action (held, or a heavy check overdue),
+  in the hangar or on the ground, then a card per plane, worst first. Each
+  card has the heavy-check clock (days since the last check, the window
+  where nights bank hours, the due mark, the overdue grace), its deferred
+  items as slots filling toward the hold, the hours banked, last night's
+  check, and its age, life, tech and AOG figures. Display only: the
+  standing is worked out in `ui/inspector/maintenance.ts` from the same
+  readouts.
 - **The Gantt:** a key above the rows explains the night cell, and each
   plane's label carries tonight's check as the day is going ("☾✓", "☾c" contracted,
   "☾−40m" short, "☾✗" away). The plane's own view says the same in words
