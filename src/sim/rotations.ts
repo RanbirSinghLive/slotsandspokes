@@ -3,6 +3,7 @@ import { classRank } from './aircraftClasses';
 import { dailyMovementsAt } from './airports';
 import { airportHours, hourlyRoomProblem, hourOf, hoursWithRoom, type AirportHours } from './hours';
 import { nextBankMinute } from './hubStyle';
+import { nightStopLegs } from './nightStops';
 import { minuteOfDayToTimeString } from './clock';
 import { greatCircleDistanceNm } from './geo';
 import { policyFare } from './pricing';
@@ -104,7 +105,9 @@ function packRotation(airports: RotationStop[], cruiseKts: number | undefined, s
  * departs base again.
  */
 function rotationStartMinute(tail: string, state: SimState): number {
-  const tailLegs = state.schedule.filter((leg) => leg.tail === tail);
+  // On a night stop (sim/nightStops.ts) new flying goes before the evening flight out.
+  const evening = nightStopLegs(state, tail)?.evening;
+  const tailLegs = state.schedule.filter((leg) => leg.tail === tail && leg !== evening);
   if (tailLegs.length === 0) return USABLE_DAY_START_MINUTE;
   const lastLeg = tailLegs.reduce((latest, leg) =>
     leg.departMinute + leg.blockMinutes > latest.departMinute + latest.blockMinutes ? leg : latest,
@@ -397,6 +400,15 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
     return fail(
       `This rotation lands back at ${base.iata} at ${minuteOfDayToTimeString(arriveBackMinute)}, past the ${minuteOfDayToTimeString(USABLE_DAY_END_MINUTE)} end of the usable day. ` +
         `Every plane based at ${base.iata} is full: lease another (tap ${base.iata}, then Plane) or shorten the rotation.`,
+    );
+  }
+
+  // On a night stop, it has to be home and turned before the evening flight out.
+  const evening = nightStopLegs(state, tail)?.evening;
+  if (evening && lastLeg && arriveBackMinute + scheduledTurnMinutes(state, lastLeg.origin, lastLeg.dest) > evening.departMinute) {
+    return fail(
+      `${tail} sleeps at ${evening.dest}: this rotation would be back at ${minuteOfDayToTimeString(arriveBackMinute)}, after its ${minuteOfDayToTimeString(evening.departMinute)} flight out. ` +
+        `Use another plane, or move the flight out later in the Schedule.`,
     );
   }
 

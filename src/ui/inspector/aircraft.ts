@@ -1,3 +1,4 @@
+import { nightStopCostPerNight, nightStopLegs } from '../../sim/nightStops';
 import { classByCode } from '../../sim/aircraftClasses';
 import { dayIndex } from '../../sim/clock';
 import { line, heading, lineWithInfo } from './dom';
@@ -176,6 +177,17 @@ export function buildAircraftView(state: SimState, tail: string, changed: () => 
   if (plane?.seasonalUntilDay !== undefined && plane.returningOnDay === undefined) {
     const left = plane.seasonalUntilDay - dayIndex(state);
     root.append(line(`Seasonal lease · back to the lessor ${gameDate(state, plane.seasonalUntilDay)} (${Math.max(0, left)}d) · its flights come off then`, 'inspector-line is-warn'));
+  }
+  // A night stop (sim/nightStops.ts): where it sleeps, and what a night there costs.
+  const nightStop = nightStopLegs(state, tail);
+  if (nightStop && plane) {
+    const station = nightStop.morning.origin;
+    root.append(
+      lineWithInfo(
+        `Night stop ${station} · out ${minuteOfDayToTimeString(nightStop.evening.departMinute)} · back ${minuteOfDayToTimeString(nightStop.morning.departMinute)} · ${money(nightStopCostPerNight(state, plane, station))}/night`,
+        `It sleeps at ${station}, not at base: the crew's hotel every night, and the line check by the station's setting on the Mtc screen (free at a maintenance base). If its flight out is cancelled or held by the curfew, it sleeps at base and the morning flight from ${station} is cancelled. On the Schedule, push either half past its end of the day to bring it home.`,
+      ),
+    );
   }
   // Tonight's line check and the heavy check (sim/mxChecks.ts), in words.
   const tonight = tonightCheck(state, tail);

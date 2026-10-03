@@ -2751,6 +2751,52 @@ where. A save from before maintenance bases has one at every crew base
 (`mxBaseList()`), so no one's planes start deferring. The headless
 player leases only at home, so it never opens a base.
 
+## Night stops (`src/sim/nightStops.ts`)
+
+A plane can sleep at the far end of an out-and-back instead of at base:
+an early flight into base for the morning, and a late one out. It isn't
+a setting: a plane whose day starts away from base where it ends is on
+a night stop there (`nightStopStation()`).
+
+**Made on the Gantt.** Drag an out-and-back from base past either end of
+the day and it wraps (sim/retime.ts calls `planWrap()`): the flight home
+leaves the station at 06:00, and the flight out leaves as late as it can
+and still land 30 minutes before the 22:00 curfew. Push either half past
+its own end of the day and it wraps back (`planUnwrap()`) into an
+out-and-back at the end of the day. The tip says what the night is, in
+ops terms ("Night stop YOW · out 20:50 · back 06:00 · no mtc base:
+contracted check"), and the halves are drawn dashed.
+
+**It never moves other flying.** The flight home has to be back and
+turned before the plane's first departure, and the flight out has to
+leave after its last arrival; otherwise the tip says what's in the way
+("needs C-P001's first departure 07:08 or later"). A half stays on its
+plane, and no move may leave a flight departing from where the plane
+isn't. New flying planned on a night-stop plane goes before its flight
+out.
+
+**Every night there costs** the crew's hotel ($200 a crew for a
+Propeller, $250 Regional, $400 Narrowbody, $900 Widebody, under crew),
+and the line check by the Bases rule: free at a maintenance base,
+contracted or deferred elsewhere. At 3 deferred items it's held there a
+morning, as anywhere. It can break down there overnight, and an overdue
+heavy check grounds it there, contracted.
+
+**When it breaks** (its flight out cancelled, or held by the curfew), it
+sleeps at base and the morning flight from the station is cancelled for
+want of a plane ("position"): one flight lost, and the rest of its day
+flies from base. **On the day it changes:** a wrap made after the round
+trip flew today flies the flight out again tonight; a wrap made while
+the plane is at base waits a day for its flight home. An unwrap is
+refused while the plane is asleep at the station or after tonight's
+flight out; made in between, tonight's flight home flies again.
+
+**The headless player** looks once a week for the wrap worth the most:
+the network's margin with it (a morning flight into base feeds
+connections), less the night's hotel and check, less a 5% chance of
+losing the morning flight, has to beat today's by $500 a day, without
+leaving the base short of crews.
+
 ## Maintenance checks (`src/sim/mxChecks.ts`)
 
 **The line check is a night at a maintenance base** (see Bases);

@@ -35,7 +35,9 @@ import type { FareStance, SimState } from '../sim/state';
 import { TURN_BUFFER_CHOICES } from '../sim/turnBuffer';
 import { networkAirports } from '../sim/reach';
 import { spillingMarkets } from '../sim/unmetDemand';
-import { aircraftUtilisation, utilisationPools } from '../sim/utilisation';
+import { aircraftUtilisation, rotationsForTail, USABLE_DAY_END_MINUTE, utilisationPools } from '../sim/utilisation';
+import { nightStopCostPerNight, nightStopStation } from '../sim/nightStops';
+import { summarizeMarket } from '../sim/marketSummary';
 import { congestionParameters } from '../sim/delays';
 
 /**
@@ -345,6 +347,7 @@ function steadyPlayer(kind: 'steady' | 'sitter' | 'bold'): Player {
         ...runHomeHub(state),
         ...tuneFareClasses(state),
         ...refitCabins(state),
+        ...takeNightStops(state),
         ...runSeatSales(state),
         ...adoptInnovations(state),
         ...(kind === 'steady' ? hedgeWhenCheap(state) : []),
@@ -352,6 +355,64 @@ function steadyPlayer(kind: 'steady' | 'sitter' | 'bold'): Player {
       ];
     },
   };
+}
+
+// --- Night stops --------------------------------------------------------
+
+/** How often the player looks for a night stop, in days, and on which day of the cycle. */
+const NIGHT_STOP_REVIEW_DAYS = 7;
+const NIGHT_STOP_REVIEW_DAY = 4;
+/** A night stop has to beat its nightly cost and its risk by this much a day. */
+const NIGHT_STOP_WORTH_PER_DAY = 500;
+/** The player's guess at how often a night stop's flight out breaks (cancelled, or held by the curfew). */
+const NIGHT_STOP_BREAK_CHANCE = 0.05;
+
+/** Every flown market's margin a day, summed (sim/marketSummary.ts): a morning flight into base feeds connections on other routes. */
+function networkMargin(state: SimState): number {
+  let total = 0;
+  for (const key of new Set(state.schedule.map((leg) => marketKey(leg.origin, leg.dest)))) {
+    const settings = state.routeSettings[key];
+    if (!settings) continue;
+    const [a, b] = key.split('-');
+    total += summarizeMarket(a, b, state, settings).margin;
+  }
+  return total;
+}
+
+/**
+ * Once a week, the one night stop worth the most: an out-and-back from
+ * base dragged past the end of the day (sim/nightStops.ts, through the
+ * same retime the Gantt uses), taken when the network's margin with it,
+ * less the night's hotel and check and the chance of it breaking (a lost
+ * morning flight), beats today's by NIGHT_STOP_WORTH_PER_DAY. Never one
+ * that would leave the base short of crews. The forecast is the player's,
+ * not the page's.
+ */
+function takeNightStops(state: SimState): string[] {
+  if (dayIndex(state) % NIGHT_STOP_REVIEW_DAYS !== NIGHT_STOP_REVIEW_DAY) return [];
+  const now = networkMargin(state);
+  let best: { tail: string; legIds: string[]; worth: number } | null = null;
+  for (const aircraft of state.aircraft) {
+    if (!aircraft.baseAirport || nightStopStation(state, aircraft.tail) || aircraft.returningOnDay !== undefined || aircraft.rebase) continue;
+    for (const rotation of rotationsForTail(state, aircraft.tail)) {
+      if (rotation.legs.length !== 2 || !rotation.closed || rotation.legs[0].origin !== aircraft.baseAirport) continue;
+      const legIds = rotation.legs.map((leg) => leg.legId);
+      const plan = actions.planRetimeRotation(state, legIds, aircraft.tail, USABLE_DAY_END_MINUTE);
+      if (!plan.ok || plan.kind !== 'wrap' || !plan.station || plan.crewWarning) continue;
+      const byId = new Map(plan.legs.map((leg) => [leg.legId, leg]));
+      const after = { ...state, schedule: state.schedule.map((leg) => byId.get(leg.legId) ?? leg) };
+      const [a, b] = [rotation.legs[0].origin, rotation.legs[0].dest];
+      const settings = state.routeSettings[marketKey(a, b)];
+      if (!settings) continue;
+      const market = summarizeMarket(a, b, state, settings);
+      const risk = NIGHT_STOP_BREAK_CHANCE * (market.freq > 0 ? market.revenue / market.freq : 0);
+      const worth = networkMargin(after) - now - nightStopCostPerNight(state, aircraft, plan.station) - risk;
+      if (worth >= NIGHT_STOP_WORTH_PER_DAY && (!best || worth > best.worth)) best = { tail: aircraft.tail, legIds, worth };
+    }
+  }
+  if (!best) return [];
+  const result = actions.retimeRotation(state, best.legIds, best.tail, USABLE_DAY_END_MINUTE);
+  return result.ok ? [result.message] : [];
 }
 
 // --- Fare classes --------------------------------------------------------

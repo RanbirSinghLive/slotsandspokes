@@ -12,7 +12,7 @@ the 74-airport top-up; the weekly balance read (pre-approved, Sundays)
 will say whether that moved anything. Desktop is the target: the
 browser and mobile pass is dropped.
 
-**Status:** stage 1 built, waiting on its quick read.
+**Status:** stages 1–2 built (stage 1's read skipped at the owner's word); stage 2's quick read next.
 
 ---
 
@@ -134,6 +134,28 @@ early game; bases and night stops are the mid-game's next layer.
    slack and the route's late-running counted as a chance of breaking)
    beats the night's hotel and check. The forecast is the player's, not
    shown on the page.
+
+**Stage 2 built:**
+- `sim/nightStops.ts`: `planWrap()` and `planUnwrap()`, the hotels, and
+  the chain rule (no flight leaving from where the plane isn't), called
+  from `sim/retime.ts`, so the Gantt's drag makes and undoes them.
+- Guards: a half can't move to another plane or be handed on by an AOG's
+  cover; a plane on a night stop takes no one else's flying behind it;
+  new rotations fit before its flight out; it can break down and be
+  held for an overdue heavy check at its station.
+- The switch-over days: a wrap or unwrap that moves a flight flown
+  earlier today flies it again tonight; an unwrap while the plane is
+  asleep at the station, or after tonight's flight out, is refused.
+- Dropped from the plan: "deferred items bring a plane home". Stage 1
+  holds a plane wherever it slept, contracted, so nothing more is needed.
+- The Gantt draws the halves dashed, with their own hover text; the
+  plane's view has a night stop line. Checked in the browser on a test
+  save: an unwrap by drag, and the tips.
+- One-seed headless Montréal: five night stops taken over the year
+  (LGA, MKE, BUF, YXU, ISP), 193 nights at a station, 4 broken;
+  cancellations by curfew and position barely moved (456 against 430,
+  151 against 122); contracted checks added about $212,000. The year:
+  $11.1M before, $4.4M after, one seed.
 
 ### Stage 3: thin homes
 

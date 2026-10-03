@@ -1104,6 +1104,13 @@ body {
   border-color: #ff8080;
 }
 
+/* A night stop's halves (sim/nightStops.ts): the plane sleeps away, so
+   each half is drawn open on its station side, in the night's colour. */
+.timeline-rotation.is-night-stop {
+  border-color: #9fb4ff;
+  border-style: dashed;
+}
+
 .timeline-leg {
   position: absolute;
   top: 3px;

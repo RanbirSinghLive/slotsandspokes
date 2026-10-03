@@ -1,6 +1,7 @@
 import { endSeasonalLeases } from './seasonalLease';
 import { demandFactors, rollDailyDemandEvents } from './demandEvents';
 import { morningHolds, rollNightlyChecks, wornAge } from './mxChecks';
+import { chargeNightStops } from './nightStops';
 import { rollDailyFareWars } from './fareWars';
 import { effectiveFareClasses } from './seatSale';
 import { rollDailyBrand } from './brand';
@@ -283,7 +284,9 @@ export function step(state: SimState): void {
     // pass so a tail already grounded for crew isn't grounded twice and
     // counted under two causes; before the cancellation count below, so
     // whatever couldn't be covered is counted as cancelled today.
-    // Last night's line checks, judged before anyone is ferried home (sim/mxChecks.ts).
+    // Night stops' hotels (sim/nightStops.ts), then last night's line
+    // checks, judged before anyone is ferried home (sim/mxChecks.ts).
+    chargeNightStops(state);
     rollNightlyChecks(state, state.simMinute);
     // A plane stranded away from base with nothing to fly from there goes home empty (sim/ferry.ts).
     ferryStrandedPlanes(state);

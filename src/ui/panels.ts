@@ -1,3 +1,5 @@
+import { nightStopLegs } from '../sim/nightStops';
+import { hasMxBase, outstationCheck } from '../sim/bases';
 import { deferredItems, MX_HOLD_AT, tonightCheck } from '../sim/mxChecks';
 import { planRetimeRotation, removeRotation as removeRotationFromSchedule, retimeRotation } from '../sim/playerActions';
 import type { RetimePlan } from '../sim/retime';
@@ -339,17 +341,25 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
       track.dataset.tail = aircraft.tail;
       track.dataset.type = aircraft.typeCode;
       track.style.setProperty('--puck', colour);
+      // A night stop's two halves (sim/nightStops.ts): the morning flight home and the evening flight out.
+      const nightStop = nightStopLegs(state, aircraft.tail);
       for (const rotation of own) {
+        const half = nightStop !== null && (rotation.legs[0] === nightStop.morning || rotation.legs[0] === nightStop.evening);
         const span = linkToMap(document.createElement('div'), { kind: 'route', a: rotation.airports[0], b: rotation.airports[1] });
         span.className = 'timeline-rotation';
-        span.classList.toggle('is-open', !rotation.closed);
+        span.classList.toggle('is-open', !rotation.closed && !half);
+        span.classList.toggle('is-night-stop', half);
         span.style.left = at(rotation.departMinute);
         span.style.width = width(rotation.arriveMinute - rotation.departMinute);
         span.title =
           `${rotation.airports.join(' → ')} · ${minuteOfDayToTimeString(rotation.departMinute)}–${minuteOfDayToTimeString(rotation.arriveMinute)}` +
           ` · ${Math.round(rotation.share * 100)}% of a plane` +
-          (rotation.closed ? ' · drag to move it' : ' · never returns to base');
-        span.addEventListener('pointerdown', (event) => startDrag(event, span, rotation, track));
+          (half
+            ? ` · night stop ${nightStop!.morning.origin} · push it past ${rotation.legs[0] === nightStop!.morning ? 'the start' : 'the end'} of the day to bring it home`
+            : rotation.closed
+              ? ' · drag to move it · past either end of the day for a night stop'
+              : ' · never returns to base');
+        span.addEventListener('pointerdown', (event) => startDrag(event, span, rotation, track, rotation.closed || half));
         span.addEventListener('click', () => {
           // A drag ends in a click too; only a plain click opens the route.
           if (justDragged) return;
@@ -440,8 +450,9 @@ dragTip.id = 'timeline-drag-tip';
 dragTip.hidden = true;
 document.body.append(dragTip);
 
-function startDrag(event: PointerEvent, span: HTMLElement, rotation: Rotation, track: HTMLElement): void {
-  if (event.button !== 0 || !rotation.closed) return;
+/** `draggable`: a rotation that's back at base, or a night stop's half (sim/nightStops.ts). */
+function startDrag(event: PointerEvent, span: HTMLElement, rotation: Rotation, track: HTMLElement, draggable: boolean): void {
+  if (event.button !== 0 || !draggable) return;
   if ((event.target as HTMLElement).closest('.rotation-remove-button')) return;
   if (!timelineWindow) return;
   const rect = track.getBoundingClientRect();
@@ -523,6 +534,17 @@ function onDragMove(event: PointerEvent): void {
 
 /** What a move would do, in ops shorthand: "08:10 · C-P004 · +$1,200/day · slots +$40/day". */
 function describeRetime(plan: RetimePlan, tail: string, fromTail: string, start: number): string {
+  // A night stop made or brought home (sim/nightStops.ts): what the night is, in ops terms.
+  if (plan.kind !== 'move' && plan.station && lastTimelineState) {
+    const [a, b] = plan.legs;
+    if (plan.kind === 'unwrap') return `Sleeps at base again · ${plan.station} ${minuteOfDayToTimeString(a.departMinute)}–${minuteOfDayToTimeString(b.departMinute + b.blockMinutes)}`;
+    const check = hasMxBase(lastTimelineState, plan.station)
+      ? 'mtc base: line check'
+      : outstationCheck(lastTimelineState, plan.station) === 'contract'
+        ? 'no mtc base: contracted check'
+        : 'no mtc base: deferred, ● a night';
+    return [`Night stop ${plan.station}`, `out ${minuteOfDayToTimeString(b.departMinute)}`, `back ${minuteOfDayToTimeString(a.departMinute)}`, check, ...(plan.crewWarning ? [plan.crewWarning] : [])].join(' · ');
+  }
   const parts = [minuteOfDayToTimeString(start)];
   if (tail !== fromTail) parts.push(tail);
   if (plan.marginChangePerDay !== 0) parts.push(`${plan.marginChangePerDay > 0 ? '+' : '−'}${shortMoney(Math.abs(plan.marginChangePerDay))}/day`);

@@ -1,5 +1,6 @@
 import { contractCost, hasMxBase, outstationCheck } from './bases';
 import { dayStartMinute } from './clock';
+import { nightStopStation } from './nightStops';
 import { projectRestOfDay } from './cascade';
 import { rotationsForTail } from './utilisation';
 import type { Aircraft, SimState } from './state';
@@ -194,7 +195,8 @@ export function morningHolds(state: SimState): { tail: string; legIds: string[] 
 export function forcedHeavyChecks(state: SimState): { aircraft: Aircraft; days: number }[] {
   const forced = state.aircraft
     .filter((aircraft) => heavyCheckDueIn(aircraft) <= -OVERDUE_GRACE_DAYS)
-    .filter((aircraft) => aircraft.status === 'ground' && aircraft.atAirport === aircraft.baseAirport && !aircraft.rebase)
+    // At its base, or where it sleeps on a night stop (sim/nightStops.ts).
+    .filter((aircraft) => aircraft.status === 'ground' && (aircraft.atAirport === aircraft.baseAirport || aircraft.atAirport === nightStopStation(state, aircraft.tail)) && !aircraft.rebase)
     .filter((aircraft) => !state.aogs.some((event) => event.tail === aircraft.tail));
   return forced.map((aircraft) => {
     const workLeft = heavyCheckWorkMinutes(aircraft.typeCode) - heavyBankedMinutes(aircraft);
