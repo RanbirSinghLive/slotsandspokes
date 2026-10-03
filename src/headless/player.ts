@@ -2,6 +2,8 @@ import { currentPotentialDemand } from '../sim/marketDemand';
 import { marketLoadFactor } from '../sim/loadFactor';
 import { saleBlockedReason, saleMarginChangePerDay } from '../sim/seatSale';
 import { crewsForRisk } from '../sim/crews';
+import { dayOfYear, marketSeasonOn } from '../sim/seasons';
+import { SEASONAL_PREMIUM } from '../sim/seasonalLease';
 import { contractOn, contractsOf, performanceFactor } from '../sim/contracts';
 import airportsData from '../../data/airports.json';
 import { inboundAt } from '../sim/fleetTiming';
@@ -959,6 +961,20 @@ function fillDelivered(state: SimState, memory: Memory): string[] {
  * the same day (keepCrews()), so they join about when it's delivered;
  * once it's delivered, openMarkets() gives it a day. One lease a day.
  */
+/** When the network's demand is this far over an ordinary day's, a lease for growth is a seasonal one. */
+const SEASONAL_LEASE_IN_PEAK = 1.08;
+
+/** The flown markets' seasonal level today, averaged (sim/seasons.ts). */
+function networkSeasonToday(state: SimState): number {
+  const keys = [...new Set(state.schedule.map((leg) => marketKey(leg.origin, leg.dest)))];
+  if (keys.length === 0) return 1;
+  const day = dayOfYear(state);
+  return keys.reduce((sum, key) => {
+    const [a, b] = key.split('-');
+    return sum + marketSeasonOn(a, b, day);
+  }, 0) / keys.length;
+}
+
 function leaseWhenFull(state: SimState, memory: Memory, bold: boolean): string[] {
   const home = state.homeAirport;
   if (tooBusy(state, home)) return [];
@@ -969,10 +985,12 @@ function leaseWhenFull(state: SimState, memory: Memory, bold: boolean): string[]
   const averageMargin = lastWeek.reduce((sum, margin) => sum + margin, 0) / 7;
 
   const options = actions.planeOptions(state, home);
+  // In a peak (sim/seasons.ts), the extra plane is leased for the season and goes back by itself.
+  const seasonal = networkSeasonToday(state) >= SEASONAL_LEASE_IN_PEAK;
   for (const cls of [...AIRCRAFT_CLASSES].reverse()) {
     const option = options.find((o) => o.code === cls.code);
     if (!option?.listing || option.disabledReason) continue;
-    const price = option.listing.leasePricePerDay;
+    const price = Math.round(option.listing.leasePricePerDay * (seasonal ? SEASONAL_PREMIUM : 1));
     // What the airline already makes a day has to carry the new lease, and
     // the network overhead it adds (sim/overhead.ts), on its own.
     // The bold player only waits for the airline to make money at all.
@@ -983,7 +1001,7 @@ function leaseWhenFull(state: SimState, memory: Memory, bold: boolean): string[]
     // One of this class on its way already: wait for it to show up.
     if (inboundAt(state, home, cls.code).length > 0) return [];
 
-    const leased = actions.leasePlane(state, home, cls.code);
+    const leased = actions.leasePlane(state, home, cls.code, seasonal);
     if (!leased.ok) continue;
     return [leased.message, ...keepCrews(state, memory)];
   }

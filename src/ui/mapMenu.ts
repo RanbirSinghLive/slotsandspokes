@@ -23,6 +23,7 @@ import { AIRCRAFT_CLASSES } from '../sim/aircraftClasses';
 import { USEFUL_LIFE_YEARS } from '../sim/leasing';
 import { crewPlan } from '../sim/crewPlan';
 import { dayIndex } from '../sim/clock';
+import { SEASON_DAYS, SEASONAL_PREMIUM } from '../sim/seasonalLease';
 
 /**
  * Click something on the map, get a ring of actions for it at the click,
@@ -86,6 +87,8 @@ let anchorY = 0;
 // moves onto another button, so a click that changes something visibly
 // elsewhere on the map still says what it did.
 let notice: string | null = null;
+/** Whether the ring's next lease is for a season (sim/seasonalLease.ts): remembered while the page is open. */
+let seasonalTerm = false;
 let hover: { text: string; problem: boolean } | null = null;
 
 export function hideMapMenu(): void {
@@ -177,13 +180,16 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
     },
   }));
 
+  // A lease for the season (sim/seasonalLease.ts): dearer a day, and back by itself.
+  const termPrice = (perDay: number) => (seasonalTerm ? Math.round(perDay * SEASONAL_PREMIUM) : perDay);
+  const termWords = seasonalTerm ? ` · for ${SEASON_DAYS} days, back by itself` : '';
   const planeChoices: RadialAction[] = ops.planeOptions(state, airport.iata).map((option) => ({
     id: `plane:${option.code}`,
     // The actual airframe on offer (sim/market.ts): its age is what
     // explains its price and how late it'll run.
     label: option.listing
       ? `Lease ${option.name} · ${option.seats} seats · ${option.listing.ageYears} yrs (${Math.max(0, USEFUL_LIFE_YEARS - option.listing.ageYears)} left) · ` +
-        `${money(option.listing.leasePricePerDay)}/day` +
+        `${money(termPrice(option.listing.leasePricePerDay))}/day${termWords}` +
         // Network overhead grows with the square of the fleet (sim/overhead.ts), so say what this plane adds.
         ` + ${money(overheadAddedByNextPlane(state))}/day overhead` +
         (option.listed > 1 ? ` · ${option.listed - 1} more listed` : ' · last one listed') +
@@ -198,11 +204,26 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
     disabledReason: option.disabledReason,
     preview: option.preview,
     onSelect: () => {
-      const result = ops.leasePlane(state, airport.iata, option.code);
+      const result = ops.leasePlane(state, airport.iata, option.code, seasonalTerm);
       notice = result.ok ? result.message : result.reason;
       refresh();
     },
   }));
+
+  planeChoices.push({
+    id: 'plane:term',
+    label: seasonalTerm
+      ? `Term: ${SEASON_DAYS} days for the season, ${Math.round((SEASONAL_PREMIUM - 1) * 100)}% dearer a day, back by itself · click for a standing lease`
+      : `Term: standing lease · click to lease for a ${SEASON_DAYS}-day season instead (${Math.round((SEASONAL_PREMIUM - 1) * 100)}% dearer a day, back by itself)`,
+    // The term as a word on the button: 90d for a season, a dash for standing.
+    icon: textIcon(seasonalTerm ? `${SEASON_DAYS}d` : '—', 9),
+    angleDeg: 0,
+    onSelect: () => {
+      seasonalTerm = !seasonalTerm;
+      refresh();
+      return false;
+    },
+  });
 
   // Hiring crews (sim/crews.ts), one choice per type the base can crew.
   // Converting crews between types stays on the Crews screen, where the

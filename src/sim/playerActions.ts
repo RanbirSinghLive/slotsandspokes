@@ -46,6 +46,7 @@ import {
 import { cashNeededToLease, LEASE_RESERVE_DAYS, leaseRateFor, loadLeaseRates } from './leasing';
 import { inboundAt, orderLease } from './fleetTiming';
 import { startSeatSale as startSeatSaleRule } from './seatSale';
+import { SEASON_DAYS, SEASONAL_PREMIUM } from './seasonalLease';
 import { deferredItems, heavyBankedMinutes, heavyCheckDueIn, heavyCheckOpen, heavyCheckWorkMinutes } from './mxChecks';
 import { rebaseOptions, rebasePlane, type RebaseOption } from './rebase';
 import { cabinGainPerDay, cabinOf, cancelRefit as cancelRefitRule, orderRefit as orderRefitRule, refitBlockedReason, refitCost, refitDays, type Cabin } from './cabins';
@@ -500,28 +501,30 @@ export function planeOptions(state: SimState, iata: string): PlaneOption[] {
 }
 
 /** Lease the next listed plane of this class. It arrives immediately, based and parked at `iata`. */
-export function leasePlane(state: SimState, iata: string, typeCode: string): Outcome<{ message: string }> {
+export function leasePlane(state: SimState, iata: string, typeCode: string, seasonal = false): Outcome<{ message: string }> {
   const option = planeOptions(state, iata).find((o) => o.code === typeCode);
   if (!option) return { ok: false, reason: 'Unknown aircraft class.' };
   if (option.disabledReason) return { ok: false, reason: option.disabledReason };
   const listing = takeListing(state, typeCode);
   if (!listing) return { ok: false, reason: `No ${option.name} on the market.` };
 
-  const leased = asLeased(state, listing);
+  const standing = asLeased(state, listing);
+  // For the season (sim/seasonalLease.ts): dearer a day, and back by itself.
+  const leased = seasonal ? { ...standing, leasePricePerDay: Math.round(standing.leasePricePerDay * SEASONAL_PREMIUM) } : standing;
   // Basing a plane where the airline has no crews opens a crew base (sim/crews.ts).
   const baseFee = crewBaseFeeAt(state, iata);
   if (baseFee > 0) {
     state.cash -= baseFee;
     openCrewBase(state, iata);
   }
-  const arrivesDay = orderLease(state, leased, iata);
+  const arrivesDay = orderLease(state, leased, iata, seasonal ? SEASON_DAYS : undefined);
   revealReach(state);
   const crewNote = crewAdvice(state, iata, typeCode);
   const refurbished = leased.ageYears === listing.ageYears ? '' : `, refurbished from ${listing.ageYears}`;
   return {
     ok: true,
     message:
-      `${option.name} leased at ${iata}: ${leased.ageYears} yrs old${refurbished}, $${leased.leasePricePerDay.toLocaleString()}/day from its delivery on day ${arrivesDay}.` +
+      `${option.name} leased at ${iata}${seasonal ? ` for ${SEASON_DAYS} days` : ''}: ${leased.ageYears} yrs old${refurbished}, $${leased.leasePricePerDay.toLocaleString()}/day from its delivery on day ${arrivesDay}.` +
       (baseFee > 0 ? ` Crew base opened at ${iata} for $${baseFee.toLocaleString()}.` : '') +
       (crewNote ? ` ${crewNote}` : ''),
   };

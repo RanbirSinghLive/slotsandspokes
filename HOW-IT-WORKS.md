@@ -2717,6 +2717,22 @@ the cancellations cost Toronto most of its year on 18 seeds.
 
 ---
 
+## Seasonal leases (`src/sim/seasonalLease.ts`)
+
+The airport ring's "Lease a plane here" has a **term** switch: a
+standing lease, or one for a 90-day season. A seasonal plane comes from
+the same shelf and is delivered the same way. It costs 30% more a day
+and flies like any other plane. When its season is over (90 days from
+delivery), its flights come off, and a market left with none loses its
+settings, as when a rotation is removed by hand. Then it goes back to
+the lessor by itself, with no return fee. It's the summer's or the
+winter's extra flying without a standing lease the quiet months would
+carry. The plane's view says when it goes back. The headless player
+leases for the season when its network's demand is 8% or more over an
+ordinary day (Seasons), and leases standing otherwise.
+
+---
+
 ## Fleet timing (`src/sim/fleetTiming.ts`)
 
 Every change to the fleet takes time, so planes and crews are planned

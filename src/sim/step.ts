@@ -1,3 +1,4 @@
+import { endSeasonalLeases } from './seasonalLease';
 import { demandFactors, rollDailyDemandEvents } from './demandEvents';
 import { morningHolds, rollNightlyChecks, wornAge } from './mxChecks';
 import { rollDailyFareWars } from './fareWars';
@@ -217,6 +218,8 @@ export function step(state: SimState): void {
     // day's leases are charged: a plane delivered today pays from today,
     // one gone back today pays nothing more.
     rollDailyFleet(state);
+    // Seasonal leases whose season is over go back (sim/seasonalLease.ts).
+    endSeasonalLeases(state);
     rollDailyRebases(state);
 
     // Lease cost: a flat per-day charge, not tied to whether the aircraft

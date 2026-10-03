@@ -1,7 +1,7 @@
 import { classByCode } from '../../sim/aircraftClasses';
 import { dayIndex } from '../../sim/clock';
 import { line, heading, lineWithInfo } from './dom';
-import { money } from '../format';
+import { gameDate, money } from '../format';
 import { aogFor, daysUntilReturn } from '../../sim/aog';
 import { projectRestOfDay } from '../../sim/cascade';
 import { minuteOfDay, minuteOfDayToTimeString } from '../../sim/clock';
@@ -172,6 +172,11 @@ export function buildAircraftView(state: SimState, tail: string, changed: () => 
     now.classList.add(aog.refitTo ? 'is-warn' : 'is-over');
   }
   root.append(now);
+  // A seasonal lease (sim/seasonalLease.ts) goes back by itself.
+  if (plane?.seasonalUntilDay !== undefined && plane.returningOnDay === undefined) {
+    const left = plane.seasonalUntilDay - dayIndex(state);
+    root.append(line(`Seasonal lease · back to the lessor ${gameDate(plane.seasonalUntilDay)} (${Math.max(0, left)}d) · its flights come off then`, 'inspector-line is-warn'));
+  }
   // Tonight's line check and the heavy check (sim/mxChecks.ts), in words.
   const tonight = tonightCheck(state, tail);
   if (tonight && plane) {

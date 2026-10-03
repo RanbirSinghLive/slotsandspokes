@@ -351,6 +351,13 @@ the route view, multiplying the day's seasonal factors. One headless
 Toronto year had 17, from a LaGuardia film festival to an Ottawa
 all-star game.
 
+**Step 3 built:** `sim/seasonalLease.ts`, the term switch in the airport
+ring (a Propeller at Toronto: $2,730 a day standing, $3,549 for the
+season), the plane view's return date, and the headless player leasing
+for the season in a peak.
+
+**Stage 5 is complete.** It hasn't had a quick balance read.
+
 ## Decisions for the owner
 
 1. The airport tags: a first pass covers every airport in the data; the
