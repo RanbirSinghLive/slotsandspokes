@@ -2616,8 +2616,8 @@ passengers of any style and earned the least.
 Crews live at **crew bases**, the airports where the airline bases
 planes, and each is **rated for one aircraft class**: Propeller crews fly
 only Propellers. Home starts with 2 Propeller crews, enough for the
-starting plane. Basing a plane at a new airport opens a base there for
-$100,000 (`CREW_BASE_FEE`, charged by the lease), with no crews.
+starting plane. A new base is opened deliberately, on the Crews screen
+(see Bases), with no crews; planes can be leased or based only at one.
 
 **Each day, at rollover** (`rollDailyCrews()`), hires and retraining
 that have come due join their class, then each base shares each class's
@@ -2725,37 +2725,67 @@ covered too. Until it ferries, the alert strip says it will.
 
 ---
 
+## Bases (`src/sim/bases.ts`)
+
+A base is an investment, opened on purpose. Home has both kinds from the
+start, inside the starting cost, and they cost nothing to run.
+
+| | Crew base | Maintenance base |
+|---|---|---|
+| What it is | Where crews live; the only places planes can be leased or based | Where a night is a line check and banks heavy-check hours |
+| Opened on | the Crews screen | the Mtc screen |
+| Cost | $100,000, then $500/day (crew room, under crew) | $400,000, then $1,500/day (under maintenance) |
+| Closes | when no planes are based there and its crews are released | any time; nights there are then contracted or deferred |
+
+**Anywhere else a plane sleeps** (a crew base without maintenance, a
+plane stranded away), the night is a **contracted check**, $300 an hour
+of the night's work (a Propeller on 4 flights a day: $840), or **no check
+and a deferred item**, by the station's setting on the Mtc screen's
+Stations list (contracted unless changed). A contracted check banks
+nothing toward the heavy check. So a crew base alone is cheap to open
+and dearer to run, and a maintenance base pays for itself at about two
+planes sleeping there.
+
+The Airports screen's Base column and each airport's view say what's
+where. A save from before maintenance bases has one at every crew base
+(`mxBaseList()`), so no one's planes start deferring. The headless
+player leases only at home, so it never opens a base.
+
 ## Maintenance checks (`src/sim/mxChecks.ts`)
 
-**The line check is the night at base.** Judged at midnight for every
+**The line check is a night at a maintenance base** (see Bases);
+elsewhere it's contracted or deferred. Judged at midnight for every
 plane that flies:
 - **The work:** a base amount plus more per flight on its day (a
   Propeller needs 2h plus 24 min a cycle; a Widebody 4h plus 36 min).
 - **The night:** from its landing to an hour before its first
   departure.
 
-A plane that sleeps away from base, or whose night is shorter than the
-work, carries a **deferred item** (●). A night with 2h to spare after
-the work clears one. Planes on an AOG, a refit, a heavy check or a ferry
-skip it. The 22:00 curfew keeps nights at base long, so items come
-mostly from planes stranded away and, once planes sleep out, from night
-stops.
+A plane with no check (a station set to defer, or in the air
+overnight), or whose night is shorter than the work, carries a
+**deferred item** (●). A night with 2h to spare at a maintenance base
+clears one. Planes on an AOG, a refit, a heavy check or a ferry skip it.
+The 22:00 curfew keeps nights at base long, so items come mostly from
+short nights and stations set to defer.
 
 **Deferred items wear the plane.** Each counts as 3 more years of age
 for breakdowns and mechanical delays (`wornAge()`). At 3 the plane is
-held at base that morning: its first rotation is cancelled (cause
-"Maintenance hold", the ticker's "MX hold") and the items are cleared.
+held that morning where it slept: its first rotation is cancelled (cause
+"Maintenance hold", the ticker's "MX hold") and the items are cleared,
+by contract (a line check's price for each) away from a maintenance
+base.
 
 **The heavy check** is hangar work every 30 days the plane flies:
 8 hours for a Propeller, 10 for a Regional, 12 for a Narrowbody, 16 for
 a Widebody. It's done at night. From 10 days before it's due, whatever
-each night at base has left after the line check goes toward it
+each night at a maintenance base has left after the line check goes toward it
 (`heavyBankedMinutes`). When the work is done, the interval starts
 again and every deferred item is cleared. A plane with long nights
 finishes in two or three without missing a flight; one flown from first
-light to the curfew makes slow progress; nights away make none. Only a
+light to the curfew makes slow progress; nights elsewhere make none. Only a
 plane 7 days past due is grounded for it, as an AOG with its flying
-moved to spare planes, until the work left is done. A plane from an
+moved to spare planes, until the work left is done, by contract at a
+base without maintenance. A plane from an
 older save starts part-way through its interval, staggered by tail.
 
 An earlier version took every plane out for 1–3 days every 30 days. A
@@ -2767,7 +2797,7 @@ the cancellations cost Toronto most of its year on 18 seeds.
   heavy check is due and the hours done toward it ("heavy 8/12h · due
   5d"), and last night's check.
 - **The Gantt:** a key above the rows explains the night cell, and each
-  plane's label carries tonight's check as the day is going ("☾✓",
+  plane's label carries tonight's check as the day is going ("☾✓", "☾c" contracted,
   "☾−40m" short, "☾✗" away). The plane's own view says the same in words
   ("Tonight ☾✓ · 9h 24m at base for 4h 24m of work · heavy due 11d"). It works from the projected
   rest of the day, so a late afternoon shows tonight getting shorter.

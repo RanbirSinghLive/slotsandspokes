@@ -1,5 +1,25 @@
 import { dayIndex } from './clock';
 import {
+  closeCrewBase as closeCrewBaseRule,
+  closeMxBase as closeMxBaseRule,
+  contractCost,
+  CREW_BASE_PER_DAY,
+  crewBaseBlocked,
+  crewBaseCloseBlocked,
+  hasCrewBase,
+  hasMxBase,
+  MX_BASE_FEE,
+  MX_BASE_PER_DAY,
+  mxBaseBlocked,
+  mxBaseCloseBlocked,
+  mxBaseList,
+  openCrewBaseAt as openCrewBaseRule,
+  openMxBase as openMxBaseRule,
+  outstationCheck,
+  setOutstationCheck as setOutstationCheckRule,
+  type OutstationCheck,
+} from './bases';
+import {
   CREW_BASE_FEE,
   crewBases,
   CREWS_PER_NEW_PLANE,
@@ -10,7 +30,6 @@ import {
   hireFee,
   hireLeadDays,
   IDEAL_SHIFT_MINUTES,
-  openCrewBase,
   releaseCrews,
   retrainCrews,
   retrainDays,
@@ -47,7 +66,7 @@ import { cashNeededToLease, LEASE_RESERVE_DAYS, leaseRateFor, loadLeaseRates } f
 import { inboundAt, orderLease } from './fleetTiming';
 import { startSeatSale as startSeatSaleRule } from './seatSale';
 import { SEASON_DAYS, SEASONAL_PREMIUM } from './seasonalLease';
-import { deferredItems, heavyBankedMinutes, heavyCheckDueIn, heavyCheckOpen, heavyCheckWorkMinutes } from './mxChecks';
+import { deferredItems, heavyBankedMinutes, heavyCheckDueIn, heavyCheckOpen, heavyCheckWorkMinutes, tonightCheck } from './mxChecks';
 import { rebaseOptions, rebasePlane, type RebaseOption } from './rebase';
 import { cabinGainPerDay, cabinOf, cancelRefit as cancelRefitRule, orderRefit as orderRefitRule, refitBlockedReason, refitCost, refitDays, type Cabin } from './cabins';
 import { commitRetime, planRetime, type RetimePlan } from './retime';
@@ -484,9 +503,11 @@ export function planeOptions(state: SimState, iata: string): PlaneOption[] {
       disabledReason = `${pluralClassName(cls.name)} open when you become ${opener ? airlineCalled(opener) : 'a bigger airline'}: see Goals.`;
     } else if (!listing) {
       disabledReason = `No ${cls.name} on the market. The next arrives in ${days(daysUntilNextListing(state, rate.typeCode))}, first come first served.`;
-    } else if (state.cash < cashNeededToLease(listing.leasePricePerDay) + crewBaseFeeAt(state, iata)) {
-      const baseNote = crewBaseFeeAt(state, iata) > 0 ? `, plus $${CREW_BASE_FEE.toLocaleString()} to open a crew base here` : '';
-      disabledReason = `Needs $${(cashNeededToLease(listing.leasePricePerDay) + crewBaseFeeAt(state, iata)).toLocaleString()} on hand (${LEASE_RESERVE_DAYS} days of lease${baseNote}) to lease this ${cls.name}.`;
+    } else if (!hasCrewBase(state, iata)) {
+      // Planes are based only where crews live (sim/bases.ts).
+      disabledReason = `No crew base at ${iata}: open one on the Crews tab.`;
+    } else if (state.cash < cashNeededToLease(listing.leasePricePerDay)) {
+      disabledReason = `Needs $${cashNeededToLease(listing.leasePricePerDay).toLocaleString()} on hand (${LEASE_RESERVE_DAYS} days of lease) to lease this ${cls.name}.`;
     }
     return {
       code: cls.code,
@@ -511,12 +532,6 @@ export function leasePlane(state: SimState, iata: string, typeCode: string, seas
   const standing = asLeased(state, listing);
   // For the season (sim/seasonalLease.ts): dearer a day, and back by itself.
   const leased = seasonal ? { ...standing, leasePricePerDay: Math.round(standing.leasePricePerDay * SEASONAL_PREMIUM) } : standing;
-  // Basing a plane where the airline has no crews opens a crew base (sim/crews.ts).
-  const baseFee = crewBaseFeeAt(state, iata);
-  if (baseFee > 0) {
-    state.cash -= baseFee;
-    openCrewBase(state, iata);
-  }
   const arrivesDay = orderLease(state, leased, iata, seasonal ? SEASON_DAYS : undefined);
   revealReach(state);
   const crewNote = crewAdvice(state, iata, typeCode);
@@ -525,7 +540,6 @@ export function leasePlane(state: SimState, iata: string, typeCode: string, seas
     ok: true,
     message:
       `${option.name} leased at ${iata}${seasonal ? ` for ${SEASON_DAYS} days` : ''}: ${leased.ageYears} yrs old${refurbished}, $${leased.leasePricePerDay.toLocaleString()}/day from its delivery on day ${arrivesDay}.` +
-      (baseFee > 0 ? ` Crew base opened at ${iata} for $${baseFee.toLocaleString()}.` : '') +
       (crewNote ? ` ${crewNote}` : ''),
   };
 }
@@ -594,7 +608,7 @@ export type HeavyCheckReadout = {
   workHours: number;
   /** Grounded for it, having gone too far overdue. */
   inCheck: boolean;
-  lastNight: 'checked' | 'cleared' | 'short' | 'away' | null;
+  lastNight: 'checked' | 'cleared' | 'short' | 'contracted' | 'away' | null;
 };
 
 /** Every plane's checks (sim/mxChecks.ts), for the Mtc screen, soonest due first. */
@@ -725,10 +739,6 @@ export function letExecutiveGo(state: SimState, role: ExecutiveRole): Outcome<{ 
 
 // --- Crews -----------------------------------------------------------------------
 
-/** What opening a crew base here would cost: nothing where there is one. */
-function crewBaseFeeAt(state: SimState, iata: string): number {
-  return crewBases(state)[iata] ? 0 : CREW_BASE_FEE;
-}
 
 /** A nudge when a base has fewer crews of a class (here or on their way) than its planes need. */
 function crewAdvice(state: SimState, iata: string, classCode: string): string | null {
@@ -808,4 +818,80 @@ export function retrainCrewsAt(state: SimState, iata: string, from: string, to: 
 
 export function releaseCrewsAt(state: SimState, iata: string, classCode: string, count: number): Outcome<{ message: string }> {
   return releaseCrews(state, iata, classCode, count);
+}
+
+/** A base the airline has, for the Crews and Mtc tabs: planes based there, its running cost, and whether it can close. */
+export type BaseReadout = { iata: string; name: string; planes: number; perDay: number; closeBlocked: string | null };
+
+/** An airport a base could open at: every known airport without one, with why not if it can't. */
+export type BaseCandidate = { iata: string; name: string; blocked: string | null };
+
+const airportNames = new Map((airportsData as { iata: string; name: string }[]).map((airport) => [airport.iata, airport.name]));
+const nameOf = (iata: string) => airportNames.get(iata) ?? iata;
+
+function basedHere(state: SimState, iata: string): number {
+  return state.aircraft.filter((aircraft) => aircraft.baseAirport === iata).length;
+}
+
+export function crewBaseReadout(state: SimState): { bases: BaseReadout[]; candidates: BaseCandidate[]; fee: number; perDay: number } {
+  const bases = Object.keys(crewBases(state)).map((iata) => ({
+    iata,
+    name: nameOf(iata),
+    planes: basedHere(state, iata),
+    perDay: iata === state.homeAirport ? 0 : CREW_BASE_PER_DAY,
+    closeBlocked: crewBaseCloseBlocked(state, iata),
+  }));
+  const candidates = state.knownAirports.filter((iata) => !hasCrewBase(state, iata)).map((iata) => ({ iata, name: nameOf(iata), blocked: crewBaseBlocked(state, iata) }));
+  return { bases, candidates, fee: CREW_BASE_FEE, perDay: CREW_BASE_PER_DAY };
+}
+
+/**
+ * The maintenance bases, the airports one could open at, and the
+ * stations where planes sleep tonight without one: each with its setting
+ * and what a contracted night costs there.
+ */
+export function mxBaseReadout(state: SimState): {
+  bases: BaseReadout[];
+  candidates: BaseCandidate[];
+  stations: { iata: string; name: string; planes: number; check: OutstationCheck; contractPerNight: number }[];
+  fee: number;
+  perDay: number;
+} {
+  const bases = mxBaseList(state).map((iata) => ({
+    iata,
+    name: nameOf(iata),
+    planes: basedHere(state, iata),
+    perDay: iata === state.homeAirport ? 0 : MX_BASE_PER_DAY,
+    closeBlocked: mxBaseCloseBlocked(state, iata),
+  }));
+  const candidates = state.knownAirports.filter((iata) => !hasMxBase(state, iata)).map((iata) => ({ iata, name: nameOf(iata), blocked: mxBaseBlocked(state, iata) }));
+  const sleeping = new Map<string, { planes: number; work: number }>();
+  for (const aircraft of state.aircraft) {
+    const tonight = tonightCheck(state, aircraft.tail);
+    if (!tonight || hasMxBase(state, tonight.station)) continue;
+    const entry = sleeping.get(tonight.station) ?? { planes: 0, work: 0 };
+    sleeping.set(tonight.station, { planes: entry.planes + 1, work: entry.work + tonight.work });
+  }
+  const stations = [...sleeping].map(([iata, { planes, work }]) => ({ iata, name: nameOf(iata), planes, check: outstationCheck(state, iata), contractPerNight: contractCost(work) }));
+  return { bases, candidates, stations, fee: MX_BASE_FEE, perDay: MX_BASE_PER_DAY };
+}
+
+export function openCrewBaseAt(state: SimState, iata: string): Outcome<{ message: string }> {
+  return openCrewBaseRule(state, iata);
+}
+
+export function closeCrewBaseAt(state: SimState, iata: string): Outcome<{ message: string }> {
+  return closeCrewBaseRule(state, iata);
+}
+
+export function openMxBaseAt(state: SimState, iata: string): Outcome<{ message: string }> {
+  return openMxBaseRule(state, iata);
+}
+
+export function closeMxBaseAt(state: SimState, iata: string): Outcome<{ message: string }> {
+  return closeMxBaseRule(state, iata);
+}
+
+export function setStationCheck(state: SimState, iata: string, check: OutstationCheck): Outcome<{ message: string }> {
+  return setOutstationCheckRule(state, iata, check);
 }

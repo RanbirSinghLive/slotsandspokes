@@ -25,6 +25,7 @@ import { rollDailyFleet } from './fleetTiming';
 import { rollDailyRebases } from './rebase';
 import { addTally, emptyTally } from './fareClasses';
 import { networkOverheadPerDay } from './overhead';
+import { basesCostPerDay } from './bases';
 import { rollDailyMarketDemand, actualDailyDemand } from './marketDemand';
 import { revealReach } from './reach';
 import { FATIGUE_DELAY_MULTIPLIER, legFatigue, rollDailyCrews } from './crews';
@@ -229,6 +230,14 @@ export function step(state: SimState): void {
     state.todayCost += totalLeaseCost;
     state.todayCostByCategory.lease += totalLeaseCost;
     state.todayMargin -= totalLeaseCost;
+
+    // Bases away from home (sim/bases.ts): crew rooms under crew, maintenance bases under maintenance.
+    const basesCost = basesCostPerDay(state);
+    state.cash -= basesCost.crew + basesCost.maintenance;
+    state.todayCost += basesCost.crew + basesCost.maintenance;
+    state.todayCostByCategory.crew += basesCost.crew;
+    state.todayCostByCategory.maintenance += basesCost.maintenance;
+    state.todayMargin -= basesCost.crew + basesCost.maintenance;
 
     // Network overhead (sim/overhead.ts): grows with the square of the fleet.
     const overhead = networkOverheadPerDay(state);

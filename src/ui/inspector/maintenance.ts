@@ -9,6 +9,7 @@ import { money } from '../format';
 import { linkToMap } from '../mapLink';
 import { planeIconElement } from '../planeIcons';
 import { select } from '../selection';
+import { baseSection, noneLine } from './bases';
 import { heading, line } from './dom';
 
 /**
@@ -70,6 +71,7 @@ export function buildMaintenanceView(state: SimState, changed: () => void): HTML
   }
 
   root.append(...buildChecks(state));
+  root.append(...buildMxBases(state, changed));
 
   root.append(
     heading(
@@ -110,7 +112,7 @@ function pips(deferred: number): string {
   return '●'.repeat(Math.min(deferred, MX_HOLD_AT)) + '○'.repeat(Math.max(0, MX_HOLD_AT - deferred));
 }
 
-const NIGHT_WORDS: Record<string, string> = { checked: 'checked', cleared: 'cleared 1', short: 'short', away: 'away' };
+const NIGHT_WORDS: Record<string, string> = { checked: 'checked', cleared: 'cleared 1', short: 'short', contracted: 'contracted', away: 'no check' };
 
 /**
  * Checks (sim/mxChecks.ts): every plane's deferred items, last night's
@@ -121,7 +123,7 @@ function buildChecks(state: SimState): HTMLElement[] {
   const nodes: HTMLElement[] = [
     heading(
       'Checks',
-      `Line check: every night at base, the plane gets its hangar work, longer for more flights a day. A night away from base, or too short for the work, leaves a deferred item (●); a long night clears one. Each item wears the plane like ${DEFERRED_AGE_YEARS} more years: more breakdowns and mechanical delays. At ${MX_HOLD_AT} it's held at base for a morning and its first rotation is cancelled. Heavy check: every ${HEAVY_INTERVAL_DAYS} flying days, 8–16 hours of hangar work, done at night: from ${HEAVY_WINDOW_DAYS} days before it's due, each night at base puts its spare hours after the line check toward it. Long nights finish it without missing a flight; a day flown from first light to curfew makes slow progress. ${OVERDUE_GRACE_DAYS} days overdue, the plane is grounded until it's done. It clears every item.`,
+      `Line check: every night at a maintenance base, the plane gets its hangar work, longer for more flights a day. Elsewhere the night is a contracted check or none, by the station's setting below. No check, or a night too short for the work, leaves a deferred item (●); a long night at a maintenance base clears one. Each item wears the plane like ${DEFERRED_AGE_YEARS} more years: more breakdowns and mechanical delays. At ${MX_HOLD_AT} it's held for a morning where it slept and its first rotation is cancelled. Heavy check: every ${HEAVY_INTERVAL_DAYS} flying days, 8–16 hours of hangar work, done at night: from ${HEAVY_WINDOW_DAYS} days before it's due, each night at a maintenance base puts its spare hours after the line check toward it. Long nights finish it without missing a flight; a day flown from first light to curfew makes slow progress. ${OVERDUE_GRACE_DAYS} days overdue, the plane is grounded until it's done. It clears every item.`,
     ),
   ];
   const readouts = ops.heavyCheckReadouts(state);
@@ -144,6 +146,60 @@ function buildChecks(state: SimState): HTMLElement[] {
     detail.textContent = heavy + night;
     if (plane.deferred >= MX_HOLD_AT - 1 || plane.dueIn <= 0) detail.classList.add('is-warn');
     row.append(name, detail);
+    list.append(row);
+  }
+  nodes.push(list);
+  return nodes;
+}
+
+/**
+ * Maintenance bases (sim/bases.ts), and the stations where planes sleep
+ * tonight without one, each set to contract its checks or defer them.
+ */
+function buildMxBases(state: SimState, changed: () => void): HTMLElement[] {
+  const readout = ops.mxBaseReadout(state);
+  const nodes = baseSection({
+    title: 'Maintenance bases',
+    info: `Where a night is a line check and banks heavy-check hours. Opening one costs ${money(readout.fee)} and ${money(readout.perDay)} a day; home's comes with the start. Anywhere else a plane sleeps, its check is contracted by the hour or deferred: see Stations.`,
+    kind: 'mtc base',
+    bases: readout.bases,
+    candidates: readout.candidates,
+    fee: readout.fee,
+    perDay: readout.perDay,
+    open: (iata) => ops.openMxBaseAt(state, iata),
+    close: (iata) => ops.closeMxBaseAt(state, iata),
+    changed,
+  });
+  nodes.push(
+    heading(
+      'Stations',
+      'Airports where planes sleep tonight without a maintenance base. Contracted: the station does the line check, paid by the hour of work, and the plane gets no deferred item if the night is long enough; it banks nothing toward the heavy check. Deferred: no check and no cost, and a deferred item each night.',
+    ),
+  );
+  if (readout.stations.length === 0) {
+    nodes.push(noneLine('None tonight · every plane sleeps at a maintenance base'));
+    return nodes;
+  }
+  const list = document.createElement('div');
+  list.className = 'inspector-rows';
+  for (const station of readout.stations) {
+    const row = linkToMap(document.createElement('div'), { kind: 'airport', iata: station.iata });
+    row.className = 'inspector-row base-row';
+    const name = document.createElement('span');
+    name.textContent = `${station.iata} · ${station.planes} plane${station.planes === 1 ? '' : 's'} tonight`;
+    const detail = document.createElement('span');
+    detail.className = 'inspector-row-detail';
+    detail.textContent = station.check === 'contract' ? `contracted · ${money(station.contractPerNight)}/night` : 'deferred · ● each night';
+    if (station.check === 'defer') detail.classList.add('is-warn');
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'base-close';
+    toggle.textContent = station.check === 'contract' ? 'Defer' : 'Contract';
+    toggle.addEventListener('click', () => {
+      ops.setStationCheck(state, station.iata, station.check === 'contract' ? 'defer' : 'contract');
+      changed();
+    });
+    row.append(name, detail, toggle);
     list.append(row);
   }
   nodes.push(list);

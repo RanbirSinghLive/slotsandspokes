@@ -84,6 +84,8 @@ export function chooseHome(state: SimState, iata: string, season: StartSeason = 
   state.aircraft = createStartingFleet(iata);
   // Home is the first crew base, crewed for the starting plane (sim/crews.ts).
   state.crewBases = { [iata]: { crewsByClass: { [STARTING_CREW_CLASS]: STARTING_CREWS }, hiring: [], retraining: [] } };
+  // And the first maintenance base (sim/bases.ts): home's two come with the start.
+  state.mxBases = [iata];
   // Whatever the placeholder home revealed is forgotten: the map opens up
   // around the city actually chosen.
   state.knownAirports = [];

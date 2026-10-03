@@ -1,4 +1,5 @@
 import { airportLoad, dailyDeparturesAt, airportLevel } from '../../sim/airports';
+import { hasCrewBase, hasMxBase } from '../../sim/bases';
 import { slotFeesPerDayAt, slotsHeld } from '../../sim/slots';
 import { airportDemandSize, sizeRank, type Size } from '../../sim/marketSize';
 import type { SimState } from '../../sim/state';
@@ -23,6 +24,8 @@ type Row = {
   slotPairs: number;
   slotFees: number;
   waiting: number;
+  /** Bases here (sim/bases.ts): 2 for a maintenance base, 1 for a crew base, both added. */
+  bases: number;
 };
 
 type Column = { key: keyof Row; label: string; title: string; format: (row: Row) => string; numeric: boolean };
@@ -42,6 +45,13 @@ const COLUMNS: Column[] = [
     label: 'Slots',
     title: 'Slot pairs you hold here, and what they cost a day',
     format: (row) => (row.slotPairs > 0 ? `${row.slotPairs} · $${row.slotFees.toLocaleString()}` : '—'),
+    numeric: true,
+  },
+  {
+    key: 'bases',
+    label: 'Base',
+    title: 'Your bases here: crew (where planes are based) and mtc (where a night is a line check)',
+    format: (row) => [row.bases & 1 ? 'crew' : '', row.bases & 2 ? 'mtc' : ''].filter(Boolean).join(' · ') || '—',
     numeric: true,
   },
   {
@@ -73,6 +83,7 @@ function buildRows(state: SimState): Row[] {
     slotFees: slotFeesPerDayAt(state, iata),
     // Sorted by size, not by the hidden number (sim/marketSize.ts).
     waiting: sizeRank(airportDemandSize(unmet.get(iata)?.latent ?? 0)),
+    bases: (hasCrewBase(state, iata) ? 1 : 0) + (hasMxBase(state, iata) ? 2 : 0),
   }));
 }
 
@@ -95,7 +106,8 @@ export function buildAirportsView(state: SimState, changed: () => void): HTMLEle
   root.append(title);
 
   const allRows = buildRows(state);
-  const served = allRows.filter((row) => row.departures > 0);
+  // A base counts as served: it's yours even before its first flight.
+  const served = allRows.filter((row) => row.departures > 0 || row.bases > 0);
   const totalFees = allRows.reduce((sum, row) => sum + row.slotFees, 0);
   const summary = document.createElement('div');
   summary.className = 'inspector-line';

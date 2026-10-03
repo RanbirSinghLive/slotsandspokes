@@ -524,6 +524,10 @@ export type SimState = {
   inboundLeases?: InboundLease[];
   /** Crew bases and their crews, by IATA (sim/crews.ts). Optional: an older save gets bases made at its first rollover. */
   crewBases?: Record<string, CrewBase>;
+  /** Maintenance bases, by IATA (sim/bases.ts): missing in a save from before them, which has one at every crew base. */
+  mxBases?: string[];
+  /** Stations set to defer their line checks rather than contract them (sim/bases.ts); unlisted ones contract. */
+  outstationChecks?: Record<string, 'contract' | 'defer'>;
   /** Today's crewing (sim/crews.ts's rollDailyCrews()): crews per plane and when each duty day starts. */
   crewDay?: CrewDay;
   /**
@@ -551,7 +555,7 @@ export type SimState = {
   /** Planes held at base this morning for their deferred items (sim/mxChecks.ts), for the ticker. */
   mxHoldsToday?: string[];
   /** How each flying plane's line check went last night (sim/mxChecks.ts), by tail. */
-  lastNightChecks?: Record<string, 'checked' | 'cleared' | 'short' | 'away'>;
+  lastNightChecks?: Record<string, 'checked' | 'cleared' | 'short' | 'contracted' | 'away'>;
   /** Demand events announced or running (sim/demandEvents.ts). Absent in an older save: none. */
   demandEvents?: DemandEvent[];
   /** Fare wars running now (sim/fareWars.ts). Absent in an older save: none. */

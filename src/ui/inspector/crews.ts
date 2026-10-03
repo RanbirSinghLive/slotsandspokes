@@ -7,6 +7,7 @@ import { linkToMap } from '../mapLink';
 import { planeIconElement } from '../planeIcons';
 import * as ops from '../routeActions';
 import { select } from '../selection';
+import { baseSection } from './bases';
 import { heading, line, lineWithInfo } from './dom';
 
 /**
@@ -75,10 +76,6 @@ export function buildCrewsView(state: SimState, changed: () => void): HTMLElemen
 
   const today = dayIndex(state);
   const plan = crewPlan(state);
-  if (plan.length === 0) {
-    root.append(line('No crew bases yet · a base opens where you base a plane'));
-    return root;
-  }
 
   const classes = plan.flatMap((base) => base.classes);
   const crews = classes.reduce((sum, c) => sum + c.crews, 0);
@@ -89,7 +86,7 @@ export function buildCrewsView(state: SimState, changed: () => void): HTMLElemen
   );
   root.append(
     line(
-      `${crews} crews · ${plan.length} base${plan.length === 1 ? '' : 's'}` +
+      `${crews} crews · ${ops.crewBaseReadout(state).bases.length} base${ops.crewBaseReadout(state).bases.length === 1 ? '' : 's'}` +
         (joining > 0 ? ` · +${joining} joining` : '') +
         (reserveCost > 0 ? ` · reserve ${money(reserveCost)}/day` : '') +
         ` · hire ${hireLeadDays(state)}d · conversion ${retrainDays(state)}d`,
@@ -99,7 +96,43 @@ export function buildCrewsView(state: SimState, changed: () => void): HTMLElemen
   root.append(...horizon(plan, today));
   root.append(...toDo(state, plan, today, changed));
   root.append(...roster(state, plan, today, changed));
+  root.append(...crewBasesSection(state, plan, changed));
   return root;
+}
+
+/**
+ * The crew bases (sim/bases.ts): open one at any airport on the map, close
+ * an empty one. A new base has no crews: hire them here, then lease or
+ * move planes to it.
+ */
+function crewBasesSection(state: SimState, plan: ReturnType<typeof crewPlan>, changed: () => void): HTMLElement[] {
+  const readout = ops.crewBaseReadout(state);
+  const nodes = baseSection({
+    title: 'Crew bases',
+    info: `Where crews live, and the only places planes can be leased or based. Opening one costs ${money(readout.fee)} and ${money(readout.perDay)} a day for the crew room; home's comes with the start. A new base has no crews: hire them before its first plane. A crew base is not a maintenance base: nights there are contracted or deferred unless you open one on the Mtc screen.`,
+    kind: 'crew base',
+    bases: readout.bases,
+    candidates: readout.candidates,
+    fee: readout.fee,
+    perDay: readout.perDay,
+    open: (iata) => ops.openCrewBaseAt(state, iata),
+    close: (iata) => ops.closeCrewBaseAt(state, iata),
+    changed,
+  });
+  // A base with no roster yet (no crews, no planes) has nothing in the roster above to hire from.
+  for (const base of readout.bases) {
+    if (plan.some((entry) => entry.iata === base.iata)) continue;
+    const classes = ops.crewReadout(state, base.iata)?.classes.filter((c) => c.open) ?? [];
+    if (classes.length === 0) continue;
+    const buttons = document.createElement('div');
+    buttons.className = 'crew-buttons';
+    buttons.append(line(`${base.iata} · no crews yet`, 'inspector-line crew-row-detail'));
+    for (const c of classes) {
+      buttons.append(actionButton(`Hire 1 ${c.name} · ${money(hireFee(c.classCode))}`, state.cash < hireFee(c.classCode), () => ops.hireCrewsAt(state, base.iata, c.classCode, 1), changed));
+    }
+    nodes.push(buttons);
+  }
+  return nodes;
 }
 
 /** The next HORIZON_DAYS as a strip: EIS, crews joining, planes going back. */

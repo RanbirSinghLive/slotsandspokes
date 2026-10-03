@@ -3,6 +3,7 @@ import { airportHours, FIRST_OPEN_HOUR, freeInHour, hoursWithRoom, OPEN_HOURS, p
 import { inboundAt } from '../../sim/fleetTiming';
 import { money, shortMoney } from '../format';
 import { crewShare } from '../../sim/crews';
+import { hasCrewBase, hasMxBase, outstationCheck } from '../../sim/bases';
 import { line, heading, lineWithInfo } from './dom';
 import { formatNps, marketNps } from '../../sim/nps';
 import { daysUntilReturn } from '../../sim/aog';
@@ -64,6 +65,16 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
     line(
       `${presence.level} · ${presence.departures} dep/day` +
         (connecting > 0 ? ` · ${connecting} connecting/day · ${HUB_STYLES[hubStyleAt(state, iata)].name}` : ''),
+    ),
+  );
+
+  // Bases here (sim/bases.ts): opened on the Crews and Mtc screens.
+  const crewBase = hasCrewBase(state, iata);
+  const mxBase = hasMxBase(state, iata);
+  root.append(
+    lineWithInfo(
+      [crewBase ? 'Crew base' : 'No crew base', mxBase ? 'mtc base' : `no mtc base · nights ${outstationCheck(state, iata) === 'contract' ? 'contracted' : 'deferred'}`].join(' · '),
+      'A crew base is where planes can be leased and based (open one on the Crews screen). A maintenance base is where a night is a line check (the Mtc screen); a plane sleeping anywhere else has its check contracted or deferred, by the station\'s setting there.',
     ),
   );
 

@@ -12,8 +12,7 @@ the 74-airport top-up; the weekly balance read (pre-approved, Sundays)
 will say whether that moved anything. Desktop is the target: the
 browser and mobile pass is dropped.
 
-**Status:** written after the owner's design calls (2026-10-03); not
-started.
+**Status:** stage 1 built, waiting on its quick read.
 
 ---
 
@@ -73,6 +72,31 @@ early game; bases and night stops are the mid-game's next layer.
    to open and $500 a day; maintenance base $400,000 and $1,500 a day;
    contracted checks $300 an hour of work (a Propeller's ~3h night is
    about $900).
+
+**Stage 1 built:**
+- `sim/bases.ts`: open and close crew and maintenance bases, their daily
+  costs (home's free), each station's contract-or-defer setting.
+  Leasing needs a crew base; the lease no longer opens one.
+- `sim/mxChecks.ts`: a night is a line check only at a maintenance base;
+  elsewhere contracted ($300/h of the work) or deferred. An MX hold
+  happens where the plane slept, contracted away from a maintenance
+  base; an overdue heavy check at a base without one is contracted.
+  Fixed on the way: a heavy check finishing on a night that also cleared
+  an item left the count at −1, which made the plane age as if younger.
+- The Crews screen's Crew bases (open, close, hire at a new base), the
+  Mtc screen's Maintenance bases and Stations, the Airports screen's
+  Base column, each airport's view, and ☾c on the Gantt.
+- Checked in the browser on a test game (opening a crew base at
+  Ottawa, both screens, the Base column), and end to end in Node: a
+  lease refused without a crew base, then contracted, deferred and
+  checked nights at Ottawa as its setting and bases changed.
+- **One finding from the browser:** a Hong Kong game had replaced the
+  owner's Toronto save before stage 1's browser check; the game keeps
+  one save, so Toronto can't be recovered.
+- One-seed headless Montréal: $29.6M before, $11.1M after. The
+  headless player never leaves home, so the rules barely touch it (21
+  contracted nights a year, $30k); the path moves because those nights
+  no longer leave items. The quick read decides.
 
 ### Stage 2: night stops
 

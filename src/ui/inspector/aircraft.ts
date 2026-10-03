@@ -183,13 +183,13 @@ export function buildAircraftView(state: SimState, tail: string, changed: () => 
     const deferred = deferredItems(plane);
     const hours = (minutes: number) => `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`;
     const text = tonight.away
-      ? 'Tonight ☾✗ · away from base · no line check'
-      : `Tonight ☾${tonight.short ? `−${tonight.work - tonight.night}m` : '✓'} · ${hours(tonight.night)} at base for ${hours(tonight.work)} of work`;
+      ? `Tonight ☾✗ · ${tonight.station} · checks deferred · no line check`
+      : `Tonight ☾${tonight.short ? `−${tonight.work - tonight.night}m` : tonight.contracted ? 'c' : '✓'} · ${tonight.station}${tonight.contracted ? ' contracted' : ''} · ${hours(tonight.night)} for ${hours(tonight.work)} of work`;
     const heavy = heavyCheckOpen(plane) ? ` · heavy ${Math.round(heavyBankedMinutes(plane) / 6) / 10}/${heavyCheckWorkMinutes(plane.typeCode) / 60}h` : ` · heavy due ${heavyCheckDueIn(plane)}d`;
     root.append(
       lineWithInfo(
         text + heavy + (deferred > 0 ? ` · ${'●'.repeat(Math.min(deferred, MX_HOLD_AT))} ${deferred} deferred` : ''),
-        `The line check: each night at base the plane needs hangar work, more for more flights a day, between landing and an hour before its first departure. ☾✓ means tonight has time for it, ☾−40m that it's that much short, ☾✗ that the plane sleeps away. A short or missed check leaves a deferred item (●): each wears the plane like ${DEFERRED_AGE_YEARS} more years, and at ${MX_HOLD_AT} it's held at base a morning. The heavy check is hangar work every ${HEAVY_INTERVAL_DAYS} flying days, done from the spare hours of nights at base. The Mtc screen lists every plane's.`,
+        `The line check: each night the plane needs hangar work, more for more flights a day, between landing and an hour before its first departure. ☾✓ means tonight is at a maintenance base with time for it, ☾c a contracted check at a station without one, ☾−40m that it's that much short, ☾✗ a station set to defer, so no check. A short or missed check leaves a deferred item (●): each wears the plane like ${DEFERRED_AGE_YEARS} more years, and at ${MX_HOLD_AT} it's held a morning. The heavy check is hangar work every ${HEAVY_INTERVAL_DAYS} flying days, done from the spare hours of nights at a maintenance base. The Mtc screen lists every plane's, and its bases and stations.`,
         tonight.away || tonight.short || deferred >= MX_HOLD_AT - 1 ? 'inspector-line is-warn' : 'inspector-line',
       ),
     );
