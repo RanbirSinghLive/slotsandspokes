@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { AIRCRAFT_CLASSES } from '../sim/aircraftClasses';
 
 /**
  * Builds data/airports.json from public data, so every coordinate,
@@ -380,6 +381,23 @@ const HUB_NAMES = new Map(REGIONS.flatMap((region) => region.hubs));
  * suburb rather than the city it serves.
  */
 const FILL_NAMES: Record<string, string> = {
+  KTI: 'Phnom Penh',
+  BCD: 'Bacolod',
+  CEB: 'Cebu',
+  MVD: 'Montevideo',
+  CCP: 'Concepción',
+  PLZ: 'Gqeberha',
+  YIN: 'Yining',
+  AKU: 'Aksu',
+  BJL: 'Banjul',
+  GDQ: 'Gondar',
+  GET: 'Geraldton',
+  KGI: 'Kalgoorlie',
+  ALH: 'Albany, Western Australia',
+  HLZ: 'Hamilton, New Zealand',
+  NVT: 'Itajaí–Navegantes',
+  JIB: 'Djibouti',
+  ELQ: 'Buraydah',
   ONT: 'Ontario, California',
   YXU: 'London, Ontario',
   PWM: 'Portland, Maine',
@@ -614,6 +632,57 @@ function placesServing(allPlaces: Place[], airports: AirportPoint[]): Place[] {
 }
 
 /**
+ * A city this big should be playable as a home, which takes
+ * HOME_MIN_NEIGHBOURS airports within a starting propeller's range
+ * (sim/homes.ts). The regional fill picks the biggest catchments anywhere
+ * in a region, so a big city in a thinly filled one (Sydney,
+ * Johannesburg, Buenos Aires) can end up with too few. The top-up adds
+ * the airports nearby that gain the most people, until it has them.
+ */
+const HOME_TOP_UP_MIN_PEOPLE = 2_000_000;
+const HOME_MIN_NEIGHBOURS = 3;
+const PROPELLER_RANGE_KM = AIRCRAFT_CLASSES[0].rangeNm * 1.852;
+
+function topUpHomeReach(chosen: AirportPoint[], pool: AirportPoint[], places: Place[]): AirportPoint[] {
+  const grid = new PlaceGrid();
+  for (const place of places) grid.add(place);
+  const nearestKm = (place: Place) =>
+    chosen.reduce((best, airport) => (airport.country === place.country ? Math.min(best, distanceKm(airport, place)) : best), Infinity);
+  const peopleNear = (airport: AirportPoint) =>
+    grid
+      .near(airport, CATCHMENT_MAX_KM)
+      .filter((place) => place.country === airport.country)
+      .reduce((total, place) => total + place.population, 0);
+  const peopleGained = (candidate: AirportPoint) =>
+    grid
+      .near(candidate, CATCHMENT_MAX_KM)
+      .filter((place) => place.country === candidate.country && distanceKm(candidate, place) < nearestKm(place))
+      .reduce((total, place) => total + place.population, 0);
+  const inReach = (a: AirportPoint, b: AirportPoint) => a !== b && distanceKm(a, b) >= METRO_SEPARATION_KM && distanceKm(a, b) <= PROPELLER_RANGE_KM;
+
+  const added: AirportPoint[] = [];
+  const bigCities = chosen.filter((airport) => peopleNear(airport) >= HOME_TOP_UP_MIN_PEOPLE).sort((a, b) => peopleNear(b) - peopleNear(a));
+  for (const city of bigCities) {
+    while (chosen.filter((airport) => inReach(city, airport)).length < HOME_MIN_NEIGHBOURS) {
+      const options = pool.filter(
+        (candidate) => !chosen.includes(candidate) && inReach(city, candidate) && !chosen.some((airport) => distanceKm(airport, candidate) < METRO_SEPARATION_KM),
+      );
+      let best: AirportPoint | null = null;
+      let bestGain = 0;
+      for (const candidate of options) {
+        const gain = peopleGained(candidate);
+        if (gain > bestGain) [best, bestGain] = [candidate, gain];
+      }
+      if (!best) break;
+      chosen.push(best);
+      added.push(best);
+      console.log(`  top-up for ${city.iata}: ${best.iata} ${best.name} (${Math.round(bestGain / 1000)}k people)`);
+    }
+  }
+  return added;
+}
+
+/**
  * The fill-out airports, in the order they're added. `alreadyChosen` is
  * the hand-kept list; see "Which airports" at the top of the file.
  */
@@ -730,6 +799,7 @@ async function main(): Promise<void> {
     return (region.countries?.includes(country) ?? false) || (region.continent !== undefined && row[column('continent')] === region.continent);
   };
   const points = [...handKept];
+  const pool: AirportPoint[] = [];
   for (const region of REGIONS) {
     const candidates = [...byIata.values()]
       .filter(
@@ -744,7 +814,10 @@ async function main(): Promise<void> {
     const added = chooseFillAirports(region, points, candidates, placesServing(allPlaces, [...points, ...candidates]));
     console.log(`${region.name}: ${added.length} added`);
     points.push(...added);
+    pool.push(...candidates);
   }
+  const toppedUp = topUpHomeReach(points, pool, placesServing(allPlaces, pool.concat(handKept)));
+  console.log(`Home reach top-up: ${toppedUp.length} added`);
 
   // Every place to the nearest airport in its own country, within reach.
   const places = placesServing(allPlaces, points);
