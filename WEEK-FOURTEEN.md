@@ -356,7 +356,31 @@ ring (a Propeller at Toronto: $2,730 a day standing, $3,549 for the
 season), the plane view's return date, and the headless player leasing
 for the season in a peak.
 
-**Stage 5 is complete.** It hasn't had a quick balance read.
+**Stage 5 is complete.**
+
+**Quick read after stage 5** (not saved as the reference): YUL $2.1M
+(3/10 busts, was $11.0M), YYZ $35.7M (0/10, was $33.4M), PHL $45.0M
+(1/10, was $68.7M), YHZ 8/10 busts. The likeliest cause is that day 0 is
+1 January, the quietest stretch of the year for business and leisure,
+when a start-up is weakest. The owner's answer is a chosen start (summer
+1 May or winter 1 November), in week fifteen; the read is to be taken
+again after it.
+
+**Speed, checked:**
+- **Seasons and events aren't slow.** The same Toronto year took 39 s
+  with them and 48 s without (that airline grew bigger). The quick read
+  ran 6m18s against 3m48s because its games took different paths.
+- **The headless player's time** goes to its stance forecasts (27%),
+  rival-response chances (27%), placing rotations (21%) and connections
+  (18%).
+- **At 100×** the sim keeps up: a minute averages 0.013–0.018 ms
+  (slowest 2 ms) for 17–19 planes and 80–96 legs, and midnight takes
+  30–50 ms, a 2–3 frame stutter once a game day.
+- **The map is the cost in the browser.** That 17-plane airline drew at
+  about 30 frames a second paused, at 1× and at 100× alike, panel shown
+  or hidden, against 55 for a one-plane game. The map is redrawn whole
+  every frame. Carried to week fifteen, where more airports would make
+  it worse.
 
 ## Decisions for the owner
 
