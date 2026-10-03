@@ -2247,8 +2247,16 @@ about a width either side):
 | Business | autumn +5% | August −25%, the holidays −40% |
 | VFR | Christmas +45%, summer +15% | — |
 
-A **sun route** has one end south of 30.5° with a leisure score of 1 or
-more, and the other north of 38° (Toronto–Orlando, not Toronto–Chicago).
+A **sun route** has one end within 30.5° of the equator with a leisure
+score of 1 or more, and the other more than 38° from it (Toronto–Orlando,
+not Toronto–Chicago).
+
+**South of the equator** the seasons run six months out of step: an
+airport's seasonal bumps are read 182 days later, so Sydney's summer
+peak is January. Holiday bumps (Christmas, the holiday business low)
+stay on their dates. A market takes half from each end, so a route
+across the equator is half and half. A sun route follows the winter of
+its cold end.
 
 The factors scale each segment's share of the travellers who want to
 fly today, in every flight and forecast (`flightResult()`'s
@@ -2256,8 +2264,7 @@ fly today, in every flight and forecast (`flightResult()`'s
 through the year. They don't touch market growth: a quiet August
 doesn't shrink the market. Across the year a market averages close to
 an ordinary day. The route view gives its year in a line ("Season −6%
-now · peak +13% mid-Jul · low −6% late-Jan"). Northern-hemisphere
-seasons only.
+now · peak +13% mid-Jul · low −6% late-Jan").
 
 ---
 

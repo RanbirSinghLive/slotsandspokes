@@ -98,6 +98,24 @@ every one of the 17,000 city pairs is walked every midnight.
    difficulty (a long run: it plays every home). Which airports are
    pickable is a decision below.
 
+**Stage 1, steps 1–4 built:**
+- **480 airports** from the regional fill-out, North America unchanged.
+  Istanbul's second airport is left out, so it doesn't take the city
+  from IST. North Korea is left out. Fill-out names read as people say
+  them ("Nagoya", not "Tokoname").
+- **Character tags** for 187 notable new airports.
+- **Eight invented incumbents**, one or two per new region, on its
+  busiest markets, and eight more names in the entrant pool. Rival entry
+  and the home rival now search pairs by airport.
+- **Southern-hemisphere seasons:** seasonal bumps six months on south of
+  the equator, holidays on their dates. Sydney–Melbourne peaks +16% in
+  January and dips −7% in July.
+- **The browser** draws all of it at under 4 ms a frame.
+- **One-seed headless years** from Montréal: $1.8M before, $38.3M with
+  the world open, then just bust with the new rivals (their draws change
+  the path). The quick read after the ratings will say more.
+- **Step 5, home ratings,** is a long run, waiting on the owner.
+
 ### Stage 2: a start worth choosing
 
 1. **The choice:** summer, starting 1 May, or winter, starting

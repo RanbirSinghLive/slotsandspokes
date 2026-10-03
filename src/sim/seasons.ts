@@ -25,39 +25,49 @@ import type { SegmentName } from './timeOfDay';
  * It scales the travellers who want to fly on a day, in every flight and
  * forecast (sim/economy.ts's flightResult()), not the market's growth
  * (sim/marketDemand.ts): a quiet August doesn't shrink the market.
- * Northern-hemisphere seasons only.
+ *
+ * **South of the equator** the year runs six months out of step: an
+ * airport's seasonal bumps are read SOUTH_SHIFT_DAYS later, so Sydney's
+ * summer peak is January, while the holidays (Christmas) stay on their
+ * dates. A market takes each end's half: two
+ * southern ends are wholly southern, a route across the equator half and
+ * half. A sun route follows the winter of its cold end, where its
+ * travellers live.
  */
 
-type Bump = { day: number; width: number; size: number };
+/** A rise or fall around a day. A holiday stays on its date in both hemispheres; a season's bump moves six months south of the equator. */
+type Bump = { day: number; width: number; size: number; holiday?: true };
 
 const DAYS_PER_YEAR = 365;
 
 const CURVES: Record<SegmentName | 'sunLeisure', Bump[]> = {
   leisure: [
     { day: 196, width: 35, size: 0.25 }, // mid-July
-    { day: 357, width: 7, size: 0.2 }, // Christmas
+    { day: 357, width: 7, size: 0.2, holiday: true }, // Christmas
     { day: 25, width: 20, size: -0.15 }, // late January
     { day: 320, width: 15, size: -0.08 }, // November
   ],
   sunLeisure: [
     { day: 45, width: 40, size: 0.35 }, // mid-February
-    { day: 357, width: 7, size: 0.2 }, // Christmas
+    { day: 357, width: 7, size: 0.2, holiday: true }, // Christmas
     { day: 200, width: 35, size: -0.15 }, // summer
   ],
   business: [
     { day: 222, width: 18, size: -0.25 }, // August
-    { day: 362, width: 8, size: -0.4 }, // the holidays
+    { day: 362, width: 8, size: -0.4, holiday: true }, // the holidays
     { day: 280, width: 30, size: 0.05 }, // autumn
   ],
   vfr: [
-    { day: 358, width: 9, size: 0.45 }, // Christmas
+    { day: 358, width: 9, size: 0.45, holiday: true }, // Christmas
     { day: 200, width: 30, size: 0.15 }, // summer
   ],
 };
 
-/** A warm end is south of this latitude, and a cold end north of COLD_LATITUDE. */
+/** A warm end is nearer the equator than this latitude, and a cold end further than COLD_LATITUDE, either side of it. */
 const WARM_LATITUDE = 30.5;
 const COLD_LATITUDE = 38;
+/** Half a year: the southern hemisphere's seasons against the northern's. */
+const SOUTH_SHIFT_DAYS = 182;
 
 const latitudeByIata = new Map((airportsData as Array<{ iata: string; lat: number }>).map((airport) => [airport.iata, airport.lat]));
 const leisureByIata = new Map(
@@ -72,25 +82,44 @@ function daysApart(a: number, b: number): number {
   return Math.min(gap, DAYS_PER_YEAR - gap);
 }
 
-function curveAt(bumps: Bump[], dayOfYear: number): number {
-  return 1 + bumps.reduce((sum, bump) => sum + bump.size * Math.exp(-((daysApart(dayOfYear, bump.day) / bump.width) ** 2)), 0);
+/** A curve on a day: south of the equator, the seasons' bumps are read half a year on and the holidays where they are. */
+function curveAt(bumps: Bump[], dayOfYear: number, southern = false): number {
+  return (
+    1 +
+    bumps.reduce((sum, bump) => {
+      const day = southern && !bump.holiday ? dayOfYear + SOUTH_SHIFT_DAYS : dayOfYear;
+      return sum + bump.size * Math.exp(-((daysApart(day, bump.day) / bump.width) ** 2));
+    }, 0)
+  );
 }
 
-/** A warm end worth a holiday and a cold one: its leisure peaks in winter. */
-export function isSunRoute(a: string, b: string): boolean {
+/** The cold end of a sun route (a warm end worth a holiday and a cold one), or null when the market isn't one. */
+function sunRouteColdEnd(a: string, b: string): string | null {
   const [latA, latB] = [latitudeByIata.get(a), latitudeByIata.get(b)];
-  if (latA === undefined || latB === undefined) return false;
-  const warm = latA < latB ? a : b;
-  const [south, north] = latA < latB ? [latA, latB] : [latB, latA];
-  return south < WARM_LATITUDE && north > COLD_LATITUDE && (leisureByIata.get(warm) ?? 0) >= 1;
+  if (latA === undefined || latB === undefined) return null;
+  const [warm, cold] = Math.abs(latA) < Math.abs(latB) ? [a, b] : [b, a];
+  const [warmLat, coldLat] = Math.abs(latA) < Math.abs(latB) ? [latA, latB] : [latB, latA];
+  return Math.abs(warmLat) < WARM_LATITUDE && Math.abs(coldLat) > COLD_LATITUDE && (leisureByIata.get(warm) ?? 0) >= 1 ? cold : null;
+}
+
+/** A warm end worth a holiday and a cold one: its leisure peaks in the cold end's winter. */
+export function isSunRoute(a: string, b: string): boolean {
+  return sunRouteColdEnd(a, b) !== null;
+}
+
+function isSouthern(iata: string): boolean {
+  return (latitudeByIata.get(iata) ?? 0) < 0;
 }
 
 /** Each segment's demand on a day of the year, as a share of an ordinary day's. */
 export function seasonFactorsOn(a: string, b: string, dayOfYear: number): Record<SegmentName, number> {
+  // Each end's half, in its own hemisphere.
+  const both = (bumps: Bump[]) => (curveAt(bumps, dayOfYear, isSouthern(a)) + curveAt(bumps, dayOfYear, isSouthern(b))) / 2;
+  const coldEnd = sunRouteColdEnd(a, b);
   return {
-    business: curveAt(CURVES.business, dayOfYear),
-    leisure: curveAt(isSunRoute(a, b) ? CURVES.sunLeisure : CURVES.leisure, dayOfYear),
-    vfr: curveAt(CURVES.vfr, dayOfYear),
+    business: both(CURVES.business),
+    leisure: coldEnd ? curveAt(CURVES.sunLeisure, dayOfYear, isSouthern(coldEnd)) : both(CURVES.leisure),
+    vfr: both(CURVES.vfr),
   };
 }
 
