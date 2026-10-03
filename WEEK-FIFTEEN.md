@@ -148,9 +148,9 @@ every one of the 17,000 city pairs is walked every midnight.
   game still says Jan 25, 2027).
 - **Headless:** games start in summer; `npm run quick -- --winter` plays
   winter starts.
-- **Found on the way, not fixed:** the weather's seasons are northern and
-  global. Every airport gets summer thunderstorms and winter snowstorms
-  on the same dates, Singapore and Sydney included.
+- **Weather by hemisphere** (the owner's call): southern storm seasons
+  six months on, and no snow nearer the equator than 30° north or 40°
+  south (none in Singapore, Miami or Sydney; some in Christchurch).
 - **Step 3, the two quick reads,** waiting on the owner.
 
 ### Stage 3: the picker

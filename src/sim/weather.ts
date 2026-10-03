@@ -31,15 +31,28 @@ export type WeatherEvent = {
 // actually is.
 const ADJACENCY_THRESHOLD_NM = 200;
 
-// Crude seasonal windows (day-of-year, 0 = Jan 1, same formula
-// render/terminator.ts already uses for the day/night terminator) — not
-// real climatology, just "thunderstorms in summer, snowstorms in
-// winter," the same "principled but not researched" spirit as
-// economy.ts's constants. Winter wraps past day 365 into the new year.
+// Crude seasonal windows (day-of-year, 0 = Jan 1) for the northern
+// hemisphere — not real climatology, just "thunderstorms in summer,
+// snowstorms in winter," the same "principled but not researched" spirit
+// as economy.ts's constants. Winter wraps past day 365 into the new year.
+// South of the equator the windows are read SOUTH_SHIFT_DAYS later, as the
+// demand seasons are (sim/seasons.ts): Sydney's storms come in January and
+// its winter in July. Nearer the equator than its hemisphere's snow line
+// it doesn't snow, so a warm airport's winter is calm: no snowstorms in
+// Singapore, Miami or Honolulu. The south's line is further out, since its
+// winters are milder at the same latitude: none in Sydney, Cape Town or
+// Buenos Aires, some in Christchurch.
 const SUMMER_START_DAY = 152; // ~June 1
 const SUMMER_END_DAY = 243; // ~Aug 31
 const WINTER_START_DAY = 335; // ~Dec 1
 const WINTER_END_DAY = 59; // ~Feb 28
+const SOUTH_SHIFT_DAYS = 182;
+const NORTH_SNOW_LATITUDE = 30;
+const SOUTH_SNOW_LATITUDE = 40;
+
+function belowSnowLine(lat: number): boolean {
+  return lat < 0 ? -lat < SOUTH_SNOW_LATITUDE : lat < NORTH_SNOW_LATITUDE;
+}
 
 const DAILY_ORIGINATION_PROBABILITY = 0.08;
 const DAILY_SPREAD_PROBABILITY = 0.25;
@@ -88,6 +101,7 @@ export function isAirportClosed(state: SimState, iata: string): boolean {
 
 type AirportLocation = { iata: string; lat: number; lon: number };
 const airports = airportsData as AirportLocation[];
+const latitudeByIata = new Map(airports.map((airport) => [airport.iata, airport.lat]));
 
 // Every airport's neighbors within ADJACENCY_THRESHOLD_NM — static
 // geography, computed once rather than on every daily roll.
@@ -103,6 +117,12 @@ function seasonalKind(dayOfYear: number): WeatherKind | null {
   if (dayOfYear >= SUMMER_START_DAY && dayOfYear <= SUMMER_END_DAY) return 'thunderstorm';
   if (dayOfYear >= WINTER_START_DAY || dayOfYear <= WINTER_END_DAY) return 'snowstorm';
   return null;
+}
+
+/** The storms in season at an airport today: its hemisphere's season, and no snow where it's too warm. */
+function seasonalKindAt(airport: AirportLocation, northern: WeatherKind | null, southern: WeatherKind | null): WeatherKind | null {
+  const kind = airport.lat < 0 ? southern : northern;
+  return kind === 'snowstorm' && belowSnowLine(airport.lat) ? null : kind;
 }
 
 /**
@@ -144,6 +164,8 @@ export function rollDailyWeather(state: SimState, dayStartMinute: number): void 
     const source = state.weatherByAirport[iata];
     for (const neighbor of neighborsByIata.get(iata) ?? []) {
       if (state.weatherByAirport[neighbor]) continue;
+      // Snow doesn't spread south of the snow line (Jacksonville's to Orlando).
+      if (source.kind === 'snowstorm' && belowSnowLine(latitudeByIata.get(neighbor) ?? 90)) continue;
       if (roll() < DAILY_SPREAD_PROBABILITY) {
         // A spreading storm rolls its own severity rather than inheriting
         // the source's — the same cell can close one airport and merely
@@ -158,10 +180,12 @@ export function rollDailyWeather(state: SimState, dayStartMinute: number): void 
   }
 
   const dayOfYear = calendarDayOfYear(state, dayIndex(state, dayStartMinute));
-  const season = seasonalKind(dayOfYear);
+  const northernSeason = seasonalKind(dayOfYear);
+  const southernSeason = seasonalKind((dayOfYear + SOUTH_SHIFT_DAYS) % 365);
 
   for (const airport of airports) {
     if (state.weatherByAirport[airport.iata]) continue;
+    const season = seasonalKindAt(airport, northernSeason, southernSeason);
     // Outside both seasons no new storms form, except inside a storm
     // season (sim/shocks.ts), where they form more often in any season.
     const storming = inStormSeason(state, airport.iata);

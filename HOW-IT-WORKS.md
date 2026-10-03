@@ -1586,11 +1586,15 @@ check, not per minute:
    happens to split the map into exactly two clusters — Ontario/Québec
    (YUL/YOW/YQB/YYZ) and the Maritimes (YHZ/YSJ/YFC/YQM/YYG) — with YYT
    isolated from both, matching how separate it actually is.
-3. **Originate**: season is a day-of-year lookup (the same formula
-   `terminator.ts` uses for the day/night line) — summer (day 152-243)
-   only ever rolls thunderstorms, winter (day 335-59, wrapping the year
-   boundary) only ever rolls snowstorms. Every airport with nothing
-   active gets an 8%/day chance.
+3. **Originate**: season is a day-of-year lookup on the calendar
+   (`sim/clock.ts`) — summer (day 152-243) only ever rolls
+   thunderstorms, winter (day 335-59, wrapping the year boundary) only
+   ever rolls snowstorms. South of the equator the windows are read 182
+   days later, so Sydney's storms come in January. Nearer the equator
+   than the snow line (30° north, 40° south, the south's winters being
+   milder) a winter is calm: no snow in Singapore, Miami, Honolulu or
+   Sydney, and a snowstorm doesn't spread across the line. Every airport
+   with nothing active gets an 8%/day chance.
 
 Every roll goes through `state.rngSeed` (`sim/rng.ts`), so weather is
 exactly as reproducible as M9's delays: same seed, same weather history.
