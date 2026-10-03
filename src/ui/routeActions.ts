@@ -15,6 +15,7 @@ export {
   crewReadout,
   crewBaseReadout,
   mxBaseReadout,
+  previewBaseChange,
   appointExecutiveById,
   executiveOptions,
   letExecutiveGo,
