@@ -62,6 +62,7 @@ import { clearMapHover, getMapHover, setupMapLinks } from './ui/mapLink';
 import { holdSaving, loadSavedState, saveFileText, saveState, storedSaveText } from './ui/save';
 import { setupCrashCatcher, showProblemCard } from './ui/problemCard';
 import { feedbackUrl, openFeedback } from './ui/feedback';
+import { setupShortcutsCard } from './ui/shortcuts';
 import { setupTutorial, startTutorial, updateTutorial } from './ui/tutorial';
 
 // Resume a saved game if one exists. A fresh game starts from
@@ -428,6 +429,7 @@ function setPanelHidden(hidden: boolean): void {
 }
 setupRail({ isHidden: () => panelHidden, setHidden: setPanelHidden });
 setupJumpBox(state);
+setupShortcutsCard(() => choosingHome);
 // Feedback, from the rail and the Game screen: the pre-filled form (ui/feedback.ts).
 document.querySelector('#rail-feedback')!.addEventListener('click', () => openFeedback(state));
 document.querySelector('#about-feedback-button')!.addEventListener('click', () => openFeedback(state));
