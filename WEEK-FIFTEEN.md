@@ -13,7 +13,7 @@ game map. The quick balance read (`npm run quick`, 4 homes × 10 seeds)
 has a saved reference from after week fourteen's stage 4; stage 5 is
 below it (Montréal $2.1M against $11.0M).
 
-**Status:** a plan for the owner to review. Nothing below is built.
+**Status:** decided with the owner; stage 0 under way.
 
 ---
 
@@ -88,11 +88,8 @@ every one of the 17,000 city pairs is walked every midnight.
 ### Stage 2: a start worth choosing
 
 1. **The choice:** summer, starting 1 May, or winter, starting
-   1 November, picked on the new-game screen before the home. Winter is
-   marked harder. The difficulty is the calendar itself: a November
-   start runs straight into the holiday business low, the January
-   leisure trough and the snowstorm season, with a one-plane airline;
-   a May start grows into July.
+   1 November, picked on the new-game screen. Whether winter is marked
+   harder is decided by the quick reads below (decision 4).
 2. **One start day of the year, everywhere.** The game's day 0 becomes
    the chosen date: the clock's calendar (main.ts), the weather's
    seasonal windows (sim/weather.ts), the seasons (sim/seasons.ts) and
@@ -100,8 +97,8 @@ every one of the 17,000 city pairs is walked every midnight.
    An old save, which has none, reads as 1 January and plays on as it
    was.
 3. **Balance, after this stage:** a quick read with summer starts as the
-   new reference, and one with winter starts to see how much harder it
-   plays. The headless runner starts summer by default.
+   new reference, and one with winter starts, to see whether and how
+   much harder it plays. The headless runner starts summer by default.
 
 ### Stage 3: the picker
 
@@ -118,29 +115,34 @@ every one of the 17,000 city pairs is walked every midnight.
    worth playing here (its catchment, its market character, its rivals,
    its rating). Written for every pickable home, from public knowledge,
    in `data/home-stories.json`, for the owner to correct.
-4. **Then the season choice and start**, as in stage 2.
+4. **"Select a different airport"** opens today's full list of homes,
+   for any airport that isn't featured.
+5. **Then the season choice and start**, as in stage 2.
 
 ---
 
-## Decisions for the owner
+## Decided with the owner (2026-10-02)
 
-1. **How many airports, and which homes are pickable.** About 500 in
-   all is the first target. Pickable homes: every airport (the picker
-   gets crowded), or a curated list of about 60, two or three per
-   region, each with a story? Recommended: the curated list.
-2. **The picker's map and the one-projection rule.** CLAUDE.md says one
-   shared projection (Mercator, render/projection.ts) and nothing else
-   constructs one. A "flatter" picker could either (a) use the same
-   Mercator at a world zoom with a flat style (keeps the rule), or (b)
-   use an equirectangular world map for the picker only (needs the rule
-   changed for that one screen). Recommended: (a), unless the owner
-   wants (b)'s look.
-3. **Southern-hemisphere seasons** in stage 1, or left northern-only for
-   now?
-4. **Winter's difficulty:** the calendar alone (recommended), or more on
-   top (less starting cash, a harder rival)?
-5. **The stories:** written by Claude from public knowledge for the
-   owner to edit, one paragraph each.
+1. **About 500 airports; about 60 featured homes**, two or three per
+   region, each with a story. A "Select a different airport" button
+   opens today's full list, so any airport can still be home, as a
+   strategy game lets you pick a nation off the featured list.
+2. **The picker's map is the game's Mercator** at world zoom with a flat
+   style: one projection, as CLAUDE.md says.
+3. **Southern-hemisphere seasons** are in stage 1.
+4. **Winter's difficulty is measured, not assumed.** On demand alone a
+   1 November start isn't plainly harder: it opens in the quietest month
+   for leisure and the holiday business low, but reaches the Christmas
+   VFR and leisure peak within about seven weeks, while a 1 May start
+   climbs steadily into July. What clearly differs is the weather:
+   snowstorms close airports through the winter, which means
+   cancellations, NPS and slower market growth when the airline has one
+   plane and no slack. Stage 2 ends with a quick read for each start. If
+   winter plays harder, the picker says so and why ("stormy first
+   months"); if not, the two are offered as different openings, not easy
+   and hard.
+5. **The stories** are written by Claude from public knowledge for the
+   owner to edit.
 
 ---
 
