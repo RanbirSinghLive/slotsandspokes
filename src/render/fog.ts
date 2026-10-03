@@ -20,6 +20,11 @@ import type { SimState } from '../sim/state';
  * circle covers a third of the globe, and a Mercator map cannot draw a
  * circle that swallows a pole. The airports beyond the cap are still
  * known and still drawn, they just sit in their own small clear disc.
+ *
+ * The sheet is rebuilt only when what it shows changes (the canvas size,
+ * a pan or zoom, the reach, the airports opened up): `fogSignature`.
+ * Rebuilding it every frame, a projected circle per airport, took about
+ * three-quarters of a frame for a grown airline.
  */
 
 const FOG_COLOR = 'rgba(3, 5, 9, 0.62)';
@@ -31,6 +36,8 @@ const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]
 
 const fogCanvas = document.createElement('canvas');
 const fogCtx = fogCanvas.getContext('2d')!;
+/** What the cached sheet was drawn for; a change means a rebuild. */
+let fogSignature = '';
 
 export function drawFog(ctx: CanvasRenderingContext2D, state: SimState): void {
   const main = ctx.canvas;
@@ -43,9 +50,20 @@ export function drawFog(ctx: CanvasRenderingContext2D, state: SimState): void {
   // before the game loop or the home picker had even started.
   if (main.width === 0 || main.height === 0) return;
 
-  if (fogCanvas.width !== main.width || fogCanvas.height !== main.height) {
-    fogCanvas.width = main.width;
-    fogCanvas.height = main.height;
+  const reach = bestRangeNm(state);
+  const network = [...networkAirports(state)].sort();
+  const signature = [main.width, main.height, scale, projection.scale(), ...projection.translate(), reach, network.join(','), state.knownAirports.join(',')].join('|');
+  if (signature !== fogSignature) {
+    fogSignature = signature;
+    rebuildFog(main.width, main.height, scale, cssWidth, cssHeight, reach, network, state.knownAirports);
+  }
+  ctx.drawImage(fogCanvas, 0, 0, cssWidth, cssHeight);
+}
+
+function rebuildFog(width: number, height: number, scale: number, cssWidth: number, cssHeight: number, reach: number, network: string[], known: string[]): void {
+  if (fogCanvas.width !== width || fogCanvas.height !== height) {
+    fogCanvas.width = width;
+    fogCanvas.height = height;
   }
   fogCtx.setTransform(scale, 0, 0, scale, 0, 0);
   fogCtx.globalCompositeOperation = 'source-over';
@@ -65,9 +83,6 @@ export function drawFog(ctx: CanvasRenderingContext2D, state: SimState): void {
     fogCtx.fill();
   };
 
-  const reach = bestRangeNm(state);
-  for (const iata of networkAirports(state)) hole(iata, reach);
-  for (const iata of state.knownAirports) hole(iata, KNOWN_DISC_NM);
-
-  ctx.drawImage(fogCanvas, 0, 0, cssWidth, cssHeight);
+  for (const iata of network) hole(iata, reach);
+  for (const iata of known) hole(iata, KNOWN_DISC_NM);
 }

@@ -48,7 +48,34 @@ const LAKE_FILL = '#05070c';
  * this once per frame, after clearing the canvas and before anything else
  * (routes, aircraft) is drawn on top.
  */
+/**
+ * The land, lakes and rivers are drawn to a cached canvas and copied onto
+ * the map each frame; they're only redrawn when the view changes (a pan,
+ * a zoom or a resize: `basemapSignature`).
+ */
+const basemapCanvas = document.createElement('canvas');
+const basemapCtx = basemapCanvas.getContext('2d')!;
+let basemapSignature = '';
+
 export function drawBasemap(ctx: CanvasRenderingContext2D): void {
+  const main = ctx.canvas;
+  if (main.width === 0 || main.height === 0) return;
+  const scale = ctx.getTransform().a;
+  const signature = [main.width, main.height, scale, projection.scale(), ...projection.translate()].join('|');
+  if (signature !== basemapSignature) {
+    basemapSignature = signature;
+    if (basemapCanvas.width !== main.width || basemapCanvas.height !== main.height) {
+      basemapCanvas.width = main.width;
+      basemapCanvas.height = main.height;
+    }
+    basemapCtx.setTransform(scale, 0, 0, scale, 0, 0);
+    basemapCtx.clearRect(0, 0, main.width / scale, main.height / scale);
+    paintBasemap(basemapCtx);
+  }
+  ctx.drawImage(basemapCanvas, 0, 0, main.width / scale, main.height / scale);
+}
+
+function paintBasemap(ctx: CanvasRenderingContext2D): void {
   // d3.geoPath normally builds an SVG path string, but given a canvas 2D
   // context instead it draws directly by calling moveTo/lineTo/etc. on that
   // context. `projection` supplies the longitude/latitude -> pixel math.
