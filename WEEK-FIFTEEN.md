@@ -177,10 +177,15 @@ every one of the 17,000 city pairs is walked every midnight.
   `data/competitors.json`; three real-world facts corrected (Montréal is
   Canada's third-busiest airport; Mumbai's crossing runways; Dublin's
   preclearance). The rest is for the owner to edit.
-- **Thin regions:** Sydney, Melbourne, Johannesburg, Buenos Aires,
-  Santiago, Lima, Cape Town, Bangkok, Jakarta and Manila can't be homes:
-  each has fewer than three airports within a propeller's 380 nm.
-  Oceania's only featured home is Brisbane.
+- **Thin regions** (the owner's call): Sydney, Johannesburg, Buenos
+  Aires, Lima, Bangkok, Jakarta, Manila and others couldn't be homes,
+  each with fewer than three airports within a propeller's 380 nm. A
+  home-reach top-up in the airport script gives every city of 2M+ three
+  where the data has them: 74 airports, 554 in all, tagged where notable.
+  Re-rated: 516 homes, 283 Standard, 88 Hard, 145 Brutal; the new big
+  cities are mostly thin starts (Sydney, Buenos Aires, Lima Brutal;
+  Johannesburg, Santiago, Jakarta Hard; Bangkok, Addis Ababa Standard).
+  Thirteen of them join the featured homes (74 in all).
 
 1. **A flat world map** for choosing: the whole world in one view,
    styled flatter than the game map (no relief, muted land, the

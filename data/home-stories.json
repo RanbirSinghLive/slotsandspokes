@@ -130,6 +130,21 @@
     "world": "Medellín lies in a valley in the Andes, and its main international airport was built on a ridge above the city. It is a centre of textiles, flowers and a growing technology sector, and it has become a popular destination.",
     "game": "A catchment of 2.9 million with moderate business and leisure demand. Four airports are in propeller range. A medium city in the mountains means careful routing. Andina Express already flies the Bogotá route."
   },
+  "EZE": {
+    "region": "South America",
+    "world": "Buenos Aires Ezeiza is the main international airport of Argentina, on the city's south-western outskirts. It carries the long-haul traffic of one of South America's biggest cities, while the downtown Aeroparque handles most domestic flights.",
+    "game": "A catchment of 6.4 million, with strong business demand and some leisure. Three airports are in propeller range: Montevideo, Rosario and Córdoba. Pampas Air already flies Córdoba, and the Brutal rating means an early slip is costly."
+  },
+  "SCL": {
+    "region": "South America",
+    "world": "Santiago sits in a valley beneath the Andes, and its airport is the hub for Chile, a long thin country that depends on air links. It is also the main crossing point for flights over the mountains to Argentina.",
+    "game": "A catchment of 6.2 million with strong business demand. Three airports are in propeller range: Concepción, Córdoba and Neuquén, the last two across the Andes and near the edge of range. Pampas Air and Andina Express each fly a route into Santiago."
+  },
+  "LIM": {
+    "region": "South America",
+    "world": "Lima's Jorge Chávez airport is the largest in Peru and the main connecting point on the Pacific side of South America. Nearly all the country's air traffic runs through the capital, with the Andes and the Amazon making roads slow.",
+    "game": "A catchment of 8.0 million, with strong business demand. Three airports are in reach: Jauja close by, Trujillo and Chiclayo up the coast. Andina Express flies only to Santiago, so the coast north is there to take."
+  },
   "LHR": {
     "region": "Europe",
     "world": "Heathrow opened as an airport in the 1940s west of London and has been the busiest in Europe for decades. It has two runways and almost no room for more, so slots there are extremely valuable.",
@@ -158,7 +173,7 @@
   "ZRH": {
     "region": "Europe",
     "world": "Zurich's airport serves a small, rich country in the middle of Europe. Banking, pharmaceuticals and mountain tourism make it one of the highest-yielding airports on the continent for its size.",
-    "game": "A catchment of 2.8 million with strong business demand. Forty-three airports are in propeller range, an unusually dense web for a smaller city. No rival is tied to it, so a business market that rewards frequency is open."
+    "game": "A catchment of 2.8 million with strong business demand. Forty-three airports are in propeller range, an unusually dense web for a smaller city. No seeded rival is tied to it, so a business market that rewards frequency is there to build."
   },
   "MAD": {
     "region": "Europe",
@@ -213,7 +228,7 @@
   "TLV": {
     "region": "Middle East",
     "world": "Tel Aviv's Ben Gurion airport is Israel's main gateway, built with strict security and a high share of international traffic. The country is small, so most air travel goes abroad.",
-    "game": "A catchment of 5.0 million with strong business demand and some leisure. Nine airports are in propeller range. It is a business market with few domestic neighbours and no rival tied to it."
+    "game": "A catchment of 5.0 million with strong business demand and some leisure. Nine airports are in propeller range. It is a business market with few domestic neighbours and no seeded rival tied to it."
   },
   "CAI": {
     "region": "Middle East",
@@ -233,12 +248,27 @@
   "CMN": {
     "region": "Africa",
     "world": "Casablanca is Morocco's economic capital and its airport, Mohammed V, is the country's main hub. Its location in the northwest corner of Africa makes it a link to Europe, West Africa and the Atlantic.",
-    "game": "A catchment of 4.9 million with strong business demand and some leisure. Four airports are in propeller range, so options are limited. No rival is tied to it."
+    "game": "A catchment of 4.9 million with strong business demand and some leisure. Four airports are in propeller range, so options are limited. No seeded rival is tied to it."
   },
   "ACC": {
     "region": "Africa",
     "world": "Accra is the capital of Ghana, on the Gulf of Guinea. Kotoka airport serves a stable, growing economy and a large Ghanaian diaspora, with regular flights to Europe, the Gulf and other African capitals.",
     "game": "A catchment of 3.6 million with strong family travel. Three airports are in propeller range. It is a small start, and Savanna Air flies from Lagos."
+  },
+  "JNB": {
+    "region": "Africa",
+    "world": "Johannesburg O.R. Tambo is the busiest airport in Africa and the hub for southern Africa, set on the high plateau above the Witwatersrand gold fields. It connects South Africa's economic heartland to the rest of the continent and to Europe.",
+    "game": "A catchment of 15.1 million, with moderate business and family travel. Three airports are in propeller range: Durban, Pietermaritzburg and Maputo. Savanna Air flies Cape Town three times a day, so the coast route is covered and the opening is the short hops."
+  },
+  "CPT": {
+    "region": "Africa",
+    "world": "Cape Town is the legislative capital of South Africa, below Table Mountain at the continent's southwestern tip. Its airport is the second busiest in the country, with heavy summer tourism and a steady flow of business traffic to Johannesburg.",
+    "game": "A catchment of 5.9 million, with strong leisure draw and moderate business. Three airports are in reach: George, Gqeberha and Upington, all along or inland from the coast. Savanna Air already flies Johannesburg, and the Brutal rating makes this a hard place to start."
+  },
+  "ADD": {
+    "region": "Africa",
+    "world": "Addis Ababa Bole is the hub of the highlands of Ethiopia and a major connecting point between Africa, the Middle East and Asia. The city is also the seat of the African Union, which brings a steady flow of diplomatic travel.",
+    "game": "A catchment of 4.3 million with moderate business demand. Six airports are in propeller range, the most of this group: Hawassa, Bahir Dar, Dire Dawa, Gondar, Djibouti and Asmara. No seeded rival flies from here, so after the local start-up's one route the rest is open."
   },
   "HND": {
     "region": "Asia",
@@ -300,9 +330,44 @@
     "world": "Mumbai is India's financial capital, with two crossing runways that can't be used at once, so it runs as one of the world's busiest single-runway airports. Business, film and trade keep it crowded, and its runway is a bottleneck.",
     "game": "A catchment of 16.5 million with strong business and family demand. Five airports are in propeller range. Monsoon Air flies Delhi, so it is a large market with a rival."
   },
+  "BKK": {
+    "region": "Asia",
+    "world": "Suvarnabhumi opened in 2006 to replace the old Don Mueang airport, and it is the main hub of Thailand. Its position at the centre of mainland Southeast Asia makes it a natural connecting point, and tourism drives much of its traffic.",
+    "game": "A catchment of 7.8 million, with strong leisure draw and some business. Three airports are in propeller range: Phnom Penh, Yangon and Can Tho. Monsoon Air flies only to Singapore, far beyond a propeller. A Standard rating makes it a forgiving start."
+  },
+  "CGK": {
+    "region": "Asia",
+    "world": "Soekarno-Hatta serves Jakarta, the capital of Indonesia and one of the largest urban areas in the world. In an archipelago of thousands of islands, air travel is the main way to link the country, and the airport is busy with domestic flights.",
+    "game": "A catchment of 14.0 million with strong business demand. Three airports are in propeller range: Bandung, Semarang and Surabaya. No seeded rival flies from here, but a Hard rating means the huge city offers few short hops to build on."
+  },
+  "MNL": {
+    "region": "Asia",
+    "world": "Manila's Ninoy Aquino airport serves the capital of the Philippines, a country of more than 7,000 islands. It is crowded for its size, and it carries a large flow of overseas workers travelling home to visit family.",
+    "game": "A catchment of 12.7 million, with strong family travel and some business. Three airports are in reach: Clark very close by, then Bacolod and Cebu. No seeded rival flies here. The Brutal rating reflects how thin the start is for such a large city."
+  },
+  "SGN": {
+    "region": "Asia",
+    "world": "Tan Son Nhat is the main airport of Ho Chi Minh City, the commercial centre of Vietnam, and one of the busiest in Southeast Asia. It sits inside the city, and a second airport is planned to relieve it.",
+    "game": "A catchment of 15.4 million, the largest in this group, with strong business and some family travel. Three airports are in propeller range: Can Tho, Phnom Penh and Da Nang. No seeded rival is here, but the Brutal rating shows how little the short routes pay."
+  },
   "BNE": {
     "region": "Oceania",
     "world": "Brisbane is the capital of Queensland and sits on a river near the Gold Coast. Its airport serves the east of Australia, with growing links to Asia and New Zealand, and a gateway to the Great Barrier Reef.",
     "game": "A catchment of 3.2 million with some business and leisure demand. Four airports are in propeller range, across long distances. Southern Cross Air flies Sydney, so the start is slow."
+  },
+  "SYD": {
+    "region": "Oceania",
+    "world": "Sydney Kingsford Smith is one of the oldest continually operating airports in the world, opened in 1920 beside Botany Bay. It is the main gateway to Australia, with a curfew that limits night flights over the city.",
+    "game": "A catchment of 6.1 million, with strong business and leisure demand. Three airports are in reach: Newcastle, Canberra and Gold Coast. Southern Cross Air already flies Melbourne, Brisbane and Auckland, so the big routes are taken and the Brutal rating follows."
+  },
+  "MEL": {
+    "region": "Oceania",
+    "world": "Melbourne Tullamarine is the second-busiest airport in Australia, serving a city that rivals Sydney in size. The Melbourne-Sydney route is one of the busiest in the world, with a very large share of business travel.",
+    "game": "A catchment of 5.6 million, with strong business and some leisure. Three airports are in propeller range: Adelaide, Hobart and Canberra. Southern Cross Air flies both Sydney and Adelaide, so the obvious routes are held and the opening must find something else."
+  },
+  "AKL": {
+    "region": "Oceania",
+    "world": "Auckland is the largest city in New Zealand and its main international gateway, on a narrow isthmus between two harbours. Most overseas visitors arrive here, and the airport links the country to Australia and the Pacific.",
+    "game": "A catchment of 2.2 million, the smallest in this group, with strong business and some leisure. Three airports are in reach: Hamilton, Tauranga and Wellington. Southern Cross Air flies Sydney from here, and the Brutal rating makes a small city a tough start."
   }
 }
