@@ -6,7 +6,7 @@ import { nextBankMinute } from './hubStyle';
 import { nightStopLegs } from './nightStops';
 import { minuteOfDayToTimeString } from './clock';
 import { greatCircleDistanceNm } from './geo';
-import { policyFare } from './pricing';
+import { fareClassPolicy, policyFare } from './pricing';
 import { revealReach } from './reach';
 import {
   computeBlockMinutes,
@@ -581,6 +581,7 @@ export function applyRotation(
       fare: policyFare(state, leg.origin, leg.dest),
       fareIsOverridden: false,
       fareStance: null,
+      fareClasses: { ...fareClassPolicy(state) },
       turnBufferMinutes: 0,
     };
     newMarkets.push({ origin: leg.origin, dest: leg.dest });

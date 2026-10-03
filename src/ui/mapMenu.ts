@@ -51,8 +51,8 @@ import { SEASON_DAYS, SEASONAL_PREMIUM } from '../sim/seasonalLease';
 const HUB_STYLE_ICON_TEXT = { rolling: 'Roll', banked: 'Bank', tight: 'Tight' } as const;
 
 const ringHintEl = document.querySelector<HTMLElement>('#radial-hint')!;
-/** How far below the click point the ring's hint label sits: clear of the ring's buttons. */
-const RING_HINT_OFFSET_PX = 84;
+/** How far below the click point the ring's hint label sits: clear of the ring and an open fan (radial.ts FAN_RADIUS_PX). */
+const RING_HINT_OFFSET_PX = 128;
 
 const ICON = {
   route: '<circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M7.5 16.5 16.5 7.5"/>',

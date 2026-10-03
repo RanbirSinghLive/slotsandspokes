@@ -1,5 +1,7 @@
 import { dayIndex } from '../sim/clock';
-import { FARE_POLICY_MAX, FARE_POLICY_MIN, pricingSummary, putAllOnPolicy, setFarePolicy } from '../sim/pricing';
+import { FARE_POLICY_MAX, FARE_POLICY_MIN, fareClassPolicy, pricingSummary, putAllOnPolicy, putAllSeatsOnPolicy, seatPolicySummary, setFareClassPolicy, setFarePolicy } from '../sim/pricing';
+import { CLASS_NAMES, CLASS_ORDER, CLASS_PRICE } from '../sim/fareClasses';
+import { buildSeatSplitBar } from './seatSplitBar';
 import { networkHill } from '../sim/revenueHill';
 import { BRAND_DAYS, brandLevel, brandPosition, LOW_COST_LEVEL, networkFareLevelToday, PREMIUM_LEVEL } from '../sim/brand';
 import { info } from './inspector/dom';
@@ -22,6 +24,7 @@ const LEVEL_STEP = 0.05;
 
 const chartEl = document.querySelector<HTMLDivElement>('#fare-policy-hill')!;
 const statusEl = document.querySelector<HTMLDivElement>('#fare-policy-status')!;
+const seatsEl = document.querySelector<HTMLDivElement>('#seat-policy')!;
 
 let drawnSignature = '';
 /** The back-to-policy button, kept under the status line and replaced on each rebuild. */
@@ -54,7 +57,9 @@ const percent = (level: number) => `${Math.round(level * 100)}%`;
 
 function signatureOf(state: SimState): string {
   const { policy, stance, hand } = pricingSummary(state);
-  return `${dayIndex(state)}|${policy}|${stance}|${hand}|${state.schedule.length}|${state.farePolicyMultiplier}`;
+  const seats = seatPolicySummary(state);
+  const split = fareClassPolicy(state);
+  return `${dayIndex(state)}|${policy}|${stance}|${hand}|${state.schedule.length}|${state.farePolicyMultiplier}|${seats.byHand}|${split.saverShare}|${split.flexShare}`;
 }
 
 /** Every route off the policy (by hand or on a stance) back on it, in one press. Null when none are off. */
@@ -71,8 +76,58 @@ function backToPolicyButton(state: SimState, offPolicy: number): HTMLButtonEleme
   return button;
 }
 
+/**
+ * The airline-wide seat split (sim/pricing.ts's setFareClassPolicy()): the
+ * same bar as a route's, moving every route not set by hand. Rebuilt with
+ * the hill, never mid-drag.
+ */
+function rebuildSeats(state: SimState): void {
+  seatsEl.replaceChildren();
+  const { routes, byHand } = seatPolicySummary(state);
+  const status = document.createElement('div');
+  const renderStatus = () => {
+    const { saverShare, flexShare } = fareClassPolicy(state);
+    const shares = [saverShare, flexShare, Math.max(0, 1 - saverShare - flexShare)];
+    const parts = CLASS_ORDER.map((fareClass, i) => `${CLASS_NAMES[fareClass]} ${percent(shares[i])} · ${percent(CLASS_PRICE[fareClass])} fare`);
+    status.textContent = `${parts.join(' · ')}${byHand > 0 ? ` · ${byHand} of ${routes} by hand` : ''}`;
+  };
+  const { bar } = buildSeatSplitBar({
+    split: () => fareClassPolicy(state),
+    move: (saver, flex) => {
+      dragging = true;
+      setFareClassPolicy(state, saver, flex);
+      renderStatus();
+    },
+    done: () => {
+      dragging = false;
+      rebuild(state);
+    },
+  });
+  const heading = document.createElement('h2');
+  heading.append(
+    'Seat policy ',
+    info(
+      'Every route sells Saver, Flex and Full seats (see a route view). This is the split every route not set by hand uses: drag the lines to move all of them at once. A route whose own lines you move leaves the policy; open its route view to change it, or put it back with the button here.',
+    ),
+  );
+  seatsEl.append(heading, bar, status);
+  renderStatus();
+  if (byHand > 0) {
+    const back = document.createElement('button');
+    back.type = 'button';
+    back.className = 'lever-reset';
+    back.textContent = `Put all seats back on policy · ${byHand} by hand`;
+    back.addEventListener('click', () => {
+      putAllSeatsOnPolicy(state);
+      rebuild(state);
+    });
+    seatsEl.append(back);
+  }
+}
+
 function rebuild(state: SimState): void {
   drawnSignature = signatureOf(state);
+  rebuildSeats(state);
   renderBrand(state);
   const hill = networkHill(state);
   chartEl.replaceChildren();
