@@ -12,7 +12,7 @@ the 74-airport top-up; the weekly balance read (pre-approved, Sundays)
 will say whether that moved anything. Desktop is the target: the
 browser and mobile pass is dropped.
 
-**Status:** stages 1–2 built and read; Montréal's drop waiting on the owner.
+**Status:** all three stages built. Montréal's drop in the stage 2 read is unexplained (the owner skipped the bisection).
 
 ---
 
@@ -190,7 +190,9 @@ panel ("Why hard · only 3 in reach · biggest market a short hop · NTL 77
 nm · small markets beyond 150 nm") and as the list row's hover text.
 It explains 128 of 145 Brutal homes and 50 of 88 Hard.
 
-**Open:** how the ratings should be measured, with the owner.
+**Decided with the owner (2026-10-03):** the ratings stay as they are,
+measuring a one-plane opening left to itself, with the reason line saying
+why; thin starts stay a labelled test, with no extra help.
 
 145 of 516 homes are Brutal, among them Sydney, Melbourne, Buenos Aires,
 Lima, Manila and Ho Chi Minh City, and the picker features them. To be
