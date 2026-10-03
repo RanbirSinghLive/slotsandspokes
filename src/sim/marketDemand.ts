@@ -89,6 +89,9 @@ const DECAY_RATE = 0.015;
  */
 const DAILY_DEMAND_GROWTH = 0.003;
 
+/** Every city pair by market key, for the nightly pass over the ones that move. */
+const PAIR_BY_KEY = new Map(MARKET_PAIR_TABLE.map((pair) => [pair.key, pair]));
+
 
 /** Potential demand including however much global growth has accumulated so far. */
 export function currentPotentialDemand(state: SimState, origin: string, dest: string): number {
@@ -135,9 +138,12 @@ function serviceSaturation(seatsOffered: number, potential: number): number {
  * random draws at all, unlike its neighbors in that block. Whether a
  * market grows or decays is entirely a function of who is flying it.
  *
- * Walks every pair rather than only those currently served, because an
- * abandoned market still needs its decay applied — "nobody flies this any
- * more" is exactly the case that has to keep being processed.
+ * Visits only the pairs that can move: every pair someone flies, and
+ * every pair still stored above its floor (an abandoned market, decaying).
+ * The rest sit at their floor by definition, and actualDailyDemand() reads
+ * a missing key as the floor, so they need nothing. Walking every pair on
+ * the map took 9 ms a night at 185 airports and would grow with the
+ * square of the map.
  */
 export function rollDailyMarketDemand(state: SimState): void {
   state.demandGrowthMultiplier *= 1 + DAILY_DEMAND_GROWTH;
@@ -150,7 +156,11 @@ export function rollDailyMarketDemand(state: SimState): void {
   // The fares flown on each market, for how fast it builds and where it settles (sim/fareStimulus.ts).
   const offers = offersByMarket(state);
 
-  for (const { origin, dest, key, basePotential } of MARKET_PAIR_TABLE) {
+  const moving = new Set([...seatsByMarket.keys(), ...Object.keys(state.marketDemand)]);
+  for (const key of moving) {
+    const pair = PAIR_BY_KEY.get(key);
+    if (!pair) continue;
+    const { origin, dest, basePotential } = pair;
     // currentPotentialDemand(), from the pair's precomputed potential.
     const potential = basePotential * multiplier;
     const floor = Math.min(VIRGIN_MARKET_PDEW, potential);

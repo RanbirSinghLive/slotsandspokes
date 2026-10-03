@@ -57,6 +57,19 @@ every one of the 17,000 city pairs is walked every midnight.
    airline (the method in WEEK-FOURTEEN.md's speed check), and on the
    midnight step in Node.
 
+**Stage 0 built:**
+- **The map:** the fog and the basemap are drawn to cached layers,
+  rebuilt only when the view, the size, the reach or the airports opened
+  up change. On a 17-plane, 82-leg test airline, the fog alone had taken
+  17.7 ms of a 23.9 ms frame; the map now draws at 60 frames a second,
+  paused and at 100×.
+- **Midnight:** the market pass visits only pairs that can move (9.0 ms
+  to 0.9 ms a night). Rival route openings search pairs by airport
+  instead of every pair on the map. Midnight is 27 ms on the test
+  airline (30 before); what's left scales with the airline and its
+  rivals, not the map. Both changes play exactly the same game (the
+  headless year is unchanged to the cent).
+
 ### Stage 1: the world
 
 1. **More airports, from the script.** `src/headless/buildAirports.ts`

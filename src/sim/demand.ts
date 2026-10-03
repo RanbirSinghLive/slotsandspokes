@@ -145,6 +145,30 @@ export const ALL_MARKET_PAIRS: [string, string][] = (() => {
   return pairs;
 })();
 
+/**
+ * Each airport's pairs, as indices into ALL_MARKET_PAIRS, in its order: for
+ * a search that only cares about pairs touching a few airports (a rival's
+ * network) without walking every pair on the map.
+ */
+const PAIR_INDICES_BY_AIRPORT: Map<string, number[]> = (() => {
+  const byAirport = new Map<string, number[]>();
+  ALL_MARKET_PAIRS.forEach(([a, b], index) => {
+    for (const iata of [a, b]) {
+      const list = byAirport.get(iata);
+      if (list) list.push(index);
+      else byAirport.set(iata, [index]);
+    }
+  });
+  return byAirport;
+})();
+
+/** Every pair touching any of these airports, once each, in ALL_MARKET_PAIRS's order. */
+export function pairsTouching(airports: Iterable<string>): [string, string][] {
+  const indices = new Set<number>();
+  for (const iata of airports) for (const index of PAIR_INDICES_BY_AIRPORT.get(iata) ?? []) indices.add(index);
+  return [...indices].sort((x, y) => x - y).map((index) => ALL_MARKET_PAIRS[index]);
+}
+
 /** potentialDailyDemand() for every pair, keyed by pairKey(). Static data, so a module-level lookup rather than state. */
 const potentialByPair = new Map<string, number>(
   ALL_MARKET_PAIRS.map(([a, b]) => [pairKey(a, b), gravityDemand(airportsByIata.get(a)!, airportsByIata.get(b)!)]),

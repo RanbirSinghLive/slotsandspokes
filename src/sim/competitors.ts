@@ -2,7 +2,7 @@ import { onSale, SALE_RIVAL_READ } from './seatSale';
 import { dayIndex } from './clock';
 import competitorsData from '../../data/competitors.json';
 import rivalPoolData from '../../data/rival-airlines.json';
-import { potentialDailyDemand, ALL_MARKET_PAIRS, marketDistanceNm } from './demand';
+import { potentialDailyDemand, ALL_MARKET_PAIRS, marketDistanceNm, pairsTouching } from './demand';
 import { marketKey, recommendedFare } from './schedule';
 import { nextRandom } from './rng';
 import { networkAirports } from './reach';
@@ -209,10 +209,9 @@ export function rollCompetitorRouteOpenings(state: SimState, dayStartMinute: num
       NEW_ROUTE_PROBABILITY_PER_DAY * pressureFactor(state) * rivalNetworkRoom(state, code) * (1 + moneyInReach / RIVAL_OPENING_MONEY_SCALE);
     if (openRoll >= openChance) continue;
 
-    // Cheapest and most selective test first: few pairs touch its network.
-    const candidates = ALL_MARKET_PAIRS.filter(
+    // Only pairs touching its network, found by airport rather than by walking every pair.
+    const candidates = pairsTouching(airlineAirports).filter(
       ([a, b]) =>
-        (airlineAirports.has(a) || airlineAirports.has(b)) &&
         marketDistanceNm(a, b) <= COMPETITOR_MAX_ROUTE_NM &&
         !servedKeys.has(marketKey(a, b)) &&
         !recentlyClosedByRival(state, code, a, b) &&

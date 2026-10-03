@@ -1938,7 +1938,9 @@ multiplies that rate.
 Unserved markets decay back toward the floor, more slowly than they grow.
 Only markets away from their floor are stored: a missing key reads as the
 floor, so the save grows with the markets anyone has flown, not with every
-pair on the map.
+pair on the map. The nightly pass visits only pairs someone flies and
+pairs still stored above their floor; every other pair sits at its floor
+already.
 
 Actual demand is a property of the **market**, not of any airline —
 everyone flying it grows it, everyone serving it draws from the same
