@@ -4621,3 +4621,32 @@ button.ops-item:hover {
   margin: 0 0 0 4px;
   box-shadow: none;
 }
+
+/* The confirm step before a commitment (ui/confirmModal.ts). */
+.modal-box--confirm {
+  min-width: 300px;
+}
+
+.confirm-rows {
+  margin-bottom: 12px;
+}
+
+.confirm-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.confirm-go {
+  background: #5ed6c8;
+  border: none;
+  color: #0a0c12;
+}
+
+.modal-box--confirm .modal-actions button:not(.confirm-go) {
+  background: #3a4258;
+  border: 1px solid #6b7694;
+  color: #fff;
+}

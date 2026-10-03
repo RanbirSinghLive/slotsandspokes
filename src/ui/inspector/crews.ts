@@ -115,6 +115,7 @@ function crewBasesSection(state: SimState, plan: ReturnType<typeof crewPlan>, ch
     candidates: readout.candidates,
     fee: readout.fee,
     perDay: readout.perDay,
+    preview: (action, iata) => ops.previewBaseChange(state, 'crew', action, iata),
     open: (iata) => ops.openCrewBaseAt(state, iata),
     close: (iata) => ops.closeCrewBaseAt(state, iata),
     changed,
