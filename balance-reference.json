@@ -1,12 +1,33 @@
 {
-  "savedAt": "2026-10-02T00:00:00.000Z",
-  "commit": "8ffbcb7",
+  "savedAt": "2026-10-03T14:15:40.166Z",
+  "commit": "8c6e9dc",
+  "season": "summer",
   "days": 365,
   "seeds": 10,
   "homes": {
-    "YUL": { "busts": 3, "games": 10, "median": 11000000, "planes": 11 },
-    "YYZ": { "busts": 0, "games": 10, "median": 33400000, "planes": 12 },
-    "PHL": { "busts": 0, "games": 10, "median": 68700000, "planes": 14 },
-    "YHZ": { "busts": 9, "games": 10, "median": -1000, "planes": 4 }
+    "YUL": {
+      "busts": 2,
+      "games": 10,
+      "median": 15982473,
+      "planes": 10
+    },
+    "YYZ": {
+      "busts": 1,
+      "games": 10,
+      "median": 48462529,
+      "planes": 13
+    },
+    "PHL": {
+      "busts": 0,
+      "games": 10,
+      "median": 74146573,
+      "planes": 13
+    },
+    "YHZ": {
+      "busts": 7,
+      "games": 10,
+      "median": -1509,
+      "planes": 3
+    }
   }
 }

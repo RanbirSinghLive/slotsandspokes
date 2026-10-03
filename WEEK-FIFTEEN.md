@@ -163,7 +163,8 @@ every one of the 17,000 city pairs is walked every midnight.
 
   Winter doesn't play harder: fewer busts (6 against 10), and the
   medians split both ways within the read's noise. Per decision 4, the
-  picker offers the two as different openings, not easy and hard.
+  picker offers the two as different openings, not easy and hard. The
+  summer read is the new reference.
 
 ### Stage 3: the picker
 
