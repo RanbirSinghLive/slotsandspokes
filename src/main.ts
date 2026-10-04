@@ -27,7 +27,7 @@ import { createNewGameState, type SimState } from './sim/state';
 import { chooseHome, homeOptions } from './sim/homes';
 import { showHomePicker } from './ui/homePicker';
 import { gameDateWithYear } from './ui/format';
-import { isOpsView, setOpsView } from './render/opsView';
+import { setOpsView } from './render/opsView';
 import { drawOpsRouteLabels } from './render/opsHub';
 
 import { drawDisruptions, findDisruptionPinAt } from './render/disruptions';
@@ -689,20 +689,22 @@ window.addEventListener('keydown', (event) => {
 /**
  * The map's lens: what the map is showing on top of your network. One at
  * a time, so there's one rule for every button and the one that's on is
- * always lit. Network is the plain map; Profit and On-time recolour your
- * routes (render/mapmodes.ts); Demand draws every market's demand and
+ * always lit. Network is the plain map; Profit recolours your routes by
+ * margin and Ops by on-time, with the operating detail of render/opsView.ts
+ * drawn on top (render/mapmodes.ts); Demand draws every market's demand and
  * headroom (render/demand.ts); Rivals draws the rival networks, with a
  * chip per airline to narrow it to one (render/competition.ts).
  */
-type Lens = 'network' | 'profit' | 'ontime' | 'demand' | 'rivals';
-const LENS_ORDER: Lens[] = ['network', 'profit', 'ontime', 'demand', 'rivals'];
+type Lens = 'network' | 'profit' | 'ops' | 'demand' | 'rivals';
+const LENS_ORDER: Lens[] = ['network', 'profit', 'ops', 'demand', 'rivals'];
 let lens: Lens = 'network';
 
 function setLens(next: Lens): void {
   lens = next;
   demandOverlayOn = lens === 'demand';
   competitionOverlayOn = lens === 'rivals';
-  mapMode = lens === 'profit' ? 'profitability' : lens === 'ontime' ? 'ontime' : 'none';
+  mapMode = lens === 'profit' ? 'profitability' : lens === 'ops' ? 'ontime' : 'none';
+  setOpsView(lens === 'ops');
   lensButtons.forEach((button) => {
     const on = button.dataset.lens === lens;
     button.classList.toggle('active', on);
@@ -732,19 +734,20 @@ window.addEventListener('keydown', (event) => {
  * needs no key.
  */
 function updateLensLegend(): void {
-  lensLegend.hidden = lens === 'network' && !isOpsView();
+  lensLegend.hidden = lens === 'network';
   const swatch = (color: string, label: string) =>
     `<div><span class="mapmode-legend-swatch" style="background:${color}"></span><span>${label}</span></div>`;
   if (lens === 'profit') {
     lensLegendTitle.textContent = 'Margin ÷ revenue';
     lensLegendScale.innerHTML =
       swatch(MAP_MODE_COLORS.loss, 'loss') + swatch(MAP_MODE_COLORS.breakeven, 'breakeven') + swatch(MAP_MODE_COLORS.profit, '+20%');
-  } else if (lens === 'ontime') {
+  } else if (lens === 'ops') {
     lensLegendTitle.textContent = 'On-time, last 7 days';
     lensLegendScale.innerHTML =
       swatch(MAP_MODE_COLORS.loss, '0%') +
       swatch(MAP_MODE_COLORS.breakeven, `${Math.round(OTP_BASELINE * 100)}% baseline`) +
-      swatch(MAP_MODE_COLORS.profit, '100%');
+      swatch(MAP_MODE_COLORS.profit, '100%') +
+      '<div><span>width = seats a day</span></div>';
   } else if (lens === 'demand') {
     lensLegendTitle.textContent = 'People waiting to fly · hover an airport for its biggest markets';
     lensLegendScale.innerHTML =
@@ -753,15 +756,7 @@ function updateLensLegend(): void {
     lensLegendTitle.textContent = 'Rival networks · pick one to narrow';
     lensLegendScale.innerHTML = '';
   }
-  if (isOpsView() && (lens === 'network' || lens === 'profit' || lens === 'ontime')) {
-    if (lens === 'network') {
-      lensLegendTitle.textContent = 'Route width';
-      lensLegendScale.innerHTML = '';
-    }
-    lensLegendScale.insertAdjacentHTML('beforeend', '<div><span>width = seats a day</span></div>');
-  }
 }
-document.querySelector('#ops-view-toggle')?.addEventListener('click', () => queueMicrotask(updateLensLegend));
 
 // Which airports the map shows (ui/airportFilter.ts): a visible three-way
 // switch in the bottom-left corner.
@@ -774,23 +769,12 @@ airportFilterButtons.forEach((button) => {
   });
 });
 
-// The Ops view switch (render/opsView.ts): bottom left, beside the airport
-// filter. O toggles it too.
-const opsViewButton = document.querySelector<HTMLButtonElement>('#ops-view-toggle')!;
-function showOpsView(next: boolean): void {
-  setOpsView(next);
-  opsViewButton.classList.toggle('active', next);
-  opsViewButton.setAttribute('aria-pressed', String(next));
-  render();
-}
-opsViewButton.addEventListener('click', () => showOpsView(!isOpsView()));
-opsViewButton.classList.toggle('active', isOpsView());
-opsViewButton.setAttribute('aria-pressed', String(isOpsView()));
+// O picks the Ops lens, or goes back to Network when Ops is already showing.
 window.addEventListener('keydown', (event) => {
   if (event.ctrlKey || event.metaKey || event.altKey || event.key.toLowerCase() !== 'o') return;
   const target = event.target as HTMLElement | null;
   if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
-  showOpsView(!isOpsView());
+  setLens(lens === 'ops' ? 'network' : 'ops');
 });
 
 // --- Pan (click and drag) ---

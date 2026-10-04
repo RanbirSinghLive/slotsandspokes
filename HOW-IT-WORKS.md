@@ -755,11 +755,11 @@ corners sit in `#map-surface`, a pointer-transparent box the size of
 the map, and rearrange with its width through CSS container queries (on
 a narrow map the lens moves down, then to the bottom left).
 
-The lens is one row of labelled buttons, Network · Profit · On-time ·
-Demand · Rivals, one on at a time (keys 1–5), with its legend and
+The lens is one row of labelled buttons, Network · Profit · Ops ·
+Demand · Rivals, one on at a time (keys 1–5; O toggles Ops), with its legend and
 filter directly under it. `setLens()` in main.ts sets the three flags
 the renderer reads: `demandOverlayOn` for Demand, `competitionOverlayOn`
-for Rivals, `mapMode` for Profit and On-time. The Rivals lens adds a
+for Rivals, `mapMode` for Profit and Ops, and the Ops lens switch (`setOpsView()`) for Ops. The Rivals lens adds a
 chip per rival airline to narrow it to one. A route can be drawn under
 any lens.
 
@@ -898,16 +898,18 @@ The accumulator loop (`main.ts`) turns real frame time into whole simulated
 minutes (`step()` calls) plus a continuous fractional minute for rendering,
 per the pattern in CLAUDE.md's "Time" section.
 
-**Hub core in Ops view** (`render/opsHub.ts`). Airport codes, 'on its way' badges and dots claim screen space first (`airportClaimedBoxes()` in `render/airports.ts`), then the route labels, held back by `drawRoutes()`, are drawn after the airports and skip every claimed box. A dot's radius grows on a steeper log curve of departures a day, capped at 7 px over the base. An airport with 6 or more of your routes is a busy hub: labels on its spokes show only for the route under the pointer, the selected route or plane, or the hovered or selected airport.
+**Hub core in Ops lens** (`render/opsHub.ts`). Airport codes, 'on its way' badges and dots claim screen space first (`airportClaimedBoxes()` in `render/airports.ts`), then the route labels, held back by `drawRoutes()`, are drawn after the airports and skip every claimed box. A dot's radius grows on a steeper log curve of departures a day, capped at 7 px over the base. An airport with 6 or more of your routes is a busy hub: labels on its spokes show only for the route under the pointer, the selected route or plane, or the hovered or selected airport.
 
-In Ops view (`render/opsView.ts`) the Network, Profit and On-time lenses draw
+The Ops lens is the old On-time lens (routes coloured by on-time) and the
+old Ops lens switch in one: picking it turns on `isOpsView()` and every
+operating-detail layer below, and no other lens does. In Ops (`render/opsView.ts`) routes are drawn
 each route at a width set by its seats a day (`render/routeWidth.ts`): both
 directions, summed over the scheduled legs by the seats of the type each tail
 flies. The scale is square-root, 1 px up to 5 px at about 3,000 seats a day.
 The amber spill overlay and the selection glow are drawn over it as before.
 The lens legend adds "width = seats a day".
 
-In Ops view a route's label ends in ▲, ▼ or ≈: the fare set on the market
+In Ops lens a route's label ends in ▲, ▼ or ≈: the fare set on the market
 against `recommendedFare()`, the going rate the route inspector quotes
 (≈ within 3%; `render/fareGap.ts`). An airport you serve gets a chip under
 its code only when something is wrong: `crews −N` (crew base short of the
@@ -916,7 +918,7 @@ or `slots full` (no room for another daily pair, as the airport inspector's
 "next pair: full"). A healthy map draws none (`render/airportChips.ts`).
 
 **What's holding you back** (`sim/bottleneck.ts`, shown by `ui/alerts.ts`).
-In Ops view, with a non-empty schedule, the alert strip ends with one
+In Ops lens, with a non-empty schedule, the alert strip ends with one
 `HOLD · …` row naming the biggest bottleneck to growth, from numbers the
 sim already has. First match wins: home hub slots full, crews short at a
 base for its next plane, a market spilling with no idle aircraft, cash
@@ -924,7 +926,7 @@ below the cheapest lease, a plane flying under 40% of its day. It is a pure
 read of `state`, so it changes no game number; clicking the row opens the
 airport, crews, fleet, money or aircraft view that explains it.
 
-**Disruption layer (Ops view only, `render/disruptions.ts`).** Each AOG
+**Disruption layer (Ops lens only, `render/disruptions.ts`).** Each AOG
 plane gets a wrench pin ("C-P002 · back 3d") above the airport it sits at;
 several at one airport stack upward, with more than four collapsing to
 "+N more AOG". Legs in `cancelledToday` draw as a dashed red line on their
@@ -1646,7 +1648,7 @@ policy. It is redrawn only when the day, the routes or the level
 change, and never mid-drag. Each chart in the route view has a key of
 swatches under it (`ui/chartLegend.ts`).
 
-**Planes in Ops view** (`render/aircraftOps.ts`, called from `drawAircraft`).
+**Planes in Ops lens** (`render/aircraftOps.ts`, called from `drawAircraft`).
 Planes scale up to 1.7x as the map zooms in, trail a fading line sampled back
 along their geodesic (at most 30 minutes or 15% of the flight), carry a
 pulsing red halo when late in addition to the red tint, and show their tail

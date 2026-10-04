@@ -349,12 +349,6 @@ button,
   gap: 4px;
 }
 
-#ops-view-toggle.active {
-  background: #2a6f6a;
-  border-color: #5ed6c8;
-  color: #e8fffb;
-}
-
 .where-zoom button {
   width: 26px;
   padding: 3px 0 !important;
@@ -440,7 +434,6 @@ button,
 }
 
 :root[data-narrow]:not([data-tools]) #lens-corner,
-:root[data-narrow]:not([data-tools]) #ops-view-toggle,
 :root[data-narrow]:not([data-tools]) #airport-filter {
   display: none;
 }
@@ -460,8 +453,7 @@ button,
 }
 
 :root[data-narrow] #lens-bar button,
-:root[data-narrow] #where-corner #airport-filter button,
-:root[data-narrow] #ops-view-toggle {
+:root[data-narrow] #where-corner #airport-filter button {
   min-height: 34px;
   padding: 0 10px;
 }
