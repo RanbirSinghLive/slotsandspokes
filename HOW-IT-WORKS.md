@@ -2082,6 +2082,15 @@ the On-time table, and the flight hover (the route's, since a flight's
 passengers are settled when it lands). Once a route has a load factor,
 its view drops the forecast "about half full for now" words.
 
+**Frequency and yield on routes** (`src/sim/routeYield.ts`). A route's
+frequency counts one direction: a plane flying A-B-A once a day is
+"1/day", not two legs, and a route flown more one way than the other
+reads "2/1/day". Yield is revenue over passengers times great-circle
+nautical miles, over the last 7 finished days, in cents per passenger
+nautical mile, so a long route and a short one compare on fare alone.
+Both sit at the middle of each route line on the plain network map, in
+the route's view, and in the Routes table (where Yield also sorts).
+
 **Markets in words** (`src/sim/marketSize.ts`). The game never prints a
 market's potential or today's demand as a number. A city pair is Tiny,
 Small, Medium, Large or Huge by its potential riders a day both ways
