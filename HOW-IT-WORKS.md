@@ -2753,7 +2753,11 @@ start, inside the starting cost, and they cost nothing to run.
 
 Opening or closing a base asks first: a confirm window (`ui/confirmModal.ts`,
 numbers from `previewBaseChange()`) shows the fee, the running cost before and
-after, the cash left, and what changes at that airport.
+after, the cash left, and what changes at that airport. The same window
+asks before leasing a plane, returning one, rebasing, ordering or calling off
+a refit, removing a route, and hiring, converting or releasing crews on the
+Crews screen. Holding a ring button to repeat (add or remove a flight, hire
+on the map) stays one click each.
 
 **Anywhere else a plane sleeps** (a crew base without maintenance, a
 plane stranded away), the night is a **contracted check**, $300 an hour

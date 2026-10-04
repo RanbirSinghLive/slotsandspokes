@@ -14,6 +14,7 @@ import { planeIconElement } from '../planeIcons';
 import * as ops from '../routeActions';
 import { select, selectRoute } from '../selection';
 import { linkToMap } from '../mapLink';
+import { showConfirm } from '../confirmModal';
 import { REBASE_DAYS, REBASE_FEE_LEASE_DAYS } from '../../sim/rebase';
 import { CABIN_PRICE, cabinLayout, cabinOf } from '../../sim/cabins';
 import { DEFERRED_AGE_YEARS, deferredItems, HEAVY_INTERVAL_DAYS, heavyBankedMinutes, heavyCheckDueIn, heavyCheckOpen, heavyCheckWorkMinutes, MX_HOLD_AT, tonightCheck } from '../../sim/mxChecks';
@@ -337,10 +338,21 @@ function buildCabin(state: SimState, tail: string, changed: () => void): HTMLEle
     cancel.type = 'button';
     cancel.className = 'inspector-plan-hub';
     cancel.textContent = `Call off · ${money(option.cost)} back`;
-    cancel.addEventListener('click', () => {
-      ops.cancelRefit(state, tail);
-      changed();
-    });
+    cancel.addEventListener('click', () =>
+      showConfirm({
+        title: `Call off ${tail} refit`,
+        rows: [
+          { label: 'Refunded', value: money(option.cost) },
+          { label: 'Cash after', value: money(state.cash + option.cost) },
+        ],
+        facts: ['The plane keeps its current cabin and stays in service.'],
+        confirmLabel: 'Call off',
+        run: () => {
+          ops.cancelRefit(state, tail);
+          changed();
+        },
+      }),
+    );
     block.append(cancel);
     return block;
   }
@@ -350,17 +362,23 @@ function buildCabin(state: SimState, tail: string, changed: () => void): HTMLEle
   const verb = option.to === 'business' ? 'Fit business cabin' : 'Back to all economy';
   button.textContent = `${verb} · ${money(option.cost)} · ${option.days}d out`;
   button.disabled = option.blocked !== null;
-  let armed = false;
-  button.addEventListener('click', () => {
-    if (!armed) {
-      armed = true;
-      button.textContent = `Confirm ${tail} refit`;
-      button.classList.add('is-act');
-      return;
-    }
-    ops.orderRefit(state, tail, option.to);
-    changed();
-  });
+  button.addEventListener('click', () =>
+    showConfirm({
+      title: `${verb} · ${tail}`,
+      rows: [
+        { label: 'Refit cost', value: money(option.cost) },
+        { label: 'Out of service', value: `${option.days} days` },
+        { label: 'Forecast', value: `${option.gainPerDay >= 0 ? '+' : '−'}${money(Math.abs(option.gainPerDay))}/day` },
+        { label: 'Cash after', value: money(state.cash - option.cost) },
+      ],
+      facts: ['Starts next morning at base; the plane flies nothing while it is out. Calling it off before then refunds the cost.'],
+      confirmLabel: `Order · ${money(option.cost)}`,
+      run: () => {
+        ops.orderRefit(state, tail, option.to);
+        changed();
+      },
+    }),
+  );
   const sign = option.gainPerDay >= 0 ? '+' : '−';
   const forecast = line(
     `Forecast ${sign}${money(Math.abs(option.gainPerDay))}/day on its routes` + (option.blocked ? ` · ${option.blocked}` : ''),
@@ -398,17 +416,25 @@ function buildRebase(state: SimState, tail: string, changed: () => void): HTMLEl
     const label = `Rebase to ${option.to} · ${money(option.fee)}${option.hops > 1 ? ` · ${option.hops} hops` : ''} · based day ${option.arrivesDay}`;
     button.textContent = label;
     button.disabled = option.blocked !== null;
-    let armed = false;
-    button.addEventListener('click', () => {
-      if (!armed) {
-        armed = true;
-        button.textContent = `Confirm ${tail} to ${option.to}`;
-        button.classList.add('is-act');
-        return;
-      }
-      ops.rebasePlane(state, tail, option.to);
-      changed();
-    });
+    button.addEventListener('click', () =>
+      showConfirm({
+        title: `Rebase ${tail} · ${aircraft.baseAirport} → ${option.to}`,
+        rows: [
+          { label: 'Ferry cost', value: money(option.fee) },
+          { label: 'Away', value: `${REBASE_DAYS} days, based day ${option.arrivesDay}` },
+          { label: 'Crews at new base', value: `${option.crews}/${option.crewsNeeded}` },
+          { label: 'Cash after', value: money(state.cash - option.fee) },
+        ],
+        facts: [
+          `Flies nothing while ferrying and the lease is still charged. Crews stay where they are: ${option.to} needs ${CREWS_PER_NEW_PLANE} crews rated on this type.`,
+        ],
+        confirmLabel: `Rebase · ${money(option.fee)}`,
+        run: () => {
+          ops.rebasePlane(state, tail, option.to);
+          changed();
+        },
+      }),
+    );
     const short = option.crews < option.crewsNeeded;
     const name = classByCode(aircraft.typeCode)?.name ?? aircraft.typeCode;
     const detail = line(
@@ -438,17 +464,22 @@ function buildReturn(state: SimState, tail: string, changed: () => void): HTMLEl
   button.className = 'inspector-plan-hub';
   button.textContent = `Return to lessor · fee ${money(option.fee)} · saves ${money(option.saves)}/day`;
   button.disabled = option.blocked !== null;
-  let armed = false;
-  button.addEventListener('click', () => {
-    if (!armed) {
-      armed = true;
-      button.textContent = `Confirm return of ${tail}`;
-      button.classList.add('is-act');
-      return;
-    }
-    ops.returnPlane(state, tail);
-    changed();
-  });
+  button.addEventListener('click', () =>
+    showConfirm({
+      title: `Return ${tail} to lessor`,
+      rows: [
+        { label: 'Return fee', value: money(option.fee) },
+        { label: 'Lease saved', value: `${money(option.saves)}/day` },
+        { label: 'Cash after', value: money(state.cash - option.fee) },
+      ],
+      facts: ['Goes back for good; leasing another means a new airframe at the market rate.'],
+      confirmLabel: `Return · ${money(option.fee)}`,
+      run: () => {
+        ops.returnPlane(state, tail);
+        changed();
+      },
+    }),
+  );
   block.append(button);
   if (option.blocked) block.append(line(option.blocked));
   // The usual reason it can't go back: it still flies. Offer to clear its day.
