@@ -924,6 +924,13 @@ below the cheapest lease, a plane flying under 40% of its day. It is a pure
 read of `state`, so it changes no game number; clicking the row opens the
 airport, crews, fleet, money or aircraft view that explains it.
 
+**Disruption layer (Ops view only, `render/disruptions.ts`).** Each AOG
+plane gets a wrench pin ("C-P002 · back 3d") above the airport it sits at;
+several at one airport stack upward, with more than four collapsing to
+"+N more AOG". Legs in `cancelledToday` draw as a dashed red line on their
+route with a count. Pins are laid out by one function that both drawing and
+`findDisruptionPinAt()` use, and a click on one opens the Maintenance screen.
+
 ## Rivals on the ladder (`src/sim/rivalLadder.ts`)
 
 Rivals climb the same ladder as the player to lease bigger aircraft: the
