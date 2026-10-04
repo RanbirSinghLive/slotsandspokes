@@ -1,6 +1,6 @@
 import './style.css';
 import { dayIndex, homeUtcOffsetMinutes, minuteOfDay as homeMinuteOfDay } from './sim/clock';
-import { projection, fitProjection, baselineScale } from './render/projection';
+import { projection, fitProjection, baselineScale, mapGesture } from './render/projection';
 import { drawBasemap } from './render/basemap';
 import { drawTerminator } from './render/terminator';
 import { drawAirportChips } from './render/airportChips';
@@ -215,7 +215,8 @@ function resize(): void {
   applyPanelWidth(); // re-clamp in case the window itself was resized, not just the panel
   const cssWidth = window.innerWidth - currentPanelWidthPx;
   const cssHeight = window.innerHeight;
-  const dpr = window.devicePixelRatio || 1;
+  // A phone's 3x screen would draw nine pixels per CSS pixel; 2x looks the same on this map and costs less than half as much.
+  const dpr = Math.min(window.devicePixelRatio || 1, isNarrowWindow() ? 2 : Infinity);
 
   canvas.width = cssWidth * dpr;
   canvas.height = cssHeight * dpr;
@@ -832,8 +833,12 @@ canvas.addEventListener('mousedown', (event) => {
  * as hoverable at all — see findCompetitionHover()'s own comment — and
  * for what the tooltip actually reveals).
  */
+// A touch has no hover: the mouse events that follow a tap would otherwise leave a hover card stuck on the map.
+let lastInputWasTouch = false;
+canvas.addEventListener('pointerdown', (event) => (lastInputWasTouch = event.pointerType === 'touch'));
+
 canvas.addEventListener('mousemove', (event) => {
-  hoverPoint = isDragging ? null : { x: event.clientX, y: event.clientY };
+  hoverPoint = isDragging || lastInputWasTouch ? null : { x: event.clientX, y: event.clientY };
   if (handleRouteBuilderMouseMove(event, state)) {
     render();
     hideCompetitionTooltip();
@@ -893,7 +898,9 @@ window.addEventListener('mouseup', (event) => {
 // A finger that moves never produces the mouse events the pan above listens
 // for, so touch has its own: one finger drags the map, two fingers pinch it.
 // A tap that doesn't move still arrives as the usual mouse events, so
-// selecting, the ring and the route builder need nothing here.
+// selecting, the ring and the route builder need nothing here. Moves only
+// change the projection: the frame loop draws it once per frame, where a
+// draw per event (several arrive per frame on a phone) made the map lag.
 const touchPoints = new Map<number, [number, number]>();
 let touchPanStart: { x: number; y: number; translate: [number, number] } | null = null;
 let touchPanning = false;
@@ -915,18 +922,18 @@ canvas.addEventListener('pointermove', (event) => {
     const distanceBefore = Math.hypot(before[0] - other[0], before[1] - other[1]);
     const distanceNow = Math.hypot(now[0] - other[0], now[1] - other[1]);
     touchPanning = true;
+    mapGesture.active = true;
     hideMapMenu();
     // Zoom about the pair's midpoint, then slide by how far the moving finger carried it.
     const [translateX, translateY] = projection.translate();
     projection.translate([translateX + (now[0] - before[0]) / 2, translateY + (now[1] - before[1]) / 2]);
-    if (distanceBefore > 0) zoomAt((now[0] + other[0]) / 2, (now[1] + other[1]) / 2, distanceNow / distanceBefore);
-    else render();
+    if (distanceBefore > 0) zoomAt((now[0] + other[0]) / 2, (now[1] + other[1]) / 2, distanceNow / distanceBefore, false);
   } else if (touchPanStart) {
     if (!touchPanning && Math.hypot(now[0] - touchPanStart.x, now[1] - touchPanStart.y) < TOUCH_PAN_SLOP_PX) return;
     if (!touchPanning) hideMapMenu();
     touchPanning = true;
+    mapGesture.active = true;
     projection.translate([touchPanStart.translate[0] + now[0] - touchPanStart.x, touchPanStart.translate[1] + now[1] - touchPanStart.y]);
-    render();
   }
   touchPoints.set(event.pointerId, now);
 });
@@ -937,6 +944,7 @@ function endTouch(event: PointerEvent): void {
   if (touchPoints.size === 0) {
     touchPanStart = null;
     touchPanning = false;
+    mapGesture.active = false;
   } else if (touchPoints.size === 1) {
     // One finger left after a pinch: carry on dragging from where it is.
     const [remaining] = touchPoints.values();
@@ -982,7 +990,7 @@ const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 20;
 
 /** Zoom by `factor`, keeping the geographic point under screen (x, y) where it is. */
-function zoomAt(x: number, y: number, factor: number): void {
+function zoomAt(x: number, y: number, factor: number, redraw = true): void {
   const geoUnderPoint = projection.invert?.([x, y]);
   if (!geoUnderPoint) return;
   const clampedScale = Math.min(Math.max(projection.scale() * factor, baselineScale * MIN_ZOOM), baselineScale * MAX_ZOOM);
@@ -990,7 +998,7 @@ function zoomAt(x: number, y: number, factor: number): void {
   const [driftedX, driftedY] = projection(geoUnderPoint)!;
   const [tx, ty] = projection.translate();
   projection.translate([tx + (x - driftedX), ty + (y - driftedY)]);
-  render();
+  if (redraw) render();
 }
 
 canvas.addEventListener(

@@ -18,6 +18,27 @@ body {
   height: 100%;
   background: #05070c;
   overflow: hidden;
+  /* A drag near the top must not pull the page to refresh or rubber-band it. */
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Touch has no hover, so a long press on the map or its controls should not
+   select text or open the iOS callout. */
+#map,
+#map-surface,
+#rail,
+#now-corner {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Taps on controls fire at once, with no double-tap-zoom wait. */
+button,
+[role='button'],
+.stat-card {
+  touch-action: manipulation;
 }
 
 /* The map renders every frame (see main.ts's render()), so it just fills

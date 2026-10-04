@@ -118,3 +118,31 @@ export function fitWorld(width: number, height: number, inset: { top: number; ri
     [width, height],
   ]);
 }
+
+/**
+ * True while a finger is dragging or pinching the map (main.ts). The cached
+ * sheets (basemap.ts, fog.ts) then slide and scale their last picture to the
+ * new view instead of repainting it every frame, and repaint once it ends.
+ */
+export const mapGesture = { active: false };
+
+/** The view a cached sheet was painted for, to carry its picture to a later view. */
+export type ViewSnapshot = { scale: number; translate: [number, number] };
+
+export function snapshotView(): ViewSnapshot {
+  return { scale: projection.scale(), translate: projection.translate() };
+}
+
+/**
+ * Draw a sheet painted for `painted` as it would look under the current view.
+ * Mercator is a scale and a shift of the same picture, so the match is exact
+ * for any pan or zoom, apart from the edges the sheet never covered.
+ */
+export function drawSheetAtCurrentView(ctx: CanvasRenderingContext2D, sheet: HTMLCanvasElement, painted: ViewSnapshot, cssWidth: number, cssHeight: number): void {
+  const ratio = projection.scale() / painted.scale;
+  const [translateX, translateY] = projection.translate();
+  ctx.save();
+  ctx.transform(ratio, 0, 0, ratio, translateX - ratio * painted.translate[0], translateY - ratio * painted.translate[1]);
+  ctx.drawImage(sheet, 0, 0, cssWidth, cssHeight);
+  ctx.restore();
+}

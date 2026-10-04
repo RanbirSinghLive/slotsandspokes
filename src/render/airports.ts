@@ -373,7 +373,8 @@ function placeLabels(ctx: CanvasRenderingContext2D, labels: PendingLabel[], obst
 // a screen point against the airport list (the route builder's arm/aim
 // gesture, the click-for-detail), so the two can never disagree
 // about how forgiving the target is.
-const HIT_RADIUS_PX = 14;
+/** A fingertip needs a wider target than a cursor: 44px across rather than 28. */
+const HIT_RADIUS_PX = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches ? 22 : 14;
 
 export type AirportHitCandidate = { airport: Airport; distPx: number; ratio: number };
 

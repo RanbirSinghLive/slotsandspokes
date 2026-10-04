@@ -5,7 +5,7 @@ import type { Topology } from 'topojson-specification';
 import worldTopology from '../../data/world-110m.json';
 import lakesGeoJson from '../../data/lakes.json';
 import riversGeoJson from '../../data/rivers.json';
-import { projection } from './projection';
+import { drawSheetAtCurrentView, mapGesture, projection, snapshotView, type ViewSnapshot } from './projection';
 import { airports, isAirportKnown } from './airports';
 
 // The downloaded file is TopoJSON: a compact format that stores shared
@@ -81,12 +81,17 @@ function loadFineLand(): void {
 const basemapCanvas = document.createElement('canvas');
 const basemapCtx = basemapCanvas.getContext('2d')!;
 let basemapSignature = '';
+let basemapView: ViewSnapshot | null = null;
 
 export function drawBasemap(ctx: CanvasRenderingContext2D): void {
   const main = ctx.canvas;
   if (main.width === 0 || main.height === 0) return;
   const scale = ctx.getTransform().a;
   const signature = [main.width, main.height, scale, projection.scale(), ...projection.translate(), knownAirportCount()].join('|');
+  if (signature !== basemapSignature && mapGesture.active && basemapView && basemapCanvas.width === main.width) {
+    drawSheetAtCurrentView(ctx, basemapCanvas, basemapView, main.width / scale, main.height / scale);
+    return;
+  }
   if (signature !== basemapSignature) {
     basemapSignature = signature;
     if (basemapCanvas.width !== main.width || basemapCanvas.height !== main.height) {
@@ -96,6 +101,7 @@ export function drawBasemap(ctx: CanvasRenderingContext2D): void {
     basemapCtx.setTransform(scale, 0, 0, scale, 0, 0);
     basemapCtx.clearRect(0, 0, main.width / scale, main.height / scale);
     paintBasemap(basemapCtx);
+    basemapView = snapshotView();
   }
   ctx.drawImage(basemapCanvas, 0, 0, main.width / scale, main.height / scale);
 }

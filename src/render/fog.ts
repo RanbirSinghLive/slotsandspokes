@@ -1,5 +1,5 @@
 import { geoCircle, geoPath } from 'd3-geo';
-import { projection } from './projection';
+import { drawSheetAtCurrentView, mapGesture, projection, snapshotView, type ViewSnapshot } from './projection';
 import { airports } from './airports';
 import { bestRangeNm, networkAirports } from '../sim/reach';
 import type { SimState } from '../sim/state';
@@ -38,6 +38,7 @@ const fogCanvas = document.createElement('canvas');
 const fogCtx = fogCanvas.getContext('2d')!;
 /** What the cached sheet was drawn for; a change means a rebuild. */
 let fogSignature = '';
+let fogView: ViewSnapshot | null = null;
 
 export function drawFog(ctx: CanvasRenderingContext2D, state: SimState): void {
   const main = ctx.canvas;
@@ -53,9 +54,14 @@ export function drawFog(ctx: CanvasRenderingContext2D, state: SimState): void {
   const reach = bestRangeNm(state);
   const network = [...networkAirports(state)].sort();
   const signature = [main.width, main.height, scale, projection.scale(), ...projection.translate(), reach, network.join(','), state.knownAirports.join(',')].join('|');
+  if (signature !== fogSignature && mapGesture.active && fogView && fogCanvas.width === main.width) {
+    drawSheetAtCurrentView(ctx, fogCanvas, fogView, cssWidth, cssHeight);
+    return;
+  }
   if (signature !== fogSignature) {
     fogSignature = signature;
     rebuildFog(main.width, main.height, scale, cssWidth, cssHeight, reach, network, state.knownAirports);
+    fogView = snapshotView();
   }
   ctx.drawImage(fogCanvas, 0, 0, cssWidth, cssHeight);
 }
