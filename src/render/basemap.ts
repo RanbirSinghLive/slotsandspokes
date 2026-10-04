@@ -6,6 +6,7 @@ import worldTopology from '../../data/world-110m.json';
 import lakesGeoJson from '../../data/lakes.json';
 import riversGeoJson from '../../data/rivers.json';
 import { projection } from './projection';
+import { airports, isAirportKnown } from './airports';
 
 // The downloaded file is TopoJSON: a compact format that stores shared
 // borders once instead of duplicating them for every country that touches
@@ -36,7 +37,7 @@ const rivers = riversGeoJson as FeatureCollection<Geometry>;
 // near-black background (the "ocean," showing through wherever nothing is
 // drawn), which clears the WCAG "distinct UI graphics" contrast bar
 // (~3:1) instead of sitting around 1.9:1 as before.
-const LAND_FILL = '#28324a';
+const LAND_FILL = '#2b3754';
 const COASTLINE_STROKE = '#4d5b7a';
 // Lakes render as the same near-black as the ocean around the continents —
 // a hole punched in the land rather than a third, competing color — so
@@ -61,6 +62,9 @@ function loadFineLand(): void {
     const topology = module.default as unknown as Topology;
     land = feature(topology, topology.objects.land);
     basemapSignature = '';
+  }).catch(() => {
+    // Offline or blocked: the 110m shape stays, which is still a complete map.
+    fineLandLoaded = false;
   });
 }
 
@@ -82,7 +86,7 @@ export function drawBasemap(ctx: CanvasRenderingContext2D): void {
   const main = ctx.canvas;
   if (main.width === 0 || main.height === 0) return;
   const scale = ctx.getTransform().a;
-  const signature = [main.width, main.height, scale, projection.scale(), ...projection.translate()].join('|');
+  const signature = [main.width, main.height, scale, projection.scale(), ...projection.translate(), knownAirportCount()].join('|');
   if (signature !== basemapSignature) {
     basemapSignature = signature;
     if (basemapCanvas.width !== main.width || basemapCanvas.height !== main.height) {
@@ -148,10 +152,41 @@ function paintBasemap(ctx: CanvasRenderingContext2D): void {
   // same void color as lake and ocean water, so a river reads as "water
   // cutting across the land" rather than a third, unrelated color.
   ctx.strokeStyle = LAKE_FILL;
-  ctx.lineWidth = 1;
+  ctx.lineWidth = Math.min(2.5, Math.max(1.2, Math.pow(projection.scale() / 800, 0.4)));
   for (const river of rivers.features as Feature<Geometry>[]) {
     ctx.beginPath();
     path(river);
     ctx.stroke();
   }
+  paintCityGlow(ctx);
+}
+
+function knownAirportCount(): number {
+  let count = 0;
+  for (const airport of airports) if (isAirportKnown(airport.iata)) count++;
+  return count;
+}
+
+// Cities as a warm glow on the land, sized by metro population and growing
+// as the map zooms in, so the map shows where people are before any route
+// does. Only known airports glow: an unknown city would give away the fog.
+const CITY_GLOW_RGB = '255, 196, 120';
+
+function paintCityGlow(ctx: CanvasRenderingContext2D): void {
+  const zoomFactor = Math.min(2.4, Math.max(0.8, Math.pow(projection.scale() / 800, 0.35)));
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const airport of airports) {
+    if (!isAirportKnown(airport.iata)) continue;
+    const at = projection([airport.lon, airport.lat]);
+    if (!at) continue;
+    const radius = (7 + 11 * Math.sqrt(airport.population / 1_000_000)) * zoomFactor;
+    const glow = ctx.createRadialGradient(at[0], at[1], 0, at[0], at[1], radius);
+    glow.addColorStop(0, `rgba(${CITY_GLOW_RGB}, 0.8)`);
+    glow.addColorStop(0.45, `rgba(${CITY_GLOW_RGB}, 0.3)`);
+    glow.addColorStop(1, `rgba(${CITY_GLOW_RGB}, 0)`);
+    ctx.fillStyle = glow;
+    ctx.fillRect(at[0] - radius, at[1] - radius, radius * 2, radius * 2);
+  }
+  ctx.restore();
 }
