@@ -25,6 +25,7 @@ import { chooseHome, homeOptions } from './sim/homes';
 import { showHomePicker } from './ui/homePicker';
 import { gameDateWithYear } from './ui/format';
 import { isOpsView, setOpsView } from './render/opsView';
+import { drawDisruptions, findDisruptionPinAt } from './render/disruptions';
 import { setAirportFilter, visibleAirports, type AirportFilter } from './ui/airportFilter';
 import { step } from './sim/step';
 import { updatePanel, renderScheduleWarnings, scheduleProblems, PANEL_WIDTH_PX, setScheduleClock } from './ui/panels';
@@ -340,6 +341,7 @@ function render(nowMs: number = performance.now()): void {
 
   drawAircraft(ctx, state, latestFractionalMinute, hoveredFlight?.legId ?? selectedFlight?.legId ?? null);
   drawAirports(ctx, state);
+  drawDisruptions(ctx, state);
   // The airport the side panel is showing, on top of its dot.
   if (selection.kind === 'airport') drawSelectedAirport(ctx, selection.iata);
   if (mapHover?.kind === 'airport') drawSelectedAirport(ctx, mapHover.iata);
@@ -761,6 +763,13 @@ canvas.addEventListener('mousedown', (event) => {
   const clickedFlight = findFlightAt(event.clientX, event.clientY, state, latestFractionalMinute);
   if (clickedFlight) {
     select({ kind: 'aircraft', tail: clickedFlight.tail });
+    render();
+    return;
+  }
+
+  // A grounded plane's pin (Ops view) opens the Maintenance screen.
+  if (findDisruptionPinAt(event.clientX, event.clientY, state)) {
+    select({ kind: 'maintenance' });
     render();
     return;
   }

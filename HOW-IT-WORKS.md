@@ -898,6 +898,13 @@ The accumulator loop (`main.ts`) turns real frame time into whole simulated
 minutes (`step()` calls) plus a continuous fractional minute for rendering,
 per the pattern in CLAUDE.md's "Time" section.
 
+**Disruption layer (Ops view only, `render/disruptions.ts`).** Each AOG
+plane gets a wrench pin ("C-P002 · back 3d") above the airport it sits at;
+several at one airport stack upward, with more than four collapsing to
+"+N more AOG". Legs in `cancelledToday` draw as a dashed red line on their
+route with a count. Pins are laid out by one function that both drawing and
+`findDisruptionPinAt()` use, and a click on one opens the Maintenance screen.
+
 ## Rivals on the ladder (`src/sim/rivalLadder.ts`)
 
 Rivals climb the same ladder as the player to lease bigger aircraft: the
