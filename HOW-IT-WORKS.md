@@ -750,20 +750,16 @@ first, every time the map panel is visible.
 speeds, ops board and a P&L strip (with the alerts under them, one
 column, `#now-corner`); top right the
 **lens**; bottom left zoom, back-to-home and the airport filter (All ·
-Yours · Contested); bottom right the fleet's plane pools. The two new
+Yours · Contested · Uncontested, the last being airports no rival flies to, home always shown); bottom right the fleet's plane pools. The two new
 corners sit in `#map-surface`, a pointer-transparent box the size of
 the map, and rearrange with its width through CSS container queries (on
 a narrow map the lens moves down, then to the bottom left).
 
 The lens is one row of labelled buttons, Network · Profit · On-time ·
-Demand · Rivals · Open, one on at a time (keys 1–6), with its legend and
-filter directly under it. `setLens()` in main.ts sets the flags
+Demand · Rivals, one on at a time (keys 1–5), with its legend and
+filter directly under it. `setLens()` in main.ts sets the three flags
 the renderer reads: `demandOverlayOn` for Demand, `competitionOverlayOn`
-for Rivals, `uncontestedOverlayOn` for Open, `mapMode` for Profit and On-time.
-Open (`render/uncontested.ts`) replaces the plain route layer: your routes
-are green where no rival flies the market and grey where one does, and
-dashed teal lines mark the 12 biggest markets (by `currentPotentialDemand`)
-from an airport you serve that nobody, you included, flies yet. The Rivals lens adds a
+for Rivals, `mapMode` for Profit and On-time. The Rivals lens adds a
 chip per rival airline to narrow it to one. A route can be drawn under
 any lens.
 
