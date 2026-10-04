@@ -1,6 +1,6 @@
 import './style.css';
 import { dayIndex, homeUtcOffsetMinutes, minuteOfDay as homeMinuteOfDay } from './sim/clock';
-import { projection, fitProjection, mapGesture, setMapElement, mapPoint, mapSize, type ClientPoint } from './render/projection';
+import { projection, fitProjection, mapGesture, setMapElement, mapPoint, mapSize, mapSizeChanged, type ClientPoint } from './render/projection';
 import { setupMapInput } from './ui/mapInput';
 import { zoomAt as cameraZoomAt, panFrom, panBy, currentView, restoreView } from './render/camera';
 import { drawBasemap } from './render/basemap';
@@ -237,6 +237,7 @@ function resize(keepView = false): void {
   // Everything else reads the map's size back from this box (render/projection.ts's mapSize()).
   canvas.style.width = `${cssWidth}px`;
   canvas.style.height = `${cssHeight}px`;
+  mapSizeChanged();
 
   // Reset any previous scale before reapplying it — resize can fire many
   // times, and scale() otherwise compounds on top of itself.
@@ -524,6 +525,25 @@ let accumulator = 0;
 let speedMultiplier = 1;
 let lastFrameTimeMs: number | null = null;
 
+// Drawing is the expensive part of a frame, so a frame that could not look
+// different from the last one is not drawn. Paused with nobody touching the
+// game, the picture only needs a refresh a few times a second (clocks,
+// flashes); on a phone, moving planes are drawn at 30 fps, which a map hides.
+const PAUSED_REDRAW_MS = 250;
+const PHONE_FRAME_MS = 1000 / 30 - 3;
+const isPhoneScreen = window.matchMedia('(pointer: coarse)').matches;
+let lastRenderMs = 0;
+let inputSinceRender = true;
+for (const type of ['pointerdown', 'pointermove', 'pointerup', 'touchstart', 'keydown', 'wheel', 'click', 'input', 'change']) {
+  window.addEventListener(type, () => (inputSinceRender = true), { capture: true, passive: true });
+}
+
+function frameNeedsRender(nowMs: number): boolean {
+  const sinceRenderMs = nowMs - lastRenderMs;
+  if (speedMultiplier === 0) return inputSinceRender || sinceRenderMs >= PAUSED_REDRAW_MS;
+  return !isPhoneScreen || sinceRenderMs >= PHONE_FRAME_MS;
+}
+
 // Save once per simulated day crossed, not every minute: a day-old save is a perfectly fine worst case to resume
 // from, and this is 1440x fewer localStorage writes than saving every
 // tick would be. Initialized from whatever day the game actually starts
@@ -589,7 +609,11 @@ function tick(nowMs: number): void {
   }
 
   latestFractionalMinute = state.simMinute + accumulator / MS_PER_SIM_MINUTE;
-  render(nowMs);
+  if (frameNeedsRender(nowMs)) {
+    lastRenderMs = nowMs;
+    inputSinceRender = false;
+    render(nowMs);
+  }
   requestAnimationFrame(tick);
 }
 

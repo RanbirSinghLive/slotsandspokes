@@ -763,7 +763,7 @@ for Rivals, `mapMode` for Profit and Ops, and the Ops lens switch (`setOpsView()
 chip per rival airline to narrow it to one. A route can be drawn under
 any lens.
 
-**The map panel** — draw order back to front, every frame:
+**The map panel** — draw order back to front, every drawn frame (paused with no input it redraws four times a second; on a touch screen it draws at most 30 a second; airport labels are placed again only when a dot or badge moves on screen):
 
 1. `basemap.ts` — land/coastlines from Natural Earth 110m TopoJSON.
 2. `terminator.ts` — the night hemisphere: a 90°-radius `d3.geoCircle`

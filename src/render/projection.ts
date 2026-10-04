@@ -203,7 +203,16 @@ export function mapPoint(clientX: number, clientY: number): [number, number] {
 
 /** The map's size in CSS pixels, read from the canvas's own box. */
 export function mapSize(): { width: number; height: number } {
-  return { width: mapElement?.clientWidth ?? 0, height: mapElement?.clientHeight ?? 0 };
+  // Reading clientWidth forces the browser to lay the page out, and this runs every frame.
+  cachedMapSize ??= { width: mapElement?.clientWidth ?? 0, height: mapElement?.clientHeight ?? 0 };
+  return cachedMapSize;
+}
+
+let cachedMapSize: { width: number; height: number } | null = null;
+
+/** Forget the remembered map size; call after the canvas's box changes. */
+export function mapSizeChanged(): void {
+  cachedMapSize = null;
 }
 
 /** What a map hit test needs from a press: where it was, in page (client) coordinates. */

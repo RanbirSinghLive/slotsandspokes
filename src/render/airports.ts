@@ -333,6 +333,27 @@ function boxesOverlap(a: Box, b: Box): boolean {
 function placeLabels(ctx: CanvasRenderingContext2D, labels: PendingLabel[], obstacles: Box[] = []): { iata: string; box: Box }[] {
   labels.sort((a, b) => Number(b.home) - Number(a.home) || b.departures - a.departures || b.population - a.population);
 
+  // Placement only depends on where things sit on screen, so a frame that looks
+  // like the last one (a paused game, planes flying under still labels) replays it.
+  const key = labelPlacementKey(ctx.font, labels, obstacles);
+  if (labelCache?.key !== key) labelCache = { key, placed: computeLabelPlacement(ctx, labels, obstacles) };
+  for (const label of labelCache.placed) {
+    ctx.fillStyle = label.fill;
+    ctx.fillText(label.iata, label.textX, label.textY);
+  }
+  return labelCache.placed.map(({ iata, box }) => ({ iata, box }));
+}
+
+type PlacedLabel = { iata: string; box: Box; textX: number; textY: number; fill: string };
+let labelCache: { key: string; placed: PlacedLabel[] } | null = null;
+
+function labelPlacementKey(font: string, labels: PendingLabel[], obstacles: Box[]): string {
+  const dots = labels.map((l) => `${l.iata}${l.home ? 'h' : ''}${l.served ? 's' : ''}@${l.x.toFixed(1)},${l.y.toFixed(1)}r${l.radius.toFixed(1)}`);
+  const badges = obstacles.map((b) => `${b.left.toFixed(1)},${b.top.toFixed(1)},${b.right.toFixed(1)},${b.bottom.toFixed(1)}`);
+  return `${font}|${dots.join(';')}|${badges.join(';')}`;
+}
+
+function computeLabelPlacement(ctx: CanvasRenderingContext2D, labels: PendingLabel[], obstacles: Box[]): PlacedLabel[] {
   // Every dot is an obstacle too, so a label never sits on a neighbour's marker.
   // So is every pending-changes line (see drawAirports()).
   const taken: Box[] = [
@@ -346,7 +367,7 @@ function placeLabels(ctx: CanvasRenderingContext2D, labels: PendingLabel[], obst
   ];
 
   const half = LABEL_HEIGHT_PX / 2;
-  const placedLabels: { iata: string; box: Box }[] = [];
+  const placedLabels: PlacedLabel[] = [];
   for (const label of labels) {
     const text = label.iata;
     const offset = label.radius + LABEL_GAP_PX;
@@ -362,9 +383,7 @@ function placeLabels(ctx: CanvasRenderingContext2D, labels: PendingLabel[], obst
       const box = { left: textX, top: textY - half, right: textX + width, bottom: textY + half };
       if (taken.some((other) => boxesOverlap(box, other))) continue;
       taken.push(box);
-      placedLabels.push({ iata: label.iata, box });
-      ctx.fillStyle = label.served || label.home ? SERVED_LABEL_FILL : LABEL_FILL;
-      ctx.fillText(text, textX, textY);
+      placedLabels.push({ iata: label.iata, box, textX, textY, fill: label.served || label.home ? SERVED_LABEL_FILL : LABEL_FILL });
       break;
     }
   }
