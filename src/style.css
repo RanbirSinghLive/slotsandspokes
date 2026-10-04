@@ -590,6 +590,24 @@ button,
 :root[data-narrow] #rail {
   height: 100dvh;
   z-index: 41;
+  /* A short phone cuts the last icons off, so the rail scrolls. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  scrollbar-width: none;
+}
+
+:root[data-narrow] #rail::-webkit-scrollbar {
+  display: none;
+}
+
+:root[data-narrow] #rail > * {
+  flex: none;
+}
+
+:root[data-narrow] #rail > .rail-spacer {
+  flex: 1 0 8px;
 }
 
 :root[data-narrow] #panel-close {

@@ -1,5 +1,5 @@
 import { geoCircle, geoPath } from 'd3-geo';
-import { drawSheetAtCurrentView, mapGesture, projection, snapshotView, type ViewSnapshot } from './projection';
+import { drawSheet, mapGesture, projection, sheetStillFits, snapshotView, withSheetClip, type ViewSnapshot } from './projection';
 import { airports } from './airports';
 import { bestRangeNm, networkAirports } from '../sim/reach';
 import type { SimState } from '../sim/state';
@@ -53,29 +53,32 @@ export function drawFog(ctx: CanvasRenderingContext2D, state: SimState): void {
 
   const reach = bestRangeNm(state);
   const network = [...networkAirports(state)].sort();
-  const signature = [main.width, main.height, scale, projection.scale(), ...projection.translate(), reach, network.join(','), state.knownAirports.join(',')].join('|');
-  if (signature !== fogSignature && mapGesture.active && fogView && fogCanvas.width === main.width) {
-    drawSheetAtCurrentView(ctx, fogCanvas, fogView, cssWidth, cssHeight);
-    return;
-  }
-  if (signature !== fogSignature) {
+  const margin = mapGesture.margin;
+  // The view itself is not part of the signature: sheetStillFits() decides whether the sheet can be moved instead (projection.ts).
+  const signature = [main.width, main.height, scale, margin, reach, network.join(','), state.knownAirports.join(',')].join('|');
+  const reusable = signature === fogSignature && fogView !== null && sheetStillFits(fogView, margin, cssWidth, cssHeight);
+  if (!reusable) {
     fogSignature = signature;
-    rebuildFog(main.width, main.height, scale, cssWidth, cssHeight, reach, network, state.knownAirports);
+    rebuildFog(main.width, main.height, scale, cssWidth, cssHeight, margin, reach, network, state.knownAirports);
     fogView = snapshotView();
   }
-  ctx.drawImage(fogCanvas, 0, 0, cssWidth, cssHeight);
+  if (fogView) drawSheet(ctx, fogCanvas, fogView, margin, cssWidth, cssHeight);
 }
 
-function rebuildFog(width: number, height: number, scale: number, cssWidth: number, cssHeight: number, reach: number, network: string[], known: string[]): void {
-  if (fogCanvas.width !== width || fogCanvas.height !== height) {
-    fogCanvas.width = width;
-    fogCanvas.height = height;
+function rebuildFog(width: number, height: number, scale: number, cssWidth: number, cssHeight: number, margin: number, reach: number, network: string[], known: string[]): void {
+  const sheetWidth = Math.ceil(width * (1 + 2 * margin));
+  const sheetHeight = Math.ceil(height * (1 + 2 * margin));
+  if (fogCanvas.width !== sheetWidth || fogCanvas.height !== sheetHeight) {
+    fogCanvas.width = sheetWidth;
+    fogCanvas.height = sheetHeight;
   }
-  fogCtx.setTransform(scale, 0, 0, scale, 0, 0);
+  const marginX = margin * cssWidth;
+  const marginY = margin * cssHeight;
+  fogCtx.setTransform(scale, 0, 0, scale, marginX * scale, marginY * scale);
   fogCtx.globalCompositeOperation = 'source-over';
-  fogCtx.clearRect(0, 0, cssWidth, cssHeight);
+  fogCtx.clearRect(-marginX, -marginY, cssWidth + 2 * marginX, cssHeight + 2 * marginY);
   fogCtx.fillStyle = FOG_COLOR;
-  fogCtx.fillRect(0, 0, cssWidth, cssHeight);
+  fogCtx.fillRect(-marginX, -marginY, cssWidth + 2 * marginX, cssHeight + 2 * marginY);
 
   fogCtx.globalCompositeOperation = 'destination-out';
   fogCtx.fillStyle = '#000';
@@ -89,6 +92,8 @@ function rebuildFog(width: number, height: number, scale: number, cssWidth: numb
     fogCtx.fill();
   };
 
-  for (const iata of network) hole(iata, reach);
-  for (const iata of known) hole(iata, KNOWN_DISC_NM);
+  withSheetClip(margin, cssWidth, cssHeight, () => {
+    for (const iata of network) hole(iata, reach);
+    for (const iata of known) hole(iata, KNOWN_DISC_NM);
+  });
 }

@@ -175,6 +175,7 @@ const MIN_MAP_WIDTH_PX = 200;
 const RAIL_WIDTH_PX = 56;
 /** At or below this window width the panel is a sheet over the map, not a column beside it (style.css's :root[data-narrow]). */
 const NARROW_WINDOW_PX = 700;
+const MAP_SHEET_MARGIN = 0.5;
 const isNarrowWindow = (): boolean => window.innerWidth <= NARROW_WINDOW_PX;
 // A phone starts with the map showing; the rail opens the panel.
 let panelHidden = isNarrowWindow();
@@ -183,6 +184,8 @@ let currentPanelWidthPx = PANEL_WIDTH_PX + RAIL_WIDTH_PX;
 function applyPanelWidth(): void {
   const narrow = isNarrowWindow();
   document.documentElement.toggleAttribute('data-narrow', narrow);
+  // A phone caches a map twice as big as the screen each way, so a drag has picture to slide over (render/projection.ts).
+  mapGesture.margin = narrow ? MAP_SHEET_MARGIN : 0;
   // Narrow: the panel floats over the map, so the map only gives up the rail.
   const desiredPanelWidthPx = (panelHidden || narrow ? 0 : PANEL_WIDTH_PX) + RAIL_WIDTH_PX;
   currentPanelWidthPx = Math.min(desiredPanelWidthPx, window.innerWidth - MIN_MAP_WIDTH_PX);
@@ -938,9 +941,52 @@ canvas.addEventListener('pointermove', (event) => {
   touchPoints.set(event.pointerId, now);
 });
 
+// A tap is handled here rather than left to the mouse events a browser makes up
+// after it: iOS skips those when the pointer moved handlers change the page, and
+// then nothing could be tapped. The made-up events are cancelled (touchend below)
+// and the same mouse handlers run from the tap itself.
+const DOUBLE_TAP_MS = 300;
+const DOUBLE_TAP_SLOP_PX = 30;
+const DOUBLE_TAP_ZOOM = 2;
+let lastTap = { time: 0, x: 0, y: 0 };
+
+function tapMap(x: number, y: number): void {
+  const now = performance.now();
+  if (now - lastTap.time < DOUBLE_TAP_MS && Math.hypot(x - lastTap.x, y - lastTap.y) < DOUBLE_TAP_SLOP_PX) {
+    lastTap.time = 0;
+    hideMapMenu();
+    animateZoomAt(x, y, DOUBLE_TAP_ZOOM);
+    return;
+  }
+  lastTap = { time: now, x, y };
+  const init = { clientX: x, clientY: y, button: 0, bubbles: true, cancelable: true, view: window };
+  canvas.dispatchEvent(new MouseEvent('mousedown', init));
+  canvas.dispatchEvent(new MouseEvent('mouseup', init));
+}
+
+/** Zoom in on (x, y) over a moment, as a double tap does. */
+function animateZoomAt(x: number, y: number, factor: number): void {
+  const started = performance.now();
+  let applied = 1;
+  mapGesture.active = true;
+  const step = (now: number): void => {
+    const progress = Math.min(1, (now - started) / 180);
+    const target = Math.pow(factor, 1 - (1 - progress) * (1 - progress));
+    zoomAt(x, y, target / applied, false);
+    applied = target;
+    if (progress < 1) requestAnimationFrame(step);
+    else mapGesture.active = false;
+  };
+  requestAnimationFrame(step);
+}
+
+canvas.addEventListener('touchend', (event) => event.preventDefault(), { passive: false });
+
 function endTouch(event: PointerEvent): void {
   if (event.pointerType !== 'touch') return;
+  const isTap = event.type === 'pointerup' && touchPoints.size === 1 && touchPoints.has(event.pointerId) && touchPanStart !== null && !touchPanning;
   touchPoints.delete(event.pointerId);
+  if (isTap) tapMap(event.clientX, event.clientY);
   if (touchPoints.size === 0) {
     touchPanStart = null;
     touchPanning = false;
