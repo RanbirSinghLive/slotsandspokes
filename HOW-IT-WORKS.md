@@ -1575,6 +1575,13 @@ policy. It is redrawn only when the day, the routes or the level
 change, and never mid-drag. Each chart in the route view has a key of
 swatches under it (`ui/chartLegend.ts`).
 
+**Planes in Ops view** (`render/aircraftOps.ts`, called from `drawAircraft`).
+Planes scale up to 1.7x as the map zooms in, trail a fading line sampled back
+along their geodesic (at most 30 minutes or 15% of the flight), carry a
+pulsing red halo when late in addition to the red tint, and show their tail
+beside them from 3x zoom, or at any zoom when hovered or selected. All of it
+is computed from the flight and projection each frame; nothing is stored.
+
 ## Randomness (`src/sim/rng.ts`)
 
 A seeded PRNG (mulberry32); `state.rngSeed` carries its entire internal
