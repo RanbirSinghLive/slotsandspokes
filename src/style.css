@@ -27,6 +27,8 @@ body {
   width: calc(100vw - var(--panel-width));
   height: 100vh;
   box-sizing: border-box;
+  /* Drag and pinch are the map's own (main.ts), not the page's. */
+  touch-action: none;
 }
 
 /* Sections parked until a screen adopts them (ui/inspector/dom.ts's
@@ -383,6 +385,64 @@ body {
   #lens-corner {
     bottom: 190px;
   }
+}
+
+#map-tools-toggle {
+  display: none;
+}
+
+/* A phone: the lens, Ops view and the airport filter fold behind one
+   Filters button beside the zoom buttons, and open as a small stack above them. */
+:root[data-narrow] #where-corner {
+  flex-direction: row;
+  flex-wrap: wrap;
+  max-width: calc(100vw - var(--panel-width) - 24px);
+  bottom: 96px;
+  gap: 6px;
+}
+
+:root[data-narrow] #map-tools-toggle {
+  display: block;
+}
+
+:root[data-narrow] .where-zoom button,
+:root[data-narrow] #map-tools-toggle {
+  min-height: 36px;
+}
+
+:root[data-narrow] .where-zoom button {
+  width: 36px;
+}
+
+:root[data-narrow] #map-tools-toggle {
+  padding: 0 12px;
+}
+
+:root[data-narrow]:not([data-tools]) #lens-corner,
+:root[data-narrow]:not([data-tools]) #ops-view-toggle,
+:root[data-narrow]:not([data-tools]) #airport-filter {
+  display: none;
+}
+
+:root[data-narrow] #airport-filter {
+  flex-wrap: wrap;
+  flex-basis: 100%;
+}
+
+:root[data-narrow] #lens-corner {
+  bottom: 300px;
+  max-width: calc(100vw - var(--panel-width) - 24px);
+}
+
+:root[data-narrow] #lens-bar {
+  flex-wrap: wrap;
+}
+
+:root[data-narrow] #lens-bar button,
+:root[data-narrow] #where-corner #airport-filter button,
+:root[data-narrow] #ops-view-toggle {
+  min-height: 34px;
+  padding: 0 10px;
 }
 
 .mapmode-legend-swatch {

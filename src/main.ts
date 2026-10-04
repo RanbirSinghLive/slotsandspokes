@@ -471,8 +471,10 @@ document.querySelector('#rail-jump')!.addEventListener('click', () => openJumpBo
 // The inspector (ui/inspector/) follows the selection: a map click, a link
 // or the breadcrumb changes it, and the panel rebuilds to show it. A hidden
 // panel comes back, since otherwise the click would seem to do nothing.
+// On a phone a tap on the map keeps the map showing, so the ring that tap opens stays in view; the rail opens the sheet.
+let mapTapInProgress = false;
 onSelectionChange(() => {
-  if (panelHidden && getSelection().kind !== 'network') setPanelHidden(false);
+  if (panelHidden && getSelection().kind !== 'network' && !(mapTapInProgress && isNarrowWindow())) setPanelHidden(false);
   clearMapHover();
   renderInspector(state);
   render();
@@ -765,8 +767,12 @@ let translateAtDragStart: [number, number] = [0, 0];
 let ringOpenAtMouseDown = false;
 /** A press that moves less than this far before release is a click, not a pan. */
 const CLICK_SLOP_PX = 4;
+/** A finger wobbles more than a mouse, so a touch pans only after moving this far. */
+const TOUCH_PAN_SLOP_PX = 8;
 
 canvas.addEventListener('mousedown', (event) => {
+  mapTapInProgress = true;
+  queueMicrotask(() => (mapTapInProgress = false));
   ringOpenAtMouseDown = isMapMenuOpen();
   // Any open ring (ui/mapMenu.ts) gets closed before deciding what this
   // click actually does, otherwise arming a route, or just starting a
@@ -882,6 +888,64 @@ window.addEventListener('mouseup', (event) => {
   isDragging = false;
 });
 
+// --- Pan and pinch (touch) ---
+//
+// A finger that moves never produces the mouse events the pan above listens
+// for, so touch has its own: one finger drags the map, two fingers pinch it.
+// A tap that doesn't move still arrives as the usual mouse events, so
+// selecting, the ring and the route builder need nothing here.
+const touchPoints = new Map<number, [number, number]>();
+let touchPanStart: { x: number; y: number; translate: [number, number] } | null = null;
+let touchPanning = false;
+
+canvas.addEventListener('pointerdown', (event) => {
+  if (event.pointerType !== 'touch') return;
+  canvas.setPointerCapture(event.pointerId);
+  touchPoints.set(event.pointerId, [event.clientX, event.clientY]);
+  touchPanning = touchPanning && touchPoints.size > 1;
+  touchPanStart = touchPoints.size === 1 ? { x: event.clientX, y: event.clientY, translate: projection.translate() } : null;
+});
+
+canvas.addEventListener('pointermove', (event) => {
+  const before = touchPoints.get(event.pointerId);
+  if (event.pointerType !== 'touch' || !before) return;
+  const now: [number, number] = [event.clientX, event.clientY];
+  if (touchPoints.size >= 2) {
+    const [other] = [...touchPoints.entries()].filter(([id]) => id !== event.pointerId).map(([, point]) => point);
+    const distanceBefore = Math.hypot(before[0] - other[0], before[1] - other[1]);
+    const distanceNow = Math.hypot(now[0] - other[0], now[1] - other[1]);
+    touchPanning = true;
+    hideMapMenu();
+    // Zoom about the pair's midpoint, then slide by how far the moving finger carried it.
+    const [translateX, translateY] = projection.translate();
+    projection.translate([translateX + (now[0] - before[0]) / 2, translateY + (now[1] - before[1]) / 2]);
+    if (distanceBefore > 0) zoomAt((now[0] + other[0]) / 2, (now[1] + other[1]) / 2, distanceNow / distanceBefore);
+    else render();
+  } else if (touchPanStart) {
+    if (!touchPanning && Math.hypot(now[0] - touchPanStart.x, now[1] - touchPanStart.y) < TOUCH_PAN_SLOP_PX) return;
+    if (!touchPanning) hideMapMenu();
+    touchPanning = true;
+    projection.translate([touchPanStart.translate[0] + now[0] - touchPanStart.x, touchPanStart.translate[1] + now[1] - touchPanStart.y]);
+    render();
+  }
+  touchPoints.set(event.pointerId, now);
+});
+
+function endTouch(event: PointerEvent): void {
+  if (event.pointerType !== 'touch') return;
+  touchPoints.delete(event.pointerId);
+  if (touchPoints.size === 0) {
+    touchPanStart = null;
+    touchPanning = false;
+  } else if (touchPoints.size === 1) {
+    // One finger left after a pinch: carry on dragging from where it is.
+    const [remaining] = touchPoints.values();
+    touchPanStart = { x: remaining[0], y: remaining[1], translate: projection.translate() };
+  }
+}
+canvas.addEventListener('pointerup', endTouch);
+canvas.addEventListener('pointercancel', endTouch);
+
 // Esc steps the inspector back one level, but only when nothing else on
 // screen wants Esc first. Listening in the capture phase runs this before
 // every ordinary keydown listener (the route builder's, the ring's, the hub
@@ -945,6 +1009,15 @@ const mapMiddle = (): [number, number] => [canvas.clientWidth / 2, canvas.client
 document.querySelector('#zoom-in')!.addEventListener('click', () => zoomAt(...mapMiddle(), ZOOM_BUTTON_FACTOR));
 document.querySelector('#zoom-out')!.addEventListener('click', () => zoomAt(...mapMiddle(), 1 / ZOOM_BUTTON_FACTOR));
 document.querySelector('#zoom-home')!.addEventListener('click', () => resize());
+
+// On a phone the lens and the airport filters fold behind one button, so they only cover the map when wanted.
+const toolsToggle = document.querySelector<HTMLButtonElement>('#map-tools-toggle')!;
+toolsToggle.addEventListener('click', () => {
+  const open = !document.documentElement.hasAttribute('data-tools');
+  document.documentElement.toggleAttribute('data-tools', open);
+  toolsToggle.setAttribute('aria-expanded', String(open));
+  toolsToggle.classList.toggle('active', open);
+});
 
 // --- Choosing a home city (new games only) ---
 //
