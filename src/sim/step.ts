@@ -2,6 +2,7 @@ import { endSeasonalLeases } from './seasonalLease';
 import { demandFactors, rollDailyDemandEvents } from './demandEvents';
 import { morningHolds, rollNightlyChecks, wornAge } from './mxChecks';
 import { chargeNightStops } from './nightStops';
+import { applyPendingRetimes } from './retime';
 import { rollDailyFareWars } from './fareWars';
 import { effectiveFareClasses } from './seatSale';
 import { rollDailyBrand } from './brand';
@@ -191,6 +192,8 @@ export function step(state: SimState): void {
     state.cancelledToday = [];
     state.mxHoldsToday = [];
     state.retimedToday = [];
+    // Gantt moves held for tomorrow (sim/retime.ts) take effect with the new day.
+    applyPendingRetimes(state);
     // Yesterday's fare-class sales, for the route view (sim/fareClasses.ts).
     state.yesterdayFareClasses = state.todayFareClasses ?? {};
     state.todayFareClasses = {};

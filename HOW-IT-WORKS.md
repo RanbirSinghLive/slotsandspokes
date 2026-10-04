@@ -1499,7 +1499,15 @@ it back. The rules:
   turn either side, and room in every hour its legs now use at every
   airport (its own old movements count as room, rivals stay where they
   are), with no same-market departure at the same minute.
-- Not while a leg is in the air or the rotation is part flown.
+- Always allowed, in the air or part flown too. A rotation with a leg
+  in the air, or some flown and some not, is **held for tomorrow**:
+  today's flying stays as it is, the move is kept in
+  `SimState.pendingRetimes` and applied at the midnight rollover
+  (`applyPendingRetimes()`), and the tip says "from tomorrow". It's
+  drawn dashed in amber where it will sit. A held move is planned in
+  tomorrow's schedule (`tomorrowView()`), so a later move sees it;
+  dragging the rotation again replaces it, and dragging it back to where
+  it is drops it.
 - Each departure whose hour changes has its slot re-priced at the new
   hour (the held pair nearest the old price takes the new one), so a
   slot taken cheap off-peak can't be dragged into the peak for free.
@@ -2858,6 +2866,19 @@ its own end of the day and it wraps back (`planUnwrap()`) into an
 out-and-back at the end of the day. The tip says what the night is, in
 ops terms ("Night stop YOW · out 20:50 · back 06:00 · no mtc base:
 contracted check"), and the halves are drawn dashed.
+
+**Removing.** The × on either half removes the night stop, both flights
+(two clicks); hovering or arming one lights the other's ×, since one half
+alone would strand the plane.
+
+**Undo.** Each half also has a ⌂ button (always showing) that brings the
+night stop home (`commitBringHome()`), the same unwrap as dragging a half
+past its end of the day. The out-and-back goes back where it sat before the
+wrap (`SimState.wrappedFrom`) when that still fits, else in the latest
+wait at base in the plane's day that holds it, the end of the day first.
+A plane asleep at its station now flies its morning flight home today and
+the change starts tomorrow; one already at the station for the night can
+come home after tomorrow's morning flight.
 
 **It never moves other flying.** The flight home has to be back and
 turned before the plane's first departure, and the flight out has to

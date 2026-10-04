@@ -70,7 +70,7 @@ import { SEASON_DAYS, SEASONAL_PREMIUM } from './seasonalLease';
 import { deferredItems, heavyBankedMinutes, heavyCheckDueIn, heavyCheckOpen, heavyCheckWorkMinutes, tonightCheck } from './mxChecks';
 import { rebaseOptions, rebasePlane, type RebaseOption } from './rebase';
 import { cabinGainPerDay, cabinOf, cancelRefit as cancelRefitRule, orderRefit as orderRefitRule, refitBlockedReason, refitCost, refitDays, type Cabin } from './cabins';
-import { commitRetime, planRetime, type RetimePlan } from './retime';
+import { commitBringHome, commitRetime, planBringHome, planRetime, type RetimePlan } from './retime';
 import { daysUntilNextListing, listingsOf, returnBlockedReason, returnFee, returnLease, takeListing, type MarketListing } from './market';
 import { airlineCalled, classOpen, tierThatOpens } from './ladder';
 import { actualDailyDemand, currentPotentialDemand } from './marketDemand';
@@ -574,6 +574,16 @@ export function returnPlane(state: SimState, tail: string): Outcome<{ message: s
 /** Check and price moving a rotation to a new start, and optionally another plane of its type (sim/retime.ts). */
 export function planRetimeRotation(state: SimState, legIds: string[], toTail: string, startMinute: number): RetimePlan {
   return planRetime(state, legIds, toTail, startMinute);
+}
+
+/** Check a night stop being brought home: back to base for the night, where it sat before if that fits (sim/retime.ts). Null if the plane isn't on one. */
+export function planBringNightStopHome(state: SimState, tail: string): RetimePlan | null {
+  return planBringHome(state, tail);
+}
+
+/** Bring a night stop home: the undo for the drag that made it (sim/retime.ts). */
+export function bringNightStopHome(state: SimState, tail: string): Outcome<{ message: string }> {
+  return commitBringHome(state, tail);
 }
 
 /** Move a rotation to a new start, and optionally another plane of its type (sim/retime.ts). */

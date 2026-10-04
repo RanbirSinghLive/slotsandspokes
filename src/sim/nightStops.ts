@@ -129,21 +129,37 @@ export function planWrap(state: SimState, legIds: string[]): WrapPlan {
 
 /**
  * Bring a night stop home: the two flights rejoined as an out-and-back at
- * the end of the plane's day, the latest that's home before the curfew.
+ * base. It goes at `preferStart` (where it sat before it was wrapped) when
+ * that fits, else in the latest gap in the plane's day that holds it, the
+ * end of the day first, so a full evening doesn't stop it coming home.
  */
-export function planUnwrap(state: SimState, tail: string): WrapPlan {
+export function planUnwrap(state: SimState, tail: string, preferStart?: number): WrapPlan {
   const pair = nightStopLegs(state, tail);
   if (!pair) return { ok: false, reason: 'Not on a night stop' };
   const { morning, evening } = pair;
+  const aircraft = state.aircraft.find((a) => a.tail === tail);
+  const base = aircraft?.baseAirport;
   const others = legsOf(state, tail).filter((leg) => leg !== morning && leg !== evening);
   const turnOut = scheduledTurnMinutes(state, evening.origin, evening.dest);
+  const turnAfter = scheduledTurnMinutes(state, morning.origin, morning.dest);
   const length = evening.blockMinutes + turnOut + morning.blockMinutes;
-  const latest = Math.floor((USABLE_DAY_END_MINUTE - length) / 5) * 5;
-  const lastOther = others[others.length - 1];
-  const earliest = lastOther ? lastOther.departMinute + lastOther.blockMinutes + scheduledTurnMinutes(state, lastOther.origin, lastOther.dest) : USABLE_DAY_START_MINUTE;
-  if (earliest > latest) return { ok: false, reason: `No room for the round trip before the 22:00 curfew` };
-  const out = { ...evening, departMinute: latest };
-  const home = { ...morning, departMinute: latest + evening.blockMinutes + turnOut };
+
+  // Each wait at base between the plane's other flying, where the round trip could sit: its earliest and latest start.
+  const gaps: { earliest: number; latest: number }[] = [];
+  for (let i = 0; i <= others.length; i++) {
+    const before = others[i - 1];
+    const after = others[i];
+    if ((before && before.dest !== base) || (after && after.origin !== base)) continue;
+    const earliest = before ? before.departMinute + before.blockMinutes + scheduledTurnMinutes(state, before.origin, before.dest) : USABLE_DAY_START_MINUTE;
+    const closes = after ? after.departMinute - turnAfter : USABLE_DAY_END_MINUTE;
+    const latest = Math.floor((Math.min(closes, USABLE_DAY_END_MINUTE) - length) / 5) * 5;
+    if (earliest <= latest) gaps.push({ earliest, latest });
+  }
+  if (gaps.length === 0) return { ok: false, reason: `No room at ${base ?? 'base'} for the round trip · every wait in ${tail}'s day is too short` };
+  const preferred = preferStart === undefined ? undefined : gaps.find((gap) => preferStart >= gap.earliest && preferStart <= gap.latest);
+  const start = preferred ? Math.round(preferStart! / 5) * 5 : gaps[gaps.length - 1].latest;
+  const out = { ...evening, departMinute: start };
+  const home = { ...morning, departMinute: start + evening.blockMinutes + turnOut };
   return { ok: true, legs: [out, home], station: evening.dest };
 }
 
