@@ -41,6 +41,7 @@ import {
 import { CANCELLATION_NPS_SCORE, flightSatisfactionScore, recordFlightNps, rollTrailingNps } from './nps';
 import { recordDailyCashHistory } from './forecast';
 import { recordDailyPnlHistory } from './pnlHistory';
+import { recordFlightSeatNm, recordDailySeatNmHistory } from './unitEconomics';
 import { recordDailyOnTimeHistory } from './routeOtp';
 import { recordDailyLoadHistory, recordFlightLoad } from './loadFactor';
 import { checkMilestones } from './ladder';
@@ -175,6 +176,7 @@ export function step(state: SimState): void {
     // Same timing, same reason: state.todayRevenue/todayCost/todayMargin
     // still hold the day that just ended, one line above where they reset.
     recordDailyPnlHistory(state);
+    recordDailySeatNmHistory(state);
     recordDailyOnTimeHistory(state);
     recordDailyLoadHistory(state);
     state.todayLoadByMarket = {};
@@ -588,6 +590,7 @@ export function step(state: SimState): void {
           flightSeats = layout.economy + layout.business;
           flightMargin = result.margin;
           recordFlightLoad(state, key, result.pax, flightSeats);
+          recordFlightSeatNm(state, flight.origin, flight.dest, flightSeats);
           state.cash += result.margin;
           state.todayRevenue += result.revenue;
           state.todayCost += result.cost;

@@ -690,6 +690,13 @@ body {
   vector-effect: non-scaling-stroke;
 }
 
+/* The Money view's RASM and CASM lines; the colour is set per line. */
+.money-chart-unit {
+  fill: none;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
 /* The Routes view (ui/inspector/routes.ts). */
 .routes-table {
   width: 100%;

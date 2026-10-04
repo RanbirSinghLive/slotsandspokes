@@ -408,6 +408,14 @@ export type SimState = {
   costHistory: number[];
   marginHistory: number[];
   /**
+   * Seats flown times nautical miles, today and for each finished day
+   * (sim/unitEconomics.ts): the capacity RASM and CASM divide by. Optional:
+   * saves from before it was kept start empty, and the chart draws only the
+   * days that have an entry.
+   */
+  todaySeatNm?: number;
+  seatNmHistory?: number[];
+  /**
    * Same-day accumulation as `todayRevenue`/`todayCost` above, split by
    * market (`marketKey(origin, dest)`, sim/schedule.ts) instead of summed
    * across the whole airline — filled in step.ts's arrival loop, right

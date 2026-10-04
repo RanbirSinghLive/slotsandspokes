@@ -1,6 +1,8 @@
 import { cashRunway, RUNWAY_WINDOW_DAYS } from '../../sim/forecast';
 import { line, heading, lineWithInfo } from './dom';
 import { money } from '../format';
+import { chartLegend } from '../chartLegend';
+import { unitEconomicsHistory } from '../../sim/unitEconomics';
 import type { SimState } from '../../sim/state';
 
 /**
@@ -41,6 +43,32 @@ function cashChart(history: number[]): SVGSVGElement {
   return svg;
 }
 
+const RASM_COLOR = '#7ed6a8';
+const CASM_COLOR = '#ff9f6b';
+
+/** RASM and CASM on one scale, so the gap between the lines is the margin per seat nm. */
+function unitChart(days: { rasm: number; casm: number }[]): SVGSVGElement {
+  const all = days.flatMap((day) => [day.rasm, day.casm]);
+  const low = Math.min(...all);
+  const high = Math.max(...all);
+  const span = high - low || 1;
+  const x = (i: number) => (days.length > 1 ? (i / (days.length - 1)) * CHART_WIDTH : 0);
+  const y = (value: number) => CHART_HEIGHT - ((value - low) / span) * (CHART_HEIGHT - 8) - 4;
+  const svg = document.createElementNS(SVG, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`);
+  svg.setAttribute('class', 'fuel-chart');
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', `RASM and CASM over the last ${days.length} days`);
+  for (const [key, color] of [['rasm', RASM_COLOR], ['casm', CASM_COLOR]] as const) {
+    const path = document.createElementNS(SVG, 'polyline');
+    path.setAttribute('points', days.map((day, i) => `${x(i).toFixed(1)},${y(day[key]).toFixed(1)}`).join(' '));
+    path.setAttribute('class', 'money-chart-unit');
+    path.setAttribute('stroke', color);
+    svg.append(path);
+  }
+  return svg;
+}
+
 const COST_NAMES: Record<string, string> = {
   fuel: 'Fuel',
   blockNonFuel: 'Flying (crews, maintenance)',
@@ -75,6 +103,24 @@ export function buildMoneyView(state: SimState): HTMLElement {
 
   const history = state.cashHistory;
   if (history.length > 1) root.append(cashChart(history), line(`Closing cash · ${history.length}d · dashed $0`, 'inspector-line goal-ahead'));
+
+  const units = unitEconomicsHistory(state);
+  if (units.length > 1) {
+    const latest = units[units.length - 1];
+    root.append(
+      heading('RASM / CASM'),
+      lineWithInfo(
+        `RASM ${latest.rasm.toFixed(2)}¢ · CASM ${latest.casm.toFixed(2)}¢ · ${units.length}d`,
+        'Revenue and cost per available seat nautical mile, for each finished day. Capacity counts every seat flown, sold or not, so RASM falls when planes fly empty. The gap between the lines is the margin per seat nm.',
+        latest.rasm < latest.casm ? 'inspector-line is-over' : 'inspector-line is-good',
+      ),
+      unitChart(units),
+      chartLegend([
+        { mark: 'line', color: RASM_COLOR, label: 'RASM' },
+        { mark: 'line', color: CASM_COLOR, label: 'CASM' },
+      ]),
+    );
+  }
 
   const week = (values: number[]) => {
     const recent = values.slice(-7);
