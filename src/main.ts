@@ -1,6 +1,7 @@
 import './style.css';
 import { dayIndex, homeUtcOffsetMinutes, minuteOfDay as homeMinuteOfDay } from './sim/clock';
-import { projection, fitProjection, mapGesture, setMapElement, mapPoint, mapSize } from './render/projection';
+import { projection, fitProjection, mapGesture, setMapElement, mapPoint, mapSize, type ClientPoint } from './render/projection';
+import { setupMapInput } from './ui/mapInput';
 import { zoomAt as cameraZoomAt, panFrom, panBy, currentView, restoreView } from './render/camera';
 import { drawBasemap } from './render/basemap';
 import { drawTerminator } from './render/terminator';
@@ -781,10 +782,13 @@ let translateAtDragStart: [number, number] = [0, 0];
 let ringOpenAtMouseDown = false;
 /** A press that moves less than this far before release is a click, not a pan. */
 const CLICK_SLOP_PX = 4;
-/** A finger wobbles more than a mouse, so a touch pans only after moving this far. */
-const TOUCH_PAN_SLOP_PX = 8;
 
-canvas.addEventListener('mousedown', (event) => {
+/**
+ * A press on the map, from a mouse button or a tap: closes any open ring, then
+ * gives the route builder, a plane, a grounded-plane pin and the airport ring
+ * first refusal, and only otherwise starts a pan.
+ */
+function pressMap(event: ClientPoint): void {
   mapTapInProgress = true;
   queueMicrotask(() => (mapTapInProgress = false));
   ringOpenAtMouseDown = isMapMenuOpen();
@@ -832,7 +836,9 @@ canvas.addEventListener('mousedown', (event) => {
   dragStartX = event.clientX;
   dragStartY = event.clientY;
   translateAtDragStart = projection.translate();
-});
+}
+
+canvas.addEventListener('mousedown', pressMap);
 
 /**
  * One hover system for the whole map. Priority order: if a route is currently armed,
@@ -901,26 +907,24 @@ window.addEventListener('mousemove', (event) => {
   render();
 });
 
-window.addEventListener('mouseup', (event) => {
+/** The end of a press: one that never moved, on empty map, returns the panel to Network. */
+function releaseMap(event: ClientPoint): void {
   // A click on empty map (no route builder, no ring, no airport or route
   // under it, so it started a pan that never moved) returns the panel to
   // Network.
   const moved = Math.hypot(event.clientX - dragStartX, event.clientY - dragStartY);
   if (isDragging && moved < CLICK_SLOP_PX && !ringOpenAtMouseDown) select(NETWORK);
   isDragging = false;
-});
+}
 
-// --- Pan and pinch (touch) ---
+window.addEventListener('mouseup', releaseMap);
+
+// --- Touch ---
 //
-// A finger that moves never produces the mouse events the pan above listens
-// for, so touch has its own: one finger drags the map, two fingers pinch it.
-// A tap that doesn't move still arrives as the usual mouse events, so
-// selecting, the ring and the route builder need nothing here. Moves only
-// change the projection: the frame loop draws it once per frame, where a
-// draw per event (several arrive per frame on a phone) made the map lag.
-const touchPoints = new Map<number, [number, number]>();
-let touchPanStart: { x: number; y: number; translate: [number, number] } | null = null;
-let touchPanning = false;
+// ui/mapInput.ts turns finger events into taps, drags and pinches; this says what
+// each does. Moves only change the projection: the frame loop draws it once per
+// frame, where a draw per event (several arrive per frame on a phone) made the
+// map lag. A tap runs the same press and release a mouse click does.
 
 // Press and hold on an airport opens its details sheet, with a ring filling
 // around the airport while the hold registers. Moving off (a drag), a second
@@ -957,73 +961,7 @@ function openAirportSheet(iata: string): void {
   if (panelHidden) setPanelHidden(false);
 }
 
-// A long press must not open the browser's own menu or select text under the finger.
-canvas.addEventListener('contextmenu', (event) => event.preventDefault());
-
-canvas.addEventListener('pointerdown', (event) => {
-  if (event.pointerType !== 'touch') return;
-  const touchPointAt = mapPoint(event.clientX, event.clientY);
-  touchPoints.set(event.pointerId, touchPointAt);
-  try {
-    canvas.setPointerCapture(event.pointerId);
-  } catch {
-    // A pointer the browser has already ended can't be captured; the touch still works without it.
-  }
-  touchPanning = touchPanning && touchPoints.size > 1;
-  touchPanStart = touchPoints.size === 1 ? { x: touchPointAt[0], y: touchPointAt[1], translate: projection.translate() } : null;
-  cancelAirportHold();
-  if (touchPoints.size === 1) startAirportHold(...mapPoint(event.clientX, event.clientY));
-});
-
-canvas.addEventListener('pointermove', (event) => {
-  const before = touchPoints.get(event.pointerId);
-  if (event.pointerType !== 'touch' || !before) return;
-  const now = mapPoint(event.clientX, event.clientY);
-  if (touchPoints.size >= 2) {
-    const [other] = [...touchPoints.entries()].filter(([id]) => id !== event.pointerId).map(([, point]) => point);
-    const distanceBefore = Math.hypot(before[0] - other[0], before[1] - other[1]);
-    const distanceNow = Math.hypot(now[0] - other[0], now[1] - other[1]);
-    touchPanning = true;
-    mapGesture.active = true;
-    cancelAirportHold();
-    hideMapMenu();
-    // Zoom about the pair's midpoint, then slide by how far the moving finger carried it.
-    panBy((now[0] - before[0]) / 2, (now[1] - before[1]) / 2);
-    if (distanceBefore > 0) zoomAt((now[0] + other[0]) / 2, (now[1] + other[1]) / 2, distanceNow / distanceBefore, false);
-  } else if (touchPanStart) {
-    if (!touchPanning && Math.hypot(now[0] - touchPanStart.x, now[1] - touchPanStart.y) < TOUCH_PAN_SLOP_PX) return;
-    if (!touchPanning) hideMapMenu();
-    cancelAirportHold();
-    touchPanning = true;
-    mapGesture.active = true;
-    panFrom(touchPanStart.translate, now[0] - touchPanStart.x, now[1] - touchPanStart.y);
-  }
-  touchPoints.set(event.pointerId, now);
-});
-
-// A tap is handled here rather than left to the mouse events a browser makes up
-// after it: iOS skips those when the pointer moved handlers change the page, and
-// then nothing could be tapped. The made-up events are cancelled (touchend below)
-// and the same mouse handlers run from the tap itself.
-const DOUBLE_TAP_MS = 300;
-const DOUBLE_TAP_SLOP_PX = 30;
 const DOUBLE_TAP_ZOOM = 2;
-let lastTap = { time: 0, x: 0, y: 0 };
-
-/** (x, y) is where the finger lifted, in page (client) coordinates, as the made-up mouse events carry it. */
-function tapMap(x: number, y: number): void {
-  const now = performance.now();
-  if (now - lastTap.time < DOUBLE_TAP_MS && Math.hypot(x - lastTap.x, y - lastTap.y) < DOUBLE_TAP_SLOP_PX) {
-    lastTap.time = 0;
-    hideMapMenu();
-    animateZoomAt(...mapPoint(x, y), DOUBLE_TAP_ZOOM);
-    return;
-  }
-  lastTap = { time: now, x, y };
-  const init = { clientX: x, clientY: y, button: 0, bubbles: true, cancelable: true, view: window };
-  canvas.dispatchEvent(new MouseEvent('mousedown', init));
-  canvas.dispatchEvent(new MouseEvent('mouseup', init));
-}
 
 /** Zoom in on (x, y) over a moment, as a double tap does. */
 function animateZoomAt(x: number, y: number, factor: number): void {
@@ -1041,26 +979,31 @@ function animateZoomAt(x: number, y: number, factor: number): void {
   requestAnimationFrame(step);
 }
 
-canvas.addEventListener('touchend', (event) => event.preventDefault(), { passive: false });
-
-function endTouch(event: PointerEvent): void {
-  if (event.pointerType !== 'touch') return;
-  const isTap = event.type === 'pointerup' && touchPoints.size === 1 && touchPoints.has(event.pointerId) && touchPanStart !== null && !touchPanning && !holdOpened;
-  cancelAirportHold();
-  touchPoints.delete(event.pointerId);
-  if (isTap) tapMap(event.clientX, event.clientY);
-  if (touchPoints.size === 0) {
-    touchPanStart = null;
-    touchPanning = false;
+setupMapInput(canvas, mapPoint, {
+  pressed: (x, y) => startAirportHold(x, y),
+  cancelHold: cancelAirportHold,
+  gestureStarted: () => {
+    mapGesture.active = true;
+    hideMapMenu();
+  },
+  holdFired: () => holdOpened,
+  pan: (dx, dy) => panBy(dx, dy),
+  pinch: (x, y, ratio, dx, dy) => {
+    panBy(dx, dy);
+    zoomAt(x, y, ratio, false);
+  },
+  gestureEnded: () => {
     mapGesture.active = false;
-  } else if (touchPoints.size === 1) {
-    // One finger left after a pinch: carry on dragging from where it is.
-    const [remaining] = touchPoints.values();
-    touchPanStart = { x: remaining[0], y: remaining[1], translate: projection.translate() };
-  }
-}
-canvas.addEventListener('pointerup', endTouch);
-canvas.addEventListener('pointercancel', endTouch);
+  },
+  tap: (clientX, clientY) => {
+    pressMap({ clientX, clientY });
+    releaseMap({ clientX, clientY });
+  },
+  doubleTap: (x, y) => {
+    hideMapMenu();
+    animateZoomAt(x, y, DOUBLE_TAP_ZOOM);
+  },
+});
 
 // Esc steps the inspector back one level, but only when nothing else on
 // screen wants Esc first. Listening in the capture phase runs this before

@@ -205,3 +205,6 @@ export function mapPoint(clientX: number, clientY: number): [number, number] {
 export function mapSize(): { width: number; height: number } {
   return { width: mapElement?.clientWidth ?? 0, height: mapElement?.clientHeight ?? 0 };
 }
+
+/** What a map hit test needs from a press: where it was, in page (client) coordinates. */
+export type ClientPoint = { clientX: number; clientY: number };
