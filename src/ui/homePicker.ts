@@ -35,6 +35,11 @@ const GROUPS: { difficulty: HomeDifficulty | null; title: string; note: string }
 
 /** How far, in screen pixels, the cursor reaches for the nearest featured home. */
 const SNAP_RADIUS_PX = 70;
+/** A fingertip covers more than a cursor, but the map is zoomable, so a tighter reach keeps a tap on the dot it meant. */
+const TOUCH_SNAP_RADIUS_PX = 44;
+const MAX_ZOOM = 8;
+/** A touch that moves less than this is a tap, not a drag. */
+const TAP_SLOP_PX = 8;
 const MAP_INSET_PX = 16;
 
 const worldEl = document.querySelector<HTMLDivElement>('#home-world')!;
@@ -58,6 +63,13 @@ let featured: (PickerPoint & { option: HomeOption; story: Story })[] = [];
 let lifted: (typeof featured)[number] | null = null;
 let pinned: (typeof featured)[number] | null = null;
 let choose: (iata: string, season: StartSeason) => void = () => {};
+
+/**
+ * The picker's own zoom and pan, on top of the whole-world fit: a factor
+ * (1 = the world fits the window) and a pixel offset. Touch only, so a
+ * phone can enlarge a crowded region; the mouse view is unchanged.
+ */
+const zoomState = { factor: 1, panX: 0, panY: 0 };
 
 const pointByIata = new Map(airports.map((airport) => [airport.iata, { iata: airport.iata, lon: airport.lon, lat: airport.lat }]));
 
@@ -106,7 +118,8 @@ function whyHard(option: HomeOption): string | null {
 function showStory(): void {
   const home = lifted ?? pinned;
   if (!home) {
-    storyEl.replaceChildren(textEl('p', 'home-world-hint', `${featured.length} featured homes · point at one to read it, click to choose it`));
+    const how = window.matchMedia('(pointer: coarse)').matches ? 'tap one to choose it · pinch to zoom' : 'point at one to read it, click to choose it';
+    storyEl.replaceChildren(textEl('p', 'home-world-hint', `${featured.length} featured homes · ${how}`));
   } else {
     const { option, story } = home;
     storyEl.replaceChildren(
@@ -126,8 +139,8 @@ function drawWorld(): void {
   // Only while it's on screen: hiding it fires pointerleave, and a redraw
   // then would refit the shared projection after the game has fitted it to home.
   if (worldEl.hidden) return;
-  const width = window.innerWidth;
-  const height = window.innerHeight;
+  const width = worldEl.clientWidth;
+  const height = worldEl.clientHeight;
   const dpr = window.devicePixelRatio || 1;
   if (worldCanvas.width !== width * dpr || worldCanvas.height !== height * dpr) {
     worldCanvas.width = width * dpr;
@@ -136,6 +149,7 @@ function drawWorld(): void {
   worldCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   // Fitted on every draw: the game map (main.ts) refits the same projection to home on a resize.
   fitWorld(width, height, { top: MAP_INSET_PX, right: MAP_INSET_PX, bottom: panelEl.offsetHeight + MAP_INSET_PX, left: MAP_INSET_PX });
+  applyZoom(width, height);
   const view: PickerView = {
     airports: [...pointByIata.values()],
     featured,
@@ -151,10 +165,34 @@ function drawWorld(): void {
   drawPickerMap(worldCtx, width, height, view);
 }
 
-/** The featured home nearest the cursor, within SNAP_RADIUS_PX. */
-function nearestFeatured(x: number, y: number): (typeof featured)[number] | null {
+/** Lay the zoom and pan over the fitted projection, keeping the map covering the window. */
+function applyZoom(width: number, height: number): void {
+  const mapHeight = height - panelEl.offsetHeight;
+  zoomState.panX = Math.min(0, Math.max(width * (1 - zoomState.factor), zoomState.panX));
+  zoomState.panY = Math.min(0, Math.max(mapHeight * (1 - zoomState.factor), zoomState.panY));
+  if (zoomState.factor === 1) {
+    zoomState.panX = 0;
+    zoomState.panY = 0;
+    return;
+  }
+  const [translateX, translateY] = projection.translate();
+  projection.scale(projection.scale() * zoomState.factor);
+  projection.translate([translateX * zoomState.factor + zoomState.panX, translateY * zoomState.factor + zoomState.panY]);
+}
+
+/** Change the zoom by `ratio`, keeping the map point under (centerX, centerY) where it is. */
+function zoomAround(ratio: number, centerX: number, centerY: number): void {
+  const next = Math.min(MAX_ZOOM, Math.max(1, zoomState.factor * ratio));
+  const applied = next / zoomState.factor;
+  zoomState.panX = centerX - (centerX - zoomState.panX) * applied;
+  zoomState.panY = centerY - (centerY - zoomState.panY) * applied;
+  zoomState.factor = next;
+}
+
+/** The featured home nearest the cursor, within the snap radius. */
+function nearestFeatured(x: number, y: number, radius = SNAP_RADIUS_PX): (typeof featured)[number] | null {
   let best: (typeof featured)[number] | null = null;
-  let bestDistance = SNAP_RADIUS_PX;
+  let bestDistance = radius;
   for (const home of featured) {
     const at = projection([home.lon, home.lat]);
     if (!at) continue;
@@ -169,7 +207,59 @@ function pointerAt(event: PointerEvent): [number, number] {
   return [event.clientX - box.left, event.clientY - box.top];
 }
 
+const touches = new Map<number, [number, number]>();
+let touchStart: [number, number] | null = null;
+let touchMoved = false;
+let lastPinchDistance = 0;
+
+function pinchDistance(): number {
+  const [first, second] = [...touches.values()];
+  return Math.hypot(first[0] - second[0], first[1] - second[1]);
+}
+
+function chooseAt(x: number, y: number, radius: number): void {
+  const home = nearestFeatured(x, y, radius);
+  if (!home) return;
+  pinned = home;
+  lifted = null;
+  showStory();
+  drawWorld();
+}
+
+worldCanvas.addEventListener('pointerdown', (event) => {
+  if (event.pointerType !== 'touch') return;
+  worldCanvas.setPointerCapture(event.pointerId);
+  touches.set(event.pointerId, pointerAt(event));
+  if (touches.size === 1) {
+    touchStart = pointerAt(event);
+    touchMoved = false;
+  } else if (touches.size === 2) {
+    touchMoved = true;
+    lastPinchDistance = pinchDistance();
+  }
+});
+
 worldCanvas.addEventListener('pointermove', (event) => {
+  if (event.pointerType === 'touch') {
+    const before = touches.get(event.pointerId);
+    if (!before) return;
+    const now = pointerAt(event);
+    if (touches.size === 1 && touchStart) {
+      if (!touchMoved && Math.hypot(now[0] - touchStart[0], now[1] - touchStart[1]) < TAP_SLOP_PX) return;
+      touchMoved = true;
+      zoomState.panX += now[0] - before[0];
+      zoomState.panY += now[1] - before[1];
+    }
+    touches.set(event.pointerId, now);
+    if (touches.size === 2) {
+      const [first, second] = [...touches.values()];
+      const distance = pinchDistance();
+      if (lastPinchDistance > 0) zoomAround(distance / lastPinchDistance, (first[0] + second[0]) / 2, (first[1] + second[1]) / 2);
+      lastPinchDistance = distance;
+    }
+    drawWorld();
+    return;
+  }
   const next = nearestFeatured(...pointerAt(event));
   if (next === lifted) return;
   lifted = next;
@@ -178,19 +268,28 @@ worldCanvas.addEventListener('pointermove', (event) => {
   drawWorld();
 });
 
-worldCanvas.addEventListener('pointerleave', () => {
-  if (!lifted) return;
+function endTouch(event: PointerEvent): void {
+  if (event.pointerType !== 'touch' || !touches.has(event.pointerId)) return;
+  const at = pointerAt(event);
+  touches.delete(event.pointerId);
+  lastPinchDistance = 0;
+  if (event.type === 'pointerup' && touches.size === 0 && !touchMoved) chooseAt(at[0], at[1], TOUCH_SNAP_RADIUS_PX);
+}
+
+worldCanvas.addEventListener('pointerup', endTouch);
+worldCanvas.addEventListener('pointercancel', endTouch);
+
+worldCanvas.addEventListener('pointerleave', (event) => {
+  if (event.pointerType === 'touch' || !lifted) return;
   lifted = null;
   showStory();
   drawWorld();
 });
 
 worldCanvas.addEventListener('click', (event) => {
-  const home = nearestFeatured(...pointerAt(event));
-  if (!home) return;
-  pinned = home;
-  showStory();
-  drawWorld();
+  // A touch is chosen on pointerup, above; the click that follows it would choose twice.
+  if ((event as PointerEvent).pointerType === 'touch') return;
+  chooseAt(...pointerAt(event as PointerEvent), SNAP_RADIUS_PX);
 });
 
 startButton.addEventListener('click', () => {
@@ -207,6 +306,7 @@ backButton.addEventListener('click', () => {
 });
 
 window.addEventListener('resize', drawWorld);
+window.visualViewport?.addEventListener('resize', drawWorld);
 
 function start(iata: string): void {
   worldEl.hidden = true;
@@ -257,6 +357,7 @@ export function showHomePicker(homes: HomeOption[], onChoose: (iata: string, sea
   });
   fillList();
   worldEl.hidden = false;
+  zoomState.factor = 1;
   showStory();
   drawWorld();
   loadFinePickerLand(drawWorld);
