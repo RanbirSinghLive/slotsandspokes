@@ -1,11 +1,14 @@
 import './style.css';
 import { dayIndex, homeUtcOffsetMinutes, minuteOfDay as homeMinuteOfDay } from './sim/clock';
-import { projection, fitProjection, baselineScale } from './render/projection';
+import { projection, fitProjection, mapGesture, setMapElement, mapPoint, mapSize, type ClientPoint } from './render/projection';
+import { setupMapInput } from './ui/mapInput';
+import { zoomAt as cameraZoomAt, panFrom, panBy, currentView, restoreView } from './render/camera';
 import { drawBasemap } from './render/basemap';
 import { drawTerminator } from './render/terminator';
-import { drawRoutes, drawSelectedRoute } from './render/routes';
+import { drawAirportChips } from './render/airportChips';
+import { drawRoutes,drawSelectedRoute } from './render/routes';
 import { drawPainGauges } from './render/pain';
-import { drawAirports, drawSelectedAirport, airports, setKnownAirports, nearestAirportCandidate } from './render/airports';
+import { drawAirports, drawSelectedAirport, airports, setKnownAirports, nearestAirportCandidate, setAirportHold } from './render/airports';
 import { drawHubView, hasHubView } from './render/hubs';
 import { drawFog } from './render/fog';
 import { drawWeatherEffects } from './render/weather';
@@ -24,6 +27,10 @@ import { createNewGameState, type SimState } from './sim/state';
 import { chooseHome, homeOptions } from './sim/homes';
 import { showHomePicker } from './ui/homePicker';
 import { gameDateWithYear } from './ui/format';
+import { isOpsView, setOpsView } from './render/opsView';
+import { drawOpsRouteLabels } from './render/opsHub';
+
+import { drawDisruptions, findDisruptionPinAt } from './render/disruptions';
 import { setAirportFilter, visibleAirports, type AirportFilter } from './ui/airportFilter';
 import { step } from './sim/step';
 import { updatePanel, renderScheduleWarnings, scheduleProblems, PANEL_WIDTH_PX, setScheduleClock } from './ui/panels';
@@ -56,6 +63,8 @@ const YEAR_ONE_DAY = 365;
 import { updateRunway } from './ui/runway';
 import { isInsolvent } from './sim/insolvency';
 import { setupGameControls } from './ui/gameControls';
+import { startCloudSave } from './ui/cloudSave';
+import { setupCloudSaveControls } from './ui/cloudSaveControls';
 import { setupRail, updateRail } from './ui/rail';
 import { closeJumpBox, isJumpBoxOpen, openJumpBox, setupJumpBox } from './ui/jumpBox';
 import { clearMapHover, getMapHover, setupMapLinks } from './ui/mapLink';
@@ -101,8 +110,11 @@ setupFarePolicy(state);
 setupInfoTooltips();
 setupGameOver();
 setupGameControls(state);
+setupCloudSaveControls();
+void startCloudSave(state);
 
 const canvas = document.querySelector<HTMLCanvasElement>('#map')!;
+setMapElement(canvas);
 const ctx = canvas.getContext('2d')!;
 const clockEl = document.querySelector<HTMLDivElement>('#clock')!;
 const speedButtons = document.querySelectorAll<HTMLButtonElement>('#speed-controls button');
@@ -169,11 +181,21 @@ function syncCompetitorAirlineChips(): void {
 const MIN_MAP_WIDTH_PX = 200;
 /** The rail's width, which stays when the panel is hidden; style.css's --rail-width matches it. */
 const RAIL_WIDTH_PX = 56;
-let panelHidden = false;
+/** At or below this window width the panel is a sheet over the map, not a column beside it (style.css's :root[data-narrow]). */
+const NARROW_WINDOW_PX = 700;
+const MAP_SHEET_MARGIN = 0.5;
+const isNarrowWindow = (): boolean => window.innerWidth <= NARROW_WINDOW_PX;
+// A phone starts with the map showing; the rail opens the panel.
+let panelHidden = isNarrowWindow();
 let currentPanelWidthPx = PANEL_WIDTH_PX + RAIL_WIDTH_PX;
 
 function applyPanelWidth(): void {
-  const desiredPanelWidthPx = (panelHidden ? 0 : PANEL_WIDTH_PX) + RAIL_WIDTH_PX;
+  const narrow = isNarrowWindow();
+  document.documentElement.toggleAttribute('data-narrow', narrow);
+  // A phone caches a map twice as big as the screen each way, so a drag has picture to slide over (render/projection.ts).
+  mapGesture.margin = narrow ? MAP_SHEET_MARGIN : 0;
+  // Narrow: the panel floats over the map, so the map only gives up the rail.
+  const desiredPanelWidthPx = (panelHidden || narrow ? 0 : PANEL_WIDTH_PX) + RAIL_WIDTH_PX;
   currentPanelWidthPx = Math.min(desiredPanelWidthPx, window.innerWidth - MIN_MAP_WIDTH_PX);
   document.documentElement.style.setProperty('--panel-width', `${currentPanelWidthPx}px`);
 }
@@ -200,14 +222,21 @@ function applyPanelWidth(): void {
  * pixel coordinates (so the rest of the code never has to think about DPR),
  * but it lands on a high-enough-resolution buffer to look sharp.
  */
-function resize(): void {
+function resize(keepView = false): void {
   applyPanelWidth(); // re-clamp in case the window itself was resized, not just the panel
+  const previous = keepView ? currentView() : null;
   const cssWidth = window.innerWidth - currentPanelWidthPx;
   const cssHeight = window.innerHeight;
-  const dpr = window.devicePixelRatio || 1;
+  // A phone's 3x screen would draw nine pixels per CSS pixel; 2x looks the same on this map and costs less than half as much.
+  const dpr = Math.min(window.devicePixelRatio || 1, isNarrowWindow() ? 2 : Infinity);
 
   canvas.width = cssWidth * dpr;
   canvas.height = cssHeight * dpr;
+  // On a phone 100vh is the page with the browser's toolbars hidden, taller than
+  // the visible window, which stretched the picture and put taps below the finger.
+  // Everything else reads the map's size back from this box (render/projection.ts's mapSize()).
+  canvas.style.width = `${cssWidth}px`;
+  canvas.style.height = `${cssHeight}px`;
 
   // Reset any previous scale before reapplying it — resize can fire many
   // times, and scale() otherwise compounds on top of itself.
@@ -216,6 +245,7 @@ function resize(): void {
 
   const home = airports.find((airport) => airport.iata === state.homeAirport) ?? airports[0];
   fitProjection(cssWidth, cssHeight, home);
+  if (previous) restoreView(previous, cssWidth, cssHeight);
   render();
 }
 
@@ -260,7 +290,7 @@ function render(nowMs: number = performance.now()): void {
   // Always visible, whatever screen is open: see ui/alerts.ts's own
   // comment for why that's the point. An alert with no view of its own
   // (a schedule problem) opens Fleet, where the rotations are.
-  updateAlerts(state, () => select({ kind: 'fleet' }));
+  updateAlerts(state, () => select({ kind: 'fleet' }), choosingHome);
 
   // The game-over screen is a global overlay, not part of any one sidebar
   // tab, so it keeps refreshing whichever one is showing. Pausing on
@@ -270,8 +300,7 @@ function render(nowMs: number = performance.now()): void {
   updateGameOver(state);
   if (updateRunway(state)) runwayPauseRequested = true;
 
-  const cssWidth = window.innerWidth - currentPanelWidthPx;
-  const cssHeight = window.innerHeight;
+  const { width: cssWidth, height: cssHeight } = mapSize();
 
   // The known airports, less any the map's airport filter hides (ui/airportFilter.ts).
   setKnownAirports(visibleAirports(state));
@@ -302,7 +331,8 @@ function render(nowMs: number = performance.now()): void {
   } else if (competitionOverlayOn) {
     drawCompetitionLayer(ctx, selectedCompetitorAirline, state);
   } else {
-    drawRoutes(ctx, state);
+    // Frequency and yield labels only on the Demand lens; on the plain map they clog the hubs.
+    drawRoutes(ctx, state, demandOverlayOn);
   }
   // A rival being squeezed out of one of your markets, or the respite
   // after one left (render/pain.ts): on whichever layer drew the routes.
@@ -340,6 +370,11 @@ function render(nowMs: number = performance.now()): void {
 
   drawAircraft(ctx, state, latestFractionalMinute, hoveredFlight?.legId ?? selectedFlight?.legId ?? null);
   drawAirports(ctx, state);
+  drawOpsRouteLabels(ctx, state, selection, mapHover, hoverPoint);
+
+  drawAirportChips(ctx, state);
+
+  drawDisruptions(ctx, state);
   // The airport the side panel is showing, on top of its dot.
   if (selection.kind === 'airport') drawSelectedAirport(ctx, selection.iata);
   if (mapHover?.kind === 'airport') drawSelectedAirport(ctx, mapHover.iata);
@@ -412,7 +447,9 @@ function updateClock(state: SimState): void {
   clockEl.title = `Local time at your home airport, ${state.homeAirport} (${formatUtcOffset(homeUtcOffsetMinutes(state))}). Every schedule time in the game uses this clock.`;
 }
 
-window.addEventListener('resize', resize);
+// A resize keeps the player's pan and zoom; only Home (below) and a new home airport refit.
+window.addEventListener('resize', () => resize(true));
+window.visualViewport?.addEventListener('resize', () => resize(true));
 resize();
 
 // Hide the side panel entirely and let the map fill the screen — CLAUDE.md's
@@ -425,8 +462,10 @@ function setPanelHidden(hidden: boolean): void {
   panelEl.hidden = panelHidden;
   clearMapHover();
   // The map's available width just changed, same as a real window resize.
-  resize();
+  resize(true);
 }
+panelEl.hidden = panelHidden;
+document.querySelector('#panel-close')!.addEventListener('click', () => setPanelHidden(true));
 setupRail({ isHidden: () => panelHidden, setHidden: setPanelHidden });
 setupJumpBox(state);
 setupShortcutsCard(() => choosingHome);
@@ -453,8 +492,10 @@ document.querySelector('#rail-jump')!.addEventListener('click', () => openJumpBo
 // The inspector (ui/inspector/) follows the selection: a map click, a link
 // or the breadcrumb changes it, and the panel rebuilds to show it. A hidden
 // panel comes back, since otherwise the click would seem to do nothing.
+// On a phone a tap on the map keeps the map showing, so the ring that tap opens stays in view; the rail opens the sheet.
+let mapTapInProgress = false;
 onSelectionChange(() => {
-  if (panelHidden && getSelection().kind !== 'network') setPanelHidden(false);
+  if (panelHidden && getSelection().kind !== 'network' && !(mapTapInProgress && isNarrowWindow())) setPanelHidden(false);
   clearMapHover();
   renderInspector(state);
   render();
@@ -667,7 +708,7 @@ window.addEventListener('keydown', (event) => {
  * needs no key.
  */
 function updateLensLegend(): void {
-  lensLegend.hidden = lens === 'network';
+  lensLegend.hidden = lens === 'network' && !isOpsView();
   const swatch = (color: string, label: string) =>
     `<div><span class="mapmode-legend-swatch" style="background:${color}"></span><span>${label}</span></div>`;
   if (lens === 'profit') {
@@ -688,7 +729,15 @@ function updateLensLegend(): void {
     lensLegendTitle.textContent = 'Rival networks · pick one to narrow';
     lensLegendScale.innerHTML = '';
   }
+  if (isOpsView() && (lens === 'network' || lens === 'profit' || lens === 'ontime')) {
+    if (lens === 'network') {
+      lensLegendTitle.textContent = 'Route width';
+      lensLegendScale.innerHTML = '';
+    }
+    lensLegendScale.insertAdjacentHTML('beforeend', '<div><span>width = seats a day</span></div>');
+  }
 }
+document.querySelector('#ops-view-toggle')?.addEventListener('click', () => queueMicrotask(updateLensLegend));
 
 // Which airports the map shows (ui/airportFilter.ts): a visible three-way
 // switch in the bottom-left corner.
@@ -699,6 +748,25 @@ airportFilterButtons.forEach((button) => {
     airportFilterButtons.forEach((other) => other.classList.toggle('active', other === button));
     render();
   });
+});
+
+// The Ops view switch (render/opsView.ts): bottom left, beside the airport
+// filter. O toggles it too.
+const opsViewButton = document.querySelector<HTMLButtonElement>('#ops-view-toggle')!;
+function showOpsView(next: boolean): void {
+  setOpsView(next);
+  opsViewButton.classList.toggle('active', next);
+  opsViewButton.setAttribute('aria-pressed', String(next));
+  render();
+}
+opsViewButton.addEventListener('click', () => showOpsView(!isOpsView()));
+opsViewButton.classList.toggle('active', isOpsView());
+opsViewButton.setAttribute('aria-pressed', String(isOpsView()));
+window.addEventListener('keydown', (event) => {
+  if (event.ctrlKey || event.metaKey || event.altKey || event.key.toLowerCase() !== 'o') return;
+  const target = event.target as HTMLElement | null;
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+  showOpsView(!isOpsView());
 });
 
 // --- Pan (click and drag) ---
@@ -721,7 +789,14 @@ let ringOpenAtMouseDown = false;
 /** A press that moves less than this far before release is a click, not a pan. */
 const CLICK_SLOP_PX = 4;
 
-canvas.addEventListener('mousedown', (event) => {
+/**
+ * A press on the map, from a mouse button or a tap: closes any open ring, then
+ * gives the route builder, a plane, a grounded-plane pin and the airport ring
+ * first refusal, and only otherwise starts a pan.
+ */
+function pressMap(event: ClientPoint): void {
+  mapTapInProgress = true;
+  queueMicrotask(() => (mapTapInProgress = false));
   ringOpenAtMouseDown = isMapMenuOpen();
   // Any open ring (ui/mapMenu.ts) gets closed before deciding what this
   // click actually does, otherwise arming a route, or just starting a
@@ -740,9 +815,16 @@ canvas.addEventListener('mousedown', (event) => {
 
   // A plane in the air, drawn on top of everything, gets the click before
   // the airports and routes under it: it opens that plane's view.
-  const clickedFlight = findFlightAt(event.clientX, event.clientY, state, latestFractionalMinute);
+  const clickedFlight = findFlightAt(...mapPoint(event.clientX, event.clientY), state, latestFractionalMinute);
   if (clickedFlight) {
     select({ kind: 'aircraft', tail: clickedFlight.tail });
+    render();
+    return;
+  }
+
+  // A grounded plane's pin (Ops view) opens the Maintenance screen.
+  if (findDisruptionPinAt(...mapPoint(event.clientX, event.clientY), state)) {
+    select({ kind: 'maintenance' });
     render();
     return;
   }
@@ -760,7 +842,9 @@ canvas.addEventListener('mousedown', (event) => {
   dragStartX = event.clientX;
   dragStartY = event.clientY;
   translateAtDragStart = projection.translate();
-});
+}
+
+canvas.addEventListener('mousedown', pressMap);
 
 /**
  * One hover system for the whole map. Priority order: if a route is currently armed,
@@ -774,8 +858,16 @@ canvas.addEventListener('mousedown', (event) => {
  * as hoverable at all — see findCompetitionHover()'s own comment — and
  * for what the tooltip actually reveals).
  */
+// A touch has no hover: the mouse events that follow a tap would otherwise leave a hover card stuck on the map.
+let lastInputWasTouch = false;
+const pointOf = (event: MouseEvent): { x: number; y: number } => {
+  const [x, y] = mapPoint(event.clientX, event.clientY);
+  return { x, y };
+};
+canvas.addEventListener('pointerdown', (event) => (lastInputWasTouch = event.pointerType === 'touch'));
+
 canvas.addEventListener('mousemove', (event) => {
-  hoverPoint = isDragging ? null : { x: event.clientX, y: event.clientY };
+  hoverPoint = isDragging || lastInputWasTouch ? null : pointOf(event);
   if (handleRouteBuilderMouseMove(event, state)) {
     render();
     hideCompetitionTooltip();
@@ -792,12 +884,12 @@ canvas.addEventListener('mousemove', (event) => {
   }
 
   // A plane under the pointer wins over the route or airport beneath it.
-  if (findFlightAt(event.clientX, event.clientY, state, latestFractionalMinute)) {
+  if (findFlightAt(...mapPoint(event.clientX, event.clientY), state, latestFractionalMinute)) {
     hideCompetitionTooltip();
     return;
   }
 
-  const hover = findCompetitionHover(event.clientX, event.clientY, selectedCompetitorAirline, state, competitionOverlayOn);
+  const hover = findCompetitionHover(...mapPoint(event.clientX, event.clientY), selectedCompetitorAirline, state, competitionOverlayOn);
   if (hover) {
     showCompetitionTooltip(hover, event.clientX, event.clientY, state, competitionOverlayOn);
   } else {
@@ -817,17 +909,106 @@ window.addEventListener('mousemove', (event) => {
   if (!isDragging) return;
   const dx = event.clientX - dragStartX;
   const dy = event.clientY - dragStartY;
-  projection.translate([translateAtDragStart[0] + dx, translateAtDragStart[1] + dy]);
+  panFrom(translateAtDragStart, dx, dy);
   render();
 });
 
-window.addEventListener('mouseup', (event) => {
+/** The end of a press: one that never moved, on empty map, returns the panel to Network. */
+function releaseMap(event: ClientPoint): void {
   // A click on empty map (no route builder, no ring, no airport or route
   // under it, so it started a pan that never moved) returns the panel to
   // Network.
   const moved = Math.hypot(event.clientX - dragStartX, event.clientY - dragStartY);
   if (isDragging && moved < CLICK_SLOP_PX && !ringOpenAtMouseDown) select(NETWORK);
   isDragging = false;
+}
+
+window.addEventListener('mouseup', releaseMap);
+
+// --- Touch ---
+//
+// ui/mapInput.ts turns finger events into taps, drags and pinches; this says what
+// each does. Moves only change the projection: the frame loop draws it once per
+// frame, where a draw per event (several arrive per frame on a phone) made the
+// map lag. A tap runs the same press and release a mouse click does.
+
+// Press and hold on an airport opens its details sheet, with a ring filling
+// around the airport while the hold registers. Moving off (a drag), a second
+// finger (a pinch) or letting go early cancels it; a release before the end is
+// the ordinary tap, which selects the airport and opens its ring of actions.
+const HOLD_MS = 450;
+let holdTimer: number | null = null;
+let holdOpened = false;
+
+function startAirportHold(x: number, y: number): void {
+  holdOpened = false;
+  const airport = isRouteBuilderActive() ? null : nearestAirportCandidate(x, y)?.airport;
+  if (!airport) return;
+  setAirportHold(airport.iata, HOLD_MS);
+  holdTimer = window.setTimeout(() => {
+    holdTimer = null;
+    holdOpened = true;
+    setAirportHold(null);
+    navigator.vibrate?.(15);
+    openAirportSheet(airport.iata);
+  }, HOLD_MS);
+}
+
+function cancelAirportHold(): void {
+  if (holdTimer !== null) window.clearTimeout(holdTimer);
+  holdTimer = null;
+  setAirportHold(null);
+}
+
+/** Show an airport's details on a phone, where a tap alone leaves the map in view. */
+function openAirportSheet(iata: string): void {
+  hideMapMenu();
+  select({ kind: 'airport', iata });
+  if (panelHidden) setPanelHidden(false);
+}
+
+const DOUBLE_TAP_ZOOM = 2;
+
+/** Zoom in on (x, y) over a moment, as a double tap does. */
+function animateZoomAt(x: number, y: number, factor: number): void {
+  const started = performance.now();
+  let applied = 1;
+  mapGesture.active = true;
+  const step = (now: number): void => {
+    const progress = Math.min(1, (now - started) / 180);
+    const target = Math.pow(factor, 1 - (1 - progress) * (1 - progress));
+    zoomAt(x, y, target / applied, false);
+    applied = target;
+    if (progress < 1) requestAnimationFrame(step);
+    else mapGesture.active = false;
+  };
+  requestAnimationFrame(step);
+}
+
+setupMapInput(canvas, mapPoint, {
+  pressed: (x, y) => startAirportHold(x, y),
+  cancelHold: cancelAirportHold,
+  gestureStarted: () => {
+    mapGesture.active = true;
+    hideMapMenu();
+  },
+  holdFired: () => holdOpened,
+  pan: (dx, dy) => panBy(dx, dy),
+  pinch: (x, y, ratio, dx, dy) => {
+    panBy(dx, dy);
+    zoomAt(x, y, ratio, false);
+  },
+  gestureEnded: () => {
+    mapGesture.active = false;
+  },
+  tap: (clientX, clientY) => {
+    pressMap({ clientX, clientY });
+    releaseMap({ clientX, clientY });
+  },
+  doubleTap: (x, y) => {
+    hideMapMenu();
+    animateZoomAt(x, y, DOUBLE_TAP_ZOOM);
+  },
 });
 
 // Esc steps the inspector back one level, but only when nothing else on
@@ -853,35 +1034,18 @@ window.addEventListener('keydown', handleMapMenuKeyDown);
 
 // --- Zoom (scroll wheel) ---
 //
-// Changing `projection.scale()` alone would zoom toward the map's reference
-// point, not toward the mouse — try it and the whole map slides sideways as
-// you scroll, which feels wrong. To zoom toward the cursor instead: find the
-// [longitude, latitude] currently under the mouse *before* changing the
-// scale, apply the new scale, then see where that same geographic point
-// lands *after* the change, and nudge `translate` by the difference. That
-// nudge cancels out the drift, so the point under the cursor never moves.
-// Zoomed all the way out shows most of the world, which a widebody's reach
-// can now open up (fog by reach, sim/reach.ts).
-const MIN_ZOOM = 0.15;
-const MAX_ZOOM = 20;
-
-/** Zoom by `factor`, keeping the geographic point under screen (x, y) where it is. */
-function zoomAt(x: number, y: number, factor: number): void {
-  const geoUnderPoint = projection.invert?.([x, y]);
-  if (!geoUnderPoint) return;
-  const clampedScale = Math.min(Math.max(projection.scale() * factor, baselineScale * MIN_ZOOM), baselineScale * MAX_ZOOM);
-  projection.scale(clampedScale);
-  const [driftedX, driftedY] = projection(geoUnderPoint)!;
-  const [tx, ty] = projection.translate();
-  projection.translate([tx + (x - driftedX), ty + (y - driftedY)]);
-  render();
+// The wheel, pinch and buttons all zoom through render/camera.ts; this just draws afterwards.
+// `redraw` is false mid-gesture, where the frame loop draws once per frame.
+function zoomAt(x: number, y: number, factor: number, redraw = true): void {
+  cameraZoomAt(x, y, factor);
+  if (redraw) render();
 }
 
 canvas.addEventListener(
   'wheel',
   (event) => {
     event.preventDefault();
-    zoomAt(event.clientX, event.clientY, Math.pow(1.002, -event.deltaY));
+    zoomAt(...mapPoint(event.clientX, event.clientY), Math.pow(1.002, -event.deltaY));
   },
   { passive: false },
 );
@@ -893,6 +1057,15 @@ const mapMiddle = (): [number, number] => [canvas.clientWidth / 2, canvas.client
 document.querySelector('#zoom-in')!.addEventListener('click', () => zoomAt(...mapMiddle(), ZOOM_BUTTON_FACTOR));
 document.querySelector('#zoom-out')!.addEventListener('click', () => zoomAt(...mapMiddle(), 1 / ZOOM_BUTTON_FACTOR));
 document.querySelector('#zoom-home')!.addEventListener('click', () => resize());
+
+// On a phone the lens and the airport filters fold behind one button, so they only cover the map when wanted.
+const toolsToggle = document.querySelector<HTMLButtonElement>('#map-tools-toggle')!;
+toolsToggle.addEventListener('click', () => {
+  const open = !document.documentElement.hasAttribute('data-tools');
+  document.documentElement.toggleAttribute('data-tools', open);
+  toolsToggle.setAttribute('aria-expanded', String(open));
+  toolsToggle.classList.toggle('active', open);
+});
 
 // --- Choosing a home city (new games only) ---
 //
@@ -908,9 +1081,11 @@ if (choosingHome) {
     saveState(state);
     choosingHome = false;
     resize();
-    speedMultiplier = 1;
+    // Paused, so the first route is drawn before any cash is spent on
+    // nothing; 1× or Space starts the clock at 1×.
+    speedMultiplier = 0;
     speedBeforePause = 1;
-    speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === 1));
+    speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === 0));
   });
 }
 

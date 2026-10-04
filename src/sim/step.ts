@@ -1,6 +1,8 @@
 import { endSeasonalLeases } from './seasonalLease';
 import { demandFactors, rollDailyDemandEvents } from './demandEvents';
 import { morningHolds, rollNightlyChecks, wornAge } from './mxChecks';
+import { chargeNightStops } from './nightStops';
+import { applyPendingRetimes } from './retime';
 import { rollDailyFareWars } from './fareWars';
 import { effectiveFareClasses } from './seatSale';
 import { rollDailyBrand } from './brand';
@@ -25,6 +27,7 @@ import { rollDailyFleet } from './fleetTiming';
 import { rollDailyRebases } from './rebase';
 import { addTally, emptyTally } from './fareClasses';
 import { networkOverheadPerDay } from './overhead';
+import { basesCostPerDay } from './bases';
 import { rollDailyMarketDemand, actualDailyDemand } from './marketDemand';
 import { revealReach } from './reach';
 import { FATIGUE_DELAY_MULTIPLIER, legFatigue, rollDailyCrews } from './crews';
@@ -39,6 +42,7 @@ import {
 import { CANCELLATION_NPS_SCORE, flightSatisfactionScore, recordFlightNps, rollTrailingNps } from './nps';
 import { recordDailyCashHistory } from './forecast';
 import { recordDailyPnlHistory } from './pnlHistory';
+import { recordFlightSeatNm, recordDailySeatNmHistory } from './unitEconomics';
 import { recordDailyOnTimeHistory } from './routeOtp';
 import { recordDailyLoadHistory, recordFlightLoad } from './loadFactor';
 import { checkMilestones } from './ladder';
@@ -173,6 +177,7 @@ export function step(state: SimState): void {
     // Same timing, same reason: state.todayRevenue/todayCost/todayMargin
     // still hold the day that just ended, one line above where they reset.
     recordDailyPnlHistory(state);
+    recordDailySeatNmHistory(state);
     recordDailyOnTimeHistory(state);
     recordDailyLoadHistory(state);
     state.todayLoadByMarket = {};
@@ -187,6 +192,8 @@ export function step(state: SimState): void {
     state.cancelledToday = [];
     state.mxHoldsToday = [];
     state.retimedToday = [];
+    // Gantt moves held for tomorrow (sim/retime.ts) take effect with the new day.
+    applyPendingRetimes(state);
     // Yesterday's fare-class sales, for the route view (sim/fareClasses.ts).
     state.yesterdayFareClasses = state.todayFareClasses ?? {};
     state.todayFareClasses = {};
@@ -229,6 +236,14 @@ export function step(state: SimState): void {
     state.todayCost += totalLeaseCost;
     state.todayCostByCategory.lease += totalLeaseCost;
     state.todayMargin -= totalLeaseCost;
+
+    // Bases away from home (sim/bases.ts): crew rooms under crew, maintenance bases under maintenance.
+    const basesCost = basesCostPerDay(state);
+    state.cash -= basesCost.crew + basesCost.maintenance;
+    state.todayCost += basesCost.crew + basesCost.maintenance;
+    state.todayCostByCategory.crew += basesCost.crew;
+    state.todayCostByCategory.maintenance += basesCost.maintenance;
+    state.todayMargin -= basesCost.crew + basesCost.maintenance;
 
     // Network overhead (sim/overhead.ts): grows with the square of the fleet.
     const overhead = networkOverheadPerDay(state);
@@ -274,7 +289,9 @@ export function step(state: SimState): void {
     // pass so a tail already grounded for crew isn't grounded twice and
     // counted under two causes; before the cancellation count below, so
     // whatever couldn't be covered is counted as cancelled today.
-    // Last night's line checks, judged before anyone is ferried home (sim/mxChecks.ts).
+    // Night stops' hotels (sim/nightStops.ts), then last night's line
+    // checks, judged before anyone is ferried home (sim/mxChecks.ts).
+    chargeNightStops(state);
     rollNightlyChecks(state, state.simMinute);
     // A plane stranded away from base with nothing to fly from there goes home empty (sim/ferry.ts).
     ferryStrandedPlanes(state);
@@ -576,6 +593,7 @@ export function step(state: SimState): void {
           flightSeats = layout.economy + layout.business;
           flightMargin = result.margin;
           recordFlightLoad(state, key, result.pax, flightSeats);
+          recordFlightSeatNm(state, flight.origin, flight.dest, flightSeats);
           state.cash += result.margin;
           state.todayRevenue += result.revenue;
           state.todayCost += result.cost;

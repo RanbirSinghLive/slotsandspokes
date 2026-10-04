@@ -15,7 +15,9 @@
     "homes": "tsx src/headless/buildHomeDifficulty.ts",
     "lakes": "tsx src/headless/buildLakes.ts",
     "rivers": "tsx src/headless/buildRivers.ts",
-    "quick": "tsx src/headless/quickBalance.ts"
+    "land50": "tsx src/headless/buildLand50.ts",
+    "quick": "tsx src/headless/quickBalance.ts",
+    "cloudtest": "tsx src/worker/saveRoutes.test.ts"
   },
   "devDependencies": {
     "@types/d3-geo": "^3.1.0",

@@ -35,3 +35,6 @@ balance-quick-last.json
 *.sln
 *.sw?
 data/.cache/
+
+# Wrangler local state (wrangler dev)
+.wrangler/

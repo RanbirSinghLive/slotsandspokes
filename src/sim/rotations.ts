@@ -3,9 +3,10 @@ import { classRank } from './aircraftClasses';
 import { dailyMovementsAt } from './airports';
 import { airportHours, hourlyRoomProblem, hourOf, hoursWithRoom, type AirportHours } from './hours';
 import { nextBankMinute } from './hubStyle';
+import { nightStopLegs } from './nightStops';
 import { minuteOfDayToTimeString } from './clock';
 import { greatCircleDistanceNm } from './geo';
-import { policyFare } from './pricing';
+import { fareClassPolicy, policyFare } from './pricing';
 import { revealReach } from './reach';
 import {
   computeBlockMinutes,
@@ -104,7 +105,9 @@ function packRotation(airports: RotationStop[], cruiseKts: number | undefined, s
  * departs base again.
  */
 function rotationStartMinute(tail: string, state: SimState): number {
-  const tailLegs = state.schedule.filter((leg) => leg.tail === tail);
+  // On a night stop (sim/nightStops.ts) new flying goes before the evening flight out.
+  const evening = nightStopLegs(state, tail)?.evening;
+  const tailLegs = state.schedule.filter((leg) => leg.tail === tail && leg !== evening);
   if (tailLegs.length === 0) return USABLE_DAY_START_MINUTE;
   const lastLeg = tailLegs.reduce((latest, leg) =>
     leg.departMinute + leg.blockMinutes > latest.departMinute + latest.blockMinutes ? leg : latest,
@@ -400,6 +403,15 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
     );
   }
 
+  // On a night stop, it has to be home and turned before the evening flight out.
+  const evening = nightStopLegs(state, tail)?.evening;
+  if (evening && lastLeg && arriveBackMinute + scheduledTurnMinutes(state, lastLeg.origin, lastLeg.dest) > evening.departMinute) {
+    return fail(
+      `${tail} sleeps at ${evening.dest}: this rotation would be back at ${minuteOfDayToTimeString(arriveBackMinute)}, after its ${minuteOfDayToTimeString(evening.departMinute)} flight out. ` +
+        `Use another plane, or move the flight out later in the Schedule.`,
+    );
+  }
+
   // No hour left for it (the search above found none).
   if (roomProblem) {
     const free = hoursWithRoom(roomCache.get(roomProblem.iata) ?? airportHours(state, roomProblem.iata));
@@ -569,6 +581,7 @@ export function applyRotation(
       fare: policyFare(state, leg.origin, leg.dest),
       fareIsOverridden: false,
       fareStance: null,
+      fareClasses: { ...fareClassPolicy(state) },
       turnBufferMinutes: 0,
     };
     newMarkets.push({ origin: leg.origin, dest: leg.dest });

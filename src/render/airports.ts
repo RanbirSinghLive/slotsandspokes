@@ -5,6 +5,7 @@ import { dailyDeparturesAt, airportLevel, airportLoad } from '../sim/airports';
 import { slotFeesPerDayAt, slotsHeld } from '../sim/slots';
 import { worstPoolShareByBase } from '../sim/utilisation';
 import { getMapPreview } from './preview';
+import { isOpsView } from './opsView';
 import type { SimState } from '../sim/state';
 
 export type Airport = {
@@ -115,9 +116,17 @@ export function capacityColor(share: number): string {
   return share > OVER_BOOKED ? CAPACITY_RING_RED : lerpCapacityColor(share);
 }
 
+// Ops view: the same log curve, steeper, so a hub's core reads as a hub; the
+// cap still keeps it from covering its spokes' first miles.
+const OPS_MAX_PRESENCE_RADIUS_BONUS = 7;
+const OPS_PRESENCE_RADIUS_SCALE = 1.9;
+
 function presenceRadius(departures: number): number {
   if (departures === 0) return MARKER_RADIUS;
-  return MARKER_RADIUS + Math.min(MAX_PRESENCE_RADIUS_BONUS, Math.log2(1 + departures) * PRESENCE_RADIUS_SCALE);
+  const ops = isOpsView();
+  const cap = ops ? OPS_MAX_PRESENCE_RADIUS_BONUS : MAX_PRESENCE_RADIUS_BONUS;
+  const scale = ops ? OPS_PRESENCE_RADIUS_SCALE : PRESENCE_RADIUS_SCALE;
+  return MARKER_RADIUS + Math.min(cap, Math.log2(1 + departures) * scale);
 }
 
 /**
@@ -269,7 +278,21 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState): vo
     });
   }
 
-  placeLabels(ctx, pendingLabels, badges);
+  const placed = placeLabels(ctx, pendingLabels, badges);
+  labelHits = placed;
+  const labelBoxes = placed.map((label) => label.box);
+  claimedBoxes = isOpsView()
+    ? [...labelBoxes, ...badges, ...pendingLabels.map((l) => ({ left: l.x - l.radius, top: l.y - l.radius, right: l.x + l.radius, bottom: l.y + l.radius }))]
+    : [];
+  drawHoldCue(ctx);
+}
+
+// Screen space this frame's airport codes, 'on its way' badges and dots took,
+// for the Ops view's route labels to keep clear of (render/opsHub.ts).
+let claimedBoxes: Box[] = [];
+
+export function airportClaimedBoxes(): readonly Box[] {
+  return claimedBoxes;
 }
 
 type PendingLabel = {
@@ -283,7 +306,7 @@ type PendingLabel = {
   population: number;
 };
 
-type Box = { left: number; top: number; right: number; bottom: number };
+export type Box = { left: number; top: number; right: number; bottom: number };
 
 const LABEL_HEIGHT_PX = 12;
 const LABEL_GAP_PX = 4;
@@ -307,7 +330,7 @@ function boxesOverlap(a: Box, b: Box): boolean {
  * by importance as it zooms out. Greedy placement isn't optimal, but it's
  * predictable and cheap, which is what a per-frame renderer needs.
  */
-function placeLabels(ctx: CanvasRenderingContext2D, labels: PendingLabel[], obstacles: Box[] = []): void {
+function placeLabels(ctx: CanvasRenderingContext2D, labels: PendingLabel[], obstacles: Box[] = []): { iata: string; box: Box }[] {
   labels.sort((a, b) => Number(b.home) - Number(a.home) || b.departures - a.departures || b.population - a.population);
 
   // Every dot is an obstacle too, so a label never sits on a neighbour's marker.
@@ -323,6 +346,7 @@ function placeLabels(ctx: CanvasRenderingContext2D, labels: PendingLabel[], obst
   ];
 
   const half = LABEL_HEIGHT_PX / 2;
+  const placedLabels: { iata: string; box: Box }[] = [];
   for (const label of labels) {
     const text = label.iata;
     const offset = label.radius + LABEL_GAP_PX;
@@ -338,11 +362,13 @@ function placeLabels(ctx: CanvasRenderingContext2D, labels: PendingLabel[], obst
       const box = { left: textX, top: textY - half, right: textX + width, bottom: textY + half };
       if (taken.some((other) => boxesOverlap(box, other))) continue;
       taken.push(box);
+      placedLabels.push({ iata: label.iata, box });
       ctx.fillStyle = label.served || label.home ? SERVED_LABEL_FILL : LABEL_FILL;
       ctx.fillText(text, textX, textY);
       break;
     }
   }
+  return placedLabels;
 }
 
 // How close a click/hover needs to land to an airport's projected point
@@ -350,7 +376,14 @@ function placeLabels(ctx: CanvasRenderingContext2D, labels: PendingLabel[], obst
 // a screen point against the airport list (the route builder's arm/aim
 // gesture, the click-for-detail), so the two can never disagree
 // about how forgiving the target is.
-const HIT_RADIUS_PX = 14;
+/** A fingertip needs a wider target than a cursor: 44px across rather than 28. */
+const TOUCH_SCREEN = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches;
+const HIT_RADIUS_PX = TOUCH_SCREEN ? 22 : 14;
+/** How far past a drawn airport code a touch still counts as on it: the code is only 12px tall. */
+const LABEL_HIT_PAD_PX = 12;
+/** Where each airport's code was drawn this frame, so a touch on the name selects it like a touch on the dot. */
+let labelHits: { iata: string; box: Box }[] = [];
+const airportsByCode = new Map(airports.map((airport) => [airport.iata, airport]));
 
 export type AirportHitCandidate = { airport: Airport; distPx: number; ratio: number };
 
@@ -378,7 +411,51 @@ export function nearestAirportCandidate(screenX: number, screenY: number): Airpo
       nearest = airport;
     }
   }
-  return nearest ? { airport: nearest, distPx: nearestDistPx, ratio: nearestDistPx / HIT_RADIUS_PX } : null;
+  const onDot = nearest ? { airport: nearest, distPx: nearestDistPx, ratio: nearestDistPx / HIT_RADIUS_PX } : null;
+  if (!TOUCH_SCREEN) return onDot;
+
+  // On a touch screen the airport's code counts too. A code is a sure hit, never beaten by a route line under it.
+  for (const { iata, box } of labelHits) {
+    const inside = screenX >= box.left - LABEL_HIT_PAD_PX && screenX <= box.right + LABEL_HIT_PAD_PX && screenY >= box.top - LABEL_HIT_PAD_PX && screenY <= box.bottom + LABEL_HIT_PAD_PX;
+    const airport = airportsByCode.get(iata);
+    if (!inside || !airport || !isAirportKnown(iata)) continue;
+    if (onDot && onDot.airport.iata === iata) return onDot;
+    if (!onDot || onDot.ratio > 0.5) {
+      const point = projection([airport.lon, airport.lat]);
+      return { airport, distPx: point ? Math.hypot(point[0] - screenX, point[1] - screenY) : 0, ratio: 0.5 };
+    }
+  }
+  return onDot;
+}
+
+// The press-and-hold cue (main.ts): a ring that fills around the airport being held.
+const HOLD_CUE_DELAY_MS = 120;
+let hold: { iata: string; startedMs: number; durationMs: number } | null = null;
+
+/** Start (or, with null, clear) the ring that fills around an airport while it is held. */
+export function setAirportHold(iata: string | null, durationMs = 0): void {
+  hold = iata ? { iata, startedMs: performance.now(), durationMs } : null;
+}
+
+function drawHoldCue(ctx: CanvasRenderingContext2D): void {
+  if (!hold) return;
+  const airport = airportsByCode.get(hold.iata);
+  const point = airport ? projection([airport.lon, airport.lat]) : null;
+  const elapsed = performance.now() - hold.startedMs;
+  if (!point || elapsed < HOLD_CUE_DELAY_MS) return;
+  const progress = Math.min(1, (elapsed - HOLD_CUE_DELAY_MS) / (hold.durationMs - HOLD_CUE_DELAY_MS));
+  ctx.save();
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = 'rgba(94, 214, 200, 0.25)';
+  ctx.beginPath();
+  ctx.arc(point[0], point[1], 26, 0, 2 * Math.PI);
+  ctx.stroke();
+  ctx.strokeStyle = '#5ed6c8';
+  ctx.beginPath();
+  ctx.arc(point[0], point[1], 26, -Math.PI / 2, -Math.PI / 2 + progress * 2 * Math.PI);
+  ctx.stroke();
+  ctx.restore();
 }
 
 /**

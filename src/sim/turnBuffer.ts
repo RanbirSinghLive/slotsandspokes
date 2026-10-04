@@ -12,6 +12,7 @@ import {
   type PoolEffect,
   type Rotation,
 } from './utilisation';
+import { nightStopStation } from './nightStops';
 import type { SimState } from './state';
 
 /**
@@ -166,6 +167,10 @@ function isInProgress(state: SimState, rotation: Rotation): boolean {
 function rehome(work: SimState, state: SimState, rotation: Rotation, fromTail: string): ScheduleLeg[] | null {
   const from = state.aircraft.find((a) => a.tail === fromTail);
   if (!from || !from.baseAirport) return null;
+  // A night stop's half starts or ends away from base, and a plane on a
+  // night stop ends its day away (sim/nightStops.ts): neither can be
+  // handed on or added behind.
+  if (rotation.legs[0].origin !== from.baseAirport || rotation.legs[rotation.legs.length - 1].dest !== from.baseAirport) return null;
 
   const candidates = state.aircraft
     // A plane grounded by an AOG (sim/aog.ts) can't take anyone's flying.
@@ -174,7 +179,8 @@ function rehome(work: SimState, state: SimState, rotation: Rotation, fromTail: s
         a.tail !== fromTail &&
         a.typeCode === from.typeCode &&
         a.baseAirport === from.baseAirport &&
-        !state.aogs.some((event) => event.tail === a.tail),
+        !state.aogs.some((event) => event.tail === a.tail) &&
+        nightStopStation(state, a.tail) === null,
     )
     .sort((a, b) => aircraftUtilisation(work, a.tail).minutes - aircraftUtilisation(work, b.tail).minutes);
 

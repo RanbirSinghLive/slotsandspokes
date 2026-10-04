@@ -1,3 +1,4 @@
+import { nightStopCostPerNight, nightStopLegs } from '../../sim/nightStops';
 import { classByCode } from '../../sim/aircraftClasses';
 import { dayIndex } from '../../sim/clock';
 import { line, heading, lineWithInfo } from './dom';
@@ -13,6 +14,7 @@ import { planeIconElement } from '../planeIcons';
 import * as ops from '../routeActions';
 import { select, selectRoute } from '../selection';
 import { linkToMap } from '../mapLink';
+import { showConfirm } from '../confirmModal';
 import { REBASE_DAYS, REBASE_FEE_LEASE_DAYS } from '../../sim/rebase';
 import { CABIN_PRICE, cabinLayout, cabinOf } from '../../sim/cabins';
 import { DEFERRED_AGE_YEARS, deferredItems, HEAVY_INTERVAL_DAYS, heavyBankedMinutes, heavyCheckDueIn, heavyCheckOpen, heavyCheckWorkMinutes, MX_HOLD_AT, tonightCheck } from '../../sim/mxChecks';
@@ -177,19 +179,30 @@ export function buildAircraftView(state: SimState, tail: string, changed: () => 
     const left = plane.seasonalUntilDay - dayIndex(state);
     root.append(line(`Seasonal lease · back to the lessor ${gameDate(state, plane.seasonalUntilDay)} (${Math.max(0, left)}d) · its flights come off then`, 'inspector-line is-warn'));
   }
+  // A night stop (sim/nightStops.ts): where it sleeps, and what a night there costs.
+  const nightStop = nightStopLegs(state, tail);
+  if (nightStop && plane) {
+    const station = nightStop.morning.origin;
+    root.append(
+      lineWithInfo(
+        `Night stop ${station} · out ${minuteOfDayToTimeString(nightStop.evening.departMinute)} · back ${minuteOfDayToTimeString(nightStop.morning.departMinute)} · ${money(nightStopCostPerNight(state, plane, station))}/night`,
+        `It sleeps at ${station}, not at base: the crew's hotel every night, and the line check by the station's setting on the Mtc screen (free at a maintenance base). If its flight out is cancelled or held by the curfew, it sleeps at base and the morning flight from ${station} is cancelled. On the Schedule, push either half past its end of the day to bring it home.`,
+      ),
+    );
+  }
   // Tonight's line check and the heavy check (sim/mxChecks.ts), in words.
   const tonight = tonightCheck(state, tail);
   if (tonight && plane) {
     const deferred = deferredItems(plane);
     const hours = (minutes: number) => `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`;
     const text = tonight.away
-      ? 'Tonight ☾✗ · away from base · no line check'
-      : `Tonight ☾${tonight.short ? `−${tonight.work - tonight.night}m` : '✓'} · ${hours(tonight.night)} at base for ${hours(tonight.work)} of work`;
+      ? `Tonight ☾✗ · ${tonight.station} · checks deferred · no line check`
+      : `Tonight ☾${tonight.short ? `−${tonight.work - tonight.night}m` : tonight.contracted ? 'c' : '✓'} · ${tonight.station}${tonight.contracted ? ' contracted' : ''} · ${hours(tonight.night)} for ${hours(tonight.work)} of work`;
     const heavy = heavyCheckOpen(plane) ? ` · heavy ${Math.round(heavyBankedMinutes(plane) / 6) / 10}/${heavyCheckWorkMinutes(plane.typeCode) / 60}h` : ` · heavy due ${heavyCheckDueIn(plane)}d`;
     root.append(
       lineWithInfo(
         text + heavy + (deferred > 0 ? ` · ${'●'.repeat(Math.min(deferred, MX_HOLD_AT))} ${deferred} deferred` : ''),
-        `The line check: each night at base the plane needs hangar work, more for more flights a day, between landing and an hour before its first departure. ☾✓ means tonight has time for it, ☾−40m that it's that much short, ☾✗ that the plane sleeps away. A short or missed check leaves a deferred item (●): each wears the plane like ${DEFERRED_AGE_YEARS} more years, and at ${MX_HOLD_AT} it's held at base a morning. The heavy check is hangar work every ${HEAVY_INTERVAL_DAYS} flying days, done from the spare hours of nights at base. The Mtc screen lists every plane's.`,
+        `The line check: each night the plane needs hangar work, more for more flights a day, between landing and an hour before its first departure. ☾✓ means tonight is at a maintenance base with time for it, ☾c a contracted check at a station without one, ☾−40m that it's that much short, ☾✗ a station set to defer, so no check. A short or missed check leaves a deferred item (●): each wears the plane like ${DEFERRED_AGE_YEARS} more years, and at ${MX_HOLD_AT} it's held a morning. The heavy check is hangar work every ${HEAVY_INTERVAL_DAYS} flying days, done from the spare hours of nights at a maintenance base. The Mtc screen lists every plane's, and its bases and stations.`,
         tonight.away || tonight.short || deferred >= MX_HOLD_AT - 1 ? 'inspector-line is-warn' : 'inspector-line',
       ),
     );
@@ -325,10 +338,21 @@ function buildCabin(state: SimState, tail: string, changed: () => void): HTMLEle
     cancel.type = 'button';
     cancel.className = 'inspector-plan-hub';
     cancel.textContent = `Call off · ${money(option.cost)} back`;
-    cancel.addEventListener('click', () => {
-      ops.cancelRefit(state, tail);
-      changed();
-    });
+    cancel.addEventListener('click', () =>
+      showConfirm({
+        title: `Call off ${tail} refit`,
+        rows: [
+          { label: 'Refunded', value: money(option.cost) },
+          { label: 'Cash after', value: money(state.cash + option.cost) },
+        ],
+        facts: ['The plane keeps its current cabin and stays in service.'],
+        confirmLabel: 'Call off',
+        run: () => {
+          ops.cancelRefit(state, tail);
+          changed();
+        },
+      }),
+    );
     block.append(cancel);
     return block;
   }
@@ -338,17 +362,23 @@ function buildCabin(state: SimState, tail: string, changed: () => void): HTMLEle
   const verb = option.to === 'business' ? 'Fit business cabin' : 'Back to all economy';
   button.textContent = `${verb} · ${money(option.cost)} · ${option.days}d out`;
   button.disabled = option.blocked !== null;
-  let armed = false;
-  button.addEventListener('click', () => {
-    if (!armed) {
-      armed = true;
-      button.textContent = `Confirm ${tail} refit`;
-      button.classList.add('is-act');
-      return;
-    }
-    ops.orderRefit(state, tail, option.to);
-    changed();
-  });
+  button.addEventListener('click', () =>
+    showConfirm({
+      title: `${verb} · ${tail}`,
+      rows: [
+        { label: 'Refit cost', value: money(option.cost) },
+        { label: 'Out of service', value: `${option.days} days` },
+        { label: 'Forecast', value: `${option.gainPerDay >= 0 ? '+' : '−'}${money(Math.abs(option.gainPerDay))}/day` },
+        { label: 'Cash after', value: money(state.cash - option.cost) },
+      ],
+      facts: ['Starts next morning at base; the plane flies nothing while it is out. Calling it off before then refunds the cost.'],
+      confirmLabel: `Order · ${money(option.cost)}`,
+      run: () => {
+        ops.orderRefit(state, tail, option.to);
+        changed();
+      },
+    }),
+  );
   const sign = option.gainPerDay >= 0 ? '+' : '−';
   const forecast = line(
     `Forecast ${sign}${money(Math.abs(option.gainPerDay))}/day on its routes` + (option.blocked ? ` · ${option.blocked}` : ''),
@@ -386,17 +416,25 @@ function buildRebase(state: SimState, tail: string, changed: () => void): HTMLEl
     const label = `Rebase to ${option.to} · ${money(option.fee)}${option.hops > 1 ? ` · ${option.hops} hops` : ''} · based day ${option.arrivesDay}`;
     button.textContent = label;
     button.disabled = option.blocked !== null;
-    let armed = false;
-    button.addEventListener('click', () => {
-      if (!armed) {
-        armed = true;
-        button.textContent = `Confirm ${tail} to ${option.to}`;
-        button.classList.add('is-act');
-        return;
-      }
-      ops.rebasePlane(state, tail, option.to);
-      changed();
-    });
+    button.addEventListener('click', () =>
+      showConfirm({
+        title: `Rebase ${tail} · ${aircraft.baseAirport} → ${option.to}`,
+        rows: [
+          { label: 'Ferry cost', value: money(option.fee) },
+          { label: 'Away', value: `${REBASE_DAYS} days, based day ${option.arrivesDay}` },
+          { label: 'Crews at new base', value: `${option.crews}/${option.crewsNeeded}` },
+          { label: 'Cash after', value: money(state.cash - option.fee) },
+        ],
+        facts: [
+          `Flies nothing while ferrying and the lease is still charged. Crews stay where they are: ${option.to} needs ${CREWS_PER_NEW_PLANE} crews rated on this type.`,
+        ],
+        confirmLabel: `Rebase · ${money(option.fee)}`,
+        run: () => {
+          ops.rebasePlane(state, tail, option.to);
+          changed();
+        },
+      }),
+    );
     const short = option.crews < option.crewsNeeded;
     const name = classByCode(aircraft.typeCode)?.name ?? aircraft.typeCode;
     const detail = line(
@@ -426,17 +464,22 @@ function buildReturn(state: SimState, tail: string, changed: () => void): HTMLEl
   button.className = 'inspector-plan-hub';
   button.textContent = `Return to lessor · fee ${money(option.fee)} · saves ${money(option.saves)}/day`;
   button.disabled = option.blocked !== null;
-  let armed = false;
-  button.addEventListener('click', () => {
-    if (!armed) {
-      armed = true;
-      button.textContent = `Confirm return of ${tail}`;
-      button.classList.add('is-act');
-      return;
-    }
-    ops.returnPlane(state, tail);
-    changed();
-  });
+  button.addEventListener('click', () =>
+    showConfirm({
+      title: `Return ${tail} to lessor`,
+      rows: [
+        { label: 'Return fee', value: money(option.fee) },
+        { label: 'Lease saved', value: `${money(option.saves)}/day` },
+        { label: 'Cash after', value: money(state.cash - option.fee) },
+      ],
+      facts: ['Goes back for good; leasing another means a new airframe at the market rate.'],
+      confirmLabel: `Return · ${money(option.fee)}`,
+      run: () => {
+        ops.returnPlane(state, tail);
+        changed();
+      },
+    }),
+  );
   block.append(button);
   if (option.blocked) block.append(line(option.blocked));
   // The usual reason it can't go back: it still flies. Offer to clear its day.

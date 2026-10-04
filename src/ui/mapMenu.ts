@@ -1,10 +1,12 @@
 import { nearestAirportCandidate, type Airport } from '../render/airports';
 import { deliveryDays } from '../sim/fleetTiming';
 import { money } from './format';
+import { showConfirm } from './confirmModal';
 import { findNearestOwnRoute } from '../render/routes';
-import { projection } from '../render/projection';
+import { projection, mapPoint, type ClientPoint } from '../render/projection';
 import { TURN_BUFFER_CHOICES } from '../sim/turnBuffer';
 import { connectingUnderStyle, spokesOf } from '../sim/hubs';
+import { confirmHubStyle } from './hubStyleConfirm';
 import { HUB_STYLES, HUB_STYLE_ORDER, hubStyleAt } from '../sim/hubStyle';
 import { setMapPreview, type MapPreview } from '../render/preview';
 import type { SimState } from '../sim/state';
@@ -22,6 +24,7 @@ import { planeIconInner } from './planeIcons';
 import { AIRCRAFT_CLASSES } from '../sim/aircraftClasses';
 import { USEFUL_LIFE_YEARS } from '../sim/leasing';
 import { crewPlan } from '../sim/crewPlan';
+import { trailingDailyMargin } from '../sim/forecast';
 import { dayIndex } from '../sim/clock';
 import { SEASON_DAYS, SEASONAL_PREMIUM } from '../sim/seasonalLease';
 
@@ -51,8 +54,8 @@ import { SEASON_DAYS, SEASONAL_PREMIUM } from '../sim/seasonalLease';
 const HUB_STYLE_ICON_TEXT = { rolling: 'Roll', banked: 'Bank', tight: 'Tight' } as const;
 
 const ringHintEl = document.querySelector<HTMLElement>('#radial-hint')!;
-/** How far below the click point the ring's hint label sits: clear of the ring's buttons. */
-const RING_HINT_OFFSET_PX = 84;
+/** How far below the click point the ring's hint label sits: clear of the ring and an open fan (radial.ts FAN_RADIUS_PX). */
+const RING_HINT_OFFSET_PX = 128;
 
 const ICON = {
   route: '<circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M7.5 16.5 16.5 7.5"/>',
@@ -170,12 +173,23 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
     icon: planeIconInner(state.aircraft.find((a) => a.tail === option.tail)?.typeCode ?? ''),
     large: true,
     angleDeg: 0,
-    confirm: true,
     disabledReason: option.blocked ?? undefined,
     onSelect: () => {
-      const result = ops.returnPlane(state, option.tail);
-      notice = result.ok ? result.message : result.reason;
-      refresh();
+      showConfirm({
+        title: `Return ${option.tail} · ${option.name}`,
+        rows: [
+          { label: 'Return fee', value: money(option.fee) },
+          { label: 'Lease saved', value: `${money(option.saves)}/day` },
+          { label: 'Cash after', value: money(state.cash - option.fee) },
+        ],
+        facts: ['Goes back to the lessor for good; leasing another means a new airframe at the market rate.'],
+        confirmLabel: `Return · ${money(option.fee)}`,
+        run: () => {
+          const result = ops.returnPlane(state, option.tail);
+          notice = result.ok ? result.message : result.reason;
+          refresh();
+        },
+      });
       return false;
     },
   }));
@@ -204,9 +218,31 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
     disabledReason: option.disabledReason,
     preview: option.preview,
     onSelect: () => {
-      const result = ops.leasePlane(state, airport.iata, option.code, seasonalTerm);
-      notice = result.ok ? result.message : result.reason;
-      refresh();
+      const listing = option.listing;
+      if (!listing) return false;
+      const perDay = termPrice(listing.leasePricePerDay);
+      const overhead = overheadAddedByNextPlane(state);
+      const recentMargin = trailingDailyMargin(state);
+      showConfirm({
+        title: `Lease ${option.name} · ${airport.iata}`,
+        rows: [
+          ...(recentMargin === null ? [] : [{ label: `Margin, last ${Math.min(7, state.marginHistory.length)} day${state.marginHistory.length === 1 ? '' : 's'}`, value: `${money(Math.round(recentMargin))}/day` }]),
+          { label: 'Airframe', value: `${option.seats} seats · ${listing.ageYears} yrs (${Math.max(0, USEFUL_LIFE_YEARS - listing.ageYears)} left)` },
+          { label: 'Lease', value: `${money(perDay)}/day` },
+          { label: 'Fleet overhead added', value: `${money(overhead)}/day` },
+          { label: 'Running cost added', value: `${money(perDay + overhead)}/day` },
+          { label: 'Term', value: seasonalTerm ? `${SEASON_DAYS} days, back by itself` : 'standing' },
+          { label: 'Delivery', value: `${deliveryDays(state)} days` },
+        ],
+        facts: ['Crews are hired separately: have crews rated on this type at the base before its first flight.'],
+        confirmLabel: 'Lease',
+        run: () => {
+          const result = ops.leasePlane(state, airport.iata, option.code, seasonalTerm);
+          notice = result.ok ? result.message : result.reason;
+          refresh();
+        },
+      });
+      return false;
     },
   }));
 
@@ -282,9 +318,10 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
       preview: plan?.ok ? plan.preview : undefined,
       onSelect: () => {
         if (isCurrent) return false;
-        const result = ops.setHubStyle(state, airport.iata, style);
-        notice = result.ok ? result.message : result.reason;
-        refresh();
+        confirmHubStyle(state, airport.iata, style, (result) => {
+          notice = result.ok ? result.message : result.reason;
+          refresh();
+        });
         return false;
       },
     };
@@ -460,17 +497,28 @@ function routeActions(a: string, b: string, state: SimState): RadialAction[] {
       label: 'Remove route',
       icon: ICON.remove,
       angleDeg: -18,
-      confirm: true,
       preview: removeRoute.ok ? removeRoute.preview : undefined,
       onSelect: () => {
-        const result = ops.removeRoute(state, a, b);
-        notice = result.ok ? result.message : result.reason;
-        if (result.ok) {
-          hideMapMenu();
-          renderInspector(state);
-          return false;
-        }
-        refresh();
+        const flights = ops.rotationsServing(state, a, b);
+        showConfirm({
+          title: `Remove route · ${a}–${b}`,
+          rows: [
+            { label: 'Flights removed', value: `${flights.length}` },
+            { label: 'Planes freed', value: [...new Set(flights.map((f) => f.tail))].join(', ') || 'none' },
+          ],
+          facts: ['Its slots go back and its schedule time is freed; drawing it again re-prices the slots.'],
+          confirmLabel: 'Remove route',
+          run: () => {
+            const result = ops.removeRoute(state, a, b);
+            notice = result.ok ? result.message : result.reason;
+            if (result.ok) {
+              hideMapMenu();
+              renderInspector(state);
+              return;
+            }
+            refresh();
+          },
+        });
         return false;
       },
     },
@@ -543,9 +591,9 @@ const AIRPORT_SURE_WIN_RATIO = 0.5;
  * ratios means a click genuinely close to the line, but not close enough
  * to either airport to count as "on" it, goes to the route.
  */
-export function handleMapMenuMouseDown(event: MouseEvent, state: SimState): boolean {
-  const airport = nearestAirportCandidate(event.clientX, event.clientY);
-  const route = findNearestOwnRoute(event.clientX, event.clientY, state);
+export function handleMapMenuMouseDown(event: ClientPoint, state: SimState): boolean {
+  const airport = nearestAirportCandidate(...mapPoint(event.clientX, event.clientY));
+  const route = findNearestOwnRoute(...mapPoint(event.clientX, event.clientY), state);
 
   const airportWins = airport && (airport.ratio <= AIRPORT_SURE_WIN_RATIO || !route || airport.ratio <= route.ratio);
   if (airportWins) {

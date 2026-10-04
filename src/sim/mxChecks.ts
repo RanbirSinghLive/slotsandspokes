@@ -1,4 +1,6 @@
+import { contractCost, hasMxBase, outstationCheck } from './bases';
 import { dayStartMinute } from './clock';
+import { nightStopStation } from './nightStops';
 import { projectRestOfDay } from './cascade';
 import { rotationsForTail } from './utilisation';
 import type { Aircraft, SimState } from './state';
@@ -6,30 +8,34 @@ import type { Aircraft, SimState } from './state';
 /**
  * Maintenance checks (WEEK-FOURTEEN.md, stage 4).
  *
- * **The line check is the night at base.** Every night a plane that flew
- * needs LINE_CHECK_MINUTES of hangar work, more for every cycle (takeoff
- * and landing) it flies a day. Its night runs from its landing to
- * RELEASE_MINUTES before its first departure. A plane that sleeps away
- * from base (stranded, on a long-haul trip) gets no check, and one whose
- * night is shorter than the work gets a short one: either way it carries a
- * **deferred item** to tomorrow. A night with CLEAR_SPARE_MINUTES to spare
- * after the work clears one.
+ * **The line check is a night at a maintenance base** (sim/bases.ts).
+ * Every night a plane that flew needs LINE_CHECK_MINUTES of hangar work,
+ * more for every cycle (takeoff and landing) it flies a day. Its night
+ * runs from its landing to RELEASE_MINUTES before its first departure. A
+ * night with CLEAR_SPARE_MINUTES to spare after the work clears an item.
+ * Sleeping anywhere else, the night is a **contracted check**, paid by the
+ * hour of work, or no check, by the station's setting. A plane with no
+ * check (deferred, or in the air overnight), or one whose night is shorter
+ * than the work, carries a **deferred item** to tomorrow.
  *
  * **Deferred items wear the plane.** Each counts as DEFERRED_AGE_YEARS more
  * age for breakdowns and mechanical delays (sim/aog.ts, sim/delays.ts), so
  * a plane worked through its nights breaks down more. At MX_HOLD_AT the
- * plane is held at base the next morning: its first rotation is cancelled
- * ("MX hold") while the items are cleared.
+ * plane is held where it is the next morning: its first rotation is
+ * cancelled ("MX hold") while the items are cleared, by contract away
+ * from a maintenance base.
  *
  * **The heavy check** is HEAVY_WORK_MINUTES of hangar work every
  * HEAVY_INTERVAL_DAYS days the plane flies, done at night: from
- * HEAVY_WINDOW_DAYS before it's due, whatever each night at base has left
- * after the line check goes toward it. Done, it clears every deferred
- * item. A plane with long nights finishes it in two or three without
- * missing a flight; one flown hard from first light to curfew makes slow
- * progress; nights away make none. Only a plane OVERDUE_GRACE_DAYS past
- * due is grounded for it, as an AOG (sim/aog.ts), until the work left is
- * done. So the lever is the shape of the plane's day, not a date.
+ * HEAVY_WINDOW_DAYS before it's due, whatever each night at a maintenance
+ * base has left after the line check goes toward it. Done, it clears every
+ * deferred item. A plane with long nights finishes it in two or three
+ * without missing a flight; one flown hard from first light to curfew
+ * makes slow progress; nights elsewhere make none. Only a plane
+ * OVERDUE_GRACE_DAYS past due is grounded for it, as an AOG (sim/aog.ts),
+ * at its base, until the work left is done, by contract if its base has
+ * no maintenance. So the lever is the shape of the plane's day and where
+ * it sleeps, not a date.
  */
 
 /** Hangar minutes a night, by class: a base, and more per cycle flown. */
@@ -104,7 +110,7 @@ export function heavyCheckDueIn(aircraft: Aircraft): number {
 }
 
 /** The night just ended, judged at midnight: whether the plane got its check. */
-export type NightResult = 'checked' | 'cleared' | 'short' | 'away';
+export type NightResult = 'checked' | 'cleared' | 'short' | 'contracted' | 'away';
 
 /**
  * Tonight's line check, at the midnight rollover (sim/step.ts), for every
@@ -122,12 +128,17 @@ export function rollNightlyChecks(state: SimState, dayStartMinute: number): void
     aircraft.daysSinceHeavyCheck = daysSinceHeavyCheck(aircraft) + 1;
 
     let result: NightResult;
-    if (aircraft.status !== 'ground' || !aircraft.baseAirport || aircraft.atAirport !== aircraft.baseAirport) {
+    const station = aircraft.status === 'ground' ? aircraft.atAirport : null;
+    const firstDeparture = dayStartMinute + Math.min(...legs.map((leg) => leg.departMinute));
+    const night = firstDeparture - RELEASE_MINUTES - aircraft.groundSinceMinute;
+    const work = lineCheckMinutes(state, aircraft);
+    if (!station || (!hasMxBase(state, station) && outstationCheck(state, station) === 'defer')) {
       result = 'away';
+    } else if (!hasMxBase(state, station)) {
+      // Contracted at the station: paid for the work, however the night turns out.
+      result = night < work ? 'short' : 'contracted';
+      chargeMaintenance(state, contractCost(work));
     } else {
-      const firstDeparture = dayStartMinute + Math.min(...legs.map((leg) => leg.departMinute));
-      const night = firstDeparture - RELEASE_MINUTES - aircraft.groundSinceMinute;
-      const work = lineCheckMinutes(state, aircraft);
       result = night < work ? 'short' : night >= work + CLEAR_SPARE_MINUTES && deferredItems(aircraft) > 0 ? 'cleared' : 'checked';
       // What the night has left after the line check goes toward the heavy check, once it's open.
       if (heavyCheckOpen(aircraft) && night > work) {
@@ -137,7 +148,8 @@ export function rollNightlyChecks(state: SimState, dayStartMinute: number): void
     }
     if (result === 'away' || result === 'short') aircraft.deferredItems = deferredItems(aircraft) + 1;
     if (result === 'cleared') {
-      aircraft.deferredItems = deferredItems(aircraft) - 1;
+      // A heavy check finished tonight has already cleared them all.
+      aircraft.deferredItems = Math.max(0, deferredItems(aircraft) - 1);
       if (aircraft.deferredItems === 0) delete aircraft.deferredItems;
     }
     results[aircraft.tail] = result;
@@ -146,19 +158,30 @@ export function rollNightlyChecks(state: SimState, dayStartMinute: number): void
   state.lastNightChecks = results;
 }
 
+/** Maintenance spending outside the flights: contracted checks. */
+function chargeMaintenance(state: SimState, cost: number): void {
+  state.cash -= cost;
+  state.todayCost += cost;
+  state.todayCostByCategory.maintenance += cost;
+  state.todayMargin -= cost;
+}
+
 /**
- * Planes held at base this morning for their deferred items: the legs of
- * each one's first rotation, to cancel ("MX hold"), its items cleared.
- * Planes away from base can't be held there, and keep flying.
+ * Planes held this morning for their deferred items: the legs of each
+ * one's first rotation, to cancel ("MX hold"), its items cleared. Held
+ * where it slept, with the work contracted away from a maintenance base
+ * (a line check's worth for each item). A plane in the air overnight
+ * can't be held, and keeps flying.
  */
 export function morningHolds(state: SimState): { tail: string; legIds: string[] }[] {
   const holds: { tail: string; legIds: string[] }[] = [];
   for (const aircraft of state.aircraft) {
-    if (deferredItems(aircraft) < MX_HOLD_AT || aircraft.atAirport !== aircraft.baseAirport) continue;
+    if (deferredItems(aircraft) < MX_HOLD_AT || aircraft.status !== 'ground') continue;
     if (state.aogs.some((event) => event.tail === aircraft.tail)) continue;
     const first = rotationsForTail(state, aircraft.tail)[0];
     if (!first) continue;
     holds.push({ tail: aircraft.tail, legIds: first.legs.map((leg) => leg.legId) });
+    if (!hasMxBase(state, aircraft.atAirport ?? '')) chargeMaintenance(state, contractCost(lineCheckMinutes(state, aircraft) * deferredItems(aircraft)));
     delete aircraft.deferredItems;
   }
   return holds;
@@ -167,13 +190,19 @@ export function morningHolds(state: SimState): { tail: string; legIds: string[] 
 /**
  * Heavy checks overdue past the grace, from sim/aog.ts's morning pass:
  * each plane at base is grounded for the work it has left, in whole days.
+ * A base with no maintenance has the work contracted, paid here.
  */
 export function forcedHeavyChecks(state: SimState): { aircraft: Aircraft; days: number }[] {
-  return state.aircraft
+  const forced = state.aircraft
     .filter((aircraft) => heavyCheckDueIn(aircraft) <= -OVERDUE_GRACE_DAYS)
-    .filter((aircraft) => aircraft.status === 'ground' && aircraft.atAirport === aircraft.baseAirport && !aircraft.rebase)
-    .filter((aircraft) => !state.aogs.some((event) => event.tail === aircraft.tail))
-    .map((aircraft) => ({ aircraft, days: Math.max(1, Math.ceil((heavyCheckWorkMinutes(aircraft.typeCode) - heavyBankedMinutes(aircraft)) / MINUTES_PER_DAY)) }));
+    // At its base, or where it sleeps on a night stop (sim/nightStops.ts).
+    .filter((aircraft) => aircraft.status === 'ground' && (aircraft.atAirport === aircraft.baseAirport || aircraft.atAirport === nightStopStation(state, aircraft.tail)) && !aircraft.rebase)
+    .filter((aircraft) => !state.aogs.some((event) => event.tail === aircraft.tail));
+  return forced.map((aircraft) => {
+    const workLeft = heavyCheckWorkMinutes(aircraft.typeCode) - heavyBankedMinutes(aircraft);
+    if (!hasMxBase(state, aircraft.atAirport ?? '')) chargeMaintenance(state, contractCost(workLeft));
+    return { aircraft, days: Math.max(1, Math.ceil(workLeft / MINUTES_PER_DAY)) };
+  });
 }
 
 /** A heavy check done: the interval starts again and every deferred item is cleared. */
@@ -187,10 +216,14 @@ export function finishHeavyCheck(aircraft: Aircraft): void {
  * Tonight's line check, as it's shaping up: the plane's projected last
  * landing (sim/cascade.ts, so a day running late shows tonight getting
  * shorter before it happens) against tomorrow's first departure, less
- * RELEASE_MINUTES, and the work it needs. Away when its day ends away
- * from base. Null for a plane with nothing to fly.
+ * RELEASE_MINUTES, and the work it needs, and where its day ends: at a
+ * maintenance base, contracted at a station, or away with no check. Null
+ * for a plane with nothing to fly.
  */
-export function tonightCheck(state: SimState, tail: string): { night: number; work: number; away: boolean; short: boolean } | null {
+export function tonightCheck(
+  state: SimState,
+  tail: string,
+): { night: number; work: number; station: string; away: boolean; contracted: boolean; short: boolean } | null {
   const aircraft = state.aircraft.find((a) => a.tail === tail);
   const legs = state.schedule.filter((leg) => leg.tail === tail).sort((a, b) => a.departMinute - b.departMinute);
   if (!aircraft || legs.length === 0) return null;
@@ -200,6 +233,8 @@ export function tonightCheck(state: SimState, tail: string): { night: number; wo
   const landing = projected.length > 0 ? projected[projected.length - 1].projectedArriveMinute : Math.max(dayStart + last.departMinute + last.blockMinutes, aircraft.status === 'ground' && legs.every((leg) => state.completedToday.includes(leg.legId) || state.cancelledToday.includes(leg.legId)) ? aircraft.groundSinceMinute : 0);
   const night = dayStart + MINUTES_PER_DAY + legs[0].departMinute - RELEASE_MINUTES - landing;
   const work = lineCheckMinutes(state, aircraft);
-  const away = last.dest !== aircraft.baseAirport;
-  return { night, work, away, short: !away && night < work };
+  const station = last.dest;
+  const contracted = !hasMxBase(state, station) && outstationCheck(state, station) === 'contract';
+  const away = !hasMxBase(state, station) && !contracted;
+  return { night, work, station, away, contracted, short: !away && night < work };
 }

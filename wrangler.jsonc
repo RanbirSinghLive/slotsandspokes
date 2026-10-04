@@ -1,14 +1,26 @@
 // Cloudflare's deploy settings (`npx wrangler deploy`, run by its build
 // after `npm run build`): the game is a static site, served straight from
-// Vite's dist folder. No Worker code, and no Cloudflare plugin in the Vite
-// build; without this file, wrangler tries to add one and fails.
+// Vite's dist folder, plus one small Worker (src/worker) that answers
+// /api/* for cloud saves. No Cloudflare plugin in the Vite build; without
+// this file, wrangler tries to add one and fails.
 {
   "$schema": "https://unpkg.com/wrangler/config-schema.json",
   "name": "slotsandspokes",
+  "main": "src/worker/index.ts",
   "compatibility_date": "2026-09-26",
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
+    // Only /api/* runs the Worker; every other path is served from dist.
+    "run_worker_first": ["/api/*"],
     // Any unknown path serves the game rather than a 404.
     "not_found_handling": "single-page-application"
-  }
+  },
+  // Cloud saves (HOW-IT-WORKS.md, "Cloud saves"): the KV namespace holding
+  // the saves. Without this binding /api/cloud answers "not configured" and
+  // the game hides cloud saves.
+  "kv_namespaces": [{ "binding": "SAVES", "id": "7e6f7f4db8554bc682604fd8e2f70112" }],
+  // Pull-request builds run `npx wrangler preview`, which refuses to run
+  // without this block; empty means the top-level settings apply.
+  "previews": {}
 }

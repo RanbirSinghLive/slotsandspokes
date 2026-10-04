@@ -1,14 +1,16 @@
-import { AIRCRAFT_CLASSES } from '../../sim/aircraftClasses';
+import { AIRCRAFT_CLASSES, pluralClassName } from '../../sim/aircraftClasses';
 import { aogChance, aogFor, daysUntilReturn, expediteCost, expediteRepair } from '../../sim/aog';
 import { ageDelayParameters } from '../../sim/delays';
 import { USEFUL_LIFE_YEARS } from '../../sim/leasing';
 import { DEFERRED_AGE_YEARS, HEAVY_INTERVAL_DAYS, HEAVY_WINDOW_DAYS, MX_HOLD_AT, OVERDUE_GRACE_DAYS, wornAge } from '../../sim/mxChecks';
 import * as ops from '../routeActions';
+import type { HeavyCheckReadout } from '../../sim/playerActions';
 import type { SimState } from '../../sim/state';
 import { money } from '../format';
 import { linkToMap } from '../mapLink';
-import { planeIconElement } from '../planeIcons';
+import { planeIconElement, TYPE_COLOURS } from '../planeIcons';
 import { select } from '../selection';
+import { baseSection, noneLine } from './bases';
 import { heading, line } from './dom';
 
 /**
@@ -17,9 +19,10 @@ import { heading, line } from './dom';
  *
  * - **AOG**: every plane grounded, what's wrong, when it's back, and the
  *   button to pay a day off the repair.
- * - **Fleet health**: every plane by type, its age, how often it leaves
- *   without a mechanical delay, today's chance of going AOG, and the years
- *   of useful life its lease has left.
+ * - **Fleet**: a release-to-service board, a strip of how the fleet stands
+ *   and a tech-log card per plane: heavy-check clock, deferred items, wear,
+ *   tech and AOG figures.
+ * - **Maintenance bases** and the **stations** planes sleep at without one.
  *
  * What an AOG cancels goes in the ticker, and a plane's own view keeps its
  * own figures; this is the board across the fleet.
@@ -43,7 +46,7 @@ export function buildMaintenanceView(state: SimState, changed: () => void): HTML
   } else {
     for (const event of state.aogs) {
       const row = linkToMap(document.createElement('div'), { kind: 'aircraft', tail: event.tail });
-      row.className = 'airport-aog-row';
+      row.className = 'airport-aog-row mx-aog-row';
       const text = document.createElement('button');
       text.type = 'button';
       text.className = 'inspector-link';
@@ -69,81 +72,285 @@ export function buildMaintenanceView(state: SimState, changed: () => void): HTML
     }
   }
 
-  root.append(...buildChecks(state));
-
-  root.append(
-    heading(
-      'Fleet health',
-      'Tech: the share of its flights that leave without a mechanical delay, which falls with age. AOG: today\'s chance of a fault grounding it, higher for older planes, busy airports and long days. Life: years left before the airframe reaches its useful life.',
-    ),
-  );
-  const list = document.createElement('div');
-  list.className = 'inspector-rows';
-  for (const cls of AIRCRAFT_CLASSES) {
-    const planes = state.aircraft.filter((a) => a.typeCode === cls.code).sort((a, b) => b.ageYears - a.ageYears);
-    for (const aircraft of planes) {
-      const row = linkToMap(document.createElement('button'), { kind: 'aircraft', tail: aircraft.tail });
-      row.type = 'button';
-      row.className = 'inspector-row';
-      const name = document.createElement('span');
-      name.append(planeIconElement(aircraft.typeCode), ` ${aircraft.tail}`);
-      const detail = document.createElement('span');
-      detail.className = 'inspector-row-detail';
-      const tech = Math.round(ageDelayParameters(wornAge(aircraft)).onTimeProbability * 100);
-      const chance = aogChance(state, aircraft) * 100;
-      const life = Math.max(0, USEFUL_LIFE_YEARS - aircraft.ageYears);
-      detail.textContent = aogFor(state, aircraft.tail)
-        ? `AOG · ${aircraft.ageYears} yrs`
-        : `${aircraft.ageYears} yrs · tech ${tech}% · AOG ${chance < 1 ? chance.toFixed(1) : Math.round(chance)}%/day · life ${life} yrs`;
-      if (aogFor(state, aircraft.tail) || life <= 2) detail.classList.add('is-over');
-      row.append(name, detail);
-      row.addEventListener('click', () => select({ kind: 'aircraft', tail: aircraft.tail }));
-      list.append(row);
-    }
-  }
-  root.append(state.aircraft.length > 0 ? list : line('No aircraft'));
+  root.append(...buildHangar(state), ...buildDueTimeline(state), ...buildFleetBoard(state, changed));
+  root.append(...buildMxBases(state, changed));
   return root;
 }
 
-/** Deferred items as pips, one per item up to the hold: "●●○". */
-function pips(deferred: number): string {
-  return '●'.repeat(Math.min(deferred, MX_HOLD_AT)) + '○'.repeat(Math.max(0, MX_HOLD_AT - deferred));
+const NIGHT_WORDS: Record<string, string> = { checked: 'checked', cleared: 'cleared 1', short: 'short', contracted: 'contracted', away: 'no check' };
+
+/** How a plane stands for release to service, worst first. */
+type Standing = 'aog' | 'check' | 'due' | 'watch' | 'ok';
+const STANDING_ORDER: Standing[] = ['aog', 'check', 'due', 'watch', 'ok'];
+const STANDING_WORDS: Record<Standing, string> = { aog: 'AOG', check: 'IN HANGAR', due: 'ACTION', watch: 'WATCH', ok: 'SERVICEABLE' };
+
+/** The heavy-check clock runs from the last check to the end of its grace, so the overdue stretch shows. */
+const CLOCK_DAYS = HEAVY_INTERVAL_DAYS + OVERDUE_GRACE_DAYS;
+
+function standingOf(state: SimState, plane: HeavyCheckReadout, life: number): Standing {
+  if (plane.inCheck) return 'check';
+  if (aogFor(state, plane.tail)) return 'aog';
+  if (plane.deferred >= MX_HOLD_AT || plane.dueIn <= 0) return 'due';
+  if (plane.deferred > 0 || plane.open || life <= 2) return 'watch';
+  return 'ok';
 }
 
-const NIGHT_WORDS: Record<string, string> = { checked: 'checked', cleared: 'cleared 1', short: 'short', away: 'away' };
+function box(className: string, text = ''): HTMLElement {
+  const el = document.createElement('div');
+  el.className = className;
+  if (text) el.textContent = text;
+  return el;
+}
+
+/** Types folded shut on the Fleet board, kept across redraws. */
+const collapsedTypes = new Set<string>();
 
 /**
- * Checks (sim/mxChecks.ts): every plane's deferred items, last night's
- * line check, and its heavy check: when it's due, and the hours done at
- * night toward it.
+ * The hangar: a bay for each plane in its heavy check, with the days until
+ * it's out, and a dashed bay for each plane whose check is next to come
+ * due (its window open or overdue), so the hangar's coming load shows.
  */
-function buildChecks(state: SimState): HTMLElement[] {
+function buildHangar(state: SimState): HTMLElement[] {
   const nodes: HTMLElement[] = [
     heading(
-      'Checks',
-      `Line check: every night at base, the plane gets its hangar work, longer for more flights a day. A night away from base, or too short for the work, leaves a deferred item (●); a long night clears one. Each item wears the plane like ${DEFERRED_AGE_YEARS} more years: more breakdowns and mechanical delays. At ${MX_HOLD_AT} it's held at base for a morning and its first rotation is cancelled. Heavy check: every ${HEAVY_INTERVAL_DAYS} flying days, 8–16 hours of hangar work, done at night: from ${HEAVY_WINDOW_DAYS} days before it's due, each night at base puts its spare hours after the line check toward it. Long nights finish it without missing a flight; a day flown from first light to curfew makes slow progress. ${OVERDUE_GRACE_DAYS} days overdue, the plane is grounded until it's done. It clears every item.`,
+      'Hangar',
+      `Heavy checks in work and coming. A filled bay is a plane in its heavy check, grounded until it's done. A dashed bay is a plane whose check is within ${HEAVY_WINDOW_DAYS} days or overdue: nights at a maintenance base bank hours toward it, and if it runs ${OVERDUE_GRACE_DAYS} days overdue it goes in whenever it is.`,
+    ),
+  ];
+  const bays = box('mx-bays');
+  for (const plane of ops.heavyCheckReadouts(state)) {
+    const event = plane.inCheck ? aogFor(state, plane.tail) : undefined;
+    if (!event && !plane.open) continue;
+    const bay = box(`mx-bay ${event ? 'is-working' : 'is-waiting'}`);
+    bay.append(box('mx-bay-tail', plane.tail), box('mx-bay-state', event ? `out in ${daysUntilReturn(state, event)}d` : plane.dueIn > 0 ? `due ${plane.dueIn}d` : `${-plane.dueIn}d over`));
+    if (!event) bay.classList.toggle('is-late', plane.dueIn <= 0);
+    bays.append(bay);
+  }
+  nodes.push(bays.childElementCount > 0 ? bays : noneLine('Hangar clear · no heavy check in work or within its window'));
+  return nodes;
+}
+
+/** The timeline's reach: the longest wait to a heavy check is its whole interval. */
+const TIMELINE_DAYS = HEAVY_INTERVAL_DAYS;
+
+/**
+ * Every plane's heavy-check due date on one axis, today at the left: a
+ * marker each, overdue ones stacked at the edge, so a fleet bunching up for
+ * the hangar shows as a cluster. Markers that would overlap take a lane
+ * of their own.
+ */
+function buildDueTimeline(state: SimState): HTMLElement[] {
+  const nodes: HTMLElement[] = [
+    heading('Heavy checks due', `Each plane's heavy check on a ${TIMELINE_DAYS}-day axis, today at the left. The amber band is the window where nights at a maintenance base bank hours; a cluster of markers is planes that will want the hangar together. Overdue planes sit at the left edge.`),
+  ];
+  const readouts = ops.heavyCheckReadouts(state).filter((p) => !p.inCheck);
+  if (readouts.length === 0) return [...nodes, line('No planes outside the hangar')];
+
+  const axis = box('mx-axis');
+  const windowBand = box('mx-axis-window');
+  windowBand.style.left = '0';
+  windowBand.style.width = `${(HEAVY_WINDOW_DAYS / TIMELINE_DAYS) * 100}%`;
+  axis.append(windowBand);
+  // Lanes: a marker takes the first lane whose last marker is far enough left.
+  const laneEnds: number[] = [];
+  const MARKER_SPAN_PCT = 11;
+  for (const plane of readouts) {
+    const at = (Math.min(TIMELINE_DAYS, Math.max(0, plane.dueIn)) / TIMELINE_DAYS) * 100;
+    let lane = laneEnds.findIndex((end) => at - end >= MARKER_SPAN_PCT);
+    if (lane === -1) lane = laneEnds.length;
+    laneEnds[lane] = at;
+    const marker = box(`mx-marker${plane.dueIn <= 0 ? ' is-late' : plane.open ? ' is-open' : ''}`, plane.tail.slice(-4));
+    marker.style.left = `${at}%`;
+    marker.style.top = `${lane * 18 + 2}px`;
+    marker.title = `${plane.tail} · ${plane.dueIn > 0 ? `due ${plane.dueIn}d` : `${-plane.dueIn}d overdue`}`;
+    axis.append(marker);
+  }
+  axis.style.height = `${laneEnds.length * 18 + 6}px`;
+  const ticks = box('mx-axis-ticks');
+  for (const day of [0, 10, 20, 30]) {
+    const tick = box('mx-axis-tick', day === 0 ? 'today' : `${day}d`);
+    tick.style.left = `${(day / TIMELINE_DAYS) * 100}%`;
+    ticks.append(tick);
+  }
+  nodes.push(axis, ticks);
+  return nodes;
+}
+
+/**
+ * The fleet's release-to-service board: a strip of how many planes stand
+ * serviceable, on watch, due for action, in the hangar or on the ground,
+ * then a tech-log card for each plane, worst first. Each card carries the
+ * heavy-check clock (the days since its last check, the window where
+ * nights at a maintenance base count toward it, the due mark and the
+ * overdue grace beyond it), its deferred items as slots that fill toward
+ * the hold, and how worn it is.
+ */
+function buildFleetBoard(state: SimState, changed: () => void): HTMLElement[] {
+  const nodes: HTMLElement[] = [
+    heading(
+      'Fleet',
+      `Release to service, plane by plane. Serviceable: nothing open. Watch: a deferred item, a heavy check in its window or under 2 years of life. Action: held at ${MX_HOLD_AT} deferred items or a heavy check overdue. Heavy-check clock: every ${HEAVY_INTERVAL_DAYS} flying days, 8–16 hours of hangar work done at night; from ${HEAVY_WINDOW_DAYS} days before it's due, each night at a maintenance base banks its spare hours toward it. ${OVERDUE_GRACE_DAYS} days overdue, the plane is grounded until it's done. Items: each deferred item (no line check, or a night too short) wears the plane like ${DEFERRED_AGE_YEARS} more years; at ${MX_HOLD_AT} it is held for a morning and its first rotation cancelled. Tech: the share of flights that leave without a mechanical delay. AOG: today's chance of a fault grounding it. Life: years left before the airframe reaches its useful life.`,
     ),
   ];
   const readouts = ops.heavyCheckReadouts(state);
   if (readouts.length === 0) return [...nodes, line('No aircraft')];
+
+  const cards = readouts.map((plane) => {
+    const aircraft = state.aircraft.find((a) => a.tail === plane.tail)!;
+    const life = Math.max(0, USEFUL_LIFE_YEARS - aircraft.ageYears);
+    return { plane, aircraft, life, standing: standingOf(state, plane, life) };
+  });
+  cards.sort((x, y) => STANDING_ORDER.indexOf(x.standing) - STANDING_ORDER.indexOf(y.standing) || x.plane.dueIn - y.plane.dueIn);
+
+  // The strip: one segment per standing, as wide as its share of the fleet.
+  const strip = box('mx-strip');
+  const legend = box('mx-strip-legend');
+  for (const standing of STANDING_ORDER) {
+    const count = cards.filter((c) => c.standing === standing).length;
+    if (count === 0) continue;
+    const segment = box(`mx-strip-seg mx-${standing}`);
+    segment.style.flexGrow = String(count);
+    segment.title = `${STANDING_WORDS[standing]} · ${count}`;
+    strip.append(segment);
+    const key = box('mx-strip-key');
+    key.append(box(`mx-lamp mx-${standing}`), `${count} ${STANDING_WORDS[standing]}`);
+    legend.append(key);
+  }
+  const tech = cards.reduce((sum, c) => sum + ageDelayParameters(wornAge(c.aircraft)).onTimeProbability, 0) / cards.length;
+  legend.append(box('mx-strip-key mx-strip-tech', `Fleet tech ${Math.round(tech * 100)}%`));
+  nodes.push(strip, legend);
+
+  const list = box('mx-cards');
+  const cardOf = ({ plane, aircraft, life, standing }: (typeof cards)[number]): HTMLElement => {
+    const card = linkToMap(document.createElement('button'), { kind: 'aircraft', tail: plane.tail });
+    card.type = 'button';
+    card.className = `mx-card mx-card-${standing}`;
+    card.addEventListener('click', () => select({ kind: 'aircraft', tail: plane.tail }));
+
+    const head = box('mx-card-head');
+    const who = box('mx-card-who');
+    who.append(box(`mx-lamp mx-${standing}`), planeIconElement(plane.typeCode), ` ${plane.tail} · ${plane.base}`);
+    const status = box('mx-card-status');
+    if (plane.lastNight) status.append(box('mx-card-night', `night ${NIGHT_WORDS[plane.lastNight]}`));
+    status.append(box(`mx-card-standing mx-text-${standing}`, STANDING_WORDS[standing]));
+    head.append(who, status);
+
+    // The heavy-check clock.
+    const daysSince = HEAVY_INTERVAL_DAYS - plane.dueIn;
+    const clock = box('mx-clock');
+    const windowZone = box('mx-clock-window');
+    windowZone.style.left = `${((HEAVY_INTERVAL_DAYS - HEAVY_WINDOW_DAYS) / CLOCK_DAYS) * 100}%`;
+    windowZone.style.width = `${(HEAVY_WINDOW_DAYS / CLOCK_DAYS) * 100}%`;
+    const graceZone = box('mx-clock-grace');
+    graceZone.style.left = `${(HEAVY_INTERVAL_DAYS / CLOCK_DAYS) * 100}%`;
+    graceZone.style.width = `${(OVERDUE_GRACE_DAYS / CLOCK_DAYS) * 100}%`;
+    const fill = box('mx-clock-fill');
+    fill.style.width = `${Math.min(1, Math.max(0, daysSince / CLOCK_DAYS)) * 100}%`;
+    const dueMark = box('mx-clock-due');
+    dueMark.style.left = `${(HEAVY_INTERVAL_DAYS / CLOCK_DAYS) * 100}%`;
+    clock.append(windowZone, graceZone, fill, dueMark);
+    const clockText = plane.inCheck
+      ? 'Heavy check · in the hangar'
+      : `Heavy ${plane.dueIn > 0 ? `due ${plane.dueIn}d` : `${-plane.dueIn}d overdue`}` + (plane.open ? ` · banked ${plane.bankedHours}/${plane.workHours}h` : '');
+    const clockLine = box('mx-clock-text', clockText);
+
+    // Deferred items as slots filling toward the hold.
+    const slots = box('mx-slots');
+    for (let i = 0; i < MX_HOLD_AT; i++) slots.append(box(`mx-slot${i < plane.deferred ? ` is-filled${plane.deferred >= MX_HOLD_AT ? ' is-held' : ''}` : ''}`));
+    const items = box('mx-items');
+    items.append('Items ', slots);
+
+    // Instruments.
+    const chance = aogChance(state, aircraft) * 100;
+    const techNow = Math.round(ageDelayParameters(wornAge(aircraft)).onTimeProbability * 100);
+    const wear = box('mx-wear');
+    const wearFill = box('mx-wear-fill');
+    wearFill.style.width = `${Math.min(100, (aircraft.ageYears / USEFUL_LIFE_YEARS) * 100)}%`;
+    wear.append(wearFill);
+    const dials = box('mx-dials', `${aircraft.ageYears} yrs · life ${life} · tech ${techNow}% · AOG ${chance < 1 ? chance.toFixed(1) : Math.round(chance)}%/day`);
+
+    const row = box('mx-card-row');
+    row.append(items, clockLine);
+    card.append(head, clock, row, wear, dials);
+    return card;
+  };
+
+  // One folding group per type, worst plane first within it.
+  for (const cls of AIRCRAFT_CLASSES) {
+    const group = cards.filter((c) => c.plane.typeCode === cls.code);
+    if (group.length === 0) continue;
+    const collapsed = collapsedTypes.has(cls.code);
+    const header = document.createElement('button');
+    header.type = 'button';
+    header.className = 'timeline-group';
+    header.style.setProperty('--puck', TYPE_COLOURS[cls.code] ?? '#5ed6c8');
+    header.setAttribute('aria-expanded', String(!collapsed));
+    header.append(`${collapsed ? '▸' : '▾'} `, planeIconElement(cls.code), ` ${pluralClassName(cls.name)} ×${group.length}`);
+    // The group's lamps stay visible when it's folded.
+    const lamps = box('mx-group-lamps');
+    for (const card of group) lamps.append(box(`mx-lamp mx-${card.standing}`));
+    header.append(lamps);
+    header.addEventListener('click', () => {
+      if (collapsedTypes.has(cls.code)) collapsedTypes.delete(cls.code);
+      else collapsedTypes.add(cls.code);
+      changed();
+    });
+    list.append(header);
+    if (!collapsed) for (const card of group) list.append(cardOf(card));
+  }
+  nodes.push(list);
+  return nodes;
+}
+
+/**
+ * Maintenance bases (sim/bases.ts), and the stations where planes sleep
+ * tonight without one, each set to contract its checks or defer them.
+ */
+function buildMxBases(state: SimState, changed: () => void): HTMLElement[] {
+  const readout = ops.mxBaseReadout(state);
+  const nodes = baseSection({
+    title: 'Maintenance bases',
+    info: `Where a night is a line check and banks heavy-check hours. Opening one costs ${money(readout.fee)} and ${money(readout.perDay)} a day; home's comes with the start. Anywhere else a plane sleeps, its check is contracted by the hour or deferred: see Stations.`,
+    kind: 'mtc base',
+    bases: readout.bases,
+    candidates: readout.candidates,
+    fee: readout.fee,
+    perDay: readout.perDay,
+    preview: (action, iata) => ops.previewBaseChange(state, 'mtc', action, iata),
+    open: (iata) => ops.openMxBaseAt(state, iata),
+    close: (iata) => ops.closeMxBaseAt(state, iata),
+    changed,
+  });
+  nodes.push(
+    heading(
+      'Stations',
+      'Airports where planes sleep tonight without a maintenance base. Contracted: the station does the line check, paid by the hour of work, and the plane gets no deferred item if the night is long enough; it banks nothing toward the heavy check. Deferred: no check and no cost, and a deferred item each night.',
+    ),
+  );
+  if (readout.stations.length === 0) {
+    nodes.push(noneLine('None tonight · every plane sleeps at a maintenance base'));
+    return nodes;
+  }
   const list = document.createElement('div');
   list.className = 'inspector-rows';
-  for (const plane of readouts) {
-    const row = document.createElement('div');
-    row.className = 'inspector-row';
+  for (const station of readout.stations) {
+    const row = linkToMap(document.createElement('div'), { kind: 'airport', iata: station.iata });
+    row.className = 'inspector-row base-row';
     const name = document.createElement('span');
-    name.append(planeIconElement(plane.typeCode), ` ${plane.tail} ${pips(plane.deferred)}`);
+    name.textContent = `${station.iata} · ${station.planes} plane${station.planes === 1 ? '' : 's'} tonight`;
     const detail = document.createElement('span');
     detail.className = 'inspector-row-detail';
-    const night = plane.lastNight ? ` · night ${NIGHT_WORDS[plane.lastNight]}` : '';
-    const heavy = plane.inCheck
-      ? 'heavy check · grounded'
-      : plane.open
-        ? `heavy ${plane.bankedHours}/${plane.workHours}h · ${plane.dueIn > 0 ? `due ${plane.dueIn}d` : `${-plane.dueIn}d overdue`}`
-        : `heavy due ${plane.dueIn}d`;
-    detail.textContent = heavy + night;
-    if (plane.deferred >= MX_HOLD_AT - 1 || plane.dueIn <= 0) detail.classList.add('is-warn');
-    row.append(name, detail);
+    detail.textContent = station.check === 'contract' ? `contracted · ${money(station.contractPerNight)}/night` : 'deferred · ● each night';
+    if (station.check === 'defer') detail.classList.add('is-warn');
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'base-close';
+    toggle.textContent = station.check === 'contract' ? 'Defer' : 'Contract';
+    toggle.addEventListener('click', () => {
+      ops.setStationCheck(state, station.iata, station.check === 'contract' ? 'defer' : 'contract');
+      changed();
+    });
+    row.append(name, detail, toggle);
     list.append(row);
   }
   nodes.push(list);

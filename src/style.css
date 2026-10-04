@@ -18,6 +18,27 @@ body {
   height: 100%;
   background: #05070c;
   overflow: hidden;
+  /* A drag near the top must not pull the page to refresh or rubber-band it. */
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Touch has no hover, so a long press on the map or its controls should not
+   select text or open the iOS callout. */
+#map,
+#map-surface,
+#rail,
+#now-corner {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Taps on controls fire at once, with no double-tap-zoom wait. */
+button,
+[role='button'],
+.stat-card {
+  touch-action: manipulation;
 }
 
 /* The map renders every frame (see main.ts's render()), so it just fills
@@ -27,6 +48,8 @@ body {
   width: calc(100vw - var(--panel-width));
   height: 100vh;
   box-sizing: border-box;
+  /* Drag and pinch are the map's own (main.ts), not the page's. */
+  touch-action: none;
 }
 
 /* Sections parked until a screen adopts them (ui/inspector/dom.ts's
@@ -326,6 +349,12 @@ body {
   gap: 4px;
 }
 
+#ops-view-toggle.active {
+  background: #2a6f6a;
+  border-color: #5ed6c8;
+  color: #e8fffb;
+}
+
 .where-zoom button {
   width: 26px;
   padding: 3px 0 !important;
@@ -377,6 +406,64 @@ body {
   #lens-corner {
     bottom: 190px;
   }
+}
+
+#map-tools-toggle {
+  display: none;
+}
+
+/* A phone: the lens, Ops view and the airport filter fold behind one
+   Filters button beside the zoom buttons, and open as a small stack above them. */
+:root[data-narrow] #where-corner {
+  flex-direction: row;
+  flex-wrap: wrap;
+  max-width: calc(100vw - var(--panel-width) - 24px);
+  bottom: 96px;
+  gap: 6px;
+}
+
+:root[data-narrow] #map-tools-toggle {
+  display: block;
+}
+
+:root[data-narrow] .where-zoom button,
+:root[data-narrow] #map-tools-toggle {
+  min-height: 36px;
+}
+
+:root[data-narrow] .where-zoom button {
+  width: 36px;
+}
+
+:root[data-narrow] #map-tools-toggle {
+  padding: 0 12px;
+}
+
+:root[data-narrow]:not([data-tools]) #lens-corner,
+:root[data-narrow]:not([data-tools]) #ops-view-toggle,
+:root[data-narrow]:not([data-tools]) #airport-filter {
+  display: none;
+}
+
+:root[data-narrow] #airport-filter {
+  flex-wrap: wrap;
+  flex-basis: 100%;
+}
+
+:root[data-narrow] #lens-corner {
+  bottom: 300px;
+  max-width: calc(100vw - var(--panel-width) - 24px);
+}
+
+:root[data-narrow] #lens-bar {
+  flex-wrap: wrap;
+}
+
+:root[data-narrow] #lens-bar button,
+:root[data-narrow] #where-corner #airport-filter button,
+:root[data-narrow] #ops-view-toggle {
+  min-height: 34px;
+  padding: 0 10px;
 }
 
 .mapmode-legend-swatch {
@@ -485,6 +572,56 @@ body {
    would silently do nothing. */
 #panel[hidden] {
   display: none;
+}
+
+#panel-close {
+  display: none;
+}
+
+/* A phone: the panel is a sheet over the map, beside the rail, closed by its
+   own button, the rail's Hide, or the rail item showing (ui/rail.ts). */
+:root[data-narrow] #panel {
+  right: var(--rail-width);
+  width: calc(100vw - var(--rail-width));
+  height: 100dvh;
+  z-index: 40;
+}
+
+:root[data-narrow] #rail {
+  height: 100dvh;
+  z-index: 41;
+  /* A short phone cuts the last icons off, so the rail scrolls. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  scrollbar-width: none;
+}
+
+:root[data-narrow] #rail::-webkit-scrollbar {
+  display: none;
+}
+
+:root[data-narrow] #rail > * {
+  flex: none;
+}
+
+:root[data-narrow] #rail > .rail-spacer {
+  flex: 1 0 8px;
+}
+
+:root[data-narrow] #panel-close {
+  display: block;
+  flex: none;
+  align-self: flex-end;
+  min-height: 44px;
+  margin: -8px 0 4px;
+  padding: 0 14px;
+  font: inherit;
+  color: #cdd3e0;
+  background: #171b26;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
 }
 
 /* The Overview screen: the cards and Last 7 days, scrolling on its own
@@ -690,17 +827,24 @@ body {
   vector-effect: non-scaling-stroke;
 }
 
+/* The Money view's RASM and CASM lines; the colour is set per line. */
+.money-chart-unit {
+  fill: none;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
 /* The Routes view (ui/inspector/routes.ts). */
 .routes-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
 .routes-table th,
 .routes-table td {
-  padding: 4px 4px;
+  padding: 4px 3px;
   text-align: right;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   white-space: nowrap;
@@ -1104,6 +1248,54 @@ body {
   border-color: #ff8080;
 }
 
+/* A night stop's halves (sim/nightStops.ts): the plane sleeps away, so
+   each half is drawn open on its station side, in the night's colour. */
+.timeline-rotation.is-night-stop {
+  border-color: #9fb4ff;
+  border-style: dashed;
+}
+
+/* A night stop half's ⌂ (ui/panels.ts): brings it home. Always showing. */
+.timeline-rotation .night-home-button {
+  position: absolute;
+  z-index: 1;
+  top: -7px;
+  left: -7px;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  line-height: 1;
+  font-family: inherit;
+  font-size: 11px;
+  color: #9fb4ff;
+  background: #0a0c12;
+  border: 1px solid #9fb4ff;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.timeline-rotation .night-home-button:hover {
+  color: #0a0c12;
+  background: #9fb4ff;
+}
+
+/* A move held for tomorrow (sim/retime.ts): dashed where it will sit. */
+.timeline-pending {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: 9px;
+  color: #ffd166;
+  white-space: nowrap;
+  border: 1px dashed #ffd166;
+  border-radius: 3px;
+  pointer-events: none;
+}
+
 .timeline-leg {
   position: absolute;
   top: 3px;
@@ -1140,7 +1332,8 @@ body {
 }
 
 .timeline-rotation:hover .rotation-remove-button,
-.timeline-rotation .rotation-remove-button.is-armed {
+.timeline-rotation .rotation-remove-button.is-armed,
+.timeline-rotation .rotation-remove-button.is-linked {
   display: block;
 }
 
@@ -1169,6 +1362,7 @@ body {
 }
 
 .rotation-remove-button:hover,
+.rotation-remove-button.is-linked,
 .rotation-remove-button.is-armed {
   color: #ff8080;
   border-color: #ff8080;
@@ -2004,10 +2198,233 @@ button.ticker-item:hover {
    starting over — a slightly harder red border marks that it's not just
    another routine pop-up, same #ff8080 the rest of the app already uses
    for "actually broken." */
+/* Over the world map (#home-world), which it opens from. */
+#home-picker-modal {
+  z-index: 70;
+}
+
 .modal-box--home {
   display: flex;
   flex-direction: column;
   max-height: 80vh;
+}
+
+/* The new-game world map (ui/homePicker.ts, render/pickerMap.ts): the
+   whole window, the map above and the story panel along the bottom. */
+#home-world {
+  position: fixed;
+  inset: 0;
+  /* The visible height: 100vh on a phone runs under the browser's toolbar and hides the Start button. */
+  height: 100dvh;
+  z-index: 60;
+  background: #070a12;
+  font-family: ui-monospace, Consolas, monospace;
+}
+
+#home-world[hidden] {
+  display: none;
+}
+
+#home-world-map {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* Drag and pinch are the picker's own (ui/homePicker.ts), not the page's. */
+  touch-action: none;
+}
+
+.home-world-title {
+  position: absolute;
+  top: 16px;
+  left: 20px;
+  margin: 0;
+  font-size: 15px;
+  color: #e8ecf5;
+  pointer-events: none;
+}
+
+#home-world-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 24px;
+  /* A fixed height, so the map above (fitted to the space left) doesn't jump as the story changes. */
+  height: 190px;
+  box-sizing: border-box;
+  padding: 16px 20px;
+  background: rgba(12, 16, 26, 0.96);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  color: #cdd3e0;
+  font-size: 13px;
+}
+
+.home-world-name {
+  color: #ffd166;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.home-world-facts {
+  margin-top: 2px;
+  color: #8a94b0;
+  font-size: 12px;
+}
+
+/* Why a Hard or Brutal home is one (sim/homes.ts's homeReasons()). */
+.home-world-why {
+  margin-top: 2px;
+  color: #ffb36b;
+  font-size: 12px;
+}
+
+.home-world-text {
+  margin: 8px 0 0;
+  max-width: 78ch;
+  line-height: 1.45;
+}
+
+.home-world-text--game {
+  color: #e8ecf5;
+}
+
+.home-world-hint {
+  margin: 0;
+  color: #8a94b0;
+}
+
+.home-world-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.home-world-actions .home-season {
+  margin: 0;
+}
+
+.home-world-season-note {
+  color: #8a94b0;
+  font-size: 12px;
+}
+
+.home-world-start {
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: #070a12;
+  background: #ffd166;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.home-world-start:disabled {
+  color: #6b7694;
+  background: #171b26;
+  cursor: default;
+}
+
+.home-world-other,
+.home-picker-back {
+  padding: 0;
+  font-family: inherit;
+  font-size: 12px;
+  color: #8a94b0;
+  text-align: left;
+  text-decoration: underline;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.home-picker-back {
+  margin-left: auto;
+}
+
+.home-world-other-short {
+  display: none;
+}
+
+#home-world-story {
+  overflow-y: auto;
+}
+
+@media (max-width: 700px) {
+  #home-world-panel {
+    height: 270px;
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .home-world-title {
+    top: 18px;
+    left: 16px;
+  }
+
+  /* The way to the full list rides the top corner, a real button a thumb can hit. */
+  .home-world-other {
+    position: fixed;
+    top: 8px;
+    right: 12px;
+    z-index: 1;
+    padding: 0 12px;
+    min-height: 44px;
+    font-size: 13px;
+    text-align: center;
+    text-decoration: none;
+    color: #cdd3e0;
+    background: rgba(12, 16, 26, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+  }
+
+  .home-world-other {
+    font-size: 0;
+  }
+
+  .home-world-other-short {
+    display: inline;
+    font-size: 13px;
+  }
+
+  .home-world-actions {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 6px 12px;
+  }
+
+  .home-world-actions .home-season {
+    grid-column: 1;
+  }
+
+  .home-world-season-note {
+    grid-column: 2;
+  }
+
+  .home-world-start {
+    grid-column: 1 / -1;
+  }
+
+  .home-world-start,
+  .home-season button {
+    min-height: 44px;
+  }
+
+  .home-option {
+    padding: 12px 10px;
+  }
+
+  .modal-box--home {
+    max-height: 90dvh;
+  }
 }
 
 /* The start season (ui/homePicker.ts): two buttons, the chosen one lit. */
@@ -4151,4 +4568,373 @@ button.ops-item:hover {
   margin: 2px 0 4px;
   color: #6b7694;
   font-size: 11px;
+}
+
+/* The Maintenance screen's release-to-service board (ui/inspector/maintenance.ts):
+   a standing strip and a tech-log card per plane. Teal serviceable, amber
+   watch, red action or grounded, blue in the hangar. */
+.mx-lamp {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+}
+
+.mx-ok { color: #5ed6c8; }
+.mx-watch { color: #ffb347; }
+.mx-due, .mx-aog { color: #ff8080; }
+.mx-check { color: #8ab4ff; }
+
+.mx-strip {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  margin: 4px 0 6px;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.mx-strip-seg {
+  background: currentColor;
+  min-width: 6px;
+}
+
+.mx-strip-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-bottom: 10px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  color: #9aa3b8;
+}
+
+.mx-strip-key .mx-lamp {
+  width: 6px;
+  height: 6px;
+  box-shadow: none;
+}
+
+.mx-strip-tech {
+  margin-left: auto;
+  color: #cdd3e0;
+}
+
+.mx-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mx-card {
+  display: block;
+  width: 100%;
+  padding: 7px 9px 8px;
+  font: inherit;
+  text-align: left;
+  color: #cdd3e0;
+  background: #0e1016;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 3px solid currentColor;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.mx-card:hover {
+  background: #171b26;
+}
+
+.mx-card-ok { border-left-color: #5ed6c8; }
+.mx-card-watch { border-left-color: #ffb347; }
+.mx-card-due, .mx-card-aog { border-left-color: #ff8080; }
+.mx-card-check { border-left-color: #8ab4ff; }
+
+.mx-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.mx-card-who {
+  display: flex;
+  align-items: center;
+  color: #e6e9f2;
+}
+
+.mx-card-who .mx-lamp { flex: none; }
+
+.mx-card-who .plane-icon { margin-right: 4px; }
+
+.mx-card-standing {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.mx-text-ok { color: #5ed6c8; }
+.mx-text-watch { color: #ffb347; }
+.mx-text-due, .mx-text-aog { color: #ff8080; }
+.mx-text-check { color: #8ab4ff; }
+
+/* The heavy-check clock: days since the last check across, the window where
+   nights bank hours tinted amber, the grace beyond the due mark hatched red. */
+.mx-clock {
+  position: relative;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.mx-clock-window,
+.mx-clock-grace,
+.mx-clock-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.mx-clock-window { background: rgba(255, 179, 71, 0.22); }
+
+.mx-clock-grace {
+  background: repeating-linear-gradient(135deg, rgba(255, 128, 128, 0.4) 0 3px, rgba(255, 128, 128, 0.1) 3px 6px);
+}
+
+.mx-clock-fill {
+  left: 0;
+  background: #cdd3e0;
+  opacity: 0.75;
+  border-radius: 4px 0 0 4px;
+}
+
+.mx-card-ok .mx-clock-fill { background: #5ed6c8; }
+.mx-card-watch .mx-clock-fill { background: #ffb347; }
+.mx-card-due .mx-clock-fill, .mx-card-aog .mx-clock-fill { background: #ff8080; }
+
+.mx-clock-due {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: #fff;
+}
+
+.mx-card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 5px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  color: #9aa3b8;
+}
+
+.mx-items {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mx-slots { display: inline-flex; gap: 3px; }
+
+.mx-slot {
+  width: 12px;
+  height: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+}
+
+.mx-slot.is-filled { background: #ffb347; border-color: #ffb347; }
+.mx-slot.is-held { background: #ff8080; border-color: #ff8080; }
+
+/* Wear: how much of its useful life the airframe has used. */
+.mx-wear {
+  height: 3px;
+  margin-top: 6px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 2px;
+}
+
+.mx-wear-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #5ed6c8, #ffb347 70%, #ff8080);
+  background-size: 100vw 100%;
+  border-radius: 2px;
+}
+
+.mx-dials {
+  margin-top: 4px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  color: #9aa3b8;
+}
+
+/* A grounded plane's row in the AOG list: a red edge and tint. */
+.mx-aog-row {
+  padding-left: 8px;
+  border-left: 3px solid #ff8080;
+  background: rgba(255, 128, 128, 0.06);
+}
+
+.mx-card-status {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.mx-card-night {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 10px;
+  color: #7c869c;
+}
+
+/* The hangar bays and the heavy-check due axis (ui/inspector/maintenance.ts). */
+.mx-bays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 6px;
+}
+
+.mx-bay {
+  min-width: 82px;
+  padding: 5px 8px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  border-radius: 4px;
+  border: 1px dashed rgba(255, 179, 71, 0.6);
+  color: #ffb347;
+}
+
+.mx-bay.is-working {
+  border: 1px solid #8ab4ff;
+  color: #8ab4ff;
+  background: repeating-linear-gradient(135deg, rgba(138, 180, 255, 0.18) 0 4px, rgba(138, 180, 255, 0.05) 4px 8px);
+}
+
+.mx-bay.is-late {
+  border-color: rgba(255, 128, 128, 0.7);
+  color: #ff8080;
+}
+
+.mx-bay-tail { color: #e6e9f2; }
+
+.mx-axis {
+  position: relative;
+  margin: 8px 22px 0 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.mx-axis-window {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(255, 179, 71, 0.14);
+}
+
+.mx-marker {
+  position: absolute;
+  transform: translateX(-50%);
+  padding: 0 5px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 10px;
+  line-height: 15px;
+  color: #0e1016;
+  background: #5ed6c8;
+  border-radius: 8px;
+  cursor: default;
+}
+
+.mx-marker.is-open { background: #ffb347; }
+.mx-marker.is-late { background: #ff8080; }
+
+.mx-axis-ticks {
+  position: relative;
+  height: 16px;
+  margin: 2px 22px 8px 14px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 10px;
+  color: #7c869c;
+}
+
+.mx-axis-tick {
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+.mx-group-lamps {
+  display: inline-flex;
+  margin-left: auto;
+}
+
+.mx-group-lamps .mx-lamp {
+  width: 6px;
+  height: 6px;
+  margin: 0 0 0 4px;
+  box-shadow: none;
+}
+
+/* The confirm step before a commitment (ui/confirmModal.ts). */
+.modal-box--confirm {
+  min-width: 300px;
+}
+
+.confirm-rows {
+  margin-bottom: 12px;
+}
+
+.confirm-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.confirm-go {
+  background: #5ed6c8;
+  border: none;
+  color: #0a0c12;
+}
+
+.modal-box--confirm .modal-actions button:not(.confirm-go) {
+  background: #3a4258;
+  border: 1px solid #6b7694;
+  color: #fff;
+}
+
+#cloud-save-section button {
+  margin-right: 6px;
+}
+
+.cloud-save-code {
+  margin-bottom: 8px;
+  font-family: ui-monospace, Consolas, monospace;
+  letter-spacing: 0.08em;
+  color: #fff;
+  user-select: all;
+}
+
+#cloud-save-status {
+  margin-top: 8px;
+  min-height: 1.2em;
+  color: #6b7694;
+  font-size: 12px;
+}
+
+.home-world-cloud {
+  background: none;
+  border: none;
+  padding: 4px 0;
+  color: #5ed6c8;
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
 }

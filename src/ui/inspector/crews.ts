@@ -5,8 +5,10 @@ import type { SimState } from '../../sim/state';
 import { money } from '../format';
 import { linkToMap } from '../mapLink';
 import { planeIconElement } from '../planeIcons';
+import { showConfirm } from '../confirmModal';
 import * as ops from '../routeActions';
 import { select } from '../selection';
+import { baseSection } from './bases';
 import { heading, line, lineWithInfo } from './dom';
 
 /**
@@ -46,16 +48,20 @@ function chipElement(chip: Chip): HTMLElement {
   return el;
 }
 
-function actionButton(label: string, disabled: boolean, act: () => void, changed: () => void): HTMLButtonElement {
+/** A confirm window before an action that spends money or lets crews go; `confirm` null runs it at once. */
+type CrewConfirm = { title: string; rows: { label: string; value: string }[]; facts?: string[]; confirmLabel: string };
+
+function actionButton(label: string, disabled: boolean, act: () => void, changed: () => void, confirm: CrewConfirm | null = null): HTMLButtonElement {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'inspector-plan-hub crew-action';
   button.textContent = label;
   button.disabled = disabled;
-  button.addEventListener('click', () => {
+  const run = () => {
     act();
     changed();
-  });
+  };
+  button.addEventListener('click', () => (confirm ? showConfirm({ ...confirm, run }) : run()));
   return button;
 }
 
@@ -75,10 +81,6 @@ export function buildCrewsView(state: SimState, changed: () => void): HTMLElemen
 
   const today = dayIndex(state);
   const plan = crewPlan(state);
-  if (plan.length === 0) {
-    root.append(line('No crew bases yet · a base opens where you base a plane'));
-    return root;
-  }
 
   const classes = plan.flatMap((base) => base.classes);
   const crews = classes.reduce((sum, c) => sum + c.crews, 0);
@@ -89,7 +91,7 @@ export function buildCrewsView(state: SimState, changed: () => void): HTMLElemen
   );
   root.append(
     line(
-      `${crews} crews · ${plan.length} base${plan.length === 1 ? '' : 's'}` +
+      `${crews} crews · ${ops.crewBaseReadout(state).bases.length} base${ops.crewBaseReadout(state).bases.length === 1 ? '' : 's'}` +
         (joining > 0 ? ` · +${joining} joining` : '') +
         (reserveCost > 0 ? ` · reserve ${money(reserveCost)}/day` : '') +
         ` · hire ${hireLeadDays(state)}d · conversion ${retrainDays(state)}d`,
@@ -99,7 +101,48 @@ export function buildCrewsView(state: SimState, changed: () => void): HTMLElemen
   root.append(...horizon(plan, today));
   root.append(...toDo(state, plan, today, changed));
   root.append(...roster(state, plan, today, changed));
+  root.append(...crewBasesSection(state, plan, changed));
   return root;
+}
+
+/**
+ * The crew bases (sim/bases.ts): open one at any airport on the map, close
+ * an empty one. A new base has no crews: hire them here, then lease or
+ * move planes to it.
+ */
+function crewBasesSection(state: SimState, plan: ReturnType<typeof crewPlan>, changed: () => void): HTMLElement[] {
+  const readout = ops.crewBaseReadout(state);
+  const nodes = baseSection({
+    title: 'Crew bases',
+    info: `Where crews live, and the only places planes can be leased or based. Opening one costs ${money(readout.fee)} and ${money(readout.perDay)} a day for the crew room; home's comes with the start. A new base has no crews: hire them before its first plane. A crew base is not a maintenance base: nights there are contracted or deferred unless you open one on the Mtc screen.`,
+    kind: 'crew base',
+    bases: readout.bases,
+    candidates: readout.candidates,
+    fee: readout.fee,
+    perDay: readout.perDay,
+    preview: (action, iata) => ops.previewBaseChange(state, 'crew', action, iata),
+    open: (iata) => ops.openCrewBaseAt(state, iata),
+    close: (iata) => ops.closeCrewBaseAt(state, iata),
+    changed,
+  });
+  // A base with no roster yet (no crews, no planes) has nothing in the roster above to hire from.
+  for (const base of readout.bases) {
+    if (plan.some((entry) => entry.iata === base.iata)) continue;
+    const classes = ops.crewReadout(state, base.iata)?.classes.filter((c) => c.open) ?? [];
+    if (classes.length === 0) continue;
+    const buttons = document.createElement('div');
+    buttons.className = 'crew-buttons';
+    buttons.append(line(`${base.iata} · no crews yet`, 'inspector-line crew-row-detail'));
+    for (const c of classes) {
+      buttons.append(actionButton(`Hire 1 ${c.name} · ${money(hireFee(c.classCode))}`, state.cash < hireFee(c.classCode), () => ops.hireCrewsAt(state, base.iata, c.classCode, 1), changed, {
+        title: `Hire 1 ${c.name} crew · ${base.iata}`,
+        rows: [{ label: 'Fee now', value: money(hireFee(c.classCode)) }, { label: 'Cash after', value: money(state.cash - hireFee(c.classCode)) }],
+        confirmLabel: `Hire · ${money(hireFee(c.classCode))}`,
+      }));
+    }
+    nodes.push(buttons);
+  }
+  return nodes;
 }
 
 /** The next HORIZON_DAYS as a strip: EIS, crews joining, planes going back. */
@@ -173,7 +216,16 @@ function entryRow(state: SimState, iata: string, c: ClassPlan, entry: PlaneEntry
   const buttons = document.createElement('div');
   buttons.className = 'crew-buttons';
   const fee = hireFee(c.classCode) * entry.short;
-  buttons.append(actionButton(`Hire ${entry.short} · ${money(fee)}`, state.cash < fee, () => ops.hireCrewsAt(state, iata, c.classCode, entry.short), changed));
+  buttons.append(actionButton(`Hire ${entry.short} · ${money(fee)}`, state.cash < fee, () => ops.hireCrewsAt(state, iata, c.classCode, entry.short), changed, {
+    title: `Hire ${entry.short} ${c.name} crew${entry.short === 1 ? '' : 's'} · ${iata}`,
+    rows: [
+      { label: 'Fee now', value: money(fee) },
+      { label: 'Join', value: `day ${today + lead} (${lead}d)` },
+      { label: 'Cash after', value: money(state.cash - fee) },
+    ],
+    facts: [`Short ${entry.short} at EIS day ${entry.day}${late > 0 ? `: they join ${late}d late` : ''}.`],
+    confirmLabel: `Hire · ${money(fee)}`,
+  }));
   // Reserve of another type at this base, converted: slower, cheaper.
   const donor = siblings.filter((s) => s.classCode !== c.classCode && s.crews - s.ideal > 0).sort((x, y) => y.crews - y.ideal - (x.crews - x.ideal))[0];
   if (donor) {
@@ -185,6 +237,16 @@ function entryRow(state: SimState, iata: string, c: ClassPlan, entry: PlaneEntry
         false,
         () => ops.retrainCrewsAt(state, iata, donor.classCode, c.classCode, n),
         changed,
+        {
+          title: `Convert ${n} ${donor.name} → ${c.name} · ${iata}`,
+          rows: [
+            { label: 'Fee now', value: money(retrainFee(c.classCode) * n) },
+            { label: 'Ready', value: `day ${ready}` },
+            { label: 'Cash after', value: money(state.cash - retrainFee(c.classCode) * n) },
+          ],
+          facts: [`${donor.name} reserve drops by ${n}; they fly nothing while retraining.`],
+          confirmLabel: `Convert · ${money(retrainFee(c.classCode) * n)}`,
+        },
       ),
     );
   }
@@ -274,12 +336,39 @@ function classRow(state: SimState, iata: string, c: ClassPlan, siblings: ClassPl
   const buttons = document.createElement('div');
   buttons.className = 'crew-buttons';
   const open = ops.crewReadout(state, iata)?.classes.find((r) => r.classCode === c.classCode)?.open ?? false;
-  buttons.append(actionButton(`Hire 1 · ${money(hireFee(c.classCode))}`, !open || state.cash < hireFee(c.classCode), () => ops.hireCrewsAt(state, iata, c.classCode, 1), changed));
+  buttons.append(actionButton(`Hire 1 · ${money(hireFee(c.classCode))}`, !open || state.cash < hireFee(c.classCode), () => ops.hireCrewsAt(state, iata, c.classCode, 1), changed, {
+    title: `Hire 1 ${c.name} crew · ${iata}`,
+    rows: [
+      { label: 'Fee now', value: money(hireFee(c.classCode)) },
+      { label: 'Joins', value: `day ${dayIndex(state) + hireLeadDays(state)}` },
+      { label: 'Cash after', value: money(state.cash - hireFee(c.classCode)) },
+    ],
+    confirmLabel: `Hire · ${money(hireFee(c.classCode))}`,
+  }));
   const donor = siblings.filter((s) => s.classCode !== c.classCode && s.crews - s.ideal > 0).sort((x, y) => y.crews - y.ideal - (x.crews - x.ideal))[0];
   if (donor && open) {
-    buttons.append(actionButton(`Convert 1 from ${donor.name} · ${money(retrainFee(c.classCode))}`, state.cash < retrainFee(c.classCode), () => ops.retrainCrewsAt(state, iata, donor.classCode, c.classCode, 1), changed));
+    buttons.append(actionButton(`Convert 1 from ${donor.name} · ${money(retrainFee(c.classCode))}`, state.cash < retrainFee(c.classCode), () => ops.retrainCrewsAt(state, iata, donor.classCode, c.classCode, 1), changed, {
+      title: `Convert 1 ${donor.name} → ${c.name} · ${iata}`,
+      rows: [
+        { label: 'Fee now', value: money(retrainFee(c.classCode)) },
+        { label: 'Ready', value: `day ${dayIndex(state) + retrainDays(state)}` },
+        { label: 'Cash after', value: money(state.cash - retrainFee(c.classCode)) },
+      ],
+      facts: [`A ${donor.name} crew leaves that roster and flies nothing while retraining.`],
+      confirmLabel: `Convert · ${money(retrainFee(c.classCode))}`,
+    }));
   }
-  if (c.crews > c.ideal) buttons.append(actionButton('Release 1', false, () => ops.releaseCrewsAt(state, iata, c.classCode, 1), changed));
+  if (c.crews > c.ideal) buttons.append(
+      actionButton('Release 1', false, () => ops.releaseCrewsAt(state, iata, c.classCode, 1), changed, {
+        title: `Release 1 ${c.name} crew · ${iata}`,
+        rows: [
+          { label: 'Crews after', value: `${c.crews - 1} (need ${c.ideal}, min ${c.minimum})` },
+          { label: 'Standby saved', value: `${money(standbyCost(c.classCode))}/day` },
+        ],
+        facts: ['Rehiring costs the fee again and takes days to join.'],
+        confirmLabel: 'Release',
+      }),
+    );
   row.append(buttons);
   return row;
 }

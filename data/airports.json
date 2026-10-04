@@ -2919,7 +2919,7 @@
     "lat": 41.6398,
     "lon": 123.4837,
     "utcOffsetMinutes": 480,
-    "population": 12094605
+    "population": 11335954
   },
   {
     "iata": "NKG",
@@ -3015,7 +3015,7 @@
     "lat": 23.0772,
     "lon": 72.6347,
     "utcOffsetMinutes": 330,
-    "population": 7780647
+    "population": 7723185
   },
   {
     "iata": "DLC",
@@ -3631,7 +3631,7 @@
     "lat": -29.6144,
     "lon": 31.1197,
     "utcOffsetMinutes": 120,
-    "population": 4020837
+    "population": 3863718
   },
   {
     "iata": "KRT",
@@ -3727,7 +3727,7 @@
     "lat": -37.012,
     "lon": 174.7863,
     "utcOffsetMinutes": 720,
-    "population": 2238984
+    "population": 2237151
   },
   {
     "iata": "CHC",
@@ -3840,5 +3840,597 @@
     "lon": 144.7973,
     "utcOffsetMinutes": 600,
     "population": 173653
+  },
+  {
+    "iata": "PNR",
+    "name": "Pointe Noire",
+    "lat": -4.816,
+    "lon": 11.8866,
+    "utcOffsetMinutes": 60,
+    "population": 1044373
+  },
+  {
+    "iata": "MEG",
+    "name": "Malanje",
+    "lat": -9.5251,
+    "lon": 16.3124,
+    "utcOffsetMinutes": 60,
+    "population": 590918
+  },
+  {
+    "iata": "KTI",
+    "name": "Phnom Penh",
+    "lat": 11.36,
+    "lon": 104.9213,
+    "utcOffsetMinutes": 420,
+    "population": 2733853
+  },
+  {
+    "iata": "DAD",
+    "name": "Da Nang",
+    "lat": 16.0439,
+    "lon": 108.199,
+    "utcOffsetMinutes": 420,
+    "population": 1842235
+  },
+  {
+    "iata": "MPM",
+    "name": "Maputo",
+    "lat": -25.9208,
+    "lon": 32.5726,
+    "utcOffsetMinutes": 120,
+    "population": 2526928
+  },
+  {
+    "iata": "PZB",
+    "name": "Pietermaritzburg",
+    "lat": -29.649,
+    "lon": 30.3987,
+    "utcOffsetMinutes": 120,
+    "population": 1135435
+  },
+  {
+    "iata": "PAT",
+    "name": "Patna",
+    "lat": 25.5913,
+    "lon": 85.088,
+    "utcOffsetMinutes": 330,
+    "population": 3225343
+  },
+  {
+    "iata": "BDO",
+    "name": "Bandung",
+    "lat": -6.9006,
+    "lon": 107.576,
+    "utcOffsetMinutes": 420,
+    "population": 4519766
+  },
+  {
+    "iata": "BCD",
+    "name": "Bacolod",
+    "lat": 10.7762,
+    "lon": 123.0189,
+    "utcOffsetMinutes": 480,
+    "population": 3050411
+  },
+  {
+    "iata": "CEB",
+    "name": "Cebu",
+    "lat": 10.3093,
+    "lon": 123.9797,
+    "utcOffsetMinutes": 480,
+    "population": 2487062
+  },
+  {
+    "iata": "BDQ",
+    "name": "Vadodara",
+    "lat": 22.3362,
+    "lon": 73.2263,
+    "utcOffsetMinutes": 330,
+    "population": 2998330
+  },
+  {
+    "iata": "SKZ",
+    "name": "Sukkur",
+    "lat": 27.722,
+    "lon": 68.7917,
+    "utcOffsetMinutes": 300,
+    "population": 2001893
+  },
+  {
+    "iata": "AOG",
+    "name": "Anshan",
+    "lat": 41.1053,
+    "lon": 122.854,
+    "utcOffsetMinutes": 480,
+    "population": 4807392
+  },
+  {
+    "iata": "TRU",
+    "name": "Trujillo",
+    "lat": -8.0824,
+    "lon": -79.1088,
+    "utcOffsetMinutes": -300,
+    "population": 1227997
+  },
+  {
+    "iata": "CIX",
+    "name": "Chiclayo",
+    "lat": -6.7892,
+    "lon": -79.8283,
+    "utcOffsetMinutes": -300,
+    "population": 920782
+  },
+  {
+    "iata": "JAU",
+    "name": "Jauja",
+    "lat": -11.7831,
+    "lon": -75.4734,
+    "utcOffsetMinutes": -300,
+    "population": 651104
+  },
+  {
+    "iata": "LFW",
+    "name": "Lomé",
+    "lat": 6.1656,
+    "lon": 1.2545,
+    "utcOffsetMinutes": 0,
+    "population": 2347956
+  },
+  {
+    "iata": "MVD",
+    "name": "Montevideo",
+    "lat": -34.8356,
+    "lon": -56.0265,
+    "utcOffsetMinutes": -180,
+    "population": 1608401
+  },
+  {
+    "iata": "ROS",
+    "name": "Rosario",
+    "lat": -32.9036,
+    "lon": -60.785,
+    "utcOffsetMinutes": -180,
+    "population": 1309381
+  },
+  {
+    "iata": "CCP",
+    "name": "Concepción",
+    "lat": -36.7724,
+    "lon": -73.0628,
+    "utcOffsetMinutes": -240,
+    "population": 1036912
+  },
+  {
+    "iata": "NQN",
+    "name": "Neuquén",
+    "lat": -38.949,
+    "lon": -68.1557,
+    "utcOffsetMinutes": -180,
+    "population": 600881
+  },
+  {
+    "iata": "CBR",
+    "name": "Canberra",
+    "lat": -35.3069,
+    "lon": 149.195,
+    "utcOffsetMinutes": 600,
+    "population": 483692
+  },
+  {
+    "iata": "MBA",
+    "name": "Mombasa",
+    "lat": -4.0348,
+    "lon": 39.5942,
+    "utcOffsetMinutes": 180,
+    "population": 1944311
+  },
+  {
+    "iata": "JRO",
+    "name": "Arusha",
+    "lat": -3.427,
+    "lon": 37.0735,
+    "utcOffsetMinutes": 180,
+    "population": 1044848
+  },
+  {
+    "iata": "MDL",
+    "name": "Mandalay",
+    "lat": 21.7022,
+    "lon": 95.9779,
+    "utcOffsetMinutes": 390,
+    "population": 1367844
+  },
+  {
+    "iata": "NYT",
+    "name": "Naypyitaw",
+    "lat": 19.6235,
+    "lon": 96.201,
+    "utcOffsetMinutes": 390,
+    "population": 1077037
+  },
+  {
+    "iata": "PLZ",
+    "name": "Gqeberha",
+    "lat": -33.9897,
+    "lon": 25.6174,
+    "utcOffsetMinutes": 120,
+    "population": 1380472
+  },
+  {
+    "iata": "GRJ",
+    "name": "George",
+    "lat": -34.0056,
+    "lon": 22.3789,
+    "utcOffsetMinutes": 120,
+    "population": 405200
+  },
+  {
+    "iata": "UTN",
+    "name": "Upington",
+    "lat": -28.4002,
+    "lon": 21.2636,
+    "utcOffsetMinutes": 120,
+    "population": 90061
+  },
+  {
+    "iata": "BRM",
+    "name": "Barquisimeto",
+    "lat": 10.0427,
+    "lon": -69.3586,
+    "utcOffsetMinutes": -240,
+    "population": 2167267
+  },
+  {
+    "iata": "RAO",
+    "name": "Ribeirão Preto",
+    "lat": -21.1343,
+    "lon": -47.7741,
+    "utcOffsetMinutes": -180,
+    "population": 1487148
+  },
+  {
+    "iata": "AKR",
+    "name": "Akure",
+    "lat": 7.2467,
+    "lon": 5.301,
+    "utcOffsetMinutes": 60,
+    "population": 2995383
+  },
+  {
+    "iata": "ABB",
+    "name": "Asaba",
+    "lat": 6.2042,
+    "lon": 6.6653,
+    "utcOffsetMinutes": 60,
+    "population": 2755748
+  },
+  {
+    "iata": "ELQ",
+    "name": "Buraydah",
+    "lat": 26.3028,
+    "lon": 43.7744,
+    "utcOffsetMinutes": 180,
+    "population": 1172388
+  },
+  {
+    "iata": "ASW",
+    "name": "Aswan",
+    "lat": 23.9611,
+    "lon": 32.8204,
+    "utcOffsetMinutes": 120,
+    "population": 850875
+  },
+  {
+    "iata": "OUA",
+    "name": "Ouagadougou",
+    "lat": 12.3532,
+    "lon": -1.5124,
+    "utcOffsetMinutes": 0,
+    "population": 2714910
+  },
+  {
+    "iata": "CKY",
+    "name": "Conakry",
+    "lat": 9.5769,
+    "lon": -13.612,
+    "utcOffsetMinutes": 0,
+    "population": 2405435
+  },
+  {
+    "iata": "BYK",
+    "name": "Bouaké",
+    "lat": 7.7388,
+    "lon": -5.0737,
+    "utcOffsetMinutes": 0,
+    "population": 1321278
+  },
+  {
+    "iata": "YIN",
+    "name": "Yining",
+    "lat": 43.9558,
+    "lon": 81.3303,
+    "utcOffsetMinutes": 360,
+    "population": 1098746
+  },
+  {
+    "iata": "AKU",
+    "name": "Aksu",
+    "lat": 41.2625,
+    "lon": 80.2917,
+    "utcOffsetMinutes": 360,
+    "population": 630027
+  },
+  {
+    "iata": "KRL",
+    "name": "Korla",
+    "lat": 41.615,
+    "lon": 86.1408,
+    "utcOffsetMinutes": 360,
+    "population": 602803
+  },
+  {
+    "iata": "AWA",
+    "name": "Hawassa",
+    "lat": 7.1006,
+    "lon": 38.3965,
+    "utcOffsetMinutes": 180,
+    "population": 1301808
+  },
+  {
+    "iata": "JIB",
+    "name": "Djibouti",
+    "lat": 11.5473,
+    "lon": 43.1595,
+    "utcOffsetMinutes": 180,
+    "population": 704316
+  },
+  {
+    "iata": "DIR",
+    "name": "Dire Dawa",
+    "lat": 9.6235,
+    "lon": 41.855,
+    "utcOffsetMinutes": 180,
+    "population": 662700
+  },
+  {
+    "iata": "NVT",
+    "name": "Itajaí–Navegantes",
+    "lat": -26.8794,
+    "lon": -48.651,
+    "utcOffsetMinutes": -180,
+    "population": 1758287
+  },
+  {
+    "iata": "FLN",
+    "name": "Florianópolis",
+    "lat": -27.6703,
+    "lon": -48.5525,
+    "utcOffsetMinutes": -180,
+    "population": 1271737
+  },
+  {
+    "iata": "NKC",
+    "name": "Nouakchott",
+    "lat": 18.31,
+    "lon": -15.9697,
+    "utcOffsetMinutes": 0,
+    "population": 1188709
+  },
+  {
+    "iata": "BJL",
+    "name": "Banjul",
+    "lat": 13.338,
+    "lon": -16.6522,
+    "utcOffsetMinutes": 0,
+    "population": 799355
+  },
+  {
+    "iata": "NAT",
+    "name": "Natal",
+    "lat": -5.7698,
+    "lon": -35.3666,
+    "utcOffsetMinutes": -180,
+    "population": 1923471
+  },
+  {
+    "iata": "GDQ",
+    "name": "Gondar",
+    "lat": 12.5199,
+    "lon": 37.434,
+    "utcOffsetMinutes": 180,
+    "population": 616700
+  },
+  {
+    "iata": "ASM",
+    "name": "Asmara",
+    "lat": 15.2919,
+    "lon": 38.9107,
+    "utcOffsetMinutes": 180,
+    "population": 602346
+  },
+  {
+    "iata": "BJR",
+    "name": "Bahir Dar",
+    "lat": 11.6081,
+    "lon": 37.3216,
+    "utcOffsetMinutes": 180,
+    "population": 548900
+  },
+  {
+    "iata": "JPA",
+    "name": "João Pessoa",
+    "lat": -7.1487,
+    "lon": -34.9506,
+    "utcOffsetMinutes": -180,
+    "population": 1821166
+  },
+  {
+    "iata": "MCZ",
+    "name": "Maceió",
+    "lat": -9.5126,
+    "lon": -35.7918,
+    "utcOffsetMinutes": -180,
+    "population": 1745596
+  },
+  {
+    "iata": "AJU",
+    "name": "Aracaju",
+    "lat": -10.9839,
+    "lon": -37.0729,
+    "utcOffsetMinutes": -180,
+    "population": 1468276
+  },
+  {
+    "iata": "EVN",
+    "name": "Yerevan",
+    "lat": 40.1489,
+    "lon": 44.3979,
+    "utcOffsetMinutes": 240,
+    "population": 2071756
+  },
+  {
+    "iata": "PEI",
+    "name": "Pereira",
+    "lat": 4.8127,
+    "lon": -75.7395,
+    "utcOffsetMinutes": -300,
+    "population": 2109887
+  },
+  {
+    "iata": "ASB",
+    "name": "Ashgabat",
+    "lat": 37.9868,
+    "lon": 58.361,
+    "utcOffsetMinutes": 300,
+    "population": 1198818
+  },
+  {
+    "iata": "SRY",
+    "name": "Sari",
+    "lat": 36.6444,
+    "lon": 53.1888,
+    "utcOffsetMinutes": 210,
+    "population": 1196553
+  },
+  {
+    "iata": "MZR",
+    "name": "Mazar-i-Sharif",
+    "lat": 36.7041,
+    "lon": 67.2105,
+    "utcOffsetMinutes": 270,
+    "population": 712058
+  },
+  {
+    "iata": "LDB",
+    "name": "Londrina",
+    "lat": -23.3344,
+    "lon": -51.1284,
+    "utcOffsetMinutes": -180,
+    "population": 1336638
+  },
+  {
+    "iata": "CGR",
+    "name": "Campo Grande",
+    "lat": -20.47,
+    "lon": -54.674,
+    "utcOffsetMinutes": -240,
+    "population": 978001
+  },
+  {
+    "iata": "MGF",
+    "name": "Maringá",
+    "lat": -23.4761,
+    "lon": -52.0162,
+    "utcOffsetMinutes": -180,
+    "population": 962907
+  },
+  {
+    "iata": "SLZ",
+    "name": "São Luís",
+    "lat": -2.5864,
+    "lon": -44.235,
+    "utcOffsetMinutes": -180,
+    "population": 1528286
+  },
+  {
+    "iata": "MCP",
+    "name": "Macapá",
+    "lat": 0.0507,
+    "lon": -51.0722,
+    "utcOffsetMinutes": -180,
+    "population": 659305
+  },
+  {
+    "iata": "IMP",
+    "name": "Imperatriz",
+    "lat": -5.5313,
+    "lon": -47.46,
+    "utcOffsetMinutes": -180,
+    "population": 455106
+  },
+  {
+    "iata": "ALH",
+    "name": "Albany, Western Australia",
+    "lat": -34.9433,
+    "lon": 117.8089,
+    "utcOffsetMinutes": 480,
+    "population": 47736
+  },
+  {
+    "iata": "GET",
+    "name": "Geraldton",
+    "lat": -28.7961,
+    "lon": 114.707,
+    "utcOffsetMinutes": 480,
+    "population": 41485
+  },
+  {
+    "iata": "KGI",
+    "name": "Kalgoorlie",
+    "lat": -30.7915,
+    "lon": 121.4646,
+    "utcOffsetMinutes": 480,
+    "population": 33371
+  },
+  {
+    "iata": "STM",
+    "name": "Santarém",
+    "lat": -2.4224,
+    "lon": -54.7931,
+    "utcOffsetMinutes": -180,
+    "population": 466043
+  },
+  {
+    "iata": "BVB",
+    "name": "Boa Vista",
+    "lat": 2.8462,
+    "lon": -60.6906,
+    "utcOffsetMinutes": -240,
+    "population": 456429
+  },
+  {
+    "iata": "ITB",
+    "name": "Itaituba",
+    "lat": -4.2421,
+    "lon": -56.0007,
+    "utcOffsetMinutes": -180,
+    "population": 150611
+  },
+  {
+    "iata": "TRG",
+    "name": "Tauranga",
+    "lat": -37.6719,
+    "lon": 176.196,
+    "utcOffsetMinutes": 720,
+    "population": 305452
+  },
+  {
+    "iata": "HLZ",
+    "name": "Hamilton, New Zealand",
+    "lat": -37.867,
+    "lon": 175.332,
+    "utcOffsetMinutes": 720,
+    "population": 283121
   }
 ]

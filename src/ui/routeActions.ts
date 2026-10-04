@@ -13,6 +13,9 @@ import { renderScheduleWarnings, scheduleProblems } from './panels';
 export {
   adoptInnovation,
   crewReadout,
+  crewBaseReadout,
+  mxBaseReadout,
+  previewBaseChange,
   appointExecutiveById,
   executiveOptions,
   letExecutiveGo,
@@ -115,4 +118,24 @@ export function removeRoute(state: SimState, a: string, b: string) {
 
 export function returnPlane(state: SimState, tail: string) {
   return afterChange(state, actions.returnPlane(state, tail));
+}
+
+export function openCrewBaseAt(state: SimState, iata: string) {
+  return afterChange(state, actions.openCrewBaseAt(state, iata));
+}
+
+export function closeCrewBaseAt(state: SimState, iata: string) {
+  return afterChange(state, actions.closeCrewBaseAt(state, iata));
+}
+
+export function openMxBaseAt(state: SimState, iata: string) {
+  return afterChange(state, actions.openMxBaseAt(state, iata));
+}
+
+export function closeMxBaseAt(state: SimState, iata: string) {
+  return afterChange(state, actions.closeMxBaseAt(state, iata));
+}
+
+export function setStationCheck(state: SimState, iata: string, check: 'contract' | 'defer') {
+  return afterChange(state, actions.setStationCheck(state, iata, check));
 }

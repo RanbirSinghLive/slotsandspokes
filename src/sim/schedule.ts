@@ -73,6 +73,13 @@ export function isAircraftTypeAllowedAt(iata: string, typeCode: string): boolean
 // cruiseKts (see sim/rotations.ts).
 const DEFAULT_CRUISE_KTS = (aircraftTypesData as AircraftType[])[0].cruiseKts;
 
+/** Great-circle distance between two airports in nautical miles, for what a flight covers once it lands. */
+export function legDistanceNm(originIata: string, destIata: string): number {
+  const origin = airportsByIata.get(originIata);
+  const dest = airportsByIata.get(destIata);
+  return origin && dest ? greatCircleDistanceNm(origin, dest) : 0;
+}
+
 /**
  * Block time for a leg between two airports, from great-circle distance
  * and `cruiseKts` — see CLAUDE.md's note on this formula. `cruiseKts`

@@ -94,3 +94,117 @@ export function fitProjection(width: number, height: number, home: { lon: number
     [width, height],
   ]);
 }
+
+/**
+ * Fit the whole inhabited world into a `width` x `height` canvas, kept
+ * `inset` pixels in from each edge: the new-game picker's view
+ * (ui/homePicker.ts), drawn through this same projection, as every map in
+ * the game is.
+ */
+export function fitWorld(width: number, height: number, inset: { top: number; right: number; bottom: number; left: number }): void {
+  // Two corners, not a ring: a ring 350° wide is ambiguous on a sphere, but
+  // two points' projected bounds are just the box between them. Antarctica
+  // and the far Arctic are left off; no airport is there.
+  projection.fitExtent(
+    [
+      [inset.left, inset.top],
+      [width - inset.right, height - inset.bottom],
+    ],
+    { type: 'MultiPoint', coordinates: [[-170, 72], [180, -50]] },
+  );
+  baselineScale = projection.scale();
+  projection.clipExtent([
+    [0, 0],
+    [width, height],
+  ]);
+}
+
+/**
+ * `active` is true while a finger is dragging or pinching the map (main.ts);
+ * `margin` is how much extra, as a fraction of the map's width and height on
+ * every side, the cached sheets (basemap.ts, fog.ts) paint beyond the screen.
+ * A sheet that big can be slid around, and scaled a little during a pinch,
+ * without a repaint and without showing a blank edge; it is repainted when
+ * the view runs off it, or sharpened once a pinch ends. The mouse view keeps
+ * margin 0 and repaints on any change, as before.
+ */
+export const mapGesture = { active: false, margin: 0 };
+
+/** The view a cached sheet was painted for, to carry its picture to a later view. */
+export type ViewSnapshot = { scale: number; translate: [number, number] };
+
+export function snapshotView(): ViewSnapshot {
+  return { scale: projection.scale(), translate: projection.translate() };
+}
+
+/** Where a sheet painted for `painted` lands under the current view: its scale and where its origin goes. */
+function sheetPlacement(painted: ViewSnapshot): { ratio: number; originX: number; originY: number } {
+  const ratio = projection.scale() / painted.scale;
+  const [translateX, translateY] = projection.translate();
+  return { ratio, originX: translateX - ratio * painted.translate[0], originY: translateY - ratio * painted.translate[1] };
+}
+
+/**
+ * Whether the sheet can stand in for a repaint now: it covers the whole
+ * screen, and either the view only moved (Mercator pans are exact) or a
+ * pinch is in progress and a blurry, slightly scaled copy will do.
+ */
+export function sheetStillFits(painted: ViewSnapshot, margin: number, cssWidth: number, cssHeight: number): boolean {
+  const { ratio, originX, originY } = sheetPlacement(painted);
+  const marginX = margin * cssWidth;
+  const marginY = margin * cssHeight;
+  const covers =
+    originX - ratio * marginX <= 0.5 &&
+    originX + ratio * (cssWidth + marginX) >= cssWidth - 0.5 &&
+    originY - ratio * marginY <= 0.5 &&
+    originY + ratio * (cssHeight + marginY) >= cssHeight - 0.5;
+  const sameScale = Math.abs(ratio - 1) < 1e-9;
+  return covers && (sameScale || (mapGesture.active && ratio > 0.5 && ratio < 3));
+}
+
+/** Draw a sheet painted for `painted` (with `margin` on every side) as it looks under the current view. */
+export function drawSheet(ctx: CanvasRenderingContext2D, sheet: HTMLCanvasElement, painted: ViewSnapshot, margin: number, cssWidth: number, cssHeight: number): void {
+  const { ratio, originX, originY } = sheetPlacement(painted);
+  const marginX = margin * cssWidth;
+  const marginY = margin * cssHeight;
+  ctx.save();
+  ctx.transform(ratio, 0, 0, ratio, originX, originY);
+  ctx.drawImage(sheet, -marginX, -marginY, cssWidth + 2 * marginX, cssHeight + 2 * marginY);
+  ctx.restore();
+}
+
+/** Run `paint` with the projection's clip widened to the sheet, so the margin is painted too. */
+export function withSheetClip(margin: number, cssWidth: number, cssHeight: number, paint: () => void): void {
+  const before = projection.clipExtent();
+  const marginX = margin * cssWidth;
+  const marginY = margin * cssHeight;
+  projection.clipExtent([[-marginX, -marginY], [cssWidth + marginX, cssHeight + marginY]]);
+  try {
+    paint();
+  } finally {
+    projection.clipExtent(before);
+  }
+}
+
+// The canvas the shared projection draws into. Pointer positions arrive in page (client)
+// coordinates and the projection works in this canvas's own pixels; the two agree only
+// while the canvas sits at the page's top-left corner, so every hit test goes through here.
+let mapElement: HTMLElement | null = null;
+
+export function setMapElement(element: HTMLElement): void {
+  mapElement = element;
+}
+
+/** Page (client) coordinates to the map's own pixels, the ones `projection` returns and inverts. */
+export function mapPoint(clientX: number, clientY: number): [number, number] {
+  const box = mapElement?.getBoundingClientRect();
+  return box ? [clientX - box.left, clientY - box.top] : [clientX, clientY];
+}
+
+/** The map's size in CSS pixels, read from the canvas's own box. */
+export function mapSize(): { width: number; height: number } {
+  return { width: mapElement?.clientWidth ?? 0, height: mapElement?.clientHeight ?? 0 };
+}
+
+/** What a map hit test needs from a press: where it was, in page (client) coordinates. */
+export type ClientPoint = { clientX: number; clientY: number };

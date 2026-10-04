@@ -172,6 +172,12 @@ export type RouteSettings = {
    * DEFAULT_FARE_CLASSES, so older saves sell as a new route does.
    */
   fareClasses?: FareClassSettings;
+  /**
+   * Whether the split was set by hand, rather than following the
+   * airline-wide seat policy (`SimState.fareClassPolicy`, sim/pricing.ts).
+   * Missing reads as false.
+   */
+  fareClassesByHand?: boolean;
   /** The route's last seat sale (sim/seatSale.ts): the day it started. Absent: never had one. */
   sale?: { startDay: number };
   /**
@@ -257,6 +263,17 @@ export type SimState = {
    * Reset at rollover. Optional: made on first use.
    */
   retimedToday?: string[];
+  /**
+   * Gantt moves held for the midnight rollover (sim/retime.ts): a rotation
+   * in the air, or part flown, keeps today's flying and takes its new
+   * times and plane tomorrow. Optional: made on first use.
+   */
+  pendingRetimes?: { legs: { legId: string; tail: string; departMinute: number }[]; repriced: { iata: string; oldFee: number; newFee: number }[] }[];
+  /**
+   * Where each night stop's out-and-back sat before it was wrapped, by
+   * tail, so bringing it home puts it back (sim/retime.ts). Optional.
+   */
+  wrappedFrom?: Record<string, { legId: string; start: number }>;
   todayRevenue: number;
   todayCost: number;
   todayMargin: number;
@@ -402,6 +419,14 @@ export type SimState = {
   costHistory: number[];
   marginHistory: number[];
   /**
+   * Seats flown times nautical miles, today and for each finished day
+   * (sim/unitEconomics.ts): the capacity RASM and CASM divide by. Optional:
+   * saves from before it was kept start empty, and the chart draws only the
+   * days that have an entry.
+   */
+  todaySeatNm?: number;
+  seatNmHistory?: number[];
+  /**
    * Same-day accumulation as `todayRevenue`/`todayCost` above, split by
    * market (`marketKey(origin, dest)`, sim/schedule.ts) instead of summed
    * across the whole airline — filled in step.ts's arrival loop, right
@@ -513,6 +538,8 @@ export type SimState = {
    * the same slider-drag repeated once per market.
    */
   farePolicyMultiplier: number;
+  /** The seat split new routes and routes not set by hand use (sim/pricing.ts). Missing reads as DEFAULT_FARE_CLASSES. */
+  fareClassPolicy?: FareClassSettings;
   /**
    * The executives (sim/executives.ts): three chairs, each empty or held
    * by one appointment.
@@ -524,6 +551,10 @@ export type SimState = {
   inboundLeases?: InboundLease[];
   /** Crew bases and their crews, by IATA (sim/crews.ts). Optional: an older save gets bases made at its first rollover. */
   crewBases?: Record<string, CrewBase>;
+  /** Maintenance bases, by IATA (sim/bases.ts): missing in a save from before them, which has one at every crew base. */
+  mxBases?: string[];
+  /** Stations set to defer their line checks rather than contract them (sim/bases.ts); unlisted ones contract. */
+  outstationChecks?: Record<string, 'contract' | 'defer'>;
   /** Today's crewing (sim/crews.ts's rollDailyCrews()): crews per plane and when each duty day starts. */
   crewDay?: CrewDay;
   /**
@@ -551,7 +582,7 @@ export type SimState = {
   /** Planes held at base this morning for their deferred items (sim/mxChecks.ts), for the ticker. */
   mxHoldsToday?: string[];
   /** How each flying plane's line check went last night (sim/mxChecks.ts), by tail. */
-  lastNightChecks?: Record<string, 'checked' | 'cleared' | 'short' | 'away'>;
+  lastNightChecks?: Record<string, 'checked' | 'cleared' | 'short' | 'contracted' | 'away'>;
   /** Demand events announced or running (sim/demandEvents.ts). Absent in an older save: none. */
   demandEvents?: DemandEvent[];
   /** Fare wars running now (sim/fareWars.ts). Absent in an older save: none. */

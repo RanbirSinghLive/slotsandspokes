@@ -4,10 +4,11 @@ import { crewShare } from '../../sim/crews';
 import { info, line, lineWithInfo } from './dom';
 import { ON_TIME_GRACE_MINUTES } from '../../sim/delays';
 import { money } from '../format';
+import { showConfirm } from '../confirmModal';
 import { RIVAL_SQUEEZED_RESPITE_DAYS } from '../../sim/pressure';
 import { brandInWords, formatNps, marketNps, networkNps } from '../../sim/nps';
 import { rivalYieldFactor } from '../../sim/pressure';
-import { policyFare, setFareClasses, setFareStance, setHandFare } from '../../sim/pricing';
+import { policyFare, putSeatsOnPolicy, setFareClasses, setFareStance, setHandFare } from '../../sim/pricing';
 import { CLASS_NAMES, CLASS_ORDER, CLASS_PRICE, DEFAULT_FARE_CLASSES, type FareClassTally } from '../../sim/fareClasses';
 import { demandAgainstSeats, marketSize } from '../../sim/marketSize';
 import { summarizeMarket } from '../../sim/marketSummary';
@@ -39,6 +40,8 @@ import { effectiveFareClasses, saleBlockedReason, saleMarginChangePerDay, saleDa
 import { marketFareLevel } from '../../sim/fareStimulus';
 import { CROWDING_WINDOW_MINUTES, crowdingWeight } from '../../sim/timeOfDay';
 import { chartLegend } from '../chartLegend';
+import { buildSeatSplitBar } from '../seatSplitBar';
+import { formatFrequency, formatYield, marketYieldCents } from '../../sim/routeYield';
 import { marketCharacterWord, marketMix } from '../../sim/marketCharacter';
 
 /**
@@ -102,10 +105,10 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   // its planes flew over the last week, from its own landings.
   const load = marketLoadFactor(state, a, b);
   const presence = lineWithInfo(
-    `${summary.rotations.length}/day · ${summary.byClass.map((c) => `${c.name} ×${c.count}`).join(', ')} · LF ${formatLoadFactor(load)}`,
+    `${formatFrequency(state, a, b)} · ${summary.byClass.map((c) => `${c.name} ×${c.count}`).join(', ')} · LF ${formatLoadFactor(load)} · yield ${formatYield(marketYieldCents(state, a, b))}`,
     load.factor === null
       ? 'Load factor (LF): how full the planes fly, from the last 7 days of landings. None landed yet.'
-      : `Load factor (LF): ${load.passengers.toLocaleString()} passengers in ${load.seats.toLocaleString()} seats over the last 7 days.`,
+      : `Load factor (LF): ${load.passengers.toLocaleString()} passengers in ${load.seats.toLocaleString()} seats over the last 7 days. Flights a day are counted each way. Yield: cents of fare per passenger per nautical mile, last 7 days.`,
   );
   presence.classList.toggle('is-over', short);
   root.append(presence);
@@ -519,24 +522,9 @@ function buildSeatSplit(state: SimState, a: string, b: string, changed: () => vo
   heading.append(
     'Seats by fare ',
     info(
-      'Every flight sells three fares from the route\'s base fare: Saver (75%), Flex (100%) and Full (140%), each with its share of the seats. Leisure travellers book first and take the cheapest open; VFR next; business last. When a class sells out, those willing to pay the next one buy up. A Saver still open when business books is sold to people who would have paid Full; held back too long, seats fly empty. Drag the lines to move the split.',
+      'Every flight sells three fares from the route\'s base fare: Saver (75%), Flex (100%) and Full (140%), each with its share of the seats. Leisure travellers book first and take the cheapest open; VFR next; business last. When a class sells out, those willing to pay the next one buy up. A Saver still open when business books is sold to people who would have paid Full; held back too long, seats fly empty. Drag the lines to move the split. A route follows the airline-wide split (Routes screen) until you move its lines; the button puts it back.',
     ),
   );
-  const bar = document.createElement('div');
-  bar.className = 'seat-split';
-  const parts = CLASS_ORDER.map((fareClass) => {
-    const part = document.createElement('span');
-    part.className = `seat-split-${fareClass}`;
-    bar.append(part);
-    return part;
-  });
-  const handles = [0, 1].map((i) => {
-    const handle = document.createElement('span');
-    handle.className = 'seat-split-handle';
-    handle.dataset.handle = String(i);
-    bar.append(handle);
-    return handle;
-  });
   const legend = document.createElement('div');
   const forecast = line('', 'inspector-line seat-split-forecast');
   const yesterday = state.yesterdayFareClasses?.[key];
@@ -545,9 +533,6 @@ function buildSeatSplit(state: SimState, a: string, b: string, changed: () => vo
   const redraw = () => {
     const { saverShare, flexShare } = split();
     const shares = [saverShare, flexShare, Math.max(0, 1 - saverShare - flexShare)];
-    parts.forEach((part, i) => (part.style.width = `${shares[i] * 100}%`));
-    handles[0].style.left = `${saverShare * 100}%`;
-    handles[1].style.left = `${(saverShare + flexShare) * 100}%`;
     legend.replaceChildren(
       chartLegend(
         CLASS_ORDER.map((fareClass, i) => ({
@@ -560,41 +545,29 @@ function buildSeatSplit(state: SimState, a: string, b: string, changed: () => vo
     forecast.textContent = `Today · ${describeTally(summarizeMarket(a, b, state, settings).fareClasses, true)}`;
   };
 
-  let dragging: number | null = null;
-  const shareFromPointer = (event: PointerEvent) => {
-    const rect = bar.getBoundingClientRect();
-    return (event.clientX - rect.left) / Math.max(1, rect.width);
-  };
-  bar.addEventListener('pointerdown', (event) => {
-    const at = shareFromPointer(event);
-    const { saverShare, flexShare } = split();
-    // The nearer line is the one being moved.
-    dragging = Math.abs(at - saverShare) <= Math.abs(at - (saverShare + flexShare)) ? 0 : 1;
-    try {
-      bar.setPointerCapture(event.pointerId);
-    } catch {
-      // Moves still arrive while the pointer stays over the bar.
-    }
+  const { bar } = buildSeatSplitBar({
+    split,
+    move: (saver, flex) => {
+      setFareClasses(state, a, b, saver, flex);
+      redraw();
+      redrawEconomics();
+    },
+    done: changed,
   });
-  bar.addEventListener('pointermove', (event) => {
-    if (dragging === null) return;
-    const at = Math.max(0, Math.min(1, shareFromPointer(event)));
-    const { saverShare, flexShare } = split();
-    const flexEnd = saverShare + flexShare;
-    if (dragging === 0) setFareClasses(state, a, b, Math.min(at, flexEnd), flexEnd - Math.min(at, flexEnd));
-    else setFareClasses(state, a, b, saverShare, Math.max(0, at - saverShare));
-    redraw();
-    redrawEconomics();
-  });
-  const finish = () => {
-    if (dragging === null) return;
-    dragging = null;
-    changed();
-  };
-  bar.addEventListener('pointerup', finish);
-  bar.addEventListener('pointercancel', finish);
   redraw();
-  return [heading, bar, legend, forecast, past, buildSale(state, a, b, changed)];
+  const policy = line(settings.fareClassesByHand ? 'Seats set by hand' : 'Seats on policy', 'inspector-line');
+  if (settings.fareClassesByHand) {
+    const back = document.createElement('button');
+    back.type = 'button';
+    back.className = 'lever-reset';
+    back.textContent = 'Put seats back on policy';
+    back.addEventListener('click', () => {
+      putSeatsOnPolicy(state, a, b);
+      changed();
+    });
+    policy.append(' ', back);
+  }
+  return [heading, bar, policy, legend, forecast, past, buildSale(state, a, b, changed)];
 }
 
 /** A seat sale (sim/seatSale.ts): the one running, or a button to start one, or when the next can. */
@@ -612,11 +585,24 @@ function buildSale(state: SimState, a: string, b: string, changed: () => void): 
   button.className = 'lever-reset';
   button.textContent = `Seat sale · ${SALE_DAYS}d · Saver $${Math.round(fare * SALE_SAVER_PRICE)}`;
   button.disabled = blocked !== null;
-  button.addEventListener('click', () => {
-    ops.startSeatSale(state, a, b);
-    changed();
-  });
   const change = saleMarginChangePerDay(state, a, b);
+  button.addEventListener('click', () => {
+    showConfirm({
+      title: `Seat sale ${a}–${b}`,
+      rows: [
+        { label: 'Length', value: `${SALE_DAYS} days` },
+        { label: 'Saver fare', value: `$${Math.round(fare * SALE_SAVER_PRICE)} (${Math.round(SALE_SAVER_PRICE * 100)}% of $${Math.round(fare)})` },
+        { label: 'Margin', value: `${shortSigned(change)}/day while on` },
+        { label: 'Next sale', value: `${SALE_COOLDOWN_DAYS} days after the start` },
+      ],
+      facts: [`Market builds ${SALE_GROWTH}× as fast while it runs. Rivals see it as a fare cut and may answer it.`],
+      confirmLabel: 'Start sale',
+      run: () => {
+        ops.startSeatSale(state, a, b);
+        changed();
+      },
+    });
+  });
   row.append(button, blocked ? ` ${blocked} ` : ` ${shortSigned(change)}/day while on `, info(explain + ' The figure is what a day of the sale makes against a normal day, at today\'s demand, before the growth it brings.'));
   if (!blocked && change < 0) row.classList.add('is-warn');
   return row;

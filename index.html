@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Slots & Spokes</title>
   </head>
   <body>
@@ -79,10 +79,13 @@
         <button type="button" id="zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
         <button type="button" id="zoom-home" title="Back to home" aria-label="Back to home">⌂</button>
       </div>
+      <button type="button" id="map-tools-toggle" aria-expanded="false" title="Map lens, Ops view and which airports show">Filters</button>
+      <button type="button" id="ops-view-toggle" aria-pressed="false" title="Ops view: planes, disruptions, fare gaps, crews and slots on the map (O)">Ops view</button>
       <div id="airport-filter" role="radiogroup" aria-label="Airports shown">
         <button type="button" data-airports="all" class="active" title="Every airport in reach">All</button>
         <button type="button" data-airports="yours" title="Only airports you fly to">Yours</button>
         <button type="button" data-airports="contested" title="Yours and your rivals'">Contested</button>
+        <button type="button" data-airports="uncontested" title="Only airports no rival flies to">Uncontested</button>
       </div>
     </div>
     </div>
@@ -135,6 +138,7 @@
       </button>
     </nav>
     <aside id="panel">
+      <button type="button" id="panel-close" aria-label="Close panel">Close ×</button>
       <section id="inspector" hidden>
         <nav id="inspector-breadcrumb" aria-label="Where you are"></nav>
         <div id="inspector-body"></div>
@@ -159,13 +163,14 @@
             <h2>Fare policy <button type="button" class="info-mark" aria-label="What this means" data-info="Prices every route on it at a share of its going rate, so you set this once instead of per route. The hill is every policy route's margin a day added up at each level, as the airline has learned it: the band is how unsure it is, narrowing where routes have flown lately. Drag the ball to set the level. Off policy: what the routes priced by hand or on a stance make a day against the policy fare; the button puts them all back. A market can instead follow a stance against its rivals, or be priced by hand, in its route view: click the route on the map.">i</button></h2>
             <div id="fare-policy-hill"></div>
             <div id="fare-policy-status"></div>
+            <div id="seat-policy"></div>
           </section>
           <section id="market-section">
             <h2>Lessor <button type="button" class="info-mark" aria-label="What this means" data-info="Every airline leases from this one shelf, first come first served, rivals included. Each class gets a new airframe every so many days, up to a few listed at once; one that finds the shelf full is lost. Each row: how many are listed, their ages, and days to the next. Bigger classes open as you climb the ladder (see Goals).">i</button></h2>
             <div id="market-strip"></div>
           </section>
           <section id="rotations-section">
-            <h2>Schedule <button type="button" class="info-mark" aria-label="What this means" data-info="Each plane's day from 06:00 to 22:00, home time, grouped by type (click a type to fold it). Solid blocks are flights; the span around them is one rotation, out from base and back, in its type's colour. Gaps are time the plane sits idle. Drag a rotation to move it in the day or onto another plane of its type: the tip says what the move does, and the base's hours show across the top (amber is full). A move to a time already past today starts tomorrow. Click a rotation to open its route; hover it for × to remove it. The line is now.">i</button></h2>
+            <h2>Schedule <button type="button" class="info-mark" aria-label="What this means" data-info="Each plane's day from 06:00 to 22:00, home time, grouped by type (click a type to fold it). Solid blocks are flights; the span around them is one rotation, out from base and back, in its type's colour. Gaps are time the plane sits idle. Drag a rotation to move it in the day or onto another plane of its type: the tip says what the move does, and the base's hours show across the top (amber is full). A move to a time already past today starts tomorrow; so does any move of a plane in the air or part flown (dashed amber). A night stop's halves have a ⌂ to bring it home. Click a rotation to open its route; hover it for × to remove it. The line is now.">i</button></h2>
             <ul id="schedule-warnings" hidden></ul>
             <div id="rotations-timeline"></div>
             <div id="rotations-empty">None yet · tap an airport on the map, then Route</div>
@@ -210,6 +215,20 @@
               <button type="button" id="load-game-confirm-cancel">Cancel</button>
             </div>
           </section>
+          <section id="cloud-save-section" hidden>
+            <h2>Cloud save <button type="button" class="info-mark" aria-label="What this means" data-info="Play one game on your phone and your computer. Turning it on makes a sync code on this device and copies your game to the cloud after every autosave. Open the share link or type the code on another device to join. Whoever has the code can play your game, so keep it private. If both devices have played since they last synced, you choose which game to keep.">i</button></h2>
+            <div id="cloud-save-off">
+              <button type="button" id="cloud-save-enable">Turn on cloud save</button>
+              <button type="button" id="cloud-save-join">Use a code</button>
+            </div>
+            <div id="cloud-save-on" hidden>
+              <div class="cloud-save-code" id="cloud-save-code"></div>
+              <button type="button" id="cloud-save-copy-link">Copy share link</button>
+              <button type="button" id="cloud-save-copy-code">Copy code</button>
+              <button type="button" id="cloud-save-disable">Turn off</button>
+            </div>
+            <div id="cloud-save-status"></div>
+          </section>
           <section id="save-file-section">
             <h2>Save file <button type="button" class="info-mark" aria-label="What this means" data-info="Your game lives in this browser. Export it to keep a copy, move it to another browser or computer, or attach it to a bug report; import one to play it here. Importing replaces the game in this browser.">i</button></h2>
             <button type="button" id="export-save-button">Export save</button>
@@ -221,7 +240,7 @@
                     <h2>New Game <button type="button" class="info-mark" aria-label="What this means" data-info="Erase this save entirely and start a brand-new airline.">i</button></h2>
             <button type="button" id="new-game-button">New Game</button>
             <div id="new-game-confirm" hidden>
-              <span>Erase current game?</span>
+              <span id="new-game-confirm-text">Erase current game?</span>
               <button type="button" id="new-game-confirm-yes">Yes, start over</button>
               <button type="button" id="new-game-confirm-cancel">Cancel</button>
             </div>
@@ -278,18 +297,37 @@
         <p id="hub-planner-notice" class="hub-planner-notice"></p>
       </div>
     </div>
+    <div id="home-world" hidden>
+      <canvas id="home-world-map"></canvas>
+      <h2 class="home-world-title">Choose your home</h2>
+      <div id="home-world-panel">
+        <div id="home-world-story"></div>
+        <div class="home-world-actions">
+          <div class="home-season">
+            <span class="home-season-label">Start</span>
+            <button type="button" data-season="summer">1 May</button>
+            <button type="button" data-season="winter">1 Nov</button>
+          </div>
+          <div id="home-world-season-note" class="home-world-season-note"></div>
+          <button type="button" id="home-world-start" class="home-world-start" disabled>Start</button>
+          <button type="button" id="home-world-cloud" class="home-world-cloud" hidden>Playing on another device? Use your sync code</button>
+          <button type="button" id="home-world-other" class="home-world-other">Select a different airport<span class="home-world-other-short">All airports</span></button>
+        </div>
+      </div>
+    </div>
     <div id="home-picker-modal" class="modal-overlay" hidden>
       <div class="modal-box modal-box--home">
-        <h2>Choose your home city</h2>
+        <h2>Every home city</h2>
         <p>
           You start with one propeller plane based here. A propeller flies
           about <span id="home-picker-range"></span> nm, so the cities listed
           are the ones with neighbours to fly to.
         </p>
-        <div id="home-picker-season" class="home-season">
+        <div class="home-season">
           <span class="home-season-label">Start</span>
-          <button type="button" data-season="summer">Summer · 1 May</button>
-          <button type="button" data-season="winter">Winter · 1 Nov</button>
+          <button type="button" data-season="summer">1 May</button>
+          <button type="button" data-season="winter">1 Nov</button>
+          <button type="button" id="home-picker-back" class="home-picker-back">Back to the map</button>
         </div>
         <div id="home-picker-list"></div>
       </div>

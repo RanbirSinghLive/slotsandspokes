@@ -5,23 +5,60 @@ import { bearing } from '../sim/geo';
 import { isOnTimeArrival } from '../sim/delays';
 import { classRank } from '../sim/aircraftClasses';
 import type { ActiveFlight, SimState } from '../sim/state';
+import { isOpsView } from './opsView';
+import { drawLateHalo, drawPlaneTrail, drawTailLabel, opsPlaneScale } from './aircraftOps';
 
 const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]));
 
-// One size per rung of the class ladder (sim/aircraftClasses.ts: Propeller,
-// Regional, Narrowbody, Widebody, smallest first) — the only visual
-// difference between classes on the map itself. A widebody flight should
-// read as visibly bigger than a propeller flight next to it without
-// needing to zoom in; the old fixed AIRCRAFT_LENGTH/WIDTH is now just the
-// fallback for a tail whose class can't be resolved, which shouldn't
-// happen in practice but costs nothing to guard.
-const AIRCRAFT_SIZE_BY_RANK: { length: number; width: number }[] = [
-  { length: 6, width: 4.5 }, // Propeller
-  { length: 7.5, width: 5.5 }, // Regional
-  { length: 9, width: 6.5 }, // Narrowbody
-  { length: 11, width: 8 }, // Widebody
+// One filled silhouette per rung of the class ladder (sim/aircraftClasses.ts:
+// Propeller, Regional, Narrowbody, Widebody, smallest first), drawn nose up
+// in a 24 by 24 box and matching the sidebar icons in ui/planeIcons.ts
+// (render/ may not import ui/, so the shapes are restated here as filled
+// paths). `span` is the on-screen size of that 24 box, so a widebody still
+// reads as bigger than a propeller next to it without zooming in.
+const NARROW_FUSELAGE = 'M12 3C13.2 5 13.2 8.5 13.2 11.5V19L12 21.5L10.8 19V11.5C10.8 8.5 10.8 5 12 3Z';
+const WIDE_FUSELAGE = 'M12 3C14 5 14 8.5 14 11.5V19L12 22L10 19V11.5C10 8.5 10 5 12 3Z';
+
+/** A filled circle as path text, so an engine joins the rest of one Path2D. */
+function circle(cx: number, cy: number, r: number): string {
+  return `M${cx - r} ${cy}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0Z`;
+}
+
+const AIRCRAFT_SHAPES: { path: Path2D; span: number }[] = [
+  {
+    // Propeller: straight wings, a bar across the nose.
+    span: 15,
+    path: new Path2D(
+      `${NARROW_FUSELAGE}M2.5 10.5H21.5V13.5H2.5ZM8 18.5H16V20.5H8ZM8.6 2H15.4V3.2H8.6Z`,
+    ),
+  },
+  {
+    // Regional: modest sweep, rear engines, T-tail.
+    span: 17,
+    path: new Path2D(
+      `${NARROW_FUSELAGE}M10.8 9.5L3.5 14.2V16.2L10.8 14ZM13.2 9.5L20.5 14.2V16.2L13.2 14Z` +
+        'M8.6 15.5H10.8V19.5H8.6ZM13.2 15.5H15.4V19.5H13.2ZM8.5 20.4H15.5V21.6H8.5Z',
+    ),
+  },
+  {
+    // Narrowbody: long swept wings, one engine under each.
+    span: 20,
+    path: new Path2D(
+      `${NARROW_FUSELAGE}M10.8 9L2 15.6V17.8L10.8 14.6ZM13.2 9L22 15.6V17.8L13.2 14.6Z` +
+        `${circle(6.4, 13.4, 1.4)}${circle(17.6, 13.4, 1.4)}M10.8 19L7.5 21.4H10.8ZM13.2 19L16.5 21.4H13.2Z`,
+    ),
+  },
+  {
+    // Widebody: fatter fuselage, the longest wings, two engines under each.
+    span: 24,
+    path: new Path2D(
+      `${WIDE_FUSELAGE}M10 9L1.5 16.2V19L10 15.4ZM14 9L22.5 16.2V19L14 15.4Z` +
+        `${circle(4.6, 16.3, 1.3)}${circle(7.6, 13.3, 1.3)}${circle(19.4, 16.3, 1.3)}${circle(16.4, 13.3, 1.3)}` +
+        'M10 19.6L6.6 22H10ZM14 19.6L17.4 22H14Z',
+    ),
+  },
 ];
-const DEFAULT_AIRCRAFT_SIZE = { length: 7, width: 5 };
+const DEFAULT_SHAPE = AIRCRAFT_SHAPES[0]!;
 const AIRCRAFT_FILL = '#ffd166';
 // A flight running late is tinted red instead of the usual yellow —
 // this is what makes a cascading delay actually watchable on the map
@@ -96,8 +133,8 @@ export function flightScreenPoint(flight: ActiveFlight, nowFractionalMinute: num
 }
 
 /**
- * Draw every currently-airborne aircraft as a small triangle pointed in its
- * direction of travel, sized by its class (AIRCRAFT_SIZE_BY_RANK above) —
+ * Draw every currently-airborne aircraft as a small silhouette of its class's
+ * plane, nose pointed in its direction of travel and sized by class (AIRCRAFT_SHAPES above) —
  * the one place on the map a widebody actually looks bigger than a
  * propeller, which is otherwise only visible in the sidebar's icons
  * (ui/planeIcons.ts). Color still means only late-vs-on-time, unchanged:
@@ -121,20 +158,28 @@ export function drawAircraft(
   // cache" reasoning render/routes.ts and render/demand.ts already use.
   const aircraftByTail = new Map(state.aircraft.map((aircraft) => [aircraft.tail, aircraft]));
 
+  const ops = isOpsView();
+  const opsScale = ops ? opsPlaneScale() : 1;
   for (const flight of state.activeFlights) {
     const pose = flightPose(flight, nowFractionalMinute);
     if (!pose) continue;
 
     const rank = classRank(aircraftByTail.get(flight.tail)?.typeCode ?? '');
-    const size = AIRCRAFT_SIZE_BY_RANK[rank] ?? DEFAULT_AIRCRAFT_SIZE;
+    const shape = AIRCRAFT_SHAPES[rank] ?? DEFAULT_SHAPE;
 
     // Same rule as the On-Time stat, so a plane drawn late is one that will count as late.
     const isLate = !isOnTimeArrival(flight.arriveMinute, flight.scheduledArriveMinute);
-    drawTriangle(ctx, pose.x, pose.y, pose.rotation, isLate ? AIRCRAFT_FILL_LATE : AIRCRAFT_FILL, size);
+    const drawnSpan = shape.span * opsScale;
+    if (ops) {
+      drawPlaneTrail(ctx, flight, nowFractionalMinute);
+      if (isLate) drawLateHalo(ctx, pose.x, pose.y, drawnSpan / 2);
+    }
+    drawSilhouette(ctx, pose.x, pose.y, pose.rotation, isLate ? AIRCRAFT_FILL_LATE : AIRCRAFT_FILL, shape, opsScale);
+    if (ops) drawTailLabel(ctx, flight.tail, pose.x, pose.y, drawnSpan / 2, flight.legId === hoveredLegId);
 
     if (flight.legId === hoveredLegId) {
       ctx.beginPath();
-      ctx.arc(pose.x, pose.y, size.length + 4, 0, 2 * Math.PI);
+      ctx.arc(pose.x, pose.y, drawnSpan / 2 + 3, 0, 2 * Math.PI);
       ctx.strokeStyle = HOVER_RING_STROKE;
       ctx.lineWidth = 1.5;
       ctx.stroke();
@@ -142,25 +187,23 @@ export function drawAircraft(
   }
 }
 
-function drawTriangle(
+function drawSilhouette(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   rotation: number,
   fillStyle: string,
-  size: { length: number; width: number },
+  shape: { path: Path2D; span: number },
+  sizeFactor = 1,
 ): void {
   ctx.save();
   ctx.translate(x, y);
-  ctx.rotate(rotation);
-
-  ctx.beginPath();
-  ctx.moveTo(size.length, 0);
-  ctx.lineTo(-size.length * 0.5, size.width * 0.5);
-  ctx.lineTo(-size.length * 0.5, -size.width * 0.5);
-  ctx.closePath();
+  // The shapes are drawn nose up; `rotation` is measured from due east.
+  ctx.rotate(rotation + Math.PI / 2);
+  const scale = (shape.span * sizeFactor) / 24;
+  ctx.scale(scale, scale);
+  ctx.translate(-12, -12);
   ctx.fillStyle = fillStyle;
-  ctx.fill();
-
+  ctx.fill(shape.path);
   ctx.restore();
 }

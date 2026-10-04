@@ -3,8 +3,8 @@ import type { SimState } from '../sim/state';
 
 /**
  * Which airports the map shows (WEEK-NINE.md, thread 12): every airport
- * you know of, only the ones you fly to, or those plus the ones your
- * rivals fly to. A view preference, so it lives here and not in
+ * you know of, only the ones you fly to, those plus the ones your
+ * rivals fly to, or only the ones no rival flies to. A view preference, so it lives here and not in
  * `SimState`, and it isn't saved.
  *
  * main.ts hands visibleAirports() to the renderers in place of the known
@@ -13,7 +13,7 @@ import type { SimState } from '../sim/state';
  * shows, even before its first route.
  */
 
-export type AirportFilter = 'all' | 'yours' | 'contested';
+export type AirportFilter = 'all' | 'yours' | 'contested' | 'uncontested';
 
 let filter: AirportFilter = 'all';
 let lastVisible: string[] = [];
@@ -33,6 +33,7 @@ export function airportFilter(): AirportFilter {
  */
 export function visibleAirports(state: SimState): string[] {
   if (filter === 'all') return state.knownAirports;
+  if (filter === 'uncontested') return cached(state.knownAirports.filter((iata) => iata === state.homeAirport || !rivalAirports(state).has(iata)));
   const shown = networkAirports(state);
   shown.add(state.homeAirport);
   if (filter === 'contested') {
@@ -41,7 +42,19 @@ export function visibleAirports(state: SimState): string[] {
       shown.add(route.dest);
     }
   }
-  const visible = state.knownAirports.filter((iata) => shown.has(iata));
+  return cached(state.knownAirports.filter((iata) => shown.has(iata)));
+}
+
+function rivalAirports(state: SimState): Set<string> {
+  const served = new Set<string>();
+  for (const route of state.competitorRoutes) {
+    served.add(route.origin);
+    served.add(route.dest);
+  }
+  return served;
+}
+
+function cached(visible: string[]): string[] {
   const unchanged = visible.length === lastVisible.length && visible.every((iata, i) => iata === lastVisible[i]);
   if (!unchanged) lastVisible = visible;
   return lastVisible;

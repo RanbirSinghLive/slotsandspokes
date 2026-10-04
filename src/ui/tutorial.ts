@@ -25,6 +25,8 @@ type Step = {
   target?: string;
   /** Moves on by itself once this is true; the card shows "Skip this step" instead of Next. */
   until?: (state: SimState, choosingHome: boolean) => boolean;
+  /** The steps after it mean nothing until it is done, so it can't be skipped alone. */
+  required?: boolean;
   /** Runs as the step starts: pause for reading, or run the clock to watch. */
   speed?: 0 | 1;
   /** Opens what the step points at (a screen in the side panel) before it's shown. */
@@ -45,6 +47,7 @@ const STEPS: Step[] = [
     text: 'Your airline starts with one leased Propeller at the city you choose. Standard homes are the gentlest start; Hard and Brutal ones have thin markets, and more contract help.',
     target: '#home-picker-modal .modal-box',
     until: (_state, choosingHome) => !choosingHome,
+    required: true,
   },
   {
     title: 'Your airline',
@@ -178,7 +181,9 @@ function show(next: number, direction: 1 | -1 = 1): void {
   actions.className = 'tutorial-actions';
   actions.append(button('Skip tutorial', 'tutorial-skip', end));
   if (index > 0) actions.append(button('Back', 'tutorial-back', () => show(index - 1, -1)));
-  if (step.until) {
+  if (step.required) {
+    // No way on from here but doing it: the picker is the only thing on screen.
+  } else if (step.until) {
     actions.append(button('Skip this step', 'tutorial-next', () => show(index + 1)));
   } else {
     actions.append(button(index === steps.length - 1 ? 'Start playing' : 'Next', 'tutorial-next', () => show(index + 1)));

@@ -1,6 +1,7 @@
 import { dayIndex } from '../../sim/clock';
 import { info, line, heading, lineWithInfo } from './dom';
 import { money } from '../format';
+import { showConfirm } from '../confirmModal';
 import { FUEL_PRICE_BASELINE } from '../../sim/fuel';
 import { activeHedge, describeFuelPrice } from '../../sim/fuelPrice';
 import type { SimState } from '../../sim/state';
@@ -46,40 +47,33 @@ function innovationCard(state: SimState, option: InnovationOption, changed: () =
   button.type = 'button';
   button.className = 'inspector-plan-hub';
   button.textContent = 'Adopt';
-  // Two clicks, since it can't be undone and a running cost runs for good.
-  let armed = false;
   button.addEventListener('click', () => {
-    if (!armed) {
-      armed = true;
-      button.textContent = option.runningCost
-        ? `Confirm · ${option.runningCost} for good`
-        : `Confirm · ${money(option.oneOffPrice)}, permanent`;
-      button.classList.add('is-act');
-      return;
-    }
-    ops.adoptInnovation(state, option.id);
-    changed();
+    const rows = [];
+    if (option.oneOffPrice > 0) rows.push({ label: 'Price', value: `${money(option.oneOffPrice)} once` });
+    if (option.runningCost) rows.push({ label: 'Running cost', value: option.runningCost });
+    rows.push({ label: 'Cash after', value: money(state.cash - option.oneOffPrice) });
+    showConfirm({
+      title: `Adopt ${option.name}`,
+      rows,
+      facts: [option.summary, 'Permanent: it cannot be undone' + (option.runningCost ? ', and the running cost runs for good.' : '.')],
+      confirmLabel: 'Adopt',
+      run: () => {
+        ops.adoptInnovation(state, option.id);
+        changed();
+      },
+    });
   });
   card.append(button);
   return card;
 }
 
-/** A two-click button: the first click says what it will do, the second does it. */
-function confirmButton(label: string, confirmLabel: string, act: () => void): HTMLButtonElement {
+/** A button that opens a confirm window; confirming does it. */
+function confirmButton(label: string, confirm: Omit<Parameters<typeof showConfirm>[0], 'run'>, act: () => void): HTMLButtonElement {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'inspector-plan-hub';
   button.textContent = label;
-  let armed = false;
-  button.addEventListener('click', () => {
-    if (!armed) {
-      armed = true;
-      button.textContent = confirmLabel;
-      button.classList.add('is-act');
-      return;
-    }
-    act();
-  });
+  button.addEventListener('click', () => showConfirm({ ...confirm, run: act }));
   return button;
 }
 
@@ -104,7 +98,16 @@ function candidateCard(state: SimState, candidate: ExecutiveOption, role: string
     body.append(
       confirmButton(
         holder ? `Replace ${holder}` : 'Appoint',
-        `Confirm · ${money(candidate.signingFee)}${holder ? ` · ${holder} leaves, no refund` : ''}`,
+        {
+          title: `${holder ? 'Replace' : 'Appoint'} ${role.toUpperCase()}: ${candidate.name}`,
+          rows: [
+            { label: 'Signing fee', value: money(candidate.signingFee) },
+            { label: 'Salary', value: `${money(candidate.salaryPerDay)}/day` },
+            { label: 'Cash after', value: money(state.cash - candidate.signingFee) },
+          ],
+          facts: [describeEffect(candidate.effect), ...(holder ? [`${holder} leaves, with no refund of their fee.`] : [])],
+          confirmLabel: holder ? `Replace ${holder}` : 'Appoint',
+        },
         () => {
           ops.appointExecutiveById(state, candidate.id);
           changed();
@@ -177,7 +180,15 @@ function executivesSection(state: SimState, changed: () => void): HTMLElement[] 
         name,
         line(describeEffect(chair.holder.effect)),
         line(`Since day ${chair.hiredDay} · ${money(chair.holder.salaryPerDay)}/day`, 'inspector-line office-card-price'),
-        confirmButton('Let go', 'Confirm · salary stops, no refund', () => {
+        confirmButton('Let go', {
+          title: `Let ${chair.holder.name} go`,
+          rows: [
+            { label: 'Chair', value: chair.label },
+            { label: 'Salary saved', value: `${money(chair.holder.salaryPerDay)}/day` },
+          ],
+          facts: [`You lose: ${describeEffect(chair.holder.effect)}`, 'Their signing fee is not refunded, and rehiring costs a new fee.'],
+          confirmLabel: 'Let go',
+        }, () => {
           ops.letExecutiveGo(state, chair.role as ExecutiveRole);
           changed();
         }),
@@ -314,7 +325,7 @@ function hedgeStatus(state: SimState): HTMLElement | null {
   return line(`Last hedge (days ${hedge.startDay}–${hedge.endDay}) · ${result}`);
 }
 
-/** One button per hedge length, each two clicks since the premium is spent for good. */
+/** One button per hedge length, each through a confirm window since the premium is spent for good. */
 function hedgeButtons(state: SimState, changed: () => void): HTMLElement[] {
   const options = ops.hedgeOptions(state);
   const blocked = options.find((option) => option.blocked)?.blocked;
@@ -325,16 +336,23 @@ function hedgeButtons(state: SimState, changed: () => void): HTMLElement[] {
     button.className = 'inspector-plan-hub';
     button.textContent = `Hedge ${option.days}d · ${money(option.premium)}`;
     button.disabled = option.blocked !== null;
-    let armed = false;
     button.addEventListener('click', () => {
-      if (!armed) {
-        armed = true;
-        button.textContent = `Confirm · lock ${describeFuelPrice(option.lockedPrice)} to day ${dayIndex(state) + option.days}`;
-        button.classList.add('is-act');
-        return;
-      }
-      ops.hedgeFuel(state, option.days);
-      changed();
+      showConfirm({
+        title: `Hedge fuel ${option.days} days`,
+        rows: [
+          { label: 'Locked price', value: describeFuelPrice(option.lockedPrice) },
+          { label: 'Runs to', value: `day ${dayIndex(state) + option.days}` },
+          { label: 'Premium', value: `${money(option.premium)} (spent either way)` },
+          { label: 'Fuel covered', value: money(option.covers) },
+          { label: 'Cash after', value: money(state.cash - option.premium) },
+        ],
+        facts: ['If fuel rises you pay less than the market; if it falls you still pay today\'s price.'],
+        confirmLabel: 'Hedge',
+        run: () => {
+          ops.hedgeFuel(state, option.days);
+          changed();
+        },
+      });
     });
     return button;
   });

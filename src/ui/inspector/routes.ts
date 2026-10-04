@@ -1,6 +1,7 @@
 import { marketLoadFactor } from '../../sim/loadFactor';
 import { formatNps, marketNps, RIVAL_NPS } from '../../sim/nps';
 import { OTP_BASELINE, trailingMarketOtp } from '../../sim/routeOtp';
+import { formatFrequency, marketYieldCents, formatYield } from '../../sim/routeYield';
 import { marketKey } from '../../sim/schedule';
 import type { SimState } from '../../sim/state';
 import * as ops from '../routeActions';
@@ -20,7 +21,8 @@ import { linkToMap } from '../mapLink';
 type RouteRow = {
   a: string;
   b: string;
-  flights: number;
+  frequency: string;
+  yieldCents: number | null;
   loadFactor: number | null;
   onTime: number | null;
   completion: number | null;
@@ -60,8 +62,15 @@ const COLUMNS: { sort: RouteSort; name: string; value: (row: RouteRow) => number
     rate: (row) => (row.nps >= RIVAL_NPS + 5 ? 'good' : row.nps >= RIVAL_NPS - 5 ? 'fair' : 'poor'),
   },
   {
+    sort: 'yield',
+    name: 'Yield',
+    value: (row) => row.yieldCents,
+    show: (row) => formatYield(row.yieldCents),
+    rate: () => null,
+  },
+  {
     sort: 'margin',
-    name: 'Yesterday',
+    name: 'Yday',
     value: (row) => row.margin,
     show: (row) => (row.margin === null ? '—' : `${row.margin < 0 ? '−' : ''}$${Math.abs(Math.round(row.margin)).toLocaleString()}`),
     rate: (row) => (row.margin === null ? null : row.margin > 0 ? 'good' : 'poor'),
@@ -73,21 +82,20 @@ function percent(share: number | null): string {
 }
 
 function routeRows(state: SimState): RouteRow[] {
-  const flights = new Map<string, { a: string; b: string; legs: number }>();
+  const markets = new Map<string, { a: string; b: string }>();
   for (const leg of state.schedule) {
     const key = marketKey(leg.origin, leg.dest);
-    const entry = flights.get(key) ?? { a: leg.origin, b: leg.dest, legs: 0 };
-    entry.legs += 1;
-    flights.set(key, entry);
+    if (!markets.has(key)) markets.set(key, { a: leg.origin, b: leg.dest });
   }
-  return [...flights.values()].map(({ a, b, legs }) => {
+  return [...markets.values()].map(({ a, b }) => {
     const reliability = trailingMarketOtp(state, a, b);
     const operated = reliability.arrived + reliability.cancelled;
     const margins = ops.marketPnlHistory(state, a, b).margin;
     return {
       a,
       b,
-      flights: legs,
+      frequency: formatFrequency(state, a, b),
+      yieldCents: marketYieldCents(state, a, b),
       loadFactor: marketLoadFactor(state, a, b).factor,
       onTime: reliability.otp,
       completion: operated > 0 ? reliability.arrived / operated : null,
@@ -128,7 +136,7 @@ export function buildRoutesView(state: SimState, sort: RouteSort): HTMLElement {
   const intro = document.createElement('div');
   intro.className = 'inspector-line';
   intro.textContent = `Worst ${column.name.toLowerCase()} first`;
-  intro.append(' ', info('On-time, flown and load are the last 7 days; NPS about the last month. Click a heading to sort by it, or a route to open it.'));
+  intro.append(' ', info('On-time, flown, load and yield (cents per passenger nautical mile) are the last 7 days; flights are per direction; NPS about the last month. Click a heading to sort by it, or a route to open it.'));
   root.append(intro);
 
   const table = document.createElement('table');
@@ -160,7 +168,7 @@ export function buildRoutesView(state: SimState, sort: RouteSort): HTMLElement {
     const route = document.createElement('td');
     route.textContent = `${row.a} – ${row.b}`;
     const count = document.createElement('td');
-    count.textContent = String(row.flights);
+    count.textContent = row.frequency;
     tr.append(route, count);
     for (const c of COLUMNS) {
       const td = document.createElement('td');

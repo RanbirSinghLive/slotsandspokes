@@ -8,6 +8,7 @@ import { aircraftUtilisation, rotationsForTail, type Rotation } from './utilisat
 import { coverRotations } from './turnBuffer';
 import { refitDays } from './cabins';
 import { finishHeavyCheck, forcedHeavyChecks, wornAge } from './mxChecks';
+import { nightStopStation } from './nightStops';
 import type { Aircraft, SimState } from './state';
 
 /**
@@ -161,7 +162,7 @@ export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
   for (const { aircraft, days } of forcedHeavyChecks(state)) {
     state.aogs.push({
       tail: aircraft.tail,
-      base: aircraft.baseAirport!,
+      base: aircraft.atAirport ?? aircraft.baseAirport!,
       fault: 'heavy check overdue',
       returnsAtMinute: dayStartMinute + days * MINUTES_PER_DAY,
       uncoveredRoutes: [],
@@ -180,9 +181,11 @@ export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
     state.rngSeed = afterDuration;
 
     if (isAog(state, aircraft.tail) || state.groundedTails.includes(aircraft.tail)) continue;
-    // Only a plane sitting at its base can go down there. A long-haul
-    // aircraft still in the air at midnight is skipped until it lands.
-    if (aircraft.status !== 'ground' || !aircraft.baseAirport || aircraft.atAirport !== aircraft.baseAirport) continue;
+    // Only a plane sitting at its base, or at its night-stop station
+    // (sim/nightStops.ts), can go down there. A long-haul aircraft still in
+    // the air at midnight is skipped until it lands.
+    const atNightStop = aircraft.atAirport !== null && aircraft.atAirport === nightStopStation(state, aircraft.tail);
+    if (aircraft.status !== 'ground' || !aircraft.baseAirport || (aircraft.atAirport !== aircraft.baseAirport && !atNightStop)) continue;
     // Nor one ferrying to another base (sim/rebase.ts).
     if (aircraft.rebase) continue;
     if (roll >= aogChance(state, aircraft)) continue;
