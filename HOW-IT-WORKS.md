@@ -931,6 +931,18 @@ several at one airport stack upward, with more than four collapsing to
 route with a count. Pins are laid out by one function that both drawing and
 `findDisruptionPinAt()` use, and a click on one opens the Maintenance screen.
 
+**Touch (`main.ts`, window 700px or narrower).** The panel is a sheet over
+the map, hidden at start; the rail, Close and the active rail item toggle it.
+One finger drags the map and two pinch it; the cached basemap and fog are
+painted twice the screen each way, so a drag slides real picture
+(`render/projection.ts`). A tap is handled on release, not from the mouse
+events a browser makes up afterwards, and runs the same mousedown logic as a
+click: it selects an airport (its code counts as part of the target) and opens
+the ring of actions, and does not open the sheet. Press and hold an airport
+for 450 ms opens its details sheet, with a ring filling around the airport
+meanwhile; a drag, a second finger or an early release cancels the hold. A
+double tap zooms in on the point.
+
 ## Rivals on the ladder (`src/sim/rivalLadder.ts`)
 
 Rivals climb the same ladder as the player to lease bigger aircraft: the

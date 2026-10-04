@@ -278,10 +278,13 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState): vo
     });
   }
 
-  const labelBoxes = placeLabels(ctx, pendingLabels, badges);
+  const placed = placeLabels(ctx, pendingLabels, badges);
+  labelHits = placed;
+  const labelBoxes = placed.map((label) => label.box);
   claimedBoxes = isOpsView()
     ? [...labelBoxes, ...badges, ...pendingLabels.map((l) => ({ left: l.x - l.radius, top: l.y - l.radius, right: l.x + l.radius, bottom: l.y + l.radius }))]
     : [];
+  drawHoldCue(ctx);
 }
 
 // Screen space this frame's airport codes, 'on its way' badges and dots took,
@@ -327,7 +330,7 @@ function boxesOverlap(a: Box, b: Box): boolean {
  * by importance as it zooms out. Greedy placement isn't optimal, but it's
  * predictable and cheap, which is what a per-frame renderer needs.
  */
-function placeLabels(ctx: CanvasRenderingContext2D, labels: PendingLabel[], obstacles: Box[] = []): Box[] {
+function placeLabels(ctx: CanvasRenderingContext2D, labels: PendingLabel[], obstacles: Box[] = []): { iata: string; box: Box }[] {
   labels.sort((a, b) => Number(b.home) - Number(a.home) || b.departures - a.departures || b.population - a.population);
 
   // Every dot is an obstacle too, so a label never sits on a neighbour's marker.
@@ -343,7 +346,7 @@ function placeLabels(ctx: CanvasRenderingContext2D, labels: PendingLabel[], obst
   ];
 
   const half = LABEL_HEIGHT_PX / 2;
-  const placedLabels: Box[] = [];
+  const placedLabels: { iata: string; box: Box }[] = [];
   for (const label of labels) {
     const text = label.iata;
     const offset = label.radius + LABEL_GAP_PX;
@@ -359,7 +362,7 @@ function placeLabels(ctx: CanvasRenderingContext2D, labels: PendingLabel[], obst
       const box = { left: textX, top: textY - half, right: textX + width, bottom: textY + half };
       if (taken.some((other) => boxesOverlap(box, other))) continue;
       taken.push(box);
-      placedLabels.push(box);
+      placedLabels.push({ iata: label.iata, box });
       ctx.fillStyle = label.served || label.home ? SERVED_LABEL_FILL : LABEL_FILL;
       ctx.fillText(text, textX, textY);
       break;
@@ -374,7 +377,13 @@ function placeLabels(ctx: CanvasRenderingContext2D, labels: PendingLabel[], obst
 // gesture, the click-for-detail), so the two can never disagree
 // about how forgiving the target is.
 /** A fingertip needs a wider target than a cursor: 44px across rather than 28. */
-const HIT_RADIUS_PX = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches ? 22 : 14;
+const TOUCH_SCREEN = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches;
+const HIT_RADIUS_PX = TOUCH_SCREEN ? 22 : 14;
+/** How far past a drawn airport code a touch still counts as on it: the code is only 12px tall. */
+const LABEL_HIT_PAD_PX = 12;
+/** Where each airport's code was drawn this frame, so a touch on the name selects it like a touch on the dot. */
+let labelHits: { iata: string; box: Box }[] = [];
+const airportsByCode = new Map(airports.map((airport) => [airport.iata, airport]));
 
 export type AirportHitCandidate = { airport: Airport; distPx: number; ratio: number };
 
@@ -402,7 +411,51 @@ export function nearestAirportCandidate(screenX: number, screenY: number): Airpo
       nearest = airport;
     }
   }
-  return nearest ? { airport: nearest, distPx: nearestDistPx, ratio: nearestDistPx / HIT_RADIUS_PX } : null;
+  const onDot = nearest ? { airport: nearest, distPx: nearestDistPx, ratio: nearestDistPx / HIT_RADIUS_PX } : null;
+  if (!TOUCH_SCREEN) return onDot;
+
+  // On a touch screen the airport's code counts too. A code is a sure hit, never beaten by a route line under it.
+  for (const { iata, box } of labelHits) {
+    const inside = screenX >= box.left - LABEL_HIT_PAD_PX && screenX <= box.right + LABEL_HIT_PAD_PX && screenY >= box.top - LABEL_HIT_PAD_PX && screenY <= box.bottom + LABEL_HIT_PAD_PX;
+    const airport = airportsByCode.get(iata);
+    if (!inside || !airport || !isAirportKnown(iata)) continue;
+    if (onDot && onDot.airport.iata === iata) return onDot;
+    if (!onDot || onDot.ratio > 0.5) {
+      const point = projection([airport.lon, airport.lat]);
+      return { airport, distPx: point ? Math.hypot(point[0] - screenX, point[1] - screenY) : 0, ratio: 0.5 };
+    }
+  }
+  return onDot;
+}
+
+// The press-and-hold cue (main.ts): a ring that fills around the airport being held.
+const HOLD_CUE_DELAY_MS = 120;
+let hold: { iata: string; startedMs: number; durationMs: number } | null = null;
+
+/** Start (or, with null, clear) the ring that fills around an airport while it is held. */
+export function setAirportHold(iata: string | null, durationMs = 0): void {
+  hold = iata ? { iata, startedMs: performance.now(), durationMs } : null;
+}
+
+function drawHoldCue(ctx: CanvasRenderingContext2D): void {
+  if (!hold) return;
+  const airport = airportsByCode.get(hold.iata);
+  const point = airport ? projection([airport.lon, airport.lat]) : null;
+  const elapsed = performance.now() - hold.startedMs;
+  if (!point || elapsed < HOLD_CUE_DELAY_MS) return;
+  const progress = Math.min(1, (elapsed - HOLD_CUE_DELAY_MS) / (hold.durationMs - HOLD_CUE_DELAY_MS));
+  ctx.save();
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = 'rgba(94, 214, 200, 0.25)';
+  ctx.beginPath();
+  ctx.arc(point[0], point[1], 26, 0, 2 * Math.PI);
+  ctx.stroke();
+  ctx.strokeStyle = '#5ed6c8';
+  ctx.beginPath();
+  ctx.arc(point[0], point[1], 26, -Math.PI / 2, -Math.PI / 2 + progress * 2 * Math.PI);
+  ctx.stroke();
+  ctx.restore();
 }
 
 /**
