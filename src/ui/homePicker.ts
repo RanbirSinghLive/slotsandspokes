@@ -4,6 +4,7 @@ import { homeNeighbours, homeReasons, PROPELLER_RANGE_NM, type HomeDifficulty, t
 import { drawPickerMap, loadFinePickerLand, type PickerPoint, type PickerView } from '../render/pickerMap';
 import { airports } from '../render/airports';
 import { fitWorld, projection } from '../render/projection';
+import { setupMapInput } from './mapInput';
 
 /**
  * The first screen of a new game: choose the city the airline starts
@@ -38,8 +39,7 @@ const SNAP_RADIUS_PX = 70;
 /** A fingertip covers more than a cursor, but the map is zoomable, so a tighter reach keeps a tap on the dot it meant. */
 const TOUCH_SNAP_RADIUS_PX = 44;
 const MAX_ZOOM = 8;
-/** A touch that moves less than this is a tap, not a drag. */
-const TAP_SLOP_PX = 8;
+const DOUBLE_TAP_ZOOM = 2;
 const MAP_INSET_PX = 16;
 
 const worldEl = document.querySelector<HTMLDivElement>('#home-world')!;
@@ -207,16 +207,6 @@ function pointerAt(event: PointerEvent): [number, number] {
   return [event.clientX - box.left, event.clientY - box.top];
 }
 
-const touches = new Map<number, [number, number]>();
-let touchStart: [number, number] | null = null;
-let touchMoved = false;
-let lastPinchDistance = 0;
-
-function pinchDistance(): number {
-  const [first, second] = [...touches.values()];
-  return Math.hypot(first[0] - second[0], first[1] - second[1]);
-}
-
 function chooseAt(x: number, y: number, radius: number): void {
   const home = nearestFeatured(x, y, radius);
   if (!home) return;
@@ -226,40 +216,39 @@ function chooseAt(x: number, y: number, radius: number): void {
   drawWorld();
 }
 
-worldCanvas.addEventListener('pointerdown', (event) => {
-  if (event.pointerType !== 'touch') return;
-  worldCanvas.setPointerCapture(event.pointerId);
-  touches.set(event.pointerId, pointerAt(event));
-  if (touches.size === 1) {
-    touchStart = pointerAt(event);
-    touchMoved = false;
-  } else if (touches.size === 2) {
-    touchMoved = true;
-    lastPinchDistance = pinchDistance();
-  }
+// Touch goes through the same state machine as the game map (ui/mapInput.ts).
+setupMapInput(worldCanvas, (clientX, clientY) => {
+  const box = worldCanvas.getBoundingClientRect();
+  return [clientX - box.left, clientY - box.top];
+}, {
+  pressed: () => {},
+  cancelHold: () => {},
+  gestureStarted: () => {},
+  holdFired: () => false,
+  pan: (dx, dy) => {
+    zoomState.panX += dx;
+    zoomState.panY += dy;
+    drawWorld();
+  },
+  pinch: (x, y, ratio, dx, dy) => {
+    zoomState.panX += dx;
+    zoomState.panY += dy;
+    zoomAround(ratio, x, y);
+    drawWorld();
+  },
+  gestureEnded: () => {},
+  tap: (clientX, clientY) => {
+    const box = worldCanvas.getBoundingClientRect();
+    chooseAt(clientX - box.left, clientY - box.top, TOUCH_SNAP_RADIUS_PX);
+  },
+  doubleTap: (x, y) => {
+    zoomAround(DOUBLE_TAP_ZOOM, x, y);
+    drawWorld();
+  },
 });
 
 worldCanvas.addEventListener('pointermove', (event) => {
-  if (event.pointerType === 'touch') {
-    const before = touches.get(event.pointerId);
-    if (!before) return;
-    const now = pointerAt(event);
-    if (touches.size === 1 && touchStart) {
-      if (!touchMoved && Math.hypot(now[0] - touchStart[0], now[1] - touchStart[1]) < TAP_SLOP_PX) return;
-      touchMoved = true;
-      zoomState.panX += now[0] - before[0];
-      zoomState.panY += now[1] - before[1];
-    }
-    touches.set(event.pointerId, now);
-    if (touches.size === 2) {
-      const [first, second] = [...touches.values()];
-      const distance = pinchDistance();
-      if (lastPinchDistance > 0) zoomAround(distance / lastPinchDistance, (first[0] + second[0]) / 2, (first[1] + second[1]) / 2);
-      lastPinchDistance = distance;
-    }
-    drawWorld();
-    return;
-  }
+  if (event.pointerType === 'touch') return;
   const next = nearestFeatured(...pointerAt(event));
   if (next === lifted) return;
   lifted = next;
@@ -267,17 +256,6 @@ worldCanvas.addEventListener('pointermove', (event) => {
   showStory();
   drawWorld();
 });
-
-function endTouch(event: PointerEvent): void {
-  if (event.pointerType !== 'touch' || !touches.has(event.pointerId)) return;
-  const at = pointerAt(event);
-  touches.delete(event.pointerId);
-  lastPinchDistance = 0;
-  if (event.type === 'pointerup' && touches.size === 0 && !touchMoved) chooseAt(at[0], at[1], TOUCH_SNAP_RADIUS_PX);
-}
-
-worldCanvas.addEventListener('pointerup', endTouch);
-worldCanvas.addEventListener('pointercancel', endTouch);
 
 worldCanvas.addEventListener('pointerleave', (event) => {
   if (event.pointerType === 'touch' || !lifted) return;
