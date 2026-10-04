@@ -35,8 +35,19 @@ export type Alert = {
 /** How many rows show before collapsing into "+N more" — a handful of aircraft shouldn't need scrolling to read. */
 const MAX_VISIBLE_ALERTS = 4;
 
-function collectAlerts(state: SimState): Alert[] {
+function collectAlerts(state: SimState, choosingHome: boolean): Alert[] {
   const alerts: Alert[] = scheduleProblems(state).map((message) => ({ key: `schedule:${message}`, message, tab: 'fleet' }));
+
+  // A new game waits paused with an empty schedule: say what to do first.
+  // It clears itself the moment a route is flown.
+  if (!choosingHome && state.schedule.length === 0) {
+    alerts.push({
+      key: 'first-route',
+      message: `NO ROUTES · click ${state.homeAirport} · Draw route · click a city · ✓ · then press 1×`,
+      tab: 'fleet',
+      view: { kind: 'airport', iata: state.homeAirport },
+    });
+  }
 
   // Planes grounded for want of crews (sim/crews.ts), one row per tail,
   // named, opening its base: the airport view's crew bar and Hire buttons.
@@ -90,8 +101,8 @@ const dismissed = new Set<string>();
  * ui/panels.ts's renderFleet()/renderRotations() needed after a per-frame
  * rebuild silently broke their own buttons.
  */
-export function updateAlerts(state: SimState, onNavigate: (tab: string) => void): void {
-  const allAlerts = collectAlerts(state);
+export function updateAlerts(state: SimState, onNavigate: (tab: string) => void, choosingHome = false): void {
+  const allAlerts = collectAlerts(state, choosingHome);
   // Forget dismissals for problems that have cleared (see `dismissed`).
   const current = new Set(allAlerts.map((a) => a.key));
   for (const key of dismissed) if (!current.has(key)) dismissed.delete(key);
@@ -123,7 +134,7 @@ export function updateAlerts(state: SimState, onNavigate: (tab: string) => void)
     close.setAttribute('aria-label', `Dismiss: ${alert.message}`);
     close.addEventListener('click', () => {
       dismissed.add(alert.key);
-      updateAlerts(state, onNavigate);
+      updateAlerts(state, onNavigate, choosingHome);
     });
 
     item.append(row, close);

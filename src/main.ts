@@ -259,7 +259,7 @@ function render(nowMs: number = performance.now()): void {
   // Always visible, whatever screen is open: see ui/alerts.ts's own
   // comment for why that's the point. An alert with no view of its own
   // (a schedule problem) opens Fleet, where the rotations are.
-  updateAlerts(state, () => select({ kind: 'fleet' }));
+  updateAlerts(state, () => select({ kind: 'fleet' }), choosingHome);
 
   // The game-over screen is a global overlay, not part of any one sidebar
   // tab, so it keeps refreshing whichever one is showing. Pausing on
@@ -906,9 +906,11 @@ if (choosingHome) {
     saveState(state);
     choosingHome = false;
     resize();
-    speedMultiplier = 1;
+    // Paused, so the first route is drawn before any cash is spent on
+    // nothing; 1× or Space starts the clock at 1×.
+    speedMultiplier = 0;
     speedBeforePause = 1;
-    speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === 1));
+    speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === 0));
   });
 }
 
