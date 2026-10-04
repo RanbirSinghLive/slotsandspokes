@@ -898,6 +898,39 @@ The accumulator loop (`main.ts`) turns real frame time into whole simulated
 minutes (`step()` calls) plus a continuous fractional minute for rendering,
 per the pattern in CLAUDE.md's "Time" section.
 
+**Hub core in Ops view** (`render/opsHub.ts`). Airport codes, 'on its way' badges and dots claim screen space first (`airportClaimedBoxes()` in `render/airports.ts`), then the route labels, held back by `drawRoutes()`, are drawn after the airports and skip every claimed box. A dot's radius grows on a steeper log curve of departures a day, capped at 7 px over the base. An airport with 6 or more of your routes is a busy hub: labels on its spokes show only for the route under the pointer, the selected route or plane, or the hovered or selected airport.
+
+In Ops view (`render/opsView.ts`) the Network, Profit and On-time lenses draw
+each route at a width set by its seats a day (`render/routeWidth.ts`): both
+directions, summed over the scheduled legs by the seats of the type each tail
+flies. The scale is square-root, 1 px up to 5 px at about 3,000 seats a day.
+The amber spill overlay and the selection glow are drawn over it as before.
+The lens legend adds "width = seats a day".
+
+In Ops view a route's label ends in ▲, ▼ or ≈: the fare set on the market
+against `recommendedFare()`, the going rate the route inspector quotes
+(≈ within 3%; `render/fareGap.ts`). An airport you serve gets a chip under
+its code only when something is wrong: `crews −N` (crew base short of the
+legal minimum for the planes flying today, else of the next plane arriving)
+or `slots full` (no room for another daily pair, as the airport inspector's
+"next pair: full"). A healthy map draws none (`render/airportChips.ts`).
+
+**What's holding you back** (`sim/bottleneck.ts`, shown by `ui/alerts.ts`).
+In Ops view, with a non-empty schedule, the alert strip ends with one
+`HOLD · …` row naming the biggest bottleneck to growth, from numbers the
+sim already has. First match wins: home hub slots full, crews short at a
+base for its next plane, a market spilling with no idle aircraft, cash
+below the cheapest lease, a plane flying under 40% of its day. It is a pure
+read of `state`, so it changes no game number; clicking the row opens the
+airport, crews, fleet, money or aircraft view that explains it.
+
+**Disruption layer (Ops view only, `render/disruptions.ts`).** Each AOG
+plane gets a wrench pin ("C-P002 · back 3d") above the airport it sits at;
+several at one airport stack upward, with more than four collapsing to
+"+N more AOG". Legs in `cancelledToday` draw as a dashed red line on their
+route with a count. Pins are laid out by one function that both drawing and
+`findDisruptionPinAt()` use, and a click on one opens the Maintenance screen.
+
 ## Rivals on the ladder (`src/sim/rivalLadder.ts`)
 
 Rivals climb the same ladder as the player to lease bigger aircraft: the
@@ -1575,6 +1608,13 @@ policy. It is redrawn only when the day, the routes or the level
 change, and never mid-drag. Each chart in the route view has a key of
 swatches under it (`ui/chartLegend.ts`).
 
+**Planes in Ops view** (`render/aircraftOps.ts`, called from `drawAircraft`).
+Planes scale up to 1.7x as the map zooms in, trail a fading line sampled back
+along their geodesic (at most 30 minutes or 15% of the flight), carry a
+pulsing red halo when late in addition to the red tint, and show their tail
+beside them from 3x zoom, or at any zoom when hovered or selected. All of it
+is computed from the flight and projection each frame; nothing is stored.
+
 ## Randomness (`src/sim/rng.ts`)
 
 A seeded PRNG (mulberry32); `state.rngSeed` carries its entire internal
@@ -1584,6 +1624,13 @@ roll stays reproducible: same state in, same state out, and a saved/
 reloaded or headlessly-rerun game produces the identical sequence of
 "random" delays. Verified: identical seed → identical 60-day outcome;
 different seed → diverges.
+
+**Basemap softening.** `render/basemap.ts` paints an ocean gradient, a faint
+10-degree graticule and a wide faint "shallows" glow under the coastline, then
+land, lakes and rivers, into a cached canvas. Natural Earth 50m land
+(`data/land-50m.json`, built by `npm run land50`) is a separate lazy chunk
+fetched after the first frame and swapped in for the 110m shape when it
+arrives. The home picker (`render/pickerMap.ts`) keeps the 110m shape.
 
 ## Weather (`src/sim/weather.ts`, `src/render/weather.ts`)
 

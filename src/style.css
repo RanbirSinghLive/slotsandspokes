@@ -326,6 +326,12 @@ body {
   gap: 4px;
 }
 
+#ops-view-toggle.active {
+  background: #2a6f6a;
+  border-color: #5ed6c8;
+  color: #e8fffb;
+}
+
 .where-zoom button {
   width: 26px;
   padding: 3px 0 !important;

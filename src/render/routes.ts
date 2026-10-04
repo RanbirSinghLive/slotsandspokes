@@ -6,7 +6,11 @@ import { distanceToArc } from './competition';
 import { getMapPreview } from './preview';
 import { spillingMarkets } from '../sim/unmetDemand';
 import { flightsEachWay, formatFrequency, formatYield, marketYieldCents } from '../sim/routeYield';
+import { isOpsView } from './opsView';
 import type { SimState } from '../sim/state';
+import { routeWidthsByMarket } from './routeWidth';
+
+import { fareGapSuffix } from './fareGap';
 
 const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]));
 
@@ -47,6 +51,7 @@ export function drawRoutes(ctx: CanvasRenderingContext2D, state: SimState, withL
 
   ctx.strokeStyle = ROUTE_STROKE;
   ctx.lineWidth = 1;
+  const widths = routeWidthsByMarket(state);
 
   for (const { origin, dest } of distinctRoutes.values()) {
     const originAirport = airportsByIata.get(origin);
@@ -61,12 +66,17 @@ export function drawRoutes(ctx: CanvasRenderingContext2D, state: SimState, withL
       ],
     };
 
+    if (widths) ctx.lineWidth = widths.get(routeKey(origin, dest)) ?? 1;
     ctx.beginPath();
     path(line);
     ctx.stroke();
   }
 
-  if (withLabels) drawRouteLabels(ctx, state, distinctRoutes);
+  // Ops view: labels wait until the airports have claimed their space (render/opsHub.ts).
+  if (withLabels) {
+    if (isOpsView()) deferredLabelRoutes = distinctRoutes;
+    else drawRouteLabels(ctx, state, distinctRoutes);
+  }
 
   // A route with more demand than seats, in the same amber as the Demand
   // lens's rim round its airports: the one that needs a flight or a
@@ -78,6 +88,7 @@ export function drawRoutes(ctx: CanvasRenderingContext2D, state: SimState, withL
     ctx.lineWidth = 2;
     for (const { origin, dest } of distinctRoutes.values()) {
       if (!spilling.has(routeKey(origin, dest))) continue;
+      ctx.lineWidth = Math.max(2, widths?.get(routeKey(origin, dest)) ?? 0);
       const originAirport = airportsByIata.get(origin);
       const destAirport = airportsByIata.get(dest);
       if (!originAirport || !destAirport) continue;
@@ -218,6 +229,8 @@ function drawRouteLabels(
   ctx: CanvasRenderingContext2D,
   state: SimState,
   routes: Map<string, { origin: string; dest: string }>,
+  avoid: readonly LabelBox[] = [],
+  only: ReadonlySet<string> | null = null,
 ): void {
   ctx.save();
   ctx.font = LABEL_FONT;
@@ -231,15 +244,16 @@ function drawRouteLabels(
       dest,
       flightsEachWay: Math.max(...flightsEachWay(state, origin, dest)),
     }))
+    .filter(({ key }) => only === null || only.has(key))
     .sort((a, b) => b.flightsEachWay - a.flightsEachWay || (a.key < b.key ? -1 : 1));
 
-  const placed: LabelBox[] = [];
+  const placed: LabelBox[] = [...avoid];
   for (const { origin, dest } of labelled) {
     const originAirport = airportsByIata.get(origin);
     const destAirport = airportsByIata.get(dest);
     if (!originAirport || !destAirport) continue;
     const along = geoInterpolate([originAirport.lon, originAirport.lat], [destAirport.lon, destAirport.lat]);
-    const text = `${formatFrequency(state, origin, dest)} · ${formatYield(marketYieldCents(state, origin, dest))}`;
+    const text = `${formatFrequency(state, origin, dest)} · ${formatYield(marketYieldCents(state, origin, dest))}${fareGapSuffix(state, origin, dest)}`;
     const halfWidth = ctx.measureText(text).width / 2 + 3;
 
     for (const t of LABEL_POSITIONS) {
@@ -261,4 +275,23 @@ function drawRouteLabels(
     }
   }
   ctx.restore();
+}
+
+let deferredLabelRoutes: Map<string, { origin: string; dest: string }> | null = null;
+
+/**
+ * Ops view: the route labels drawRoutes() held back, drawn once the airports
+ * have claimed their space. `visible` limits them to those route keys, or
+ * null for every route. Draws nothing if no routes were drawn this frame.
+ */
+export function drawDeferredRouteLabels(
+  ctx: CanvasRenderingContext2D,
+  state: SimState,
+  avoid: readonly LabelBox[],
+  visible: (routes: ReadonlyMap<string, { origin: string; dest: string }>) => ReadonlySet<string> | null,
+): void {
+  const routes = deferredLabelRoutes;
+  deferredLabelRoutes = null;
+  if (!routes) return;
+  drawRouteLabels(ctx, state, routes, avoid, visible(routes));
 }

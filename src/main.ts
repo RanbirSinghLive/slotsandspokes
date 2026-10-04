@@ -3,7 +3,8 @@ import { dayIndex, homeUtcOffsetMinutes, minuteOfDay as homeMinuteOfDay } from '
 import { projection, fitProjection, baselineScale } from './render/projection';
 import { drawBasemap } from './render/basemap';
 import { drawTerminator } from './render/terminator';
-import { drawRoutes, drawSelectedRoute } from './render/routes';
+import { drawAirportChips } from './render/airportChips';
+import { drawRoutes,drawSelectedRoute } from './render/routes';
 import { drawPainGauges } from './render/pain';
 import { drawAirports, drawSelectedAirport, airports, setKnownAirports, nearestAirportCandidate } from './render/airports';
 import { drawHubView, hasHubView } from './render/hubs';
@@ -24,6 +25,10 @@ import { createNewGameState, type SimState } from './sim/state';
 import { chooseHome, homeOptions } from './sim/homes';
 import { showHomePicker } from './ui/homePicker';
 import { gameDateWithYear } from './ui/format';
+import { isOpsView, setOpsView } from './render/opsView';
+import { drawOpsRouteLabels } from './render/opsHub';
+
+import { drawDisruptions, findDisruptionPinAt } from './render/disruptions';
 import { setAirportFilter, visibleAirports, type AirportFilter } from './ui/airportFilter';
 import { step } from './sim/step';
 import { updatePanel, renderScheduleWarnings, scheduleProblems, PANEL_WIDTH_PX, setScheduleClock } from './ui/panels';
@@ -340,6 +345,11 @@ function render(nowMs: number = performance.now()): void {
 
   drawAircraft(ctx, state, latestFractionalMinute, hoveredFlight?.legId ?? selectedFlight?.legId ?? null);
   drawAirports(ctx, state);
+  drawOpsRouteLabels(ctx, state, selection, mapHover, hoverPoint);
+
+  drawAirportChips(ctx, state);
+
+  drawDisruptions(ctx, state);
   // The airport the side panel is showing, on top of its dot.
   if (selection.kind === 'airport') drawSelectedAirport(ctx, selection.iata);
   if (mapHover?.kind === 'airport') drawSelectedAirport(ctx, mapHover.iata);
@@ -666,7 +676,7 @@ window.addEventListener('keydown', (event) => {
  * needs no key.
  */
 function updateLensLegend(): void {
-  lensLegend.hidden = lens === 'network';
+  lensLegend.hidden = lens === 'network' && !isOpsView();
   const swatch = (color: string, label: string) =>
     `<div><span class="mapmode-legend-swatch" style="background:${color}"></span><span>${label}</span></div>`;
   if (lens === 'profit') {
@@ -687,7 +697,15 @@ function updateLensLegend(): void {
     lensLegendTitle.textContent = 'Rival networks · pick one to narrow';
     lensLegendScale.innerHTML = '';
   }
+  if (isOpsView() && (lens === 'network' || lens === 'profit' || lens === 'ontime')) {
+    if (lens === 'network') {
+      lensLegendTitle.textContent = 'Route width';
+      lensLegendScale.innerHTML = '';
+    }
+    lensLegendScale.insertAdjacentHTML('beforeend', '<div><span>width = seats a day</span></div>');
+  }
 }
+document.querySelector('#ops-view-toggle')?.addEventListener('click', () => queueMicrotask(updateLensLegend));
 
 // Which airports the map shows (ui/airportFilter.ts): a visible three-way
 // switch in the bottom-left corner.
@@ -698,6 +716,25 @@ airportFilterButtons.forEach((button) => {
     airportFilterButtons.forEach((other) => other.classList.toggle('active', other === button));
     render();
   });
+});
+
+// The Ops view switch (render/opsView.ts): bottom left, beside the airport
+// filter. O toggles it too.
+const opsViewButton = document.querySelector<HTMLButtonElement>('#ops-view-toggle')!;
+function showOpsView(next: boolean): void {
+  setOpsView(next);
+  opsViewButton.classList.toggle('active', next);
+  opsViewButton.setAttribute('aria-pressed', String(next));
+  render();
+}
+opsViewButton.addEventListener('click', () => showOpsView(!isOpsView()));
+opsViewButton.classList.toggle('active', isOpsView());
+opsViewButton.setAttribute('aria-pressed', String(isOpsView()));
+window.addEventListener('keydown', (event) => {
+  if (event.ctrlKey || event.metaKey || event.altKey || event.key.toLowerCase() !== 'o') return;
+  const target = event.target as HTMLElement | null;
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+  showOpsView(!isOpsView());
 });
 
 // --- Pan (click and drag) ---
@@ -742,6 +779,13 @@ canvas.addEventListener('mousedown', (event) => {
   const clickedFlight = findFlightAt(event.clientX, event.clientY, state, latestFractionalMinute);
   if (clickedFlight) {
     select({ kind: 'aircraft', tail: clickedFlight.tail });
+    render();
+    return;
+  }
+
+  // A grounded plane's pin (Ops view) opens the Maintenance screen.
+  if (findDisruptionPinAt(event.clientX, event.clientY, state)) {
+    select({ kind: 'maintenance' });
     render();
     return;
   }

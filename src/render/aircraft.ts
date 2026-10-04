@@ -5,6 +5,8 @@ import { bearing } from '../sim/geo';
 import { isOnTimeArrival } from '../sim/delays';
 import { classRank } from '../sim/aircraftClasses';
 import type { ActiveFlight, SimState } from '../sim/state';
+import { isOpsView } from './opsView';
+import { drawLateHalo, drawPlaneTrail, drawTailLabel, opsPlaneScale } from './aircraftOps';
 
 const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]));
 
@@ -156,6 +158,8 @@ export function drawAircraft(
   // cache" reasoning render/routes.ts and render/demand.ts already use.
   const aircraftByTail = new Map(state.aircraft.map((aircraft) => [aircraft.tail, aircraft]));
 
+  const ops = isOpsView();
+  const opsScale = ops ? opsPlaneScale() : 1;
   for (const flight of state.activeFlights) {
     const pose = flightPose(flight, nowFractionalMinute);
     if (!pose) continue;
@@ -165,11 +169,17 @@ export function drawAircraft(
 
     // Same rule as the On-Time stat, so a plane drawn late is one that will count as late.
     const isLate = !isOnTimeArrival(flight.arriveMinute, flight.scheduledArriveMinute);
-    drawSilhouette(ctx, pose.x, pose.y, pose.rotation, isLate ? AIRCRAFT_FILL_LATE : AIRCRAFT_FILL, shape);
+    const drawnSpan = shape.span * opsScale;
+    if (ops) {
+      drawPlaneTrail(ctx, flight, nowFractionalMinute);
+      if (isLate) drawLateHalo(ctx, pose.x, pose.y, drawnSpan / 2);
+    }
+    drawSilhouette(ctx, pose.x, pose.y, pose.rotation, isLate ? AIRCRAFT_FILL_LATE : AIRCRAFT_FILL, shape, opsScale);
+    if (ops) drawTailLabel(ctx, flight.tail, pose.x, pose.y, drawnSpan / 2, flight.legId === hoveredLegId);
 
     if (flight.legId === hoveredLegId) {
       ctx.beginPath();
-      ctx.arc(pose.x, pose.y, shape.span / 2 + 3, 0, 2 * Math.PI);
+      ctx.arc(pose.x, pose.y, drawnSpan / 2 + 3, 0, 2 * Math.PI);
       ctx.strokeStyle = HOVER_RING_STROKE;
       ctx.lineWidth = 1.5;
       ctx.stroke();
@@ -184,12 +194,13 @@ function drawSilhouette(
   rotation: number,
   fillStyle: string,
   shape: { path: Path2D; span: number },
+  sizeFactor = 1,
 ): void {
   ctx.save();
   ctx.translate(x, y);
   // The shapes are drawn nose up; `rotation` is measured from due east.
   ctx.rotate(rotation + Math.PI / 2);
-  const scale = shape.span / 24;
+  const scale = (shape.span * sizeFactor) / 24;
   ctx.scale(scale, scale);
   ctx.translate(-12, -12);
   ctx.fillStyle = fillStyle;
