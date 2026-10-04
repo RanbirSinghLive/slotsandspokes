@@ -3,7 +3,7 @@ import { geoCircle, geoPath } from 'd3-geo';
 import { money } from './format';
 import type { LineString } from 'geojson';
 import aircraftTypesData from '../../data/aircraft-types.json';
-import { projection } from '../render/projection';
+import { projection, mapPoint } from '../render/projection';
 import { findNearestAirport, type Airport } from '../render/airports';
 import { greatCircleDistanceNm } from '../sim/geo';
 import { demandAgainstSeats, marketSize, neverFills } from '../sim/marketSize';
@@ -248,7 +248,7 @@ export function handleRouteBuilderMouseDown(event: MouseEvent, state: SimState):
   // Nothing armed means this click isn't ours; the map menu or a pan gets it.
   if (builderState.mode === 'idle') return false;
 
-  const clicked = findNearestAirport(event.clientX, event.clientY);
+  const clicked = findNearestAirport(...mapPoint(event.clientX, event.clientY));
 
   if (builderState.mode === 'armed') {
     const origin = chainOrigin(builderState.chain);
@@ -284,10 +284,10 @@ export function handleRouteBuilderMouseDown(event: MouseEvent, state: SimState):
  */
 export function handleRouteBuilderMouseMove(event: MouseEvent, state: SimState): boolean {
   if (builderState.mode !== 'armed') return false;
-  const geo = projection.invert?.([event.clientX, event.clientY]);
+  const geo = projection.invert?.(mapPoint(event.clientX, event.clientY));
   if (!geo) return false;
   previewGeo = geo;
-  candidate = findNearestAirport(event.clientX, event.clientY);
+  candidate = findNearestAirport(...mapPoint(event.clientX, event.clientY));
 
   const origin = chainOrigin(builderState.chain);
   if (candidate && candidate.iata !== origin.iata) {

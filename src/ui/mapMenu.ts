@@ -3,7 +3,7 @@ import { deliveryDays } from '../sim/fleetTiming';
 import { money } from './format';
 import { showConfirm } from './confirmModal';
 import { findNearestOwnRoute } from '../render/routes';
-import { projection } from '../render/projection';
+import { projection, mapPoint } from '../render/projection';
 import { TURN_BUFFER_CHOICES } from '../sim/turnBuffer';
 import { connectingUnderStyle, spokesOf } from '../sim/hubs';
 import { confirmHubStyle } from './hubStyleConfirm';
@@ -592,8 +592,8 @@ const AIRPORT_SURE_WIN_RATIO = 0.5;
  * to either airport to count as "on" it, goes to the route.
  */
 export function handleMapMenuMouseDown(event: MouseEvent, state: SimState): boolean {
-  const airport = nearestAirportCandidate(event.clientX, event.clientY);
-  const route = findNearestOwnRoute(event.clientX, event.clientY, state);
+  const airport = nearestAirportCandidate(...mapPoint(event.clientX, event.clientY));
+  const route = findNearestOwnRoute(...mapPoint(event.clientX, event.clientY), state);
 
   const airportWins = airport && (airport.ratio <= AIRPORT_SURE_WIN_RATIO || !route || airport.ratio <= route.ratio);
   if (airportWins) {

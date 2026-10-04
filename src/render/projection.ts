@@ -185,3 +185,23 @@ export function withSheetClip(margin: number, cssWidth: number, cssHeight: numbe
     projection.clipExtent(before);
   }
 }
+
+// The canvas the shared projection draws into. Pointer positions arrive in page (client)
+// coordinates and the projection works in this canvas's own pixels; the two agree only
+// while the canvas sits at the page's top-left corner, so every hit test goes through here.
+let mapElement: HTMLElement | null = null;
+
+export function setMapElement(element: HTMLElement): void {
+  mapElement = element;
+}
+
+/** Page (client) coordinates to the map's own pixels, the ones `projection` returns and inverts. */
+export function mapPoint(clientX: number, clientY: number): [number, number] {
+  const box = mapElement?.getBoundingClientRect();
+  return box ? [clientX - box.left, clientY - box.top] : [clientX, clientY];
+}
+
+/** The map's size in CSS pixels, read from the canvas's own box. */
+export function mapSize(): { width: number; height: number } {
+  return { width: mapElement?.clientWidth ?? 0, height: mapElement?.clientHeight ?? 0 };
+}

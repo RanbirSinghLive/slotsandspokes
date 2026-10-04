@@ -1,6 +1,6 @@
 import './style.css';
 import { dayIndex, homeUtcOffsetMinutes, minuteOfDay as homeMinuteOfDay } from './sim/clock';
-import { projection, fitProjection, baselineScale, mapGesture } from './render/projection';
+import { projection, fitProjection, baselineScale, mapGesture, setMapElement, mapPoint, mapSize } from './render/projection';
 import { drawBasemap } from './render/basemap';
 import { drawTerminator } from './render/terminator';
 import { drawAirportChips } from './render/airportChips';
@@ -107,6 +107,7 @@ setupGameOver();
 setupGameControls(state);
 
 const canvas = document.querySelector<HTMLCanvasElement>('#map')!;
+setMapElement(canvas);
 const ctx = canvas.getContext('2d')!;
 const clockEl = document.querySelector<HTMLDivElement>('#clock')!;
 const speedButtons = document.querySelectorAll<HTMLButtonElement>('#speed-controls button');
@@ -214,8 +215,9 @@ function applyPanelWidth(): void {
  * pixel coordinates (so the rest of the code never has to think about DPR),
  * but it lands on a high-enough-resolution buffer to look sharp.
  */
-function resize(): void {
+function resize(keepView = false): void {
   applyPanelWidth(); // re-clamp in case the window itself was resized, not just the panel
+  const previous = keepView ? currentView() : null;
   const cssWidth = window.innerWidth - currentPanelWidthPx;
   const cssHeight = window.innerHeight;
   // A phone's 3x screen would draw nine pixels per CSS pixel; 2x looks the same on this map and costs less than half as much.
@@ -225,6 +227,7 @@ function resize(): void {
   canvas.height = cssHeight * dpr;
   // On a phone 100vh is the page with the browser's toolbars hidden, taller than
   // the visible window, which stretched the picture and put taps below the finger.
+  // Everything else reads the map's size back from this box (render/projection.ts's mapSize()).
   canvas.style.width = `${cssWidth}px`;
   canvas.style.height = `${cssHeight}px`;
 
@@ -235,7 +238,22 @@ function resize(): void {
 
   const home = airports.find((airport) => airport.iata === state.homeAirport) ?? airports[0];
   fitProjection(cssWidth, cssHeight, home);
+  if (previous) restoreView(previous, cssWidth, cssHeight);
   render();
+}
+
+/** What the player is looking at, so a resize that only changes the box can keep it. */
+function currentView(): { zoom: number; centre: [number, number] } | null {
+  const { width, height } = mapSize();
+  const centre = projection.invert?.([width / 2, height / 2]);
+  return centre && width > 0 ? { zoom: projection.scale() / baselineScale, centre } : null;
+}
+
+function restoreView(view: { zoom: number; centre: [number, number] }, width: number, height: number): void {
+  projection.scale(baselineScale * view.zoom);
+  const [x, y] = projection(view.centre)!;
+  const [tx, ty] = projection.translate();
+  projection.translate([tx + width / 2 - x, ty + height / 2 - y]);
 }
 
 // The exact (fractional) simulated minute currently on screen. Updated once
@@ -289,8 +307,7 @@ function render(nowMs: number = performance.now()): void {
   updateGameOver(state);
   if (updateRunway(state)) runwayPauseRequested = true;
 
-  const cssWidth = window.innerWidth - currentPanelWidthPx;
-  const cssHeight = window.innerHeight;
+  const { width: cssWidth, height: cssHeight } = mapSize();
 
   // The known airports, less any the map's airport filter hides (ui/airportFilter.ts).
   setKnownAirports(visibleAirports(state));
@@ -437,8 +454,9 @@ function updateClock(state: SimState): void {
   clockEl.title = `Local time at your home airport, ${state.homeAirport} (${formatUtcOffset(homeUtcOffsetMinutes(state))}). Every schedule time in the game uses this clock.`;
 }
 
-window.addEventListener('resize', resize);
-window.visualViewport?.addEventListener('resize', resize);
+// A resize keeps the player's pan and zoom; only Home (below) and a new home airport refit.
+window.addEventListener('resize', () => resize(true));
+window.visualViewport?.addEventListener('resize', () => resize(true));
 resize();
 
 // Hide the side panel entirely and let the map fill the screen — CLAUDE.md's
@@ -451,7 +469,7 @@ function setPanelHidden(hidden: boolean): void {
   panelEl.hidden = panelHidden;
   clearMapHover();
   // The map's available width just changed, same as a real window resize.
-  resize();
+  resize(true);
 }
 panelEl.hidden = panelHidden;
 document.querySelector('#panel-close')!.addEventListener('click', () => setPanelHidden(true));
@@ -800,7 +818,7 @@ canvas.addEventListener('mousedown', (event) => {
 
   // A plane in the air, drawn on top of everything, gets the click before
   // the airports and routes under it: it opens that plane's view.
-  const clickedFlight = findFlightAt(event.clientX, event.clientY, state, latestFractionalMinute);
+  const clickedFlight = findFlightAt(...mapPoint(event.clientX, event.clientY), state, latestFractionalMinute);
   if (clickedFlight) {
     select({ kind: 'aircraft', tail: clickedFlight.tail });
     render();
@@ -808,7 +826,7 @@ canvas.addEventListener('mousedown', (event) => {
   }
 
   // A grounded plane's pin (Ops view) opens the Maintenance screen.
-  if (findDisruptionPinAt(event.clientX, event.clientY, state)) {
+  if (findDisruptionPinAt(...mapPoint(event.clientX, event.clientY), state)) {
     select({ kind: 'maintenance' });
     render();
     return;
@@ -843,10 +861,14 @@ canvas.addEventListener('mousedown', (event) => {
  */
 // A touch has no hover: the mouse events that follow a tap would otherwise leave a hover card stuck on the map.
 let lastInputWasTouch = false;
+const pointOf = (event: MouseEvent): { x: number; y: number } => {
+  const [x, y] = mapPoint(event.clientX, event.clientY);
+  return { x, y };
+};
 canvas.addEventListener('pointerdown', (event) => (lastInputWasTouch = event.pointerType === 'touch'));
 
 canvas.addEventListener('mousemove', (event) => {
-  hoverPoint = isDragging || lastInputWasTouch ? null : { x: event.clientX, y: event.clientY };
+  hoverPoint = isDragging || lastInputWasTouch ? null : pointOf(event);
   if (handleRouteBuilderMouseMove(event, state)) {
     render();
     hideCompetitionTooltip();
@@ -863,12 +885,12 @@ canvas.addEventListener('mousemove', (event) => {
   }
 
   // A plane under the pointer wins over the route or airport beneath it.
-  if (findFlightAt(event.clientX, event.clientY, state, latestFractionalMinute)) {
+  if (findFlightAt(...mapPoint(event.clientX, event.clientY), state, latestFractionalMinute)) {
     hideCompetitionTooltip();
     return;
   }
 
-  const hover = findCompetitionHover(event.clientX, event.clientY, selectedCompetitorAirline, state, competitionOverlayOn);
+  const hover = findCompetitionHover(...mapPoint(event.clientX, event.clientY), selectedCompetitorAirline, state, competitionOverlayOn);
   if (hover) {
     showCompetitionTooltip(hover, event.clientX, event.clientY, state, competitionOverlayOn);
   } else {
@@ -953,22 +975,23 @@ canvas.addEventListener('contextmenu', (event) => event.preventDefault());
 
 canvas.addEventListener('pointerdown', (event) => {
   if (event.pointerType !== 'touch') return;
-  touchPoints.set(event.pointerId, [event.clientX, event.clientY]);
+  const touchPointAt = mapPoint(event.clientX, event.clientY);
+  touchPoints.set(event.pointerId, touchPointAt);
   try {
     canvas.setPointerCapture(event.pointerId);
   } catch {
     // A pointer the browser has already ended can't be captured; the touch still works without it.
   }
   touchPanning = touchPanning && touchPoints.size > 1;
-  touchPanStart = touchPoints.size === 1 ? { x: event.clientX, y: event.clientY, translate: projection.translate() } : null;
+  touchPanStart = touchPoints.size === 1 ? { x: touchPointAt[0], y: touchPointAt[1], translate: projection.translate() } : null;
   cancelAirportHold();
-  if (touchPoints.size === 1) startAirportHold(event.clientX, event.clientY);
+  if (touchPoints.size === 1) startAirportHold(...mapPoint(event.clientX, event.clientY));
 });
 
 canvas.addEventListener('pointermove', (event) => {
   const before = touchPoints.get(event.pointerId);
   if (event.pointerType !== 'touch' || !before) return;
-  const now: [number, number] = [event.clientX, event.clientY];
+  const now = mapPoint(event.clientX, event.clientY);
   if (touchPoints.size >= 2) {
     const [other] = [...touchPoints.entries()].filter(([id]) => id !== event.pointerId).map(([, point]) => point);
     const distanceBefore = Math.hypot(before[0] - other[0], before[1] - other[1]);
@@ -1001,12 +1024,13 @@ const DOUBLE_TAP_SLOP_PX = 30;
 const DOUBLE_TAP_ZOOM = 2;
 let lastTap = { time: 0, x: 0, y: 0 };
 
+/** (x, y) is where the finger lifted, in page (client) coordinates, as the made-up mouse events carry it. */
 function tapMap(x: number, y: number): void {
   const now = performance.now();
   if (now - lastTap.time < DOUBLE_TAP_MS && Math.hypot(x - lastTap.x, y - lastTap.y) < DOUBLE_TAP_SLOP_PX) {
     lastTap.time = 0;
     hideMapMenu();
-    animateZoomAt(x, y, DOUBLE_TAP_ZOOM);
+    animateZoomAt(...mapPoint(x, y), DOUBLE_TAP_ZOOM);
     return;
   }
   lastTap = { time: now, x, y };
@@ -1103,7 +1127,7 @@ canvas.addEventListener(
   'wheel',
   (event) => {
     event.preventDefault();
-    zoomAt(event.clientX, event.clientY, Math.pow(1.002, -event.deltaY));
+    zoomAt(...mapPoint(event.clientX, event.clientY), Math.pow(1.002, -event.deltaY));
   },
   { passive: false },
 );
