@@ -1585,6 +1585,13 @@ reloaded or headlessly-rerun game produces the identical sequence of
 "random" delays. Verified: identical seed → identical 60-day outcome;
 different seed → diverges.
 
+**Basemap softening.** `render/basemap.ts` paints an ocean gradient, a faint
+10-degree graticule and a wide faint "shallows" glow under the coastline, then
+land, lakes and rivers, into a cached canvas. Natural Earth 50m land
+(`data/land-50m.json`, built by `npm run land50`) is a separate lazy chunk
+fetched after the first frame and swapped in for the 110m shape when it
+arrives. The home picker (`render/pickerMap.ts`) keeps the 110m shape.
+
 ## Weather (`src/sim/weather.ts`, `src/render/weather.ts`)
 
 Week two's "random events" layer — seasonal thunderstorms and
