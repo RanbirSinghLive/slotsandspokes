@@ -201,6 +201,8 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
     icon: planeIconInner(option.code),
     large: true,
     angleDeg: 0,
+    // A lease is a standing cost, so it takes a second click.
+    confirm: true,
     disabledReason: option.disabledReason,
     preview: option.preview,
     onSelect: () => {

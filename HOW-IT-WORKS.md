@@ -1678,9 +1678,16 @@ the tree), Goals, and a last word on edges fading, size drawing rivals,
 cash, and the year one report. A step pointing inside a screen opens it
 first (`open`). The two hands-on steps, choosing a
 home and drawing a first route, move on by themselves once done (a
-"Skip this step" meanwhile), and are passed over when already done. The
-clock pauses for reading after the home is chosen, and runs at 1× again
-at the end.
+"Skip this step" meanwhile, except choosing a home, which only "Skip
+tutorial" leaves), and are passed over when already done. The clock
+pauses for reading after the home is chosen, and runs at 1× again at the
+end.
+
+**A new game starts paused.** Choosing a home leaves the clock stopped,
+and while the schedule is empty the alert strip says what to do first
+("NO ROUTES · click BOS · Draw route · click a city · ✓ · then press
+1×"), opening the home airport when clicked. It goes when a route is
+flown. A lease from the map ring takes two clicks: the first arms it.
 
 ## Persistence (`src/ui/save.ts`)
 
