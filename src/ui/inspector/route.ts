@@ -40,6 +40,7 @@ import { marketFareLevel } from '../../sim/fareStimulus';
 import { CROWDING_WINDOW_MINUTES, crowdingWeight } from '../../sim/timeOfDay';
 import { chartLegend } from '../chartLegend';
 import { buildSeatSplitBar } from '../seatSplitBar';
+import { formatFrequency, formatYield, marketYieldCents } from '../../sim/routeYield';
 import { marketCharacterWord, marketMix } from '../../sim/marketCharacter';
 
 /**
@@ -103,10 +104,10 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   // its planes flew over the last week, from its own landings.
   const load = marketLoadFactor(state, a, b);
   const presence = lineWithInfo(
-    `${summary.rotations.length}/day · ${summary.byClass.map((c) => `${c.name} ×${c.count}`).join(', ')} · LF ${formatLoadFactor(load)}`,
+    `${formatFrequency(state, a, b)} · ${summary.byClass.map((c) => `${c.name} ×${c.count}`).join(', ')} · LF ${formatLoadFactor(load)} · yield ${formatYield(marketYieldCents(state, a, b))}`,
     load.factor === null
       ? 'Load factor (LF): how full the planes fly, from the last 7 days of landings. None landed yet.'
-      : `Load factor (LF): ${load.passengers.toLocaleString()} passengers in ${load.seats.toLocaleString()} seats over the last 7 days.`,
+      : `Load factor (LF): ${load.passengers.toLocaleString()} passengers in ${load.seats.toLocaleString()} seats over the last 7 days. Flights a day are counted each way. Yield: cents of fare per passenger per nautical mile, last 7 days.`,
   );
   presence.classList.toggle('is-over', short);
   root.append(presence);

@@ -694,13 +694,13 @@ body {
 .routes-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
 .routes-table th,
 .routes-table td {
-  padding: 4px 4px;
+  padding: 4px 3px;
   text-align: right;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   white-space: nowrap;

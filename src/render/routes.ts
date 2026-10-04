@@ -1,10 +1,11 @@
-import { geoPath } from 'd3-geo';
+import { geoInterpolate, geoPath } from 'd3-geo';
 import type { LineString } from 'geojson';
 import { projection } from './projection';
 import { airports } from './airports';
 import { distanceToArc } from './competition';
 import { getMapPreview } from './preview';
 import { spillingMarkets } from '../sim/unmetDemand';
+import { formatFrequency, formatYield, marketYieldCents } from '../sim/routeYield';
 import type { SimState } from '../sim/state';
 
 const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]));
@@ -62,6 +63,8 @@ export function drawRoutes(ctx: CanvasRenderingContext2D, state: SimState): void
     path(line);
     ctx.stroke();
   }
+
+  drawRouteLabels(ctx, state, distinctRoutes);
 
   // A route with more demand than seats, in the same amber as the Demand
   // lens's rim round its airports: the one that needs a flight or a
@@ -179,6 +182,39 @@ export function drawSelectedRoute(ctx: CanvasRenderingContext2D, a: string, b: s
     ctx.beginPath();
     path(line);
     ctx.stroke();
+  }
+  ctx.restore();
+}
+
+const LABEL_FONT = '10px ui-monospace, Consolas, monospace';
+const LABEL_TEXT = '#9aa4bd';
+
+/**
+ * Each route's flights a day each way and its yield (cents per passenger
+ * nautical mile, last 7 days) at the middle of its arc, so fares compare
+ * at a glance. Frequency counts one direction, not both added together.
+ */
+function drawRouteLabels(
+  ctx: CanvasRenderingContext2D,
+  state: SimState,
+  routes: Map<string, { origin: string; dest: string }>,
+): void {
+  ctx.save();
+  ctx.font = LABEL_FONT;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const { origin, dest } of routes.values()) {
+    const originAirport = airportsByIata.get(origin);
+    const destAirport = airportsByIata.get(dest);
+    if (!originAirport || !destAirport) continue;
+    const middle = projection(geoInterpolate([originAirport.lon, originAirport.lat], [destAirport.lon, destAirport.lat])(0.5));
+    if (!middle) continue;
+    const text = `${formatFrequency(state, origin, dest)} · ${formatYield(marketYieldCents(state, origin, dest))}`;
+    const width = ctx.measureText(text).width;
+    ctx.fillStyle = 'rgba(10, 12, 18, 0.8)';
+    ctx.fillRect(middle[0] - width / 2 - 3, middle[1] - 7, width + 6, 14);
+    ctx.fillStyle = LABEL_TEXT;
+    ctx.fillText(text, middle[0], middle[1]);
   }
   ctx.restore();
 }
