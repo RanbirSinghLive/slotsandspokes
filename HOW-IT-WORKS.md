@@ -898,6 +898,14 @@ The accumulator loop (`main.ts`) turns real frame time into whole simulated
 minutes (`step()` calls) plus a continuous fractional minute for rendering,
 per the pattern in CLAUDE.md's "Time" section.
 
+In Ops view a route's label ends in ▲, ▼ or ≈: the fare set on the market
+against `recommendedFare()`, the going rate the route inspector quotes
+(≈ within 3%; `render/fareGap.ts`). An airport you serve gets a chip under
+its code only when something is wrong: `crews −N` (crew base short of the
+legal minimum for the planes flying today, else of the next plane arriving)
+or `slots full` (no room for another daily pair, as the airport inspector's
+"next pair: full"). A healthy map draws none (`render/airportChips.ts`).
+
 ## Rivals on the ladder (`src/sim/rivalLadder.ts`)
 
 Rivals climb the same ladder as the player to lease bigger aircraft: the

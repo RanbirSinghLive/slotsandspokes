@@ -3,7 +3,8 @@ import { dayIndex, homeUtcOffsetMinutes, minuteOfDay as homeMinuteOfDay } from '
 import { projection, fitProjection, baselineScale } from './render/projection';
 import { drawBasemap } from './render/basemap';
 import { drawTerminator } from './render/terminator';
-import { drawRoutes, drawSelectedRoute } from './render/routes';
+import { drawAirportChips } from './render/airportChips';
+import { drawRoutes,drawSelectedRoute } from './render/routes';
 import { drawPainGauges } from './render/pain';
 import { drawAirports, drawSelectedAirport, airports, setKnownAirports, nearestAirportCandidate } from './render/airports';
 import { drawHubView, hasHubView } from './render/hubs';
@@ -339,6 +340,7 @@ function render(nowMs: number = performance.now()): void {
 
   drawAircraft(ctx, state, latestFractionalMinute, hoveredFlight?.legId ?? selectedFlight?.legId ?? null);
   drawAirports(ctx, state);
+  drawAirportChips(ctx, state);
   // The airport the side panel is showing, on top of its dot.
   if (selection.kind === 'airport') drawSelectedAirport(ctx, selection.iata);
   if (mapHover?.kind === 'airport') drawSelectedAirport(ctx, mapHover.iata);
