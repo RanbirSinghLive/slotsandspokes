@@ -223,6 +223,10 @@ function resize(): void {
 
   canvas.width = cssWidth * dpr;
   canvas.height = cssHeight * dpr;
+  // On a phone 100vh is the page with the browser's toolbars hidden, taller than
+  // the visible window, which stretched the picture and put taps below the finger.
+  canvas.style.width = `${cssWidth}px`;
+  canvas.style.height = `${cssHeight}px`;
 
   // Reset any previous scale before reapplying it — resize can fire many
   // times, and scale() otherwise compounds on top of itself.
@@ -434,6 +438,7 @@ function updateClock(state: SimState): void {
 }
 
 window.addEventListener('resize', resize);
+window.visualViewport?.addEventListener('resize', resize);
 resize();
 
 // Hide the side panel entirely and let the map fill the screen — CLAUDE.md's
