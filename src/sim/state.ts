@@ -263,6 +263,17 @@ export type SimState = {
    * Reset at rollover. Optional: made on first use.
    */
   retimedToday?: string[];
+  /**
+   * Gantt moves held for the midnight rollover (sim/retime.ts): a rotation
+   * in the air, or part flown, keeps today's flying and takes its new
+   * times and plane tomorrow. Optional: made on first use.
+   */
+  pendingRetimes?: { legs: { legId: string; tail: string; departMinute: number }[]; repriced: { iata: string; oldFee: number; newFee: number }[] }[];
+  /**
+   * Where each night stop's out-and-back sat before it was wrapped, by
+   * tail, so bringing it home puts it back (sim/retime.ts). Optional.
+   */
+  wrappedFrom?: Record<string, { legId: string; start: number }>;
   todayRevenue: number;
   todayCost: number;
   todayMargin: number;

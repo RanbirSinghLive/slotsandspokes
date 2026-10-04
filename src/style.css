@@ -1255,6 +1255,47 @@ button,
   border-style: dashed;
 }
 
+/* A night stop half's ⌂ (ui/panels.ts): brings it home. Always showing. */
+.timeline-rotation .night-home-button {
+  position: absolute;
+  z-index: 1;
+  top: -7px;
+  left: -7px;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  line-height: 1;
+  font-family: inherit;
+  font-size: 11px;
+  color: #9fb4ff;
+  background: #0a0c12;
+  border: 1px solid #9fb4ff;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.timeline-rotation .night-home-button:hover {
+  color: #0a0c12;
+  background: #9fb4ff;
+}
+
+/* A move held for tomorrow (sim/retime.ts): dashed where it will sit. */
+.timeline-pending {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: 9px;
+  color: #ffd166;
+  white-space: nowrap;
+  border: 1px dashed #ffd166;
+  border-radius: 3px;
+  pointer-events: none;
+}
+
 .timeline-leg {
   position: absolute;
   top: 3px;
@@ -1291,7 +1332,8 @@ button,
 }
 
 .timeline-rotation:hover .rotation-remove-button,
-.timeline-rotation .rotation-remove-button.is-armed {
+.timeline-rotation .rotation-remove-button.is-armed,
+.timeline-rotation .rotation-remove-button.is-linked {
   display: block;
 }
 
@@ -1320,6 +1362,7 @@ button,
 }
 
 .rotation-remove-button:hover,
+.rotation-remove-button.is-linked,
 .rotation-remove-button.is-armed {
   color: #ff8080;
   border-color: #ff8080;

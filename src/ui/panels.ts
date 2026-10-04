@@ -1,7 +1,7 @@
 import { nightStopLegs } from '../sim/nightStops';
 import { hasMxBase, outstationCheck } from '../sim/bases';
 import { deferredItems, MX_HOLD_AT, tonightCheck } from '../sim/mxChecks';
-import { planRetimeRotation, removeRotation as removeRotationFromSchedule, retimeRotation } from '../sim/playerActions';
+import { bringNightStopHome, planBringNightStopHome, planRetimeRotation, removeRotation as removeRotationFromSchedule, retimeRotation } from '../sim/playerActions';
 import type { RetimePlan } from '../sim/retime';
 import { airportHours, FIRST_OPEN_HOUR, freeInHour, OPEN_HOURS } from '../sim/hours';
 import { money, shortMoney } from './format';
@@ -228,7 +228,9 @@ function renderRotations(state: SimState): void {
     '|' +
     state.aircraft.map((aircraft) => aircraft.tail).join(',') +
     '|' +
-    rotations.map((r) => `${r.tail}:${r.airports.join('>')}:${r.departMinute}:${r.arriveMinute}:${r.closed}`).join('|');
+    rotations.map((r) => `${r.tail}:${r.airports.join('>')}:${r.departMinute}:${r.arriveMinute}:${r.closed}`).join('|') +
+    '|' +
+    JSON.stringify(state.pendingRetimes ?? []);
   if (signature === rotationsSignature) return;
   rotationsSignature = signature;
 
@@ -343,6 +345,7 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
       track.style.setProperty('--puck', colour);
       // A night stop's two halves (sim/nightStops.ts): the morning flight home and the evening flight out.
       const nightStop = nightStopLegs(state, aircraft.tail);
+      const halfButtons: HTMLButtonElement[] = [];
       for (const rotation of own) {
         const half = nightStop !== null && (rotation.legs[0] === nightStop.morning || rotation.legs[0] === nightStop.evening);
         const span = linkToMap(document.createElement('div'), { kind: 'route', a: rotation.airports[0], b: rotation.airports[1] });
@@ -355,7 +358,7 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
           `${rotation.airports.join(' → ')} · ${minuteOfDayToTimeString(rotation.departMinute)}–${minuteOfDayToTimeString(rotation.arriveMinute)}` +
           ` · ${Math.round(rotation.share * 100)}% of a plane` +
           (half
-            ? ` · night stop ${nightStop!.morning.origin} · push it past ${rotation.legs[0] === nightStop!.morning ? 'the start' : 'the end'} of the day to bring it home`
+            ? ` · night stop ${nightStop!.morning.origin} · ⌂ or push it past ${rotation.legs[0] === nightStop!.morning ? 'the start' : 'the end'} of the day to bring it home`
             : rotation.closed
               ? ' · drag to move it · past either end of the day for a night stop'
               : ' · never returns to base');
@@ -378,8 +381,34 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
             span.append(groundLabel(before.dest, within((before.departMinute + before.blockMinutes + leg.departMinute) / 2)));
           }
         });
-        span.append(removeButtonFor(rotation, state));
+        if (half) span.append(nightHomeButtonFor(aircraft.tail, state));
+        const removeButton = removeButtonFor(rotation, state, half ? own.find((other) => other !== rotation && (other.legs[0] === nightStop!.morning || other.legs[0] === nightStop!.evening)) : undefined);
+        if (half) halfButtons.push(removeButton);
+        span.append(removeButton);
         track.append(span);
+      }
+      // A night stop's two × are one control: hovering or arming either lights both.
+      if (halfButtons.length === 2) {
+        const [first, second] = halfButtons;
+        for (const [a, b] of [[first, second], [second, first]]) {
+          a.addEventListener('mouseenter', () => b.classList.add('is-linked'));
+          a.addEventListener('mouseleave', () => b.classList.remove('is-linked'));
+          a.addEventListener('click', () => b.classList.add('is-armed'));
+        }
+      }
+      // Moves held for tomorrow (sim/retime.ts), drawn dashed where they'll sit.
+      for (const move of state.pendingRetimes ?? []) {
+        if (move.legs[0]?.tail !== aircraft.tail) continue;
+        const scheduled = move.legs.map((leg) => ({ ...leg, block: state.schedule.find((l) => l.legId === leg.legId)?.blockMinutes ?? 0 }));
+        const departs = Math.min(...scheduled.map((leg) => leg.departMinute));
+        const arrives = Math.max(...scheduled.map((leg) => leg.departMinute + leg.block));
+        const pending = document.createElement('div');
+        pending.className = 'timeline-pending';
+        pending.style.left = at(departs);
+        pending.style.width = width(arrives - departs);
+        pending.textContent = `tomorrow ${minuteOfDayToTimeString(departs)}`;
+        pending.title = `Moves here tomorrow · today's flying stays as it is`;
+        track.append(pending);
       }
       // The base in each wait between rotations, where another one could drop in.
       if (aircraft.baseAirport) {
@@ -453,7 +482,7 @@ document.body.append(dragTip);
 /** `draggable`: a rotation that's back at base, or a night stop's half (sim/nightStops.ts). */
 function startDrag(event: PointerEvent, span: HTMLElement, rotation: Rotation, track: HTMLElement, draggable: boolean): void {
   if (event.button !== 0 || !draggable) return;
-  if ((event.target as HTMLElement).closest('.rotation-remove-button')) return;
+  if ((event.target as HTMLElement).closest('.rotation-remove-button, .night-home-button')) return;
   if (!timelineWindow) return;
   const rect = track.getBoundingClientRect();
   drag = {
@@ -537,13 +566,14 @@ function describeRetime(plan: RetimePlan, tail: string, fromTail: string, start:
   // A night stop made or brought home (sim/nightStops.ts): what the night is, in ops terms.
   if (plan.kind !== 'move' && plan.station && lastTimelineState) {
     const [a, b] = plan.legs;
-    if (plan.kind === 'unwrap') return `Sleeps at base again · ${plan.station} ${minuteOfDayToTimeString(a.departMinute)}–${minuteOfDayToTimeString(b.departMinute + b.blockMinutes)}`;
+    const tomorrow = plan.deferred ? ' · from tomorrow' : '';
+    if (plan.kind === 'unwrap') return `Sleeps at base again · ${plan.station} ${minuteOfDayToTimeString(a.departMinute)}–${minuteOfDayToTimeString(b.departMinute + b.blockMinutes)}${tomorrow}`;
     const check = hasMxBase(lastTimelineState, plan.station)
       ? 'mtc base: line check'
       : outstationCheck(lastTimelineState, plan.station) === 'contract'
         ? 'no mtc base: contracted check'
         : 'no mtc base: deferred, ● a night';
-    return [`Night stop ${plan.station}`, `out ${minuteOfDayToTimeString(b.departMinute)}`, `back ${minuteOfDayToTimeString(a.departMinute)}`, check, ...(plan.crewWarning ? [plan.crewWarning] : [])].join(' · ');
+    return [`Night stop ${plan.station}`, `out ${minuteOfDayToTimeString(b.departMinute)}`, `back ${minuteOfDayToTimeString(a.departMinute)}`, check, ...(plan.crewWarning ? [plan.crewWarning] : []), ...(plan.deferred ? ['from tomorrow'] : [])].join(' · ');
   }
   const parts = [minuteOfDayToTimeString(start)];
   if (tail !== fromTail) parts.push(tail);
@@ -638,8 +668,30 @@ function showBaseHours(state: SimState, iata: string): void {
   timelineHours.strip.replaceChildren(...cells);
 }
 
-/** A rotation's ×: two clicks, since a rotation can't be put back. */
-function removeButtonFor(rotation: Rotation, state: SimState): HTMLButtonElement {
+/** A night stop half's ⌂: bring the night stop home, back to where it sat before (sim/retime.ts). Always showing, since the drag that undoes it is hidden. */
+function nightHomeButtonFor(tail: string, state: SimState): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'night-home-button';
+  button.textContent = '⌂';
+  const plan = planBringNightStopHome(state, tail);
+  button.title = plan?.ok ? `Bring ${tail} home for the night · ${describeRetime(plan, tail, tail, plan.legs[0].departMinute)}` : `Bring ${tail} home for the night · ${plan?.reason ?? 'not on a night stop'}`;
+  button.setAttribute('aria-label', `Bring ${tail} night stop home`);
+  button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const result = bringNightStopHome(state, tail);
+    renderScheduleWarnings(scheduleProblems(state));
+    flashTip(result.ok ? result.message : result.reason, !result.ok);
+    rebuildTimeline();
+  });
+  return button;
+}
+
+/**
+ * A rotation's ×: two clicks, since a rotation can't be put back. A night
+ * stop's half takes its `partner` with it: one half alone would strand the plane.
+ */
+function removeButtonFor(rotation: Rotation, state: SimState, partner?: Rotation): HTMLButtonElement {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'rotation-remove-button';
@@ -648,14 +700,16 @@ function removeButtonFor(rotation: Rotation, state: SimState): HTMLButtonElement
   let armed = false;
   button.addEventListener('click', (event) => {
     event.stopPropagation();
-    if (!armed) {
+    if (!armed && !button.classList.contains('is-armed')) {
       armed = true;
       button.classList.add('is-armed');
-      button.title = 'Click again to remove this rotation';
+      button.title = partner ? 'Click again to remove the night stop, both flights' : 'Click again to remove this rotation';
       return;
     }
     removeRotation(rotation, state);
+    if (partner) removeRotation(partner, state);
   });
+  if (partner) button.title = 'Removes the night stop, both flights · ⌂ brings it home instead';
   return button;
 }
 
