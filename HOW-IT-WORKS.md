@@ -1969,7 +1969,7 @@ sitter never hedges.
 **Head office** (Network › Head office, `ui/inspector/headOffice.ts`)
 shows today's price against usual, a 90-day chart (dashed: usual; green:
 the locked price), the hedge and its running result, one button per
-term with its premium (two clicks), and the innovations. The Network
+term with its premium (a confirm window), and the innovations. The Network
 view's Head office row shows the price and whether it's hedged.
 
 `legCostBreakdown()` splits each type's flat `costPerBlockHour` into
@@ -2776,7 +2776,9 @@ numbers from `previewBaseChange()`) shows the fee, the running cost before and
 after, the cash left, and what changes at that airport. The same window
 asks before leasing a plane, returning one, rebasing, ordering or calling off
 a refit, removing a route, and hiring, converting or releasing crews on the
-Crews screen. Holding a ring button to repeat (add or remove a flight, hire
+Crews screen. It also asks before a fuel hedge, adopting an innovation,
+appointing, replacing or letting go an executive, starting a seat sale, and
+switching a hub's style (map menu and Plan hub window). Holding a ring button to repeat (add or remove a flight, hire
 on the map) stays one click each.
 
 **Anywhere else a plane sleeps** (a crew base without maintenance, a
@@ -3030,7 +3032,7 @@ money on the table, `connectingFeedMultiplier()` into each hub's flows
 (and its cache key), `leasedAge()` into leasing (the lease fan shows the
 refurbished age and price). Running costs are charged at rollover, under
 the cost category `innovations`; the loyalty scheme's share is of the
-day just ended. Adopting takes two clicks, since it can't be undone.
+day just ended. Adopting opens a confirm window with the price, running cost and cash after, since it can't be undone.
 
 The steady headless player adopts one when its one-off price pays back
 from a rough estimate of the gain within 90 days (a running cost must be

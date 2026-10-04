@@ -4,6 +4,7 @@ import { crewShare } from '../../sim/crews';
 import { info, line, lineWithInfo } from './dom';
 import { ON_TIME_GRACE_MINUTES } from '../../sim/delays';
 import { money } from '../format';
+import { showConfirm } from '../confirmModal';
 import { RIVAL_SQUEEZED_RESPITE_DAYS } from '../../sim/pressure';
 import { brandInWords, formatNps, marketNps, networkNps } from '../../sim/nps';
 import { rivalYieldFactor } from '../../sim/pressure';
@@ -584,11 +585,24 @@ function buildSale(state: SimState, a: string, b: string, changed: () => void): 
   button.className = 'lever-reset';
   button.textContent = `Seat sale · ${SALE_DAYS}d · Saver $${Math.round(fare * SALE_SAVER_PRICE)}`;
   button.disabled = blocked !== null;
-  button.addEventListener('click', () => {
-    ops.startSeatSale(state, a, b);
-    changed();
-  });
   const change = saleMarginChangePerDay(state, a, b);
+  button.addEventListener('click', () => {
+    showConfirm({
+      title: `Seat sale ${a}–${b}`,
+      rows: [
+        { label: 'Length', value: `${SALE_DAYS} days` },
+        { label: 'Saver fare', value: `$${Math.round(fare * SALE_SAVER_PRICE)} (${Math.round(SALE_SAVER_PRICE * 100)}% of $${Math.round(fare)})` },
+        { label: 'Margin', value: `${shortSigned(change)}/day while on` },
+        { label: 'Next sale', value: `${SALE_COOLDOWN_DAYS} days after the start` },
+      ],
+      facts: [`Market builds ${SALE_GROWTH}× as fast while it runs. Rivals see it as a fare cut and may answer it.`],
+      confirmLabel: 'Start sale',
+      run: () => {
+        ops.startSeatSale(state, a, b);
+        changed();
+      },
+    });
+  });
   row.append(button, blocked ? ` ${blocked} ` : ` ${shortSigned(change)}/day while on `, info(explain + ' The figure is what a day of the sale makes against a normal day, at today\'s demand, before the growth it brings.'));
   if (!blocked && change < 0) row.classList.add('is-warn');
   return row;
