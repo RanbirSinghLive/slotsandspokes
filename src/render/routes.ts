@@ -32,7 +32,7 @@ function routeKey(a: string, b: string): string {
  * between them as it projects, which is what produces the curved look
  * (see CLAUDE.md's note on this under "Geography").
  */
-export function drawRoutes(ctx: CanvasRenderingContext2D, state: SimState): void {
+export function drawRoutes(ctx: CanvasRenderingContext2D, state: SimState, withLabels = false): void {
   const path = geoPath(projection, ctx);
 
   const distinctRoutes = new Map<string, { origin: string; dest: string }>();
@@ -66,7 +66,7 @@ export function drawRoutes(ctx: CanvasRenderingContext2D, state: SimState): void
     ctx.stroke();
   }
 
-  drawRouteLabels(ctx, state, distinctRoutes);
+  if (withLabels) drawRouteLabels(ctx, state, distinctRoutes);
 
   // A route with more demand than seats, in the same amber as the Demand
   // lens's rim round its airports: the one that needs a flight or a

@@ -2088,9 +2088,10 @@ frequency counts one direction: a plane flying A-B-A once a day is
 reads "2/1/day". Yield is revenue over passengers times great-circle
 nautical miles, over the last 7 finished days, in cents per passenger
 nautical mile, so a long route and a short one compare on fare alone.
-Both sit on each route line on the plain network map, in the route's
-view, and in the Routes table (where Yield also sorts). On the map,
-labels are placed busiest route first; a label that would cover one
+Both sit on each route line on the Demand lens only (the plain network
+map leaves them off, as they clog a hub), in the route's view, and in
+the Routes table (where Yield also sorts). On the Demand lens, labels
+are placed busiest route first; a label that would cover one
 already placed slides along its line (middle, then 40/60%, 30/70%) and
 is left off if no spot is clear, so a hub's fan of routes stays
 readable. Zooming in spreads the lines and brings the labels back.
