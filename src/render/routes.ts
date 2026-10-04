@@ -5,7 +5,7 @@ import { airports } from './airports';
 import { distanceToArc } from './competition';
 import { getMapPreview } from './preview';
 import { spillingMarkets } from '../sim/unmetDemand';
-import { formatFrequency, formatYield, marketYieldCents } from '../sim/routeYield';
+import { flightsEachWay, formatFrequency, formatYield, marketYieldCents } from '../sim/routeYield';
 import type { SimState } from '../sim/state';
 
 const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]));
@@ -189,10 +189,27 @@ export function drawSelectedRoute(ctx: CanvasRenderingContext2D, a: string, b: s
 const LABEL_FONT = '10px ui-monospace, Consolas, monospace';
 const LABEL_TEXT = '#9aa4bd';
 
+// Positions tried along each arc, in order, for a label that collides
+// with one already placed: the middle first, then either side of it.
+const LABEL_POSITIONS = [0.5, 0.4, 0.6, 0.3, 0.7];
+const LABEL_HEIGHT = 14;
+const LABEL_GAP = 2;
+
+type LabelBox = { left: number; top: number; right: number; bottom: number };
+
+function boxesOverlap(a: LabelBox, b: LabelBox): boolean {
+  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+}
+
 /**
  * Each route's flights a day each way and its yield (cents per passenger
- * nautical mile, last 7 days) at the middle of its arc, so fares compare
- * at a glance. Frequency counts one direction, not both added together.
+ * nautical mile, last 7 days) along its arc, so fares compare at a glance.
+ * Frequency counts one direction, not both added together.
+ *
+ * Where routes fan out of one hub their arcs run close together, so
+ * labels are placed busiest route first. A label slides along its arc to
+ * the first spot that clears every label already placed, and is left off
+ * when none does; zooming in spreads the arcs apart and brings it back.
  */
 function drawRouteLabels(
   ctx: CanvasRenderingContext2D,
@@ -203,18 +220,42 @@ function drawRouteLabels(
   ctx.font = LABEL_FONT;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  for (const { origin, dest } of routes.values()) {
+
+  const labelled = [...routes.entries()]
+    .map(([key, { origin, dest }]) => ({
+      key,
+      origin,
+      dest,
+      flightsEachWay: Math.max(...flightsEachWay(state, origin, dest)),
+    }))
+    .sort((a, b) => b.flightsEachWay - a.flightsEachWay || (a.key < b.key ? -1 : 1));
+
+  const placed: LabelBox[] = [];
+  for (const { origin, dest } of labelled) {
     const originAirport = airportsByIata.get(origin);
     const destAirport = airportsByIata.get(dest);
     if (!originAirport || !destAirport) continue;
-    const middle = projection(geoInterpolate([originAirport.lon, originAirport.lat], [destAirport.lon, destAirport.lat])(0.5));
-    if (!middle) continue;
+    const along = geoInterpolate([originAirport.lon, originAirport.lat], [destAirport.lon, destAirport.lat]);
     const text = `${formatFrequency(state, origin, dest)} · ${formatYield(marketYieldCents(state, origin, dest))}`;
-    const width = ctx.measureText(text).width;
-    ctx.fillStyle = 'rgba(10, 12, 18, 0.8)';
-    ctx.fillRect(middle[0] - width / 2 - 3, middle[1] - 7, width + 6, 14);
-    ctx.fillStyle = LABEL_TEXT;
-    ctx.fillText(text, middle[0], middle[1]);
+    const halfWidth = ctx.measureText(text).width / 2 + 3;
+
+    for (const t of LABEL_POSITIONS) {
+      const point = projection(along(t));
+      if (!point) continue;
+      const box = {
+        left: point[0] - halfWidth - LABEL_GAP,
+        right: point[0] + halfWidth + LABEL_GAP,
+        top: point[1] - LABEL_HEIGHT / 2 - LABEL_GAP,
+        bottom: point[1] + LABEL_HEIGHT / 2 + LABEL_GAP,
+      };
+      if (placed.some((other) => boxesOverlap(box, other))) continue;
+      placed.push(box);
+      ctx.fillStyle = 'rgba(10, 12, 18, 0.8)';
+      ctx.fillRect(point[0] - halfWidth, point[1] - LABEL_HEIGHT / 2, halfWidth * 2, LABEL_HEIGHT);
+      ctx.fillStyle = LABEL_TEXT;
+      ctx.fillText(text, point[0], point[1]);
+      break;
+    }
   }
   ctx.restore();
 }
