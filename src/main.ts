@@ -19,7 +19,6 @@ import { showFlightTooltip, hideFlightTooltip } from './ui/flightTooltip';
 import { showAirportTooltip, hideAirportTooltip } from './ui/airportTooltip';
 import { drawDemandLayer } from './render/demand';
 import { drawCompetitionLayer, competitorAirlines, findCompetitionHover, drawNewCompetitorRouteFlashes } from './render/competition';
-import { isOpsView } from './render/opsView';
 import { drawRouteMapMode, MAP_MODE_COLORS, type MapMode } from './render/mapmodes';
 import { showCompetitionTooltip, hideCompetitionTooltip } from './ui/competitionTooltip';
 import { createNewGameState, type SimState } from './sim/state';
