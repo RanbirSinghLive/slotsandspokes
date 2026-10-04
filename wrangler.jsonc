@@ -11,7 +11,7 @@
     // Any unknown path serves the game rather than a 404.
     "not_found_handling": "single-page-application"
   },
-  // `npx wrangler preview` (the build's pull-request deploy) refuses to run
-  // without this block; empty means previews use the settings above.
+  // Pull-request builds run `npx wrangler preview`, which refuses to run
+  // without this block; empty means the top-level settings apply.
   "previews": {}
 }
