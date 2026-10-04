@@ -1,7 +1,7 @@
 import homeStoriesData from '../../data/home-stories.json';
 import type { StartSeason } from '../sim/clock';
 import { homeNeighbours, homeReasons, PROPELLER_RANGE_NM, type HomeDifficulty, type HomeOption } from '../sim/homes';
-import { drawPickerMap, type PickerPoint, type PickerView } from '../render/pickerMap';
+import { drawPickerMap, loadFinePickerLand, type PickerPoint, type PickerView } from '../render/pickerMap';
 import { airports } from '../render/airports';
 import { fitWorld, projection } from '../render/projection';
 
@@ -259,4 +259,5 @@ export function showHomePicker(homes: HomeOption[], onChoose: (iata: string, sea
   worldEl.hidden = false;
   showStory();
   drawWorld();
+  loadFinePickerLand(drawWorld);
 }
