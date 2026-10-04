@@ -1,7 +1,7 @@
 import { geoInterpolate, geoPath } from 'd3-geo';
 import type { LineString } from 'geojson';
 import { projection } from './projection';
-import { airports } from './airports';
+import { airports, isAirportKnown } from './airports';
 import { distanceToArc } from './competition';
 import { getMapPreview } from './preview';
 import { spillingMarkets } from '../sim/unmetDemand';
@@ -37,6 +37,8 @@ export function drawRoutes(ctx: CanvasRenderingContext2D, state: SimState): void
 
   const distinctRoutes = new Map<string, { origin: string; dest: string }>();
   for (const leg of state.schedule) {
+    // The airport filter's shown list (ui/airportFilter.ts): a route to an airport it hides isn't drawn or clickable.
+    if (!isAirportKnown(leg.origin) || !isAirportKnown(leg.dest)) continue;
     const key = routeKey(leg.origin, leg.dest);
     if (!distinctRoutes.has(key)) {
       distinctRoutes.set(key, { origin: leg.origin, dest: leg.dest });
@@ -140,6 +142,7 @@ export type RouteHitCandidate = { origin: string; dest: string; distPx: number; 
 export function findNearestOwnRoute(screenX: number, screenY: number, state: SimState): RouteHitCandidate | null {
   const distinct = new Map<string, { origin: string; dest: string }>();
   for (const leg of state.schedule) {
+    if (!isAirportKnown(leg.origin) || !isAirportKnown(leg.dest)) continue;
     const key = routeKey(leg.origin, leg.dest);
     if (!distinct.has(key)) distinct.set(key, { origin: leg.origin, dest: leg.dest });
   }
