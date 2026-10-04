@@ -3,7 +3,7 @@ import { geoCircle, geoPath } from 'd3-geo';
 import { money } from './format';
 import type { LineString } from 'geojson';
 import aircraftTypesData from '../../data/aircraft-types.json';
-import { projection, mapPoint } from '../render/projection';
+import { projection, mapPoint, type ClientPoint } from '../render/projection';
 import { findNearestAirport, type Airport } from '../render/airports';
 import { greatCircleDistanceNm } from '../sim/geo';
 import { demandAgainstSeats, marketSize, neverFills } from '../sim/marketSize';
@@ -244,7 +244,7 @@ export function armRouteBuilderAt(airport: Airport, typeCode?: string): void {
  * starting a pan in that case. Returns false to mean "not mine, go ahead
  * and pan as usual."
  */
-export function handleRouteBuilderMouseDown(event: MouseEvent, state: SimState): boolean {
+export function handleRouteBuilderMouseDown(event: ClientPoint, state: SimState): boolean {
   // Nothing armed means this click isn't ours; the map menu or a pan gets it.
   if (builderState.mode === 'idle') return false;
 
@@ -282,7 +282,7 @@ export function handleRouteBuilderMouseDown(event: MouseEvent, state: SimState):
  * snaps to, so that reading is visible before the second click confirms
  * anything.
  */
-export function handleRouteBuilderMouseMove(event: MouseEvent, state: SimState): boolean {
+export function handleRouteBuilderMouseMove(event: ClientPoint, state: SimState): boolean {
   if (builderState.mode !== 'armed') return false;
   const geo = projection.invert?.(mapPoint(event.clientX, event.clientY));
   if (!geo) return false;

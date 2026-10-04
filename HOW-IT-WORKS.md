@@ -931,7 +931,7 @@ several at one airport stack upward, with more than four collapsing to
 route with a count. Pins are laid out by one function that both drawing and
 `findDisruptionPinAt()` use, and a click on one opens the Maintenance screen.
 
-**Touch (`main.ts`, window 700px or narrower).** The panel is a sheet over
+**Touch (`ui/mapInput.ts`, wired in `main.ts`; window 700px or narrower).** The panel is a sheet over
 the map, hidden at start; the rail, Close and the active rail item toggle it.
 One finger drags the map and two pinch it; the cached basemap and fog are
 painted twice the screen each way, so a drag slides real picture
@@ -941,7 +941,10 @@ click: it selects an airport (its code counts as part of the target) and opens
 the ring of actions, and does not open the sheet. Press and hold an airport
 for 450 ms opens its details sheet, with a ring filling around the airport
 meanwhile; a drag, a second finger or an early release cancels the hold. A
-double tap zooms in on the point.
+double tap zooms in on the point. `mapInput.ts` is one state machine (idle,
+pressed, panning, pinching) that turns finger events into tap, double tap,
+pan and pinch; the mouse keeps its own handlers in `main.ts`, and a tap runs
+the same press and release functions a click does.
 
 **Map coordinates.** The canvas is sized to the visible window (a phone's
 `100vh` is taller with the toolbar showing) and everything reads its size back
