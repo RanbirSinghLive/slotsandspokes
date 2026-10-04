@@ -6,6 +6,7 @@ import { findNearestOwnRoute } from '../render/routes';
 import { projection } from '../render/projection';
 import { TURN_BUFFER_CHOICES } from '../sim/turnBuffer';
 import { connectingUnderStyle, spokesOf } from '../sim/hubs';
+import { confirmHubStyle } from './hubStyleConfirm';
 import { HUB_STYLES, HUB_STYLE_ORDER, hubStyleAt } from '../sim/hubStyle';
 import { setMapPreview, type MapPreview } from '../render/preview';
 import type { SimState } from '../sim/state';
@@ -317,9 +318,10 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
       preview: plan?.ok ? plan.preview : undefined,
       onSelect: () => {
         if (isCurrent) return false;
-        const result = ops.setHubStyle(state, airport.iata, style);
-        notice = result.ok ? result.message : result.reason;
-        refresh();
+        confirmHubStyle(state, airport.iata, style, (result) => {
+          notice = result.ok ? result.message : result.reason;
+          refresh();
+        });
         return false;
       },
     };

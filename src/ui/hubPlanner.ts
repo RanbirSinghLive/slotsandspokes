@@ -4,6 +4,7 @@ import { airports } from '../render/airports';
 import { armRouteBuilderAt } from './routeBuilder';
 import * as ops from './routeActions';
 import type { SimState } from '../sim/state';
+import { confirmHubStyle } from './hubStyleConfirm';
 
 /**
  * The Plan hub window: everything about one hub's connections on one
@@ -85,7 +86,7 @@ function renderStyles(plan: HubPlan, state: SimState): void {
 
       card.append(name, figures, description);
       if (!current) {
-        card.append(button(`Switch to ${spec.name}`, () => act(ops.setHubStyle(state, plan.hub, preview.style)), preview.blockedReason ?? undefined));
+        card.append(button(`Switch to ${spec.name}`, () => confirmHubStyle(state, plan.hub, preview.style, act), preview.blockedReason ?? undefined));
       }
       return card;
     }),
@@ -165,7 +166,7 @@ function renderMoves(plan: HubPlan, state: SimState): void {
       row.append(text);
 
       if (move.kind === 'style') {
-        row.append(button('Switch', () => act(ops.setHubStyle(state, plan.hub, move.style))));
+        row.append(button('Switch', () => confirmHubStyle(state, plan.hub, move.style, act)));
       } else if (move.kind === 'frequency') {
         const preview = ops.previewAddFlight(state, plan.hub, move.spoke);
         row.append(button('Add flight', () => act(ops.addFlight(state, plan.hub, move.spoke)), preview.ok ? undefined : preview.reason));
