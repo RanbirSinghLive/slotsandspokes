@@ -898,6 +898,13 @@ The accumulator loop (`main.ts`) turns real frame time into whole simulated
 minutes (`step()` calls) plus a continuous fractional minute for rendering,
 per the pattern in CLAUDE.md's "Time" section.
 
+In Ops view (`render/opsView.ts`) the Network, Profit and On-time lenses draw
+each route at a width set by its seats a day (`render/routeWidth.ts`): both
+directions, summed over the scheduled legs by the seats of the type each tail
+flies. The scale is square-root, 1 px up to 5 px at about 3,000 seats a day.
+The amber spill overlay and the selection glow are drawn over it as before.
+The lens legend adds "width = seats a day".
+
 ## Rivals on the ladder (`src/sim/rivalLadder.ts`)
 
 Rivals climb the same ladder as the player to lease bigger aircraft: the

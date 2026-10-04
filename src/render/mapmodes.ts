@@ -6,6 +6,7 @@ import { marketKey } from '../sim/schedule';
 import { summarizeMarket } from '../sim/marketSummary';
 import { OTP_BASELINE } from '../sim/routeOtp';
 import type { SimState } from '../sim/state';
+import { routeWidthsByMarket } from './routeWidth';
 
 /**
  * Recolouring the existing route network by a per-market metric instead
@@ -97,6 +98,7 @@ export function drawRouteMapMode(ctx: CanvasRenderingContext2D, state: SimState,
   const path = geoPath(projection, ctx);
 
   ctx.lineWidth = LINE_WIDTH;
+  const widths = routeWidthsByMarket(state);
   for (const { origin, dest } of distinctMarkets(state).values()) {
     const originAirport = airportsByIata.get(origin);
     const destAirport = airportsByIata.get(dest);
@@ -122,6 +124,7 @@ export function drawRouteMapMode(ctx: CanvasRenderingContext2D, state: SimState,
       ],
     };
     ctx.strokeStyle = color;
+    if (widths) ctx.lineWidth = widths.get(marketKey(origin, dest)) ?? LINE_WIDTH;
     ctx.beginPath();
     path(line);
     ctx.stroke();
