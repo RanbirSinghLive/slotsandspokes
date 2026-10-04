@@ -1687,7 +1687,7 @@ end.
 and while the schedule is empty the alert strip says what to do first
 ("NO ROUTES · click BOS · Draw route · click a city · ✓ · then press
 1×"), opening the home airport when clicked. It goes when a route is
-flown. A lease from the map ring takes two clicks: the first arms it.
+flown.
 
 ## Persistence (`src/ui/save.ts`)
 
