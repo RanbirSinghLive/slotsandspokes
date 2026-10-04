@@ -10,5 +10,8 @@
     "directory": "./dist",
     // Any unknown path serves the game rather than a 404.
     "not_found_handling": "single-page-application"
-  }
+  },
+  // Pull-request builds run `npx wrangler preview`, which refuses to run
+  // without this block; empty means the top-level settings apply.
+  "previews": {}
 }
