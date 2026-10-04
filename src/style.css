@@ -493,6 +493,38 @@ body {
   display: none;
 }
 
+#panel-close {
+  display: none;
+}
+
+/* A phone: the panel is a sheet over the map, beside the rail, closed by its
+   own button, the rail's Hide, or the rail item showing (ui/rail.ts). */
+:root[data-narrow] #panel {
+  right: var(--rail-width);
+  width: calc(100vw - var(--rail-width));
+  height: 100dvh;
+  z-index: 40;
+}
+
+:root[data-narrow] #rail {
+  height: 100dvh;
+  z-index: 41;
+}
+
+:root[data-narrow] #panel-close {
+  display: block;
+  flex: none;
+  align-self: flex-end;
+  min-height: 44px;
+  margin: -8px 0 4px;
+  padding: 0 14px;
+  font: inherit;
+  color: #cdd3e0;
+  background: #171b26;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
 /* The Overview screen: the cards and Last 7 days, scrolling on its own
    like #inspector. */
 #econ-summary {

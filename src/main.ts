@@ -173,11 +173,18 @@ function syncCompetitorAirlineChips(): void {
 const MIN_MAP_WIDTH_PX = 200;
 /** The rail's width, which stays when the panel is hidden; style.css's --rail-width matches it. */
 const RAIL_WIDTH_PX = 56;
-let panelHidden = false;
+/** At or below this window width the panel is a sheet over the map, not a column beside it (style.css's :root[data-narrow]). */
+const NARROW_WINDOW_PX = 700;
+const isNarrowWindow = (): boolean => window.innerWidth <= NARROW_WINDOW_PX;
+// A phone starts with the map showing; the rail opens the panel.
+let panelHidden = isNarrowWindow();
 let currentPanelWidthPx = PANEL_WIDTH_PX + RAIL_WIDTH_PX;
 
 function applyPanelWidth(): void {
-  const desiredPanelWidthPx = (panelHidden ? 0 : PANEL_WIDTH_PX) + RAIL_WIDTH_PX;
+  const narrow = isNarrowWindow();
+  document.documentElement.toggleAttribute('data-narrow', narrow);
+  // Narrow: the panel floats over the map, so the map only gives up the rail.
+  const desiredPanelWidthPx = (panelHidden || narrow ? 0 : PANEL_WIDTH_PX) + RAIL_WIDTH_PX;
   currentPanelWidthPx = Math.min(desiredPanelWidthPx, window.innerWidth - MIN_MAP_WIDTH_PX);
   document.documentElement.style.setProperty('--panel-width', `${currentPanelWidthPx}px`);
 }
@@ -437,6 +444,8 @@ function setPanelHidden(hidden: boolean): void {
   // The map's available width just changed, same as a real window resize.
   resize();
 }
+panelEl.hidden = panelHidden;
+document.querySelector('#panel-close')!.addEventListener('click', () => setPanelHidden(true));
 setupRail({ isHidden: () => panelHidden, setHidden: setPanelHidden });
 setupJumpBox(state);
 // Feedback, from the rail and the Game screen: the pre-filled form (ui/feedback.ts).
