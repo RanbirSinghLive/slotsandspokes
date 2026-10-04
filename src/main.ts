@@ -1,6 +1,7 @@
 import './style.css';
 import { dayIndex, homeUtcOffsetMinutes, minuteOfDay as homeMinuteOfDay } from './sim/clock';
-import { projection, fitProjection, baselineScale, mapGesture, setMapElement, mapPoint, mapSize } from './render/projection';
+import { projection, fitProjection, mapGesture, setMapElement, mapPoint, mapSize } from './render/projection';
+import { zoomAt as cameraZoomAt, panFrom, panBy, currentView, restoreView } from './render/camera';
 import { drawBasemap } from './render/basemap';
 import { drawTerminator } from './render/terminator';
 import { drawAirportChips } from './render/airportChips';
@@ -240,20 +241,6 @@ function resize(keepView = false): void {
   fitProjection(cssWidth, cssHeight, home);
   if (previous) restoreView(previous, cssWidth, cssHeight);
   render();
-}
-
-/** What the player is looking at, so a resize that only changes the box can keep it. */
-function currentView(): { zoom: number; centre: [number, number] } | null {
-  const { width, height } = mapSize();
-  const centre = projection.invert?.([width / 2, height / 2]);
-  return centre && width > 0 ? { zoom: projection.scale() / baselineScale, centre } : null;
-}
-
-function restoreView(view: { zoom: number; centre: [number, number] }, width: number, height: number): void {
-  projection.scale(baselineScale * view.zoom);
-  const [x, y] = projection(view.centre)!;
-  const [tx, ty] = projection.translate();
-  projection.translate([tx + width / 2 - x, ty + height / 2 - y]);
 }
 
 // The exact (fractional) simulated minute currently on screen. Updated once
@@ -910,7 +897,7 @@ window.addEventListener('mousemove', (event) => {
   if (!isDragging) return;
   const dx = event.clientX - dragStartX;
   const dy = event.clientY - dragStartY;
-  projection.translate([translateAtDragStart[0] + dx, translateAtDragStart[1] + dy]);
+  panFrom(translateAtDragStart, dx, dy);
   render();
 });
 
@@ -1001,8 +988,7 @@ canvas.addEventListener('pointermove', (event) => {
     cancelAirportHold();
     hideMapMenu();
     // Zoom about the pair's midpoint, then slide by how far the moving finger carried it.
-    const [translateX, translateY] = projection.translate();
-    projection.translate([translateX + (now[0] - before[0]) / 2, translateY + (now[1] - before[1]) / 2]);
+    panBy((now[0] - before[0]) / 2, (now[1] - before[1]) / 2);
     if (distanceBefore > 0) zoomAt((now[0] + other[0]) / 2, (now[1] + other[1]) / 2, distanceNow / distanceBefore, false);
   } else if (touchPanStart) {
     if (!touchPanning && Math.hypot(now[0] - touchPanStart.x, now[1] - touchPanStart.y) < TOUCH_PAN_SLOP_PX) return;
@@ -1010,7 +996,7 @@ canvas.addEventListener('pointermove', (event) => {
     cancelAirportHold();
     touchPanning = true;
     mapGesture.active = true;
-    projection.translate([touchPanStart.translate[0] + now[0] - touchPanStart.x, touchPanStart.translate[1] + now[1] - touchPanStart.y]);
+    panFrom(touchPanStart.translate, now[0] - touchPanStart.x, now[1] - touchPanStart.y);
   }
   touchPoints.set(event.pointerId, now);
 });
@@ -1099,27 +1085,10 @@ window.addEventListener('keydown', handleMapMenuKeyDown);
 
 // --- Zoom (scroll wheel) ---
 //
-// Changing `projection.scale()` alone would zoom toward the map's reference
-// point, not toward the mouse — try it and the whole map slides sideways as
-// you scroll, which feels wrong. To zoom toward the cursor instead: find the
-// [longitude, latitude] currently under the mouse *before* changing the
-// scale, apply the new scale, then see where that same geographic point
-// lands *after* the change, and nudge `translate` by the difference. That
-// nudge cancels out the drift, so the point under the cursor never moves.
-// Zoomed all the way out shows most of the world, which a widebody's reach
-// can now open up (fog by reach, sim/reach.ts).
-const MIN_ZOOM = 0.15;
-const MAX_ZOOM = 20;
-
-/** Zoom by `factor`, keeping the geographic point under screen (x, y) where it is. */
+// The wheel, pinch and buttons all zoom through render/camera.ts; this just draws afterwards.
+// `redraw` is false mid-gesture, where the frame loop draws once per frame.
 function zoomAt(x: number, y: number, factor: number, redraw = true): void {
-  const geoUnderPoint = projection.invert?.([x, y]);
-  if (!geoUnderPoint) return;
-  const clampedScale = Math.min(Math.max(projection.scale() * factor, baselineScale * MIN_ZOOM), baselineScale * MAX_ZOOM);
-  projection.scale(clampedScale);
-  const [driftedX, driftedY] = projection(geoUnderPoint)!;
-  const [tx, ty] = projection.translate();
-  projection.translate([tx + (x - driftedX), ty + (y - driftedY)]);
+  cameraZoomAt(x, y, factor);
   if (redraw) render();
 }
 

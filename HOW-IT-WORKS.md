@@ -949,6 +949,8 @@ from its own box (`mapSize()`). Pointer positions go through `mapPoint()`
 before any hit test, so a tap lands where the finger is whatever the canvas's
 offset. A window resize, such as a phone's toolbar or keyboard, keeps the
 player's pan and zoom; only the Home button and choosing a home refit.
+Pan, zoom and keeping the view live in `render/camera.ts`; `main.ts` decides
+what the player meant and draws afterwards.
 
 ## Rivals on the ladder (`src/sim/rivalLadder.ts`)
 
