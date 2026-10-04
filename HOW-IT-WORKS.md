@@ -943,6 +943,13 @@ for 450 ms opens its details sheet, with a ring filling around the airport
 meanwhile; a drag, a second finger or an early release cancels the hold. A
 double tap zooms in on the point.
 
+**Map coordinates.** The canvas is sized to the visible window (a phone's
+`100vh` is taller with the toolbar showing) and everything reads its size back
+from its own box (`mapSize()`). Pointer positions go through `mapPoint()`
+before any hit test, so a tap lands where the finger is whatever the canvas's
+offset. A window resize, such as a phone's toolbar or keyboard, keeps the
+player's pan and zoom; only the Home button and choosing a home refit.
+
 ## Rivals on the ladder (`src/sim/rivalLadder.ts`)
 
 Rivals climb the same ladder as the player to lease bigger aircraft: the
