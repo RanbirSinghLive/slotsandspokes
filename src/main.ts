@@ -306,7 +306,8 @@ function render(nowMs: number = performance.now()): void {
   } else if (competitionOverlayOn) {
     drawCompetitionLayer(ctx, selectedCompetitorAirline, state);
   } else {
-    drawRoutes(ctx, state);
+    // Frequency and yield labels only on the Demand lens; on the plain map they clog the hubs.
+    drawRoutes(ctx, state, demandOverlayOn);
   }
   // A rival being squeezed out of one of your markets, or the respite
   // after one left (render/pain.ts): on whichever layer drew the routes.
