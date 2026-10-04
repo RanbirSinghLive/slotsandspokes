@@ -5,6 +5,7 @@ import { dailyDeparturesAt, airportLevel, airportLoad } from '../sim/airports';
 import { slotFeesPerDayAt, slotsHeld } from '../sim/slots';
 import { worstPoolShareByBase } from '../sim/utilisation';
 import { getMapPreview } from './preview';
+import { isOpsView } from './opsView';
 import type { SimState } from '../sim/state';
 
 export type Airport = {
@@ -115,9 +116,17 @@ export function capacityColor(share: number): string {
   return share > OVER_BOOKED ? CAPACITY_RING_RED : lerpCapacityColor(share);
 }
 
+// Ops view: the same log curve, steeper, so a hub's core reads as a hub; the
+// cap still keeps it from covering its spokes' first miles.
+const OPS_MAX_PRESENCE_RADIUS_BONUS = 7;
+const OPS_PRESENCE_RADIUS_SCALE = 1.9;
+
 function presenceRadius(departures: number): number {
   if (departures === 0) return MARKER_RADIUS;
-  return MARKER_RADIUS + Math.min(MAX_PRESENCE_RADIUS_BONUS, Math.log2(1 + departures) * PRESENCE_RADIUS_SCALE);
+  const ops = isOpsView();
+  const cap = ops ? OPS_MAX_PRESENCE_RADIUS_BONUS : MAX_PRESENCE_RADIUS_BONUS;
+  const scale = ops ? OPS_PRESENCE_RADIUS_SCALE : PRESENCE_RADIUS_SCALE;
+  return MARKER_RADIUS + Math.min(cap, Math.log2(1 + departures) * scale);
 }
 
 /**
@@ -269,7 +278,18 @@ export function drawAirports(ctx: CanvasRenderingContext2D, state: SimState): vo
     });
   }
 
-  placeLabels(ctx, pendingLabels, badges);
+  const labelBoxes = placeLabels(ctx, pendingLabels, badges);
+  claimedBoxes = isOpsView()
+    ? [...labelBoxes, ...badges, ...pendingLabels.map((l) => ({ left: l.x - l.radius, top: l.y - l.radius, right: l.x + l.radius, bottom: l.y + l.radius }))]
+    : [];
+}
+
+// Screen space this frame's airport codes, 'on its way' badges and dots took,
+// for the Ops view's route labels to keep clear of (render/opsHub.ts).
+let claimedBoxes: Box[] = [];
+
+export function airportClaimedBoxes(): readonly Box[] {
+  return claimedBoxes;
 }
 
 type PendingLabel = {
@@ -283,7 +303,7 @@ type PendingLabel = {
   population: number;
 };
 
-type Box = { left: number; top: number; right: number; bottom: number };
+export type Box = { left: number; top: number; right: number; bottom: number };
 
 const LABEL_HEIGHT_PX = 12;
 const LABEL_GAP_PX = 4;
@@ -307,7 +327,7 @@ function boxesOverlap(a: Box, b: Box): boolean {
  * by importance as it zooms out. Greedy placement isn't optimal, but it's
  * predictable and cheap, which is what a per-frame renderer needs.
  */
-function placeLabels(ctx: CanvasRenderingContext2D, labels: PendingLabel[], obstacles: Box[] = []): void {
+function placeLabels(ctx: CanvasRenderingContext2D, labels: PendingLabel[], obstacles: Box[] = []): Box[] {
   labels.sort((a, b) => Number(b.home) - Number(a.home) || b.departures - a.departures || b.population - a.population);
 
   // Every dot is an obstacle too, so a label never sits on a neighbour's marker.
@@ -323,6 +343,7 @@ function placeLabels(ctx: CanvasRenderingContext2D, labels: PendingLabel[], obst
   ];
 
   const half = LABEL_HEIGHT_PX / 2;
+  const placedLabels: Box[] = [];
   for (const label of labels) {
     const text = label.iata;
     const offset = label.radius + LABEL_GAP_PX;
@@ -338,11 +359,13 @@ function placeLabels(ctx: CanvasRenderingContext2D, labels: PendingLabel[], obst
       const box = { left: textX, top: textY - half, right: textX + width, bottom: textY + half };
       if (taken.some((other) => boxesOverlap(box, other))) continue;
       taken.push(box);
+      placedLabels.push(box);
       ctx.fillStyle = label.served || label.home ? SERVED_LABEL_FILL : LABEL_FILL;
       ctx.fillText(text, textX, textY);
       break;
     }
   }
+  return placedLabels;
 }
 
 // How close a click/hover needs to land to an airport's projected point
