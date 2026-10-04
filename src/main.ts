@@ -18,6 +18,7 @@ import { showFlightTooltip, hideFlightTooltip } from './ui/flightTooltip';
 import { showAirportTooltip, hideAirportTooltip } from './ui/airportTooltip';
 import { drawDemandLayer } from './render/demand';
 import { drawCompetitionLayer, competitorAirlines, findCompetitionHover, drawNewCompetitorRouteFlashes } from './render/competition';
+import { isOpsView } from './render/opsView';
 import { drawRouteMapMode, MAP_MODE_COLORS, type MapMode } from './render/mapmodes';
 import { showCompetitionTooltip, hideCompetitionTooltip } from './ui/competitionTooltip';
 import { createNewGameState, type SimState } from './sim/state';
@@ -668,7 +669,7 @@ window.addEventListener('keydown', (event) => {
  * needs no key.
  */
 function updateLensLegend(): void {
-  lensLegend.hidden = lens === 'network';
+  lensLegend.hidden = lens === 'network' && !isOpsView();
   const swatch = (color: string, label: string) =>
     `<div><span class="mapmode-legend-swatch" style="background:${color}"></span><span>${label}</span></div>`;
   if (lens === 'profit') {
@@ -689,7 +690,15 @@ function updateLensLegend(): void {
     lensLegendTitle.textContent = 'Rival networks · pick one to narrow';
     lensLegendScale.innerHTML = '';
   }
+  if (isOpsView() && (lens === 'network' || lens === 'profit' || lens === 'ontime')) {
+    if (lens === 'network') {
+      lensLegendTitle.textContent = 'Route width';
+      lensLegendScale.innerHTML = '';
+    }
+    lensLegendScale.insertAdjacentHTML('beforeend', '<div><span>width = seats a day</span></div>');
+  }
 }
+document.querySelector('#ops-view-toggle')?.addEventListener('click', () => queueMicrotask(updateLensLegend));
 
 // Which airports the map shows (ui/airportFilter.ts): a visible three-way
 // switch in the bottom-left corner.

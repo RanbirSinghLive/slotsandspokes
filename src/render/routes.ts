@@ -8,6 +8,7 @@ import { spillingMarkets } from '../sim/unmetDemand';
 import { flightsEachWay, formatFrequency, formatYield, marketYieldCents } from '../sim/routeYield';
 import { isOpsView } from './opsView';
 import type { SimState } from '../sim/state';
+import { routeWidthsByMarket } from './routeWidth';
 
 const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]));
 
@@ -48,6 +49,7 @@ export function drawRoutes(ctx: CanvasRenderingContext2D, state: SimState): void
 
   ctx.strokeStyle = ROUTE_STROKE;
   ctx.lineWidth = 1;
+  const widths = routeWidthsByMarket(state);
 
   for (const { origin, dest } of distinctRoutes.values()) {
     const originAirport = airportsByIata.get(origin);
@@ -62,6 +64,7 @@ export function drawRoutes(ctx: CanvasRenderingContext2D, state: SimState): void
       ],
     };
 
+    if (widths) ctx.lineWidth = widths.get(routeKey(origin, dest)) ?? 1;
     ctx.beginPath();
     path(line);
     ctx.stroke();
@@ -81,6 +84,7 @@ export function drawRoutes(ctx: CanvasRenderingContext2D, state: SimState): void
     ctx.lineWidth = 2;
     for (const { origin, dest } of distinctRoutes.values()) {
       if (!spilling.has(routeKey(origin, dest))) continue;
+      ctx.lineWidth = Math.max(2, widths?.get(routeKey(origin, dest)) ?? 0);
       const originAirport = airportsByIata.get(origin);
       const destAirport = airportsByIata.get(dest);
       if (!originAirport || !destAirport) continue;

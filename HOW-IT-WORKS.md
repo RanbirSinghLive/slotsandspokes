@@ -900,6 +900,13 @@ per the pattern in CLAUDE.md's "Time" section.
 
 **Hub core in Ops view** (`render/opsHub.ts`). Airport codes, 'on its way' badges and dots claim screen space first (`airportClaimedBoxes()` in `render/airports.ts`), then the route labels, held back by `drawRoutes()`, are drawn after the airports and skip every claimed box. A dot's radius grows on a steeper log curve of departures a day, capped at 7 px over the base. An airport with 6 or more of your routes is a busy hub: labels on its spokes show only for the route under the pointer, the selected route or plane, or the hovered or selected airport.
 
+In Ops view (`render/opsView.ts`) the Network, Profit and On-time lenses draw
+each route at a width set by its seats a day (`render/routeWidth.ts`): both
+directions, summed over the scheduled legs by the seats of the type each tail
+flies. The scale is square-root, 1 px up to 5 px at about 3,000 seats a day.
+The amber spill overlay and the selection glow are drawn over it as before.
+The lens legend adds "width = seats a day".
+
 ## Rivals on the ladder (`src/sim/rivalLadder.ts`)
 
 Rivals climb the same ladder as the player to lease bigger aircraft: the
