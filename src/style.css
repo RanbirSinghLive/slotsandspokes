@@ -4908,3 +4908,33 @@ button.ops-item:hover {
   border: 1px solid #6b7694;
   color: #fff;
 }
+
+#cloud-save-section button {
+  margin-right: 6px;
+}
+
+.cloud-save-code {
+  margin-bottom: 8px;
+  font-family: ui-monospace, Consolas, monospace;
+  letter-spacing: 0.08em;
+  color: #fff;
+  user-select: all;
+}
+
+#cloud-save-status {
+  margin-top: 8px;
+  min-height: 1.2em;
+  color: #6b7694;
+  font-size: 12px;
+}
+
+.home-world-cloud {
+  background: none;
+  border: none;
+  padding: 4px 0;
+  color: #5ed6c8;
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}

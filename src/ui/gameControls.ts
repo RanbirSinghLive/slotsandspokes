@@ -2,6 +2,7 @@ import { saveState, clearSavedState, hasSavedState, downloadText, importSaveText
 import { dayIndex } from '../sim/clock';
 import type { SimState } from '../sim/state';
 import { GAME_VERSION } from './version';
+import { cloudLinkInfo } from './cloudSave';
 
 /**
  * The Game screen: Save, Load, the save as a file (export and import),
@@ -28,6 +29,7 @@ const loadGameConfirmCancel = document.querySelector<HTMLButtonElement>('#load-g
 // Game's own confirm already documented — native dialogs are silently
 // blocked in some embedded/preview browser contexts.
 const newGameButton = document.querySelector<HTMLButtonElement>('#new-game-button')!;
+const newGameConfirmText = document.querySelector<HTMLSpanElement>('#new-game-confirm-text')!;
 const newGameConfirmEl = document.querySelector<HTMLDivElement>('#new-game-confirm')!;
 const newGameConfirmYes = document.querySelector<HTMLButtonElement>('#new-game-confirm-yes')!;
 const newGameConfirmCancel = document.querySelector<HTMLButtonElement>('#new-game-confirm-cancel')!;
@@ -95,6 +97,8 @@ export function setupGameControls(state: SimState): void {
   aboutVersion.textContent = `Slots & Spokes ${GAME_VERSION} · alpha · save format ${SAVE_FORMAT}`;
 
   newGameButton.addEventListener('click', () => {
+    const cloudNote = cloudLinkInfo() ? ' The cloud save is replaced too.' : '';
+    newGameConfirmText.textContent = `Erase current game?${cloudNote}`;
     newGameButton.hidden = true;
     newGameConfirmEl.hidden = false;
   });

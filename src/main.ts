@@ -63,6 +63,8 @@ const YEAR_ONE_DAY = 365;
 import { updateRunway } from './ui/runway';
 import { isInsolvent } from './sim/insolvency';
 import { setupGameControls } from './ui/gameControls';
+import { startCloudSave } from './ui/cloudSave';
+import { setupCloudSaveControls } from './ui/cloudSaveControls';
 import { setupRail, updateRail } from './ui/rail';
 import { closeJumpBox, isJumpBoxOpen, openJumpBox, setupJumpBox } from './ui/jumpBox';
 import { clearMapHover, getMapHover, setupMapLinks } from './ui/mapLink';
@@ -107,6 +109,8 @@ setupFarePolicy(state);
 setupInfoTooltips();
 setupGameOver();
 setupGameControls(state);
+setupCloudSaveControls();
+void startCloudSave(state);
 
 const canvas = document.querySelector<HTMLCanvasElement>('#map')!;
 setMapElement(canvas);
