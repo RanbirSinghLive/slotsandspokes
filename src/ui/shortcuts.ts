@@ -16,6 +16,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
     title: 'Map',
     rows: [
       ['1 2 3 4 5', 'lens Network · Profit · On-time · Demand · Rivals'],
+      ['O', 'Ops view on / off'],
       ['Esc', 'back one level in the inspector'],
       ['?', 'this card'],
     ],
