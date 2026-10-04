@@ -10,6 +10,8 @@ import { isOpsView } from './opsView';
 import type { SimState } from '../sim/state';
 import { routeWidthsByMarket } from './routeWidth';
 
+import { fareGapSuffix } from './fareGap';
+
 const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]));
 
 const ROUTE_STROKE = '#3a4258';
@@ -249,7 +251,7 @@ function drawRouteLabels(
     const destAirport = airportsByIata.get(dest);
     if (!originAirport || !destAirport) continue;
     const along = geoInterpolate([originAirport.lon, originAirport.lat], [destAirport.lon, destAirport.lat]);
-    const text = `${formatFrequency(state, origin, dest)} · ${formatYield(marketYieldCents(state, origin, dest))}`;
+    const text = `${formatFrequency(state, origin, dest)} · ${formatYield(marketYieldCents(state, origin, dest))}${fareGapSuffix(state, origin, dest)}`;
     const halfWidth = ctx.measureText(text).width / 2 + 3;
 
     for (const t of LABEL_POSITIONS) {
