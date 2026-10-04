@@ -1819,9 +1819,8 @@ fallback; the cloud is a copy of it.
 - Turning cloud save on uploads the save already in this browser, so
   existing games carry over. New Game replaces the cloud copy too.
 - Offline or failing pushes stay `dirty` and retry at the next save.
-- Setup (once, in the Cloudflare dashboard): create a KV namespace, paste
-  its id into the commented `kv_namespaces` block in `wrangler.jsonc`
-  (binding `SAVES`) and merge. `npm run cloudtest` checks the API in Node.
+- Storage is the KV namespace bound as `SAVES` in `wrangler.jsonc`.
+  `npm run cloudtest` checks the API in Node.
 
 **The crash catcher** (`ui/problemCard.ts`): an uncaught error or
 rejected promise pauses the game and shows a card with the error, the

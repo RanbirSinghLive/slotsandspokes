@@ -16,10 +16,10 @@
     // Any unknown path serves the game rather than a 404.
     "not_found_handling": "single-page-application"
   },
-  // Cloud saves: create a KV namespace in the Cloudflare dashboard, paste
-  // its id here and uncomment (HOW-IT-WORKS.md, "Cloud saves"). Until
-  // then /api/cloud answers "not configured" and the game hides cloud saves.
-  // "kv_namespaces": [{ "binding": "SAVES", "id": "PASTE-NAMESPACE-ID" }],
+  // Cloud saves (HOW-IT-WORKS.md, "Cloud saves"): the KV namespace holding
+  // the saves. Without this binding /api/cloud answers "not configured" and
+  // the game hides cloud saves.
+  "kv_namespaces": [{ "binding": "SAVES", "id": "7e6f7f4db8554bc682604fd8e2f70112" }],
   // Pull-request builds run `npx wrangler preview`, which refuses to run
   // without this block; empty means the top-level settings apply.
   "previews": {}
