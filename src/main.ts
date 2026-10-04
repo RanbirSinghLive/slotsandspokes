@@ -6,7 +6,7 @@ import { drawTerminator } from './render/terminator';
 import { drawAirportChips } from './render/airportChips';
 import { drawRoutes,drawSelectedRoute } from './render/routes';
 import { drawPainGauges } from './render/pain';
-import { drawAirports, drawSelectedAirport, airports, setKnownAirports, nearestAirportCandidate } from './render/airports';
+import { drawAirports, drawSelectedAirport, airports, setKnownAirports, nearestAirportCandidate, setAirportHold } from './render/airports';
 import { drawHubView, hasHubView } from './render/hubs';
 import { drawFog } from './render/fog';
 import { drawWeatherEffects } from './render/weather';
@@ -908,12 +908,56 @@ const touchPoints = new Map<number, [number, number]>();
 let touchPanStart: { x: number; y: number; translate: [number, number] } | null = null;
 let touchPanning = false;
 
+// Press and hold on an airport opens its details sheet, with a ring filling
+// around the airport while the hold registers. Moving off (a drag), a second
+// finger (a pinch) or letting go early cancels it; a release before the end is
+// the ordinary tap, which selects the airport and opens its ring of actions.
+const HOLD_MS = 450;
+let holdTimer: number | null = null;
+let holdOpened = false;
+
+function startAirportHold(x: number, y: number): void {
+  holdOpened = false;
+  const airport = isRouteBuilderActive() ? null : nearestAirportCandidate(x, y)?.airport;
+  if (!airport) return;
+  setAirportHold(airport.iata, HOLD_MS);
+  holdTimer = window.setTimeout(() => {
+    holdTimer = null;
+    holdOpened = true;
+    setAirportHold(null);
+    navigator.vibrate?.(15);
+    openAirportSheet(airport.iata);
+  }, HOLD_MS);
+}
+
+function cancelAirportHold(): void {
+  if (holdTimer !== null) window.clearTimeout(holdTimer);
+  holdTimer = null;
+  setAirportHold(null);
+}
+
+/** Show an airport's details on a phone, where a tap alone leaves the map in view. */
+function openAirportSheet(iata: string): void {
+  hideMapMenu();
+  select({ kind: 'airport', iata });
+  if (panelHidden) setPanelHidden(false);
+}
+
+// A long press must not open the browser's own menu or select text under the finger.
+canvas.addEventListener('contextmenu', (event) => event.preventDefault());
+
 canvas.addEventListener('pointerdown', (event) => {
   if (event.pointerType !== 'touch') return;
-  canvas.setPointerCapture(event.pointerId);
   touchPoints.set(event.pointerId, [event.clientX, event.clientY]);
+  try {
+    canvas.setPointerCapture(event.pointerId);
+  } catch {
+    // A pointer the browser has already ended can't be captured; the touch still works without it.
+  }
   touchPanning = touchPanning && touchPoints.size > 1;
   touchPanStart = touchPoints.size === 1 ? { x: event.clientX, y: event.clientY, translate: projection.translate() } : null;
+  cancelAirportHold();
+  if (touchPoints.size === 1) startAirportHold(event.clientX, event.clientY);
 });
 
 canvas.addEventListener('pointermove', (event) => {
@@ -926,6 +970,7 @@ canvas.addEventListener('pointermove', (event) => {
     const distanceNow = Math.hypot(now[0] - other[0], now[1] - other[1]);
     touchPanning = true;
     mapGesture.active = true;
+    cancelAirportHold();
     hideMapMenu();
     // Zoom about the pair's midpoint, then slide by how far the moving finger carried it.
     const [translateX, translateY] = projection.translate();
@@ -934,6 +979,7 @@ canvas.addEventListener('pointermove', (event) => {
   } else if (touchPanStart) {
     if (!touchPanning && Math.hypot(now[0] - touchPanStart.x, now[1] - touchPanStart.y) < TOUCH_PAN_SLOP_PX) return;
     if (!touchPanning) hideMapMenu();
+    cancelAirportHold();
     touchPanning = true;
     mapGesture.active = true;
     projection.translate([touchPanStart.translate[0] + now[0] - touchPanStart.x, touchPanStart.translate[1] + now[1] - touchPanStart.y]);
@@ -984,7 +1030,8 @@ canvas.addEventListener('touchend', (event) => event.preventDefault(), { passive
 
 function endTouch(event: PointerEvent): void {
   if (event.pointerType !== 'touch') return;
-  const isTap = event.type === 'pointerup' && touchPoints.size === 1 && touchPoints.has(event.pointerId) && touchPanStart !== null && !touchPanning;
+  const isTap = event.type === 'pointerup' && touchPoints.size === 1 && touchPoints.has(event.pointerId) && touchPanStart !== null && !touchPanning && !holdOpened;
+  cancelAirportHold();
   touchPoints.delete(event.pointerId);
   if (isTap) tapMap(event.clientX, event.clientY);
   if (touchPoints.size === 0) {
