@@ -25,6 +25,7 @@ import { chooseHome, homeOptions } from './sim/homes';
 import { showHomePicker } from './ui/homePicker';
 import { gameDateWithYear } from './ui/format';
 import { isOpsView, setOpsView } from './render/opsView';
+import { drawOpsRouteLabels } from './render/opsHub';
 import { setAirportFilter, visibleAirports, type AirportFilter } from './ui/airportFilter';
 import { step } from './sim/step';
 import { updatePanel, renderScheduleWarnings, scheduleProblems, PANEL_WIDTH_PX, setScheduleClock } from './ui/panels';
@@ -340,6 +341,7 @@ function render(nowMs: number = performance.now()): void {
 
   drawAircraft(ctx, state, latestFractionalMinute, hoveredFlight?.legId ?? selectedFlight?.legId ?? null);
   drawAirports(ctx, state);
+  drawOpsRouteLabels(ctx, state, selection, mapHover, hoverPoint);
   // The airport the side panel is showing, on top of its dot.
   if (selection.kind === 'airport') drawSelectedAirport(ctx, selection.iata);
   if (mapHover?.kind === 'airport') drawSelectedAirport(ctx, mapHover.iata);

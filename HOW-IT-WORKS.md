@@ -898,6 +898,8 @@ The accumulator loop (`main.ts`) turns real frame time into whole simulated
 minutes (`step()` calls) plus a continuous fractional minute for rendering,
 per the pattern in CLAUDE.md's "Time" section.
 
+**Hub core in Ops view** (`render/opsHub.ts`). Airport codes, 'on its way' badges and dots claim screen space first (`airportClaimedBoxes()` in `render/airports.ts`), then the route labels, held back by `drawRoutes()`, are drawn after the airports and skip every claimed box. A dot's radius grows on a steeper log curve of departures a day, capped at 7 px over the base. An airport with 6 or more of your routes is a busy hub: labels on its spokes show only for the route under the pointer, the selected route or plane, or the hovered or selected airport.
+
 ## Rivals on the ladder (`src/sim/rivalLadder.ts`)
 
 Rivals climb the same ladder as the player to lease bigger aircraft: the
