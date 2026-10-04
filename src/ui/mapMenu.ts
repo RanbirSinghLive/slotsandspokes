@@ -1,6 +1,7 @@
 import { nearestAirportCandidate, type Airport } from '../render/airports';
 import { deliveryDays } from '../sim/fleetTiming';
 import { money } from './format';
+import { showConfirm } from './confirmModal';
 import { findNearestOwnRoute } from '../render/routes';
 import { projection } from '../render/projection';
 import { TURN_BUFFER_CHOICES } from '../sim/turnBuffer';
@@ -170,12 +171,23 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
     icon: planeIconInner(state.aircraft.find((a) => a.tail === option.tail)?.typeCode ?? ''),
     large: true,
     angleDeg: 0,
-    confirm: true,
     disabledReason: option.blocked ?? undefined,
     onSelect: () => {
-      const result = ops.returnPlane(state, option.tail);
-      notice = result.ok ? result.message : result.reason;
-      refresh();
+      showConfirm({
+        title: `Return ${option.tail} · ${option.name}`,
+        rows: [
+          { label: 'Return fee', value: money(option.fee) },
+          { label: 'Lease saved', value: `${money(option.saves)}/day` },
+          { label: 'Cash after', value: money(state.cash - option.fee) },
+        ],
+        facts: ['Goes back to the lessor for good; leasing another means a new airframe at the market rate.'],
+        confirmLabel: `Return · ${money(option.fee)}`,
+        run: () => {
+          const result = ops.returnPlane(state, option.tail);
+          notice = result.ok ? result.message : result.reason;
+          refresh();
+        },
+      });
       return false;
     },
   }));
@@ -204,9 +216,29 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
     disabledReason: option.disabledReason,
     preview: option.preview,
     onSelect: () => {
-      const result = ops.leasePlane(state, airport.iata, option.code, seasonalTerm);
-      notice = result.ok ? result.message : result.reason;
-      refresh();
+      const listing = option.listing;
+      if (!listing) return false;
+      const perDay = termPrice(listing.leasePricePerDay);
+      const overhead = overheadAddedByNextPlane(state);
+      showConfirm({
+        title: `Lease ${option.name} · ${airport.iata}`,
+        rows: [
+          { label: 'Airframe', value: `${option.seats} seats · ${listing.ageYears} yrs (${Math.max(0, USEFUL_LIFE_YEARS - listing.ageYears)} left)` },
+          { label: 'Lease', value: `${money(perDay)}/day` },
+          { label: 'Fleet overhead added', value: `${money(overhead)}/day` },
+          { label: 'Running cost added', value: `${money(perDay + overhead)}/day` },
+          { label: 'Term', value: seasonalTerm ? `${SEASON_DAYS} days, back by itself` : 'standing' },
+          { label: 'Delivery', value: `${deliveryDays(state)} days` },
+        ],
+        facts: ['Crews are hired separately: have crews rated on this type at the base before its first flight.'],
+        confirmLabel: 'Lease',
+        run: () => {
+          const result = ops.leasePlane(state, airport.iata, option.code, seasonalTerm);
+          notice = result.ok ? result.message : result.reason;
+          refresh();
+        },
+      });
+      return false;
     },
   }));
 
@@ -460,17 +492,28 @@ function routeActions(a: string, b: string, state: SimState): RadialAction[] {
       label: 'Remove route',
       icon: ICON.remove,
       angleDeg: -18,
-      confirm: true,
       preview: removeRoute.ok ? removeRoute.preview : undefined,
       onSelect: () => {
-        const result = ops.removeRoute(state, a, b);
-        notice = result.ok ? result.message : result.reason;
-        if (result.ok) {
-          hideMapMenu();
-          renderInspector(state);
-          return false;
-        }
-        refresh();
+        const flights = ops.rotationsServing(state, a, b);
+        showConfirm({
+          title: `Remove route · ${a}–${b}`,
+          rows: [
+            { label: 'Flights removed', value: `${flights.length}` },
+            { label: 'Planes freed', value: [...new Set(flights.map((f) => f.tail))].join(', ') || 'none' },
+          ],
+          facts: ['Its slots go back and its schedule time is freed; drawing it again re-prices the slots.'],
+          confirmLabel: 'Remove route',
+          run: () => {
+            const result = ops.removeRoute(state, a, b);
+            notice = result.ok ? result.message : result.reason;
+            if (result.ok) {
+              hideMapMenu();
+              renderInspector(state);
+              return;
+            }
+            refresh();
+          },
+        });
         return false;
       },
     },

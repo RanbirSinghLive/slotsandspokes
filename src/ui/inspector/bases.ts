@@ -1,4 +1,5 @@
-import type { BaseCandidate, BaseReadout, Outcome } from '../../sim/playerActions';
+import type { BaseChangePreview, BaseCandidate, BaseReadout, Outcome } from '../../sim/playerActions';
+import { costRows, showConfirm } from '../confirmModal';
 import { money } from '../format';
 import { linkToMap } from '../mapLink';
 import { select } from '../selection';
@@ -17,10 +18,24 @@ export function baseSection(options: {
   candidates: BaseCandidate[];
   fee: number;
   perDay: number;
+  preview: (action: 'open' | 'close', iata: string) => BaseChangePreview;
   open: (iata: string) => Outcome<{ message: string }>;
   close: (iata: string) => Outcome<{ message: string }>;
   changed: () => void;
 }): HTMLElement[] {
+  const confirmChange = (action: 'open' | 'close', iata: string) => {
+    const preview = options.preview(action, iata);
+    showConfirm({
+      title: `${action === 'open' ? 'Open' : 'Close'} ${options.kind} · ${iata}`,
+      rows: costRows(preview.fee, preview.kindPerDayBefore, preview.kindPerDayAfter, preview.cashAfter),
+      facts: preview.blocked ? [preview.blocked] : preview.facts,
+      confirmLabel: action === 'open' ? `Open · ${money(preview.fee)}` : 'Close base',
+      run: () => {
+        (action === 'open' ? options.open : options.close)(iata);
+        options.changed();
+      },
+    });
+  };
   const nodes: HTMLElement[] = [heading(options.title, options.info)];
   const list = document.createElement('div');
   list.className = 'inspector-rows';
@@ -43,10 +58,7 @@ export function baseSection(options: {
       close.textContent = 'Close';
       close.disabled = base.closeBlocked !== null;
       if (base.closeBlocked) close.title = base.closeBlocked;
-      close.addEventListener('click', () => {
-        options.close(base.iata);
-        options.changed();
-      });
+      close.addEventListener('click', () => confirmChange('close', base.iata));
       row.append(close);
     }
     list.append(row);
@@ -75,10 +87,7 @@ export function baseSection(options: {
   };
   select_.addEventListener('change', refresh);
   refresh();
-  button.addEventListener('click', () => {
-    options.open(select_.value);
-    options.changed();
-  });
+  button.addEventListener('click', () => confirmChange('open', select_.value));
   opener.append(select_, button);
   nodes.push(opener);
   return nodes;

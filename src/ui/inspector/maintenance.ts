@@ -316,6 +316,7 @@ function buildMxBases(state: SimState, changed: () => void): HTMLElement[] {
     candidates: readout.candidates,
     fee: readout.fee,
     perDay: readout.perDay,
+    preview: (action, iata) => ops.previewBaseChange(state, 'mtc', action, iata),
     open: (iata) => ops.openMxBaseAt(state, iata),
     close: (iata) => ops.closeMxBaseAt(state, iata),
     changed,

@@ -5,6 +5,7 @@ import {
   contractCost,
   CREW_BASE_PER_DAY,
   crewBaseBlocked,
+  basesCostPerDay,
   crewBaseCloseBlocked,
   hasCrewBase,
   hasMxBase,
@@ -874,6 +875,55 @@ export function mxBaseReadout(state: SimState): {
   }
   const stations = [...sleeping].map(([iata, { planes, work }]) => ({ iata, name: nameOf(iata), planes, check: outstationCheck(state, iata), contractPerNight: contractCost(work) }));
   return { bases, candidates, stations, fee: MX_BASE_FEE, perDay: MX_BASE_PER_DAY };
+}
+
+/** What opening or closing a base commits to, shown before the player confirms. */
+export type BaseChangePreview = {
+  /** One-off fee, 0 for a close. */
+  fee: number;
+  /** The base's own running cost a day. */
+  perDay: number;
+  cashBefore: number;
+  cashAfter: number;
+  /** All bases' running costs a day, of this kind, before and after. */
+  kindPerDayBefore: number;
+  kindPerDayAfter: number;
+  /** Plain consequences, one per line. */
+  facts: string[];
+  /** Why it can't go ahead, or null. */
+  blocked: string | null;
+};
+
+export function previewBaseChange(state: SimState, kind: 'crew' | 'mtc', action: 'open' | 'close', iata: string): BaseChangePreview {
+  const isCrew = kind === 'crew';
+  const fee = action === 'open' ? (isCrew ? CREW_BASE_FEE : MX_BASE_FEE) : 0;
+  const perDay = isCrew ? CREW_BASE_PER_DAY : MX_BASE_PER_DAY;
+  const costs = basesCostPerDay(state);
+  const before = isCrew ? costs.crew : costs.maintenance;
+  const blocked = action === 'open' ? (isCrew ? crewBaseBlocked(state, iata) : mxBaseBlocked(state, iata)) : isCrew ? crewBaseCloseBlocked(state, iata) : mxBaseCloseBlocked(state, iata);
+  const facts: string[] = [];
+  if (action === 'open' && isCrew) {
+    facts.push('Starts with no crews: hire them here before basing a plane.');
+    facts.push('Not a maintenance base: nights here are contracted or deferred.');
+  } else if (action === 'open') {
+    facts.push('Nights here become line checks and bank heavy-check hours.');
+    const station = mxBaseReadout(state).stations.find((entry) => entry.iata === iata);
+    if (station) facts.push(`${station.planes} plane${station.planes === 1 ? '' : 's'} sleep here tonight: saves ${station.contractPerNight > 0 ? `$${station.contractPerNight.toLocaleString()}` : 'the'} contracted check a night.`);
+  } else if (isCrew) {
+    facts.push('No planes or crews are left here; reopening costs the fee again.');
+  } else {
+    facts.push('Nights here go back to contracted checks unless set to defer; the fee is not refunded.');
+  }
+  return {
+    fee,
+    perDay,
+    cashBefore: state.cash,
+    cashAfter: state.cash - fee,
+    kindPerDayBefore: before,
+    kindPerDayAfter: before + (action === 'open' ? perDay : -perDay),
+    facts,
+    blocked,
+  };
 }
 
 export function openCrewBaseAt(state: SimState, iata: string): Outcome<{ message: string }> {

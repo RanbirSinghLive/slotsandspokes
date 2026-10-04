@@ -2751,6 +2751,14 @@ start, inside the starting cost, and they cost nothing to run.
 | Cost | $100,000, then $500/day (crew room, under crew) | $400,000, then $1,500/day (under maintenance) |
 | Closes | when no planes are based there and its crews are released | any time; nights there are then contracted or deferred |
 
+Opening or closing a base asks first: a confirm window (`ui/confirmModal.ts`,
+numbers from `previewBaseChange()`) shows the fee, the running cost before and
+after, the cash left, and what changes at that airport. The same window
+asks before leasing a plane, returning one, rebasing, ordering or calling off
+a refit, removing a route, and hiring, converting or releasing crews on the
+Crews screen. Holding a ring button to repeat (add or remove a flight, hire
+on the map) stays one click each.
+
 **Anywhere else a plane sleeps** (a crew base without maintenance, a
 plane stranded away), the night is a **contracted check**, $300 an hour
 of the night's work (a Propeller on 4 flights a day: $840), or **no check
