@@ -23,6 +23,7 @@ import { planeIconInner } from './planeIcons';
 import { AIRCRAFT_CLASSES } from '../sim/aircraftClasses';
 import { USEFUL_LIFE_YEARS } from '../sim/leasing';
 import { crewPlan } from '../sim/crewPlan';
+import { trailingDailyMargin } from '../sim/forecast';
 import { dayIndex } from '../sim/clock';
 import { SEASON_DAYS, SEASONAL_PREMIUM } from '../sim/seasonalLease';
 
@@ -220,9 +221,11 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
       if (!listing) return false;
       const perDay = termPrice(listing.leasePricePerDay);
       const overhead = overheadAddedByNextPlane(state);
+      const recentMargin = trailingDailyMargin(state);
       showConfirm({
         title: `Lease ${option.name} · ${airport.iata}`,
         rows: [
+          ...(recentMargin === null ? [] : [{ label: `Margin, last ${Math.min(7, state.marginHistory.length)} day${state.marginHistory.length === 1 ? '' : 's'}`, value: `${money(Math.round(recentMargin))}/day` }]),
           { label: 'Airframe', value: `${option.seats} seats · ${listing.ageYears} yrs (${Math.max(0, USEFUL_LIFE_YEARS - listing.ageYears)} left)` },
           { label: 'Lease', value: `${money(perDay)}/day` },
           { label: 'Fleet overhead added', value: `${money(overhead)}/day` },

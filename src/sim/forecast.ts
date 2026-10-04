@@ -50,3 +50,14 @@ export function cashRunway(state: SimState): CashRunway | null {
   const daysLeft = dailyDelta < 0 && state.cash > 0 ? Math.ceil(state.cash / -dailyDelta) : null;
   return { dailyDelta, daysLeft };
 }
+
+/**
+ * The airline's average daily margin over its last `days` finished days,
+ * or null before the first day is done. Shown where a player commits
+ * cash, so a lease is read against the trend it is added to.
+ */
+export function trailingDailyMargin(state: SimState, days = RUNWAY_WINDOW_DAYS): number | null {
+  const recent = state.marginHistory.slice(-days);
+  if (recent.length === 0) return null;
+  return recent.reduce((sum, margin) => sum + margin, 0) / recent.length;
+}

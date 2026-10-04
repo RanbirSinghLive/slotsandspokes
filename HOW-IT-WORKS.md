@@ -2892,6 +2892,10 @@ the cancellations cost Toronto most of its year on 18 seeds.
 
 ## Seasonal leases (`src/sim/seasonalLease.ts`)
 
+The lease's confirm window opens with the airline's average daily margin
+over its last 7 finished days, or fewer early on (`trailingDailyMargin()` in `sim/forecast.ts`), so a
+plane is read against the trend it joins; it is left out on day 0.
+
 The airport ring's "Lease a plane here" has a **term** switch: a
 standing lease, or one for a 90-day season. A seasonal plane comes from
 the same shelf and is delivered the same way. It costs 30% more a day
