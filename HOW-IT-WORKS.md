@@ -945,6 +945,8 @@ double tap zooms in on the point. `mapInput.ts` is one state machine (idle,
 pressed, panning, pinching) that turns finger events into tap, double tap,
 pan and pinch; the mouse keeps its own handlers in `main.ts`, and a tap runs
 the same press and release functions a click does.
+The home picker's touch (tap to choose, drag, pinch, double tap to zoom) runs
+through the same machine; its mouse hover and click are separate.
 
 **Map coordinates.** The canvas is sized to the visible window (a phone's
 `100vh` is taller with the toolbar showing) and everything reads its size back
