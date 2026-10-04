@@ -1,6 +1,6 @@
 import './style.css';
 import { dayIndex, homeUtcOffsetMinutes, minuteOfDay as homeMinuteOfDay } from './sim/clock';
-import { projection, fitProjection, baselineScale } from './render/projection';
+import { projection, fitProjection, baselineScale, mapGesture } from './render/projection';
 import { drawBasemap } from './render/basemap';
 import { drawTerminator } from './render/terminator';
 import { drawAirportChips } from './render/airportChips';
@@ -173,11 +173,21 @@ function syncCompetitorAirlineChips(): void {
 const MIN_MAP_WIDTH_PX = 200;
 /** The rail's width, which stays when the panel is hidden; style.css's --rail-width matches it. */
 const RAIL_WIDTH_PX = 56;
-let panelHidden = false;
+/** At or below this window width the panel is a sheet over the map, not a column beside it (style.css's :root[data-narrow]). */
+const NARROW_WINDOW_PX = 700;
+const MAP_SHEET_MARGIN = 0.5;
+const isNarrowWindow = (): boolean => window.innerWidth <= NARROW_WINDOW_PX;
+// A phone starts with the map showing; the rail opens the panel.
+let panelHidden = isNarrowWindow();
 let currentPanelWidthPx = PANEL_WIDTH_PX + RAIL_WIDTH_PX;
 
 function applyPanelWidth(): void {
-  const desiredPanelWidthPx = (panelHidden ? 0 : PANEL_WIDTH_PX) + RAIL_WIDTH_PX;
+  const narrow = isNarrowWindow();
+  document.documentElement.toggleAttribute('data-narrow', narrow);
+  // A phone caches a map twice as big as the screen each way, so a drag has picture to slide over (render/projection.ts).
+  mapGesture.margin = narrow ? MAP_SHEET_MARGIN : 0;
+  // Narrow: the panel floats over the map, so the map only gives up the rail.
+  const desiredPanelWidthPx = (panelHidden || narrow ? 0 : PANEL_WIDTH_PX) + RAIL_WIDTH_PX;
   currentPanelWidthPx = Math.min(desiredPanelWidthPx, window.innerWidth - MIN_MAP_WIDTH_PX);
   document.documentElement.style.setProperty('--panel-width', `${currentPanelWidthPx}px`);
 }
@@ -208,7 +218,8 @@ function resize(): void {
   applyPanelWidth(); // re-clamp in case the window itself was resized, not just the panel
   const cssWidth = window.innerWidth - currentPanelWidthPx;
   const cssHeight = window.innerHeight;
-  const dpr = window.devicePixelRatio || 1;
+  // A phone's 3x screen would draw nine pixels per CSS pixel; 2x looks the same on this map and costs less than half as much.
+  const dpr = Math.min(window.devicePixelRatio || 1, isNarrowWindow() ? 2 : Infinity);
 
   canvas.width = cssWidth * dpr;
   canvas.height = cssHeight * dpr;
@@ -437,6 +448,8 @@ function setPanelHidden(hidden: boolean): void {
   // The map's available width just changed, same as a real window resize.
   resize();
 }
+panelEl.hidden = panelHidden;
+document.querySelector('#panel-close')!.addEventListener('click', () => setPanelHidden(true));
 setupRail({ isHidden: () => panelHidden, setHidden: setPanelHidden });
 setupJumpBox(state);
 // Feedback, from the rail and the Game screen: the pre-filled form (ui/feedback.ts).
@@ -462,8 +475,10 @@ document.querySelector('#rail-jump')!.addEventListener('click', () => openJumpBo
 // The inspector (ui/inspector/) follows the selection: a map click, a link
 // or the breadcrumb changes it, and the panel rebuilds to show it. A hidden
 // panel comes back, since otherwise the click would seem to do nothing.
+// On a phone a tap on the map keeps the map showing, so the ring that tap opens stays in view; the rail opens the sheet.
+let mapTapInProgress = false;
 onSelectionChange(() => {
-  if (panelHidden && getSelection().kind !== 'network') setPanelHidden(false);
+  if (panelHidden && getSelection().kind !== 'network' && !(mapTapInProgress && isNarrowWindow())) setPanelHidden(false);
   clearMapHover();
   renderInspector(state);
   render();
@@ -756,8 +771,12 @@ let translateAtDragStart: [number, number] = [0, 0];
 let ringOpenAtMouseDown = false;
 /** A press that moves less than this far before release is a click, not a pan. */
 const CLICK_SLOP_PX = 4;
+/** A finger wobbles more than a mouse, so a touch pans only after moving this far. */
+const TOUCH_PAN_SLOP_PX = 8;
 
 canvas.addEventListener('mousedown', (event) => {
+  mapTapInProgress = true;
+  queueMicrotask(() => (mapTapInProgress = false));
   ringOpenAtMouseDown = isMapMenuOpen();
   // Any open ring (ui/mapMenu.ts) gets closed before deciding what this
   // click actually does, otherwise arming a route, or just starting a
@@ -817,8 +836,12 @@ canvas.addEventListener('mousedown', (event) => {
  * as hoverable at all — see findCompetitionHover()'s own comment — and
  * for what the tooltip actually reveals).
  */
+// A touch has no hover: the mouse events that follow a tap would otherwise leave a hover card stuck on the map.
+let lastInputWasTouch = false;
+canvas.addEventListener('pointerdown', (event) => (lastInputWasTouch = event.pointerType === 'touch'));
+
 canvas.addEventListener('mousemove', (event) => {
-  hoverPoint = isDragging ? null : { x: event.clientX, y: event.clientY };
+  hoverPoint = isDragging || lastInputWasTouch ? null : { x: event.clientX, y: event.clientY };
   if (handleRouteBuilderMouseMove(event, state)) {
     render();
     hideCompetitionTooltip();
@@ -873,6 +896,110 @@ window.addEventListener('mouseup', (event) => {
   isDragging = false;
 });
 
+// --- Pan and pinch (touch) ---
+//
+// A finger that moves never produces the mouse events the pan above listens
+// for, so touch has its own: one finger drags the map, two fingers pinch it.
+// A tap that doesn't move still arrives as the usual mouse events, so
+// selecting, the ring and the route builder need nothing here. Moves only
+// change the projection: the frame loop draws it once per frame, where a
+// draw per event (several arrive per frame on a phone) made the map lag.
+const touchPoints = new Map<number, [number, number]>();
+let touchPanStart: { x: number; y: number; translate: [number, number] } | null = null;
+let touchPanning = false;
+
+canvas.addEventListener('pointerdown', (event) => {
+  if (event.pointerType !== 'touch') return;
+  canvas.setPointerCapture(event.pointerId);
+  touchPoints.set(event.pointerId, [event.clientX, event.clientY]);
+  touchPanning = touchPanning && touchPoints.size > 1;
+  touchPanStart = touchPoints.size === 1 ? { x: event.clientX, y: event.clientY, translate: projection.translate() } : null;
+});
+
+canvas.addEventListener('pointermove', (event) => {
+  const before = touchPoints.get(event.pointerId);
+  if (event.pointerType !== 'touch' || !before) return;
+  const now: [number, number] = [event.clientX, event.clientY];
+  if (touchPoints.size >= 2) {
+    const [other] = [...touchPoints.entries()].filter(([id]) => id !== event.pointerId).map(([, point]) => point);
+    const distanceBefore = Math.hypot(before[0] - other[0], before[1] - other[1]);
+    const distanceNow = Math.hypot(now[0] - other[0], now[1] - other[1]);
+    touchPanning = true;
+    mapGesture.active = true;
+    hideMapMenu();
+    // Zoom about the pair's midpoint, then slide by how far the moving finger carried it.
+    const [translateX, translateY] = projection.translate();
+    projection.translate([translateX + (now[0] - before[0]) / 2, translateY + (now[1] - before[1]) / 2]);
+    if (distanceBefore > 0) zoomAt((now[0] + other[0]) / 2, (now[1] + other[1]) / 2, distanceNow / distanceBefore, false);
+  } else if (touchPanStart) {
+    if (!touchPanning && Math.hypot(now[0] - touchPanStart.x, now[1] - touchPanStart.y) < TOUCH_PAN_SLOP_PX) return;
+    if (!touchPanning) hideMapMenu();
+    touchPanning = true;
+    mapGesture.active = true;
+    projection.translate([touchPanStart.translate[0] + now[0] - touchPanStart.x, touchPanStart.translate[1] + now[1] - touchPanStart.y]);
+  }
+  touchPoints.set(event.pointerId, now);
+});
+
+// A tap is handled here rather than left to the mouse events a browser makes up
+// after it: iOS skips those when the pointer moved handlers change the page, and
+// then nothing could be tapped. The made-up events are cancelled (touchend below)
+// and the same mouse handlers run from the tap itself.
+const DOUBLE_TAP_MS = 300;
+const DOUBLE_TAP_SLOP_PX = 30;
+const DOUBLE_TAP_ZOOM = 2;
+let lastTap = { time: 0, x: 0, y: 0 };
+
+function tapMap(x: number, y: number): void {
+  const now = performance.now();
+  if (now - lastTap.time < DOUBLE_TAP_MS && Math.hypot(x - lastTap.x, y - lastTap.y) < DOUBLE_TAP_SLOP_PX) {
+    lastTap.time = 0;
+    hideMapMenu();
+    animateZoomAt(x, y, DOUBLE_TAP_ZOOM);
+    return;
+  }
+  lastTap = { time: now, x, y };
+  const init = { clientX: x, clientY: y, button: 0, bubbles: true, cancelable: true, view: window };
+  canvas.dispatchEvent(new MouseEvent('mousedown', init));
+  canvas.dispatchEvent(new MouseEvent('mouseup', init));
+}
+
+/** Zoom in on (x, y) over a moment, as a double tap does. */
+function animateZoomAt(x: number, y: number, factor: number): void {
+  const started = performance.now();
+  let applied = 1;
+  mapGesture.active = true;
+  const step = (now: number): void => {
+    const progress = Math.min(1, (now - started) / 180);
+    const target = Math.pow(factor, 1 - (1 - progress) * (1 - progress));
+    zoomAt(x, y, target / applied, false);
+    applied = target;
+    if (progress < 1) requestAnimationFrame(step);
+    else mapGesture.active = false;
+  };
+  requestAnimationFrame(step);
+}
+
+canvas.addEventListener('touchend', (event) => event.preventDefault(), { passive: false });
+
+function endTouch(event: PointerEvent): void {
+  if (event.pointerType !== 'touch') return;
+  const isTap = event.type === 'pointerup' && touchPoints.size === 1 && touchPoints.has(event.pointerId) && touchPanStart !== null && !touchPanning;
+  touchPoints.delete(event.pointerId);
+  if (isTap) tapMap(event.clientX, event.clientY);
+  if (touchPoints.size === 0) {
+    touchPanStart = null;
+    touchPanning = false;
+    mapGesture.active = false;
+  } else if (touchPoints.size === 1) {
+    // One finger left after a pinch: carry on dragging from where it is.
+    const [remaining] = touchPoints.values();
+    touchPanStart = { x: remaining[0], y: remaining[1], translate: projection.translate() };
+  }
+}
+canvas.addEventListener('pointerup', endTouch);
+canvas.addEventListener('pointercancel', endTouch);
+
 // Esc steps the inspector back one level, but only when nothing else on
 // screen wants Esc first. Listening in the capture phase runs this before
 // every ordinary keydown listener (the route builder's, the ring's, the hub
@@ -909,7 +1036,7 @@ const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 20;
 
 /** Zoom by `factor`, keeping the geographic point under screen (x, y) where it is. */
-function zoomAt(x: number, y: number, factor: number): void {
+function zoomAt(x: number, y: number, factor: number, redraw = true): void {
   const geoUnderPoint = projection.invert?.([x, y]);
   if (!geoUnderPoint) return;
   const clampedScale = Math.min(Math.max(projection.scale() * factor, baselineScale * MIN_ZOOM), baselineScale * MAX_ZOOM);
@@ -917,7 +1044,7 @@ function zoomAt(x: number, y: number, factor: number): void {
   const [driftedX, driftedY] = projection(geoUnderPoint)!;
   const [tx, ty] = projection.translate();
   projection.translate([tx + (x - driftedX), ty + (y - driftedY)]);
-  render();
+  if (redraw) render();
 }
 
 canvas.addEventListener(
@@ -936,6 +1063,15 @@ const mapMiddle = (): [number, number] => [canvas.clientWidth / 2, canvas.client
 document.querySelector('#zoom-in')!.addEventListener('click', () => zoomAt(...mapMiddle(), ZOOM_BUTTON_FACTOR));
 document.querySelector('#zoom-out')!.addEventListener('click', () => zoomAt(...mapMiddle(), 1 / ZOOM_BUTTON_FACTOR));
 document.querySelector('#zoom-home')!.addEventListener('click', () => resize());
+
+// On a phone the lens and the airport filters fold behind one button, so they only cover the map when wanted.
+const toolsToggle = document.querySelector<HTMLButtonElement>('#map-tools-toggle')!;
+toolsToggle.addEventListener('click', () => {
+  const open = !document.documentElement.hasAttribute('data-tools');
+  document.documentElement.toggleAttribute('data-tools', open);
+  toolsToggle.setAttribute('aria-expanded', String(open));
+  toolsToggle.classList.toggle('active', open);
+});
 
 // --- Choosing a home city (new games only) ---
 //

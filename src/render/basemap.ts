@@ -5,7 +5,7 @@ import type { Topology } from 'topojson-specification';
 import worldTopology from '../../data/world-110m.json';
 import lakesGeoJson from '../../data/lakes.json';
 import riversGeoJson from '../../data/rivers.json';
-import { projection } from './projection';
+import { drawSheet, mapGesture, projection, sheetStillFits, snapshotView, withSheetClip, type ViewSnapshot } from './projection';
 import { airports, isAirportKnown } from './airports';
 
 // The downloaded file is TopoJSON: a compact format that stores shared
@@ -81,39 +81,48 @@ function loadFineLand(): void {
 const basemapCanvas = document.createElement('canvas');
 const basemapCtx = basemapCanvas.getContext('2d')!;
 let basemapSignature = '';
+let basemapView: ViewSnapshot | null = null;
 
 export function drawBasemap(ctx: CanvasRenderingContext2D): void {
   const main = ctx.canvas;
   if (main.width === 0 || main.height === 0) return;
   const scale = ctx.getTransform().a;
-  const signature = [main.width, main.height, scale, projection.scale(), ...projection.translate(), knownAirportCount()].join('|');
-  if (signature !== basemapSignature) {
+  const cssWidth = main.width / scale;
+  const cssHeight = main.height / scale;
+  const margin = mapGesture.margin;
+  // The view itself (pan, zoom) is not part of the signature: sheetStillFits() decides whether the picture can be moved instead.
+  const signature = [main.width, main.height, scale, margin, knownAirportCount()].join('|');
+  const reusable = signature === basemapSignature && basemapView !== null && sheetStillFits(basemapView, margin, cssWidth, cssHeight);
+  if (!reusable) {
     basemapSignature = signature;
-    if (basemapCanvas.width !== main.width || basemapCanvas.height !== main.height) {
-      basemapCanvas.width = main.width;
-      basemapCanvas.height = main.height;
+    const sheetWidth = Math.ceil(main.width * (1 + 2 * margin));
+    const sheetHeight = Math.ceil(main.height * (1 + 2 * margin));
+    if (basemapCanvas.width !== sheetWidth || basemapCanvas.height !== sheetHeight) {
+      basemapCanvas.width = sheetWidth;
+      basemapCanvas.height = sheetHeight;
     }
-    basemapCtx.setTransform(scale, 0, 0, scale, 0, 0);
-    basemapCtx.clearRect(0, 0, main.width / scale, main.height / scale);
-    paintBasemap(basemapCtx);
+    const marginX = margin * cssWidth;
+    const marginY = margin * cssHeight;
+    basemapCtx.setTransform(scale, 0, 0, scale, marginX * scale, marginY * scale);
+    basemapCtx.clearRect(-marginX, -marginY, cssWidth + 2 * marginX, cssHeight + 2 * marginY);
+    withSheetClip(margin, cssWidth, cssHeight, () => paintBasemap(basemapCtx, cssWidth, cssHeight, marginX, marginY));
+    basemapView = snapshotView();
   }
-  ctx.drawImage(basemapCanvas, 0, 0, main.width / scale, main.height / scale);
+  if (basemapView) drawSheet(ctx, basemapCanvas, basemapView, margin, cssWidth, cssHeight);
 }
 
-function paintBasemap(ctx: CanvasRenderingContext2D): void {
+function paintBasemap(ctx: CanvasRenderingContext2D, cssWidth: number, cssHeight: number, marginX: number, marginY: number): void {
   // d3.geoPath normally builds an SVG path string, but given a canvas 2D
   // context instead it draws directly by calling moveTo/lineTo/etc. on that
   // context. `projection` supplies the longitude/latitude -> pixel math.
   const path = geoPath(projection, ctx);
-  const width = ctx.canvas.width / ctx.getTransform().a;
-  const height = ctx.canvas.height / ctx.getTransform().a;
   loadFineLand();
 
-  const ocean = ctx.createLinearGradient(0, 0, 0, height);
+  const ocean = ctx.createLinearGradient(0, 0, 0, cssHeight);
   ocean.addColorStop(0, OCEAN_TOP);
   ocean.addColorStop(1, OCEAN_BOTTOM);
   ctx.fillStyle = ocean;
-  ctx.fillRect(0, 0, width, height);
+  ctx.fillRect(-marginX, -marginY, cssWidth + 2 * marginX, cssHeight + 2 * marginY);
 
   ctx.beginPath();
   path(geoGraticule().step([10, 10])());

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Slots & Spokes</title>
   </head>
   <body>
@@ -79,6 +79,7 @@
         <button type="button" id="zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
         <button type="button" id="zoom-home" title="Back to home" aria-label="Back to home">⌂</button>
       </div>
+      <button type="button" id="map-tools-toggle" aria-expanded="false" title="Map lens, Ops view and which airports show">Filters</button>
       <button type="button" id="ops-view-toggle" aria-pressed="false" title="Ops view: planes, disruptions, fare gaps, crews and slots on the map (O)">Ops view</button>
       <div id="airport-filter" role="radiogroup" aria-label="Airports shown">
         <button type="button" data-airports="all" class="active" title="Every airport in reach">All</button>
@@ -137,6 +138,7 @@
       </button>
     </nav>
     <aside id="panel">
+      <button type="button" id="panel-close" aria-label="Close panel">Close ×</button>
       <section id="inspector" hidden>
         <nav id="inspector-breadcrumb" aria-label="Where you are"></nav>
         <div id="inspector-body"></div>

@@ -18,6 +18,27 @@ body {
   height: 100%;
   background: #05070c;
   overflow: hidden;
+  /* A drag near the top must not pull the page to refresh or rubber-band it. */
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Touch has no hover, so a long press on the map or its controls should not
+   select text or open the iOS callout. */
+#map,
+#map-surface,
+#rail,
+#now-corner {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Taps on controls fire at once, with no double-tap-zoom wait. */
+button,
+[role='button'],
+.stat-card {
+  touch-action: manipulation;
 }
 
 /* The map renders every frame (see main.ts's render()), so it just fills
@@ -27,6 +48,8 @@ body {
   width: calc(100vw - var(--panel-width));
   height: 100vh;
   box-sizing: border-box;
+  /* Drag and pinch are the map's own (main.ts), not the page's. */
+  touch-action: none;
 }
 
 /* Sections parked until a screen adopts them (ui/inspector/dom.ts's
@@ -385,6 +408,64 @@ body {
   }
 }
 
+#map-tools-toggle {
+  display: none;
+}
+
+/* A phone: the lens, Ops view and the airport filter fold behind one
+   Filters button beside the zoom buttons, and open as a small stack above them. */
+:root[data-narrow] #where-corner {
+  flex-direction: row;
+  flex-wrap: wrap;
+  max-width: calc(100vw - var(--panel-width) - 24px);
+  bottom: 96px;
+  gap: 6px;
+}
+
+:root[data-narrow] #map-tools-toggle {
+  display: block;
+}
+
+:root[data-narrow] .where-zoom button,
+:root[data-narrow] #map-tools-toggle {
+  min-height: 36px;
+}
+
+:root[data-narrow] .where-zoom button {
+  width: 36px;
+}
+
+:root[data-narrow] #map-tools-toggle {
+  padding: 0 12px;
+}
+
+:root[data-narrow]:not([data-tools]) #lens-corner,
+:root[data-narrow]:not([data-tools]) #ops-view-toggle,
+:root[data-narrow]:not([data-tools]) #airport-filter {
+  display: none;
+}
+
+:root[data-narrow] #airport-filter {
+  flex-wrap: wrap;
+  flex-basis: 100%;
+}
+
+:root[data-narrow] #lens-corner {
+  bottom: 300px;
+  max-width: calc(100vw - var(--panel-width) - 24px);
+}
+
+:root[data-narrow] #lens-bar {
+  flex-wrap: wrap;
+}
+
+:root[data-narrow] #lens-bar button,
+:root[data-narrow] #where-corner #airport-filter button,
+:root[data-narrow] #ops-view-toggle {
+  min-height: 34px;
+  padding: 0 10px;
+}
+
 .mapmode-legend-swatch {
   display: inline-block;
   width: 10px;
@@ -491,6 +572,56 @@ body {
    would silently do nothing. */
 #panel[hidden] {
   display: none;
+}
+
+#panel-close {
+  display: none;
+}
+
+/* A phone: the panel is a sheet over the map, beside the rail, closed by its
+   own button, the rail's Hide, or the rail item showing (ui/rail.ts). */
+:root[data-narrow] #panel {
+  right: var(--rail-width);
+  width: calc(100vw - var(--rail-width));
+  height: 100dvh;
+  z-index: 40;
+}
+
+:root[data-narrow] #rail {
+  height: 100dvh;
+  z-index: 41;
+  /* A short phone cuts the last icons off, so the rail scrolls. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  scrollbar-width: none;
+}
+
+:root[data-narrow] #rail::-webkit-scrollbar {
+  display: none;
+}
+
+:root[data-narrow] #rail > * {
+  flex: none;
+}
+
+:root[data-narrow] #rail > .rail-spacer {
+  flex: 1 0 8px;
+}
+
+:root[data-narrow] #panel-close {
+  display: block;
+  flex: none;
+  align-self: flex-end;
+  min-height: 44px;
+  margin: -8px 0 4px;
+  padding: 0 14px;
+  font: inherit;
+  color: #cdd3e0;
+  background: #171b26;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
 }
 
 /* The Overview screen: the cards and Last 7 days, scrolling on its own
