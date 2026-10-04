@@ -18,6 +18,7 @@ import { showFlightTooltip, hideFlightTooltip } from './ui/flightTooltip';
 import { showAirportTooltip, hideAirportTooltip } from './ui/airportTooltip';
 import { drawDemandLayer } from './render/demand';
 import { drawCompetitionLayer, competitorAirlines, findCompetitionHover, drawNewCompetitorRouteFlashes } from './render/competition';
+import { drawUncontestedLayer, UNCONTESTED_COLORS } from './render/uncontested';
 import { drawRouteMapMode, MAP_MODE_COLORS, type MapMode } from './render/mapmodes';
 import { showCompetitionTooltip, hideCompetitionTooltip } from './ui/competitionTooltip';
 import { createNewGameState, type SimState } from './sim/state';
@@ -228,6 +229,7 @@ let latestFractionalMinute = state.simMinute;
 // lens (setLens(), below).
 let demandOverlayOn = false;
 let competitionOverlayOn = false;
+let uncontestedOverlayOn = false;
 // Which mapmode is recolouring the route network (render/
 // mapmodes.ts) — mutually exclusive with itself (there's only one map
 // underneath) but layered the same way Demand/Competition are: an
@@ -298,6 +300,8 @@ function render(nowMs: number = performance.now()): void {
   // see this" choice, same precedence Competition already had over plain.
   if (mapMode !== 'none') {
     drawRouteMapMode(ctx, state, mapMode);
+  } else if (uncontestedOverlayOn) {
+    drawUncontestedLayer(ctx, state);
   } else if (competitionOverlayOn) {
     drawCompetitionLayer(ctx, selectedCompetitorAirline, state);
   } else {
@@ -625,16 +629,18 @@ window.addEventListener('keydown', (event) => {
  * always lit. Network is the plain map; Profit and On-time recolour your
  * routes (render/mapmodes.ts); Demand draws every market's demand and
  * headroom (render/demand.ts); Rivals draws the rival networks, with a
- * chip per airline to narrow it to one (render/competition.ts).
+ * chip per airline to narrow it to one (render/competition.ts); Open draws
+ * your routes no rival flies and the biggest markets nobody flies (render/uncontested.ts).
  */
-type Lens = 'network' | 'profit' | 'ontime' | 'demand' | 'rivals';
-const LENS_ORDER: Lens[] = ['network', 'profit', 'ontime', 'demand', 'rivals'];
+type Lens = 'network' | 'profit' | 'ontime' | 'demand' | 'rivals' | 'uncontested';
+const LENS_ORDER: Lens[] = ['network', 'profit', 'ontime', 'demand', 'rivals', 'uncontested'];
 let lens: Lens = 'network';
 
 function setLens(next: Lens): void {
   lens = next;
   demandOverlayOn = lens === 'demand';
   competitionOverlayOn = lens === 'rivals';
+  uncontestedOverlayOn = lens === 'uncontested';
   mapMode = lens === 'profit' ? 'profitability' : lens === 'ontime' ? 'ontime' : 'none';
   lensButtons.forEach((button) => {
     const on = button.dataset.lens === lens;
@@ -649,7 +655,7 @@ function setLens(next: Lens): void {
 
 lensButtons.forEach((button) => button.addEventListener('click', () => setLens(button.dataset.lens as Lens)));
 
-// Keys 1–5 pick a lens, unless the player is typing into something.
+// Keys 1–6 pick a lens, unless the player is typing into something.
 window.addEventListener('keydown', (event) => {
   if (event.ctrlKey || event.metaKey || event.altKey) return;
   const target = event.target as HTMLElement | null;
@@ -685,6 +691,12 @@ function updateLensLegend(): void {
   } else if (lens === 'rivals') {
     lensLegendTitle.textContent = 'Rival networks · pick one to narrow';
     lensLegendScale.innerHTML = '';
+  } else if (lens === 'uncontested') {
+    lensLegendTitle.textContent = 'Where no rival flies';
+    lensLegendScale.innerHTML =
+      swatch(UNCONTESTED_COLORS.yours, 'your route, no rival') +
+      swatch(UNCONTESTED_COLORS.contested, 'your route, rival too') +
+      swatch(UNCONTESTED_COLORS.open, 'open market, nobody flies it');
   }
 }
 

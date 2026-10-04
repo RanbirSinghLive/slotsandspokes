@@ -756,10 +756,14 @@ the map, and rearrange with its width through CSS container queries (on
 a narrow map the lens moves down, then to the bottom left).
 
 The lens is one row of labelled buttons, Network · Profit · On-time ·
-Demand · Rivals, one on at a time (keys 1–5), with its legend and
-filter directly under it. `setLens()` in main.ts sets the three flags
+Demand · Rivals · Open, one on at a time (keys 1–6), with its legend and
+filter directly under it. `setLens()` in main.ts sets the flags
 the renderer reads: `demandOverlayOn` for Demand, `competitionOverlayOn`
-for Rivals, `mapMode` for Profit and On-time. The Rivals lens adds a
+for Rivals, `uncontestedOverlayOn` for Open, `mapMode` for Profit and On-time.
+Open (`render/uncontested.ts`) replaces the plain route layer: your routes
+are green where no rival flies the market and grey where one does, and
+dashed teal lines mark the 12 biggest markets (by `currentPotentialDemand`)
+from an airport you serve that nobody, you included, flies yet. The Rivals lens adds a
 chip per rival airline to narrow it to one. A route can be drawn under
 any lens.
 
