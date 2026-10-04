@@ -24,6 +24,7 @@ import { createNewGameState, type SimState } from './sim/state';
 import { chooseHome, homeOptions } from './sim/homes';
 import { showHomePicker } from './ui/homePicker';
 import { gameDateWithYear } from './ui/format';
+import { isOpsView, setOpsView } from './render/opsView';
 import { setAirportFilter, visibleAirports, type AirportFilter } from './ui/airportFilter';
 import { step } from './sim/step';
 import { updatePanel, renderScheduleWarnings, scheduleProblems, PANEL_WIDTH_PX, setScheduleClock } from './ui/panels';
@@ -697,6 +698,25 @@ airportFilterButtons.forEach((button) => {
     airportFilterButtons.forEach((other) => other.classList.toggle('active', other === button));
     render();
   });
+});
+
+// The Ops view switch (render/opsView.ts): bottom left, beside the airport
+// filter. O toggles it too.
+const opsViewButton = document.querySelector<HTMLButtonElement>('#ops-view-toggle')!;
+function showOpsView(next: boolean): void {
+  setOpsView(next);
+  opsViewButton.classList.toggle('active', next);
+  opsViewButton.setAttribute('aria-pressed', String(next));
+  render();
+}
+opsViewButton.addEventListener('click', () => showOpsView(!isOpsView()));
+opsViewButton.classList.toggle('active', isOpsView());
+opsViewButton.setAttribute('aria-pressed', String(isOpsView()));
+window.addEventListener('keydown', (event) => {
+  if (event.ctrlKey || event.metaKey || event.altKey || event.key.toLowerCase() !== 'o') return;
+  const target = event.target as HTMLElement | null;
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+  showOpsView(!isOpsView());
 });
 
 // --- Pan (click and drag) ---
