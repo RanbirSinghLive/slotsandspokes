@@ -3,6 +3,8 @@ import { classByCode } from '../sim/aircraftClasses';
 import { select, type Selection } from './selection';
 import { scheduleProblems } from './panels';
 import { runwayAlertMessage } from './runway';
+import { biggestBottleneck, type Bottleneck } from '../sim/bottleneck';
+import { isOpsView } from '../render/opsView';
 import type { SimState } from '../sim/state';
 
 /**
@@ -34,6 +36,19 @@ export type Alert = {
 
 /** How many rows show before collapsing into "+N more" — a handful of aircraft shouldn't need scrolling to read. */
 const MAX_VISIBLE_ALERTS = 4;
+
+// The answer only moves as the world does; the strip is asked every frame.
+let bottleneckState: SimState | null = null;
+let bottleneckMinute = -1;
+let bottleneckCache: Bottleneck | null = null;
+function cachedBottleneck(state: SimState): Bottleneck | null {
+  if (state !== bottleneckState || state.simMinute !== bottleneckMinute) {
+    bottleneckState = state;
+    bottleneckMinute = state.simMinute;
+    bottleneckCache = biggestBottleneck(state);
+  }
+  return bottleneckCache;
+}
 
 function collectAlerts(state: SimState, choosingHome: boolean): Alert[] {
   const alerts: Alert[] = scheduleProblems(state).map((message) => ({ key: `schedule:${message}`, message, tab: 'fleet' }));
@@ -67,6 +82,12 @@ function collectAlerts(state: SimState, choosingHome: boolean): Alert[] {
   // for weeks, so it sits in the strip for as long as it lasts.
   const shock = describeShock(state);
   if (shock) alerts.push({ key: shock.key, message: shock.headline, tab: 'fleet' });
+
+  // Ops view: the one thing holding growth back, after the problems.
+  if (!choosingHome && isOpsView() && state.schedule.length > 0) {
+    const hold = cachedBottleneck(state);
+    if (hold) alerts.push({ key: `hold:${hold.kind}`, message: hold.text, tab: 'fleet', view: hold.target });
+  }
 
   // Cash running out ends the game, so it goes first: of everything in
   // this strip, it's the one problem that can't be fixed after the fact.

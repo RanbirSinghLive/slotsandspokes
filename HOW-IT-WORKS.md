@@ -898,6 +898,15 @@ The accumulator loop (`main.ts`) turns real frame time into whole simulated
 minutes (`step()` calls) plus a continuous fractional minute for rendering,
 per the pattern in CLAUDE.md's "Time" section.
 
+**What's holding you back** (`sim/bottleneck.ts`, shown by `ui/alerts.ts`).
+In Ops view, with a non-empty schedule, the alert strip ends with one
+`HOLD · …` row naming the biggest bottleneck to growth, from numbers the
+sim already has. First match wins: home hub slots full, crews short at a
+base for its next plane, a market spilling with no idle aircraft, cash
+below the cheapest lease, a plane flying under 40% of its day. It is a pure
+read of `state`, so it changes no game number; clicking the row opens the
+airport, crews, fleet, money or aircraft view that explains it.
+
 ## Rivals on the ladder (`src/sim/rivalLadder.ts`)
 
 Rivals climb the same ladder as the player to lease bigger aircraft: the
