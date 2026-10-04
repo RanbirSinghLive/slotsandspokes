@@ -1793,6 +1793,36 @@ The Game screen **exports** the save as a file (named for the home and
 the day) and **imports** one, which goes through the same upgrade and
 reloads. It also shows the version and format, and the credits.
 
+**Cloud saves** (`ui/cloudSave.ts`, `src/worker/`): one game across
+phone and computer. The local save above stays the working copy and the
+fallback; the cloud is a copy of it.
+
+- The **account is a sync code**: 20 random characters made on the
+  device (`worker/syncCode.ts`), shown as XXXXX-XXXXX-XXXXX-XXXXX. The
+  server keeps only a SHA-256 of it, so there is no email, password or
+  sign-in. A second device joins by opening the share link (`/#sync=CODE`)
+  or typing the code, on the Game screen or the home picker. Whoever has
+  the code can play the game.
+- The Worker (`worker/index.ts`, `worker/saveRoutes.ts`) answers only
+  `/api/*`, storing the save text under that hash in Workers KV and
+  numbering each write (`rev`). It never reads the game. Without the KV
+  binding `/api/cloud` says `configured: false` and the game shows no
+  cloud controls.
+- **Pushing**: every autosave (`saveState`) also PUTs the save, sending
+  the `rev` this device last synced as `base`. **Pulling**: at startup and
+  whenever the tab comes back to the front, the device asks for the
+  cloud's `rev`. Same `rev`: nothing to do. Different `rev` and this
+  device hasn't saved since it last synced (`dirty` false): at startup the
+  cloud save is loaded and the page reloads; otherwise a **Newer save on
+  another device** dialog offers Keep this device or Load cloud save.
+  Last write wins; the loser is replaced only when the player says so.
+- Turning cloud save on uploads the save already in this browser, so
+  existing games carry over. New Game replaces the cloud copy too.
+- Offline or failing pushes stay `dirty` and retry at the next save.
+- Setup (once, in the Cloudflare dashboard): create a KV namespace, paste
+  its id into the commented `kv_namespaces` block in `wrangler.jsonc`
+  (binding `SAVES`) and merge. `npm run cloudtest` checks the API in Node.
+
 **The crash catcher** (`ui/problemCard.ts`): an uncaught error or
 rejected promise pauses the game and shows a card with the error, the
 version, a download of the save as it stands, and Reload.

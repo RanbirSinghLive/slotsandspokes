@@ -215,6 +215,20 @@
               <button type="button" id="load-game-confirm-cancel">Cancel</button>
             </div>
           </section>
+          <section id="cloud-save-section" hidden>
+            <h2>Cloud save <button type="button" class="info-mark" aria-label="What this means" data-info="Play one game on your phone and your computer. Turning it on makes a sync code on this device and copies your game to the cloud after every autosave. Open the share link or type the code on another device to join. Whoever has the code can play your game, so keep it private. If both devices have played since they last synced, you choose which game to keep.">i</button></h2>
+            <div id="cloud-save-off">
+              <button type="button" id="cloud-save-enable">Turn on cloud save</button>
+              <button type="button" id="cloud-save-join">Use a code</button>
+            </div>
+            <div id="cloud-save-on" hidden>
+              <div class="cloud-save-code" id="cloud-save-code"></div>
+              <button type="button" id="cloud-save-copy-link">Copy share link</button>
+              <button type="button" id="cloud-save-copy-code">Copy code</button>
+              <button type="button" id="cloud-save-disable">Turn off</button>
+            </div>
+            <div id="cloud-save-status"></div>
+          </section>
           <section id="save-file-section">
             <h2>Save file <button type="button" class="info-mark" aria-label="What this means" data-info="Your game lives in this browser. Export it to keep a copy, move it to another browser or computer, or attach it to a bug report; import one to play it here. Importing replaces the game in this browser.">i</button></h2>
             <button type="button" id="export-save-button">Export save</button>
@@ -226,7 +240,7 @@
                     <h2>New Game <button type="button" class="info-mark" aria-label="What this means" data-info="Erase this save entirely and start a brand-new airline.">i</button></h2>
             <button type="button" id="new-game-button">New Game</button>
             <div id="new-game-confirm" hidden>
-              <span>Erase current game?</span>
+              <span id="new-game-confirm-text">Erase current game?</span>
               <button type="button" id="new-game-confirm-yes">Yes, start over</button>
               <button type="button" id="new-game-confirm-cancel">Cancel</button>
             </div>
@@ -296,6 +310,7 @@
           </div>
           <div id="home-world-season-note" class="home-world-season-note"></div>
           <button type="button" id="home-world-start" class="home-world-start" disabled>Start</button>
+          <button type="button" id="home-world-cloud" class="home-world-cloud" hidden>Playing on another device? Use your sync code</button>
           <button type="button" id="home-world-other" class="home-world-other">Select a different airport<span class="home-world-other-short">All airports</span></button>
         </div>
       </div>

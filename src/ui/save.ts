@@ -168,7 +168,16 @@ export function saveState(state: SimState): void {
     localStorage.removeItem(LEGACY_KEY);
   } catch {
     // Ignored deliberately — see the note above.
+    return;
   }
+  afterSave?.();
+}
+
+let afterSave: (() => void) | null = null;
+
+/** Run `callback` after each save is written to this browser (ui/cloudSave.ts copies it to the cloud). */
+export function onSaveWritten(callback: () => void): void {
+  afterSave = callback;
 }
 
 /** Clears the save — used by the "New Game" button (ui/gameControls.ts). */
