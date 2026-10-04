@@ -24,7 +24,23 @@ const REACH_DOT = '#e8ecf5';
 const LABEL_TEXT = '#e8ecf5';
 const LABEL_SHADOW = 'rgba(0, 0, 0, 0.85)';
 
-const land = feature(worldTopology as unknown as Topology, (worldTopology as unknown as Topology).objects.land);
+let land = feature(worldTopology as unknown as Topology, (worldTopology as unknown as Topology).objects.land);
+
+/**
+ * Swap in the Natural Earth 50m land the game map uses (a separate chunk, so
+ * the picker's first frame still draws at once from 110m), then call
+ * `onLoaded` so the picker redraws with it.
+ */
+let fineLandRequested = false;
+export function loadFinePickerLand(onLoaded: () => void): void {
+  if (fineLandRequested) return;
+  fineLandRequested = true;
+  import('../../data/land-50m.json').then((module) => {
+    const topology = module.default as unknown as Topology;
+    land = feature(topology, topology.objects.land);
+    onLoaded();
+  });
+}
 
 export type PickerPoint = { iata: string; lon: number; lat: number };
 
