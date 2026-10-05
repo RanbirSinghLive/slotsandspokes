@@ -2830,7 +2830,9 @@ a barred leg (`BOS → LGA · cabotage barred for CA carriers`), like a range
 limit; legs an old save already flies stay. Rivals follow the rule when
 they open routes, the headless player skips barred markets, and the home
 picker counts only legal neighbours. Connecting passengers still ignore
-it: `npm run rights` prints how many a day it would remove.
+it: `npm run rights` prints how many a day it would remove. While drawing a
+route, airports the carrier can't fly to from the leg's origin show greyed
+with a slash, and hovering one says why.
 
 An airline's **home country** is the country of its home airport
 (`data/airport-countries.json`, built by `npm run countries` from
