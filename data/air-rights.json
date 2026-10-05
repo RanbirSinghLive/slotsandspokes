@@ -1,0 +1,16 @@
+{
+  "note": "Hand-authored from public knowledge (ICAO freedoms of the air, the EU single aviation market). Not yet checked row by row by the owner. A pair in neither list is open for third and fourth freedom.",
+  "sovereignty": {
+    "PR": "US",
+    "GU": "US"
+  },
+  "blocs": [
+    {
+      "id": "EU-EEA",
+      "name": "EU single aviation market",
+      "cabotage": true,
+      "countries": ["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT", "NL", "PL", "PT", "RO", "ES", "SE", "NO", "IS"]
+    }
+  ],
+  "closed": []
+}

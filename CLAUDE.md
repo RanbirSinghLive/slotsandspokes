@@ -166,7 +166,7 @@ Public sources only: OurAirports for coordinates, Natural Earth for the
 basemap and water, GeoNames for population (checked against StatsCan
 census metros), and published type
 specs for aircraft. Some files are **generated** (`npm run airports`,
-`lakes`, `rivers`, `homes`; scripts in `src/headless/build*.ts`). To change a generated
+`countries`, `lakes`, `rivers`, `homes`; scripts in `src/headless/build*.ts`). To change a generated
 file, change its script and re-run it. Never hand-edit its output. No
 database, server or API.
 

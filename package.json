@@ -12,10 +12,12 @@
     "lease": "tsx src/headless/lease.ts",
     "balance": "tsx src/headless/balance.ts",
     "airports": "tsx src/headless/buildAirports.ts",
+    "countries": "tsx src/headless/buildAirportCountries.ts",
     "lakes": "tsx src/headless/buildLakes.ts",
     "rivers": "tsx src/headless/buildRivers.ts",
     "land50": "tsx src/headless/buildLand50.ts",
     "quick": "tsx src/headless/quickBalance.ts",
+    "rights": "tsx src/headless/rightsReport.ts",
     "cloudtest": "tsx src/worker/saveRoutes.test.ts"
   },
   "devDependencies": {
