@@ -2858,6 +2858,12 @@ one; a crew academy shortens the courses and so frees seats sooner. The
 headless player hires up to the free seats each day and the rest the
 days after. Seats are shown per base on the Crews screen.
 
+Cabin teams are hired on the Crews screen, in the Roster: each open class
+from Regional up has a "cabin" row under its pilot row, shown even before
+its first plane so teams can be trained ahead of delivery. The airport
+menu's "Hire pilots and cabin crew" lists them too, and leasing a plane
+adds a cabin note when the base is short.
+
 ## The crew planning board (`src/ui/inspector/crews.ts`, read-out in `src/sim/crewPlan.ts`)
 
 The Crews screen reads like a crew planner's board. `crewPlan()` counts,

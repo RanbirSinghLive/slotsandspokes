@@ -260,7 +260,7 @@ function entryRow(state: SimState, iata: string, c: ClassPlan, entry: PlaneEntry
 
 /** Each base's roster, type by type. */
 function roster(state: SimState, plan: ReturnType<typeof crewPlan>, today: number, changed: () => void): HTMLElement[] {
-  const nodes: HTMLElement[] = [heading('Roster', 'Crews by type rating at each base. The bar is crews on hand (solid) and joining (hatched); the marks are the legal minimum (red), the comfortable number for 8-hour shifts (white), and what the planes on their way will need (amber). Short grounds planes; tight flies late legs tired; reserve crews stand by at a daily cost.')];
+  const nodes: HTMLElement[] = [heading('Roster', 'Crews by type rating at each base. The bar is crews on hand (solid) and joining (hatched); the marks are the legal minimum (red), the comfortable number for 8-hour shifts (white), and what the planes on their way will need (amber). Short grounds planes; tight flies late legs tired; reserve crews stand by at a daily cost. Regional and bigger types have a cabin row under their pilots: cabin teams staff the plane, and short ones cost NPS.')];
   for (const base of plan) {
     const card = document.createElement('div');
     card.className = 'crew-base';
@@ -283,7 +283,7 @@ function roster(state: SimState, plan: ReturnType<typeof crewPlan>, today: numbe
     for (const c of base.classes) {
       card.append(classRow(state, base.iata, c, base.classes, today, changed));
       const cabin = ops.crewReadout(state, base.iata)?.classes.find((r) => r.classCode === c.classCode)?.cabin;
-      if (cabin && (cabin.teams > 0 || cabin.ideal > 0 || cabin.arriving > 0)) card.append(cabinRow(state, base.iata, c, cabin, changed));
+      if (cabin) card.append(cabinRow(state, base.iata, c, cabin, changed));
     }
     nodes.push(card);
   }

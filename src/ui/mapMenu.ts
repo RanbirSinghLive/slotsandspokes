@@ -304,6 +304,29 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
       };
     });
 
+  // Cabin teams for the classes that carry them (Regional and up), after the pilot crews.
+  const cabinCrewChoices: RadialAction[] = (crews?.classes ?? [])
+    .filter((c) => c.open && c.cabin)
+    .map((c) => {
+      const cabin = c.cabin!;
+      return {
+        id: `cabin:${c.classCode}`,
+        label: `Hire 1 ${c.name} cabin team · ${money(cabin.hireFee)} · joins day ${dayIndex(state) + (crews?.cabinLeadDays ?? 0)} · ${cabin.teams} teams${cabin.arriving > 0 ? ` +${cabin.arriving} joining` : ''} · need ${cabin.ideal} (min ${cabin.minimum}) · hold for more`,
+        icon: planeIconInner(c.classCode),
+        large: true,
+        angleDeg: 0,
+        repeatable: true,
+        disabledReason: crews && crews.training.cabin.free === 0 ? `No free cabin training seats at ${airport.iata}.` : state.cash < cabin.hireFee ? `Needs ${money(cabin.hireFee)} on hand to hire a ${c.name} cabin team.` : undefined,
+        onSelect: () => {
+          const result = ops.hireCabinAt(state, airport.iata, c.classCode, 1);
+          notice = result.ok ? result.message : result.reason;
+          refresh();
+          return false;
+        },
+      };
+    });
+  crewChoices.push(...cabinCrewChoices);
+
   // Create base: one entry, then crew, line base or hangar. Each opens the same
   // confirm the Crews and Mtc screens use (fee, running cost, cash after).
   const baseChoice = (kind: 'crew' | 'line' | 'heavy'): RadialAction => {
@@ -393,7 +416,7 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
     { id: 'plane', label: 'Lease a plane here', icon: ICON.plane, angleDeg: -65, children: planeChoices },
     {
       id: 'crew',
-      label: `Hire crews at ${airport.iata} · by type`,
+      label: `Hire pilots and cabin crew at ${airport.iata} · by type`,
       icon: ICON.crew,
       angleDeg: -15,
       disabledReason: !crews
