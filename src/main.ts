@@ -12,6 +12,7 @@ import { drawAirports, drawSelectedAirport, airports, setKnownAirports, nearestA
 import { drawHubView, hasHubView } from './render/hubs';
 import { drawFog } from './render/fog';
 import { drawWeatherEffects } from './render/weather';
+import { drawAirspaceClosures } from './render/airspace';
 import { drawAircraft, findFlightAt, flightScreenPoint } from './render/aircraft';
 import { OTP_BASELINE } from './sim/routeOtp';
 import { updateMarket } from './ui/market';
@@ -329,6 +330,7 @@ function render(nowMs: number = performance.now()): void {
   // just coloured differently, so drawing more than one would double every
   // line. Mapmode wins when active: it's the more deliberate "I asked to
   // see this" choice, same precedence Competition already had over plain.
+  drawAirspaceClosures(ctx, state);
   if (mapMode !== 'none') {
     drawRouteMapMode(ctx, state, mapMode);
   } else if (competitionOverlayOn) {

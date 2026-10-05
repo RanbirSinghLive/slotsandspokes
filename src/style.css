@@ -2103,6 +2103,7 @@ button.ticker-item:hover {
 }
 
 .ticker-tag--shock,
+.ticker-tag--airspace,
 .ticker-tag--wx {
   background: #ffa36b;
 }

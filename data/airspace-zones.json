@@ -1,0 +1,21 @@
+[
+  { "name": "Wildfire smoke, northern Ontario", "kind": "wildfire", "lat": 50.5, "lon": -86.0, "radiusNm": [90, 200], "perYear": 0.12, "season": [152, 273], "days": [3, 9], "noticeDays": 0 },
+  { "name": "Wildfire smoke, northern Quebec", "kind": "wildfire", "lat": 49.5, "lon": -75.5, "radiusNm": [90, 200], "perYear": 0.12, "season": [152, 273], "days": [3, 9], "noticeDays": 0 },
+  { "name": "Wildfire smoke, British Columbia interior", "kind": "wildfire", "lat": 51.5, "lon": -121.0, "radiusNm": [90, 200], "perYear": 0.15, "season": [182, 273], "days": [3, 10], "noticeDays": 0 },
+  { "name": "Wildfire smoke, Alberta", "kind": "wildfire", "lat": 55.5, "lon": -114.0, "radiusNm": [90, 200], "perYear": 0.1, "season": [121, 243], "days": [3, 9], "noticeDays": 0 },
+  { "name": "Wildfire smoke, northern California", "kind": "wildfire", "lat": 40.0, "lon": -122.0, "radiusNm": [80, 180], "perYear": 0.15, "season": [182, 304], "days": [3, 10], "noticeDays": 0 },
+  { "name": "Wildfire smoke, Pacific Northwest", "kind": "wildfire", "lat": 44.5, "lon": -121.5, "radiusNm": [80, 180], "perYear": 0.1, "season": [196, 273], "days": [3, 8], "noticeDays": 0 },
+  { "name": "Wildfire smoke, Mediterranean coast", "kind": "wildfire", "lat": 38.5, "lon": 23.0, "radiusNm": [80, 160], "perYear": 0.15, "season": [182, 243], "days": [3, 7], "noticeDays": 0 },
+  { "name": "Wildfire smoke, southeast Australia", "kind": "wildfire", "lat": -36.5, "lon": 147.0, "radiusNm": [100, 220], "perYear": 0.2, "season": [335, 59], "days": [4, 10], "noticeDays": 0 },
+  { "name": "Ash cloud, Iceland", "kind": "ash", "lat": 63.6, "lon": -19.6, "radiusNm": [250, 600], "perYear": 0.08, "days": [4, 14], "noticeDays": 0 },
+  { "name": "Ash cloud, Sicily", "kind": "ash", "lat": 37.7, "lon": 15.0, "radiusNm": [200, 450], "perYear": 0.06, "days": [2, 8], "noticeDays": 0 },
+  { "name": "Ash cloud, Java", "kind": "ash", "lat": -7.5, "lon": 110.4, "radiusNm": [200, 450], "perYear": 0.06, "days": [3, 10], "noticeDays": 0 },
+  { "name": "Ash cloud, Luzon", "kind": "ash", "lat": 14.0, "lon": 121.0, "radiusNm": [200, 450], "perYear": 0.05, "days": [3, 10], "noticeDays": 0 },
+  { "name": "Ash cloud, central Mexico", "kind": "ash", "lat": 19.0, "lon": -98.6, "radiusNm": [150, 350], "perYear": 0.08, "days": [2, 6], "noticeDays": 0 },
+  { "name": "Ash cloud, Alaska Peninsula", "kind": "ash", "lat": 56.0, "lon": -159.0, "radiusNm": [250, 500], "perYear": 0.05, "days": [3, 9], "noticeDays": 0 },
+  { "name": "Ash cloud, eastern Caribbean", "kind": "ash", "lat": 16.7, "lon": -62.2, "radiusNm": [150, 350], "perYear": 0.04, "days": [3, 8], "noticeDays": 0 },
+  { "name": "Eastern Europe conflict zone", "kind": "conflict", "lat": 49.0, "lon": 32.0, "radiusNm": [300, 500], "perYear": 0.03, "days": [90, 250], "noticeDays": 4 },
+  { "name": "Middle East conflict zone", "kind": "conflict", "lat": 33.0, "lon": 40.0, "radiusNm": [300, 600], "perYear": 0.05, "days": [45, 180], "noticeDays": 4 },
+  { "name": "Gulf conflict zone", "kind": "conflict", "lat": 27.0, "lon": 52.0, "radiusNm": [250, 450], "perYear": 0.03, "days": [30, 120], "noticeDays": 5 },
+  { "name": "Horn of Africa conflict zone", "kind": "conflict", "lat": 11.0, "lon": 44.0, "radiusNm": [250, 450], "perYear": 0.02, "days": [60, 200], "noticeDays": 4 }
+]

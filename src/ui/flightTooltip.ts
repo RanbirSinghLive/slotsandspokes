@@ -77,6 +77,8 @@ export function showFlightTooltip(
     line(`Route LF ${formatLoadFactor(marketLoadFactor(state, flight.origin, flight.dest))} · NPS ${formatNps(marketNps(state, flight.origin, flight.dest))}`),
   ];
 
+  if (flight.detourMinutes) nodes.push(line(`Round airspace closure · +${flight.detourMinutes} min filed`, 'is-late'));
+
   if (lateOnArrival <= 0) {
     nodes.push(line('On time', 'is-good'));
   } else if (lateOnArrival <= ON_TIME_GRACE_MINUTES) {

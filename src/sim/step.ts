@@ -16,6 +16,7 @@ import { carryCargo, rollDailyCargo } from './cargo';
 import { MIN_TURN_MINUTES, legsServingMarket, marketDepartMinutes, marketKey, type ScheduleLeg } from './schedule';
 import { breaksCurfew, rotationStartingWith } from './curfew';
 import { rollDailyWeather, isAirportClosed } from './weather';
+import { legAirspace, rollDailyAirspace } from './airspace';
 import { rollDailyShocks } from './shocks';
 import { airlineFuelPrice, recordHedgedFuel, rollDailyFuelPrice } from './fuelPrice';
 import { airportLoadAt } from './airports';
@@ -115,6 +116,12 @@ const aircraftTypesByCode = new Map<string, EconomyAircraftType>(
  * route's reliability (sim/routeOtp.ts), which is what lets cancellations
  * slow that route's demand growth.
  */
+/** Whether a closure shuts one end of the leg or its detour is beyond the plane's range. */
+function legBlockedByAirspace(state: SimState, leg: ScheduleLeg): boolean {
+  const aircraft = state.aircraft.find((a) => a.tail === leg.tail);
+  return !!aircraft && legAirspace(state, leg.origin, leg.dest, aircraft.typeCode).kind === 'blocked';
+}
+
 function recordCancellation(state: SimState, leg: ScheduleLeg, cause: keyof SimState['cancellationsByCause']): void {
   state.cancellationsByCause[cause] = (state.cancellationsByCause[cause] ?? 0) + 1;
   state.todayFlightsCancelled += 1;
@@ -310,6 +317,10 @@ export function step(state: SimState): void {
     }
 
 
+    // Airspace closures (sim/airspace.ts) come before the day's cancellations,
+    // which read them.
+    rollDailyAirspace(state);
+
     // Cancellations. Everything on the schedule that has an aircraft is a
     // scheduled departure; the ones whose aircraft couldn't be crewed
     // today never operate. Counted once here rather than discovered leg
@@ -331,8 +342,12 @@ export function step(state: SimState): void {
           ? 'mechanical'
           : isAirportClosed(state, leg.origin)
             ? 'weather'
-            : null;
+            : legBlockedByAirspace(state, leg)
+              ? 'airspace'
+              : null;
       if (cause === null) continue;
+      // Held on the ground for the day, so it never leaves and its plane's next leg is judged from where it is.
+      if (cause === 'airspace') state.cancelledToday.push(leg.legId);
       recordCancellation(state, leg, cause);
     }
 
@@ -514,17 +529,22 @@ export function step(state: SimState): void {
     ) + executiveNpsBonus(state);
     recordFlightNps(state, leg.origin, leg.dest, satisfactionScore);
 
+    // Flying round an airspace closure adds minutes to the flight and to
+    // the time it is scheduled to land: re-filed, not late.
+    const airspace = legAirspace(state, leg.origin, leg.dest, aircraft.typeCode);
+    const detourMinutes = airspace.kind === 'detour' ? airspace.extraMinutes : 0;
+
     const activeFlight: ActiveFlight = {
       legId: leg.legId,
       tail: leg.tail,
       origin: leg.origin,
       dest: leg.dest,
       departMinute: state.simMinute,
-      arriveMinute: state.simMinute + leg.blockMinutes + delayMinutes,
+      arriveMinute: state.simMinute + leg.blockMinutes + detourMinutes + delayMinutes,
       // What arriveMinute would be with a fully on-time departure today and
       // zero delay — the honest "should have landed by" time, for the
       // panel to compare against.
-      scheduledArriveMinute: dayStart + leg.departMinute + leg.blockMinutes,
+      scheduledArriveMinute: dayStart + leg.departMinute + leg.blockMinutes + detourMinutes,
       scheduledDepartMinute: dayStart + leg.departMinute,
       delayByCause: delayBreakdown,
       delayMinutes,
@@ -532,6 +552,10 @@ export function step(state: SimState): void {
       // re-read from state.routeSettings at arrival.
       fare: routeSettings.fare,
     };
+    if (airspace.kind === 'detour') {
+      activeFlight.via = airspace.via;
+      activeFlight.detourMinutes = detourMinutes;
+    }
     state.activeFlights.push(activeFlight);
     airborne.add(activeFlight.legId);
   }

@@ -1,4 +1,6 @@
 import { describeShock } from '../sim/shocks';
+import { activeClosures, closureIsRelevant, closureLine } from '../sim/airspace';
+import { dayIndex } from '../sim/clock';
 import { classByCode } from '../sim/aircraftClasses';
 import { select, type Selection } from './selection';
 import { scheduleProblems } from './panels';
@@ -82,6 +84,12 @@ function collectAlerts(state: SimState, choosingHome: boolean): Alert[] {
   // for weeks, so it sits in the strip for as long as it lasts.
   const shock = describeShock(state);
   if (shock) alerts.push({ key: shock.key, message: shock.headline, tab: 'fleet' });
+
+  // Airspace closures near the network (sim/airspace.ts): routes bend round them while they last.
+  for (const closure of activeClosures(state)) {
+    if (!closureIsRelevant(state, closure)) continue;
+    alerts.push({ key: `airspace:${closure.id}`, message: closureLine(closure, dayIndex(state)), tab: 'fleet' });
+  }
 
   // Ops view: the one thing holding growth back, after the problems.
   if (!choosingHome && isOpsView() && state.schedule.length > 0) {

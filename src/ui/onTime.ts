@@ -24,6 +24,7 @@ const CANCEL_CAUSE_LABELS: [keyof SimState['cancellationsByCause'], string][] = 
   ['curfew', 'Delays ran past 22:00'],
   ['position', 'Aircraft out of position'],
   ['maintenance', 'Maintenance hold'],
+  ['airspace', 'Airspace closed'],
 ];
 
 // A simple inline bar for the delay-codes table — 90px is this cause's

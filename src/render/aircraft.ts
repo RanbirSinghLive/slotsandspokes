@@ -1,4 +1,4 @@
-import { geoInterpolate } from 'd3-geo';
+import { flightInterpolator } from './flightPath';
 import { projection } from './projection';
 import { airports } from './airports';
 import { bearing } from '../sim/geo';
@@ -92,7 +92,7 @@ function flightPose(flight: ActiveFlight, nowFractionalMinute: number): FlightPo
   const rawT = (nowFractionalMinute - flight.departMinute) / blockMinutes;
   const t = Math.min(Math.max(rawT, 0), 1);
 
-  const interpolate = geoInterpolate([origin.lon, origin.lat], [dest.lon, dest.lat]);
+  const interpolate = flightInterpolator(flight, [origin.lon, origin.lat], [dest.lon, dest.lat]);
   const here = interpolate(t);
   const point = projection(here);
   if (!point) return null;
