@@ -4,7 +4,8 @@ import { money } from './format';
 import type { LineString } from 'geojson';
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { projection, mapPoint, type ClientPoint } from '../render/projection';
-import { findNearestAirport, type Airport } from '../render/airports';
+import { airports, findNearestAirport, isAirportKnown, type Airport } from '../render/airports';
+import { homeCountry, legRights } from '../sim/rights';
 import { greatCircleDistanceNm } from '../sim/geo';
 import { demandAgainstSeats, marketSize, neverFills } from '../sim/marketSize';
 import { suppressedMarketReason } from '../sim/demand';
@@ -22,6 +23,8 @@ const CHAIN_STROKE = '#ffd166';
 const ORIGIN_RING_STROKE = '#9aa3b8';
 const CANDIDATE_RING_STROKE = '#ffd166';
 const RANGE_RING_STROKE = '#4a90d9';
+/** Airports the carrier's home country may not fly to: greyed out, not hidden, so the player sees why. */
+const BARRED_STROKE = '#6b7388';
 
 // A minimal local view of aircraft-types.json — just what this module
 // needs (range for the ring, seats for the PDEW/CAP readout below,
@@ -109,6 +112,14 @@ function showRouteHoverTooltip(
     routeHoverTooltipBody.textContent = '';
     routeHoverTooltipBody.classList.remove('out-of-range', 'thin-market', 'needs-another-stop');
   }
+
+  // Air rights come first and need no plane: a barred stop says why before it is picked.
+  const rights = legRights(homeCountry(state), origin.iata, candidate.iata);
+  if (!rights.ok) {
+    routeHoverTooltipBody.textContent = rights.reason;
+    routeHoverTooltipBody.classList.remove('out-of-range', 'thin-market', 'needs-another-stop');
+  }
+  routeHoverTooltipBody.classList.toggle('rights-barred', !rights.ok);
 
   routeHoverTooltip.hidden = false;
   routeHoverTooltip.style.left = `${screenX + 16}px`;
@@ -376,6 +387,8 @@ export function drawRoutePreview(ctx: CanvasRenderingContext2D, state: SimState)
     ctx.stroke();
   }
 
+  if (builderState.mode === 'armed') drawBarredAirports(ctx, origin, homeCountry(state));
+
   if (builderState.mode !== 'armed' || !previewGeo) return;
 
   // Snap the preview's endpoint to the candidate airport's exact
@@ -404,6 +417,25 @@ export function drawRoutePreview(ctx: CanvasRenderingContext2D, state: SimState)
       ctx.stroke();
     }
   }
+}
+
+/** A grey slashed ring on every airport the carrier's home country can't fly to from `origin` (sim/rights.ts). */
+function drawBarredAirports(ctx: CanvasRenderingContext2D, origin: Airport, country: string | undefined): void {
+  ctx.save();
+  ctx.strokeStyle = BARRED_STROKE;
+  ctx.lineWidth = 1.5;
+  for (const airport of airports) {
+    if (airport.iata === origin.iata || !isAirportKnown(airport.iata)) continue;
+    if (legRights(country, origin.iata, airport.iata).ok) continue;
+    const point = projection([airport.lon, airport.lat]);
+    if (!point) continue;
+    ctx.beginPath();
+    ctx.arc(point[0], point[1], RING_RADIUS, 0, 2 * Math.PI);
+    ctx.moveTo(point[0] - RING_RADIUS * 0.7, point[1] + RING_RADIUS * 0.7);
+    ctx.lineTo(point[0] + RING_RADIUS * 0.7, point[1] - RING_RADIUS * 0.7);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 // --- Packing a rotation into the day ---

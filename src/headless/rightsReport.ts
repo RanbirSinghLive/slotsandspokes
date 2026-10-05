@@ -24,7 +24,7 @@ const days = Number(process.argv[2]) || 365;
 const homes = process.argv[3] ? [process.argv[3]] : ['YUL', 'YYZ', 'PHL', 'YHZ'];
 const seeds = [1, 2];
 
-console.log(`\n  Air rights, log only · steady player · ${days} days\n`);
+console.log(`\n  Air rights, connections log only · steady player · ${days} days\n`);
 for (const home of homes) {
   for (const seed of seeds) {
     const player = createPlayer('steady');

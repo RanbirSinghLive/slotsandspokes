@@ -72,3 +72,19 @@ export function flowRights(home: string | undefined, a: string, hub: string, b: 
   const first = legRights(home, a, hub);
   return first.ok ? legRights(home, hub, b) : first;
 }
+
+/**
+ * A rival's home country: the one stamped on any of its routes, else the
+ * country of its oldest route's origin (a seed rival such as Albion
+ * Regional is where it starts flying). Undefined for an airline with no
+ * routes, which the rule allows.
+ */
+export function rivalHomeCountry(routes: { code: string; origin: string; homeCountry?: string }[], code: string): string | undefined {
+  let first: { origin: string } | undefined;
+  for (const route of routes) {
+    if (route.code !== code) continue;
+    if (route.homeCountry) return route.homeCountry;
+    first ??= route;
+  }
+  return first ? countryOf(first.origin) : undefined;
+}
