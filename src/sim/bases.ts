@@ -41,11 +41,11 @@ export const MX_MAX_LEVEL = 6;
 export const MX_HOME_FREE_LEVELS = 3;
 export const MX_BASE_FEE: Record<MxKind, number> = { line: 150_000, heavy: 400_000 };
 /** Each level above the first: planes checked a night, or bays. */
-export const MX_LEVEL_FEE: Record<MxKind, number> = { line: 75_000, heavy: 250_000 };
-export const MX_PER_LEVEL_PER_DAY: Record<MxKind, number> = { line: 300, heavy: 900 };
+export const MX_LEVEL_FEE: Record<MxKind, number> = { line: 25_000, heavy: 100_000 };
+export const MX_PER_LEVEL_PER_DAY: Record<MxKind, number> = { line: 100, heavy: 300 };
 /** Rating a station's mechanics for another aircraft class: once, then a day. */
-export const MX_RATING_FEE = 100_000;
-export const MX_RATING_PER_DAY = 400;
+export const MX_RATING_FEE = 50_000;
+export const MX_RATING_PER_DAY = 150;
 export const CONTRACT_CHECK_PER_HOUR = 300;
 
 export type OutstationCheck = 'contract' | 'defer';

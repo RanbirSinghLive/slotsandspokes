@@ -1180,13 +1180,21 @@ const HANGAR_PLANES_PER_BAY = 4;
 function keepMaintenance(state: SimState): string[] {
   const log: string[] = [];
   for (const iata of Object.keys(state.lineBases ?? {})) {
+    // Planes on their way count: the base is ready the night one arrives.
     const based = state.aircraft.filter((aircraft) => aircraft.baseAirport === iata);
-    for (const code of new Set(based.map((aircraft) => aircraft.typeCode))) {
+    const classes = new Set(based.map((aircraft) => aircraft.typeCode));
+    let planes = based.length;
+    for (const cls of AIRCRAFT_CLASSES) {
+      const coming = inboundAt(state, iata, cls.code).length;
+      if (coming > 0) classes.add(cls.code);
+      planes += coming;
+    }
+    for (const code of classes) {
       const rated = actions.rateStation(state, iata, code);
       if (rated.ok) log.push(rated.message);
     }
-    const lineWanted = based.length;
-    const bayWanted = Math.ceil(based.length / HANGAR_PLANES_PER_BAY);
+    const lineWanted = planes;
+    const bayWanted = Math.ceil(planes / HANGAR_PLANES_PER_BAY);
     for (const [kind, wanted] of [['line', lineWanted], ['heavy', bayWanted]] as const) {
       while (mxLevel(state, kind, iata) < wanted) {
         const raised = actions.changeMxLevel(state, kind, iata, 1);

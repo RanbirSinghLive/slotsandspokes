@@ -2886,8 +2886,8 @@ base and a hangar from the start, inside the starting cost.
 | What it is | Where crews live; the only places planes can be leased or based | Where a night is a line check | Where heavy-check hours are banked |
 | Level | none | planes checked a night | bays: planes banking at once |
 | Opened on | the Crews screen | the Mtc screen | the Mtc screen |
-| Open | $100,000, then $500/day | $150,000, then $300/day a level | $400,000, then $900/day a level |
-| Each level above 1 | n/a | $75,000 | $250,000 |
+| Open | $100,000, then $500/day | $150,000, then $100/day a level | $400,000, then $300/day a level |
+| Each level above 1 | n/a | $25,000 | $100,000 |
 | Closes | when no planes are based there and its crews are released | any time away from home | any time away from home |
 
 Levels run 1 to 6. Home starts with the line base and hangar at level 3,
@@ -2907,7 +2907,7 @@ station is cheap and never does a heavy check.
 A plane of an unrated class is treated like one at an outstation, at a line
 base or a hangar. A station's first rating is free (home starts rated for
 the Propeller; a station you open is rated for your most numerous class),
-and each further class costs $100,000 and $400/day, so a mixed fleet costs
+and each further class costs $50,000 and $150/day, so a mixed fleet costs
 more to maintain. Chips on the Mtc screen's Ratings list rate or drop them.
 
 Opening or closing a base asks first: a confirm window (`ui/confirmModal.ts`,
