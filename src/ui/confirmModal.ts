@@ -20,7 +20,7 @@ let open: (() => void) | null = null;
 export function showConfirm(options: ConfirmOptions): void {
   open?.();
   const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
+  overlay.className = 'modal-overlay modal-overlay--confirm';
   const box = document.createElement('div');
   box.className = 'modal-box modal-box--confirm';
   box.setAttribute('role', 'dialog');

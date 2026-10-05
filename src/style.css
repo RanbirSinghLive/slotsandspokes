@@ -4849,7 +4849,12 @@ button.ops-item:hover {
   box-shadow: none;
 }
 
-/* The confirm step before a commitment (ui/confirmModal.ts). */
+/* The confirm step before a commitment (ui/confirmModal.ts). On a phone the
+   panel sheet (40) and rail (41) sit over the map, so the dialog has to clear them. */
+.modal-overlay--confirm {
+  z-index: 45;
+}
+
 .modal-box--confirm {
   min-width: 300px;
 }
