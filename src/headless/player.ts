@@ -2,6 +2,7 @@ import { currentPotentialDemand } from '../sim/marketDemand';
 import { marketLoadFactor } from '../sim/loadFactor';
 import { saleBlockedReason, saleMarginChangePerDay } from '../sim/seatSale';
 import { crewsForRisk } from '../sim/crews';
+import { mxLevel } from '../sim/bases';
 import { dayOfYear, marketSeasonOn } from '../sim/seasons';
 import { SEASONAL_PREMIUM } from '../sim/seasonalLease';
 import { contractOn, contractsOf, performanceFactor } from '../sim/contracts';
@@ -343,6 +344,7 @@ function steadyPlayer(kind: 'steady' | 'sitter' | 'bold'): Player {
         ...shedWhenOverheadBites(state, memory),
         ...returnIdle(state, memory),
         ...keepCrews(state, memory),
+        ...keepMaintenance(state),
         ...pickStances(state, memory),
         ...runHomeHub(state),
         ...tuneFareClasses(state),
@@ -1166,6 +1168,36 @@ function hireExecutives(state: SimState): string[] {
  * crews above target are let go once they've sat spare for
  * CREW_RELEASE_AFTER_DAYS.
  */
+/**
+ * Keep each base's maintenance matched to its planes: the mechanics rated
+ * for every class based there, a line base level for every plane, and a bay
+ * for every HANGAR_PLANES_PER_BAY planes (never fewer than home starts
+ * with). A plane's nights are what the player's day plan builds on, so
+ * the headless player pays for what it flies.
+ */
+const HANGAR_PLANES_PER_BAY = 4;
+
+function keepMaintenance(state: SimState): string[] {
+  const log: string[] = [];
+  for (const iata of Object.keys(state.lineBases ?? {})) {
+    const based = state.aircraft.filter((aircraft) => aircraft.baseAirport === iata);
+    for (const code of new Set(based.map((aircraft) => aircraft.typeCode))) {
+      const rated = actions.rateStation(state, iata, code);
+      if (rated.ok) log.push(rated.message);
+    }
+    const lineWanted = based.length;
+    const bayWanted = Math.ceil(based.length / HANGAR_PLANES_PER_BAY);
+    for (const [kind, wanted] of [['line', lineWanted], ['heavy', bayWanted]] as const) {
+      while (mxLevel(state, kind, iata) < wanted) {
+        const raised = actions.changeMxLevel(state, kind, iata, 1);
+        if (!raised.ok) break;
+        log.push(raised.message);
+      }
+    }
+  }
+  return log;
+}
+
 /** The weekly chance of a crew grounding the player staffs for. */
 const CREW_GROUNDING_RISK = 0.05;
 

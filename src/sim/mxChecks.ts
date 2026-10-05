@@ -1,4 +1,4 @@
-import { contractCost, hasMxBase, outstationCheck } from './bases';
+import { contractCost, heavyBays, heavyRated, lineCapacity, lineRated, outstationCheck } from './bases';
 import { dayStartMinute } from './clock';
 import { nightStopStation } from './nightStops';
 import { projectRestOfDay } from './cascade';
@@ -121,30 +121,37 @@ export type NightResult = 'checked' | 'cleared' | 'short' | 'contracted' | 'away
  */
 export function rollNightlyChecks(state: SimState, dayStartMinute: number): void {
   const results: Record<string, NightResult> = {};
+  const checked: { aircraft: Aircraft; station: string | null }[] = [];
   for (const aircraft of state.aircraft) {
     const legs = state.schedule.filter((leg) => leg.tail === aircraft.tail);
     if (legs.length === 0 || aircraft.rebase) continue;
     if (state.aogs.some((event) => event.tail === aircraft.tail)) continue;
     aircraft.daysSinceHeavyCheck = daysSinceHeavyCheck(aircraft) + 1;
+    checked.push({ aircraft, station: aircraft.status === 'ground' ? aircraft.atAirport : null });
+  }
+  const sleepers = checked.flatMap((entry) => (entry.station ? [{ aircraft: entry.aircraft, station: entry.station }] : []));
+  const inHouse = lineCheckedTails(state, sleepers);
+  const bays = heavyBayTails(state, sleepers);
 
+  for (const { aircraft, station } of checked) {
+    const legs = state.schedule.filter((leg) => leg.tail === aircraft.tail);
     let result: NightResult;
-    const station = aircraft.status === 'ground' ? aircraft.atAirport : null;
     const firstDeparture = dayStartMinute + Math.min(...legs.map((leg) => leg.departMinute));
     const night = firstDeparture - RELEASE_MINUTES - aircraft.groundSinceMinute;
     const work = lineCheckMinutes(state, aircraft);
-    if (!station || (!hasMxBase(state, station) && outstationCheck(state, station) === 'defer')) {
+    if (!station || (!inHouse.has(aircraft.tail) && outstationCheck(state, station) === 'defer')) {
       result = 'away';
-    } else if (!hasMxBase(state, station)) {
+    } else if (!inHouse.has(aircraft.tail)) {
       // Contracted at the station: paid for the work, however the night turns out.
       result = night < work ? 'short' : 'contracted';
       chargeMaintenance(state, contractCost(work));
     } else {
       result = night < work ? 'short' : night >= work + CLEAR_SPARE_MINUTES && deferredItems(aircraft) > 0 ? 'cleared' : 'checked';
-      // What the night has left after the line check goes toward the heavy check, once it's open.
-      if (heavyCheckOpen(aircraft) && night > work) {
-        aircraft.heavyBankedMinutes = heavyBankedMinutes(aircraft) + Math.round(night - work);
-        if (heavyBankedMinutes(aircraft) >= heavyCheckWorkMinutes(aircraft.typeCode)) finishHeavyCheck(aircraft);
-      }
+    }
+    // What the night has left after the line check goes toward the heavy check, once it's open, in a hangar bay.
+    if (station && result !== 'away' && bays.has(aircraft.tail) && night > work) {
+      aircraft.heavyBankedMinutes = heavyBankedMinutes(aircraft) + Math.round(night - work);
+      if (heavyBankedMinutes(aircraft) >= heavyCheckWorkMinutes(aircraft.typeCode)) finishHeavyCheck(aircraft);
     }
     if (result === 'away' || result === 'short') aircraft.deferredItems = deferredItems(aircraft) + 1;
     if (result === 'cleared') {
@@ -153,9 +160,52 @@ export function rollNightlyChecks(state: SimState, dayStartMinute: number): void
       if (aircraft.deferredItems === 0) delete aircraft.deferredItems;
     }
     results[aircraft.tail] = result;
-
   }
   state.lastNightChecks = results;
+}
+
+/**
+ * Of the planes sleeping at stations, the tails whose night is a line
+ * check in house: at a line base rated for their class, the ones with the
+ * most deferred items first, up to the base's level.
+ */
+export function lineCheckedTails(state: SimState, sleepers: { aircraft: Aircraft; station: string }[]): Set<string> {
+  const done = new Set<string>();
+  const byStation = new Map<string, Aircraft[]>();
+  for (const { aircraft, station } of sleepers) {
+    if (!lineRated(state, station, aircraft.typeCode)) continue;
+    byStation.set(station, [...(byStation.get(station) ?? []), aircraft]);
+  }
+  for (const [station, planes] of byStation) {
+    planes.sort((a, b) => deferredItems(b) - deferredItems(a) || a.tail.localeCompare(b.tail));
+    for (const plane of planes.slice(0, lineCapacity(state, station))) done.add(plane.tail);
+  }
+  return done;
+}
+
+/**
+ * The planes holding a hangar bay: at a hangar rated for their class, with
+ * the heavy check open, the closest to due first, up to the bays left
+ * after planes in a forced check there.
+ */
+export function heavyBayTails(state: SimState, sleepers: { aircraft: Aircraft; station: string }[]): Set<string> {
+  const held = new Set<string>();
+  const byStation = new Map<string, Aircraft[]>();
+  for (const { aircraft, station } of sleepers) {
+    if (!heavyRated(state, station, aircraft.typeCode) || !heavyCheckOpen(aircraft)) continue;
+    byStation.set(station, [...(byStation.get(station) ?? []), aircraft]);
+  }
+  for (const [station, planes] of byStation) {
+    const inForcedCheck = state.aogs.filter((event) => event.check && event.base === station).length;
+    planes.sort((a, b) => heavyCheckDueIn(a) - heavyCheckDueIn(b) || a.tail.localeCompare(b.tail));
+    for (const plane of planes.slice(0, Math.max(0, heavyBays(state, station) - inForcedCheck))) held.add(plane.tail);
+  }
+  return held;
+}
+
+/** The planes asleep at each station tonight, as they stand now: grounded planes where they are. */
+export function sleepersNow(state: SimState): { aircraft: Aircraft; station: string }[] {
+  return state.aircraft.flatMap((aircraft) => (aircraft.status === 'ground' && aircraft.atAirport ? [{ aircraft, station: aircraft.atAirport }] : []));
 }
 
 /** Maintenance spending outside the flights: contracted checks. */
@@ -181,7 +231,7 @@ export function morningHolds(state: SimState): { tail: string; legIds: string[] 
     const first = rotationsForTail(state, aircraft.tail)[0];
     if (!first) continue;
     holds.push({ tail: aircraft.tail, legIds: first.legs.map((leg) => leg.legId) });
-    if (!hasMxBase(state, aircraft.atAirport ?? '')) chargeMaintenance(state, contractCost(lineCheckMinutes(state, aircraft) * deferredItems(aircraft)));
+    if (!lineRated(state, aircraft.atAirport ?? '', aircraft.typeCode)) chargeMaintenance(state, contractCost(lineCheckMinutes(state, aircraft) * deferredItems(aircraft)));
     delete aircraft.deferredItems;
   }
   return holds;
@@ -190,7 +240,8 @@ export function morningHolds(state: SimState): { tail: string; legIds: string[] 
 /**
  * Heavy checks overdue past the grace, from sim/aog.ts's morning pass:
  * each plane at base is grounded for the work it has left, in whole days.
- * A base with no maintenance has the work contracted, paid here.
+ * Done in house at a hangar rated for the class; elsewhere the work is
+ * contracted, paid here.
  */
 export function forcedHeavyChecks(state: SimState): { aircraft: Aircraft; days: number }[] {
   const forced = state.aircraft
@@ -200,7 +251,7 @@ export function forcedHeavyChecks(state: SimState): { aircraft: Aircraft; days: 
     .filter((aircraft) => !state.aogs.some((event) => event.tail === aircraft.tail));
   return forced.map((aircraft) => {
     const workLeft = heavyCheckWorkMinutes(aircraft.typeCode) - heavyBankedMinutes(aircraft);
-    if (!hasMxBase(state, aircraft.atAirport ?? '')) chargeMaintenance(state, contractCost(workLeft));
+    if (!heavyRated(state, aircraft.atAirport ?? '', aircraft.typeCode)) chargeMaintenance(state, contractCost(workLeft));
     return { aircraft, days: Math.max(1, Math.ceil(workLeft / MINUTES_PER_DAY)) };
   });
 }
@@ -216,14 +267,14 @@ export function finishHeavyCheck(aircraft: Aircraft): void {
  * Tonight's line check, as it's shaping up: the plane's projected last
  * landing (sim/cascade.ts, so a day running late shows tonight getting
  * shorter before it happens) against tomorrow's first departure, less
- * RELEASE_MINUTES, and the work it needs, and where its day ends: at a
- * maintenance base, contracted at a station, or away with no check. Null
- * for a plane with nothing to fly.
+ * RELEASE_MINUTES, and the work it needs, and where its day ends: checked
+ * in house at a line base with room and the class rated, contracted at a
+ * station, or away with no check. Null for a plane with nothing to fly.
  */
 export function tonightCheck(
   state: SimState,
   tail: string,
-): { night: number; work: number; station: string; away: boolean; contracted: boolean; short: boolean } | null {
+): { night: number; work: number; station: string; inHouse: boolean; away: boolean; contracted: boolean; short: boolean } | null {
   const aircraft = state.aircraft.find((a) => a.tail === tail);
   const legs = state.schedule.filter((leg) => leg.tail === tail).sort((a, b) => a.departMinute - b.departMinute);
   if (!aircraft || legs.length === 0) return null;
@@ -234,7 +285,13 @@ export function tonightCheck(
   const night = dayStart + MINUTES_PER_DAY + legs[0].departMinute - RELEASE_MINUTES - landing;
   const work = lineCheckMinutes(state, aircraft);
   const station = last.dest;
-  const contracted = !hasMxBase(state, station) && outstationCheck(state, station) === 'contract';
-  const away = !hasMxBase(state, station) && !contracted;
-  return { night, work, station, away, contracted, short: !away && night < work };
+  // Who else ends the day at this station decides whether the line base has room.
+  const sleepers = state.aircraft.flatMap((other) => {
+    const otherLegs = state.schedule.filter((leg) => leg.tail === other.tail).sort((a, b) => a.departMinute - b.departMinute);
+    return otherLegs.length > 0 && otherLegs[otherLegs.length - 1].dest === station ? [{ aircraft: other, station }] : [];
+  });
+  const inHouse = lineCheckedTails(state, sleepers).has(tail);
+  const contracted = !inHouse && outstationCheck(state, station) === 'contract';
+  const away = !inHouse && !contracted;
+  return { night, work, station, inHouse, away, contracted, short: !away && night < work };
 }
