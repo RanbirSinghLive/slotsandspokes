@@ -42,6 +42,8 @@ import { aircraftUtilisation, rotationsForTail, USABLE_DAY_END_MINUTE, utilisati
 import { nightStopCostPerNight, nightStopStation } from '../sim/nightStops';
 import { summarizeMarket } from '../sim/marketSummary';
 import { congestionParameters } from '../sim/delays';
+import { acceptMandate, mandatedLeg, mandatesOf, marketHasMandate } from '../sim/mandates';
+import { crewReadiness } from '../sim/crews';
 
 /**
  * The headless "players" that balance runs are played by (WEEK-EIGHT.md,
@@ -363,6 +365,7 @@ function steadyPlayer(kind: 'steady' | 'sitter' | 'bold'): Player {
         ...cutLosers(state, memory),
         ...fillDelivered(state, memory),
         ...takeContracts(state, memory),
+        ...takePriorityFlights(state),
         ...keepContractsOnTime(state, memory),
         ...(harvesting ? [] : [...feedSpill(state, memory), ...openMarkets(state, memory), ...leaseWhenFull(state, memory, kind === 'bold')]),
         ...shedWhenOverheadBites(state, memory),
@@ -568,6 +571,23 @@ function runHomeHub(state: SimState): string[] {
  * asks, and it starts the next day. Priced on the Match stance like any
  * market this player opens.
  */
+/**
+ * Accept an offered priority flight (sim/mandates.ts) when the plane that
+ * flies it has a spare crew at its base: protection is only worth having
+ * with crews to protect it. Everything else is left to lapse.
+ */
+function takePriorityFlights(state: SimState): string[] {
+  const log: string[] = [];
+  for (const mandate of mandatesOf(state)) {
+    if (mandate.status !== 'offered') continue;
+    const leg = mandatedLeg(state, mandate);
+    const plane = leg ? state.aircraft.find((aircraft) => aircraft.tail === leg.tail) : undefined;
+    if (!plane?.baseAirport || crewReadiness(state, plane.baseAirport, plane.typeCode).reserve < 1) continue;
+    if (acceptMandate(state, mandate.id).ok) log.push(`priority ${mandate.origin}–${mandate.dest}`);
+  }
+  return log;
+}
+
 function takeContracts(state: SimState, memory: Memory): string[] {
   const log: string[] = [];
   for (const contract of contractsOf(state)) {
@@ -744,6 +764,10 @@ function dropOneFlight(state: SimState, memory: Memory, a: string, b: string, ti
   // way every day: its last round trip stays until the term is over.
   if (contractOn(state, a, b)?.status === 'active' && legsServingMarket(a, b, state.schedule) <= 2) {
     return { ok: false, reason: `${a}–${b} is under contract` };
+  }
+  // Nor a market with a priority flight accepted on it (sim/mandates.ts), until its term is over.
+  if (marketHasMandate(state, a, b) && legsServingMarket(a, b, state.schedule) <= 1) {
+    return { ok: false, reason: `${a}–${b} carries a priority flight` };
   }
   const one = actions.previewRemoveFlight(state, a, b);
   const tails = one.ok ? [one.rotation.tail] : actions.rotationsServing(state, a, b).map((rotation) => rotation.tail);
@@ -926,6 +950,7 @@ function shedWhenOverheadBites(state: SimState, memory: Memory): string[] {
   for (const aircraft of [...state.aircraft].reverse()) {
     const legs = state.schedule.filter((leg) => leg.tail === aircraft.tail);
     const keys = [...new Set(legs.map((leg) => marketKey(leg.origin, leg.dest)))];
+    if (legs.some((leg) => marketHasMandate(state, leg.origin, leg.dest))) continue;
     const ready = legs.length > 0 && keys.every((key) => daysFlown(state, memory, key) >= RAMP_UP_DAYS && lastWeekMargin(state, key) !== null);
     if (!ready) {
       memory.shortDays.delete(aircraft.tail);

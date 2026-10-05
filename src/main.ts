@@ -13,6 +13,8 @@ import { drawHubView, hasHubView } from './render/hubs';
 import { drawFog } from './render/fog';
 import { drawWeatherEffects } from './render/weather';
 import { drawAirspaceClosures } from './render/airspace';
+import { updateMandates } from './ui/mandates';
+import { drawMandateStars } from './render/mandates';
 import { drawAircraft, findFlightAt, flightScreenPoint } from './render/aircraft';
 import { OTP_BASELINE } from './sim/routeOtp';
 import { updateMarket } from './ui/market';
@@ -295,6 +297,7 @@ function render(nowMs: number = performance.now()): void {
   // comment for why that's the point. An alert with no view of its own
   // (a schedule problem) opens Fleet, where the rotations are.
   updateAlerts(state, () => select({ kind: 'fleet' }), choosingHome);
+  updateMandates(state, choosingHome);
 
   // The game-over screen is a global overlay, not part of any one sidebar
   // tab, so it keeps refreshing whichever one is showing. Pausing on
@@ -383,6 +386,7 @@ function render(nowMs: number = performance.now()): void {
   drawAircraft(ctx, state, latestFractionalMinute, hoveredFlight?.legId ?? selectedFlight?.legId ?? null);
   drawAirports(ctx, state);
   drawOpsRouteLabels(ctx, state, selection, mapHover, hoverPoint);
+  drawMandateStars(ctx, state);
 
   drawAirportChips(ctx, state);
 

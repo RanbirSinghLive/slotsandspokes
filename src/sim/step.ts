@@ -17,6 +17,7 @@ import { MIN_TURN_MINUTES, legsServingMarket, marketDepartMinutes, marketKey, ty
 import { breaksCurfew, rotationStartingWith } from './curfew';
 import { rollDailyWeather, isAirportClosed } from './weather';
 import { legAirspace, rollDailyAirspace } from './airspace';
+import { rollDailyMandates, settleMandateArrival, settleMandateCancellation } from './mandates';
 import { rollDailyShocks } from './shocks';
 import { airlineFuelPrice, recordHedgedFuel, rollDailyFuelPrice } from './fuelPrice';
 import { airportLoadAt } from './airports';
@@ -126,6 +127,7 @@ function recordCancellation(state: SimState, leg: ScheduleLeg, cause: keyof SimS
   state.cancellationsByCause[cause] = (state.cancellationsByCause[cause] ?? 0) + 1;
   state.todayFlightsCancelled += 1;
   state.flightsCancelledTotal += 1;
+  settleMandateCancellation(state, leg, cause);
   recordFlightNps(state, leg.origin, leg.dest, CANCELLATION_NPS_SCORE);
   const market = (state.todayOnTimeByMarket[marketKey(leg.origin, leg.dest)] ??= { arrived: 0, onTime: 0, cancelled: 0 });
   market.cancelled += 1;
@@ -320,6 +322,7 @@ export function step(state: SimState): void {
     // Airspace closures (sim/airspace.ts) come before the day's cancellations,
     // which read them.
     rollDailyAirspace(state);
+    rollDailyMandates(state);
 
     // Cancellations. Everything on the schedule that has an aircraft is a
     // scheduled departure; the ones whose aircraft couldn't be crewed
@@ -689,6 +692,7 @@ export function step(state: SimState): void {
     };
 
     state.completedToday.push(flight.legId);
+    settleMandateArrival(state, flight);
     state.activeFlights.splice(i, 1);
   }
 

@@ -3,6 +3,7 @@ import type { GameDifficulty } from './difficulty';
 import type { FareWar, FareWarEvent } from './fareWars';
 import type { DemandEvent } from './demandEvents';
 import type { AirspaceClosure } from './airspace';
+import type { Mandate } from './mandates';
 import aircraftTypesData from '../../data/aircraft-types.json';
 import type { Shock } from './shocks';
 import { START_DAY_OF_YEAR, startingSimMinute } from './clock';
@@ -517,6 +518,11 @@ export type SimState = {
   nextClosureId?: number;
   /** The closures' own random stream, apart from rngSeed so they don't shift every other roll. */
   airspaceSeed?: number;
+  /** Priority flights offered, accepted or just finished (sim/mandates.ts). */
+  mandates?: Mandate[];
+  nextMandateId?: number;
+  /** The mandates' own random stream, apart from rngSeed. */
+  mandateSeed?: number;
   /** The latest fuel hedge bought, running or ended (sim/fuelPrice.ts), or absent if none ever was. */
   fuelHedge?: FuelHedge;
   /**

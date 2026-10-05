@@ -13,6 +13,12 @@ export type ConfirmOptions = {
   facts?: string[];
   confirmLabel: string;
   run: () => void;
+  /** Paragraphs under the title, before the rows: flavour or a lead-in. */
+  intro?: string[];
+  /** Replaces "Cancel" on the dismissing button. */
+  cancelLabel?: string;
+  /** Adds a modifier class to the box, for a dialog styled as an alert. */
+  tone?: 'priority';
 };
 
 let open: (() => void) | null = null;
@@ -24,9 +30,16 @@ export function showConfirm(options: ConfirmOptions): void {
   const box = document.createElement('div');
   box.className = 'modal-box modal-box--confirm';
   box.setAttribute('role', 'dialog');
+  if (options.tone) box.classList.add(`modal-box--${options.tone}`);
   const title = document.createElement('h2');
   title.textContent = options.title;
   box.append(title);
+  for (const text of options.intro ?? []) {
+    const p = document.createElement('p');
+    p.className = 'confirm-intro';
+    p.textContent = text;
+    box.append(p);
+  }
   const table = document.createElement('div');
   table.className = 'confirm-rows';
   for (const row of options.rows) {
@@ -50,7 +63,7 @@ export function showConfirm(options: ConfirmOptions): void {
   actions.className = 'modal-actions';
   const cancel = document.createElement('button');
   cancel.type = 'button';
-  cancel.textContent = 'Cancel';
+  cancel.textContent = options.cancelLabel ?? 'Cancel';
   const confirm = document.createElement('button');
   confirm.type = 'button';
   confirm.className = 'confirm-go';
