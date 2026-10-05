@@ -6,6 +6,7 @@ import { findNearestOwnRoute } from '../render/routes';
 import { projection, mapPoint, type ClientPoint } from '../render/projection';
 import { TURN_BUFFER_CHOICES } from '../sim/turnBuffer';
 import { connectingUnderStyle, spokesOf } from '../sim/hubs';
+import { costRows } from './confirmModal';
 import { confirmHubStyle } from './hubStyleConfirm';
 import { HUB_STYLES, HUB_STYLE_ORDER, hubStyleAt } from '../sim/hubStyle';
 import { setMapPreview, type MapPreview } from '../render/preview';
@@ -26,6 +27,7 @@ import { USEFUL_LIFE_YEARS } from '../sim/leasing';
 import { crewPlan } from '../sim/crewPlan';
 import { trailingDailyMargin } from '../sim/forecast';
 import { dayIndex } from '../sim/clock';
+import { hasCrewBase, hasMxBase } from '../sim/bases';
 import { SEASON_DAYS, SEASONAL_PREMIUM } from '../sim/seasonalLease';
 
 /**
@@ -71,6 +73,10 @@ const ICON = {
   hub: '<circle cx="12" cy="12" r="2.5"/><path d="M12 9.5V3"/><path d="M9.8 13.3 4.5 17"/><path d="M14.2 13.3 19.5 17"/>',
   clock: '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>',
   // Two people: a crew.
+  // A hangar: a base to build.
+  base: '<path d="M3 20V10l9-6 9 6v10"/><path d="M8 20v-6h8v6"/>',
+  // A wrench: maintenance.
+  wrench: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3.5 17.3a1.4 1.4 0 0 0 2 2l5.8-5.8a4 4 0 0 0 5.2-5.4l-2.5 2.5-2-.6-.6-2z"/>',
   crew: '<circle cx="9" cy="8" r="3"/><path d="M3 20v-1a6 6 0 0 1 12 0v1"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.2a5 5 0 0 1 5 4.8v1"/>',
 };
 
@@ -298,6 +304,38 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
       };
     });
 
+  // Create base: one entry, then crew or maintenance. Each opens the same
+  // confirm the Crews and Mtc screens use (fee, running cost, cash after).
+  const baseChoice = (kind: 'crew' | 'mtc'): RadialAction => {
+    const exists = kind === 'crew' ? hasCrewBase(state, airport.iata) : hasMxBase(state, airport.iata);
+    const word = kind === 'crew' ? 'crew' : 'Mtc';
+    const preview = ops.previewBaseChange(state, kind, 'open', airport.iata);
+    return {
+      id: `base:${kind}`,
+      label: exists
+        ? `${airport.iata} is already a ${word} base`
+        : `Create ${word} base · ${money(preview.fee)} + ${money(preview.perDay)}/day · ${kind === 'crew' ? 'crews live here, planes can be based' : 'nights here are line checks'}`,
+      icon: kind === 'crew' ? ICON.crew : ICON.wrench,
+      large: true,
+      angleDeg: 0,
+      disabledReason: preview.blocked ?? undefined,
+      onSelect: () => {
+        showConfirm({
+          title: `Open ${word} base · ${airport.iata}`,
+          rows: costRows(preview.fee, preview.kindPerDayBefore, preview.kindPerDayAfter, preview.cashAfter),
+          facts: preview.facts,
+          confirmLabel: `Open · ${money(preview.fee)}`,
+          run: () => {
+            const result = kind === 'crew' ? ops.openCrewBaseAt(state, airport.iata) : ops.openMxBaseAt(state, airport.iata);
+            notice = result.ok ? result.message : result.reason;
+            refresh();
+          },
+        });
+        return false;
+      },
+    };
+  };
+
   // Hub style (sim/hubStyle.ts): each choice planned up front, like the
   // route ring's turn buffer, so one the base can't absorb is greyed out
   // with the reason, and hovering one previews its effect on the pools.
@@ -364,6 +402,14 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
           ? 'No aircraft type open to crew yet'
           : undefined,
       children: crewChoices,
+    },
+    {
+      id: 'base',
+      label: `Create base at ${airport.iata} · crew or maintenance`,
+      icon: ICON.base,
+      angleDeg: 60,
+      disabledReason: hasCrewBase(state, airport.iata) && hasMxBase(state, airport.iata) ? `${airport.iata} has a crew base and a Mtc base` : undefined,
+      children: [baseChoice('crew'), baseChoice('mtc')],
     },
     {
       id: 'return',

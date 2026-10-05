@@ -2873,11 +2873,11 @@ start, inside the starting cost, and they cost nothing to run.
 | | Crew base | Maintenance base |
 |---|---|---|
 | What it is | Where crews live; the only places planes can be leased or based | Where a night is a line check and banks heavy-check hours |
-| Opened on | the Crews screen | the Mtc screen |
+| Opened on | the Crews screen, or the map ring's Create base | the Mtc screen, or the map ring's Create base |
 | Cost | $100,000, then $500/day (crew room, under crew) | $400,000, then $1,500/day (under maintenance) |
 | Closes | when no planes are based there and its crews are released | any time; nights there are then contracted or deferred |
 
-Opening or closing a base asks first: a confirm window (`ui/confirmModal.ts`,
+Clicking an airport's ring has one Create base button with a crew or Mtc choice; it greys out for a kind the airport already has and opens the same confirm as the screens. Opening or closing a base asks first: a confirm window (`ui/confirmModal.ts`,
 numbers from `previewBaseChange()`) shows the fee, the running cost before and
 after, the cash left, and what changes at that airport. The same window
 asks before leasing a plane, returning one, rebasing, ordering or calling off
