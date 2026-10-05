@@ -1,6 +1,8 @@
 import { dayIndex } from '../../sim/clock';
 import { crewPlan, type ClassPlan, type PlaneEntry } from '../../sim/crewPlan';
-import { CABIN_SHORT_NPS_PENALTY, CABIN_TEAMS_PER_SHIFT, CREWS_PER_NEW_PLANE, crewReadiness, hireFee, hireLeadDays, retrainDays, retrainFee, SICK_BASE_CHANCE, SICK_STRAIN_CHANCE, standbyCost } from '../../sim/crews';
+import { AIRCRAFT_CLASSES, classByCode } from '../../sim/aircraftClasses';
+import { classOpen, tierThatOpens } from '../../sim/ladder';
+import { cabinHireFee, needsCabinCrew, CABIN_SHORT_NPS_PENALTY, CABIN_TEAMS_PER_SHIFT, CREWS_PER_NEW_PLANE, crewReadiness, hireFee, hireLeadDays, retrainDays, retrainFee, SICK_BASE_CHANCE, SICK_STRAIN_CHANCE, standbyCost } from '../../sim/crews';
 import type { SimState } from '../../sim/state';
 import { money } from '../format';
 import { linkToMap } from '../mapLink';
@@ -260,7 +262,7 @@ function entryRow(state: SimState, iata: string, c: ClassPlan, entry: PlaneEntry
 
 /** Each base's roster, type by type. */
 function roster(state: SimState, plan: ReturnType<typeof crewPlan>, today: number, changed: () => void): HTMLElement[] {
-  const nodes: HTMLElement[] = [heading('Roster', 'Crews by type rating at each base. The bar is crews on hand (solid) and joining (hatched); the marks are the legal minimum (red), the comfortable number for 8-hour shifts (white), and what the planes on their way will need (amber). Short grounds planes; tight flies late legs tired; reserve crews stand by at a daily cost.')];
+  const nodes: HTMLElement[] = [heading('Roster', 'Crews by type rating at each base. The bar is crews on hand (solid) and joining (hatched); the marks are the legal minimum (red), the comfortable number for 8-hour shifts (white), and what the planes on their way will need (amber). Short grounds planes; tight flies late legs tired; reserve crews stand by at a daily cost. Regional and bigger types have a cabin row under their pilots: cabin teams staff the plane, and short ones cost NPS.')];
   for (const base of plan) {
     const card = document.createElement('div');
     card.className = 'crew-base';
@@ -283,7 +285,11 @@ function roster(state: SimState, plan: ReturnType<typeof crewPlan>, today: numbe
     for (const c of base.classes) {
       card.append(classRow(state, base.iata, c, base.classes, today, changed));
       const cabin = ops.crewReadout(state, base.iata)?.classes.find((r) => r.classCode === c.classCode)?.cabin;
-      if (cabin && (cabin.teams > 0 || cabin.ideal > 0 || cabin.arriving > 0)) card.append(cabinRow(state, base.iata, c, cabin, changed));
+      if (cabin) card.append(cabinRow(state, base.iata, c, cabin, changed));
+    }
+    // Types the airline can't fly yet still show their cabin row, greyed out: a hint of what comes later.
+    for (const cls of AIRCRAFT_CLASSES) {
+      if (needsCabinCrew(cls.code) && !classOpen(state, cls.code)) card.append(lockedCabinRow(cls.code));
     }
     nodes.push(card);
   }
@@ -431,6 +437,33 @@ function cabinRow(state: SimState, iata: string, c: ClassPlan, cabin: NonNullabl
       confirmLabel: 'Release',
     }));
   }
+  row.append(buttons);
+  return row;
+}
+
+/** A cabin row for a type the airline can't fly yet: greyed out, with what opens it. */
+function lockedCabinRow(classCode: string): HTMLElement {
+  const name = classByCode(classCode)?.name ?? classCode;
+  const opener = tierThatOpens(classCode);
+  const row = document.createElement('div');
+  row.className = 'crew-row crew-row--locked';
+  const head = document.createElement('div');
+  head.className = 'crew-row-head';
+  const label = document.createElement('span');
+  label.append(planeIconElement(classCode), ` ${name} cabin`);
+  head.append(label, chipElement({ text: 'LOCKED', tone: 'idle' }));
+  row.append(head);
+  const teams = CABIN_TEAMS_PER_SHIFT[classCode] ?? 0;
+  row.append(line(`${teams} cabin team${teams === 1 ? '' : 's'} a shift · ${money(cabinHireFee(classCode))} a team · opens as ${opener?.name ?? 'you grow'}`, 'inspector-line crew-row-detail'));
+  const buttons = document.createElement('div');
+  buttons.className = 'crew-buttons';
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'inspector-plan-hub crew-action';
+  button.textContent = `Hire 1 cabin · ${money(cabinHireFee(classCode))}`;
+  button.disabled = true;
+  button.title = `${name} planes aren't open to the airline yet.`;
+  buttons.append(button);
   row.append(buttons);
   return row;
 }

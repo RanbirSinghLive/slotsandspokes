@@ -28,6 +28,8 @@ import { crewPlan } from '../sim/crewPlan';
 import { trailingDailyMargin } from '../sim/forecast';
 import { dayIndex } from '../sim/clock';
 import { hasCrewBase, mxLevel } from '../sim/bases';
+import { classOpen, tierThatOpens } from '../sim/ladder';
+import { cabinHireFee, needsCabinCrew } from '../sim/crews';
 import { SEASON_DAYS, SEASONAL_PREMIUM } from '../sim/seasonalLease';
 
 /**
@@ -304,6 +306,39 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
       };
     });
 
+  // Cabin teams for the classes that carry them (Regional and up), after the pilot crews.
+  const cabinCrewChoices: RadialAction[] = (crews?.classes ?? [])
+    .filter((c) => c.open && c.cabin)
+    .map((c) => {
+      const cabin = c.cabin!;
+      return {
+        id: `cabin:${c.classCode}`,
+        label: `Hire 1 ${c.name} cabin team · ${money(cabin.hireFee)} · joins day ${dayIndex(state) + (crews?.cabinLeadDays ?? 0)} · ${cabin.teams} teams${cabin.arriving > 0 ? ` +${cabin.arriving} joining` : ''} · need ${cabin.ideal} (min ${cabin.minimum}) · hold for more`,
+        icon: planeIconInner(c.classCode),
+        large: true,
+        angleDeg: 0,
+        repeatable: true,
+        disabledReason: crews && crews.training.cabin.free === 0 ? `No free cabin training seats at ${airport.iata}.` : state.cash < cabin.hireFee ? `Needs ${money(cabin.hireFee)} on hand to hire a ${c.name} cabin team.` : undefined,
+        onSelect: () => {
+          const result = ops.hireCabinAt(state, airport.iata, c.classCode, 1);
+          notice = result.ok ? result.message : result.reason;
+          refresh();
+          return false;
+        },
+      };
+    });
+  // Types not open yet stay in the menu greyed out.
+  const lockedCabinChoices: RadialAction[] = AIRCRAFT_CLASSES.filter((cls) => needsCabinCrew(cls.code) && !classOpen(state, cls.code)).map((cls) => ({
+    id: `cabin:${cls.code}`,
+    label: `${cls.name} cabin teams · ${money(cabinHireFee(cls.code))} a team · opens as ${tierThatOpens(cls.code)?.name ?? 'you grow'}`,
+    icon: planeIconInner(cls.code),
+    large: true,
+    angleDeg: 0,
+    disabledReason: `${cls.name} planes aren't open to the airline yet.`,
+    onSelect: () => false,
+  }));
+  crewChoices.push(...cabinCrewChoices, ...lockedCabinChoices);
+
   // Create base: one entry, then crew, line base or hangar. Each opens the same
   // confirm the Crews and Mtc screens use (fee, running cost, cash after).
   const baseChoice = (kind: 'crew' | 'line' | 'heavy'): RadialAction => {
@@ -393,7 +428,7 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
     { id: 'plane', label: 'Lease a plane here', icon: ICON.plane, angleDeg: -65, children: planeChoices },
     {
       id: 'crew',
-      label: `Hire crews at ${airport.iata} · by type`,
+      label: `Hire pilots and cabin crew at ${airport.iata} · by type`,
       icon: ICON.crew,
       angleDeg: -15,
       disabledReason: !crews

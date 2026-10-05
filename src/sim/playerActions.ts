@@ -36,6 +36,7 @@ import {
 } from './bases';
 import {
   CREW_BASE_FEE,
+  CABIN_TEAMS_PER_SHIFT,
   cabinArriving,
   cabinHireFee,
   cabinLeadDays,
@@ -788,9 +789,14 @@ function crewAdvice(state: SimState, iata: string, classCode: string): string | 
   const have = crewsOf(base, classCode) + crewsArriving(base, classCode);
   // Every plane of this class on its way needs its own crews.
   const inbound = inboundAt(state, iata, classCode).length * CREWS_PER_NEW_PLANE;
-  if (have >= need.minimum + inbound) return null;
   const name = classByCode(classCode)?.name ?? classCode;
-  return `${iata} short of ${name} crews for it · hire or retrain now to join by delivery`;
+  if (have < need.minimum + inbound) return `${iata} short of ${name} crews for it · hire or retrain now to join by delivery`;
+  // Cabin teams for the plane too: a short cabin doesn't ground it, but its NPS suffers.
+  if (!needsCabinCrew(classCode)) return null;
+  const cabinHave = cabinTeamsOf(base, classCode) + cabinArriving(base, classCode);
+  const cabinInbound = inboundAt(state, iata, classCode).length * CREWS_PER_NEW_PLANE * (CABIN_TEAMS_PER_SHIFT[classCode] ?? 0);
+  if (cabinHave >= cabinNeed(state, iata, classCode).minimum + cabinInbound) return null;
+  return `${iata} short of ${name} cabin teams for it · hire them on the Crews screen to protect NPS`;
 }
 
 
