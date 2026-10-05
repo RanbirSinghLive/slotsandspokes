@@ -1,5 +1,6 @@
 import { onSale, SALE_RIVAL_READ } from './seatSale';
 import { dayIndex } from './clock';
+import { difficultySettings } from './difficulty';
 import competitorsData from '../../data/competitors.json';
 import rivalPoolData from '../../data/rival-airlines.json';
 import { potentialDailyDemand, marketDistanceNm, pairsTouching } from './demand';
@@ -14,7 +15,6 @@ import {
   RIVAL_ENTRY_CHANCE_PER_DOLLAR,
   RIVAL_OPENING_MONEY_SCALE,
   RIVAL_TARGETS_PLAYER,
-  RIVAL_FIRST_ENTRY_DAY,
   RIVAL_FREQUENCY_CAP,
   inRespite,
   recentlyClosedByRival,
@@ -252,7 +252,7 @@ export function rollCompetitorRouteOpenings(state: SimState, dayStartMinute: num
 const SEED_CODES = new Set((competitorsData as { code: string }[]).map((route) => route.code));
 
 /**
- * A new rival airline arrives. From RIVAL_FIRST_ENTRY_DAY, each day has a
+ * A new rival airline arrives. From the difficulty's first entry day, each day has a
  * chance of one, which grows with the money the player's network leaves
  * on the table (sim/pressure.ts, sim/attractiveness.ts), up to
  * MAX_RIVAL_ENTRIES in a game. It opens a single daily flight on a market
@@ -272,7 +272,8 @@ export function rollRivalEntry(state: SimState, dayStartMinute: number): void {
   const codesInUse = new Set(state.competitorRoutes.map((route) => route.code));
   const entered = [...codesInUse].filter((code) => !SEED_CODES.has(code)).length;
   if (entered >= MAX_RIVAL_ENTRIES) return;
-  if (day < RIVAL_FIRST_ENTRY_DAY) return;
+  const difficulty = difficultySettings(state);
+  if (day < difficulty.rivalFirstEntryDay) return;
 
   // Whether one comes today at all: the more the network leaves on the
   // table, the likelier.
@@ -280,7 +281,7 @@ export function rollRivalEntry(state: SimState, dayStartMinute: number): void {
   const networkMoney = [...money.values()].reduce((sum, perDay) => sum + perDay, 0);
   const [arrivalRoll, seedAfterArrival] = nextRandom(state.rngSeed);
   state.rngSeed = seedAfterArrival;
-  if (arrivalRoll >= Math.min(MAX_RIVAL_ENTRY_CHANCE_PER_DAY, networkMoney * RIVAL_ENTRY_CHANCE_PER_DOLLAR)) return;
+  if (arrivalRoll >= Math.min(MAX_RIVAL_ENTRY_CHANCE_PER_DAY, networkMoney * RIVAL_ENTRY_CHANCE_PER_DOLLAR * difficulty.rivalEntryChanceMultiplier)) return;
 
   const known = new Set(state.knownAirports);
   const network = networkAirports(state);

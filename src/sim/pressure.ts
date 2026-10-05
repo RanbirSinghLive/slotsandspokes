@@ -6,7 +6,7 @@ import type { SimState } from './state';
  * Time pressure: the reason to keep building. Nothing here hurts a player
  * who keeps growing; it makes standing still lose ground.
  *
- * - **Rivals enter.** From day RIVAL_FIRST_ENTRY_DAY new airlines arrive,
+ * - **Rivals enter.** From day `rivalFirstEntryDay` (sim/difficulty.ts) new airlines arrive,
  *   up to MAX_RIVAL_ENTRIES, more often the more money the player's
  *   network leaves on the table (sim/attractiveness.ts), on a market next
  *   to the player's network (sim/competitors.ts). They go after the player
@@ -29,12 +29,11 @@ import type { SimState } from './state';
  * bigger plane, which is exactly what the map already lets you do.
  */
 
-export const RIVAL_FIRST_ENTRY_DAY = 15;
 export const MAX_RIVAL_ENTRIES = 5;
 
 /**
  * Profit attracts entry (CLAUDE.md, the game's philosophy). From
- * RIVAL_FIRST_ENTRY_DAY, each day's chance of a new airline arriving is
+ * the first entry day, each day's chance of a new airline arriving is
  * this much per dollar a day left on the table across the player's
  * network (sim/attractiveness.ts): $100k a day is a 5% daily chance, a new
  * airline every three weeks or so. A lean network leaves little on the

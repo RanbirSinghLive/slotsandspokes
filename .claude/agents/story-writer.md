@@ -17,7 +17,6 @@ in two parts:
    invented. Read:
    - `data/airports.json`: catchment population, coordinates;
    - `data/airport-character.json`: business / leisure / VFR (0–2);
-   - `data/home-difficulty.json`: its rating (Standard / Hard / Brutal);
    - `data/competitors.json`: which invented rivals fly from it;
    - `src/sim/homes.ts` `homeOptions()`: how many airports a starting
      propeller can reach.

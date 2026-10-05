@@ -4,15 +4,17 @@ import { isInsolvent } from '../sim/insolvency';
 import { DEFAULT_HOME_AIRPORT } from '../sim/state';
 import { step } from '../sim/step';
 import { startHeadlessGame } from './newGame';
-import { createPlayer, playerFromArgs } from './player';
+import { createPlayer, difficultyFromArgs, playerFromArgs } from './player';
 
 const MINUTES_PER_DAY = 1440;
 const SEED = 1;
 
 // `npm run headless -- 30` runs 30 days instead of the default year;
 // `npm run headless -- 30 YHZ` also starts from Halifax instead of the default home;
+// `--difficulty hard` starts on that tier (easy, medium, hard);
 // `--player starter` plays it with the do-nothing player instead of the steady one.
-const { kind: playerKind, rest: args } = playerFromArgs(process.argv.slice(2));
+const { difficulty, rest: afterDifficulty } = difficultyFromArgs(process.argv.slice(2));
+const { kind: playerKind, rest: args } = playerFromArgs(afterDifficulty);
 const days = Number(args[0]) || 365;
 const home = args[1] || DEFAULT_HOME_AIRPORT;
 
@@ -20,7 +22,7 @@ const home = args[1] || DEFAULT_HOME_AIRPORT;
 // by a headless player (headless/player.ts) through the same rules and
 // actions a person has.
 const player = createPlayer(playerKind);
-const state = startHeadlessGame(home, SEED, player);
+const state = startHeadlessGame(home, SEED, player, 'summer', difficulty);
 const startingCash = state.cash;
 
 const rows: string[] = ['day,cash,revenue,cost,margin,legsFlown,fuelPriceIndex'];

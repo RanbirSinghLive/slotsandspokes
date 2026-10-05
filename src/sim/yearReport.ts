@@ -3,7 +3,8 @@ import { dayIndex } from './clock';
 import { airlineCalled, LADDER, tiersClimbed } from './ladder';
 import { formatNps, networkNps } from './nps';
 import { marketKey } from './schedule';
-import { STARTING_CASH, type SimState } from './state';
+import { difficultySettings } from './difficulty';
+import type { SimState } from './state';
 
 /**
  * The year one report (WEEK-TWELVE.md, thread 4): the airline's year,
@@ -64,7 +65,7 @@ export function yearReport(state: SimState): YearReport {
 
   const climbed = tiersClimbed(state);
   const standing = climbed > 0 ? airlineCalled(LADDER[climbed - 1]) : null;
-  const gained = state.cash - STARTING_CASH;
+  const gained = state.cash - difficultySettings(state).startingCash;
   const scheduled = state.flightsScheduledTotal;
   const report: YearReport = {
     home: state.homeAirport,
