@@ -1,7 +1,9 @@
-# airgame — Week nineteen (maintenance depth)
+# airgame — Week twenty (maintenance depth)
 
 Handoff document. Week eighteen (the map you can read and watch) lives in
-`WEEK-EIGHTEEN.md`.
+`WEEK-EIGHTEEN.md`. `WEEK-NINETEEN.md` is the cargo plan, not started: this
+file names the maintenance work that was built first, so the two don't share
+a file.
 
 **Status:** a sim change, from the roadmap in the project files
 (`roadmap/airline-roadmap.md`), items 2, 4 and 8 of its maintenance list.
@@ -31,7 +33,6 @@ ratings, bays), the headless player's `keepMaintenance()`, docs.
 
 ## Not in this week
 
-- The Create base modal that picks crew or maintenance first: a separate
-  thread.
+- Cargo terminals as a base kind (see `WEEK-NINETEEN.md`).
 - A, C and D checks, spares pools and engine shop visits (roadmap items
   1, 3 and 5).

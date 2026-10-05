@@ -1,4 +1,5 @@
 import type { FareClassSettings, FareClassTally } from './fareClasses';
+import type { GameDifficulty } from './difficulty';
 import type { FareWar, FareWarEvent } from './fareWars';
 import type { DemandEvent } from './demandEvents';
 import aircraftTypesData from '../../data/aircraft-types.json';
@@ -195,6 +196,8 @@ export type SimState = {
   /** The airport the player chose to start from (sim/homes.ts). The map centres on it. */
   /** The calendar date day 0 fell on, in days after 1 January (sim/clock.ts): 120 for a summer start. Missing in a save from before the choice, which started on 1 January. */
   startDayOfYear?: number;
+  /** Chosen with the home city (sim/difficulty.ts); absent in older saves, which play as medium. */
+  difficulty?: GameDifficulty;
   homeAirport: string;
   /**
    * Airports the player can see and use (fog by reach, sim/reach.ts).

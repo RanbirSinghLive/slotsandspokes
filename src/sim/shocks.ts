@@ -1,5 +1,6 @@
 import airportsData from '../../data/airports.json';
 import { dayIndex } from './clock';
+import { difficultySettings } from './difficulty';
 import { FUEL_SHARE_OF_BLOCK_HOUR_COST } from './fuel';
 import { greatCircleDistanceNm } from './geo';
 import { nextRandom } from './rng';
@@ -21,7 +22,7 @@ import type { SimState } from './state';
  *   form STORM_SEASON_MULTIPLIER times as often, in or out of season, and
  *   close airports more often (sim/weather.ts).
  *
- * At most one at a time, none before FIRST_SHOCK_DAY (the early valley
+ * At most one at a time, none before `firstShockDay` (sim/difficulty.ts; the early valley
  * is hard enough), and none within CALM_AFTER_SHOCK_DAYS of the last. Every roll comes from the seeded stream, the same number
  * each day whether or not one starts, so a seed still repeats exactly.
  */
@@ -39,8 +40,6 @@ export type Shock = {
   centre?: string;
 };
 
-/** No shocks before this day. */
-export const FIRST_SHOCK_DAY = 60;
 /** The daily chance of a shock starting, while none is running or just ended. About three a year. */
 export const SHOCK_CHANCE_PER_DAY = 1 / 90;
 /** Days of calm after a shock ends before another can start, so they don't arrive back to back. */
@@ -101,7 +100,7 @@ export function rollDailyShocks(state: SimState): void {
 
   // The last shock stays on record after it ends, for the calm that follows it.
   const calm = !state.shock || today >= state.shock.endDay + CALM_AFTER_SHOCK_DAYS;
-  if (calm && today >= FIRST_SHOCK_DAY && chanceRoll < SHOCK_CHANCE_PER_DAY) {
+  if (calm && today >= difficultySettings(state).firstShockDay && chanceRoll < SHOCK_CHANCE_PER_DAY) {
     const kind = KINDS[Math.min(KINDS.length - 1, Math.floor(kindRoll * KINDS.length))];
     const range = RANGES[kind];
     const days = Math.round(range.days[0] + daysRoll * (range.days[1] - range.days[0]));

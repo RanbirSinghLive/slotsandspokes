@@ -1,3 +1,4 @@
+import { DIFFICULTIES, type GameDifficulty } from '../sim/difficulty';
 import { currentPotentialDemand } from '../sim/marketDemand';
 import { marketLoadFactor } from '../sim/loadFactor';
 import { saleBlockedReason, saleMarginChangePerDay } from '../sim/seatSale';
@@ -95,6 +96,18 @@ export function createPlayer(kind: PlayerKind): Player {
  * and the other arguments in order without it, so each runner keeps its
  * own positional arguments.
  */
+/** `--difficulty easy|medium|hard`, medium when absent; the rest of the arguments are returned. */
+export function difficultyFromArgs(argv: string[]): { difficulty: GameDifficulty; rest: string[] } {
+  const rest = [...argv];
+  const at = rest.indexOf('--difficulty');
+  if (at === -1) return { difficulty: 'medium', rest };
+  const [, value] = rest.splice(at, 2);
+  if (!DIFFICULTIES.includes(value as GameDifficulty)) {
+    throw new Error(`Unknown difficulty "${value}". Choose one of: ${DIFFICULTIES.join(', ')}.`);
+  }
+  return { difficulty: value as GameDifficulty, rest };
+}
+
 export function playerFromArgs(argv: string[]): { kind: PlayerKind; rest: string[] } {
   const rest = [...argv];
   const at = rest.indexOf('--player');

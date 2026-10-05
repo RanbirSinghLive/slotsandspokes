@@ -93,7 +93,6 @@ for (const player of players) printTable(player, results.filter((r) => r.player 
 console.log('');
 console.log(`  ${results.length} games in ${Math.round((Date.now() - started) / 1000)} s, ${workerCount} at a time.`);
 
-
 const csv = [
   'player,home,seed,cash,bustDay,planes,markets,flightsPerDay,tiers',
   ...results.map((r) => [r.player, r.home, r.seed, Math.round(r.cash), r.bustDay ?? '', r.planes, r.markets, r.flightsPerDay, r.tiers].join(',')),
@@ -102,11 +101,3 @@ const outputPath = fileURLToPath(new URL('../../balance-output.csv', import.meta
 writeFileSync(outputPath, csv + '\n');
 console.log(`  Wrote ${outputPath}`);
 console.log('');
-
-// The full report also re-rates every home (npm run homes), so the
-// ratings the home picker shows can't go stale after a tuning change.
-if (!passedPlayer) {
-  console.log('');
-  console.log('  Re-rating the homes (npm run homes):');
-  await import('./buildHomeDifficulty');
-}

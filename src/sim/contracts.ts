@@ -36,8 +36,8 @@ import type { SimState } from './state';
  *   that survives it.
  *
  * Sizes vary by seed and by the home's weakness (homeWeakness()), worked
- * out from the data rather than from the headless-rated difficulty
- * (data/home-difficulty.json), which contracts themselves move.
+ * out from the data, not from a measured rating, which contracts
+ * themselves would move.
  */
 
 export type ContractStatus = 'offered' | 'active' | 'ended' | 'lapsed';

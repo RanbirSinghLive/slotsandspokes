@@ -1,4 +1,5 @@
 import type { StartSeason } from '../sim/clock';
+import type { GameDifficulty } from '../sim/difficulty';
 import { chooseHome } from '../sim/homes';
 import { createNewGameState, type SimState } from '../sim/state';
 import type { Player } from './player';
@@ -18,9 +19,9 @@ import type { Player } from './player';
  * Date.now() default, so a headless run is repeatable. A game starts in
  * summer, as the picker does unless the player changes it.
  */
-export function startHeadlessGame(homeIata: string, seed: number, player: Player, season: StartSeason = 'summer'): SimState {
+export function startHeadlessGame(homeIata: string, seed: number, player: Player, season: StartSeason = 'summer', difficulty: GameDifficulty = 'medium'): SimState {
   const state = createNewGameState(seed, homeIata);
-  chooseHome(state, homeIata, season);
+  chooseHome(state, homeIata, season, difficulty);
   player.open(state);
   return state;
 }
