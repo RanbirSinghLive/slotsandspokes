@@ -22,6 +22,7 @@ import { showAirportTooltip, hideAirportTooltip } from './ui/airportTooltip';
 import { drawDemandLayer } from './render/demand';
 import { drawCompetitionLayer, competitorAirlines, findCompetitionHover, drawNewCompetitorRouteFlashes } from './render/competition';
 import { drawRouteMapMode, MAP_MODE_COLORS, type MapMode } from './render/mapmodes';
+import { cargoLegend, drawCargoLayer } from './render/cargo';
 import { showCompetitionTooltip, hideCompetitionTooltip } from './ui/competitionTooltip';
 import { createNewGameState, type SimState } from './sim/state';
 import { chooseHome, homeOptions } from './sim/homes';
@@ -260,6 +261,7 @@ let latestFractionalMinute = state.simMinute;
 // lens (setLens(), below).
 let demandOverlayOn = false;
 let competitionOverlayOn = false;
+let cargoOverlayOn = false;
 // Which mapmode is recolouring the route network (render/
 // mapmodes.ts) — mutually exclusive with itself (there's only one map
 // underneath) but layered the same way Demand/Competition are: an
@@ -334,6 +336,13 @@ function render(nowMs: number = performance.now()): void {
   } else {
     // Frequency and yield labels only on the Demand lens; on the plain map they clog the hubs.
     drawRoutes(ctx, state, demandOverlayOn);
+  }
+  // The Cargo lens draws over the routes and under the airport dots: a circle per
+  // airport, your freight-carrying routes, and the hovered airport's best partners.
+  if (cargoOverlayOn) {
+    const hovered = hoverPoint && !isRouteBuilderActive() && !isMapMenuOpen() ? nearestAirportCandidate(hoverPoint.x, hoverPoint.y) : null;
+    const selected = getSelection();
+    drawCargoLayer(ctx, state, hovered?.airport.iata ?? (selected.kind === 'airport' ? selected.iata : null));
   }
   // A rival being squeezed out of one of your markets, or the respite
   // after one left (render/pain.ts): on whichever layer drew the routes.
@@ -693,16 +702,19 @@ window.addEventListener('keydown', (event) => {
  * margin and Ops by on-time, with the operating detail of render/opsView.ts
  * drawn on top (render/mapmodes.ts); Demand draws every market's demand and
  * headroom (render/demand.ts); Rivals draws the rival networks, with a
- * chip per airline to narrow it to one (render/competition.ts).
+ * chip per airline to narrow it to one (render/competition.ts); Cargo
+ * draws what each airport makes and needs and the freight lanes that
+ * match (render/cargo.ts).
  */
-type Lens = 'network' | 'profit' | 'ops' | 'demand' | 'rivals';
-const LENS_ORDER: Lens[] = ['network', 'profit', 'ops', 'demand', 'rivals'];
+type Lens = 'network' | 'profit' | 'ops' | 'demand' | 'rivals' | 'cargo';
+const LENS_ORDER: Lens[] = ['network', 'profit', 'ops', 'demand', 'rivals', 'cargo'];
 let lens: Lens = 'network';
 
 function setLens(next: Lens): void {
   lens = next;
   demandOverlayOn = lens === 'demand';
   competitionOverlayOn = lens === 'rivals';
+  cargoOverlayOn = lens === 'cargo';
   mapMode = lens === 'profit' ? 'profitability' : lens === 'ops' ? 'ontime' : 'none';
   setOpsView(lens === 'ops');
   lensButtons.forEach((button) => {
@@ -718,7 +730,7 @@ function setLens(next: Lens): void {
 
 lensButtons.forEach((button) => button.addEventListener('click', () => setLens(button.dataset.lens as Lens)));
 
-// Keys 1–5 pick a lens, unless the player is typing into something.
+// Keys 1–6 pick a lens, unless the player is typing into something.
 window.addEventListener('keydown', (event) => {
   if (event.ctrlKey || event.metaKey || event.altKey) return;
   const target = event.target as HTMLElement | null;
@@ -735,6 +747,7 @@ window.addEventListener('keydown', (event) => {
  */
 function updateLensLegend(): void {
   lensLegend.hidden = lens === 'network';
+  lensLegendScale.classList.toggle('is-wrapped', lens === 'cargo');
   const swatch = (color: string, label: string) =>
     `<div><span class="mapmode-legend-swatch" style="background:${color}"></span><span>${label}</span></div>`;
   if (lens === 'profit') {
@@ -755,6 +768,15 @@ function updateLensLegend(): void {
   } else if (lens === 'rivals') {
     lensLegendTitle.textContent = 'Rival networks · pick one to narrow';
     lensLegendScale.innerHTML = '';
+  } else if (lens === 'cargo') {
+    lensLegendTitle.textContent = 'Cargo · hover an airport for its best matches';
+    lensLegendScale.innerHTML =
+      swatch('rgb(255, 179, 71)', '▲ makes more') +
+      swatch('rgb(94, 214, 196)', '▼ needs more') +
+      '<div class="legend-note"><span>line colour = good · width = $/day · dashed = not flown</span></div>' +
+      cargoLegend()
+        .map((entry) => `<div class="legend-good"><span class="mapmode-legend-swatch" style="background:${entry.color}"></span><span>${entry.label}</span></div>`)
+        .join('');
   }
 }
 

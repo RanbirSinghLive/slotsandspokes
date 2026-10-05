@@ -300,6 +300,23 @@ button,
   gap: 12px;
 }
 
+/* The Cargo lens has ten goods to key: wrap them, notes on a row of their own. */
+#lens-legend-scale.is-wrapped {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px 10px;
+}
+
+/* On a phone the goods key would cover the map: keep the two ends and the note. */
+:root[data-narrow] #lens-legend-scale .legend-good {
+  display: none;
+}
+
+#lens-legend-scale.is-wrapped > div.legend-note {
+  flex-basis: 100%;
+  justify-content: flex-end;
+}
+
 #lens-legend-scale:not(:empty) {
   margin-top: 5px;
 }

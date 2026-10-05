@@ -29,6 +29,7 @@ import { select } from '../selection';
 import { aircraftLink } from './aircraft';
 import { linkToMap } from '../mapLink';
 import { contractsOf } from '../../sim/contracts';
+import { airportCargo, bestCargoPartners, cargoGood, neededTonnes, producedTonnes, shortagePremium } from '../../sim/cargo';
 
 /**
  * The inspector's view of one airport (ui/inspector/inspector.ts): how
@@ -98,6 +99,8 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
   const service = describeServiceLevel(hungerAt(state, iata));
   root.append(lineWithInfo(service.label, `How well this airport is served by every airline: ${service.description}.`));
 
+  root.append(...cargoLines(state, iata));
+
   // Contracts touching this airport (sim/contracts.ts).
   for (const contract of contractsOf(state)) {
     if ((contract.a !== iata && contract.b !== iata) || (contract.status !== 'offered' && contract.status !== 'active')) continue;
@@ -143,6 +146,45 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
 
   root.append(heading('Markets'), marketRows(state, iata));
   return { root, redrawPools };
+}
+
+/**
+ * What the airport makes and needs, and its best matched partners among
+ * the airports you can reach (sim/cargo.ts): the lanes the Cargo lens
+ * draws, in words. A need shows its shortage premium while it is unmet.
+ */
+function cargoLines(state: SimState, iata: string): HTMLElement[] {
+  const cargo = airportCargo(iata);
+  const tonnes = (n: number) => `${n.toFixed(1)} t/d`;
+  const makes = cargo.produces.map((id) => `${cargoGood(id).name} ${tonnes(producedTonnes(iata, id))}`);
+  const needs = cargo.needs.map((id) => {
+    const premium = shortagePremium(state, iata, id);
+    return `${cargoGood(id).name} ${tonnes(neededTonnes(iata, id))}${premium >= 0.05 ? ` +${Math.round(premium * 100)}%` : ''}`;
+  });
+  const lines = [
+    lineWithInfo(
+      `Makes ▲ ${makes.join(' · ')}`,
+      'Goods this airport ships out each day, from its trade. The first is its specialty. Freight earns where one end makes what the other needs, whatever the passenger demand: a small town can be a rich origin. Flights carry it in the hold the passengers\' bags leave free.',
+    ),
+    lineWithInfo(
+      `Needs ▼ ${needs.join(' · ')}`,
+      'Goods this airport takes in each day. A need nobody is filling pays a shortage premium (+%), which fades as you fill it and comes back if you stop, so the edge is temporary.',
+    ),
+  ];
+  const flown = new Set(state.schedule.map((leg) => (leg.origin === iata ? leg.dest : leg.origin)));
+  const partners = bestCargoPartners(iata, state.knownAirports, 4);
+  if (partners.length > 0) {
+    lines.push(
+      lineWithInfo(
+        'Cargo partners',
+        'The airports you can reach whose goods best match this one\'s, by matched freight a day at the base rate, both ways, before the hold limit and any rival. A lane only earns on a market you fly.',
+      ),
+      ...partners.map((entry) =>
+        line(`${entry.partner} · ${entry.goods.map((id) => cargoGood(id).name).join(', ')} · ${shortMoney(entry.dollarsPerDay)}/day${flown.has(entry.partner) ? ' · flown' : ''}`, flown.has(entry.partner) ? 'inspector-line is-good' : 'inspector-line'),
+      ),
+    );
+  }
+  return lines;
 }
 
 /**
