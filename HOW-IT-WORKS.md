@@ -2822,6 +2822,32 @@ passengers of any style and earned the least.
 
 ---
 
+## Air rights (`src/sim/rights.ts`, `data/air-rights.json`)
+
+**Not yet switched on: this slice only measures.** The plan is
+`roadmap/air-rights-spec.md`. `npm run rights` plays the steady player and
+prints what the rule *would* bar; nothing in the game refuses or removes
+anything yet.
+
+An airline's **home country** is the country of its home airport
+(`data/airport-countries.json`, built by `npm run countries` from
+OurAirports). Puerto Rico and Guam follow the US. Where an airport's
+country is unknown the rule allows it, so a missing row never stops a route.
+
+| Leg or connection | Rule |
+|---|---|
+| Both ends in the home country | allowed |
+| Both ends in one *other* country | **cabotage: barred**, unless a bloc grants it (the EU/EEA market lets members fly each other's domestic routes) |
+| Ends in two countries | allowed, unless the pair is on the `closed` list (empty so far) |
+| Connection A–hub–B, A and B in one other country | **barred**, whatever the hub: a Canadian carrier can't sell Boston to New York through Toronto |
+| Connection with A and B in different countries | allowed when both legs are |
+
+A Canadian carrier may still fly Boston–Toronto–New York as a rotation,
+because each leg touches Canada; it just can't sell Boston–New York on it.
+Nothing is saved: the home country is read from the home airport.
+
+---
+
 ## Crews (`src/sim/crews.ts`)
 
 Crews live at **crew bases**, the airports where the airline bases
