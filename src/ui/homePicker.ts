@@ -1,6 +1,7 @@
+import { DIFFICULTY_SETTINGS, type GameDifficulty } from '../sim/difficulty';
 import homeStoriesData from '../../data/home-stories.json';
 import type { StartSeason } from '../sim/clock';
-import { homeNeighbours, homeReasons, PROPELLER_RANGE_NM, type HomeDifficulty, type HomeOption } from '../sim/homes';
+import { homeNeighbours, PROPELLER_RANGE_NM, type HomeOption } from '../sim/homes';
 import { drawPickerMap, loadFinePickerLand, type PickerPoint, type PickerView } from '../render/pickerMap';
 import { airports } from '../render/airports';
 import { fitWorld, projection } from '../render/projection';
@@ -8,7 +9,8 @@ import { setupMapInput } from './mapInput';
 
 /**
  * The first screen of a new game: choose the city the airline starts
- * from, and the date it starts. Shown only when there is no saved game to
+ * from, the date it starts and the difficulty (sim/difficulty.ts). Shown
+ * only when there is no saved game to
  * resume; the game is paused while it is open (main.ts), so no simulated
  * time passes while the player thinks.
  *
@@ -17,22 +19,16 @@ import { setupMapInput } from './mapInput';
  *   - **The world map**: the featured homes (data/home-stories.json) as
  *     bright dots. The cursor snaps to the nearest one and its story shows
  *     along the bottom; a click chooses it, then "Start" begins.
- *   - **"Select a different airport"**: every home in a list, grouped by
- *     how hard a start it is (sim/homes.ts), easiest first. A click there
- *     starts straight away.
+ *   - **"Select a different airport"**: every home in a list, biggest
+ *     catchment first. A click there starts straight away. Cities carry no
+ *     rating: which ones play differently is for the player to find out.
  *
- * Both share the start date: 1 May or 1 November (sim/clock.ts).
+ * Both share the start date (1 May or 1 November, sim/clock.ts) and the
+ * difficulty.
  */
 
 type Story = { region: string; world: string; game: string };
 const stories = homeStoriesData as unknown as Record<string, Story | string>;
-
-const GROUPS: { difficulty: HomeDifficulty | null; title: string; note: string }[] = [
-  { difficulty: 'Standard', title: 'Standard starts', note: 'Room to learn: the first routes pay their way.' },
-  { difficulty: 'Hard', title: 'Hard starts', note: 'The first routes lose money for weeks. Plan the opening.' },
-  { difficulty: 'Brutal', title: 'Brutal starts', note: 'For experienced players: thin or short markets that sink a careless opening fast.' },
-  { difficulty: null, title: 'Unrated', note: 'Not measured yet.' },
-];
 
 /** How far, in screen pixels, the cursor reaches for the nearest featured home. */
 const SNAP_RADIUS_PX = 70;
@@ -56,13 +52,16 @@ const rangeEl = document.querySelector<HTMLElement>('#home-picker-range')!;
 const listEl = document.querySelector<HTMLDivElement>('#home-picker-list')!;
 const backButton = document.querySelector<HTMLButtonElement>('#home-picker-back')!;
 const seasonButtons = document.querySelectorAll<HTMLButtonElement>('[data-season]');
+const difficultyButtons = document.querySelectorAll<HTMLButtonElement>('[data-difficulty]');
+const difficultyNoteEl = document.querySelector<HTMLElement>('#home-world-difficulty-note')!;
 
 let chosenSeason: StartSeason = 'summer';
+let chosenDifficulty: GameDifficulty = 'medium';
 let options: HomeOption[] = [];
 let featured: (PickerPoint & { option: HomeOption; story: Story })[] = [];
 let lifted: (typeof featured)[number] | null = null;
 let pinned: (typeof featured)[number] | null = null;
-let choose: (iata: string, season: StartSeason) => void = () => {};
+let choose: (iata: string, season: StartSeason, difficulty: GameDifficulty) => void = () => {};
 
 /**
  * The picker's own zoom and pan, on top of the whole-world fit: a factor
@@ -96,6 +95,25 @@ seasonButtons.forEach((button) =>
   }),
 );
 
+/** What the chosen difficulty changes, in the panel's terms (sim/difficulty.ts has the numbers). */
+function difficultyNote(): string {
+  const settings = DIFFICULTY_SETTINGS[chosenDifficulty];
+  const cash = `$${settings.startingCash / 1_000}k`;
+  return `${cash} · rivals d${settings.rivalFirstEntryDay} · shocks d${settings.firstShockDay}`;
+}
+
+function showDifficulty(): void {
+  difficultyButtons.forEach((button) => button.classList.toggle('active', button.dataset.difficulty === chosenDifficulty));
+  difficultyNoteEl.textContent = difficultyNote();
+}
+
+difficultyButtons.forEach((button) =>
+  button.addEventListener('click', () => {
+    chosenDifficulty = button.dataset.difficulty as GameDifficulty;
+    showDifficulty();
+  }),
+);
+
 function millions(population: number): string {
   return `${(population / 1_000_000).toFixed(population >= 10_000_000 ? 0 : 1)}M`;
 }
@@ -105,13 +123,6 @@ function textEl(tag: string, className: string, text: string): HTMLElement {
   el.className = className;
   el.textContent = text;
   return el;
-}
-
-/** Why a Hard or Brutal home is one, in a line (sim/homes.ts's homeReasons()); null for a Standard home or one with no reason found. */
-function whyHard(option: HomeOption): string | null {
-  if (option.difficulty !== 'Hard' && option.difficulty !== 'Brutal') return null;
-  const reasons = homeReasons(option.iata);
-  return reasons.length > 0 ? `Why hard · ${reasons.join(' · ')}` : null;
 }
 
 /** The story along the bottom: the home under the cursor, else the one chosen, else a hint. */
@@ -124,8 +135,7 @@ function showStory(): void {
     const { option, story } = home;
     storyEl.replaceChildren(
       textEl('div', 'home-world-name', `${option.iata} · ${option.name}`),
-      textEl('div', 'home-world-facts', [story.region, option.difficulty ?? 'Unrated', `${option.neighbours} within reach`, `${millions(option.population)} catchment`].join(' · ')),
-      ...(whyHard(option) ? [textEl('div', 'home-world-why', whyHard(option)!)] : []),
+      textEl('div', 'home-world-facts', [story.region, `${option.neighbours} within reach`, `${millions(option.population)} catchment`].join(' · ')),
       textEl('p', 'home-world-text', story.world),
       textEl('p', 'home-world-text home-world-text--game', story.game),
     );
@@ -156,7 +166,7 @@ function drawWorld(): void {
     lifted: lifted
       ? {
           home: lifted,
-          label: `${lifted.option.name} · ${lifted.option.difficulty ?? 'Unrated'}`,
+          label: lifted.option.name,
           reach: homeNeighbours(lifted.iata).flatMap((iata) => pointByIata.get(iata) ?? []),
         }
       : null,
@@ -289,7 +299,7 @@ window.visualViewport?.addEventListener('resize', drawWorld);
 function start(iata: string): void {
   worldEl.hidden = true;
   modalEl.hidden = true;
-  choose(iata, chosenSeason);
+  choose(iata, chosenSeason, chosenDifficulty);
 }
 
 /** One city's row in the full list: its code, name and reach. Choosing it starts the game there. */
@@ -302,28 +312,16 @@ function optionButton(option: HomeOption): HTMLButtonElement {
     textEl('span', 'home-option-name', option.name),
     textEl('span', 'home-option-reach', `${option.neighbours} within reach`),
   );
-  const why = whyHard(option);
-  if (why) button.title = why;
   button.addEventListener('click', () => start(option.iata));
   return button;
 }
 
 function fillList(): void {
   rangeEl.textContent = String(PROPELLER_RANGE_NM);
-  const sections: HTMLElement[] = [];
-  for (const group of GROUPS) {
-    const inGroup = options.filter((option) => option.difficulty === group.difficulty);
-    if (inGroup.length === 0) continue;
-    sections.push(
-      textEl('h3', 'home-group-title', `${group.title} (${inGroup.length})`),
-      textEl('p', 'home-group-note', group.note),
-      ...inGroup.map(optionButton),
-    );
-  }
-  listEl.replaceChildren(...sections);
+  listEl.replaceChildren(...options.map(optionButton));
 }
 
-export function showHomePicker(homes: HomeOption[], onChoose: (iata: string, season: StartSeason) => void): void {
+export function showHomePicker(homes: HomeOption[], onChoose: (iata: string, season: StartSeason, difficulty: GameDifficulty) => void): void {
   options = homes;
   choose = onChoose;
   const optionByIata = new Map(homes.map((option) => [option.iata, option]));
@@ -334,6 +332,7 @@ export function showHomePicker(homes: HomeOption[], onChoose: (iata: string, sea
     return typeof story === 'object' && option && point ? [{ ...point, option, story }] : [];
   });
   fillList();
+  showDifficulty();
   worldEl.hidden = false;
   zoomState.factor = 1;
   showStory();

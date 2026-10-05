@@ -1084,8 +1084,8 @@ toolsToggle.addEventListener('click', () => {
 if (choosingHome) {
   speedMultiplier = 0;
   speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === 0));
-  showHomePicker(homeOptions(), (iata, season) => {
-    chooseHome(state, iata, season);
+  showHomePicker(homeOptions(), (iata, season, difficulty) => {
+    chooseHome(state, iata, season, difficulty);
     saveState(state);
     choosingHome = false;
     resize();

@@ -2,8 +2,7 @@ import airportsData from '../../data/airports.json';
 import { STARTING_CREW_CLASS, STARTING_CREWS } from './crews';
 import { placeHomeRival } from './competitors';
 import { ensureRivalFleets } from './market';
-import homeDifficultyData from '../../data/home-difficulty.json';
-import competitorsData from '../../data/competitors.json';
+import { DIFFICULTY_SETTINGS, type GameDifficulty } from './difficulty';
 import { AIRCRAFT_CLASSES } from './aircraftClasses';
 import { marketDistanceNm, potentialDailyDemand } from './demand';
 import { START_DAY_OF_YEAR, startingSimMinute, type StartSeason } from './clock';
@@ -28,26 +27,12 @@ const MIN_NEIGHBOURS = 3;
 type AirportSpec = { iata: string; name: string; population: number };
 const airports = airportsData as AirportSpec[];
 
-export type HomeDifficulty = 'Standard' | 'Hard' | 'Brutal';
-
-/**
- * How hard each city is to start from, measured by playing the airline
- * left to itself from there (`npm run homes`, headless/buildHomeDifficulty.ts):
- * Standard if it lasts, Hard if it goes under slowly or only sometimes,
- * Brutal if it goes under fast every time. A city missing from the file
- * (measured before it was added) has no rating.
- */
-const difficultyByIata = new Map(
-  (homeDifficultyData as { iata: string; difficulty: HomeDifficulty }[]).map((entry) => [entry.iata, entry.difficulty]),
-);
-
 export type HomeOption = {
   iata: string;
   name: string;
   population: number;
   /** Airports a propeller can reach from here and fly a market to. */
   neighbours: number;
-  difficulty: HomeDifficulty | null;
 };
 
 /** The airports a starting propeller can fly a market to from `iata`. */
@@ -55,40 +40,6 @@ export function homeNeighbours(iata: string): string[] {
   return airports
     .filter((other) => other.iata !== iata && marketDistanceNm(iata, other.iata) <= PROPELLER_RANGE_NM && potentialDailyDemand(iata, other.iata) > 0)
     .map((other) => other.iata);
-}
-
-/** A hop this short means a takeoff every hour or so: a day of them runs late and tires its crews. */
-const SHORT_HOP_NM = 100;
-/** Demand a day to airports in reach at least PAYING_NM away below which a home's markets are small. */
-const SMALL_MARKETS_DEMAND = 2_000;
-const PAYING_NM = 150;
-/** As few airports in reach as this makes the opening narrow. */
-const FEW_NEIGHBOURS = 4;
-
-const seededRivals = competitorsData as { airline: string; origin: string; dest: string }[];
-
-/**
- * Why a home is a hard start, from the data, for the picker
- * (ui/homePicker.ts): few airports in reach; its biggest market a short
- * hop (a day of them runs late and tires the crews, and a market flown
- * unreliably shrinks, sim/marketDemand.ts); small markets at a paying
- * distance; a seeded rival already on its biggest market. Empty for a
- * home with none of these.
- */
-export function homeReasons(iata: string): string[] {
-  const neighbours = homeNeighbours(iata);
-  if (neighbours.length === 0) return [];
-  const byDemand = [...neighbours].sort((a, b) => potentialDailyDemand(iata, b) - potentialDailyDemand(iata, a));
-  const biggest = byDemand[0];
-  const reasons: string[] = [];
-  if (neighbours.length <= FEW_NEIGHBOURS) reasons.push(`only ${neighbours.length} in reach`);
-  const biggestNm = Math.round(marketDistanceNm(iata, biggest));
-  if (biggestNm < SHORT_HOP_NM) reasons.push(`biggest market a short hop · ${biggest} ${biggestNm} nm`);
-  const paying = neighbours.filter((other) => marketDistanceNm(iata, other) >= PAYING_NM).reduce((total, other) => total + potentialDailyDemand(iata, other), 0);
-  if (paying < SMALL_MARKETS_DEMAND) reasons.push('small markets beyond 150 nm');
-  const rival = seededRivals.find((route) => (route.origin === iata && route.dest === biggest) || (route.dest === iata && route.origin === biggest));
-  if (rival) reasons.push(`${rival.airline} on ${biggest}`);
-  return reasons;
 }
 
 /** Every city the player may start from, biggest first. */
@@ -99,7 +50,6 @@ export function homeOptions(): HomeOption[] {
       name: airport.name,
       population: airport.population,
       neighbours: homeNeighbours(airport.iata).length,
-      difficulty: difficultyByIata.get(airport.iata) ?? null,
     }))
     .filter((option) => option.neighbours >= MIN_NEIGHBOURS)
     .sort((a, b) => b.population - a.population);
@@ -109,8 +59,10 @@ export function homeOptions(): HomeOption[] {
  * Start the game from `iata`. Only meant for the very start: it replaces
  * the fleet, so calling it once routes are flying would strand them.
  */
-export function chooseHome(state: SimState, iata: string, season: StartSeason = 'summer'): void {
+export function chooseHome(state: SimState, iata: string, season: StartSeason = 'summer', difficulty: GameDifficulty = 'medium'): void {
   state.homeAirport = iata;
+  state.difficulty = difficulty;
+  state.cash = DIFFICULTY_SETTINGS[difficulty].startingCash;
   // The calendar starts on the chosen season's date (sim/clock.ts).
   state.startDayOfYear = START_DAY_OF_YEAR[season];
   // The airline's day runs on home time (sim/clock.ts), so the clock

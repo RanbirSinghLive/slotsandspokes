@@ -12,7 +12,6 @@
     "lease": "tsx src/headless/lease.ts",
     "balance": "tsx src/headless/balance.ts",
     "airports": "tsx src/headless/buildAirports.ts",
-    "homes": "tsx src/headless/buildHomeDifficulty.ts",
     "lakes": "tsx src/headless/buildLakes.ts",
     "rivers": "tsx src/headless/buildRivers.ts",
     "land50": "tsx src/headless/buildLand50.ts",
