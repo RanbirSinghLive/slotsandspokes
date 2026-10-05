@@ -31,7 +31,7 @@ import { networkOverheadPerDay } from './overhead';
 import { basesCostPerDay } from './bases';
 import { rollDailyMarketDemand, actualDailyDemand } from './marketDemand';
 import { revealReach } from './reach';
-import { FATIGUE_DELAY_MULTIPLIER, legFatigue, rollDailyCrews } from './crews';
+import { cabinCover, FATIGUE_DELAY_MULTIPLIER, legFatigue, rollDailyCrews } from './crews';
 import { MAINTENANCE_AGE_FACTOR } from './aog';
 import { isAog, rollDailyAogs } from './aog';
 import {
@@ -509,6 +509,8 @@ export function step(state: SimState): void {
       state.competitorRoutes,
       // A fresh crew gives full service; a tired one less (sim/crews.ts).
       1 - fatigue,
+      // A short cabin loses service points on every flight (sim/crews.ts).
+      cabinCover(state, leg.tail),
     ) + executiveNpsBonus(state);
     recordFlightNps(state, leg.origin, leg.dest, satisfactionScore);
 

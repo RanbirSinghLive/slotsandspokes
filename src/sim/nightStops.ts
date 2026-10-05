@@ -1,4 +1,4 @@
-import { contractCost, hasMxBase, outstationCheck } from './bases';
+import { contractCost, lineRated, outstationCheck } from './bases';
 import { lineCheckMinutes } from './mxChecks';
 import type { ScheduleLeg } from './schedule';
 import type { Aircraft, SimState } from './state';
@@ -63,7 +63,7 @@ export function hotelPerNight(state: SimState, aircraft: Aircraft): number {
 
 /** A night at the station: the hotel, and the check where it's contracted. */
 export function nightStopCostPerNight(state: SimState, aircraft: Aircraft, station: string): number {
-  const check = !hasMxBase(state, station) && outstationCheck(state, station) === 'contract' ? contractCost(lineCheckMinutes(state, aircraft)) : 0;
+  const check = !lineRated(state, station, aircraft.typeCode) && outstationCheck(state, station) === 'contract' ? contractCost(lineCheckMinutes(state, aircraft)) : 0;
   return hotelPerNight(state, aircraft) + check;
 }
 

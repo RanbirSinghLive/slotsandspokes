@@ -3,7 +3,7 @@ import { airportHours, FIRST_OPEN_HOUR, freeInHour, hoursWithRoom, OPEN_HOURS, p
 import { inboundAt } from '../../sim/fleetTiming';
 import { money, shortMoney } from '../format';
 import { crewShare } from '../../sim/crews';
-import { hasCrewBase, hasMxBase, outstationCheck } from '../../sim/bases';
+import { hasCrewBase, mxLevel, outstationCheck } from '../../sim/bases';
 import { line, heading, lineWithInfo } from './dom';
 import { formatNps, marketNps } from '../../sim/nps';
 import { daysUntilReturn } from '../../sim/aog';
@@ -71,11 +71,13 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
 
   // Bases here (sim/bases.ts): opened on the Crews and Mtc screens.
   const crewBase = hasCrewBase(state, iata);
-  const mxBase = hasMxBase(state, iata);
+  const lineLevel = mxLevel(state, 'line', iata);
+  const heavyLevel = mxLevel(state, 'heavy', iata);
+  const mtcText = [lineLevel > 0 ? `line L${lineLevel}` : 'no line base', heavyLevel > 0 ? `hangar L${heavyLevel}` : 'no hangar'].join(' · ');
   root.append(
     lineWithInfo(
-      [crewBase ? 'Crew base' : 'No crew base', mxBase ? 'mtc base' : `no mtc base · nights ${outstationCheck(state, iata) === 'contract' ? 'contracted' : 'deferred'}`].join(' · '),
-      'A crew base is where planes can be leased and based (open one on the Crews screen). A maintenance base is where a night is a line check (the Mtc screen); a plane sleeping anywhere else has its check contracted or deferred, by the station\'s setting there.',
+      [crewBase ? 'Crew base' : 'No crew base', lineLevel > 0 ? mtcText : `${mtcText} · nights ${outstationCheck(state, iata) === 'contract' ? 'contracted' : 'deferred'}`].join(' · '),
+      'A crew base is where planes can be leased and based (open one on the Crews screen). A line base checks as many planes a night as its level; a hangar has a bay for each level and is where heavy-check hours are banked (the Mtc screen). A plane sleeping anywhere else, or past a base\'s capacity, has its check contracted or deferred, by the station\'s setting there.',
     ),
   );
 

@@ -1,3 +1,4 @@
+import type { MxKind } from '../sim/bases';
 import type { HubStyle } from '../sim/hubStyle';
 import * as actions from '../sim/playerActions';
 import type { SimState } from '../sim/state';
@@ -15,6 +16,8 @@ export {
   crewReadout,
   crewBaseReadout,
   mxBaseReadout,
+  mxRatingsReadout,
+  mxStationsReadout,
   previewBaseChange,
   appointExecutiveById,
   executiveOptions,
@@ -29,6 +32,8 @@ export {
   previewAddFlight,
   previewGauge,
   previewHubStyle,
+  previewMxLevel,
+  previewMxRating,
   previewRemoveFlight,
   previewRemoveRoute,
   previewTurnBuffer,
@@ -62,6 +67,14 @@ export function hireCrewsAt(state: SimState, iata: string, classCode: string, co
 
 export function retrainCrewsAt(state: SimState, iata: string, from: string, to: string, count: number) {
   return afterChange(state, actions.retrainCrewsAt(state, iata, from, to, count));
+}
+
+export function hireCabinAt(state: SimState, iata: string, classCode: string, count: number) {
+  return afterChange(state, actions.hireCabinAt(state, iata, classCode, count));
+}
+
+export function releaseCabinAt(state: SimState, iata: string, classCode: string, count: number) {
+  return afterChange(state, actions.releaseCabinAt(state, iata, classCode, count));
 }
 
 export function releaseCrewsAt(state: SimState, iata: string, classCode: string, count: number) {
@@ -128,12 +141,24 @@ export function closeCrewBaseAt(state: SimState, iata: string) {
   return afterChange(state, actions.closeCrewBaseAt(state, iata));
 }
 
-export function openMxBaseAt(state: SimState, iata: string) {
-  return afterChange(state, actions.openMxBaseAt(state, iata));
+export function openMxBaseAt(state: SimState, kind: MxKind, iata: string) {
+  return afterChange(state, actions.openMxBaseAt(state, kind, iata));
 }
 
-export function closeMxBaseAt(state: SimState, iata: string) {
-  return afterChange(state, actions.closeMxBaseAt(state, iata));
+export function closeMxBaseAt(state: SimState, kind: MxKind, iata: string) {
+  return afterChange(state, actions.closeMxBaseAt(state, kind, iata));
+}
+
+export function changeMxLevel(state: SimState, kind: MxKind, iata: string, delta: 1 | -1) {
+  return afterChange(state, actions.changeMxLevel(state, kind, iata, delta));
+}
+
+export function rateStation(state: SimState, iata: string, classCode: string) {
+  return afterChange(state, actions.rateStation(state, iata, classCode));
+}
+
+export function unrateStation(state: SimState, iata: string, classCode: string) {
+  return afterChange(state, actions.unrateStation(state, iata, classCode));
 }
 
 export function setStationCheck(state: SimState, iata: string, check: 'contract' | 'defer') {

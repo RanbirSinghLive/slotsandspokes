@@ -568,8 +568,14 @@ export type SimState = {
   inboundLeases?: InboundLease[];
   /** Crew bases and their crews, by IATA (sim/crews.ts). Optional: an older save gets bases made at its first rollover. */
   crewBases?: Record<string, CrewBase>;
-  /** Maintenance bases, by IATA (sim/bases.ts): missing in a save from before them, which has one at every crew base. */
+  /** Old maintenance bases, by IATA: read only by a save from before levels (sim/bases.ts's mxLevels()), and dropped at its first change. */
   mxBases?: string[];
+  /** Line bases by IATA, each with its level: planes it can check in a night (sim/bases.ts). */
+  lineBases?: Record<string, number>;
+  /** Hangars by IATA, each with its level: bays for heavy checks at once (sim/bases.ts). */
+  heavyBases?: Record<string, number>;
+  /** The aircraft classes each station's mechanics are rated for; missing in a save from before ratings, which rates every class everywhere. */
+  mxRatings?: Record<string, string[]>;
   /** Stations set to defer their line checks rather than contract them (sim/bases.ts); unlisted ones contract. */
   outstationChecks?: Record<string, 'contract' | 'defer'>;
   /** Today's crewing (sim/crews.ts's rollDailyCrews()): crews per plane and when each duty day starts. */

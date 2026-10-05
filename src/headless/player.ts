@@ -2,7 +2,8 @@ import { DIFFICULTIES, type GameDifficulty } from '../sim/difficulty';
 import { currentPotentialDemand } from '../sim/marketDemand';
 import { marketLoadFactor } from '../sim/loadFactor';
 import { saleBlockedReason, saleMarginChangePerDay } from '../sim/seatSale';
-import { crewsForRisk } from '../sim/crews';
+import { CABIN_TEAMS_PER_SHIFT, crewsForRisk } from '../sim/crews';
+import { mxLevel } from '../sim/bases';
 import { dayOfYear, marketSeasonOn } from '../sim/seasons';
 import { SEASONAL_PREMIUM } from '../sim/seasonalLease';
 import { contractOn, contractsOf, performanceFactor } from '../sim/contracts';
@@ -254,7 +255,17 @@ function recklessPlayer(): Player {
         for (const crew of actions.crewReadout(state, iata)?.classes ?? []) {
           const short = crew.ideal + CREWS_PER_NEW_PLANE * inboundAt(state, iata, crew.classCode).length - crew.crews - crew.arriving;
           if (short <= 0) continue;
-          const hired = actions.hireCrewsAt(state, iata, crew.classCode, short);
+          const seats = actions.crewReadout(state, iata)?.training.pilot.free ?? 0;
+          if (seats <= 0) continue;
+          const hired = actions.hireCrewsAt(state, iata, crew.classCode, Math.min(short, seats));
+          if (hired.ok) log.push(hired.message);
+        }
+        for (const crew of actions.crewReadout(state, iata)?.classes ?? []) {
+          if (!crew.cabin) continue;
+          const short = crew.cabin.ideal + CREWS_PER_NEW_PLANE * (CABIN_TEAMS_PER_SHIFT[crew.classCode] ?? 0) * inboundAt(state, iata, crew.classCode).length - crew.cabin.teams - crew.cabin.arriving;
+          const seats = actions.crewReadout(state, iata)?.training.cabin.free ?? 0;
+          if (short <= 0 || seats <= 0) continue;
+          const hired = actions.hireCabinAt(state, iata, crew.classCode, Math.min(short, seats));
           if (hired.ok) log.push(hired.message);
         }
       }
@@ -357,6 +368,7 @@ function steadyPlayer(kind: 'steady' | 'sitter' | 'bold'): Player {
         ...shedWhenOverheadBites(state, memory),
         ...returnIdle(state, memory),
         ...keepCrews(state, memory),
+        ...keepMaintenance(state),
         ...pickStances(state, memory),
         ...runHomeHub(state),
         ...tuneFareClasses(state),
@@ -1182,8 +1194,83 @@ function hireExecutives(state: SimState): string[] {
  * crews above target are let go once they've sat spare for
  * CREW_RELEASE_AFTER_DAYS.
  */
+/**
+ * Keep each base's maintenance matched to its planes: the mechanics rated
+ * for every class based there, a line base level for every plane, and a bay
+ * for every HANGAR_PLANES_PER_BAY planes (never fewer than home starts
+ * with). A plane's nights are what the player's day plan builds on, so
+ * the headless player pays for what it flies.
+ */
+const HANGAR_PLANES_PER_BAY = 4;
+
+function keepMaintenance(state: SimState): string[] {
+  const log: string[] = [];
+  for (const iata of Object.keys(state.lineBases ?? {})) {
+    // Planes on their way count: the base is ready the night one arrives.
+    const based = state.aircraft.filter((aircraft) => aircraft.baseAirport === iata);
+    const classes = new Set(based.map((aircraft) => aircraft.typeCode));
+    let planes = based.length;
+    for (const cls of AIRCRAFT_CLASSES) {
+      const coming = inboundAt(state, iata, cls.code).length;
+      if (coming > 0) classes.add(cls.code);
+      planes += coming;
+    }
+    for (const code of classes) {
+      const rated = actions.rateStation(state, iata, code);
+      if (rated.ok) log.push(rated.message);
+    }
+    const lineWanted = planes;
+    const bayWanted = Math.ceil(planes / HANGAR_PLANES_PER_BAY);
+    for (const [kind, wanted] of [['line', lineWanted], ['heavy', bayWanted]] as const) {
+      while (mxLevel(state, kind, iata) < wanted) {
+        const raised = actions.changeMxLevel(state, kind, iata, 1);
+        if (!raised.ok) break;
+        log.push(raised.message);
+      }
+    }
+  }
+  return log;
+}
+
 /** The weekly chance of a crew grounding the player staffs for. */
 const CREW_GROUNDING_RISK = 0.05;
+
+/**
+ * Cabin teams follow the same rule as pilots without the sickness reserve:
+ * each class's need at ideal shifts plus CREWS_PER_NEW_PLANE shifts of
+ * teams for each plane on its way, hired up to the base's free cabin
+ * training seats and let go after CREW_RELEASE_AFTER_DAYS spare.
+ */
+function keepCabin(state: SimState, memory: Memory, iata: string, classes: { classCode: string; cabin: { teams: number; arriving: number; ideal: number } | null }[]): string[] {
+  const log: string[] = [];
+  for (const crew of classes) {
+    if (!crew.cabin) continue;
+    const key = `${iata}:${crew.classCode}:cabin`;
+    const perShift = CABIN_TEAMS_PER_SHIFT[crew.classCode] ?? 0;
+    const target = crew.cabin.ideal + CREWS_PER_NEW_PLANE * perShift * inboundAt(state, iata, crew.classCode).length;
+    const short = target - crew.cabin.teams - crew.cabin.arriving;
+    if (short > 0) {
+      memory.spareCrewDays.delete(key);
+      const seats = actions.crewReadout(state, iata)?.training.cabin.free ?? 0;
+      if (seats <= 0) continue;
+      const hired = actions.hireCabinAt(state, iata, crew.classCode, Math.min(short, seats));
+      if (hired.ok) log.push(hired.message);
+      continue;
+    }
+    const spare = crew.cabin.teams - target;
+    if (spare <= 0 || crew.cabin.arriving > 0) {
+      memory.spareCrewDays.delete(key);
+      continue;
+    }
+    const days = (memory.spareCrewDays.get(key) ?? 0) + 1;
+    memory.spareCrewDays.set(key, days);
+    if (days < CREW_RELEASE_AFTER_DAYS) continue;
+    memory.spareCrewDays.delete(key);
+    const released = actions.releaseCabinAt(state, iata, crew.classCode, spare);
+    if (released.ok) log.push(released.message);
+  }
+  return log;
+}
 
 function keepCrews(state: SimState, memory: Memory): string[] {
   const log: string[] = [];
@@ -1206,15 +1293,18 @@ function keepCrews(state: SimState, memory: Memory): string[] {
           if (short <= 0 || other.crew.classCode === crew.classCode) continue;
           const otherSpare = other.crew.crews - other.target;
           if (otherSpare <= 0) continue;
-          const moved = Math.min(short, otherSpare);
+          const moved = Math.min(short, otherSpare, actions.crewReadout(state, iata)?.training.pilot.free ?? 0);
+          if (moved <= 0) continue;
           const retrained = actions.retrainCrewsAt(state, iata, other.crew.classCode, crew.classCode, moved);
           if (!retrained.ok) continue;
           log.push(retrained.message);
           other.crew.crews -= moved;
           short -= moved;
         }
-        if (short > 0) {
-          const hired = actions.hireCrewsAt(state, iata, crew.classCode, short);
+        // Only as many as the base has training seats for; the rest follow as seats free up.
+        const seats = actions.crewReadout(state, iata)?.training.pilot.free ?? 0;
+        if (short > 0 && seats > 0) {
+          const hired = actions.hireCrewsAt(state, iata, crew.classCode, Math.min(short, seats));
           if (hired.ok) log.push(hired.message);
         }
         continue;
@@ -1231,6 +1321,7 @@ function keepCrews(state: SimState, memory: Memory): string[] {
       const released = actions.releaseCrewsAt(state, iata, crew.classCode, spare);
       if (released.ok) log.push(released.message);
     }
+    log.push(...keepCabin(state, memory, iata, classes));
   }
   return log;
 }
