@@ -16,6 +16,8 @@ const ICONS: Record<string, string> = {
   winglets: '<path d="M3 16 16 11c2-.7 3-2 3.5-5l.5-2 1 1-.5 3c-.5 3-2 5-5 6L4 19Z"/><path d="M8 17.5 7 21"/>',
   // Two linked rings: a partner selling your connections.
   'codeshare-feed': '<circle cx="9" cy="12" r="5"/><circle cx="15" cy="12" r="5"/><path d="M12 8.2v7.6"/>',
+  // A row of seats with one filled: selling the last seat.
+  'spoilage': '<path d="M5 18v-6a3 3 0 0 1 3-3h1v9"/><path d="M15 18V9h1a3 3 0 0 1 3 3v6"/><path d="M9 18h6"/><path d="M12 3v4M10 5h4"/>',
 };
 
 export function innovationIconElement(id: string): SVGSVGElement {
@@ -27,6 +29,6 @@ export function innovationIconElement(id: string): SVGSVGElement {
   svg.setAttribute('stroke-linecap', 'round');
   svg.setAttribute('stroke-linejoin', 'round');
   svg.setAttribute('aria-hidden', 'true');
-  svg.innerHTML = ICONS[id] ?? '<circle cx="12" cy="12" r="8"/>';
+  svg.innerHTML = ICONS[id.startsWith('spoilage-') ? 'spoilage' : id] ?? '<circle cx="12" cy="12" r="8"/>';
   return svg;
 }

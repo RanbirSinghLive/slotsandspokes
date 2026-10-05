@@ -368,11 +368,11 @@ can actually support that many passengers, and priced at the route
 (market) level rather than one flat rate for everyone:
 
 ```
-LOAD_FACTOR    = 0.75
+LOAD_FACTOR    = 0.75   // the base; loadFactorCap(state) raises it, never past 0.90
 RECAPTURE_RATE = 0.4
 demandPerFlight = dailyDemand(origin, dest) / legsServingMarket
 bookedDemand    = demandPerFlight * bookingShare(fare, legsServingMarket, origin, dest, competitorRoutes)
-seatCeiling     = round(seats * LOAD_FACTOR)
+seatCeiling     = round(seats * loadFactorCap(state))  // 0.75 + spoilage levels + CCO
 if bookedDemand > seatCeiling:
   pax             = seatCeiling
   spilloverDelta  = round((bookedDemand - seatCeiling) * RECAPTURE_RATE)  // deposited for a later flight
@@ -2135,8 +2135,8 @@ stays met.
 | Start-up | 4 of 4 | fly your first route; a route that makes money for a week after its share of fixed costs; a route 72% full over a week; hold a starved city no rival flies to, on a route flown 30 days | Regional aircraft |
 | Regional carrier | 3 of 4 | serve 8 airports; connect 150 a day through one airport; put a Regional into service; make money every day for a week of a shock | Narrowbody; online booking, younger airframes |
 | Network airline | 3 of 5 | fly 60% of the movements at a busy airport; four routes 4+ a day each way; trailing NPS 15, with 1,000 flights flown; planes based at two airports; put a Narrowbody into service | Widebody; loyalty scheme, winglet retrofits |
-| International | 2 of 2 | a route to another continent; connect 750 a day through one airport | codeshare feed |
-| Global | 1 of 1 | round the world: a loop of your routes that goes all the way round the globe, reachable from home | — |
+| International | 2 of 2 | a route to another continent; connect 750 a day through one airport | codeshare feed, spoilage management I–III |
+| Global | 1 of 1 | round the world: a loop of your routes that goes all the way round the globe, reachable from home | spoilage management IV–V |
 
 What a tier opens is in force: aircraft classes (see the aircraft
 market above) and innovations (see Innovations). Round the world is judged by walking the
@@ -3152,6 +3152,14 @@ below the tree, with what it does, what it costs and the Adopt button.
 | Loyalty scheme | International | $500,000 once, then 2% of revenue a day | 60% of turned-away passengers rebook with you, not 40%; rivals see 25% less money on the table on your routes (sim/attractiveness.ts) |
 | Winglet retrofits | International | $800,000 once | 10% less fuel burned (`fuelEfficiencyMultiplier`) |
 | Codeshare feed | Global | $6,000 a day | 30% more connecting passengers at every hub (sim/hubs.ts) |
+| Spoilage management I–V | I–III Global, IV–V past Global | $3M, $5M, $8M, $12M, $18M once, each needing the one before | each level lets planes sell 1 point more of their seats (75% → up to 80%) |
+
+Spoilage management is the way to fuller planes (an unsold seat is
+spoiled stock). `loadFactorCap()` adds one point per level and the
+CCO's points to the 75% base and clamps at 90%, and goes into every
+`flightResult()` through `bookingPerks()`, and into a market's seat
+ceiling. Rivals stay at 75%. Each point is worth a few percent of profit
+on a seat-capped route, hence the late gate and the steep prices.
 
 The effects are read where they apply: `bookingPerks()` goes into every
 `flightResult()` (yield and recapture rate), `loyaltyKeeps()` into the
@@ -3196,6 +3204,8 @@ needs 20 (judged at hiring; they stay if NPS falls later).
 | COO | Errol Vance: breakdowns as if 15% younger; Lena Fischer (NPS 10): deliveries and returns in half the time | Marcus Oyelaran: delays 15% shorter | Priya Raghunathan: +8 NPS a flight |
 | CFO | Dale Mercer: overhead −15% | Hana Okafor: hedge premiums halved, overhead −5% | Simone Adeyemi: new leases −12% |
 | CCO | Tomas Lindqvist: markets grow 25% faster | Inês Carvalho: +15% connecting passengers | Kofi Mensah: +3% yield |
+
+A fourth CCO, Akira Sato (NPS 25, $500,000, $5,000 a day), lifts the share of seats a plane can sell by 3 points (see Innovations; the 90% ceiling holds).
 
 Fees run $150,000 (journeymen) to $400,000, salaries $1,500 to $4,000 a
 day. The effects are read where they apply: delays (sim/cascade.ts,

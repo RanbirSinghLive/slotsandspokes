@@ -1,5 +1,5 @@
-import { RECAPTURE_RATE } from './economy';
-import { executiveYieldMultiplier } from './executives';
+import { LOAD_FACTOR, RECAPTURE_RATE } from './economy';
+import { executiveLoadFactorBonus, executiveYieldMultiplier } from './executives';
 import { airlineCalled, LADDER, tiersClimbed } from './ladder';
 import { brandEdge } from './nps';
 import { positionEdge } from './brand';
@@ -23,7 +23,8 @@ import type { SimState } from './state';
  * every place that books a flight or judges a market sees the same thing.
  */
 
-export type InnovationId = 'online-booking' | 'younger-airframes' | 'crew-academy' | 'loyalty-scheme' | 'winglets' | 'codeshare-feed';
+export type InnovationId = 'online-booking' | 'younger-airframes' | 'crew-academy' | 'loyalty-scheme' | 'winglets' | 'codeshare-feed' | SpoilageLevelId;
+export type SpoilageLevelId = 'spoilage-1' | 'spoilage-2' | 'spoilage-3' | 'spoilage-4' | 'spoilage-5';
 
 export type Innovation = {
   id: InnovationId;
@@ -59,6 +60,30 @@ export const WINGLET_FUEL_FACTOR = 0.9;
 export const CODESHARE_FEED_FACTOR = 1.3;
 /** Codeshare feed: the partner's fee, a day. */
 export const CODESHARE_COST_PER_DAY = 6000;
+
+/** Spoilage management: each level lets planes sell this much more of their seats. */
+export const SPOILAGE_STEP = 0.01;
+/** No mix of programmes and executives sells more than this share of a plane's seats. */
+export const LOAD_FACTOR_CEILING = 0.9;
+/** One-off prices of the five spoilage levels; deliberately steep, so only a big airline gains by buying them. */
+const SPOILAGE_PRICES = [3_000_000, 5_000_000, 8_000_000, 12_000_000, 18_000_000];
+const SPOILAGE_LEVELS: SpoilageLevelId[] = ['spoilage-1', 'spoilage-2', 'spoilage-3', 'spoilage-4', 'spoilage-5'];
+const ROMAN = ['I', 'II', 'III', 'IV', 'V'];
+
+/** Level 1 to 5 of spoilage management: each needs the one before it. */
+function spoilageLevel(level: number): Innovation {
+  const points = Math.round(SPOILAGE_STEP * 100);
+  return {
+    id: SPOILAGE_LEVELS[level - 1],
+    name: `Spoilage mgmt ${ROMAN[level - 1]}`,
+    summary: `Seats sold +${points} point`,
+    description: `Spoilage management: unsold seats are spoiled stock: they can't be sold after the door closes. Better overbooking and last-minute selling let every plane sell ${points} point more of its seats, ${Math.round(LOAD_FACTOR * 100)}% before any programme. Level ${level} of 5; each needs the one before it. With a commercial officer's help, no airline passes ${Math.round(LOAD_FACTOR_CEILING * 100)}%.`,
+    // The first three open with the international tier, the last two only at the top.
+    openedBy: level <= 3 ? 'international' : 'global',
+    oneOffPrice: SPOILAGE_PRICES[level - 1],
+    runningCost: null,
+  };
+}
 
 export const INNOVATIONS: Innovation[] = [
   {
@@ -115,6 +140,11 @@ export const INNOVATIONS: Innovation[] = [
     oneOffPrice: 0,
     runningCost: `$${CODESHARE_COST_PER_DAY.toLocaleString()}/day`,
   },
+  spoilageLevel(1),
+  spoilageLevel(2),
+  spoilageLevel(3),
+  spoilageLevel(4),
+  spoilageLevel(5),
 ];
 
 export function innovationById(id: string): Innovation | undefined {
@@ -134,6 +164,8 @@ export function innovationOpen(state: SimState, innovation: Innovation): boolean
 /** Why it can't be adopted right now, or null if it can. */
 export function adoptBlockedReason(state: SimState, innovation: Innovation): string | null {
   if (isAdopted(state, innovation.id)) return 'Running';
+  const spoilageIndex = SPOILAGE_LEVELS.indexOf(innovation.id as SpoilageLevelId);
+  if (spoilageIndex > 0 && !isAdopted(state, SPOILAGE_LEVELS[spoilageIndex - 1])) return `Needs ${INNOVATIONS.find((i) => i.id === SPOILAGE_LEVELS[spoilageIndex - 1])?.name}`;
   if (!innovationOpen(state, innovation)) {
     const tierIndex = LADDER.findIndex((tier) => tier.id === innovation.openedBy);
     const becomes = LADDER[tierIndex + 1];
@@ -169,6 +201,8 @@ export type BookingPerks = {
   positionEdge: Record<SegmentName, number>;
   /** Multiplies every ticket's revenue. */
   yieldMultiplier: number;
+  /** The share of its seats a plane can sell (spoilage management and a commercial officer lift it). */
+  loadFactor: number;
   /** Share of turned-away passengers who wait for a later flight. */
   recaptureRate: number;
 };
@@ -179,8 +213,15 @@ export function bookingPerks(state: SimState, origin: string, dest: string): Boo
     positionEdge: positionEdge(state),
     // Online booking, and a revenue-management CCO (sim/executives.ts).
     yieldMultiplier: (isAdopted(state, 'online-booking') ? DIRECT_BOOKING_YIELD : 1) * executiveYieldMultiplier(state),
+    loadFactor: loadFactorCap(state),
     recaptureRate: isAdopted(state, 'loyalty-scheme') ? LOYALTY_RECAPTURE_RATE : RECAPTURE_RATE,
   };
+}
+
+/** The share of its seats a plane of this airline can sell: the base, spoilage management levels, and a CCO, never past the ceiling. */
+export function loadFactorCap(state: SimState): number {
+  const levels = SPOILAGE_LEVELS.filter((id) => isAdopted(state, id)).length;
+  return Math.min(LOAD_FACTOR_CEILING, LOAD_FACTOR + levels * SPOILAGE_STEP + executiveLoadFactorBonus(state));
 }
 
 /** How much of the money on the table the loyalty scheme keeps from rivals, 0 without one. */

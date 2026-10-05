@@ -53,6 +53,7 @@ export type ExecutiveEffect =
   /** Multiplies every ticket's revenue (sim/innovations.ts's bookingPerks()). */
   | { kind: 'revenue'; yieldMultiplier: number }
   /** Multiplies how long leased planes take to arrive and returned ones to go (sim/fleetTiming.ts). */
+  | { kind: 'load-factor'; points: number }
   | { kind: 'fleet-programmes'; deliveryMultiplier: number; returnMultiplier: number };
 
 export type ExecutiveCandidate = {
@@ -190,6 +191,11 @@ export function executiveReturnMultiplier(state: SimState): number {
   return effectOf(state, 'fleet-programmes')?.returnMultiplier ?? 1;
 }
 
+/** Extra share of its seats a plane can sell (sim/innovations.ts's loadFactorCap()). */
+export function executiveLoadFactorBonus(state: SimState): number {
+  return (effectOf(state, 'load-factor')?.points ?? 0) / 100;
+}
+
 export function executiveYieldMultiplier(state: SimState): number {
   return effectOf(state, 'revenue')?.yieldMultiplier ?? 1;
 }
@@ -221,6 +227,8 @@ export function describeEffect(effect: ExecutiveEffect): string {
       return `Connecting pax +${percent(effect.connectingMultiplier)}`;
     case 'revenue':
       return `Yield +${percent(effect.yieldMultiplier)} · fare estimates twice as sharp`;
+    case 'load-factor':
+      return `Seats sold +${effect.points} points`;
     case 'fleet-programmes':
       return `Deliveries −${percent(effect.deliveryMultiplier)} · returns −${percent(effect.returnMultiplier)} time`;
   }
