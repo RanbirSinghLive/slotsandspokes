@@ -28,6 +28,8 @@ import { crewPlan } from '../sim/crewPlan';
 import { trailingDailyMargin } from '../sim/forecast';
 import { dayIndex } from '../sim/clock';
 import { hasCrewBase, mxLevel } from '../sim/bases';
+import { classOpen, tierThatOpens } from '../sim/ladder';
+import { cabinHireFee, needsCabinCrew } from '../sim/crews';
 import { SEASON_DAYS, SEASONAL_PREMIUM } from '../sim/seasonalLease';
 
 /**
@@ -325,7 +327,17 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
         },
       };
     });
-  crewChoices.push(...cabinCrewChoices);
+  // Types not open yet stay in the menu greyed out.
+  const lockedCabinChoices: RadialAction[] = AIRCRAFT_CLASSES.filter((cls) => needsCabinCrew(cls.code) && !classOpen(state, cls.code)).map((cls) => ({
+    id: `cabin:${cls.code}`,
+    label: `${cls.name} cabin teams · ${money(cabinHireFee(cls.code))} a team · opens as ${tierThatOpens(cls.code)?.name ?? 'you grow'}`,
+    icon: planeIconInner(cls.code),
+    large: true,
+    angleDeg: 0,
+    disabledReason: `${cls.name} planes aren't open to the airline yet.`,
+    onSelect: () => false,
+  }));
+  crewChoices.push(...cabinCrewChoices, ...lockedCabinChoices);
 
   // Create base: one entry, then crew, line base or hangar. Each opens the same
   // confirm the Crews and Mtc screens use (fee, running cost, cash after).

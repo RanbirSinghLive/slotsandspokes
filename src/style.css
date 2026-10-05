@@ -4009,6 +4009,10 @@ button.ops-item:hover {
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+.crew-row--locked {
+  opacity: 0.45;
+}
+
 .crew-row-head {
   display: flex;
   align-items: center;

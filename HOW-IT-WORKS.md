@@ -2863,6 +2863,9 @@ from Regional up has a "cabin" row under its pilot row, shown even before
 its first plane so teams can be trained ahead of delivery. The airport
 menu's "Hire pilots and cabin crew" lists them too, and leasing a plane
 adds a cabin note when the base is short.
+Types not open yet still show a greyed LOCKED cabin row (and a greyed
+airport menu entry) with what opens them, as a hint of mid-game
+complexity; their hire buttons are disabled.
 
 ## The crew planning board (`src/ui/inspector/crews.ts`, read-out in `src/sim/crewPlan.ts`)
 
