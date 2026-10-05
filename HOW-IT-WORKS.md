@@ -2690,6 +2690,14 @@ is scaled by its booking share at its fare over its share at the going
 rate, capped at 1.5× for pricing under it, so an over-priced hub
 doesn't stay full on connections alone.
 
+**No proration.** A connection is two tickets, one per leg, never one
+through fare split between routes. Each leg books its connecting
+passengers at its own fare class and keeps all of that revenue, so a
+route's P&L shows what its own seats earned. A feeder spoke gets no
+credit for the passengers it hands to the other leg. Airline profit is
+the same either way; a split would only move revenue between routes'
+P&L lines, so none is made.
+
 **Worked out once per change, not per question.** Every departure asks
 for the flows at both ends, and working them out visits every pair of a
 hub's spokes, so a thirty-spoke hub made them most of the simulation's
