@@ -4786,12 +4786,49 @@ button.ops-item:hover {
   background: repeating-linear-gradient(135deg, rgba(138, 180, 255, 0.18) 0 4px, rgba(138, 180, 255, 0.05) 4px 8px);
 }
 
+.mx-bay.is-banking {
+  border: 1px solid rgba(255, 179, 71, 0.9);
+  background: rgba(255, 179, 71, 0.1);
+}
+
+.mx-bay.is-waiting {
+  opacity: 0.75;
+}
+
 .mx-bay.is-late {
   border-color: rgba(255, 128, 128, 0.7);
   color: #ff8080;
 }
 
 .mx-bay-tail { color: #e6e9f2; }
+
+.mx-ratings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.mx-rating {
+  padding: 2px 7px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  color: #9aa3b8;
+  background: transparent;
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.mx-rating.is-rated {
+  color: #8ab4ff;
+  border: 1px solid #8ab4ff;
+  background: rgba(138, 180, 255, 0.12);
+}
+
+.mx-rating:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
 
 .mx-axis {
   position: relative;

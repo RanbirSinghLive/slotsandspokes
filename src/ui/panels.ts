@@ -1,5 +1,5 @@
 import { nightStopLegs } from '../sim/nightStops';
-import { hasMxBase, outstationCheck } from '../sim/bases';
+import { hasLineBase, outstationCheck } from '../sim/bases';
 import { deferredItems, MX_HOLD_AT, tonightCheck } from '../sim/mxChecks';
 import { bringNightStopHome, planBringNightStopHome, planRetimeRotation, removeRotation as removeRotationFromSchedule, retimeRotation } from '../sim/playerActions';
 import type { RetimePlan } from '../sim/retime';
@@ -568,11 +568,11 @@ function describeRetime(plan: RetimePlan, tail: string, fromTail: string, start:
     const [a, b] = plan.legs;
     const tomorrow = plan.deferred ? ' · from tomorrow' : '';
     if (plan.kind === 'unwrap') return `Sleeps at base again · ${plan.station} ${minuteOfDayToTimeString(a.departMinute)}–${minuteOfDayToTimeString(b.departMinute + b.blockMinutes)}${tomorrow}`;
-    const check = hasMxBase(lastTimelineState, plan.station)
-      ? 'mtc base: line check'
+    const check = hasLineBase(lastTimelineState, plan.station)
+      ? 'line base: line check'
       : outstationCheck(lastTimelineState, plan.station) === 'contract'
-        ? 'no mtc base: contracted check'
-        : 'no mtc base: deferred, ● a night';
+        ? 'no line base: contracted check'
+        : 'no line base: deferred, ● a night';
     return [`Night stop ${plan.station}`, `out ${minuteOfDayToTimeString(b.departMinute)}`, `back ${minuteOfDayToTimeString(a.departMinute)}`, check, ...(plan.crewWarning ? [plan.crewWarning] : []), ...(plan.deferred ? ['from tomorrow'] : [])].join(' · ');
   }
   const parts = [minuteOfDayToTimeString(start)];

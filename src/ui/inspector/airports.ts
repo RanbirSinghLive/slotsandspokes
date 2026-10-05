@@ -1,5 +1,5 @@
 import { airportLoad, dailyDeparturesAt, airportLevel } from '../../sim/airports';
-import { hasCrewBase, hasMxBase } from '../../sim/bases';
+import { hasCrewBase, hasHeavyBase, hasLineBase } from '../../sim/bases';
 import { slotFeesPerDayAt, slotsHeld } from '../../sim/slots';
 import { airportDemandSize, sizeRank, type Size } from '../../sim/marketSize';
 import type { SimState } from '../../sim/state';
@@ -83,7 +83,7 @@ function buildRows(state: SimState): Row[] {
     slotFees: slotFeesPerDayAt(state, iata),
     // Sorted by size, not by the hidden number (sim/marketSize.ts).
     waiting: sizeRank(airportDemandSize(unmet.get(iata)?.latent ?? 0)),
-    bases: (hasCrewBase(state, iata) ? 1 : 0) + (hasMxBase(state, iata) ? 2 : 0),
+    bases: (hasCrewBase(state, iata) ? 1 : 0) + (hasLineBase(state, iata) || hasHeavyBase(state, iata) ? 2 : 0),
   }));
 }
 

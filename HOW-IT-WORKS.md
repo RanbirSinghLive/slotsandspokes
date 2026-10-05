@@ -2875,17 +2875,39 @@ covered too. Until it ferries, the alert strip says it will.
 
 ## Bases (`src/sim/bases.ts`)
 
-A base is an investment, opened on purpose. Home has both kinds from the
-start, inside the starting cost, and they cost nothing to run.
+A base is an investment, opened on purpose. Home has a crew base, a line
+base and a hangar from the start, inside the starting cost.
 
-| | Crew base | Maintenance base |
-|---|---|---|
-| What it is | Where crews live; the only places planes can be leased or based | Where a night is a line check and banks heavy-check hours |
-| Opened on | the Crews screen, or the map ring's Create base | the Mtc screen, or the map ring's Create base |
-| Cost | $100,000, then $500/day (crew room, under crew) | $400,000, then $1,500/day (under maintenance) |
-| Closes | when no planes are based there and its crews are released | any time; nights there are then contracted or deferred |
+| | Crew base | Line base | Hangar (heavy base) |
+|---|---|---|---|
+| What it is | Where crews live; the only places planes can be leased or based | Where a night is a line check | Where heavy-check hours are banked |
+| Level | none | planes checked a night | bays: planes banking at once |
+| Opened on | the Crews screen, or the map ring's Create base | the Mtc screen, or the map ring's Create base | the Mtc screen, or the map ring's Create base |
+| Open | $100,000, then $500/day | $150,000, then $100/day a level | $400,000, then $300/day a level |
+| Each level above 1 | n/a | $25,000 | $100,000 |
+| Closes | when no planes are based there and its crews are released | any time away from home | any time away from home |
 
-Clicking an airport's ring has one Create base button with a crew or Mtc choice; it greys out for a kind the airport already has and opens the same confirm as the screens. Opening or closing a base asks first: a confirm window (`ui/confirmModal.ts`,
+Levels run 1 to 6. Home starts with the line base and hangar at level 3,
+and its first three levels of each cost nothing a day; levels above that
+are charged like anywhere else. Lowering a level is free and refunds
+nothing.
+
+**Capacity.** A line base checks as many planes a night as its level, the
+ones with the most deferred items first (`lineCheckedTails()`); a plane
+past that is treated like one at an outstation. A hangar's bays go to the
+planes with an open heavy check nearest to due, less any plane in a forced
+check there (`heavyBayTails()`); only those bank hours on their nights,
+the rest queue. A station with no hangar banks nothing, so a line-only
+station is cheap and never does a heavy check.
+
+**Ratings.** A station's mechanics are rated by aircraft class, like crews.
+A plane of an unrated class is treated like one at an outstation, at a line
+base or a hangar. A station's first rating is free (home starts rated for
+the Propeller; a station you open is rated for your most numerous class),
+and each further class costs $50,000 and $150/day, so a mixed fleet costs
+more to maintain. Chips on the Mtc screen's Ratings list rate or drop them.
+
+Clicking an airport's ring has one Create base button with a crew, line base or hangar choice; it greys out for a kind the airport already has and opens the same confirm as the screens. Opening or closing a base asks first: a confirm window (`ui/confirmModal.ts`,
 numbers from `previewBaseChange()`) shows the fee, the running cost before and
 after, the cash left, and what changes at that airport. The same window
 asks before leasing a plane, returning one, rebasing, ordering or calling off
@@ -2895,19 +2917,22 @@ appointing, replacing or letting go an executive, starting a seat sale, and
 switching a hub's style (map menu and Plan hub window). Holding a ring button to repeat (add or remove a flight, hire
 on the map) stays one click each.
 
-**Anywhere else a plane sleeps** (a crew base without maintenance, a
-plane stranded away), the night is a **contracted check**, $300 an hour
-of the night's work (a Propeller on 4 flights a day: $840), or **no check
-and a deferred item**, by the station's setting on the Mtc screen's
-Stations list (contracted unless changed). A contracted check banks
-nothing toward the heavy check. So a crew base alone is cheap to open
-and dearer to run, and a maintenance base pays for itself at about two
-planes sleeping there.
+**Anywhere else a plane sleeps** (no line base, a full one, an unrated
+class, a plane stranded away), the night is a **contracted check**, $300 an
+hour of the night's work (a Propeller on 4 flights a day: $840), or **no
+check and a deferred item**, by the station's setting on the Mtc screen's
+Stations list (contracted unless changed). A contracted night still banks
+hours toward the heavy check if the plane holds a bay at a hangar there. So
+a crew base alone is cheap to open and dearer to run, and a line base pays
+for itself at about one plane sleeping there.
 
 The Airports screen's Base column and each airport's view say what's
-where. A save from before maintenance bases has one at every crew base
-(`mxBaseList()`), so no one's planes start deferring. The headless
-player leases only at home, so it never opens a base.
+where. A save from before levels has a line base and a hangar at every old
+maintenance base, at level 3 or its based planes if more, rated for every
+class (`mxLevels()`), so no one's planes start deferring. The headless
+player leases only at home, and keeps its maintenance matched to its
+planes: the classes rated, a line level for every plane and a bay for every
+four (`keepMaintenance()`).
 
 ## Night stops (`src/sim/nightStops.ts`)
 
@@ -2922,7 +2947,7 @@ leaves the station at 06:00, and the flight out leaves as late as it can
 and still land 30 minutes before the 22:00 curfew. Push either half past
 its own end of the day and it wraps back (`planUnwrap()`) into an
 out-and-back at the end of the day. The tip says what the night is, in
-ops terms ("Night stop YOW · out 20:50 · back 06:00 · no mtc base:
+ops terms ("Night stop YOW · out 20:50 · back 06:00 · no line base:
 contracted check"), and the halves are drawn dashed.
 
 **Removing.** The × on either half removes the night stop, both flights
@@ -2948,7 +2973,7 @@ out.
 
 **Every night there costs** the crew's hotel ($200 a crew for a
 Propeller, $250 Regional, $400 Narrowbody, $900 Widebody, under crew),
-and the line check by the Bases rule: free at a maintenance base,
+and the line check by the Bases rule: free at a line base with room,
 contracted or deferred elsewhere. At 3 deferred items it's held there a
 morning, as anywhere. It can break down there overnight, and an overdue
 heavy check grounds it there, contracted.
@@ -2970,7 +2995,7 @@ leaving the base short of crews.
 
 ## Maintenance checks (`src/sim/mxChecks.ts`)
 
-**The line check is a night at a maintenance base** (see Bases);
+**The line check is a night at a line base** (see Bases);
 elsewhere it's contracted or deferred. Judged at midnight for every
 plane that flies:
 - **The work:** a base amount plus more per flight on its day (a
@@ -2980,7 +3005,7 @@ plane that flies:
 
 A plane with no check (a station set to defer, or in the air
 overnight), or whose night is shorter than the work, carries a
-**deferred item** (●). A night with 2h to spare at a maintenance base
+**deferred item** (●). A night with 2h to spare at a line base
 clears one. Planes on an AOG, a refit, a heavy check or a ferry skip it.
 The 22:00 curfew keeps nights at base long, so items come mostly from
 short nights and stations set to defer.
@@ -2995,11 +3020,11 @@ base.
 **The heavy check** is hangar work every 30 days the plane flies:
 8 hours for a Propeller, 10 for a Regional, 12 for a Narrowbody, 16 for
 a Widebody. It's done at night. From 10 days before it's due, whatever
-each night at a maintenance base has left after the line check goes toward it
+each night in a hangar bay has left after the line check goes toward it
 (`heavyBankedMinutes`). When the work is done, the interval starts
 again and every deferred item is cleared. A plane with long nights
 finishes in two or three without missing a flight; one flown from first
-light to the curfew makes slow progress; nights elsewhere make none. Only a
+light to the curfew makes slow progress; nights without a hangar bay make none. Only a
 plane 7 days past due is grounded for it, as an AOG with its flying
 moved to spare planes, until the work left is done, by contract at a
 base without maintenance. A plane from an
@@ -3019,9 +3044,9 @@ the cancellations cost Toronto most of its year on 18 seeds.
   check, and its age, life, tech and AOG figures. Display only: the
   standing is worked out in `ui/inspector/maintenance.ts` from the same
   readouts. Planes are grouped by type, each group folding shut with its
-  planes' lamps still showing. Above the board, a **Hangar** row has a bay
+  planes' lamps still showing. Above the board, a **Hangar** row has each hangar's bays in use, a bay
   for each plane in its heavy check (days until it's out) and a dashed bay
-  for each whose check window is open or overdue, and **Heavy checks due**
+  for each whose check window is open or overdue (filled edge in a bay, dimmed queued), and **Heavy checks due**
   puts every plane's due date on one 30-day axis so a bunching fleet
   shows as a cluster.
 - **The Gantt:** a key above the rows explains the night cell, and each

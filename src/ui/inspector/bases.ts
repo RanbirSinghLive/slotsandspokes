@@ -1,4 +1,4 @@
-import type { BaseChangePreview, BaseCandidate, BaseReadout, Outcome } from '../../sim/playerActions';
+import type { BaseChangePreview, BaseCandidate, BaseReadout, LevelledBaseReadout, Outcome } from '../../sim/playerActions';
 import { costRows, showConfirm } from '../confirmModal';
 import { money } from '../format';
 import { linkToMap } from '../mapLink';
@@ -14,10 +14,12 @@ export function baseSection(options: {
   title: string;
   info: string;
   kind: string;
-  bases: BaseReadout[];
+  bases: (BaseReadout | LevelledBaseReadout)[];
   candidates: BaseCandidate[];
   fee: number;
   perDay: number;
+  /** Where bases have levels: the preview and the change for one step up or down. */
+  level?: { preview: (iata: string, delta: 1 | -1) => BaseChangePreview; change: (iata: string, delta: 1 | -1) => Outcome<{ message: string }> };
   preview: (action: 'open' | 'close', iata: string) => BaseChangePreview;
   open: (iata: string) => Outcome<{ message: string }>;
   close: (iata: string) => Outcome<{ message: string }>;
@@ -49,9 +51,41 @@ export function baseSection(options: {
     name.addEventListener('click', () => select({ kind: 'airport', iata: base.iata }));
     const detail = document.createElement('span');
     detail.className = 'inspector-row-detail';
-    detail.textContent = [`${base.planes} plane${base.planes === 1 ? '' : 's'} based`, base.perDay > 0 ? `${money(base.perDay)}/day` : 'home'].join(' · ');
+    const levelled = 'level' in base ? base : null;
+    detail.textContent = [
+      ...(levelled ? [`L${levelled.level} · ${levelled.used}/${levelled.level} ${levelled.unit.replace(' a night', '')} tonight${levelled.overflow > 0 ? ` · ${levelled.overflow} over` : ''}`] : []),
+      `${base.planes} plane${base.planes === 1 ? '' : 's'} based`,
+      base.perDay > 0 ? `${money(base.perDay)}/day` : 'free',
+    ].join(' · ');
+    if (levelled && levelled.overflow > 0) detail.classList.add('is-warn');
     row.append(name, detail);
-    if (base.perDay > 0) {
+    if (levelled && options.level) {
+      const step = (delta: 1 | -1) => {
+        const preview = options.level!.preview(base.iata, delta);
+        showConfirm({
+          title: `${delta === 1 ? 'Raise' : 'Lower'} ${options.kind} · ${base.iata}`,
+          rows: costRows(preview.fee, preview.kindPerDayBefore, preview.kindPerDayAfter, preview.cashAfter),
+          facts: preview.blocked ? [preview.blocked] : preview.facts,
+          confirmLabel: delta === 1 ? `Raise · ${money(preview.fee)}` : 'Lower',
+          run: () => {
+            options.level!.change(base.iata, delta);
+            options.changed();
+          },
+        });
+      };
+      for (const delta of [-1, 1] as const) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'base-close';
+        button.textContent = delta === 1 ? '+' : '−';
+        const blocked = delta === 1 ? levelled.upBlocked : levelled.downBlocked;
+        button.disabled = blocked !== null;
+        button.title = blocked ?? (delta === 1 ? `Level up · ${money(levelled.upFee)}` : 'Level down');
+        button.addEventListener('click', () => step(delta));
+        row.append(button);
+      }
+    }
+    if ('level' in base || base.perDay > 0) {
       const close = document.createElement('button');
       close.type = 'button';
       close.className = 'base-close';
