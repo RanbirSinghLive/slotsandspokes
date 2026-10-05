@@ -578,7 +578,6 @@ function runHomeHub(state: SimState): string[] {
  * with crews to protect it. Everything else is left to lapse.
  */
 function takePriorityFlights(state: SimState): string[] {
-  if (process.env.NO_PRIORITY) return [];
   const log: string[] = [];
   for (const mandate of mandatesOf(state)) {
     if (mandate.status !== 'offered') continue;
