@@ -2003,6 +2003,11 @@ button,
   color: #ff8080;
 }
 
+/* Grey, like the slashed rings on the map: not a warning, a locked option (sim/rights.ts). */
+#route-hover-tooltip-body.rights-barred {
+  color: #9aa3b8;
+}
+
 /* Amber, not red: this stop is perfectly flyable, it just can't be the
    last one before the base. Same caution-not-refusal weight .thin-market
    carries, since both describe a choice with a consequence rather than a

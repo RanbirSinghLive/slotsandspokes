@@ -22,6 +22,7 @@ import {
 } from './pressure';
 import { moneyOnTable } from './attractiveness';
 import { rivalSecuresCapacity } from './market';
+import { legRights, rivalHomeCountry, countryOf } from './rights';
 import { rivalSlotQuote } from './slots';
 import type { SimState } from './state';
 
@@ -63,6 +64,8 @@ export type CompetitorOffering = {
   /** Consecutive profitable days, and yesterday's passengers over seats (sim/rivalEconomics.ts), for the rival's ladder (sim/rivalLadder.ts). Absent in an older save. */
   profitableDays?: number;
   loadFactor?: number;
+  /** The airline's home country (sim/rights.ts's rivalHomeCountry()), stamped when it opens a route so closing its first one doesn't change it. Absent on seed routes and older saves. */
+  homeCountry?: string;
 };
 
 /**
@@ -191,9 +194,12 @@ export function rollCompetitorRouteOpenings(state: SimState, dayStartMinute: num
     // The player's markets within this airline's reach that leave money on
     // the table: they make it keener to open a route, and are where it
     // mostly goes when it does.
+    // Air rights (sim/rights.ts): a rival may not open a route its home country's carriers can't fly.
+    const homeCountry = rivalHomeCountry(state.competitorRoutes, code);
     const inReach = [...money.entries()].filter(([key]) => {
       const [a, b] = key.split('-');
       return (
+        legRights(homeCountry, a, b).ok &&
         !servedKeys.has(key) &&
         !recentlyClosedByRival(state, code, a, b) &&
         !inRespite(state, a, b) &&
@@ -213,6 +219,7 @@ export function rollCompetitorRouteOpenings(state: SimState, dayStartMinute: num
     const candidates = pairsTouching(airlineAirports).filter(
       ([a, b]) =>
         marketDistanceNm(a, b) <= COMPETITOR_MAX_ROUTE_NM &&
+        legRights(homeCountry, a, b).ok &&
         !servedKeys.has(marketKey(a, b)) &&
         !recentlyClosedByRival(state, code, a, b) &&
         !inRespite(state, a, b),
@@ -245,6 +252,7 @@ export function rollCompetitorRouteOpenings(state: SimState, dayStartMinute: num
       baseFare: recommendedFare(origin, dest),
       openedAtMinute: dayStartMinute,
       slotFeesPerDay: slotFees,
+      homeCountry,
     });
   }
 }
@@ -331,6 +339,8 @@ export function rollRivalEntry(state: SimState, dayStartMinute: number): void {
     baseFare: recommendedFare(origin, dest),
     openedAtMinute: dayStartMinute,
     slotFeesPerDay: slotFees,
+    // A newcomer is from where it starts flying, so its first route is never barred; later ones are.
+    homeCountry: countryOf(origin),
   });
 }
 
