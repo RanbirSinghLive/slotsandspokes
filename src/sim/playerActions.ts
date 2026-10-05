@@ -36,20 +36,32 @@ import {
 } from './bases';
 import {
   CREW_BASE_FEE,
+  cabinArriving,
+  cabinHireFee,
+  cabinLeadDays,
+  cabinNeed,
+  cabinStandbyCost,
+  cabinTeamsOf,
   crewBases,
   CREWS_PER_NEW_PLANE,
   crewNeed,
   crewsArriving,
   crewsOf,
+  hireCabin,
   hireCrews,
   hireFee,
   hireLeadDays,
   IDEAL_SHIFT_MINUTES,
+  inTraining,
+  needsCabinCrew,
+  releaseCabin,
   releaseCrews,
   retrainCrews,
   retrainDays,
   retrainFee,
   standbyCost,
+  trainingSeats,
+  trainingSeatsFree,
 } from './crews';
 import airportsData from '../../data/airports.json';
 import {
@@ -798,12 +810,19 @@ export type ClassCrewReadout = {
   standbyPerDay: number;
   /** Whether the ladder has opened this class to the airline (sim/ladder.ts), so its crews can be hired. */
   open: boolean;
+  /** Cabin teams for this class (null for a class that flies without them): on hand, joining, needed, and costs. */
+  cabin: { teams: number; arriving: number; ideal: number; minimum: number; hireFee: number; standbyPerDay: number } | null;
 };
+
+/** One workforce's training seats at a base: in use and the total. */
+export type TrainingReadout = { used: number; seats: number; free: number };
 
 export type CrewReadout = {
   classes: ClassCrewReadout[];
   leadDays: number;
+  cabinLeadDays: number;
   retrainDays: number;
+  training: { pilot: TrainingReadout; cabin: TrainingReadout };
 };
 
 /**
@@ -830,9 +849,13 @@ export function crewReadout(state: SimState, iata: string): CrewReadout | null {
       retrainFee: retrainFee(cls.code),
       standbyPerDay: standbyCost(cls.code),
       open: classOpen(state, cls.code),
+      cabin: needsCabinCrew(cls.code)
+        ? { teams: cabinTeamsOf(base, cls.code), arriving: cabinArriving(base, cls.code), ...cabinNeed(state, iata, cls.code), hireFee: cabinHireFee(cls.code), standbyPerDay: cabinStandbyCost(cls.code) }
+        : null,
     };
   }).filter((c) => c.open || c.crews > 0 || c.arriving > 0 || c.bookedHours > 0);
-  return { classes, leadDays: hireLeadDays(state), retrainDays: retrainDays(state) };
+  const training = (role: 'pilot' | 'cabin'): TrainingReadout => ({ used: inTraining(base, role), seats: trainingSeats(base, role), free: trainingSeatsFree(base, role) });
+  return { classes, leadDays: hireLeadDays(state), cabinLeadDays: cabinLeadDays(state), retrainDays: retrainDays(state), training: { pilot: training('pilot'), cabin: training('cabin') } };
 }
 
 export function hireCrewsAt(state: SimState, iata: string, classCode: string, count: number): Outcome<{ message: string }> {
@@ -843,6 +866,15 @@ export function hireCrewsAt(state: SimState, iata: string, classCode: string, co
 export function retrainCrewsAt(state: SimState, iata: string, from: string, to: string, count: number): Outcome<{ message: string }> {
   if (!classOpen(state, to)) return { ok: false, reason: 'That class isn\'t open to the airline yet.' };
   return retrainCrews(state, iata, from, to, count);
+}
+
+export function hireCabinAt(state: SimState, iata: string, classCode: string, count: number): Outcome<{ message: string }> {
+  if (!classOpen(state, classCode)) return { ok: false, reason: 'That class isn\'t open to the airline yet.' };
+  return hireCabin(state, iata, classCode, count);
+}
+
+export function releaseCabinAt(state: SimState, iata: string, classCode: string, count: number): Outcome<{ message: string }> {
+  return releaseCabin(state, iata, classCode, count);
 }
 
 export function releaseCrewsAt(state: SimState, iata: string, classCode: string, count: number): Outcome<{ message: string }> {

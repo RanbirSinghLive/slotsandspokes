@@ -155,7 +155,8 @@ export function crewBaseCloseBlocked(state: SimState, iata: string): string | nu
   if (iata === state.homeAirport) return 'Home is always a crew base.';
   if (state.aircraft.some((aircraft) => aircraft.baseAirport === iata || aircraft.rebase?.to === iata)) return `Planes are based at ${iata}: move or return them first.`;
   const crews = Object.values(base.crewsByClass ?? {}).reduce((total, count) => total + count, 0);
-  if (crews > 0 || base.hiring.length > 0 || base.retraining.length > 0) return `${iata} still has crews: release them first.`;
+  const cabin = Object.values(base.cabinByClass ?? {}).reduce((total, count) => total + count, 0);
+  if (crews > 0 || cabin > 0 || base.hiring.length > 0 || base.retraining.length > 0 || (base.cabinHiring ?? []).length > 0) return `${iata} still has crews: release them first.`;
   return null;
 }
 
