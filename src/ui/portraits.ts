@@ -23,6 +23,7 @@ const TRAITS: Record<string, Traits> = {
   'cfo-adeyemi': { skin: SKIN.brown, hair: 'bun', hairColour: HAIR.black, glasses: true },
   'cco-lindqvist': { skin: SKIN.fair, hair: 'side', hairColour: HAIR.blond },
   'cco-carvalho': { skin: SKIN.olive, hair: 'long', hairColour: HAIR.auburn },
+  'cco-sato': { skin: SKIN.light, hair: 'short', hairColour: HAIR.black, glasses: true },
   'cco-mensah': { skin: SKIN.deep, hair: 'bald', hairColour: HAIR.black, glasses: true },
 };
 

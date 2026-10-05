@@ -27,7 +27,7 @@ import { USEFUL_LIFE_YEARS } from '../sim/leasing';
 import { crewPlan } from '../sim/crewPlan';
 import { trailingDailyMargin } from '../sim/forecast';
 import { dayIndex } from '../sim/clock';
-import { hasCrewBase, hasMxBase } from '../sim/bases';
+import { hasCrewBase, mxLevel } from '../sim/bases';
 import { SEASON_DAYS, SEASONAL_PREMIUM } from '../sim/seasonalLease';
 
 /**
@@ -304,17 +304,17 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
       };
     });
 
-  // Create base: one entry, then crew or maintenance. Each opens the same
+  // Create base: one entry, then crew, line base or hangar. Each opens the same
   // confirm the Crews and Mtc screens use (fee, running cost, cash after).
-  const baseChoice = (kind: 'crew' | 'mtc'): RadialAction => {
-    const exists = kind === 'crew' ? hasCrewBase(state, airport.iata) : hasMxBase(state, airport.iata);
-    const word = kind === 'crew' ? 'crew' : 'Mtc';
+  const baseChoice = (kind: 'crew' | 'line' | 'heavy'): RadialAction => {
+    const exists = kind === 'crew' ? hasCrewBase(state, airport.iata) : mxLevel(state, kind, airport.iata) > 0;
+    const word = kind === 'crew' ? 'crew' : kind === 'line' ? 'line' : 'hangar';
     const preview = ops.previewBaseChange(state, kind, 'open', airport.iata);
     return {
       id: `base:${kind}`,
       label: exists
         ? `${airport.iata} is already a ${word} base`
-        : `Create ${word} base · ${money(preview.fee)} + ${money(preview.perDay)}/day · ${kind === 'crew' ? 'crews live here, planes can be based' : 'nights here are line checks'}`,
+        : `Create ${word} base · ${money(preview.fee)} + ${money(preview.perDay)}/day · ${kind === 'crew' ? 'crews live here, planes can be based' : kind === 'line' ? 'nights here are line checks' : 'bays for heavy checks'}`,
       icon: kind === 'crew' ? ICON.crew : ICON.wrench,
       large: true,
       angleDeg: 0,
@@ -326,7 +326,7 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
           facts: preview.facts,
           confirmLabel: `Open · ${money(preview.fee)}`,
           run: () => {
-            const result = kind === 'crew' ? ops.openCrewBaseAt(state, airport.iata) : ops.openMxBaseAt(state, airport.iata);
+            const result = kind === 'crew' ? ops.openCrewBaseAt(state, airport.iata) : ops.openMxBaseAt(state, kind, airport.iata);
             notice = result.ok ? result.message : result.reason;
             refresh();
           },
@@ -405,11 +405,11 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
     },
     {
       id: 'base',
-      label: `Create base at ${airport.iata} · crew or maintenance`,
+      label: `Create base at ${airport.iata} · crew, line or hangar`,
       icon: ICON.base,
       angleDeg: 60,
-      disabledReason: hasCrewBase(state, airport.iata) && hasMxBase(state, airport.iata) ? `${airport.iata} has a crew base and a Mtc base` : undefined,
-      children: [baseChoice('crew'), baseChoice('mtc')],
+      disabledReason: hasCrewBase(state, airport.iata) && mxLevel(state, 'line', airport.iata) > 0 && mxLevel(state, 'heavy', airport.iata) > 0 ? `${airport.iata} has a crew base, a line base and a hangar` : undefined,
+      children: [baseChoice('crew'), baseChoice('line'), baseChoice('heavy')],
     },
     {
       id: 'return',

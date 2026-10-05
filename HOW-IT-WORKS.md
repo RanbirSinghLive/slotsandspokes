@@ -368,11 +368,11 @@ can actually support that many passengers, and priced at the route
 (market) level rather than one flat rate for everyone:
 
 ```
-LOAD_FACTOR    = 0.75
+LOAD_FACTOR    = 0.75   // the base; loadFactorCap(state) raises it, never past 0.90
 RECAPTURE_RATE = 0.4
 demandPerFlight = dailyDemand(origin, dest) / legsServingMarket
 bookedDemand    = demandPerFlight * bookingShare(fare, legsServingMarket, origin, dest, competitorRoutes)
-seatCeiling     = round(seats * LOAD_FACTOR)
+seatCeiling     = round(seats * loadFactorCap(state))  // 0.75 + spoilage levels + CCO
 if bookedDemand > seatCeiling:
   pax             = seatCeiling
   spilloverDelta  = round((bookedDemand - seatCeiling) * RECAPTURE_RATE)  // deposited for a later flight
@@ -2135,8 +2135,8 @@ stays met.
 | Start-up | 4 of 4 | fly your first route; a route that makes money for a week after its share of fixed costs; a route 72% full over a week; hold a starved city no rival flies to, on a route flown 30 days | Regional aircraft |
 | Regional carrier | 3 of 4 | serve 8 airports; connect 150 a day through one airport; put a Regional into service; make money every day for a week of a shock | Narrowbody; online booking, younger airframes |
 | Network airline | 3 of 5 | fly 60% of the movements at a busy airport; four routes 4+ a day each way; trailing NPS 15, with 1,000 flights flown; planes based at two airports; put a Narrowbody into service | Widebody; loyalty scheme, winglet retrofits |
-| International | 2 of 2 | a route to another continent; connect 750 a day through one airport | codeshare feed |
-| Global | 1 of 1 | round the world: a loop of your routes that goes all the way round the globe, reachable from home | — |
+| International | 2 of 2 | a route to another continent; connect 750 a day through one airport | codeshare feed, spoilage management I–III |
+| Global | 1 of 1 | round the world: a loop of your routes that goes all the way round the globe, reachable from home | spoilage management IV–V |
 
 What a tier opens is in force: aircraft classes (see the aircraft
 market above) and innovations (see Innovations). Round the world is judged by walking the
@@ -2690,6 +2690,14 @@ is scaled by its booking share at its fare over its share at the going
 rate, capped at 1.5× for pricing under it, so an over-priced hub
 doesn't stay full on connections alone.
 
+**No proration.** A connection is two tickets, one per leg, never one
+through fare split between routes. Each leg books its connecting
+passengers at its own fare class and keeps all of that revenue, so a
+route's P&L shows what its own seats earned. A feeder spoke gets no
+credit for the passengers it hands to the other leg. Airline profit is
+the same either way; a split would only move revenue between routes'
+P&L lines, so none is made.
+
 **Worked out once per change, not per question.** Every departure asks
 for the flows at both ends, and working them out visits every pair of a
 hub's spokes, so a thirty-spoke hub made them most of the simulation's
@@ -2897,17 +2905,39 @@ covered too. Until it ferries, the alert strip says it will.
 
 ## Bases (`src/sim/bases.ts`)
 
-A base is an investment, opened on purpose. Home has both kinds from the
-start, inside the starting cost, and they cost nothing to run.
+A base is an investment, opened on purpose. Home has a crew base, a line
+base and a hangar from the start, inside the starting cost.
 
-| | Crew base | Maintenance base |
-|---|---|---|
-| What it is | Where crews live; the only places planes can be leased or based | Where a night is a line check and banks heavy-check hours |
-| Opened on | the Crews screen, or the map ring's Create base | the Mtc screen, or the map ring's Create base |
-| Cost | $100,000, then $500/day (crew room, under crew) | $400,000, then $1,500/day (under maintenance) |
-| Closes | when no planes are based there and its crews are released | any time; nights there are then contracted or deferred |
+| | Crew base | Line base | Hangar (heavy base) |
+|---|---|---|---|
+| What it is | Where crews live; the only places planes can be leased or based | Where a night is a line check | Where heavy-check hours are banked |
+| Level | none | planes checked a night | bays: planes banking at once |
+| Opened on | the Crews screen, or the map ring's Create base | the Mtc screen, or the map ring's Create base | the Mtc screen, or the map ring's Create base |
+| Open | $100,000, then $500/day | $150,000, then $100/day a level | $400,000, then $300/day a level |
+| Each level above 1 | n/a | $25,000 | $100,000 |
+| Closes | when no planes are based there and its crews are released | any time away from home | any time away from home |
 
-Clicking an airport's ring has one Create base button with a crew or Mtc choice; it greys out for a kind the airport already has and opens the same confirm as the screens. Opening or closing a base asks first: a confirm window (`ui/confirmModal.ts`,
+Levels run 1 to 6. Home starts with the line base and hangar at level 3,
+and its first three levels of each cost nothing a day; levels above that
+are charged like anywhere else. Lowering a level is free and refunds
+nothing.
+
+**Capacity.** A line base checks as many planes a night as its level, the
+ones with the most deferred items first (`lineCheckedTails()`); a plane
+past that is treated like one at an outstation. A hangar's bays go to the
+planes with an open heavy check nearest to due, less any plane in a forced
+check there (`heavyBayTails()`); only those bank hours on their nights,
+the rest queue. A station with no hangar banks nothing, so a line-only
+station is cheap and never does a heavy check.
+
+**Ratings.** A station's mechanics are rated by aircraft class, like crews.
+A plane of an unrated class is treated like one at an outstation, at a line
+base or a hangar. A station's first rating is free (home starts rated for
+the Propeller; a station you open is rated for your most numerous class),
+and each further class costs $50,000 and $150/day, so a mixed fleet costs
+more to maintain. Chips on the Mtc screen's Ratings list rate or drop them.
+
+Clicking an airport's ring has one Create base button with a crew, line base or hangar choice; it greys out for a kind the airport already has and opens the same confirm as the screens. Opening or closing a base asks first: a confirm window (`ui/confirmModal.ts`,
 numbers from `previewBaseChange()`) shows the fee, the running cost before and
 after, the cash left, and what changes at that airport. The same window
 asks before leasing a plane, returning one, rebasing, ordering or calling off
@@ -2917,19 +2947,22 @@ appointing, replacing or letting go an executive, starting a seat sale, and
 switching a hub's style (map menu and Plan hub window). Holding a ring button to repeat (add or remove a flight, hire
 on the map) stays one click each.
 
-**Anywhere else a plane sleeps** (a crew base without maintenance, a
-plane stranded away), the night is a **contracted check**, $300 an hour
-of the night's work (a Propeller on 4 flights a day: $840), or **no check
-and a deferred item**, by the station's setting on the Mtc screen's
-Stations list (contracted unless changed). A contracted check banks
-nothing toward the heavy check. So a crew base alone is cheap to open
-and dearer to run, and a maintenance base pays for itself at about two
-planes sleeping there.
+**Anywhere else a plane sleeps** (no line base, a full one, an unrated
+class, a plane stranded away), the night is a **contracted check**, $300 an
+hour of the night's work (a Propeller on 4 flights a day: $840), or **no
+check and a deferred item**, by the station's setting on the Mtc screen's
+Stations list (contracted unless changed). A contracted night still banks
+hours toward the heavy check if the plane holds a bay at a hangar there. So
+a crew base alone is cheap to open and dearer to run, and a line base pays
+for itself at about one plane sleeping there.
 
 The Airports screen's Base column and each airport's view say what's
-where. A save from before maintenance bases has one at every crew base
-(`mxBaseList()`), so no one's planes start deferring. The headless
-player leases only at home, so it never opens a base.
+where. A save from before levels has a line base and a hangar at every old
+maintenance base, at level 3 or its based planes if more, rated for every
+class (`mxLevels()`), so no one's planes start deferring. The headless
+player leases only at home, and keeps its maintenance matched to its
+planes: the classes rated, a line level for every plane and a bay for every
+four (`keepMaintenance()`).
 
 ## Night stops (`src/sim/nightStops.ts`)
 
@@ -2944,7 +2977,7 @@ leaves the station at 06:00, and the flight out leaves as late as it can
 and still land 30 minutes before the 22:00 curfew. Push either half past
 its own end of the day and it wraps back (`planUnwrap()`) into an
 out-and-back at the end of the day. The tip says what the night is, in
-ops terms ("Night stop YOW · out 20:50 · back 06:00 · no mtc base:
+ops terms ("Night stop YOW · out 20:50 · back 06:00 · no line base:
 contracted check"), and the halves are drawn dashed.
 
 **Removing.** The × on either half removes the night stop, both flights
@@ -2970,7 +3003,7 @@ out.
 
 **Every night there costs** the crew's hotel ($200 a crew for a
 Propeller, $250 Regional, $400 Narrowbody, $900 Widebody, under crew),
-and the line check by the Bases rule: free at a maintenance base,
+and the line check by the Bases rule: free at a line base with room,
 contracted or deferred elsewhere. At 3 deferred items it's held there a
 morning, as anywhere. It can break down there overnight, and an overdue
 heavy check grounds it there, contracted.
@@ -2992,7 +3025,7 @@ leaving the base short of crews.
 
 ## Maintenance checks (`src/sim/mxChecks.ts`)
 
-**The line check is a night at a maintenance base** (see Bases);
+**The line check is a night at a line base** (see Bases);
 elsewhere it's contracted or deferred. Judged at midnight for every
 plane that flies:
 - **The work:** a base amount plus more per flight on its day (a
@@ -3002,7 +3035,7 @@ plane that flies:
 
 A plane with no check (a station set to defer, or in the air
 overnight), or whose night is shorter than the work, carries a
-**deferred item** (●). A night with 2h to spare at a maintenance base
+**deferred item** (●). A night with 2h to spare at a line base
 clears one. Planes on an AOG, a refit, a heavy check or a ferry skip it.
 The 22:00 curfew keeps nights at base long, so items come mostly from
 short nights and stations set to defer.
@@ -3017,11 +3050,11 @@ base.
 **The heavy check** is hangar work every 30 days the plane flies:
 8 hours for a Propeller, 10 for a Regional, 12 for a Narrowbody, 16 for
 a Widebody. It's done at night. From 10 days before it's due, whatever
-each night at a maintenance base has left after the line check goes toward it
+each night in a hangar bay has left after the line check goes toward it
 (`heavyBankedMinutes`). When the work is done, the interval starts
 again and every deferred item is cleared. A plane with long nights
 finishes in two or three without missing a flight; one flown from first
-light to the curfew makes slow progress; nights elsewhere make none. Only a
+light to the curfew makes slow progress; nights without a hangar bay make none. Only a
 plane 7 days past due is grounded for it, as an AOG with its flying
 moved to spare planes, until the work left is done, by contract at a
 base without maintenance. A plane from an
@@ -3041,9 +3074,9 @@ the cancellations cost Toronto most of its year on 18 seeds.
   check, and its age, life, tech and AOG figures. Display only: the
   standing is worked out in `ui/inspector/maintenance.ts` from the same
   readouts. Planes are grouped by type, each group folding shut with its
-  planes' lamps still showing. Above the board, a **Hangar** row has a bay
+  planes' lamps still showing. Above the board, a **Hangar** row has each hangar's bays in use, a bay
   for each plane in its heavy check (days until it's out) and a dashed bay
-  for each whose check window is open or overdue, and **Heavy checks due**
+  for each whose check window is open or overdue (filled edge in a bay, dimmed queued), and **Heavy checks due**
   puts every plane's due date on one 30-day axis so a bunching fleet
   shows as a cluster.
 - **The Gantt:** a key above the rows explains the night cell, and each
@@ -3174,6 +3207,14 @@ below the tree, with what it does, what it costs and the Adopt button.
 | Loyalty scheme | International | $500,000 once, then 2% of revenue a day | 60% of turned-away passengers rebook with you, not 40%; rivals see 25% less money on the table on your routes (sim/attractiveness.ts) |
 | Winglet retrofits | International | $800,000 once | 10% less fuel burned (`fuelEfficiencyMultiplier`) |
 | Codeshare feed | Global | $6,000 a day | 30% more connecting passengers at every hub (sim/hubs.ts) |
+| Spoilage management I–V | I–III Global, IV–V past Global | $3M, $5M, $8M, $12M, $18M once, each needing the one before | each level lets planes sell 1 point more of their seats (75% → up to 80%) |
+
+Spoilage management is the way to fuller planes (an unsold seat is
+spoiled stock). `loadFactorCap()` adds one point per level and the
+CCO's points to the 75% base and clamps at 90%, and goes into every
+`flightResult()` through `bookingPerks()`, and into a market's seat
+ceiling. Rivals stay at 75%. Each point is worth a few percent of profit
+on a seat-capped route, hence the late gate and the steep prices.
 
 The effects are read where they apply: `bookingPerks()` goes into every
 `flightResult()` (yield and recapture rate), `loyaltyKeeps()` into the
@@ -3218,6 +3259,8 @@ needs 20 (judged at hiring; they stay if NPS falls later).
 | COO | Errol Vance: breakdowns as if 15% younger; Lena Fischer (NPS 10): deliveries and returns in half the time | Marcus Oyelaran: delays 15% shorter | Priya Raghunathan: +8 NPS a flight |
 | CFO | Dale Mercer: overhead −15% | Hana Okafor: hedge premiums halved, overhead −5% | Simone Adeyemi: new leases −12% |
 | CCO | Tomas Lindqvist: markets grow 25% faster | Inês Carvalho: +15% connecting passengers | Kofi Mensah: +3% yield |
+
+A fourth CCO, Akira Sato (NPS 25, $500,000, $5,000 a day), lifts the share of seats a plane can sell by 3 points (see Innovations; the 90% ceiling holds).
 
 Fees run $150,000 (journeymen) to $400,000, salaries $1,500 to $4,000 a
 day. The effects are read where they apply: delays (sim/cascade.ts,

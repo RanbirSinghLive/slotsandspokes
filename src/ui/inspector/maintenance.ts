@@ -10,6 +10,8 @@ import { money } from '../format';
 import { linkToMap } from '../mapLink';
 import { planeIconElement, TYPE_COLOURS } from '../planeIcons';
 import { select } from '../selection';
+import { MX_RATING_FEE, MX_RATING_PER_DAY } from '../../sim/bases';
+import { costRows, showConfirm } from '../confirmModal';
 import { baseSection, noneLine } from './bases';
 import { heading, line } from './dom';
 
@@ -114,18 +116,20 @@ function buildHangar(state: SimState): HTMLElement[] {
   const nodes: HTMLElement[] = [
     heading(
       'Hangar',
-      `Heavy checks in work and coming. A filled bay is a plane in its heavy check, grounded until it's done. A dashed bay is a plane whose check is within ${HEAVY_WINDOW_DAYS} days or overdue: nights at a maintenance base bank hours toward it, and if it runs ${OVERDUE_GRACE_DAYS} days overdue it goes in whenever it is.`,
+      `Heavy checks in work and coming. A filled bay is a plane in its heavy check, grounded until it's done. A dashed bay is a plane whose check is within ${HEAVY_WINDOW_DAYS} days or overdue: nights at a hangar bank hours toward it while it holds one of the hangar's bays (the nearest due first), and if it runs ${OVERDUE_GRACE_DAYS} days overdue it goes in whenever it is.`,
     ),
   ];
   const bays = box('mx-bays');
   for (const plane of ops.heavyCheckReadouts(state)) {
     const event = plane.inCheck ? aogFor(state, plane.tail) : undefined;
     if (!event && !plane.open) continue;
-    const bay = box(`mx-bay ${event ? 'is-working' : 'is-waiting'}`);
-    bay.append(box('mx-bay-tail', plane.tail), box('mx-bay-state', event ? `out in ${daysUntilReturn(state, event)}d` : plane.dueIn > 0 ? `due ${plane.dueIn}d` : `${-plane.dueIn}d over`));
+    const bay = box(`mx-bay ${event ? 'is-working' : plane.inBay ? 'is-banking' : 'is-waiting'}`);
+    bay.append(box('mx-bay-tail', plane.tail), box('mx-bay-state', event ? `out in ${daysUntilReturn(state, event)}d` : `${plane.dueIn > 0 ? `due ${plane.dueIn}d` : `${-plane.dueIn}d over`} · ${plane.inBay ? 'in bay' : 'queued'}`));
     if (!event) bay.classList.toggle('is-late', plane.dueIn <= 0);
     bays.append(bay);
   }
+  const capacity = ops.mxBaseReadout(state, 'heavy').bases.map((base) => `${base.iata} ${base.used}/${base.level} bays`).join(' · ');
+  nodes.push(line(capacity || 'No hangar'));
   nodes.push(bays.childElementCount > 0 ? bays : noneLine('Hangar clear · no heavy check in work or within its window'));
   return nodes;
 }
@@ -303,41 +307,53 @@ function buildFleetBoard(state: SimState, changed: () => void): HTMLElement[] {
 }
 
 /**
- * Maintenance bases (sim/bases.ts), and the stations where planes sleep
- * tonight without one, each set to contract its checks or defer them.
+ * Line bases and hangars (sim/bases.ts), the ratings of each station's
+ * mechanics, and the stations where planes sleep tonight without an
+ * in-house check, each set to contract its checks or defer them.
  */
 function buildMxBases(state: SimState, changed: () => void): HTMLElement[] {
-  const readout = ops.mxBaseReadout(state);
-  const nodes = baseSection({
-    title: 'Maintenance bases',
-    info: `Where a night is a line check and banks heavy-check hours. Opening one costs ${money(readout.fee)} and ${money(readout.perDay)} a day; home's comes with the start. Anywhere else a plane sleeps, its check is contracted by the hour or deferred: see Stations.`,
-    kind: 'mtc base',
-    bases: readout.bases,
-    candidates: readout.candidates,
-    fee: readout.fee,
-    perDay: readout.perDay,
-    preview: (action, iata) => ops.previewBaseChange(state, 'mtc', action, iata),
-    open: (iata) => ops.openMxBaseAt(state, iata),
-    close: (iata) => ops.closeMxBaseAt(state, iata),
-    changed,
-  });
+  const nodes: HTMLElement[] = [];
+  for (const kind of ['line', 'heavy'] as const) {
+    const readout = ops.mxBaseReadout(state, kind);
+    const isLine = kind === 'line';
+    nodes.push(
+      ...baseSection({
+        title: isLine ? 'Line bases' : 'Hangars',
+        info: isLine
+          ? `Where a night is a line check. The level is how many planes it checks a night, most deferred items first; a plane past that, or of a class it isn't rated for, is treated like a night at an outstation. Opening one costs ${money(readout.fee)}, then ${money(readout.perLevelPerDay)} a day for each level; home starts at level 3, free.`
+          : `Where heavy checks are done. The level is the number of bays: only that many planes, the ones nearest due, bank hours toward their heavy check on a night here; the rest wait. Planes in a forced check take a bay too. Opening one costs ${money(readout.fee)}, then ${money(readout.perLevelPerDay)} a day for each level; home starts at level 3, free. A station without one banks nothing.`,
+        kind: isLine ? 'line base' : 'hangar',
+        bases: readout.bases,
+        candidates: readout.candidates,
+        fee: readout.fee,
+        perDay: readout.perLevelPerDay,
+        preview: (action, iata) => ops.previewBaseChange(state, kind, action, iata),
+        open: (iata) => ops.openMxBaseAt(state, kind, iata),
+        close: (iata) => ops.closeMxBaseAt(state, kind, iata),
+        level: { preview: (iata, delta) => ops.previewMxLevel(state, kind, iata, delta), change: (iata, delta) => ops.changeMxLevel(state, kind, iata, delta) },
+        changed,
+      }),
+    );
+  }
+  nodes.push(...buildRatings(state, changed));
+  const stations = ops.mxStationsReadout(state);
   nodes.push(
     heading(
       'Stations',
-      'Airports where planes sleep tonight without a maintenance base. Contracted: the station does the line check, paid by the hour of work, and the plane gets no deferred item if the night is long enough; it banks nothing toward the heavy check. Deferred: no check and no cost, and a deferred item each night.',
+      'Airports where planes sleep tonight without an in-house line check: no line base, a full one, or a class the mechanics are not rated for. Contracted: the station does the line check, paid by the hour of work, and the plane gets no deferred item if the night is long enough. Deferred: no check and no cost, and a deferred item each night.',
     ),
   );
-  if (readout.stations.length === 0) {
-    nodes.push(noneLine('None tonight · every plane sleeps at a maintenance base'));
+  if (stations.length === 0) {
+    nodes.push(noneLine('None tonight · every plane is checked at a line base'));
     return nodes;
   }
   const list = document.createElement('div');
   list.className = 'inspector-rows';
-  for (const station of readout.stations) {
+  for (const station of stations) {
     const row = linkToMap(document.createElement('div'), { kind: 'airport', iata: station.iata });
     row.className = 'inspector-row base-row';
     const name = document.createElement('span');
-    name.textContent = `${station.iata} · ${station.planes} plane${station.planes === 1 ? '' : 's'} tonight`;
+    name.textContent = `${station.iata} · ${station.planes} plane${station.planes === 1 ? '' : 's'} tonight · ${station.reason}`;
     const detail = document.createElement('span');
     detail.className = 'inspector-row-detail';
     detail.textContent = station.check === 'contract' ? `contracted · ${money(station.contractPerNight)}/night` : 'deferred · ● each night';
@@ -351,6 +367,68 @@ function buildMxBases(state: SimState, changed: () => void): HTMLElement[] {
       changed();
     });
     row.append(name, detail, toggle);
+    list.append(row);
+  }
+  nodes.push(list);
+  return nodes;
+}
+
+/**
+ * Each station's mechanics' ratings: a chip per aircraft class, filled where
+ * rated (click to drop), dashed where not (click to rate, with its price).
+ */
+function buildRatings(state: SimState, changed: () => void): HTMLElement[] {
+  const nodes: HTMLElement[] = [
+    heading(
+      'Ratings',
+      `Mechanics are rated by aircraft class, like crews. Planes of an unrated class are treated like a night at an outstation, at a line base or a hangar. A station's first rating is free; each further class costs ${money(MX_RATING_FEE)} and ${money(MX_RATING_PER_DAY)} a day, so a mixed fleet costs more to maintain.`,
+    ),
+  ];
+  const list = document.createElement('div');
+  list.className = 'inspector-rows';
+  for (const entry of ops.mxRatingsReadout(state)) {
+    const row = linkToMap(document.createElement('div'), { kind: 'airport', iata: entry.iata });
+    row.className = 'inspector-row base-row';
+    const name = document.createElement('span');
+    name.textContent = `${entry.iata} · ${entry.name}`;
+    const chips = box('mx-ratings');
+    for (const classCode of entry.rated) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'mx-rating is-rated';
+      chip.textContent = classCode;
+      const blocked = entry.dropBlocked[classCode];
+      chip.disabled = blocked !== null && blocked !== undefined;
+      chip.title = blocked ?? `Rated · click to drop`;
+      chip.addEventListener('click', () => {
+        ops.unrateStation(state, entry.iata, classCode);
+        changed();
+      });
+      chips.append(chip);
+    }
+    for (const option of entry.options) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'mx-rating';
+      chip.textContent = `+ ${option.classCode}`;
+      chip.disabled = option.blocked !== null;
+      chip.title = option.blocked ?? `Rate for ${option.classCode} · ${money(MX_RATING_FEE)}`;
+      chip.addEventListener('click', () => {
+        const preview = ops.previewMxRating(state, entry.iata, option.classCode);
+        showConfirm({
+          title: `Rate ${entry.iata} for ${option.classCode}`,
+          rows: costRows(preview.fee, preview.kindPerDayBefore, preview.kindPerDayAfter, preview.cashAfter),
+          facts: preview.blocked ? [preview.blocked] : preview.facts,
+          confirmLabel: `Rate · ${money(preview.fee)}`,
+          run: () => {
+            ops.rateStation(state, entry.iata, option.classCode);
+            changed();
+          },
+        });
+      });
+      chips.append(chip);
+    }
+    row.append(name, chips);
     list.append(row);
   }
   nodes.push(list);
