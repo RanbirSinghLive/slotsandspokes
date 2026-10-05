@@ -1,3 +1,4 @@
+import { CABIN_SHORT_NPS_PENALTY } from './crews';
 import { marketKey } from './schedule';
 import type { CompetitorOffering } from './competitors';
 import type { SimState } from './state';
@@ -91,6 +92,8 @@ export function flightSatisfactionScore(
   competitorRoutes: CompetitorOffering[],
   /** 0-1: how fresh the crew is (1 − its fatigue, sim/crews.ts). */
   crewFreshness = 1,
+  /** 0-1: the share of the cabin teams its plane needs that it has (sim/crews.ts's cabinCover()). */
+  cabinCover = 1,
 ): number {
   const delayComponent = clamp(
     DELAY_BASELINE_POINTS - delayMinutes * DELAY_PENALTY_PER_MINUTE,
@@ -108,7 +111,8 @@ export function flightSatisfactionScore(
 
   const ageComponent = clamp(AGE_BASELINE_POINTS - ageYears * AGE_PENALTY_PER_YEAR, AGE_FLOOR_POINTS, AGE_BASELINE_POINTS);
 
-  const serviceComponent = clamp(crewFreshness, 0, 1) * CABIN_SERVICE_MAX_POINTS;
+  const cover = clamp(cabinCover, 0, 1);
+  const serviceComponent = clamp(crewFreshness, 0, 1) * cover * CABIN_SERVICE_MAX_POINTS - (1 - cover) * CABIN_SHORT_NPS_PENALTY;
 
   // Real NPS is bounded to [-100, 100] by definition (100% detractors to
   // 100% promoters) — the components above rarely sum past that on their

@@ -2820,6 +2820,36 @@ its sick chance times the 1.6 days a sickness lasts on average. For six
 Propellers needing six crews: 6 crews, 74% a week; 7, 13%; 8, 1%. The
 headless player staffs for 5% (`crewsForRisk()`).
 
+## Cabin crew and training seats (`src/sim/crews.ts`)
+
+**Cabin crew** staff Regional planes and up; a Propeller flies without.
+Cabin teams are rated for a class like pilots and live at the same crew
+base. A plane needs `CABIN_TEAMS_PER_SHIFT` teams (1 for Regional and
+Narrowbody, 2 for Widebody) for each shift its pilots fly, so cabin need
+follows the pilot need and the plane's duty day. A team costs half a
+pilot crew in the same class (hire and standby), trains in 4 days (shorter with
+the crew academy), and can be hired and released but not
+converted between classes. Each rollover, after pilots are crewed, each
+flying plane is given the teams it needs in fleet order.
+
+A short cabin never grounds a plane. It flies, and every flight on it
+loses service points in its NPS score: the service component is scaled by
+the share of teams it has, and a flight with no cabin team at all loses
+a further `CABIN_SHORT_NPS_PENALTY` (25) points. So short cabins show up
+as a falling name, not as cancellations. Spare teams stand by at their
+cost. An older save's bases are given the teams their planes need on
+load (`ensureCrewBases()`).
+
+**Training seats** gate how fast a base can grow. Pilots and cabin each
+have their own seats at a base: `TRAINING_SEATS_BASE` (2) plus one for
+every two crews already on the roster. A hire, and for pilots a
+retraining, takes a seat from the day it is paid until the crews join,
+and a hire or conversion that doesn't fit is refused. So a new base
+trains two crews at a time, and a big roster can grow faster than a small
+one; a crew academy shortens the courses and so frees seats sooner. The
+headless player hires up to the free seats each day and the rest the
+days after. Seats are shown per base on the Crews screen.
+
 ## The crew planning board (`src/ui/inspector/crews.ts`, read-out in `src/sim/crewPlan.ts`)
 
 The Crews screen reads like a crew planner's board. `crewPlan()` counts,

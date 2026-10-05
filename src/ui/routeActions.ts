@@ -64,6 +64,14 @@ export function retrainCrewsAt(state: SimState, iata: string, from: string, to: 
   return afterChange(state, actions.retrainCrewsAt(state, iata, from, to, count));
 }
 
+export function hireCabinAt(state: SimState, iata: string, classCode: string, count: number) {
+  return afterChange(state, actions.hireCabinAt(state, iata, classCode, count));
+}
+
+export function releaseCabinAt(state: SimState, iata: string, classCode: string, count: number) {
+  return afterChange(state, actions.releaseCabinAt(state, iata, classCode, count));
+}
+
 export function releaseCrewsAt(state: SimState, iata: string, classCode: string, count: number) {
   return afterChange(state, actions.releaseCrewsAt(state, iata, classCode, count));
 }

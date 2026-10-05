@@ -1,6 +1,6 @@
 import { dayIndex } from '../../sim/clock';
 import { crewPlan, type ClassPlan, type PlaneEntry } from '../../sim/crewPlan';
-import { CREWS_PER_NEW_PLANE, crewReadiness, hireFee, hireLeadDays, retrainDays, retrainFee, SICK_BASE_CHANCE, SICK_STRAIN_CHANCE, standbyCost } from '../../sim/crews';
+import { CABIN_SHORT_NPS_PENALTY, CABIN_TEAMS_PER_SHIFT, CREWS_PER_NEW_PLANE, crewReadiness, hireFee, hireLeadDays, retrainDays, retrainFee, SICK_BASE_CHANCE, SICK_STRAIN_CHANCE, standbyCost } from '../../sim/crews';
 import type { SimState } from '../../sim/state';
 import { money } from '../format';
 import { linkToMap } from '../mapLink';
@@ -133,8 +133,9 @@ function crewBasesSection(state: SimState, plan: ReturnType<typeof crewPlan>, ch
     const buttons = document.createElement('div');
     buttons.className = 'crew-buttons';
     buttons.append(line(`${base.iata} · no crews yet`, 'inspector-line crew-row-detail'));
+    const emptySeats = ops.crewReadout(state, base.iata)?.training.pilot.free ?? 0;
     for (const c of classes) {
-      buttons.append(actionButton(`Hire 1 ${c.name} · ${money(hireFee(c.classCode))}`, state.cash < hireFee(c.classCode), () => ops.hireCrewsAt(state, base.iata, c.classCode, 1), changed, {
+      buttons.append(actionButton(`Hire 1 ${c.name} · ${money(hireFee(c.classCode))}`, emptySeats === 0 || state.cash < hireFee(c.classCode), () => ops.hireCrewsAt(state, base.iata, c.classCode, 1), changed, {
         title: `Hire 1 ${c.name} crew · ${base.iata}`,
         rows: [{ label: 'Fee now', value: money(hireFee(c.classCode)) }, { label: 'Cash after', value: money(state.cash - hireFee(c.classCode)) }],
         confirmLabel: `Hire · ${money(hireFee(c.classCode))}`,
@@ -215,15 +216,18 @@ function entryRow(state: SimState, iata: string, c: ClassPlan, entry: PlaneEntry
   );
   const buttons = document.createElement('div');
   buttons.className = 'crew-buttons';
-  const fee = hireFee(c.classCode) * entry.short;
-  buttons.append(actionButton(`Hire ${entry.short} · ${money(fee)}`, state.cash < fee, () => ops.hireCrewsAt(state, iata, c.classCode, entry.short), changed, {
-    title: `Hire ${entry.short} ${c.name} crew${entry.short === 1 ? '' : 's'} · ${iata}`,
+  // Only as many as the base has training seats for; the rest can follow as seats free up.
+  const seats = ops.crewReadout(state, iata)?.training.pilot.free ?? 0;
+  const hireCount = Math.min(entry.short, seats);
+  const fee = hireFee(c.classCode) * hireCount;
+  buttons.append(actionButton(hireCount === 0 ? 'No free training seats' : `Hire ${hireCount}${hireCount < entry.short ? ` of ${entry.short}` : ''} · ${money(fee)}`, hireCount === 0 || state.cash < fee, () => ops.hireCrewsAt(state, iata, c.classCode, hireCount), changed, {
+    title: `Hire ${hireCount} ${c.name} crew${hireCount === 1 ? '' : 's'} · ${iata}`,
     rows: [
       { label: 'Fee now', value: money(fee) },
       { label: 'Join', value: `day ${today + lead} (${lead}d)` },
       { label: 'Cash after', value: money(state.cash - fee) },
     ],
-    facts: [`Short ${entry.short} at EIS day ${entry.day}${late > 0 ? `: they join ${late}d late` : ''}.`],
+    facts: [`Short ${entry.short} at EIS day ${entry.day}${late > 0 ? `: they join ${late}d late` : ''}.`, ...(hireCount < entry.short ? [`Training seats cap this hire at ${hireCount}.`] : [])],
     confirmLabel: `Hire · ${money(fee)}`,
   }));
   // Reserve of another type at this base, converted: slower, cheaper.
@@ -234,7 +238,7 @@ function entryRow(state: SimState, iata: string, c: ClassPlan, entry: PlaneEntry
     buttons.append(
       actionButton(
         `Convert ${n} from ${donor.name} · ${money(retrainFee(c.classCode) * n)} · ready day ${ready}${ready > entry.day ? ' (late)' : ''}`,
-        false,
+        n > seats,
         () => ops.retrainCrewsAt(state, iata, donor.classCode, c.classCode, n),
         changed,
         {
@@ -266,7 +270,21 @@ function roster(state: SimState, plan: ReturnType<typeof crewPlan>, today: numbe
     name.textContent = `${base.iata} · crew base`;
     name.addEventListener('click', () => select({ kind: 'airport', iata: base.iata }));
     card.append(name);
-    for (const c of base.classes) card.append(classRow(state, base.iata, c, base.classes, today, changed));
+    const training = ops.crewReadout(state, base.iata)?.training;
+    if (training) {
+      card.append(
+        lineWithInfo(
+          `Training seats · pilots ${training.pilot.used}/${training.pilot.seats} · cabin ${training.cabin.used}/${training.cabin.seats}`,
+          'Crews hired or retraining take a training seat until they join. A base has 2 seats for each workforce plus 1 for every 2 crews it already has, so a small base can only grow so fast: ask for more crews than seats and the rest wait. A crew academy shortens the courses, which frees seats sooner.',
+          training.pilot.free === 0 || training.cabin.free === 0 ? 'inspector-line is-warn' : 'inspector-line',
+        ),
+      );
+    }
+    for (const c of base.classes) {
+      card.append(classRow(state, base.iata, c, base.classes, today, changed));
+      const cabin = ops.crewReadout(state, base.iata)?.classes.find((r) => r.classCode === c.classCode)?.cabin;
+      if (cabin && (cabin.teams > 0 || cabin.ideal > 0 || cabin.arriving > 0)) card.append(cabinRow(state, base.iata, c, cabin, changed));
+    }
     nodes.push(card);
   }
   return nodes;
@@ -336,7 +354,8 @@ function classRow(state: SimState, iata: string, c: ClassPlan, siblings: ClassPl
   const buttons = document.createElement('div');
   buttons.className = 'crew-buttons';
   const open = ops.crewReadout(state, iata)?.classes.find((r) => r.classCode === c.classCode)?.open ?? false;
-  buttons.append(actionButton(`Hire 1 · ${money(hireFee(c.classCode))}`, !open || state.cash < hireFee(c.classCode), () => ops.hireCrewsAt(state, iata, c.classCode, 1), changed, {
+  const pilotSeats = ops.crewReadout(state, iata)?.training.pilot.free ?? 0;
+  buttons.append(actionButton(pilotSeats === 0 ? 'No free training seats' : `Hire 1 · ${money(hireFee(c.classCode))}`, !open || pilotSeats === 0 || state.cash < hireFee(c.classCode), () => ops.hireCrewsAt(state, iata, c.classCode, 1), changed, {
     title: `Hire 1 ${c.name} crew · ${iata}`,
     rows: [
       { label: 'Fee now', value: money(hireFee(c.classCode)) },
@@ -347,7 +366,7 @@ function classRow(state: SimState, iata: string, c: ClassPlan, siblings: ClassPl
   }));
   const donor = siblings.filter((s) => s.classCode !== c.classCode && s.crews - s.ideal > 0).sort((x, y) => y.crews - y.ideal - (x.crews - x.ideal))[0];
   if (donor && open) {
-    buttons.append(actionButton(`Convert 1 from ${donor.name} · ${money(retrainFee(c.classCode))}`, state.cash < retrainFee(c.classCode), () => ops.retrainCrewsAt(state, iata, donor.classCode, c.classCode, 1), changed, {
+    buttons.append(actionButton(`Convert 1 from ${donor.name} · ${money(retrainFee(c.classCode))}`, pilotSeats === 0 || state.cash < retrainFee(c.classCode), () => ops.retrainCrewsAt(state, iata, donor.classCode, c.classCode, 1), changed, {
       title: `Convert 1 ${donor.name} → ${c.name} · ${iata}`,
       rows: [
         { label: 'Fee now', value: money(retrainFee(c.classCode)) },
@@ -369,6 +388,49 @@ function classRow(state: SimState, iata: string, c: ClassPlan, siblings: ClassPl
         confirmLabel: 'Release',
       }),
     );
+  row.append(buttons);
+  return row;
+}
+
+/** A class's cabin teams at a base: on hand against need, with hire and release. A short cabin flies, but every flight scores lower. */
+function cabinRow(state: SimState, iata: string, c: ClassPlan, cabin: NonNullable<ReturnType<typeof ops.crewReadout>>['classes'][number]['cabin'] & {}, changed: () => void): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'crew-row';
+  const short = cabin.teams < cabin.minimum;
+  const head = document.createElement('div');
+  head.className = 'crew-row-head';
+  const label = document.createElement('span');
+  label.append(planeIconElement(c.classCode), ` ${c.name} cabin`);
+  head.append(label, chipElement(short ? { text: 'SHORT', tone: 'bad' } : cabin.teams < cabin.ideal ? { text: 'TIGHT', tone: 'warn' } : cabin.teams > cabin.ideal ? { text: `RESERVE +${cabin.teams - cabin.ideal}`, tone: 'info' } : { text: 'OK', tone: 'good' }));
+  row.append(head);
+  row.append(
+    lineWithInfo(
+      `${cabin.teams} teams${cabin.arriving > 0 ? ` +${cabin.arriving} joining` : ''} · need ${cabin.ideal} (min ${cabin.minimum}) · standby ${money(cabin.standbyPerDay)}/day`,
+      `Cabin teams staff every Regional plane and up: ${CABIN_TEAMS_PER_SHIFT[c.classCode]} per shift its pilots fly. A short cabin never grounds a plane, but each of its flights loses up to ${CABIN_SHORT_NPS_PENALTY} NPS points in proportion to the teams missing. They train in ${ops.crewReadout(state, iata)?.cabinLeadDays ?? 0} days in a cabin training seat, and can't be converted between classes.`,
+      short ? 'inspector-line is-over' : 'inspector-line crew-row-detail',
+    ),
+  );
+  const readout = ops.crewReadout(state, iata);
+  const seats = readout?.training.cabin.free ?? 0;
+  const buttons = document.createElement('div');
+  buttons.className = 'crew-buttons';
+  buttons.append(actionButton(seats === 0 ? 'No free cabin seats' : `Hire 1 cabin · ${money(cabin.hireFee)}`, seats === 0 || state.cash < cabin.hireFee, () => ops.hireCabinAt(state, iata, c.classCode, 1), changed, {
+    title: `Hire 1 ${c.name} cabin team · ${iata}`,
+    rows: [
+      { label: 'Fee now', value: money(cabin.hireFee) },
+      { label: 'Joins', value: `day ${dayIndex(state) + (readout?.cabinLeadDays ?? 0)}` },
+      { label: 'Cash after', value: money(state.cash - cabin.hireFee) },
+    ],
+    confirmLabel: `Hire · ${money(cabin.hireFee)}`,
+  }));
+  if (cabin.teams > cabin.ideal) {
+    buttons.append(actionButton('Release 1', false, () => ops.releaseCabinAt(state, iata, c.classCode, 1), changed, {
+      title: `Release 1 ${c.name} cabin team · ${iata}`,
+      rows: [{ label: 'Teams after', value: `${cabin.teams - 1} (need ${cabin.ideal}, min ${cabin.minimum})` }, { label: 'Standby saved', value: `${money(cabin.standbyPerDay)}/day` }],
+      facts: ['Rehiring costs the fee again and takes days to join.'],
+      confirmLabel: 'Release',
+    }));
+  }
   row.append(buttons);
   return row;
 }

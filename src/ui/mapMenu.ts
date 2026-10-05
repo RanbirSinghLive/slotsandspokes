@@ -294,7 +294,7 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
         large: true,
         angleDeg: 0,
         repeatable: true,
-        disabledReason: state.cash < c.hireFee ? `Needs ${money(c.hireFee)} on hand to hire a ${c.name} crew.` : undefined,
+        disabledReason: crews && crews.training.pilot.free === 0 ? `No free pilot training seats at ${airport.iata}.` : state.cash < c.hireFee ? `Needs ${money(c.hireFee)} on hand to hire a ${c.name} crew.` : undefined,
         onSelect: () => {
           const result = ops.hireCrewsAt(state, airport.iata, c.classCode, 1);
           notice = result.ok ? result.message : result.reason;

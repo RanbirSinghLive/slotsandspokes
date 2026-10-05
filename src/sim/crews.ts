@@ -46,6 +46,18 @@ import type { SimState } from './state';
  * them at standby cost. Overworking a small roster makes it sicker as
  * well as tired: the cheap roster is the fragile one.
  *
+ * **Cabin crew.** Regional planes and up also need cabin crews, rated for
+ * a class like pilots (CABIN_TEAMS_PER_SHIFT teams for each shift a plane's
+ * pilots fly). A short cabin never grounds a plane: it flies with a thin
+ * cabin and every flight loses service points in its NPS score
+ * (cabinCover(), sim/nps.ts). They hire and release like pilots, with no
+ * retraining.
+ *
+ * **Training capacity.** Each base has a limited number of training seats
+ * per workforce (pilots, cabin): crews hired or retraining occupy one until
+ * they join. A base's seats grow with its roster, so a small base can't
+ * staff a large fleet at once (trainingSeats()).
+ *
  * **Crew bases.** Basing a plane at an airport without one opens a base,
  * for CREW_BASE_FEE (sim/playerActions.ts's lease); it starts with no
  * crews, so the plane waits for the first hires.
@@ -96,6 +108,21 @@ export const CREWS_PER_NEW_PLANE = 2;
 /** The starting plane's class, which the home base's first crews are rated for. */
 export const STARTING_CREW_CLASS = 'PROP';
 
+/** Cabin teams a plane carries for each shift its pilots fly: none on a Propeller. */
+export const CABIN_TEAMS_PER_SHIFT: Record<string, number> = { PROP: 0, REGIONAL: 1, NARROWBODY: 1, WIDEBODY: 2 };
+/** A cabin team's hiring fee and standby cost, as a share of a pilot crew's in the same class. */
+export const CABIN_COST_SHARE = 0.5;
+/** Days until a cabin team hired today flies: shorter than a pilot's course. */
+export const CABIN_HIRE_LEAD_DAYS = 4;
+/** Service points a flight loses with no cabin team at all (sim/nps.ts), scaled down as cover improves. */
+export const CABIN_SHORT_NPS_PENALTY = 25;
+/** Training seats a base has before any crews: crews in training at once, per workforce. */
+export const TRAINING_SEATS_BASE = 2;
+/** Each crew on a base's roster adds this many training seats, rounded down. */
+export const TRAINING_SEATS_PER_CREW = 0.5;
+
+export type CrewRole = 'pilot' | 'cabin';
+
 export type CrewBase = {
   /** Crews rated for each aircraft class, by class code. */
   crewsByClass: Record<string, number>;
@@ -105,6 +132,10 @@ export type CrewBase = {
   hiring: { classCode: string; count: number; readyDay: number }[];
   /** Crews away retraining for another class (already out of `from`), and the day they're back. */
   retraining: { from: string; classCode: string; count: number; readyDay: number }[];
+  /** Cabin teams rated for each class, by class code. Absent in an older save: ensureCrewBases() crews its planes. */
+  cabinByClass?: Record<string, number>;
+  /** Cabin teams being trained, and the day each batch starts. */
+  cabinHiring?: { classCode: string; count: number; readyDay: number }[];
 };
 
 export type CrewDay = {
@@ -112,6 +143,8 @@ export type CrewDay = {
   crewsByTail: Record<string, number>;
   /** When each flying plane's duty day starts, home-local minute of day, by tail. */
   dutyStartByTail: Record<string, number>;
+  /** Share of the cabin teams each flying plane needs that it has today, 0 to 1, by tail. Absent for a plane that needs none, or in a save from before cabin crews. */
+  cabinCoverByTail?: Record<string, number>;
 };
 
 function legsOf(state: SimState, tail: string): ScheduleLeg[] {
@@ -183,6 +216,71 @@ export function hireLeadDays(state: SimState): number {
 /** Days a crew is away retraining: shorter with a crew academy. */
 export function retrainDays(state: SimState): number {
   return Math.max(1, Math.round(RETRAIN_DAYS * crewTrainingTimeFactor(state)));
+}
+
+/** Whether planes of this class carry cabin crew at all. */
+export function needsCabinCrew(classCode: string): boolean {
+  return (CABIN_TEAMS_PER_SHIFT[classCode] ?? 0) > 0;
+}
+
+/** A cabin team's hiring fee in this class. */
+export function cabinHireFee(classCode: string): number {
+  return Math.round(hireFee(classCode) * CABIN_COST_SHARE);
+}
+
+/** What a cabin team of this class costs a day standing by. */
+export function cabinStandbyCost(classCode: string): number {
+  return Math.round(standbyCost(classCode) * CABIN_COST_SHARE);
+}
+
+/** Days until a cabin team hired today flies: shorter with a crew academy. */
+export function cabinLeadDays(state: SimState): number {
+  return Math.max(1, Math.round(CABIN_HIRE_LEAD_DAYS * crewTrainingTimeFactor(state)));
+}
+
+/** Cabin teams of this class a base has now. */
+export function cabinTeamsOf(base: CrewBase | undefined, classCode: string): number {
+  return base?.cabinByClass?.[classCode] ?? 0;
+}
+
+/** Cabin teams of this class in training for a base. */
+export function cabinArriving(base: CrewBase | undefined, classCode: string): number {
+  return (base?.cabinHiring ?? []).filter((batch) => batch.classCode === classCode).reduce((sum, batch) => sum + batch.count, 0);
+}
+
+/** Cabin teams a base's planes of a class need at ideal shifts and at the legal minimum. */
+export function cabinNeed(state: SimState, iata: string, classCode: string): { ideal: number; minimum: number } {
+  const need = crewNeed(state, iata, classCode);
+  const teams = CABIN_TEAMS_PER_SHIFT[classCode] ?? 0;
+  return { ideal: need.ideal * teams, minimum: need.minimum * teams };
+}
+
+/** How many crews of this workforce a base has on its books, flying or in training. */
+function rosterSize(base: CrewBase | undefined, role: CrewRole): number {
+  const byClass = role === 'pilot' ? base?.crewsByClass : base?.cabinByClass;
+  return Object.values(byClass ?? {}).reduce((sum, count) => sum + count, 0);
+}
+
+/** Crews of this workforce in training at a base: hired, or (pilots) retraining. */
+export function inTraining(base: CrewBase | undefined, role: CrewRole): number {
+  if (!base) return 0;
+  const hiring = (role === 'pilot' ? base.hiring : base.cabinHiring ?? []).reduce((sum, batch) => sum + batch.count, 0);
+  return role === 'pilot' ? hiring + base.retraining.reduce((sum, batch) => sum + batch.count, 0) : hiring;
+}
+
+/** Crews of this workforce a base can have in training at once: a few to start, more as its roster grows. */
+export function trainingSeats(base: CrewBase | undefined, role: CrewRole): number {
+  return TRAINING_SEATS_BASE + Math.floor(rosterSize(base, role) * TRAINING_SEATS_PER_CREW);
+}
+
+/** Training seats a base has free now. */
+export function trainingSeatsFree(base: CrewBase | undefined, role: CrewRole): number {
+  return Math.max(0, trainingSeats(base, role) - inTraining(base, role));
+}
+
+/** The cover a flight's cabin has, 1 when its plane needs none or the day's crewing predates cabin crews. */
+export function cabinCover(state: SimState, tail: string): number {
+  return state.crewDay?.cabinCoverByTail?.[tail] ?? 1;
 }
 
 /** Every crew base, by IATA. */
@@ -352,12 +450,22 @@ export function ensureCrewBases(state: SimState): void {
     }
     bases[iata] = { crewsByClass, hiring: [], retraining: [] };
   }
+  // A base from before cabin crews gets the cabin teams its planes need, so loading a save doesn't thin its cabins.
+  for (const [iata, base] of Object.entries(bases)) {
+    if (base.cabinByClass !== undefined) continue;
+    base.cabinByClass = {};
+    for (const cls of AIRCRAFT_CLASSES) {
+      const ideal = cabinNeed(state, iata, cls.code).ideal;
+      if (ideal > 0) base.cabinByClass[cls.code] = ideal;
+    }
+    base.cabinHiring ??= [];
+  }
 }
 
 /** Open a crew base with no crews (a lease at a new airport does this). */
 export function openCrewBase(state: SimState, iata: string): void {
   const bases = (state.crewBases ??= {});
-  if (!bases[iata]) bases[iata] = { crewsByClass: {}, hiring: [], retraining: [] };
+  if (!bases[iata]) bases[iata] = { crewsByClass: {}, hiring: [], retraining: [], cabinByClass: {}, cabinHiring: [] };
 }
 
 type Outcome = { ok: true; message: string } | { ok: false; reason: string };
@@ -367,11 +475,18 @@ function crewsWord(count: number, classCode: string): string {
   return `${count} ${name} crew${count === 1 ? '' : 's'}`;
 }
 
+function seatsReason(free: number, role: CrewRole, iata: string): string {
+  const name = role === 'pilot' ? 'pilot' : 'cabin';
+  return free === 0 ? `No free ${name} training seats at ${iata}.` : `Only ${free} ${name} training seat${free === 1 ? '' : 's'} free at ${iata}.`;
+}
+
 /** Recruit crews rated for a class at a base: paid now, flying after the hiring lead time. */
 export function hireCrews(state: SimState, iata: string, classCode: string, count: number): Outcome {
   const base = crewBases(state)[iata];
   if (!base) return { ok: false, reason: `No crew base at ${iata}.` };
   if (count < 1) return { ok: false, reason: 'Hire at least one crew.' };
+  const free = trainingSeatsFree(base, 'pilot');
+  if (count > free) return { ok: false, reason: seatsReason(free, 'pilot', iata) };
   const fee = count * hireFee(classCode);
   if (state.cash < fee) return { ok: false, reason: `Needs $${fee.toLocaleString()} on hand.` };
   state.cash -= fee;
@@ -386,6 +501,8 @@ export function retrainCrews(state: SimState, iata: string, from: string, to: st
   if (!base) return { ok: false, reason: `No crew base at ${iata}.` };
   if (from === to) return { ok: false, reason: 'They already fly that class.' };
   if (count < 1 || crewsOf(base, from) < count) return { ok: false, reason: 'Not that many crews there.' };
+  const free = trainingSeatsFree(base, 'pilot');
+  if (count > free) return { ok: false, reason: seatsReason(free, 'pilot', iata) };
   const fee = count * retrainFee(to);
   if (state.cash < fee) return { ok: false, reason: `Needs $${fee.toLocaleString()} on hand.` };
   state.cash -= fee;
@@ -402,6 +519,32 @@ export function releaseCrews(state: SimState, iata: string, classCode: string, c
   if (!base || crewsOf(base, classCode) < count || count < 1) return { ok: false, reason: 'Not that many crews there.' };
   base.crewsByClass[classCode] -= count;
   return { ok: true, message: `${crewsWord(count, classCode)} released · ${iata}` };
+}
+
+/** Recruit cabin teams for a class at a base: paid now, flying after the cabin lead time, in a training seat meanwhile. */
+export function hireCabin(state: SimState, iata: string, classCode: string, count: number): Outcome {
+  const base = crewBases(state)[iata];
+  if (!base) return { ok: false, reason: `No crew base at ${iata}.` };
+  if (!needsCabinCrew(classCode)) return { ok: false, reason: 'That class flies without cabin crew.' };
+  if (count < 1) return { ok: false, reason: 'Hire at least one cabin team.' };
+  const free = trainingSeatsFree(base, 'cabin');
+  if (count > free) return { ok: false, reason: seatsReason(free, 'cabin', iata) };
+  const fee = count * cabinHireFee(classCode);
+  if (state.cash < fee) return { ok: false, reason: `Needs $${fee.toLocaleString()} on hand.` };
+  state.cash -= fee;
+  const readyDay = dayIndex(state) + cabinLeadDays(state);
+  (base.cabinHiring ??= []).push({ classCode, count, readyDay });
+  const name = classByCode(classCode)?.name ?? classCode;
+  return { ok: true, message: `${count} ${name} cabin team${count === 1 ? '' : 's'} hired · ${iata} · $${fee.toLocaleString()} · ready day ${readyDay}` };
+}
+
+/** Let cabin teams of a class go at a base. */
+export function releaseCabin(state: SimState, iata: string, classCode: string, count: number): Outcome {
+  const base = crewBases(state)[iata];
+  if (!base || cabinTeamsOf(base, classCode) < count || count < 1) return { ok: false, reason: 'Not that many cabin teams there.' };
+  base.cabinByClass![classCode] -= count;
+  const name = classByCode(classCode)?.name ?? classCode;
+  return { ok: true, message: `${count} ${name} cabin team${count === 1 ? '' : 's'} released · ${iata}` };
 }
 
 /**
@@ -425,6 +568,9 @@ export function rollDailyCrews(state: SimState): number {
     }
     base.hiring = base.hiring.filter((b) => b.readyDay > today);
     base.retraining = base.retraining.filter((b) => b.readyDay > today);
+    const cabin = (base.cabinByClass ??= {});
+    for (const batch of (base.cabinHiring ?? []).filter((b) => b.readyDay <= today)) cabin[batch.classCode] = (cabin[batch.classCode] ?? 0) + batch.count;
+    base.cabinHiring = (base.cabinHiring ?? []).filter((b) => b.readyDay > today);
 
     // Sickness: who's back today, then who calls in, on yesterday's roster.
     base.sick = (base.sick ?? []).filter((batch) => batch.backDay > today);
@@ -469,6 +615,18 @@ export function rollDailyCrews(state: SimState): number {
         left -= 1;
       }
       standby += left * standbyCost(cls.code);
+      // Cabin teams: each flying plane's teams for the shifts its pilots fly, in fleet order; a short cabin still flies.
+      let cabinLeft = cabinTeamsOf(base, cls.code);
+      const teams = CABIN_TEAMS_PER_SHIFT[cls.code] ?? 0;
+      for (const plane of planes) {
+        const pilots = day.crewsByTail[plane.tail];
+        if (teams === 0 || pilots <= 0) continue;
+        const needed = crewsFor(plane.duty, LEGAL_SHIFT_MINUTES) * teams;
+        const given = Math.min(needed, cabinLeft);
+        cabinLeft -= given;
+        (day.cabinCoverByTail ??= {})[plane.tail] = given / needed;
+      }
+      standby += cabinLeft * cabinStandbyCost(cls.code);
       for (const plane of planes) {
         const first = legsOf(state, plane.tail)[0];
         day.dutyStartByTail[plane.tail] = first.departMinute - REPORT_MINUTES;
