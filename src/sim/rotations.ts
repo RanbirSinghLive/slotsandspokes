@@ -8,6 +8,7 @@ import { minuteOfDayToTimeString } from './clock';
 import { greatCircleDistanceNm } from './geo';
 import { fareClassPolicy, policyFare } from './pricing';
 import { revealReach } from './reach';
+import { homeCountry, legRights } from './rights';
 import {
   computeBlockMinutes,
   isAircraftTypeAllowedAt,
@@ -332,6 +333,15 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
       `${base.iata} isn't in your network yet — a rotation has to start from an airport you already fly to. ` +
         `Fly there as a destination first, then rotations can start from it.`,
     );
+  }
+
+  // Air rights (sim/rights.ts): a leg the home country's carrier may not
+  // fly is law, not a cost, so it fails like a range limit. Only new
+  // rotations are checked: legs a save already flies stay.
+  const home = homeCountry(state);
+  for (const leg of legs) {
+    const rights = legRights(home, leg.origin, leg.dest);
+    if (!rights.ok) return fail(rights.reason);
   }
 
   // Slots (sim/slots.ts): every departure needs a slot pair at its

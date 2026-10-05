@@ -2824,10 +2824,13 @@ passengers of any style and earned the least.
 
 ## Air rights (`src/sim/rights.ts`, `data/air-rights.json`)
 
-**Not yet switched on: this slice only measures.** The plan is
-`roadmap/air-rights-spec.md`. `npm run rights` plays the steady player and
-prints what the rule *would* bar; nothing in the game refuses or removes
-anything yet.
+**Routes are enforced; connections are not yet.** The plan is
+`roadmap/air-rights-spec.md`. `planRotation()` refuses a new rotation with
+a barred leg (`BOS → LGA · cabotage barred for CA carriers`), like a range
+limit; legs an old save already flies stay. Rivals follow the rule when
+they open routes, the headless player skips barred markets, and the home
+picker counts only legal neighbours. Connecting passengers still ignore
+it: `npm run rights` prints how many a day it would remove.
 
 An airline's **home country** is the country of its home airport
 (`data/airport-countries.json`, built by `npm run countries` from
@@ -2844,7 +2847,11 @@ country is unknown the rule allows it, so a missing row never stops a route.
 
 A Canadian carrier may still fly Boston–Toronto–New York as a rotation,
 because each leg touches Canada; it just can't sell Boston–New York on it.
-Nothing is saved: the home country is read from the home airport.
+Nothing about the player is saved: the home country is read from the home
+airport. A rival's home country is stamped on the routes it opens
+(`CompetitorOffering.homeCountry`, optional); a seed rival is from where
+its oldest route starts, and a newcomer from where its first route starts,
+so its first route is never barred and every later one is.
 
 ---
 

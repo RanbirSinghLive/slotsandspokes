@@ -8,6 +8,7 @@ import { AIRCRAFT_CLASSES } from './aircraftClasses';
 import { marketDistanceNm, potentialDailyDemand } from './demand';
 import { START_DAY_OF_YEAR, startingSimMinute, type StartSeason } from './clock';
 import { revealReach } from './reach';
+import { countryOf, legRights } from './rights';
 import { createStartingFleet, type SimState } from './state';
 import { makeOffers } from './contracts';
 
@@ -39,7 +40,7 @@ export type HomeOption = {
 /** The airports a starting propeller can fly a market to from `iata`. */
 export function homeNeighbours(iata: string): string[] {
   return airports
-    .filter((other) => other.iata !== iata && marketDistanceNm(iata, other.iata) <= PROPELLER_RANGE_NM && potentialDailyDemand(iata, other.iata) > 0)
+    .filter((other) => other.iata !== iata && marketDistanceNm(iata, other.iata) <= PROPELLER_RANGE_NM && potentialDailyDemand(iata, other.iata) > 0 && legRights(countryOf(iata), iata, other.iata).ok)
     .map((other) => other.iata);
 }
 
