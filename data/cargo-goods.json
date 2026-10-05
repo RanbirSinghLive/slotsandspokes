@@ -1,0 +1,16 @@
+{
+  "_about": "Hand-authored from public knowledge of air freight. ratePerTonneNm is dollars per tonne per nautical mile (what a shipper pays, before the shortage price); baseTonnes is the daily volume a middling airport makes or needs of the good; shelfHours is how long it keeps (null: it doesn't spoil); handlingPerTonne is the ground cost, by handling type. Read by sim/cargo.ts. Correct freely: it shapes which airports are worth linking.",
+  "goods": [
+    { "id": "seafood", "name": "Seafood", "ratePerTonneNm": 0.9, "baseTonnes": 2.0, "shelfHours": 72, "handling": "cold" },
+    { "id": "produce", "name": "Fresh produce", "ratePerTonneNm": 0.55, "baseTonnes": 3.0, "shelfHours": 96, "handling": "cold" },
+    { "id": "autoparts", "name": "Auto parts", "ratePerTonneNm": 0.5, "baseTonnes": 3.0, "shelfHours": null, "handling": "general" },
+    { "id": "aerospace", "name": "Aerospace parts", "ratePerTonneNm": 1.1, "baseTonnes": 1.0, "shelfHours": null, "handling": "general" },
+    { "id": "electronics", "name": "Electronics", "ratePerTonneNm": 0.9, "baseTonnes": 1.5, "shelfHours": null, "handling": "general" },
+    { "id": "parcels", "name": "Parcels and mail", "ratePerTonneNm": 0.6, "baseTonnes": 4.0, "shelfHours": 120, "handling": "general" },
+    { "id": "medical", "name": "Medical supplies", "ratePerTonneNm": 1.2, "baseTonnes": 0.8, "shelfHours": 96, "handling": "cold" },
+    { "id": "minerals", "name": "Minerals and ore samples", "ratePerTonneNm": 0.45, "baseTonnes": 2.5, "shelfHours": null, "handling": "bulky" },
+    { "id": "supplies", "name": "Industrial and camp supplies", "ratePerTonneNm": 0.4, "baseTonnes": 3.0, "shelfHours": null, "handling": "bulky" },
+    { "id": "textiles", "name": "Textiles and apparel", "ratePerTonneNm": 0.45, "baseTonnes": 3.5, "shelfHours": null, "handling": "general" }
+  ],
+  "handlingPerTonne": { "general": 20, "cold": 60, "bulky": 35 }
+}

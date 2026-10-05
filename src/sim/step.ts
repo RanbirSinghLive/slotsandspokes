@@ -12,6 +12,7 @@ import { crowdingWeight } from './timeOfDay';
 import { cabinLayout, cabinOf } from './cabins';
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { flightResult, type EconomyAircraftType } from './economy';
+import { carryCargo, rollDailyCargo } from './cargo';
 import { MIN_TURN_MINUTES, legsServingMarket, marketDepartMinutes, marketKey, type ScheduleLeg } from './schedule';
 import { breaksCurfew, rotationStartingWith } from './curfew';
 import { rollDailyWeather, isAirportClosed } from './weather';
@@ -198,6 +199,7 @@ export function step(state: SimState): void {
     state.yesterdayFareClasses = state.todayFareClasses ?? {};
     state.todayFareClasses = {};
     state.todayLegResults = {};
+    rollDailyCargo(state);
     state.todayRevenue = 0;
     state.todayCost = 0;
     state.todayMargin = 0;
@@ -606,6 +608,22 @@ export function step(state: SimState): void {
           // into revenueHistoryByMarket/costHistoryByMarket at rollover.
           state.todayRevenueByMarket[key] = (state.todayRevenueByMarket[key] ?? 0) + result.revenue;
           state.todayCostByMarket[key] = (state.todayCostByMarket[key] ?? 0) + result.cost;
+          // Freight in whatever hold the passengers left (sim/cargo.ts), paid
+          // net of handling and counted in the same revenue and margin.
+          const cargo = carryCargo(state, {
+            origin: flight.origin,
+            dest: flight.dest,
+            seats: flightSeats,
+            passengers: result.pax,
+            transitMinutes: flight.arriveMinute - flight.scheduledDepartMinute,
+          });
+          if (cargo.revenue !== 0) {
+            flightMargin += cargo.revenue;
+            state.cash += cargo.revenue;
+            state.todayRevenue += cargo.revenue;
+            state.todayMargin += cargo.revenue;
+            state.todayRevenueByMarket[key] = (state.todayRevenueByMarket[key] ?? 0) + cargo.revenue;
+          }
         }
       }
     }

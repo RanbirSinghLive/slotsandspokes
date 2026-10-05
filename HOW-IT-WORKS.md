@@ -114,6 +114,11 @@ JSON by hand.
   that airport limits use, and index 0 is the starting class.
 - **`lease-rates.json`** — the daily lease price of a *new* airframe per
   class; age discounts it (see The aircraft market).
+- **`cargo-goods.json`** and **`airport-cargo.json`** — hand-authored
+  from public knowledge (cargo, below): ten goods with a rate per tonne
+  per nautical mile, a daily volume, a shelf life and a handling type;
+  and, for about ninety airports, the goods each makes and needs. An
+  airport not listed gets a default from its population.
 - **`competitors.json`** — the seed rival routes a game starts with:
   four small airlines in eastern Canada and four in Europe, so rivals
   grow outward around both (they only ever expand from their own
@@ -745,10 +750,10 @@ the map, and rearrange with its width through CSS container queries (on
 a narrow map the lens moves down, then to the bottom left).
 
 The lens is one row of labelled buttons, Network · Profit · Ops ·
-Demand · Rivals, one on at a time (keys 1–5; O toggles Ops), with its legend and
+Demand · Rivals · Cargo, one on at a time (keys 1–6; O toggles Ops), with its legend and
 filter directly under it. `setLens()` in main.ts sets the three flags
 the renderer reads: `demandOverlayOn` for Demand, `competitionOverlayOn`
-for Rivals, `mapMode` for Profit and Ops, and the Ops lens switch (`setOpsView()`) for Ops. The Rivals lens adds a
+for Rivals, `cargoOverlayOn` for Cargo, `mapMode` for Profit and Ops, and the Ops lens switch (`setOpsView()`) for Ops. The Rivals lens adds a
 chip per rival airline to narrow it to one. A route can be drawn under
 any lens.
 
@@ -2321,6 +2326,64 @@ The mix feeds the choice model in place of one mix for every market
 market by how well its hour suits that market's travellers). The route
 view shows it as a word ("Business trunk", "Sun and leisure", "Friends
 and family", "Business-leaning", "Mixed") and a three-colour bar.
+
+---
+
+## Cargo (`src/sim/cargo.ts`)
+
+Freight is a supply-and-need match, not a pull that grows with a city's
+size. Every airport **makes** some goods and **needs** others
+(`data/airport-cargo.json`: the Halifax profile makes seafood and needs
+electronics and produce); a flight earns freight money when what its
+origin makes is what its destination needs, whatever the passenger demand.
+A small fishing town can be a rich origin and a big business city a poor
+one.
+
+- **Volumes.** A good's base daily tonnes (`data/cargo-goods.json`) times
+  the airport's size (0.5 for a village up to 2 for a megacity, by a log
+  of its population). A made good's first listing, its specialty, is a
+  half more; a place under 100,000 people needs half as much again per
+  head. A city of a million needs one more good than its listing says,
+  five million two more (`withMetroNeeds()`), so two cities usually have
+  something in common. An airport nobody listed gets a default: a big
+  city makes parcels and needs fresh food, a small remote place needs
+  supplies and produce.
+- **A lane** is one good from an airport that makes it to one that needs
+  it, worth the smaller of the two volumes a day.
+- **A flight's freight** (`carryCargo()`, called when a flight lands)
+  fills the **belly**: 0.02 tonnes a seat less 0.01 a passenger, so a
+  75%-full narrowbody has about 1.9 tonnes and a propeller 0.3. It is
+  limited by that hold, by this flight's share of the lane (the lane's
+  tonnes, split between your flights in that direction and rivals' daily
+  frequencies on the pair), and by what is left of the origin's output
+  and the destination's need today. Revenue is tonnes × rate × distance
+  × (1 + shortage premium) × (1 − spoilage), less handling ($20 a tonne
+  general, $60 cold chain, $35 bulky). It goes into cash, revenue, the
+  day's margin and the market's revenue, and is counted apart as
+  `todayCargoRevenue`.
+- **Spoilage.** A good with a shelf life loses up to half its value if
+  it spends the whole shelf life in transit, from the flight's scheduled
+  departure to its actual arrival, so a late flight spoils more.
+- **The edge fades.** Each need has a satisfaction from 0 to 1
+  (`cargoSatisfaction`), and pays a premium of up to 60% × (1 −
+  satisfaction). At midnight (`rollDailyCargo()`) satisfaction moves 30%
+  of the way toward the share of the need you filled today, so a lane
+  you serve every day pays less and less premium, and one you leave
+  alone has its premium come back. Nothing else changes: the base rate
+  and the volumes stay.
+- **What a player reads.** The airport view lists what it makes and
+  needs (with the premium while it is unmet) and its best matched
+  partners among the airports you reach, by matched dollars a day at the
+  base rate (`bestCargoPartners()`); the Money screen shows yesterday's
+  freight and the lifetime total; the **Cargo lens** (key 6,
+  `render/cargo.ts`) draws a circle per airport (amber where it mostly
+  makes, teal where it mostly needs), your freight-carrying routes in
+  the colour of their best good, and the hovered or selected airport's
+  best partners (dashed where you don't fly them).
+
+Not built: cargo terminals and shipper contracts, freighters, goods
+that change hands through a hub, a prop cargo hold (props carry what
+their bags leave, a few hundred kilos).
 
 ---
 

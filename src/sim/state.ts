@@ -281,6 +281,20 @@ export type SimState = {
   todayCost: number;
   todayMargin: number;
   /**
+   * Cargo (sim/cargo.ts). Today's freight money and tonnes, already inside
+   * `todayRevenue`; yesterday's, kept for the Money screen; and the airline's
+   * lifetime freight revenue. Optional: absent in saves from before cargo.
+   */
+  todayCargoRevenue?: number;
+  todayCargoTonnes?: number;
+  yesterdayCargoRevenue?: number;
+  yesterdayCargoTonnes?: number;
+  cargoRevenueTotal?: number;
+  /** Tonnes moved today, by 'P:<good>@<airport>' (made there) and 'N:<good>@<airport>' (needed there); reset at midnight. */
+  cargoMovedToday?: Record<string, number>;
+  /** How well you have filled a need lately, 0 to 1, by 'N:<good>@<airport>'; the shortage premium is what it leaves unfilled. */
+  cargoSatisfaction?: Record<string, number>;
+  /**
    * Today's own departed/on-time/NPS-point counts, reset to zero at
    * day-rollover same as `todayRevenue` and friends above, after the
    * trailing NPS (sim/nps.ts) and the day's histories have read them.

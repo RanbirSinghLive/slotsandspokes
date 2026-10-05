@@ -1,6 +1,6 @@
 import { cashRunway, RUNWAY_WINDOW_DAYS } from '../../sim/forecast';
 import { line, heading, lineWithInfo } from './dom';
-import { money } from '../format';
+import { money, shortMoney } from '../format';
 import { chartLegend } from '../chartLegend';
 import { unitEconomicsHistory } from '../../sim/unitEconomics';
 import type { SimState } from '../../sim/state';
@@ -132,6 +132,14 @@ export function buildMoneyView(state: SimState): HTMLElement {
     root.append(
       heading('Daily average · 7d'),
       line(`Rev ${money(revenue)} · cost ${money(cost)} · margin ${money(revenue - cost)}`, revenue - cost < 0 ? 'inspector-line is-over' : 'inspector-line is-good'),
+    );
+  }
+  if ((state.cargoRevenueTotal ?? 0) > 0) {
+    root.append(
+      lineWithInfo(
+        `Cargo ${money(state.yesterdayCargoRevenue ?? 0)}/day · ${(state.yesterdayCargoTonnes ?? 0).toFixed(1)} t · total ${shortMoney(state.cargoRevenueTotal ?? 0)}`,
+        'Freight carried in the hold the passengers\' bags leave free, paid net of handling and already inside revenue above. It earns where a flight\'s origin makes what its destination needs; the airport view lists the best matches.',
+      ),
     );
   }
 

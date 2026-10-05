@@ -73,7 +73,7 @@ const STEPS: Step[] = [
   },
   {
     title: 'Read the map',
-    text: 'Lenses recolour the map: Profit shows which routes pay, On-time which run late, Demand where people want to fly, Rivals who flies against you.',
+    text: 'Lenses recolour the map: Profit shows which routes pay, On-time which run late, Demand where people want to fly, Rivals who flies against you, Cargo which airports make what others need.',
     target: '#lens-corner',
   },
   {
