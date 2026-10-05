@@ -1,7 +1,8 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { brandEdge } from './nps';
 import { airlineFuelPrice } from './fuelPrice';
-import { connectingPriceResponse, legCost, LOAD_FACTOR, type EconomyAircraftType } from './economy';
+import { loadFactorCap } from './innovations';
+import { connectingPriceResponse, legCost, type EconomyAircraftType } from './economy';
 import { connectingDemandOnMarket, connectingPassengersThrough, connectingFlowsAt, spokesOf, planHubStyleChange } from './hubs';
 import { HUB_STYLES, HUB_STYLE_ORDER, hubStyleAt, type HubStyle } from './hubStyle';
 import { airportLoad } from './airports';
@@ -136,7 +137,7 @@ function frequencyMove(state: SimState, hub: string, spoke: string): HubMove | n
     { ...existing, legId: '__plan-back', origin: spoke, dest: hub },
   ];
   const after = { ...state, schedule: [...state.schedule, ...hypothetical] };
-  const { revenue, passengers } = connectionRevenueGain(state, after, hub, new Map([[spoke, 2 * Math.round(type.seats * LOAD_FACTOR)]]));
+  const { revenue, passengers } = connectionRevenueGain(state, after, hub, new Map([[spoke, 2 * Math.round(type.seats * loadFactorCap(state))]]));
   const cost = 2 * legCost(existing.blockMinutes, type, airlineFuelPrice(state), state.fuelEfficiencyMultiplier);
   return { kind: 'frequency', spoke, gainPerDay: revenue - cost, extraConnecting: passengers };
 }

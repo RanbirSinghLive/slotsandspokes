@@ -14,7 +14,7 @@ import { airportHours, averageHourLoad } from '../sim/hours';
 import { lastWeekMargin } from '../sim/pnlHistory';
 import { AIRCRAFT_CLASSES, classByCode } from '../sim/aircraftClasses';
 import { dayIndex } from '../sim/clock';
-import { RECAPTURE_RATE } from '../sim/economy';
+import { LOAD_FACTOR, RECAPTURE_RATE } from '../sim/economy';
 import { connectingPassengersThrough } from '../sim/hubs';
 import {
   CODESHARE_FEED_FACTOR,
@@ -23,6 +23,7 @@ import {
   runningCostOf,
   WINGLET_FUEL_FACTOR,
   type InnovationId,
+  SPOILAGE_STEP,
 } from '../sim/innovations';
 import { greatCircleDistanceNm } from '../sim/geo';
 import { cashNeededToLease } from '../sim/leasing';
@@ -1099,6 +1100,8 @@ function innovationGainPerDay(state: SimState, id: InnovationId): number {
   if (id === 'winglets') return state.todayCostByCategory.fuel * (1 - WINGLET_FUEL_FACTOR);
   // Recapture only helps flights that turn people away: a tenth of revenue is a fair guess at how much that is.
   if (id === 'loyalty-scheme') return revenue * 0.1 * (LOYALTY_RECAPTURE_RATE - RECAPTURE_RATE);
+  // One more point of seats sold lifts revenue only on flights that sell out: half of revenue is a fair guess.
+  if (id.startsWith('spoilage-')) return (revenue * 0.5 * SPOILAGE_STEP) / LOAD_FACTOR;
   if (id === 'codeshare-feed') {
     let connecting = 0;
     for (const hub of networkAirports(state)) connecting = Math.max(connecting, connectingPassengersThrough(state, hub));

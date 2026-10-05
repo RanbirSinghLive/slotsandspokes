@@ -49,7 +49,8 @@ export type FlightResult = {
 };
 
 // Deliberately crude: no flight sells more than this fraction of its
-// seats, whatever the day. (Fare is set per market, sim/state.ts's
+// seats, whatever the day. This is the base; spoilage management and a
+// commercial officer raise it (sim/innovations.ts's loadFactorCap()). (Fare is set per market, sim/state.ts's
 // RouteSettings.)
 // Exported so sim/marketSummary.ts can tell whether a market's `pax` figure is
 // pinned at this ceiling (seat-capped — more demand exists than the plane
@@ -246,11 +247,11 @@ export function flightResult(
     : marketDailyDemand / legsServingMarket;
   const connecting = connectingDailyDemand * connectingPriceResponse(fare, legsServingMarket, leg.origin, leg.dest, competitorRoutes, perks.brandEdge);
   const layout = cabinLayout(type.seats, cabin);
-  const seatCeiling = Math.round(layout.economy * LOAD_FACTOR);
+  const seatCeiling = Math.round(layout.economy * perks.loadFactor);
   // The seats sold class by class, in booking order (sim/fareClasses.ts).
   const sale = sellSeats({
     seats: seatCeiling,
-    businessSeats: Math.round(layout.business * LOAD_FACTOR),
+    businessSeats: Math.round(layout.business * perks.loadFactor),
     baseFare: fare,
     demand: demandPerFlight,
     // The season scales how many of each segment want to fly today (sim/seasons.ts).
