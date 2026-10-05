@@ -97,7 +97,7 @@ export function updateMandates(state: SimState, choosingHome: boolean): void {
     primed = true;
     return;
   }
-  if (choosingHome || document.querySelector('.modal-overlay')) return;
+  if (choosingHome || document.querySelector('.modal-overlay:not([hidden])')) return;
   const fresh = shown.find((m) => m.status === 'offered' && !announced.has(m.id));
   if (fresh) {
     announced.add(fresh.id);
