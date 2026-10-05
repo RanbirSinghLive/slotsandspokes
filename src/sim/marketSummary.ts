@@ -3,7 +3,7 @@ import { effectiveFareClasses } from './seatSale';
 import { crowdingWeight } from './timeOfDay';
 import { cabinLayout, cabinOf } from './cabins';
 import aircraftTypesData from '../../data/aircraft-types.json';
-import { flightResult, LOAD_FACTOR, type EconomyAircraftType } from './economy';
+import { flightResult, type EconomyAircraftType } from './economy';
 import { trafficShare } from './choiceModel';
 import { addTally, DEFAULT_FARE_CLASSES, emptyTally, type FareClassTally } from './fareClasses';
 import { actualDailyDemand } from './marketDemand';
@@ -136,7 +136,7 @@ export function summarizeMarket(
     cost += result.cost;
     margin += result.margin;
     totalSeats += layout.economy + layout.business;
-    totalSeatCeiling += Math.round(layout.economy * LOAD_FACTOR) + Math.round(layout.business * LOAD_FACTOR);
+    totalSeatCeiling += Math.round(layout.economy * perks.loadFactor) + Math.round(layout.business * perks.loadFactor);
   }
 
   // A market is "seat-capped" when every one of its flights is pinned at

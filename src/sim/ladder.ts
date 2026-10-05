@@ -299,7 +299,7 @@ export const LADDER: Tier[] = [
     id: 'international',
     name: 'International',
     needed: 2,
-    opens: ['Innovation: codeshare feed'],
+    opens: ['Innovations: codeshare feed, spoilage management I–III'],
     milestones: [
       {
         id: 'ocean-crossing',
@@ -321,7 +321,7 @@ export const LADDER: Tier[] = [
     id: 'global',
     name: 'Global',
     needed: 1,
-    opens: [],
+    opens: ['Innovations: spoilage management IV–V'],
     milestones: [
       {
         id: 'round-the-world',

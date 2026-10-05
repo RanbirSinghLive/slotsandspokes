@@ -108,5 +108,16 @@
     "signingFee": 350000,
     "salaryPerDay": 3500,
     "effect": { "kind": "revenue", "yieldMultiplier": 1.03 }
+  },
+  {
+    "id": "cco-sato",
+    "role": "cco",
+    "name": "Akira Sato",
+    "background": "Inventory control",
+    "flavor": "Ran overbooking models at a flag carrier where an empty seat was an offence. Believes every spoiled seat was sold to somebody, just not by you.",
+    "npsNeeded": 25,
+    "signingFee": 500000,
+    "salaryPerDay": 5000,
+    "effect": { "kind": "load-factor", "points": 3 }
   }
 ]
