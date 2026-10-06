@@ -8,7 +8,7 @@ import { line, heading, lineWithInfo } from './dom';
 import { formatNps, marketNps } from '../../sim/nps';
 import { daysUntilReturn } from '../../sim/aog';
 import { congestionParameters } from '../../sim/delays';
-import { connectingPassengersThrough } from '../../sim/hubs';
+import { barredSpokePairsAt, connectingPassengersThrough } from '../../sim/hubs';
 import { planHub } from '../../sim/hubPlanner';
 import { formatLoadFactor, marketLoadFactor } from '../../sim/loadFactor';
 import { airportDemandSize } from '../../sim/marketSize';
@@ -68,6 +68,15 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
         (connecting > 0 ? ` · ${connecting} connecting/day · ${HUB_STYLES[hubStyleAt(state, iata)].name}` : ''),
     ),
   );
+  const barredPairs = barredSpokePairsAt(state, iata);
+  if (barredPairs > 0) {
+    root.append(
+      lineWithInfo(
+        `${barredPairs} spoke ${barredPairs === 1 ? 'pair' : 'pairs'} can't connect · cabotage`,
+        `Cabotage is carrying passengers between two airports in a country that isn't your home. Your airline can't sell a trip between two airports in one foreign country, whichever hub it changes planes at, so those pairs add no connecting passengers here.`,
+      ),
+    );
+  }
 
   // Bases here (sim/bases.ts): opened on the Crews and Mtc screens.
   const crewBase = hasCrewBase(state, iata);

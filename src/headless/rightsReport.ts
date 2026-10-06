@@ -1,22 +1,19 @@
-import { connectingFlowsAt } from '../sim/hubs';
+import { barredSpokePairsAt, connectingFlowsAt } from '../sim/hubs';
 import { isInsolvent } from '../sim/insolvency';
-import { flowRights, homeCountry, legRights } from '../sim/rights';
+import { homeCountry, legRights } from '../sim/rights';
 import { marketKey, networkAirports } from '../sim/schedule';
 import { step } from '../sim/step';
 import { startHeadlessGame } from './newGame';
 import { createPlayer } from './player';
 
 /**
- * What the air rights rule (sim/rights.ts) would bar from the steady
- * player's game, without barring it: the first measurement before the
- * rule is switched on.
+ * What air rights (sim/rights.ts) take out of the steady player's game: the
+ * markets it flies that its home country's carrier couldn't (none, since
+ * the planner refuses them), and the spoke pairs at its hubs that can't
+ * connect, with the connecting passengers a day that remain.
  *
  *   npm run rights                 # the four quick-balance homes, 2 seeds, a year
  *   npm run rights -- 180 YUL      # 180 days from one home
- *
- * Per game it prints the markets the player flies that a carrier of its home
- * country could not, and the connecting passengers a day (sim/hubs.ts) that
- * the rule would remove, out of the total.
  */
 
 const MINUTES_PER_DAY = 1440;
@@ -24,7 +21,7 @@ const days = Number(process.argv[2]) || 365;
 const homes = process.argv[3] ? [process.argv[3]] : ['YUL', 'YYZ', 'PHL', 'YHZ'];
 const seeds = [1, 2];
 
-console.log(`\n  Air rights, connections log only · steady player · ${days} days\n`);
+console.log(`\n  Air rights · steady player · ${days} days\n`);
 for (const home of homes) {
   for (const seed of seeds) {
     const player = createPlayer('steady');
@@ -46,23 +43,16 @@ for (const home of homes) {
       return !legRights(country, a, b).ok;
     });
 
-    let total = 0;
-    let barred = 0;
-    const barredFlows: string[] = [];
+    let connecting = 0;
+    let barredPairs = 0;
     for (const hub of networkAirports(state.schedule)) {
-      for (const flow of connectingFlowsAt(state, hub)) {
-        total += flow.passengers;
-        if (!flowRights(country, flow.a, hub, flow.b).ok) {
-          barred += flow.passengers;
-          barredFlows.push(`${flow.a}-${hub}-${flow.b}`);
-        }
-      }
+      barredPairs += barredSpokePairsAt(state, hub);
+      for (const flow of connectingFlowsAt(state, hub)) connecting += flow.passengers;
     }
     console.log(
-      `  ${home} s${seed} · ${country} carrier · ${markets.size} markets, ${barredMarkets.length} barred${barredMarkets.length ? ` (${barredMarkets.slice(0, 6).join(' ')}${barredMarkets.length > 6 ? ' …' : ''})` : ''}` +
-        ` · connecting ${Math.round(total)}/day, ${Math.round(barred)} barred${total ? ` (${Math.round((100 * barred) / total)}%)` : ''}`,
+      `  ${home} s${seed} · ${country} carrier · ${markets.size} markets, ${barredMarkets.length} barred` +
+        ` · connecting ${Math.round(connecting)}/day · ${barredPairs} spoke pairs barred`,
     );
-    if (barredFlows.length) console.log(`      ${barredFlows.slice(0, 4).join('  ')}${barredFlows.length > 4 ? ` +${barredFlows.length - 4} more` : ''}`);
   }
 }
 console.log('');
