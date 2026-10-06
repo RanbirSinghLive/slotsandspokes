@@ -1,5 +1,5 @@
 {
-  "savedAt": "2026-10-06T20:59:02.848Z",
+  "savedAt": "2026-10-06T21:11:03.328Z",
   "season": "summer",
   "days": 365,
   "seeds": 10,
@@ -8,12 +8,12 @@
       "busts": 4,
       "games": 10,
       "median": 839893,
-      "planes": 8
+      "planes": 7
     },
     "YYZ": {
       "busts": 3,
       "games": 10,
-      "median": 7313407,
+      "median": 7449674,
       "planes": 13
     },
     "PHL": {
@@ -23,10 +23,10 @@
       "planes": 16
     },
     "YHZ": {
-      "busts": 7,
+      "busts": 9,
       "games": 10,
-      "median": -1060,
-      "planes": 9
+      "median": -3829,
+      "planes": 7
     }
   }
 }
