@@ -22,7 +22,7 @@ import {
 } from './pressure';
 import { moneyOnTable } from './attractiveness';
 import { rivalSecuresCapacity } from './market';
-import { legRights, rivalHomeCountry, countryOf } from './rights';
+import { legRights, rivalHomeCountry } from './rights';
 import { rivalSlotQuote } from './slots';
 import type { SimState } from './state';
 
@@ -257,6 +257,9 @@ export function rollCompetitorRouteOpenings(state: SimState, dayStartMinute: num
   }
 }
 
+/** A newcomer airline from data/rival-airlines.json; `country` is where it is from. */
+type RivalPoolEntry = { airline: string; code: string; country: string };
+
 const SEED_CODES = new Set((competitorsData as { code: string }[]).map((route) => route.code));
 
 /**
@@ -304,7 +307,7 @@ export function rollRivalEntry(state: SimState, dayStartMinute: number): void {
   );
   if (candidates.length === 0) return;
 
-  const pool = (rivalPoolData as { airline: string; code: string }[]).filter((rival) => !codesInUse.has(rival.code));
+  const pool = (rivalPoolData as RivalPoolEntry[]).filter((rival) => !codesInUse.has(rival.code));
   if (pool.length === 0) return;
 
   const [targetRoll, seedAfterTarget] = nextRandom(state.rngSeed);
@@ -323,7 +326,12 @@ export function rollRivalEntry(state: SimState, dayStartMinute: number): void {
   const weights = marketPool.map(([a, b]) => (targetsPlayer ? money.get(marketKey(a, b))! : potentialDailyDemand(a, b)));
 
   const [origin, dest] = pickWeighted(marketPool, weights, marketRoll);
-  const rival = pool[Math.min(pool.length - 1, Math.floor(nameRoll * pool.length))];
+  // A newcomer has a nationality of its own, so it can only open the market
+  // if its country's carriers may fly it: a domestic market is closed to
+  // foreign newcomers (sim/rights.ts).
+  const eligible = pool.filter((rival) => legRights(rival.country, origin, dest).ok);
+  if (eligible.length === 0) return;
+  const rival = eligible[Math.min(eligible.length - 1, Math.floor(nameRoll * eligible.length))];
   // A new airline needs slots at both ends and its first plane from the
   // market, like anyone.
   const slotFees = rivalSlotQuote(state, origin, dest);
@@ -339,8 +347,7 @@ export function rollRivalEntry(state: SimState, dayStartMinute: number): void {
     baseFare: recommendedFare(origin, dest),
     openedAtMinute: dayStartMinute,
     slotFeesPerDay: slotFees,
-    // A newcomer is from where it starts flying, so its first route is never barred; later ones are.
-    homeCountry: countryOf(origin),
+    homeCountry: rival.country,
   });
 }
 
@@ -373,16 +380,19 @@ export function placeHomeRival(state: SimState): void {
     .sort((x, y) => potentialDailyDemand(y[0], y[1]) - potentialDailyDemand(x[0], x[1]))
     .slice(0, HOME_RIVAL_CHOICES);
   const codesInUse = new Set(state.competitorRoutes.map((route) => route.code));
-  const pool = (rivalPoolData as { airline: string; code: string }[]).filter((rival) => !codesInUse.has(rival.code));
+  const pool = (rivalPoolData as RivalPoolEntry[]).filter((rival) => !codesInUse.has(rival.code));
   if (markets.length === 0 || pool.length === 0) return;
 
   const [marketRoll, seedAfterMarket] = nextRandom(state.rngSeed);
   const [nameRoll, seedAfterName] = nextRandom(seedAfterMarket);
   state.rngSeed = seedAfterName;
   const [a, b] = pickWeighted(markets, markets.map(([x, y]) => potentialDailyDemand(x, y)), marketRoll);
-  const rival = pool[Math.min(pool.length - 1, Math.floor(nameRoll * pool.length))];
   const origin = a === home ? a : b;
   const dest = a === home ? b : a;
+  // The home rival is a local start-up: its nationality has to be allowed on that market.
+  const eligible = pool.filter((rival) => legRights(rival.country, origin, dest).ok);
+  if (eligible.length === 0) return;
+  const rival = eligible[Math.min(eligible.length - 1, Math.floor(nameRoll * eligible.length))];
   state.competitorRoutes.push({
     airline: rival.airline,
     code: rival.code,
@@ -392,6 +402,7 @@ export function placeHomeRival(state: SimState): void {
     fare: incumbentFare(origin, dest),
     baseFare: incumbentFare(origin, dest),
     openedAtMinute: PRE_EXISTING_OPENED_AT_MINUTE,
+    homeCountry: rival.country,
   });
 }
 
