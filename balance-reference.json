@@ -1,33 +1,32 @@
 {
-  "savedAt": "2026-10-03T14:15:40.166Z",
-  "commit": "8c6e9dc",
+  "savedAt": "2026-10-06T21:24:30.727Z",
   "season": "summer",
   "days": 365,
   "seeds": 10,
   "homes": {
     "YUL": {
-      "busts": 2,
+      "busts": 6,
       "games": 10,
-      "median": 15982473,
-      "planes": 10
+      "median": -1885,
+      "planes": 6
     },
     "YYZ": {
-      "busts": 1,
+      "busts": 4,
       "games": 10,
-      "median": 48462529,
+      "median": 5950063,
       "planes": 13
     },
     "PHL": {
       "busts": 0,
       "games": 10,
-      "median": 74146573,
-      "planes": 13
+      "median": 61532935,
+      "planes": 15
     },
     "YHZ": {
-      "busts": 7,
+      "busts": 8,
       "games": 10,
-      "median": -1509,
-      "planes": 3
+      "median": -2594,
+      "planes": 9
     }
   }
 }

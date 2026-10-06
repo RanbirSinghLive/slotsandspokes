@@ -4,6 +4,7 @@ import { projection, fitProjection, mapGesture, setMapElement, mapPoint, mapSize
 import { setupMapInput } from './ui/mapInput';
 import { zoomAt as cameraZoomAt, panFrom, panBy, currentView, restoreView } from './render/camera';
 import { drawBasemap } from './render/basemap';
+import { drawRightsView } from './render/rightsView';
 import { drawTerminator } from './render/terminator';
 import { drawAirportChips } from './render/airportChips';
 import { drawRoutes,drawSelectedRoute } from './render/routes';
@@ -318,6 +319,7 @@ function render(nowMs: number = performance.now()): void {
   drawBasemap(ctx);
   drawTerminator(ctx, latestFractionalMinute, state.startDayOfYear ?? 0);
   drawFog(ctx, state);
+  drawRightsView(ctx, state);
 
   // Demand draws first (a background of all 45 possible markets, sized
   // by estimated demand) so your own network — either plain gray or, if

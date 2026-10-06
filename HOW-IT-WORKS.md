@@ -1815,8 +1815,11 @@ fallback; the cloud is a copy of it.
   numbering each write (`rev`). It never reads the game. Without the KV
   binding `/api/cloud` says `configured: false` and the game shows no
   cloud controls.
-- **Pushing**: every autosave (`saveState`) also PUTs the save, sending
-  the `rev` this device last synced as `base`. **Pulling**: at startup and
+- **Pushing**: an autosave (`saveState`) marks the device `dirty` and PUTs
+  the save, at most once every 5 minutes (and when the tab is hidden, at
+  most once a minute), because each push is two KV writes and the free
+  tier allows 1,000 a day. The PUT sends the `rev` this device last
+  synced as `base`. **Pulling**: at startup and
   whenever the tab comes back to the front, the device asks for the
   cloud's `rev`. Same `rev`: nothing to do. Different `rev` and this
   device hasn't saved since it last synced (`dirty` false): at startup the
@@ -2014,7 +2017,9 @@ balance lever for a weak home.
 
 - **Offers.** A contract is for one market from your network to a small
   community (under 800,000 people) at least half starved for service,
-  in reach, unflown and not already offered. Fly it at least once a day
+  in reach, unflown, not already offered and one your home country's carrier
+  may fly (two US airports are never offered to a Canadian airline; see
+  Air rights). Fly it at least once a day
   each way and the contract pays so much a day for a 90–150 day term
   and sends contract riders. Made when the game starts and every 45 days,
   picked from the contracts' own random stream (begun from the game's
@@ -2728,6 +2733,7 @@ For each pair of spokes at a hub, passengers a day (both directions) =
 | × timing | `0.3 + 0.7 × timed`, where timed is `1 − e^(−connections/0.5)` each way, averaged over the two: every arrival from A counts as much as its best onward departure to B is good |
 | × circuity | full up to 1.3× the direct distance, falling to nothing at 2× |
 | × nonstop discount | 0.2 if anyone, player or rival, flies A–B direct |
+| × air rights | 0 when A and B are in one country that isn't the airline's home (Air rights, below) |
 
 **A good connection** is a wait at the hub of 40 minutes (the shortest a
 passenger and their bag can make) to 75 minutes, worth 1; longer waits
@@ -2829,15 +2835,16 @@ passengers of any style and earned the least.
 
 ## Air rights (`src/sim/rights.ts`, `data/air-rights.json`)
 
-**Routes are enforced; connections are not yet.** The plan is
-`roadmap/air-rights-spec.md`. `planRotation()` refuses a new rotation with
-a barred leg (`BOS → LGA · cabotage barred for CA carriers`), like a range
-limit; legs an old save already flies stay. Rivals follow the rule when
-they open routes, the headless player skips barred markets, and the home
-picker counts only legal neighbours. Connecting passengers still ignore
-it: `npm run rights` prints how many a day it would remove. While drawing a
-route, airports the carrier can't fly to from the leg's origin show greyed
-with a slash, and hovering one says why.
+The plan is `roadmap/air-rights-spec.md`. `planRotation()` refuses a new
+rotation with a barred leg (`BOS → LGA · cabotage barred for CA carriers`),
+like a range limit; legs an old save already flies stay. Rivals follow the
+rule when they open routes, the headless player skips barred markets, and
+the home picker counts only legal neighbours. While drawing a route,
+airports the carrier can't fly to from the leg's origin show greyed with a
+slash, and hovering one says why. `connectingFlowsAt()` skips barred spoke
+pairs, so they add no connecting passengers to either leg, and the airport
+inspector says how many pairs can't connect. `npm run rights` prints both
+counts for the steady player.
 
 An airline's **home country** is the country of its home airport
 (`data/airport-countries.json`, built by `npm run countries` from
@@ -2852,13 +2859,20 @@ country is unknown the rule allows it, so a missing row never stops a route.
 | Connection A–hub–B, A and B in one other country | **barred**, whatever the hub: a Canadian carrier can't sell Boston to New York through Toronto |
 | Connection with A and B in different countries | allowed when both legs are |
 
+**Seeing it.** The Ops lens tints the countries where your airline may
+fly domestic routes (its own, plus a cabotage bloc it belongs to) in soft
+green (`render/rightsView.ts`). Everywhere untinted is foreign: international
+legs only.
+
 A Canadian carrier may still fly Boston–Toronto–New York as a rotation,
 because each leg touches Canada; it just can't sell Boston–New York on it.
 Nothing about the player is saved: the home country is read from the home
 airport. A rival's home country is stamped on the routes it opens
 (`CompetitorOffering.homeCountry`, optional); a seed rival is from where
-its oldest route starts, and a newcomer from where its first route starts,
-so its first route is never barred and every later one is.
+its oldest route starts. A newcomer has a nationality of its own
+(`country` in `data/rival-airlines.json`) and only opens a market its
+country's carriers may fly, so a foreign newcomer can't enter a domestic
+market; the home rival is picked the same way.
 
 ---
 
