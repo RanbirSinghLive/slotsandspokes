@@ -2,6 +2,7 @@ import { marketDistanceNm } from './demand';
 import { executiveConnectingMultiplier } from './executives';
 import { connectingFeedMultiplier } from './innovations';
 import { actualDailyDemand, currentPotentialDemand } from './marketDemand';
+import { flowRights, homeCountry } from './rights';
 import { marketKey } from './schedule';
 import { hubStyleAt, type HubStyle } from './hubStyle';
 import { planRespace, applyRespace, workingCopy, type TurnBufferPlan } from './turnBuffer';
@@ -236,6 +237,7 @@ const flowCache = new Map<string, { inputs: string; flows: ConnectingFlow[] }>()
 /** Every connecting flow through `hub`, busiest first. Callers must not modify the result. */
 export function connectingFlowsAt(state: SimState, hub: string): ConnectingFlow[] {
   const spokes = [...spokesOf(state, hub).entries()];
+  const home = homeCountry(state);
   const spokeSet = new Set(spokes.map(([spoke]) => spoke));
 
   // Spoke pairs flown nonstop, by the player or a rival: one pass over
@@ -264,6 +266,7 @@ export function connectingFlowsAt(state: SimState, hub: string): ConnectingFlow[
     recessionFactor(state),
     spokes.map(([spoke, flights], i) => `${spoke}:${flights}:${established[i]}`).join(','),
     [...nonstop].sort().join(','),
+    home,
   ].join('|');
   const cached = flowCache.get(hub);
   if (cached && cached.inputs === inputs) return cached.flows;
@@ -273,6 +276,8 @@ export function connectingFlowsAt(state: SimState, hub: string): ConnectingFlow[
     for (let j = i + 1; j < spokes.length; j++) {
       const [a] = spokes[i];
       const [b] = spokes[j];
+      // Air rights (sim/rights.ts): two airports in one foreign country can't be joined through any hub.
+      if (!flowRights(home, a, hub, b).ok) continue;
       const passengers = flowBetween(state, hub, a, b, times, established[i], established[j], nonstop.has(marketKey(a, b)));
       if (passengers >= 0.5) flows.push({ hub, a, b, passengers });
     }
@@ -280,6 +285,19 @@ export function connectingFlowsAt(state: SimState, hub: string): ConnectingFlow[
   flows.sort((x, y) => y.passengers - x.passengers);
   flowCache.set(hub, { inputs, flows });
   return flows;
+}
+
+/** How many pairs of this hub's spokes air rights bar from connecting (sim/rights.ts): the hub inspector says so, so a missing connection has a reason. */
+export function barredSpokePairsAt(state: SimState, hub: string): number {
+  const home = homeCountry(state);
+  const spokes = [...spokesOf(state, hub).keys()];
+  let barred = 0;
+  for (let i = 0; i < spokes.length; i++) {
+    for (let j = i + 1; j < spokes.length; j++) {
+      if (!flowRights(home, spokes[i], hub, spokes[j]).ok) barred++;
+    }
+  }
+  return barred;
 }
 
 /**

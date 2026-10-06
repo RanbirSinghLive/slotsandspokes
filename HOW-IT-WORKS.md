@@ -2723,6 +2723,7 @@ For each pair of spokes at a hub, passengers a day (both directions) =
 | × timing | `0.3 + 0.7 × timed`, where timed is `1 − e^(−connections/0.5)` each way, averaged over the two: every arrival from A counts as much as its best onward departure to B is good |
 | × circuity | full up to 1.3× the direct distance, falling to nothing at 2× |
 | × nonstop discount | 0.2 if anyone, player or rival, flies A–B direct |
+| × air rights | 0 when A and B are in one country that isn't the airline's home (Air rights, below) |
 
 **A good connection** is a wait at the hub of 40 minutes (the shortest a
 passenger and their bag can make) to 75 minutes, worth 1; longer waits
@@ -2824,15 +2825,16 @@ passengers of any style and earned the least.
 
 ## Air rights (`src/sim/rights.ts`, `data/air-rights.json`)
 
-**Routes are enforced; connections are not yet.** The plan is
-`roadmap/air-rights-spec.md`. `planRotation()` refuses a new rotation with
-a barred leg (`BOS → LGA · cabotage barred for CA carriers`), like a range
-limit; legs an old save already flies stay. Rivals follow the rule when
-they open routes, the headless player skips barred markets, and the home
-picker counts only legal neighbours. Connecting passengers still ignore
-it: `npm run rights` prints how many a day it would remove. While drawing a
-route, airports the carrier can't fly to from the leg's origin show greyed
-with a slash, and hovering one says why.
+The plan is `roadmap/air-rights-spec.md`. `planRotation()` refuses a new
+rotation with a barred leg (`BOS → LGA · cabotage barred for CA carriers`),
+like a range limit; legs an old save already flies stay. Rivals follow the
+rule when they open routes, the headless player skips barred markets, and
+the home picker counts only legal neighbours. While drawing a route,
+airports the carrier can't fly to from the leg's origin show greyed with a
+slash, and hovering one says why. `connectingFlowsAt()` skips barred spoke
+pairs, so they add no connecting passengers to either leg, and the airport
+inspector says how many pairs can't connect. `npm run rights` prints both
+counts for the steady player.
 
 An airline's **home country** is the country of its home airport
 (`data/airport-countries.json`, built by `npm run countries` from
