@@ -2859,8 +2859,10 @@ because each leg touches Canada; it just can't sell Boston–New York on it.
 Nothing about the player is saved: the home country is read from the home
 airport. A rival's home country is stamped on the routes it opens
 (`CompetitorOffering.homeCountry`, optional); a seed rival is from where
-its oldest route starts, and a newcomer from where its first route starts,
-so its first route is never barred and every later one is.
+its oldest route starts. A newcomer has a nationality of its own
+(`country` in `data/rival-airlines.json`) and only opens a market its
+country's carriers may fly, so a foreign newcomer can't enter a domestic
+market; the home rival is picked the same way.
 
 ---
 
