@@ -2854,6 +2854,11 @@ country is unknown the rule allows it, so a missing row never stops a route.
 | Connection A–hub–B, A and B in one other country | **barred**, whatever the hub: a Canadian carrier can't sell Boston to New York through Toronto |
 | Connection with A and B in different countries | allowed when both legs are |
 
+**Seeing it.** The Ops lens tints the countries where your airline may
+fly domestic routes (its own, plus a cabotage bloc it belongs to) in soft
+green (`render/rightsView.ts`). Everywhere untinted is foreign: international
+legs only.
+
 A Canadian carrier may still fly Boston–Toronto–New York as a rotation,
 because each leg touches Canada; it just can't sell Boston–New York on it.
 Nothing about the player is saved: the home country is read from the home
