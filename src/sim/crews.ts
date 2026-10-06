@@ -1,6 +1,7 @@
 import { AIRCRAFT_CLASSES, classByCode } from './aircraftClasses';
 import { crewTrainingTimeFactor } from './innovations';
 import { dayIndex } from './clock';
+import { mandatedTails } from './mandates';
 import { nextRandom } from './rng';
 import type { ScheduleLeg } from './schedule';
 import type { SimState } from './state';
@@ -588,6 +589,7 @@ export function rollDailyCrews(state: SimState): number {
   const today = dayIndex(state);
   const day: CrewDay = { crewsByTail: {}, dutyStartByTail: {} };
   const grounded: string[] = [];
+  const mandated = mandatedTails(state);
   let standby = 0;
 
   for (const [iata, base] of Object.entries(crewBases(state))) {
@@ -620,7 +622,9 @@ export function rollDailyCrews(state: SimState): number {
       const planes = state.aircraft
         .filter((aircraft) => aircraft.baseAirport === iata && aircraft.typeCode === cls.code)
         .map((aircraft) => ({ tail: aircraft.tail, duty: dutyMinutes(state, aircraft.tail) }))
-        .filter((plane) => plane.duty > 0);
+        .filter((plane) => plane.duty > 0)
+        // A plane flying a priority flight (sim/mandates.ts) is crewed first; the sort is stable, so the rest keep fleet order.
+        .sort((a, b) => Number(mandated.has(b.tail)) - Number(mandated.has(a.tail)));
       // Sick crews fly nothing.
       let left = crewsOf(base, cls.code) - sickOf(base, cls.code, today);
       // The minimum first, in fleet order, so which plane waits is stable.

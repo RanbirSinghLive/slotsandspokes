@@ -2,6 +2,8 @@ import type { FareClassSettings, FareClassTally } from './fareClasses';
 import type { GameDifficulty } from './difficulty';
 import type { FareWar, FareWarEvent } from './fareWars';
 import type { DemandEvent } from './demandEvents';
+import type { AirspaceClosure } from './airspace';
+import type { Mandate } from './mandates';
 import aircraftTypesData from '../../data/aircraft-types.json';
 import type { Shock } from './shocks';
 import { START_DAY_OF_YEAR, startingSimMinute } from './clock';
@@ -140,6 +142,9 @@ export type ActiveFlight = {
    * that's everything sim/economy.ts needs.
    */
   fare: number;
+  /** Set when it flies round an airspace closure (sim/airspace.ts): the waypoint [lon, lat], and the minutes that added. */
+  via?: [number, number];
+  detourMinutes?: number;
 };
 
 /** A way of pricing a market against its rivals (sim/pricing.ts). */
@@ -508,6 +513,16 @@ export type SimState = {
   nextContractOfferDay?: number;
   /** The contracts' own random stream (sim/contracts.ts), apart from rngSeed so offers don't shift every other roll. */
   contractSeed?: number;
+  /** Airspace closures announced or running (sim/airspace.ts). */
+  airspaceClosures?: AirspaceClosure[];
+  nextClosureId?: number;
+  /** The closures' own random stream, apart from rngSeed so they don't shift every other roll. */
+  airspaceSeed?: number;
+  /** Priority flights offered, accepted or just finished (sim/mandates.ts). */
+  mandates?: Mandate[];
+  nextMandateId?: number;
+  /** The mandates' own random stream, apart from rngSeed. */
+  mandateSeed?: number;
   /** The latest fuel hedge bought, running or ended (sim/fuelPrice.ts), or absent if none ever was. */
   fuelHedge?: FuelHedge;
   /**
@@ -636,7 +651,7 @@ export type SimState = {
    * was due (stranded by an earlier disruption); optional so older saves
    * load, absent meaning none.
    */
-  cancellationsByCause: { crew: number; mechanical: number; weather: number; curfew: number; position?: number; maintenance?: number };
+  cancellationsByCause: { crew: number; mechanical: number; weather: number; curfew: number; position?: number; maintenance?: number; airspace?: number };
   /**
    * Cancellations: legs that should have operated today and
    * didn't. `flightsScheduled*` counts what was on the books, so

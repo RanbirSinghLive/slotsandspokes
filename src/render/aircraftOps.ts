@@ -1,4 +1,4 @@
-import { geoInterpolate } from 'd3-geo';
+import { flightInterpolator } from './flightPath';
 import { projection, baselineScale } from './projection';
 import { airports } from './airports';
 import type { ActiveFlight } from '../sim/state';
@@ -46,7 +46,7 @@ export function drawPlaneTrail(ctx: CanvasRenderingContext2D, flight: ActiveFlig
   if (t <= 0 || t >= 1) return;
 
   const span = Math.min(t, TRAIL_MAX_FRACTION, TRAIL_MINUTES / block);
-  const interpolate = geoInterpolate([origin.lon, origin.lat], [dest.lon, dest.lat]);
+  const interpolate = flightInterpolator(flight, [origin.lon, origin.lat], [dest.lon, dest.lat]);
   for (let i = 0; i <= TRAIL_SEGMENTS; i++) {
     const point = projection(interpolate(t - (span * i) / TRAIL_SEGMENTS));
     if (!point) return;

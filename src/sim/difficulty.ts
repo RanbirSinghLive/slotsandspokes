@@ -18,12 +18,16 @@ type DifficultySettings = {
   rivalEntryChanceMultiplier: number;
   /** First day a shock can strike (sim/shocks.ts). */
   firstShockDay: number;
+  /** First day an airspace closure can be announced (sim/airspace.ts). */
+  closureFirstDay: number;
+  /** Multiplies how often closures start. */
+  closureRateMultiplier: number;
 };
 
 export const DIFFICULTY_SETTINGS: Record<GameDifficulty, DifficultySettings> = {
-  easy: { startingCash: 1_000_000, rivalFirstEntryDay: 30, rivalEntryChanceMultiplier: 0.5, firstShockDay: 120 },
-  medium: { startingCash: 500_000, rivalFirstEntryDay: 15, rivalEntryChanceMultiplier: 1, firstShockDay: 60 },
-  hard: { startingCash: 350_000, rivalFirstEntryDay: 10, rivalEntryChanceMultiplier: 1.5, firstShockDay: 40 },
+  easy: { startingCash: 1_000_000, rivalFirstEntryDay: 30, rivalEntryChanceMultiplier: 0.5, firstShockDay: 120, closureFirstDay: 120, closureRateMultiplier: 0.5 },
+  medium: { startingCash: 500_000, rivalFirstEntryDay: 15, rivalEntryChanceMultiplier: 1, firstShockDay: 60, closureFirstDay: 60, closureRateMultiplier: 1 },
+  hard: { startingCash: 350_000, rivalFirstEntryDay: 10, rivalEntryChanceMultiplier: 1.5, firstShockDay: 40, closureFirstDay: 40, closureRateMultiplier: 1.5 },
 };
 
 /** A save from before difficulty existed plays as Medium. */

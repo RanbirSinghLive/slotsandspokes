@@ -5,6 +5,9 @@ import { classByCode } from '../sim/aircraftClasses';
 import { gameDate, shortMoney } from './format';
 import { RIVAL_CLOSE_AFTER_LOSING_DAYS, RIVAL_SQUEEZED_RESPITE_DAYS } from '../sim/pressure';
 import { activeHedge } from '../sim/fuelPrice';
+import { activeClosures, announcedClosures, closureIsRelevant, closureLine } from '../sim/airspace';
+import { dayIndex } from '../sim/clock';
+import { mandatesOf, mandateIsActive } from '../sim/mandates';
 import { activeShock, describeShock, shockEndedLine, type Shock } from '../sim/shocks';
 import { moneyOnTable, RIVAL_MARGIN_SHARE } from '../sim/attractiveness';
 import { networkAirports } from '../sim/reach';
@@ -32,7 +35,7 @@ const PIXELS_PER_SECOND = 60;
  * ("AOG YUL · C-P002 · hydraulics · back 3d"). Kept apart from the text so
  * the ticker can style it on its own.
  */
-type TickerTag = 'AOG' | 'CNX' | 'CREW' | 'FLEET' | 'LESSOR' | 'RIVAL' | 'FARE' | 'FUEL' | 'SHOCK' | 'WX' | 'GOAL' | 'REACH' | 'CONTRACT' | 'EVENT';
+type TickerTag = 'AOG' | 'CNX' | 'CREW' | 'FLEET' | 'LESSOR' | 'RIVAL' | 'FARE' | 'FUEL' | 'SHOCK' | 'AIRSPACE' | 'PRIORITY' | 'WX' | 'GOAL' | 'REACH' | 'CONTRACT' | 'EVENT';
 
 /**
  * A line, and the inspector view that explains it, when one does: clicking
@@ -223,6 +226,49 @@ function pollShockEvents(state: SimState): void {
   if (seenShock) pushEvent(state.simMinute, 'SHOCK', shockEndedLine(seenShock), shockTarget(seenShock));
   if (running) pushEvent(state.simMinute, 'SHOCK', describeShock(state)!.headline, shockTarget(running));
   seenShock = running;
+}
+
+// The closures announced and in force at the last poll, so each stage is said once (sim/airspace.ts). Undefined until the first poll.
+let seenClosures: Map<number, { stage: 'announced' | 'active'; name: string }> | undefined;
+
+/** An airspace closure announced, in force, and open again, when it is near the network. */
+function pollAirspaceEvents(state: SimState): void {
+  const today = dayIndex(state);
+  const now = new Map<number, { stage: 'announced' | 'active'; name: string }>();
+  for (const closure of announcedClosures(state)) if (closureIsRelevant(state, closure)) now.set(closure.id, { stage: 'announced', name: closure.name });
+  for (const closure of activeClosures(state)) if (closureIsRelevant(state, closure)) now.set(closure.id, { stage: 'active', name: closure.name });
+  if (seenClosures) {
+    for (const closure of [...announcedClosures(state), ...activeClosures(state)]) {
+      const stage = now.get(closure.id)?.stage;
+      if (stage && seenClosures.get(closure.id)?.stage !== stage) {
+        pushEvent(state.simMinute, 'AIRSPACE', closureLine(closure, today), undefined, true);
+      }
+    }
+    for (const [id, seen] of seenClosures) {
+      if (!now.has(id)) pushEvent(state.simMinute, 'AIRSPACE', `AIRSPACE OPEN · ${seen.name} · routes back to normal`);
+    }
+  }
+  seenClosures = now;
+}
+
+// Each priority flight's status and whether it was running at the last poll (sim/mandates.ts).
+let seenMandates: Map<number, string> | undefined;
+
+/** A priority flight offered, starting and finished. */
+function pollMandateEvents(state: SimState): void {
+  const now = new Map(mandatesOf(state).map((m) => [m.id, `${m.status}:${mandateIsActive(state, m)}`]));
+  if (seenMandates) {
+    for (const m of mandatesOf(state)) {
+      const before = seenMandates.get(m.id);
+      const after = now.get(m.id);
+      if (before === after) continue;
+      const route = `${m.origin}-${m.dest}`;
+      if (m.status === 'offered' && before === undefined) pushEvent(state.simMinute, 'PRIORITY', `${route} offered · +${shortMoney(m.premium)}/flt`, { kind: 'fleet' }, true);
+      else if (m.status === 'accepted' && mandateIsActive(state, m)) pushEvent(state.simMinute, 'PRIORITY', `${route} starts today · ${shortMoney(m.premium)}/flt`);
+      else if (m.status === 'ended') pushEvent(state.simMinute, 'PRIORITY', `${route} done · ${m.flown} flown · ${m.failed} failed · ${m.netTotal >= 0 ? '+' : '-'}${shortMoney(Math.abs(m.netTotal))}`);
+    }
+  }
+  seenMandates = now;
 }
 
 // The running hedge's start day at the last poll, so its end is said once.
@@ -695,6 +741,8 @@ export function updateTicker(state: SimState): void {
   pollLadderEvents(state);
   pollContractEvents(state);
   pollShockEvents(state);
+  pollAirspaceEvents(state);
+  pollMandateEvents(state);
   pollHedgeEvents(state);
   pollFleetEvents(state);
   pollPositionEvents(state);

@@ -3281,6 +3281,8 @@ Each cause has a different answer available:
 - **Curfew** — a rotation that can't be back at base by 22:00 on the
   delay it's carrying is cancelled whole before it leaves. Answered by
   slack in the day: a turn buffer, or fewer rotations.
+- **Airspace closed** — an end of the leg is inside a closure, or the
+  detour is beyond the plane's range (see Airspace closures).
 - **Aircraft out of position** — a leg is due while its plane is parked
   at another airport, stranded there by an earlier closure or curfew.
   The leg is cancelled, and the plane picks up its day from the next leg
@@ -3415,6 +3417,62 @@ with the do-nothing player, which keeps the network fixed. On the current start 
 
 
 ---
+
+## Airspace closures (`src/sim/airspace.ts`)
+
+A circle of sky shut for days or months: wildfire smoke, a volcano's ash,
+a conflict zone. They are physical and temporary and apply to every airline;
+who may fly or overfly where is the rights layer, not this.
+
+- **Where and how rare.** `data/airspace-zones.json` lists candidate sites
+  with a kind, a radius range, a length range, a yearly chance and, for
+  wildfires, a season. North America is mostly wildfire smoke, a few a year
+  at most; ash and conflict sit elsewhere. One roll per site per day, from
+  the closures' own stream (`state.airspaceSeed`), so a game whose routes
+  never meet one plays as it did before. Hard 1.5x as often, Easy 0.5x, and
+  none before day 120, 60 or 40 (`closureFirstDay`).
+- **Notice.** Wildfire and ash are in force the day they are announced; a
+  conflict zone is announced 4 or 5 days ahead. At most 3 at once.
+- **A flight round it.** At departure `legAirspace()` tests the route against
+  each closure in force. A route that would cross one bends through a single
+  waypoint just outside the circle, on the shorter side. The flight's arrival
+  and its *scheduled* arrival both gain the extra minutes (`detourMinutes`),
+  so it is re-filed, not late: on-time and NPS don't suffer. Fuel cost rises
+  through the longer block time, the next leg waits, and the 22:00 curfew
+  still bites without a turn buffer. `ActiveFlight.via` holds the waypoint;
+  `render/flightPath.ts` draws plane, trail and heading along it.
+- **Blocked.** A leg with an end inside a closure, or a detour past the
+  plane's range, is cancelled at rollover under the cause `airspace` and the
+  plane is judged from where it sits.
+- **On the map.** The zone is a red disc with a name and days left, on every
+  lens. A closure ahead is a dashed outline. The Ops lens adds a dashed red
+  line for each flight on a detour. Only closures within 600 nm of a known
+  airport are drawn or announced. The ticker and alert strip carry each stage.
+
+## Priority flights (`src/sim/mandates.ts`)
+
+An offer to carry someone who must get there on time, on a route already
+flown: a touring band, a delegation, a children's wish trip. A window opens
+when it arrives, saying who is aboard (`STORIES`), what it pays and what a
+failure costs.
+
+- **Offers.** About one every 20 days with 4 planes or fewer, thinning as the
+  fleet grows, from day 10, at most 2 open and 3 accepted. The flight is one
+  already on the schedule. Notice is 14 to 28 days; an offer not accepted by
+  its first day lapses. Declining costs nothing.
+- **Pay.** A flight leaving on time pays the premium, `1,200 x
+  homeWeakness() x class scale`, so a thin home earns several times what a
+  strong one does, and a large airline barely notices. A flight cancelled or
+  more than 60 minutes late costs 1.5 times that, except cancellations by
+  weather or a closed airspace, which are waived. A day with no flight on the
+  route within 2 hours of the offered time also costs a failure. A term of
+  10 to 21 days kept to 95% pays 3 premiums.
+- **Priority.** `rollDailyCrews()` crews a plane flying a priority flight
+  first, so a shortage falls on another plane. There is no curfew or
+  turn-buffer exemption.
+- **UI.** The offer window and a list at the top of the Schedule panel;
+  Ops-lens stars on running routes. The headless player accepts when the plane's
+  base has a spare crew and won't drop a market carrying one.
 
 ## What isn't built yet
 
