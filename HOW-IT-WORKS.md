@@ -2009,7 +2009,9 @@ balance lever for a weak home.
 
 - **Offers.** A contract is for one market from your network to a small
   community (under 800,000 people) at least half starved for service,
-  in reach, unflown and not already offered. Fly it at least once a day
+  in reach, unflown, not already offered and one your home country's carrier
+  may fly (two US airports are never offered to a Canadian airline; see
+  Air rights). Fly it at least once a day
   each way and the contract pays so much a day for a 90–150 day term
   and sends contract riders. Made when the game starts and every 45 days,
   picked from the contracts' own random stream (begun from the game's
