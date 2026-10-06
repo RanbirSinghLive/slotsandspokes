@@ -415,6 +415,34 @@ export function crewShare(state: SimState, classCode: string, iata?: string): { 
 }
 
 /**
+ * One class's cabin team hours, as crewShare() is for pilots: duty booked
+ * (per team a shift carries) against what its teams work at ideal shifts,
+ * at one base or across every base. Null for a class that flies without
+ * cabin crew, or with no teams or duty. `short` when teams are below the
+ * legal minimum somewhere, so flights lose NPS.
+ */
+export function cabinShare(state: SimState, classCode: string, iata?: string): { share: number; short: boolean } | null {
+  const perShift = CABIN_TEAMS_PER_SHIFT[classCode] ?? 0;
+  if (perShift === 0) return null;
+  let booked = 0;
+  let available = 0;
+  let short = false;
+  let any = false;
+  for (const [base, crewBase] of Object.entries(crewBases(state))) {
+    if (iata !== undefined && base !== iata) continue;
+    const need = crewNeed(state, base, classCode);
+    const teams = cabinTeamsOf(crewBase, classCode);
+    if (need.dutyHours === 0 && teams === 0) continue;
+    any = true;
+    booked += need.dutyHours * perShift;
+    available += (teams * IDEAL_SHIFT_MINUTES) / 60;
+    if (teams < need.minimum * perShift) short = true;
+  }
+  if (!any) return null;
+  return { share: available > 0 ? booked / available : booked > 0 ? 2 : 0, short };
+}
+
+/**
  * Bring a crew base up to date: a base from before crews were rated by
  * class gets its crews shared out to the classes its planes fly (the rest
  * to the starting class), and any airport with planes but no base gets

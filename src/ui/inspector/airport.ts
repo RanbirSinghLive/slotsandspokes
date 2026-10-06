@@ -2,7 +2,7 @@ import { dailyMovementsAt } from '../../sim/airports';
 import { airportHours, FIRST_OPEN_HOUR, freeInHour, hoursWithRoom, OPEN_HOURS, peakHour, type AirportHours } from '../../sim/hours';
 import { inboundAt } from '../../sim/fleetTiming';
 import { money, shortMoney } from '../format';
-import { crewShare } from '../../sim/crews';
+import { cabinShare, crewShare } from '../../sim/crews';
 import { hasCrewBase, mxLevel, outstationCheck } from '../../sim/bases';
 import { line, heading, lineWithInfo } from './dom';
 import { formatNps, marketNps } from '../../sim/nps';
@@ -124,7 +124,7 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
   const pools = document.createElement('div');
   pools.className = 'inspector-pools';
   const redrawPools = () => {
-    pools.replaceChildren(...buildPoolRows(utilisationPools(state, iata), getMapPreview()?.effects, iata, (code) => crewShare(state, code, iata), (code) => inboundAt(state, iata, code).length));
+    pools.replaceChildren(...buildPoolRows(utilisationPools(state, iata), getMapPreview()?.effects, iata, (code) => crewShare(state, code, iata), (code) => inboundAt(state, iata, code).length, (code) => cabinShare(state, code, iata)));
   };
   redrawPools();
   const basedHere = utilisationPools(state, iata).some((pool) => pool.planes > 0);

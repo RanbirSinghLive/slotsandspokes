@@ -289,7 +289,9 @@ function roster(state: SimState, plan: ReturnType<typeof crewPlan>, today: numbe
     }
     // Types the airline can't fly yet still show their cabin row, greyed out: a hint of what comes later.
     for (const cls of AIRCRAFT_CLASSES) {
-      if (needsCabinCrew(cls.code) && !classOpen(state, cls.code)) card.append(lockedCabinRow(cls.code));
+      if (classOpen(state, cls.code)) continue;
+      card.append(lockedRow(cls.code, 'pilot'));
+      if (needsCabinCrew(cls.code)) card.append(lockedRow(cls.code, 'cabin'));
     }
     nodes.push(card);
   }
@@ -441,8 +443,8 @@ function cabinRow(state: SimState, iata: string, c: ClassPlan, cabin: NonNullabl
   return row;
 }
 
-/** A cabin row for a type the airline can't fly yet: greyed out, with what opens it. */
-function lockedCabinRow(classCode: string): HTMLElement {
+/** A pilot or cabin row for a type the airline can't fly yet: greyed out, with what opens it. */
+function lockedRow(classCode: string, role: 'pilot' | 'cabin'): HTMLElement {
   const name = classByCode(classCode)?.name ?? classCode;
   const opener = tierThatOpens(classCode);
   const row = document.createElement('div');
@@ -450,17 +452,25 @@ function lockedCabinRow(classCode: string): HTMLElement {
   const head = document.createElement('div');
   head.className = 'crew-row-head';
   const label = document.createElement('span');
-  label.append(planeIconElement(classCode), ` ${name} cabin`);
+  label.append(planeIconElement(classCode), role === 'cabin' ? ` ${name} cabin` : ` ${name}`);
   head.append(label, chipElement({ text: 'LOCKED', tone: 'idle' }));
   row.append(head);
   const teams = CABIN_TEAMS_PER_SHIFT[classCode] ?? 0;
-  row.append(line(`${teams} cabin team${teams === 1 ? '' : 's'} a shift · ${money(cabinHireFee(classCode))} a team · opens as ${opener?.name ?? 'you grow'}`, 'inspector-line crew-row-detail'));
+  const fee = role === 'cabin' ? cabinHireFee(classCode) : hireFee(classCode);
+  row.append(
+    line(
+      role === 'cabin'
+        ? `${teams} cabin team${teams === 1 ? '' : 's'} a shift · ${money(fee)} a team · opens as ${opener?.name ?? 'you grow'}`
+        : `${money(fee)} a crew · opens as ${opener?.name ?? 'you grow'}`,
+      'inspector-line crew-row-detail',
+    ),
+  );
   const buttons = document.createElement('div');
   buttons.className = 'crew-buttons';
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'inspector-plan-hub crew-action';
-  button.textContent = `Hire 1 cabin · ${money(cabinHireFee(classCode))}`;
+  button.textContent = role === 'cabin' ? `Hire 1 cabin · ${money(fee)}` : `Hire 1 · ${money(fee)}`;
   button.disabled = true;
   button.title = `${name} planes aren't open to the airline yet.`;
   buttons.append(button);

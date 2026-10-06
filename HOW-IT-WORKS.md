@@ -2900,6 +2900,10 @@ and route views) has a thin unlabelled crew bar under its plane bar:
 duty hours booked against what that class's crews fly at 8-hour shifts,
 red when planes are grounded for want of crews. The two bars lining up
 is balance; the crew bar past the plane bar, or red, is short.
+Regional and bigger classes have a second thin bar under it for cabin
+teams (`cabinShare()`): duty booked times the teams a shift carries,
+against what their teams work at 8-hour shifts, red when teams are below
+the legal minimum and flights lose NPS.
 
 **The headless players** keep each class's crews at its planes' need
 plus 2 for each plane of the class on its way, hiring them the day the
@@ -2961,8 +2965,8 @@ from Regional up has a "cabin" row under its pilot row, shown even before
 its first plane so teams can be trained ahead of delivery. The airport
 menu's "Hire pilots and cabin crew" lists them too, and leasing a plane
 adds a cabin note when the base is short.
-Types not open yet still show a greyed LOCKED cabin row (and a greyed
-airport menu entry) with what opens them, as a hint of mid-game
+Types not open yet still show greyed LOCKED pilot and cabin rows (and
+greyed airport menu entries) with what opens them, as a hint of mid-game
 complexity; their hire buttons are disabled.
 
 ## The crew planning board (`src/ui/inspector/crews.ts`, read-out in `src/sim/crewPlan.ts`)

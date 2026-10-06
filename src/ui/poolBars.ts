@@ -1,6 +1,6 @@
 import { CAPACITY_RING_RED, capacityColor } from '../render/airports';
 import { inboundAt } from '../sim/fleetTiming';
-import { crewShare } from '../sim/crews';
+import { cabinShare, crewShare } from '../sim/crews';
 import { USABLE_DAY_MINUTES, utilisationPools, type ClassPool, type PoolEffect } from '../sim/utilisation';
 import { getMapPreview } from '../render/preview';
 import { planeIconElement } from './planeIcons';
@@ -48,6 +48,8 @@ export function buildPoolRows(
   crewShareOf?: CrewShareOf,
   /** Planes of a class on their way (sim/fleetTiming.ts), shown as "+N" after the count. */
   inboundOf?: (classCode: string) => number,
+  /** One class's cabin team hours for a second thin bar, for the classes that carry cabin crew. */
+  cabinShareOf?: CrewShareOf,
 ): HTMLElement[] {
   const touching = (pool: ClassPool) => effects.filter((e) => e.classCode === pool.code && (base === undefined || e.base === base));
 
@@ -133,6 +135,20 @@ export function buildPoolRows(
         row.title += `. Crews: ${Math.round(crew.share * 100)}% of their hours booked${crew.short ? ', too few to fly every plane' : ''}.`;
       }
 
+      // And its cabin teams (Regional and up), a second thin bar under the pilots'.
+      const cabin = cabinShareOf?.(pool.code);
+      if (cabin) {
+        const cabinBar = document.createElement('span');
+        cabinBar.className = 'pool-crew-bar pool-cabin-bar';
+        const cabinFill = document.createElement('span');
+        cabinFill.className = 'pool-fill';
+        cabinFill.style.width = `${Math.min(cabin.share, 1) * 100}%`;
+        cabinFill.style.background = cabin.short ? CAPACITY_RING_RED : capacityColor(cabin.share);
+        cabinBar.appendChild(cabinFill);
+        bars.append(cabinBar);
+        row.title += ` Cabin: ${Math.round(cabin.share * 100)}% of their hours booked${cabin.short ? ', too few teams: flights lose NPS' : ''}.`;
+      }
+
       row.append(name, bars, value);
       return row;
     });
@@ -148,15 +164,17 @@ export function updatePoolBars(state: SimState): void {
   const pools = utilisationPools(state);
   const effects = getMapPreview()?.effects ?? [];
   const crewShareOf: CrewShareOf = (classCode) => crewShare(state, classCode);
+  const cabinShareOf: CrewShareOf = (classCode) => cabinShare(state, classCode);
   const inboundOf = (classCode: string) => inboundAt(state, undefined, classCode).length;
   const next =
     pools.map((pool) => `${pool.code}:${pool.planes}:${pool.grounded}:${Math.round(pool.share * 100)}:${Math.round(pool.usedMinutes)}`).join('|') +
     `#${effects.map((e) => `${e.base}${e.classCode}${Math.round(e.minutes)}:${e.planes ?? 0}`).join(',')}` +
     `#${pools.map((pool) => { const c = crewShareOf(pool.code); return c ? `${Math.round(c.share * 100)}${c.short ? '!' : ''}` : ''; }).join(',')}` +
-    `#${pools.map((pool) => inboundOf(pool.code)).join(',')}`;
+    `#${pools.map((pool) => inboundOf(pool.code)).join(',')}` +
+    `#${pools.map((pool) => { const c = cabinShareOf(pool.code); return c ? `${Math.round(c.share * 100)}${c.short ? '!' : ''}` : ''; }).join(',')}`;
   if (next === signature) return;
   signature = next;
 
   overlayEl.hidden = pools.every((pool) => pool.planes === 0);
-  overlayEl.replaceChildren(...buildPoolRows(pools, effects, undefined, crewShareOf, inboundOf));
+  overlayEl.replaceChildren(...buildPoolRows(pools, effects, undefined, crewShareOf, inboundOf, cabinShareOf));
 }
