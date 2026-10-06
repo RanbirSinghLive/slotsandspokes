@@ -48,6 +48,14 @@ function mayFlyInside(home: string, country: string): boolean {
   return home === country || cabotageBlocs.some((bloc) => bloc.has(home) && bloc.has(country));
 }
 
+/** Every country where an airline of `home` may carry domestic traffic: its own, plus the members of a cabotage bloc it belongs to. */
+export function domesticRightsCountries(home: string | undefined): string[] {
+  if (!home) return [];
+  const result = new Set([home]);
+  for (const bloc of cabotageBlocs) if (bloc.has(home)) for (const country of bloc) result.add(country);
+  return [...result];
+}
+
 /** May an airline of `home` fly a leg between `a` and `b`? */
 export function legRights(home: string | undefined, a: string, b: string): Rights {
   const countryA = countryOf(a);
