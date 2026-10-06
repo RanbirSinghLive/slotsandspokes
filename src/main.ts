@@ -53,6 +53,7 @@ import { refreshInspectorForNewDay, renderInspector } from './ui/inspector/inspe
 import { isHubPlannerOpen } from './ui/hubPlanner';
 import { setupFarePolicy, updateFarePolicy } from './ui/farePolicy';
 import { setupInfoTooltips } from './ui/infoTooltip';
+import { setupMapToolTips } from './ui/mapTools';
 import { updateTicker } from './ui/ticker';
 import { updateStamps } from './ui/stamp';
 import { updateOpsBoard } from './ui/opsBoard';
@@ -112,6 +113,7 @@ setupRouteBuilder(state, () => {
 });
 setupFarePolicy(state);
 setupInfoTooltips();
+setupMapToolTips();
 setupGameOver();
 setupGameControls(state);
 setupCloudSaveControls();
@@ -122,7 +124,7 @@ setMapElement(canvas);
 const ctx = canvas.getContext('2d')!;
 const clockEl = document.querySelector<HTMLDivElement>('#clock')!;
 const speedButtons = document.querySelectorAll<HTMLButtonElement>('#speed-controls button');
-// The map's lens (index.html's #lens-corner): one at a time, its legend
+// The map's lens (index.html's #map-tools): one at a time, its legend
 // and filter directly under the buttons. See setLens() below.
 const lensButtons = document.querySelectorAll<HTMLButtonElement>('#lens-bar button[data-lens]');
 const lensLegend = document.querySelector<HTMLDivElement>('#lens-legend')!;
@@ -1086,7 +1088,7 @@ canvas.addEventListener(
   { passive: false },
 );
 
-// The bottom-left corner's buttons: zoom toward the middle of the map,
+// The map tools' zoom buttons: zoom toward the middle of the map,
 // or refit it around home, as at the start.
 const ZOOM_BUTTON_FACTOR = 1.5;
 const mapMiddle = (): [number, number] => [canvas.clientWidth / 2, canvas.clientHeight / 2];
@@ -1094,7 +1096,7 @@ document.querySelector('#zoom-in')!.addEventListener('click', () => zoomAt(...ma
 document.querySelector('#zoom-out')!.addEventListener('click', () => zoomAt(...mapMiddle(), 1 / ZOOM_BUTTON_FACTOR));
 document.querySelector('#zoom-home')!.addEventListener('click', () => resize());
 
-// On a phone the lens and the airport filters fold behind one button, so they only cover the map when wanted.
+// On a phone the lens and the airport filters fold behind the layers button, so they only cover the map when wanted.
 const toolsToggle = document.querySelector<HTMLButtonElement>('#map-tools-toggle')!;
 toolsToggle.addEventListener('click', () => {
   const open = !document.documentElement.hasAttribute('data-tools');

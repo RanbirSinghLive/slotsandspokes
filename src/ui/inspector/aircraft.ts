@@ -101,7 +101,12 @@ export function buildFleetView(state: SimState): HTMLElement {
     return root;
   }
   const leases = state.aircraft.reduce((sum, a) => sum + a.leaseCostPerDay, 0);
-  root.append(line(`${state.aircraft.length} aircraft · leases ${money(leases)}/day`));
+  root.append(
+    lineWithInfo(
+      `${state.aircraft.length} aircraft · leases ${money(leases)}/day`,
+      'Each row: base · share of the usable day flown (over 100% cannot be flown) · OTP, arrivals on time of flown today · LF, load factor today · J, business cabin. AOG is grounded by a fault.',
+    ),
+  );
 
   const list = document.createElement('div');
   list.className = 'inspector-rows';
@@ -117,7 +122,7 @@ export function buildFleetView(state: SimState): HTMLElement {
     detail.className = 'inspector-row-detail';
     detail.textContent =
       (aircraft.rebase ? `${aircraft.rebase.from}→${aircraft.rebase.to} day ${aircraft.rebase.arrivesDay}` : (aircraft.baseAirport ?? 'no base')) +
-      ` · ${Math.round(use.share * 100)}% of day` +
+      ` · ${Math.round(use.share * 100)}%` +
       (flown > 0 ? ` · OTP ${onTime}/${flown}` : '') +
       (loadFactor !== null ? ` · LF ${Math.round(loadFactor * 100)}%` : '') +
       (aogFor(state, aircraft.tail) ? (aogFor(state, aircraft.tail)?.refitTo ? ' · refit' : ' · AOG') : aircraft.refitPending ? ' · refit tomorrow' : '') +
