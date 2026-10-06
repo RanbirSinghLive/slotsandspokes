@@ -119,7 +119,7 @@ function schedulePush(): void {
   }
   pushTimer = setTimeout(() => {
     pushTimer = null;
-    void push();
+    schedulePush();
   }, wait);
 }
 
