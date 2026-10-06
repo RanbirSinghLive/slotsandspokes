@@ -24,6 +24,15 @@ import { hasSavedState, importSaveText, onSaveWritten, saveFileText } from './sa
  */
 const LINK_KEY = 'slotsandspokes-cloud';
 
+/**
+ * Each push costs two Workers KV writes, and the free tier allows 1,000
+ * writes a day for the whole deployment. The game autosaves once per
+ * simulated day, which at 100x is every two seconds, so pushes are spaced
+ * out. The save stays `dirty` between pushes, so nothing is lost: the next
+ * push carries the newest state.
+ */
+const MIN_PUSH_GAP_MS = 5 * 60 * 1000;
+
 type Link = { code: string; rev: number; device: string; dirty: boolean };
 
 let available = false;
@@ -33,6 +42,8 @@ let statusText = '';
 let pushing = false;
 let pushAgain = false;
 let conflictOpen = false;
+let lastPushAt = 0;
+let pushTimer: ReturnType<typeof setTimeout> | null = null;
 const listeners: Array<() => void> = [];
 
 function readLink(): Link | null {
@@ -98,6 +109,20 @@ function newDevice(): string {
   return crypto.getRandomValues(new Uint32Array(1))[0].toString(36);
 }
 
+/** Push now if the last push was long enough ago, otherwise once the gap has passed. */
+function schedulePush(): void {
+  if (pushTimer !== null) return;
+  const wait = Math.max(0, lastPushAt + MIN_PUSH_GAP_MS - Date.now());
+  if (wait === 0) {
+    void push();
+    return;
+  }
+  pushTimer = setTimeout(() => {
+    pushTimer = null;
+    void push();
+  }, wait);
+}
+
 async function push(): Promise<void> {
   if (link === null || state === null || conflictOpen || !hasSavedState()) return;
   if (pushing) {
@@ -105,6 +130,7 @@ async function push(): Promise<void> {
     return;
   }
   pushing = true;
+  lastPushAt = Date.now();
   try {
     const params = new URLSearchParams({ base: String(link.rev), day: String(dayIndex(state)), device: link.device });
     const response = await api(`/api/save?${params}`, link.code, { method: 'PUT', body: saveFileText(state) });
@@ -301,7 +327,7 @@ export async function startCloudSave(gameState: SimState): Promise<void> {
   onSaveWritten(() => {
     if (link === null) return;
     writeLink({ ...link, dirty: true });
-    void push();
+    schedulePush();
   });
   try {
     const response = await fetch('/api/cloud');
@@ -320,5 +346,6 @@ export async function startCloudSave(gameState: SimState): Promise<void> {
   await checkRemote(true);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') void checkRemote(false);
+    else if (link?.dirty && Date.now() - lastPushAt > 60_000) void push();
   });
 }

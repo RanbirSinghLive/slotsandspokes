@@ -1810,8 +1810,11 @@ fallback; the cloud is a copy of it.
   numbering each write (`rev`). It never reads the game. Without the KV
   binding `/api/cloud` says `configured: false` and the game shows no
   cloud controls.
-- **Pushing**: every autosave (`saveState`) also PUTs the save, sending
-  the `rev` this device last synced as `base`. **Pulling**: at startup and
+- **Pushing**: an autosave (`saveState`) marks the device `dirty` and PUTs
+  the save, at most once every 5 minutes (and when the tab is hidden, at
+  most once a minute), because each push is two KV writes and the free
+  tier allows 1,000 a day. The PUT sends the `rev` this device last
+  synced as `base`. **Pulling**: at startup and
   whenever the tab comes back to the front, the device asks for the
   cloud's `rev`. Same `rev`: nothing to do. Different `rev` and this
   device hasn't saved since it last synced (`dirty` false): at startup the
