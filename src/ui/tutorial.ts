@@ -269,7 +269,7 @@ export function setupTutorial(setSpeed: (speed: 0 | 1) => void): void {
   if (window.innerWidth < DESKTOP_MIN_WIDTH_PX) {
     const narrow = document.createElement('p');
     narrow.className = 'tutorial-note';
-    narrow.textContent = "It's an alpha built for a desktop or laptop browser: on a small screen, parts won't fit.";
+    narrow.textContent = 'On a small screen: tap an icon to read its name, and pinch to zoom the map.';
     welcome.append(narrow);
   }
   const actions = document.createElement('div');

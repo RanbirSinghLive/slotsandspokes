@@ -26,8 +26,10 @@ const tooltip = document.querySelector<HTMLDivElement>('#info-tooltip')!;
 
 const OFFSET_PX = 14;
 
-function show(mark: HTMLElement): void {
-  const text = mark.dataset.info;
+const TOUCH_TIP_MS = 2200;
+const isTouch = (): boolean => window.matchMedia('(pointer: coarse)').matches;
+
+function show(mark: HTMLElement, text: string | undefined = mark.dataset.info): void {
   if (!text) return;
 
   tooltip.textContent = text;
@@ -69,6 +71,8 @@ export function setupInfoTooltips(): void {
     if (mark) show(mark);
   });
   panel.addEventListener('mouseout', (event) => {
+    // A touch screen sends a mouseout right after a tap's click, which would put the tip away before it is read.
+    if (isTouch()) return;
     if (markFrom(event.target)) hide();
   });
   // Focus/blur rather than click: tabbing to the mark should reveal it,
@@ -84,5 +88,18 @@ export function setupInfoTooltips(): void {
   // anywhere else should put it away again.
   panel.addEventListener('click', (event) => {
     if (!markFrom(event.target)) hide();
+  });
+
+  // A native `title` never shows on touch. Tapping a bar, mark or row that
+  // has one flashes it in the same box for a couple of seconds. Buttons are
+  // left alone: tapping one does its job, and the ⓘ beside it explains it.
+  let hideTimer = 0;
+  document.addEventListener('click', (event) => {
+    if (!isTouch() || !(event.target instanceof Element)) return;
+    const holder = event.target.closest<HTMLElement>('[title]');
+    if (!holder || holder.closest('button, a, input, select, tr, .info-mark')) return;
+    window.clearTimeout(hideTimer);
+    show(holder, holder.title);
+    hideTimer = window.setTimeout(hide, TOUCH_TIP_MS);
   });
 }
