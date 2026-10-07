@@ -72,6 +72,8 @@ function wireTips(strip: HTMLElement, tooltip: HTMLDivElement): void {
     if (button) show(button);
   });
   strip.addEventListener('mouseout', (event) => {
+    // A touch screen sends a mouseout right after a tap's click, which would put the tip away before it is read; the timer does that.
+    if (window.matchMedia('(pointer: coarse)').matches) return;
     if (buttonFrom(event.target)) hide();
   });
   strip.addEventListener('focusin', (event) => {

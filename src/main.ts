@@ -186,12 +186,9 @@ function syncCompetitorAirlineChips(): void {
 // Hiding the panel (the rail's Hide, ui/rail.ts) is what varies it:
 // hidden leaves only the rail.
 const MIN_MAP_WIDTH_PX = 200;
-/** The rail's width, which stays when the panel is hidden; style.css's --rail-width starts at the same number. */
-const RAIL_WIDTH_PX = 56;
-/** With a mouse the rail's labels become hover tips and the rail narrows to icons (style.css's compact rail); a touch screen keeps the labels. */
-const COMPACT_RAIL_WIDTH_PX = 44;
-const hasMouse = window.matchMedia('(hover: hover) and (pointer: fine)');
-const railWidthPx = (): number => (hasMouse.matches ? COMPACT_RAIL_WIDTH_PX : RAIL_WIDTH_PX);
+/** The rail's width, which stays when the panel is hidden; icons only, with the names in tips (style.css's --rail-width starts at the same number). */
+const RAIL_WIDTH_PX = 44;
+const railWidthPx = (): number => RAIL_WIDTH_PX;
 /** At or below this window width the panel is a sheet over the map, not a column beside it (style.css's :root[data-narrow]). */
 const NARROW_WINDOW_PX = 700;
 const MAP_SHEET_MARGIN = 0.5;
