@@ -358,9 +358,9 @@ button,
   gap: 4px 10px;
 }
 
-/* On a phone the goods key would cover the map: keep the two ends and the note. */
-:root[data-narrow] #lens-legend-scale .legend-good {
-  display: none;
+/* On a phone the goods key stays as one tight row of icons. */
+:root[data-narrow] #lens-legend-scale.is-wrapped {
+  gap: 2px 6px;
 }
 
 /* The Cargo key: ▲ makes, amber to teal lane, ▼ needs, dashed lane = not flown. */
@@ -5119,4 +5119,73 @@ button.ops-item:hover {
 
 .mandate-row button {
   margin-left: auto;
+}
+
+
+/* Touch: a thumb needs 44px, so the small controls keep their look and grow an
+   invisible hit area (the ::after), or grow for real where there is room. */
+@media (pointer: coarse) {
+  .info-mark,
+  .info-mark.rights-mark,
+  .inspector-link,
+  .inspector-sort,
+  .inspector-crumb,
+  .inspector-back,
+  .inspector-chips button.is-icon,
+  #speed-controls button,
+  .lever-reset,
+  .crew-action {
+    position: relative;
+  }
+
+  .info-mark::after,
+  .inspector-link::after,
+  .inspector-sort::after,
+  .inspector-crumb::after,
+  .inspector-back::after,
+  .inspector-chips button.is-icon::after,
+  #speed-controls button::after,
+  .lever-reset::after,
+  .crew-action::after {
+    content: '';
+    position: absolute;
+    inset: -14px -8px;
+  }
+
+  /* Neighbours that sit close would fight over the overlap: those two get less. */
+  .inspector-chips button.is-icon::after,
+  #speed-controls button::after,
+  .crew-action::after {
+    inset: -10px -3px;
+  }
+
+  .inspector-table .inspector-link::after,
+  .inspector-table .inspector-sort::after {
+    inset: -12px -6px;
+  }
+}
+
+/* The Airports table scrolls sideways inside the panel rather than being cut off. */
+.inspector-table-scroll {
+  overflow-x: auto;
+}
+
+/* A phone's clock bar: the date on one line, the speeds under it. */
+@media (max-width: 700px) {
+  #hud {
+    grid-template-columns: auto;
+    grid-template-areas:
+      'clock'
+      'speed'
+      'ops'
+      'pnl';
+  }
+
+  #clock {
+    white-space: nowrap;
+  }
+}
+
+:root[data-narrow] .inspector-table-scroll td {
+  white-space: nowrap;
 }

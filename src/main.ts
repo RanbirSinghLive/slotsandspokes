@@ -774,14 +774,14 @@ function updateLensLegend(): void {
       swatch(MAP_MODE_COLORS.profit, '100%') +
       '<div><span>width = seats a day</span></div>';
   } else if (lens === 'demand') {
-    lensLegendTitle.textContent = 'People waiting to fly · hover an airport for its biggest markets';
+    lensLegendTitle.textContent = `People waiting to fly · ${isPhoneScreen ? 'tap' : 'hover'} an airport for its biggest markets`;
     lensLegendScale.innerHTML =
       swatch('rgba(94, 214, 196, 0.6)', 'underserved') + swatch('rgba(154, 163, 184, 0.5)', 'well served') + swatch('#ffb347', 'you turn away') + swatch('#e8c170', 'contract offer');
   } else if (lens === 'rivals') {
     lensLegendTitle.textContent = 'Rival networks · pick one to narrow';
     lensLegendScale.innerHTML = '';
   } else if (lens === 'cargo') {
-    lensLegendTitle.textContent = 'Cargo · hover an airport';
+    lensLegendTitle.textContent = `Cargo · ${isPhoneScreen ? 'tap' : 'hover'} an airport`;
     lensLegendScale.innerHTML =
       '<div class="legend-note"><span class="cargo-key-ring is-makes">▲</span><span class="cargo-key-lane"></span><span class="cargo-key-ring is-needs">▼</span>' +
       '<span class="cargo-key-lane is-dashed" title="not flown yet"></span></div>' +

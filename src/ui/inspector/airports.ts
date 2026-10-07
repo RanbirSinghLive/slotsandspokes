@@ -191,6 +191,10 @@ export function buildAirportsView(state: SimState, changed: () => void): HTMLEle
     tbody.append(tr);
   }
   table.append(thead, tbody);
-  root.append(table);
+  // On a narrow screen the columns scroll sideways inside the panel instead of being cut off.
+  const scroller = document.createElement('div');
+  scroller.className = 'inspector-table-scroll';
+  scroller.append(table);
+  root.append(scroller);
   return root;
 }
