@@ -740,18 +740,23 @@ and, when it's `'map'`, two independent booleans (`demandOverlayOn`,
 of the base map that frame. `basemap.ts` is the one layer always drawn
 first, every time the map panel is visible.
 
-**The map's four corners** each have one job: top left the clock,
+**The map's three corners** each have one job: top left the clock,
 speeds, ops board and a P&L strip (with the alerts under them, one
-column, `#now-corner`); top right the
-**lens**; bottom left zoom, back-to-home and the airport filter (All ·
-Yours · Contested · Uncontested, the last being airports no rival flies to, home always shown); bottom right the fleet's plane pools. The two new
-corners sit in `#map-surface`, a pointer-transparent box the size of
-the map, and rearrange with its width through CSS container queries (on
-a narrow map the lens moves down, then to the bottom left).
+column, `#now-corner`); top right the **map tools** (`#map-tools`), one
+icon strip in three groups: the lens, the airport filter (All · Yours ·
+Contested · Uncontested, the last being airports no rival flies to, home
+always shown) and zoom, back-to-home; bottom right the fleet's plane
+pools. The strip has no words: each button's `data-tip` is its tip
+(`ui/mapTools.ts`), shown on hover or focus and, on touch, for a couple
+of seconds after a tap. The lens key and rival chips (`#lens-corner`) sit
+left of the strip, and drop to the bottom left on a narrow map. On a
+phone the strip moves to the bottom left and the lens and filter groups
+fold behind its layers button. The corners sit in `#map-surface`, a
+pointer-transparent box the size of the map.
 
-The lens is one row of labelled buttons, Network · Profit · Ops ·
+The lens is one group of icon buttons, Network · Profit · Ops ·
 Demand · Rivals · Cargo, one on at a time (keys 1–6; O toggles Ops), with its legend and
-filter directly under it. `setLens()` in main.ts sets the three flags
+rival chips beside the strip. `setLens()` in main.ts sets the three flags
 the renderer reads: `demandOverlayOn` for Demand, `competitionOverlayOn`
 for Rivals, `cargoOverlayOn` for Cargo, `mapMode` for Profit and Ops, and the Ops lens switch (`setOpsView()`) for Ops. The Rivals lens adds a
 chip per rival airline to narrow it to one. A route can be drawn under

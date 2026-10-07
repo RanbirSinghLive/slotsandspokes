@@ -107,9 +107,7 @@ button,
   gap: 4px;
 }
 
-#speed-controls button,
-#lens-bar button,
-#where-corner button {
+#speed-controls button {
   font-family: inherit;
   font-size: inherit;
   color: #cdd3e0;
@@ -120,15 +118,11 @@ button,
   cursor: pointer;
 }
 
-#speed-controls button:hover,
-#lens-bar button:hover,
-#where-corner button:hover {
+#speed-controls button:hover {
   border-color: rgba(255, 255, 255, 0.5);
 }
 
-#speed-controls button.active,
-#lens-bar button.active,
-#where-corner button.active {
+#speed-controls button.active {
   background: #3a4258;
   border-color: #6b7694;
   color: #fff;
@@ -248,10 +242,83 @@ button,
   pointer-events: auto;
 }
 
-#lens-corner {
+/* Map tools: one strip of icon buttons, a group each for the lens, the
+   airport filter and zoom. Top right, with the lens key to its left. */
+#map-tools {
   position: absolute;
   top: 12px;
   right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px;
+  background: rgba(10, 12, 18, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
+.tools-fold {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tools-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tools-group + .tools-group,
+.tools-fold + .tools-group {
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.tool {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: #9aa3b8;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.tool svg {
+  width: 18px;
+  height: 18px;
+}
+
+.tool:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.tool.active {
+  color: #fff;
+  background: #3a4258;
+  border-color: #6b7694;
+}
+
+/* The airport filters borrow the map's own colours: yours is route amber, contested rival red, uncontested open-field teal. */
+.tool.tone-yours { color: #ffd166; }
+.tool.tone-contested { color: #ff7a7a; }
+.tool.tone-uncontested { color: #5ed6c4; }
+
+#map-tools-toggle {
+  display: none;
+}
+
+/* The lens key and the rival chips: left of the strip. */
+#lens-corner {
+  position: absolute;
+  top: 12px;
+  right: 58px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -260,22 +327,6 @@ button,
   font-family: ui-monospace, Consolas, monospace;
   font-size: 12px;
   color: #cdd3e0;
-}
-
-#lens-bar,
-#where-corner {
-  display: flex;
-  gap: 4px;
-  padding: 6px;
-  background: rgba(10, 12, 18, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-}
-
-#lens-bar button,
-#where-corner button {
-  padding: 3px 8px;
-  font-size: 12px;
 }
 
 #lens-legend,
@@ -351,31 +402,8 @@ button,
   border-color: #ffd166;
 }
 
-#where-corner {
-  position: absolute;
-  left: 12px;
-  bottom: 40px;
-  align-items: center;
-  gap: 10px;
-  font-family: ui-monospace, Consolas, monospace;
-}
-
-.where-zoom,
-#airport-filter {
-  display: flex;
-  gap: 4px;
-}
-
-.where-zoom button {
-  width: 26px;
-  padding: 3px 0 !important;
-  text-align: center;
-}
-
-/* A narrower map: the clock box and the lens would meet at the top, so
-   the lens sits above the bottom-left corner instead, its legend and
-   chips growing upward from the buttons. Narrower still, the bottom-left
-   corner stacks so it clears the fleet bars. */
+/* A narrower map: the clock box and the lens key would meet at the top, so
+   the key drops to the bottom left, growing upward. */
 @container (max-width: 880px) {
   #lens-corner {
     top: auto;
@@ -386,93 +414,78 @@ button,
     align-items: flex-start;
   }
 
-  #lens-bar {
-    flex-wrap: wrap;
-  }
-
   #lens-airlines {
     justify-content: flex-start;
   }
 }
 
-@container (max-width: 720px) {
-  #where-corner {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-  }
-
-  #lens-corner {
-    bottom: 132px;
-  }
-}
-
-/* Narrowest: no room for two corners side by side at the bottom, so the
-   bottom-left one rises above the fleet bars. */
 @container (max-width: 520px) {
-  #where-corner {
+  #lens-corner {
     bottom: 96px;
   }
-
-  #lens-corner {
-    bottom: 190px;
-  }
 }
 
-#map-tools-toggle {
-  display: none;
+/* A phone: the strip moves to the bottom left, and the lens and filter
+   groups fold behind one layers button beside the zoom buttons, opening as
+   rows above them. */
+:root[data-narrow] #map-tools {
+  top: auto;
+  bottom: 96px;
+  right: auto;
+  left: 12px;
+  flex-direction: column-reverse;
+  max-width: calc(100vw - var(--panel-width) - 24px);
 }
 
-/* A phone: the lens, Ops view and the airport filter fold behind one
-   Filters button beside the zoom buttons, and open as a small stack above them. */
-:root[data-narrow] #where-corner {
+:root[data-narrow] #map-tools-toggle {
+  display: flex;
+}
+
+:root[data-narrow] .tool {
+  width: 40px;
+  height: 40px;
+}
+
+:root[data-narrow] .tools-group,
+:root[data-narrow] .tools-fold {
   flex-direction: row;
   flex-wrap: wrap;
-  max-width: calc(100vw - var(--panel-width) - 24px);
-  bottom: 96px;
-  gap: 6px;
 }
 
-:root[data-narrow] #map-tools-toggle {
-  display: block;
+:root[data-narrow] .tools-fold {
+  flex-direction: column;
 }
 
-:root[data-narrow] .where-zoom button,
-:root[data-narrow] #map-tools-toggle {
-  min-height: 36px;
+:root[data-narrow] .tools-group + .tools-group,
+:root[data-narrow] .tools-fold + .tools-group {
+  padding-top: 0;
+  border-top: 0;
 }
 
-:root[data-narrow] .where-zoom button {
-  width: 36px;
+/* The zoom group and the layers button share one row. */
+:root[data-narrow] #map-tools {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: end;
 }
 
-:root[data-narrow] #map-tools-toggle {
-  padding: 0 12px;
+:root[data-narrow] .tools-fold {
+  grid-column: 1 / -1;
+  grid-row: 1;
 }
 
-:root[data-narrow]:not([data-tools]) #lens-corner,
-:root[data-narrow]:not([data-tools]) #airport-filter {
+:root[data-narrow]:not([data-tools]) .tools-fold {
   display: none;
-}
-
-:root[data-narrow] #airport-filter {
-  flex-wrap: wrap;
-  flex-basis: 100%;
 }
 
 :root[data-narrow] #lens-corner {
-  bottom: 300px;
+  bottom: 158px;
   max-width: calc(100vw - var(--panel-width) - 24px);
 }
 
-:root[data-narrow] #lens-bar {
-  flex-wrap: wrap;
-}
-
-:root[data-narrow] #lens-bar button,
-:root[data-narrow] #where-corner #airport-filter button {
-  min-height: 34px;
-  padding: 0 10px;
+/* Clears the strip whether the lens and filter rows are folded open or not. */
+:root[data-narrow][data-tools] #lens-corner {
+  bottom: 252px;
 }
 
 .mapmode-legend-swatch {
@@ -3541,6 +3554,10 @@ button.inspector-crumb:hover {
 .inspector-row:hover {
   color: #fff;
   background: rgba(255, 255, 255, 0.04);
+}
+
+.inspector-row > span:first-child {
+  white-space: nowrap;
 }
 
 .inspector-row-detail {
