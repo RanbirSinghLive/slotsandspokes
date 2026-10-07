@@ -1,3 +1,4 @@
+import { routeRightsMark } from './rights';
 import { forecastStance, type StanceForecast } from '../../sim/fareForecast';
 import { inboundAt } from '../../sim/fleetTiming';
 import { cabinShare, crewShare } from '../../sim/crews';
@@ -83,6 +84,8 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   const title = document.createElement('h3');
   title.className = 'inspector-title';
   title.textContent = `${a} – ${b}`;
+  const rights = routeRightsMark(state, a, b);
+  if (rights) title.append(rights);
   root.append(title);
 
   // Flights that should have flown and didn't: everything below that

@@ -64,7 +64,7 @@ const PLANE_GLYPH = new Path2D(
   'M12 1.5 C13.1 1.5 13.6 3.5 13.6 5.5 V9.2 L22.5 14 V16.3 L13.6 13.6 V18.6 L16.5 20.7 V22.5 L12 21.3 L7.5 22.5 V20.7 L10.4 18.6 V13.6 L1.5 16.3 V14 L10.4 9.2 V5.5 C10.4 3.5 10.9 1.5 12 1.5Z',
 );
 /** A head and shoulders: crews joining. */
-const CREW_GLYPH = new Path2D('M12 2.5 A4.5 4.5 0 1 1 11.99 2.5Z M3.5 22.5 C3.5 16.5 7.5 13.5 12 13.5 C16.5 13.5 20.5 16.5 20.5 22.5Z');
+export const CREW_GLYPH = new Path2D('M12 2.5 A4.5 4.5 0 1 1 11.99 2.5Z M3.5 22.5 C3.5 16.5 7.5 13.5 12 13.5 C16.5 13.5 20.5 16.5 20.5 22.5Z');
 const PENDING_FILL = '#ffd166';
 const PENDING_BACKGROUND = 'rgba(10, 14, 24, 0.75)';
 const PENDING_HEIGHT_PX = 11;

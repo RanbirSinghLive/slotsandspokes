@@ -18,6 +18,7 @@ import { goalsSummary } from './inspector/goals';
 import { headOfficeSummary } from './inspector/headOffice';
 import type { SimState } from '../sim/state';
 import { minuteOfDay, minuteOfDayToTimeString } from '../sim/clock';
+import { info } from './inspector/dom';
 import { linkToMap } from './mapLink';
 
 // Must match the --panel-width custom property's default value in
@@ -286,7 +287,10 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
   // The key to the night cell beside each plane (sim/mxChecks.ts).
   const key = document.createElement('div');
   key.className = 'timeline-key';
-  key.textContent = `☾ tonight's line check: ✓ at a mtc base · c contracted at a station · −40m short by · ✗ deferred, no check · ● deferred items (${MX_HOLD_AT} holds the plane a morning)`;
+  key.append(
+    '☾ ✓ · c · −40m · ✗ · ● ',
+    info(`Tonight's line check, beside each plane. ✓ at a maintenance base. c contracted at a station. −40m short by that long. ✗ deferred, no check. ● a deferred item (${MX_HOLD_AT} holds the plane a morning).`),
+  );
   rows.push(key);
 
   for (const cls of AIRCRAFT_CLASSES) {

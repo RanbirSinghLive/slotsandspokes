@@ -58,6 +58,9 @@ function actionButton(label: string, disabled: boolean, act: () => void, changed
   button.type = 'button';
   button.className = 'inspector-plan-hub crew-action';
   button.textContent = label;
+  // The label is short; the tip says it in full for hover and screen readers.
+  button.title = confirm?.title ?? label;
+  button.setAttribute('aria-label', button.title);
   button.disabled = disabled;
   const run = () => {
     act();
@@ -340,19 +343,25 @@ function classRow(state: SimState, iata: string, c: ClassPlan, siblings: ClassPl
   }
   row.append(bar);
 
-  const parts = [`${c.crews} rated`, `need ${c.ideal} (min ${c.minimum})`];
-  if (neededAtLastEis > 0) parts.push(`${neededAtLastEis} at EIS`);
+  const parts = [`${c.crews} of ${c.ideal}`];
+  if (neededAtLastEis > 0) parts.push(`→ ${neededAtLastEis}`);
   for (const j of c.joining) parts.push(`+${j.count} ${j.kind === 'conversion' ? `from ${j.from ?? '?'} ` : ''}day ${j.day}`);
   if (c.entries.length > 0) parts.push(`✈ ${c.entries.length} EIS from day ${c.entries[0].day}`);
   for (const day of c.returningDays) parts.push(`↩ plane back day ${day} (${when(day, today)})`);
-  row.append(line(parts.join(' · '), 'inspector-line crew-row-detail'));
+  row.append(
+    lineWithInfo(
+      parts.join(' · '),
+      `Crews rated for this type against the comfortable number (legal minimum ${c.minimum}); → is what the planes on their way will need. + joining crews with their day, ✈ planes arriving, ↩ a grounded plane back. The marks on the bar say the same.`,
+      'inspector-line crew-row-detail',
+    ),
+  );
   // Readiness (sim/crews.ts): who's off sick, and the chance of a crew grounding this week.
   if (c.minimum > 0) {
     const ready = crewReadiness(state, iata, c.classCode);
     const risk = Math.round(ready.weeklyRisk * 100);
     row.append(
       lineWithInfo(
-        `Sick ${ready.sick} · reserve ${Math.max(0, ready.reserve)} · grounding risk ${ready.weeklyRisk < 0.01 ? '<1' : risk}%/wk`,
+        `Sick ${ready.sick} · reserve ${Math.max(0, ready.reserve)} · risk ${ready.weeklyRisk < 0.01 ? '<1' : risk}%/wk`,
         `Crews call in sick for 1–3 days: about ${Math.round(SICK_BASE_CHANCE * 100)}% a crew a day on an easy roster, up to ${Math.round((SICK_BASE_CHANCE + SICK_STRAIN_CHANCE) * 100)}% when shifts run to the 13-hour limit (now ${(ready.chance * 100).toFixed(1)}%). Sick crews fly nothing: with fewer than the legal minimum fit, a plane is grounded and its flights cancel. Reserve crews over the minimum cover them, at standby cost. The risk is the chance of at least one grounding in the next 7 days at this staffing.`,
         risk >= 25 ? 'inspector-line is-over' : risk >= 10 ? 'inspector-line is-warn' : 'inspector-line',
       ),
@@ -363,7 +372,7 @@ function classRow(state: SimState, iata: string, c: ClassPlan, siblings: ClassPl
   buttons.className = 'crew-buttons';
   const open = ops.crewReadout(state, iata)?.classes.find((r) => r.classCode === c.classCode)?.open ?? false;
   const pilotSeats = ops.crewReadout(state, iata)?.training.pilot.free ?? 0;
-  buttons.append(actionButton(pilotSeats === 0 ? 'No free training seats' : `Hire 1 · ${money(hireFee(c.classCode))}`, !open || pilotSeats === 0 || state.cash < hireFee(c.classCode), () => ops.hireCrewsAt(state, iata, c.classCode, 1), changed, {
+  buttons.append(actionButton(pilotSeats === 0 ? 'No free training seats' : `+1 · ${money(hireFee(c.classCode))}`, !open || pilotSeats === 0 || state.cash < hireFee(c.classCode), () => ops.hireCrewsAt(state, iata, c.classCode, 1), changed, {
     title: `Hire 1 ${c.name} crew · ${iata}`,
     rows: [
       { label: 'Fee now', value: money(hireFee(c.classCode)) },
@@ -374,7 +383,7 @@ function classRow(state: SimState, iata: string, c: ClassPlan, siblings: ClassPl
   }));
   const donor = siblings.filter((s) => s.classCode !== c.classCode && s.crews - s.ideal > 0).sort((x, y) => y.crews - y.ideal - (x.crews - x.ideal))[0];
   if (donor && open) {
-    buttons.append(actionButton(`Convert 1 from ${donor.name} · ${money(retrainFee(c.classCode))}`, pilotSeats === 0 || state.cash < retrainFee(c.classCode), () => ops.retrainCrewsAt(state, iata, donor.classCode, c.classCode, 1), changed, {
+    buttons.append(actionButton(`⇄ ${donor.name} · ${money(retrainFee(c.classCode))}`, pilotSeats === 0 || state.cash < retrainFee(c.classCode), () => ops.retrainCrewsAt(state, iata, donor.classCode, c.classCode, 1), changed, {
       title: `Convert 1 ${donor.name} → ${c.name} · ${iata}`,
       rows: [
         { label: 'Fee now', value: money(retrainFee(c.classCode)) },
@@ -386,7 +395,7 @@ function classRow(state: SimState, iata: string, c: ClassPlan, siblings: ClassPl
     }));
   }
   if (c.crews > c.ideal) buttons.append(
-      actionButton('Release 1', false, () => ops.releaseCrewsAt(state, iata, c.classCode, 1), changed, {
+      actionButton('−1', false, () => ops.releaseCrewsAt(state, iata, c.classCode, 1), changed, {
         title: `Release 1 ${c.name} crew · ${iata}`,
         rows: [
           { label: 'Crews after', value: `${c.crews - 1} (need ${c.ideal}, min ${c.minimum})` },
@@ -422,7 +431,7 @@ function cabinRow(state: SimState, iata: string, c: ClassPlan, cabin: NonNullabl
   const seats = readout?.training.cabin.free ?? 0;
   const buttons = document.createElement('div');
   buttons.className = 'crew-buttons';
-  buttons.append(actionButton(seats === 0 ? 'No free cabin seats' : `Hire 1 cabin · ${money(cabin.hireFee)}`, seats === 0 || state.cash < cabin.hireFee, () => ops.hireCabinAt(state, iata, c.classCode, 1), changed, {
+  buttons.append(actionButton(seats === 0 ? 'No free cabin seats' : `+1 · ${money(cabin.hireFee)}`, seats === 0 || state.cash < cabin.hireFee, () => ops.hireCabinAt(state, iata, c.classCode, 1), changed, {
     title: `Hire 1 ${c.name} cabin team · ${iata}`,
     rows: [
       { label: 'Fee now', value: money(cabin.hireFee) },
@@ -432,7 +441,7 @@ function cabinRow(state: SimState, iata: string, c: ClassPlan, cabin: NonNullabl
     confirmLabel: `Hire · ${money(cabin.hireFee)}`,
   }));
   if (cabin.teams > cabin.ideal) {
-    buttons.append(actionButton('Release 1', false, () => ops.releaseCabinAt(state, iata, c.classCode, 1), changed, {
+    buttons.append(actionButton('−1', false, () => ops.releaseCabinAt(state, iata, c.classCode, 1), changed, {
       title: `Release 1 ${c.name} cabin team · ${iata}`,
       rows: [{ label: 'Teams after', value: `${cabin.teams - 1} (need ${cabin.ideal}, min ${cabin.minimum})` }, { label: 'Standby saved', value: `${money(cabin.standbyPerDay)}/day` }],
       facts: ['Rehiring costs the fee again and takes days to join.'],
@@ -470,7 +479,7 @@ function lockedRow(classCode: string, role: 'pilot' | 'cabin'): HTMLElement {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'inspector-plan-hub crew-action';
-  button.textContent = role === 'cabin' ? `Hire 1 cabin · ${money(fee)}` : `Hire 1 · ${money(fee)}`;
+  button.textContent = role === 'cabin' ? `+1 · ${money(fee)}` : `+1 · ${money(fee)}`;
   button.disabled = true;
   button.title = `${name} planes aren't open to the airline yet.`;
   buttons.append(button);

@@ -186,15 +186,19 @@ function syncCompetitorAirlineChips(): void {
 // Hiding the panel (the rail's Hide, ui/rail.ts) is what varies it:
 // hidden leaves only the rail.
 const MIN_MAP_WIDTH_PX = 200;
-/** The rail's width, which stays when the panel is hidden; style.css's --rail-width matches it. */
+/** The rail's width, which stays when the panel is hidden; style.css's --rail-width starts at the same number. */
 const RAIL_WIDTH_PX = 56;
+/** With a mouse the rail's labels become hover tips and the rail narrows to icons (style.css's compact rail); a touch screen keeps the labels. */
+const COMPACT_RAIL_WIDTH_PX = 44;
+const hasMouse = window.matchMedia('(hover: hover) and (pointer: fine)');
+const railWidthPx = (): number => (hasMouse.matches ? COMPACT_RAIL_WIDTH_PX : RAIL_WIDTH_PX);
 /** At or below this window width the panel is a sheet over the map, not a column beside it (style.css's :root[data-narrow]). */
 const NARROW_WINDOW_PX = 700;
 const MAP_SHEET_MARGIN = 0.5;
 const isNarrowWindow = (): boolean => window.innerWidth <= NARROW_WINDOW_PX;
 // A phone starts with the map showing; the rail opens the panel.
 let panelHidden = isNarrowWindow();
-let currentPanelWidthPx = PANEL_WIDTH_PX + RAIL_WIDTH_PX;
+let currentPanelWidthPx = PANEL_WIDTH_PX + railWidthPx();
 
 function applyPanelWidth(): void {
   const narrow = isNarrowWindow();
@@ -202,7 +206,8 @@ function applyPanelWidth(): void {
   // A phone caches a map twice as big as the screen each way, so a drag has picture to slide over (render/projection.ts).
   mapGesture.margin = narrow ? MAP_SHEET_MARGIN : 0;
   // Narrow: the panel floats over the map, so the map only gives up the rail.
-  const desiredPanelWidthPx = (panelHidden || narrow ? 0 : PANEL_WIDTH_PX) + RAIL_WIDTH_PX;
+  const desiredPanelWidthPx = (panelHidden || narrow ? 0 : PANEL_WIDTH_PX) + railWidthPx();
+  document.documentElement.style.setProperty('--rail-width', `${railWidthPx()}px`);
   currentPanelWidthPx = Math.min(desiredPanelWidthPx, window.innerWidth - MIN_MAP_WIDTH_PX);
   document.documentElement.style.setProperty('--panel-width', `${currentPanelWidthPx}px`);
 }

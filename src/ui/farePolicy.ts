@@ -68,7 +68,9 @@ function backToPolicyButton(state: SimState, offPolicy: number): HTMLButtonEleme
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'lever-reset';
-  button.textContent = `Put all routes back on policy · ${offPolicy} off`;
+  button.textContent = `↺ ${offPolicy}`;
+  button.title = `Put all ${offPolicy} routes that are off policy back on it`;
+  button.setAttribute('aria-label', button.title);
   button.addEventListener('click', () => {
     putAllOnPolicy(state);
     rebuild(state);
@@ -88,7 +90,7 @@ function rebuildSeats(state: SimState): void {
   const renderStatus = () => {
     const { saverShare, flexShare } = fareClassPolicy(state);
     const shares = [saverShare, flexShare, Math.max(0, 1 - saverShare - flexShare)];
-    const parts = CLASS_ORDER.map((fareClass, i) => `${CLASS_NAMES[fareClass]} ${percent(shares[i])} · ${percent(CLASS_PRICE[fareClass])} fare`);
+    const parts = CLASS_ORDER.map((fareClass, i) => `${CLASS_NAMES[fareClass]} ${percent(shares[i])}`);
     status.textContent = `${parts.join(' · ')}${byHand > 0 ? ` · ${byHand} of ${routes} by hand` : ''}`;
   };
   const { bar } = buildSeatSplitBar({
@@ -107,7 +109,7 @@ function rebuildSeats(state: SimState): void {
   heading.append(
     'Seat policy ',
     info(
-      'Every route sells Saver, Flex and Full seats (see a route view). This is the split every route not set by hand uses: drag the lines to move all of them at once. A route whose own lines you move leaves the policy; open its route view to change it, or put it back with the button here.',
+      `Every route sells Saver, Flex and Full seats at ${CLASS_ORDER.map((fareClass) => `${percent(CLASS_PRICE[fareClass])}`).join(' · ')} of the going fare (see a route view). This is the split every route not set by hand uses: drag the lines to move all of them at once. A route whose own lines you move leaves the policy; open its route view to change it, or put it back with the ↺ button here.`,
     ),
   );
   seatsEl.append(heading, bar, status);
@@ -116,7 +118,9 @@ function rebuildSeats(state: SimState): void {
     const back = document.createElement('button');
     back.type = 'button';
     back.className = 'lever-reset';
-    back.textContent = `Put all seats back on policy · ${byHand} by hand`;
+    back.textContent = `↺ ${byHand}`;
+    back.title = `Put all ${byHand} routes with their own seat split back on policy`;
+    back.setAttribute('aria-label', back.title);
     back.addEventListener('click', () => {
       putAllSeatsOnPolicy(state);
       rebuild(state);

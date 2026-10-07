@@ -28,6 +28,7 @@ import * as ops from '../routeActions';
 import { select } from '../selection';
 import { aircraftLink } from './aircraft';
 import { linkToMap } from '../mapLink';
+import { airportRightsMark } from './rights';
 import { contractsOf } from '../../sim/contracts';
 import { cargoGlyph } from '../../render/cargo';
 import { airportCargo, bestCargoPartners, neededTonnes, producedTonnes, shortagePremium } from '../../sim/cargo';
@@ -59,6 +60,8 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
   const title = document.createElement('h3');
   title.className = 'inspector-title';
   title.textContent = `${iata} — ${namesByIata.get(iata) ?? iata}`;
+  const rights = airportRightsMark(state, iata);
+  if (rights) title.append(rights);
   root.append(title);
 
   const presence = airportPresence(state, iata);
