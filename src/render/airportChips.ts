@@ -1,4 +1,4 @@
-import { airports, isAirportKnown } from './airports';
+import { airports, CREW_GLYPH, isAirportKnown } from './airports';
 import { isOpsView } from './opsView';
 import { projection } from './projection';
 import { crewPlan } from '../sim/crewPlan';
@@ -8,14 +8,16 @@ import type { SimState } from '../sim/state';
 
 /**
  * Ops view's small chips under an airport you serve, only where something is
- * wrong: "crews −2" when the crew base there is short of the legal minimum
- * for the planes flying today (or of a plane about to arrive), "slots full"
- * when the airport has no room for another daily pair (the inspector's
- * "next pair: full"). A healthy map draws none.
+ * wrong: a crew glyph and "−2" when the crew base there is short of the legal
+ * minimum for the planes flying today (or of a plane about to arrive), a red
+ * clock when the airport has no room for another daily pair (the inspector's
+ * "next pair: full"). Glyphs, not words, to keep them small. A healthy map
+ * draws none.
  */
 
 const CHIP_FONT = '10px ui-monospace, Consolas, monospace';
 const CHIP_HEIGHT = 13;
+const GLYPH_PX = 9;
 const CHIP_OFFSET_Y = 30; // below the "on its way" badges
 const CREWS_COLOUR = '#ffb347';
 const SLOTS_COLOUR = '#ff8080';
@@ -41,23 +43,47 @@ export function drawAirportChips(ctx: CanvasRenderingContext2D, state: SimState)
   ctx.textBaseline = 'middle';
   for (const airport of airports) {
     if (!isAirportKnown(airport.iata) || dailyDeparturesAt(state, airport.iata) === 0) continue;
-    const chips: { text: string; colour: string }[] = [];
+    const chips: { glyph: 'crew' | 'clock'; text: string; colour: string }[] = [];
     const missing = shortages.get(airport.iata);
-    if (missing) chips.push({ text: `crews −${missing}`, colour: CREWS_COLOUR });
-    if (nextSlotFees(state, airport.iata, 1)[0] === null) chips.push({ text: 'slots full', colour: SLOTS_COLOUR });
+    if (missing) chips.push({ glyph: 'crew', text: `−${missing}`, colour: CREWS_COLOUR });
+    if (nextSlotFees(state, airport.iata, 1)[0] === null) chips.push({ glyph: 'clock', text: '', colour: SLOTS_COLOUR });
     if (chips.length === 0) continue;
     const point = projection([airport.lon, airport.lat]);
     if (!point) continue;
     chips.forEach((chip, i) => {
       const y = point[1] + CHIP_OFFSET_Y + i * (CHIP_HEIGHT + 2);
-      const width = ctx.measureText(chip.text).width + 8;
+      const textWidth = chip.text ? ctx.measureText(chip.text).width + 2 : 0;
+      const width = GLYPH_PX + textWidth + 8;
+      const left = point[0] - width / 2;
       ctx.fillStyle = 'rgba(10, 12, 18, 0.88)';
-      ctx.fillRect(point[0] - width / 2, y - CHIP_HEIGHT / 2, width, CHIP_HEIGHT);
+      ctx.fillRect(left, y - CHIP_HEIGHT / 2, width, CHIP_HEIGHT);
       ctx.strokeStyle = chip.colour;
       ctx.lineWidth = 1;
-      ctx.strokeRect(point[0] - width / 2 + 0.5, y - CHIP_HEIGHT / 2 + 0.5, width - 1, CHIP_HEIGHT - 1);
+      ctx.strokeRect(left + 0.5, y - CHIP_HEIGHT / 2 + 0.5, width - 1, CHIP_HEIGHT - 1);
       ctx.fillStyle = chip.colour;
-      ctx.fillText(chip.text, point[0], y);
+      const glyphX = left + 4;
+      const glyphY = y - GLYPH_PX / 2;
+      if (chip.glyph === 'crew') {
+        ctx.save();
+        ctx.translate(glyphX, glyphY);
+        ctx.scale(GLYPH_PX / 24, GLYPH_PX / 24);
+        ctx.fill(CREW_GLYPH);
+        ctx.restore();
+      } else {
+        // A clock face: the slot is full.
+        const cx = glyphX + GLYPH_PX / 2;
+        ctx.beginPath();
+        ctx.arc(cx, y, GLYPH_PX / 2 - 0.5, 0, 2 * Math.PI);
+        ctx.moveTo(cx, y - 2.5);
+        ctx.lineTo(cx, y);
+        ctx.lineTo(cx + 2, y + 1.5);
+        ctx.stroke();
+      }
+      if (chip.text) {
+        ctx.textAlign = 'left';
+        ctx.fillText(chip.text, glyphX + GLYPH_PX + 2, y);
+        ctx.textAlign = 'center';
+      }
     });
   }
   ctx.restore();

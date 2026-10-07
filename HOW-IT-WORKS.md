@@ -911,10 +911,10 @@ The lens legend adds "width = seats a day".
 In Ops lens a route's label ends in ▲, ▼ or ≈: the fare set on the market
 against `recommendedFare()`, the going rate the route inspector quotes
 (≈ within 3%; `render/fareGap.ts`). An airport you serve gets a chip under
-its code only when something is wrong: `crews −N` (crew base short of the
-legal minimum for the planes flying today, else of the next plane arriving)
-or `slots full` (no room for another daily pair, as the airport inspector's
-"next pair: full"). A healthy map draws none (`render/airportChips.ts`).
+its code only when something is wrong: a crew glyph with `−N` (crew base
+short of the legal minimum for the planes flying today, else of the next
+plane arriving) or a red clock (no room for another daily pair, as the
+airport inspector's "next pair: full"). A healthy map draws none (`render/airportChips.ts`).
 
 **What's holding you back** (`sim/bottleneck.ts`, shown by `ui/alerts.ts`).
 In Ops lens, with a non-empty schedule, the alert strip ends with one
@@ -1241,7 +1241,9 @@ and `cancelledToday`, so it resets at the home midnight.
 ## Panel (`src/ui/panels.ts`)
 
 A real HTML sidebar, 420px wide, with a 56px **rail** down its left edge
-(`ui/rail.ts`): every screen one labelled click away, Overview · Routes ·
+(`ui/rail.ts`; 44px and icons only with a mouse, the label becoming a hover
+tip from `ui/mapTools.ts`, while a touch screen keeps the labels):
+every screen one click away, Overview · Routes ·
 Airports · Fleet · Crews · Mtc · Rivals · Money · Goals · Office, with Game and
 Hide at the foot. The rail stays with the panel hidden, and clicking an
 item then slides the panel open straight to that screen; clicking the
@@ -1271,7 +1273,7 @@ a rotation on the timeline, a where-to-fly suggestion) marks it on the
 map the way a selection is marked. Beside the breadcrumb, ‹ and › step
 back and forward through what you've opened, like a browser. A view
 with three or more sections (an airport, Routes, Head office) gets a
-row of jump chips pinned at its top, one per section. The canvas gets the width left
+row of jump chips pinned at its top, one per section (an icon with the heading as its tip where `ui/inspector/chipIcons.ts` knows one, else the heading's words). An airport's or route's title carries an air-rights mark (`ui/inspector/rights.ts`): a green shield when the home carrier may fly domestic routes there, a grey globe for international only, the details in its tip. The canvas gets the width left
 over (`--panel-width` covers rail and panel, kept in sync via
 `PANEL_WIDTH_PX` and `RAIL_WIDTH_PX`).
 

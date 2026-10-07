@@ -1,3 +1,4 @@
+import { chipIconFor } from './chipIcons';
 import { buildGoalsView } from './goals';
 import { buildHeadOfficeView } from './headOffice';
 import { buildMoneyView } from './money';
@@ -259,8 +260,17 @@ function addJumpChips(): void {
   for (const h of headings) {
     const chip = document.createElement('button');
     chip.type = 'button';
-    // The heading's own words, without its (i).
-    chip.textContent = (h.firstChild?.textContent ?? h.textContent ?? '').trim();
+    // The heading's own words, without its (i): the chip's text, or its tip when an icon stands in.
+    const words = (h.firstChild?.textContent ?? h.textContent ?? '').trim();
+    const icon = chipIconFor(words);
+    if (icon) {
+      chip.innerHTML = icon;
+      chip.classList.add('is-icon');
+      chip.dataset.tip = words;
+      chip.setAttribute('aria-label', words);
+    } else {
+      chip.textContent = words;
+    }
     chip.addEventListener('click', () => h.scrollIntoView({ block: 'start', behavior: 'smooth' }));
     chips.append(chip);
   }

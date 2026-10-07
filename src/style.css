@@ -716,6 +716,33 @@ button,
   background: #3a4258;
 }
 
+/* With a mouse the labels give way to the buttons' hover tips and the rail
+   narrows to icons; main.ts sets --rail-width to match. A touch screen has
+   no hover, so it keeps the labels. */
+@media (hover: hover) and (pointer: fine) {
+  .rail-label {
+    display: none;
+  }
+
+  .rail-item {
+    padding: 9px 0;
+  }
+
+  .rail-item svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .rail-dot {
+    right: 6px;
+  }
+
+  .rail-badge {
+    letter-spacing: 0.02em;
+    font-size: 7px;
+  }
+}
+
 /* A status dot: something on that screen wants a look (ui/rail.ts). */
 .rail-dot {
   position: absolute;
@@ -2931,6 +2958,23 @@ button.ticker-item:hover {
   outline: none;
 }
 
+/* The air-rights mark beside a title (ui/inspector/rights.ts): the Rights view's green for domestic rights, grey for international only. */
+.info-mark.rights-mark {
+  width: 18px;
+  height: 18px;
+  border: 0;
+  font-style: normal;
+}
+
+.info-mark.rights-mark svg {
+  width: 16px;
+  height: 16px;
+}
+
+.info-mark.rights-mark.is-domestic {
+  color: rgb(110, 220, 160);
+}
+
 /* Same floating-card treatment as the map's own tooltips, so an
    explanation looks like every other piece of hover content. */
 #info-tooltip {
@@ -3906,6 +3950,21 @@ button.ops-item:hover {
 .inspector-chips button:hover {
   color: #fff;
   border-color: #5ed6c8;
+}
+
+.inspector-chips button.is-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  border-radius: 6px;
+}
+
+.inspector-chips button.is-icon svg {
+  width: 15px;
+  height: 15px;
 }
 
 /* A section scrolled to by a chip stops clear of the pinned chips. */

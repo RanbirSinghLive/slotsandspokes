@@ -59,7 +59,8 @@ export function setupInfoTooltips(): void {
   if (!panel) return;
 
   const markFrom = (target: EventTarget | null): HTMLElement | null => {
-    if (!(target instanceof HTMLElement)) return null;
+    // An Element, not an HTMLElement: an icon mark's svg is the event target.
+    if (!(target instanceof Element)) return null;
     return target.closest<HTMLElement>('.info-mark');
   };
 
