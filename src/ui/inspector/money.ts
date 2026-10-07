@@ -149,9 +149,14 @@ export function buildMoneyView(state: SimState): HTMLElement {
   root.append(heading('Costs today'));
   const rows = document.createElement('div');
   rows.className = 'inspector-rows';
+  const total = costs.reduce((sum, [, amount]) => sum + (amount ?? 0), 0);
   for (const [kind, amount] of costs) {
     const row = document.createElement('div');
-    row.className = 'inspector-row';
+    row.className = 'inspector-row cost-row';
+    // Each row's share of the day's costs, drawn behind it so the shape reads at a glance.
+    const share = Math.round(((amount ?? 0) / total) * 100);
+    row.style.setProperty('--share', `${share}%`);
+    row.title = `${share}% of today's costs`;
     const name = document.createElement('span');
     name.textContent = COST_NAMES[kind] ?? kind;
     const detail = document.createElement('span');

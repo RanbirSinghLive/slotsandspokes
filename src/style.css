@@ -3564,6 +3564,11 @@ button.inspector-crumb:hover {
   color: #9aa3b8;
 }
 
+/* A cost row with its share of the day drawn behind it (ui/inspector/money.ts). */
+.cost-row {
+  background: linear-gradient(90deg, rgba(94, 214, 200, 0.16) var(--share), transparent var(--share));
+}
+
 .inspector-row-detail.is-over {
   color: #ff8080;
 }
