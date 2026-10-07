@@ -5,12 +5,14 @@ import { showConfirm } from './confirmModal';
 import { money, shortMoney } from './format';
 
 /**
- * Priority flights (sim/mandates.ts) on the page: an alert window when an
- * offer arrives, saying who is aboard, and a list in the Schedule panel with
- * Accept on every offer still open and a tally on each one running.
+ * Events (priority flights, sim/mandates.ts) on the page: an alert window when
+ * an offer arrives, saying who is aboard; a list in the Schedule panel with
+ * Accept on every offer still open and a tally on each one running; and an
+ * amber star chip on the HUD counting the ones open or running.
  */
 
 const listEl = document.querySelector<HTMLDivElement>('#mandates-list')!;
+const chipEl = document.querySelector<HTMLButtonElement>('#events-chip')!;
 
 /** Offers already put in front of the player this visit. Screen state, not saved: a reload lists them but doesn't pop them up again. */
 const announced = new Set<number>();
@@ -38,7 +40,7 @@ function showOffer(state: SimState, mandate: Mandate, refresh: () => void): void
   const story = STORIES[mandate.story];
   const today = dayIndex(state);
   showConfirm({
-    title: `PRIORITY FLIGHT · ${label(mandate)}`,
+    title: `EVENT · ${label(mandate)}`,
     tone: 'priority',
     intro: [`Carrying ${story.who}. ${story.headline}.`],
     rows: [
@@ -61,7 +63,7 @@ function row(state: SimState, mandate: Mandate, refresh: () => void): HTMLElemen
   el.className = 'mandate-row';
   const text = document.createElement('span');
   if (mandate.status === 'offered') {
-    text.textContent = `PRIORITY ${label(mandate)} · +${shortMoney(mandate.premium)}/flt · -${shortMoney(mandate.penalty)} fail · starts ${mandate.startDay - today}d · ${termFlights(mandate)}d term`;
+    text.textContent = `EVENT ${label(mandate)} · +${shortMoney(mandate.premium)}/flt · -${shortMoney(mandate.penalty)} fail · starts ${mandate.startDay - today}d · ${termFlights(mandate)}d term`;
     el.append(text);
     const button = document.createElement('button');
     button.type = 'button';
@@ -71,36 +73,54 @@ function row(state: SimState, mandate: Mandate, refresh: () => void): HTMLElemen
   } else {
     const net = `${mandate.netTotal >= 0 ? '+' : '-'}${shortMoney(Math.abs(mandate.netTotal))}`;
     const when = mandateIsActive(state, mandate) ? `${mandate.endDay - today}d left` : `starts ${mandate.startDay - today}d`;
-    text.textContent = `PRIORITY ${label(mandate)} · ${mandate.flown} flown · ${mandate.failed} failed · ${net} · ${when}`;
+    text.textContent = `EVENT ${label(mandate)} · ${mandate.flown} flown · ${mandate.failed} failed · ${net} · ${when}`;
     el.append(text);
   }
   return el;
 }
 
-/** Refresh the list and raise any new offer. Called once per rendered frame; rebuilds the DOM only when a row changes. */
-export function updateMandates(state: SimState, choosingHome: boolean): void {
+function chipTip(state: SimState, shown: Mandate[]): string {
+  const today = dayIndex(state);
+  return shown
+    .map((m) => (m.status === 'offered' ? `${label(m)} · offer · starts ${m.startDay - today}d` : `${label(m)} · ${mandateIsActive(state, m) ? `${m.endDay - today}d left` : `starts ${m.startDay - today}d`}`))
+    .join('\n');
+}
+
+
+/**
+ * Refresh the list and raise any new offer. Called once per rendered frame;
+ * rebuilds the DOM only when a row changes. Returns true on the frame a new
+ * offer is put in front of the player, so the caller can pause the clock.
+ */
+export function updateMandates(state: SimState, choosingHome: boolean, openSchedule: () => void): boolean {
   const shown = mandatesOf(state).filter((m) => m.status === 'offered' || m.status === 'accepted');
   const today = dayIndex(state);
   const next = shown.map((m) => `${m.id}:${m.status}:${m.flown}:${m.failed}:${m.netTotal}:${m.startDay - today}`).join('|');
   const refresh = () => {
     signature = null;
-    updateMandates(state, choosingHome);
+    updateMandates(state, choosingHome, openSchedule);
   };
   if (next !== signature) {
     signature = next;
     listEl.replaceChildren(...shown.map((m) => row(state, m, refresh)));
+    chipEl.textContent = `★ ${shown.length}`;
+    chipEl.title = chipTip(state, shown);
+    chipEl.hidden = shown.length === 0;
   }
+  chipEl.onclick = openSchedule;
   listEl.hidden = shown.length === 0;
 
   if (!primed) {
     for (const m of mandatesOf(state)) announced.add(m.id);
     primed = true;
-    return;
+    return false;
   }
-  if (choosingHome || document.querySelector('.modal-overlay:not([hidden])')) return;
+  if (choosingHome || document.querySelector('.modal-overlay:not([hidden])')) return false;
   const fresh = shown.find((m) => m.status === 'offered' && !announced.has(m.id));
   if (fresh) {
     announced.add(fresh.id);
     showOffer(state, fresh, refresh);
+    return true;
   }
+  return false;
 }

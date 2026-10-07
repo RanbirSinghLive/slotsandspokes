@@ -3851,6 +3851,15 @@ button.inspector-crumb:hover {
   font-variant-numeric: tabular-nums;
 }
 
+#ops-items {
+  display: contents;
+}
+
+#events-chip {
+  color: #ffb454;
+  cursor: pointer;
+}
+
 button.ops-item {
   cursor: pointer;
 }

@@ -11,7 +11,7 @@ import { select } from './selection';
  * On-time tab, which breaks cancellations down by cause.
  */
 
-const boardEl = document.querySelector<HTMLDivElement>('#ops-board')!;
+const boardEl = document.querySelector<HTMLDivElement>('#ops-items')!;
 
 type Today = { landed: number; airborne: number; toGo: number; late: number; cancelled: number; worst: { a: string; b: string } | null };
 
