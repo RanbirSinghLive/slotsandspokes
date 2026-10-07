@@ -9,7 +9,7 @@
   --panel-width: 476px;
   /* Must match RAIL_WIDTH_PX in main.ts. --panel-width covers the rail
      and the panel beside it; hiding the panel leaves just the rail. */
-  --rail-width: 56px;
+  --rail-width: 44px;
 }
 
 html,
@@ -744,30 +744,25 @@ button,
   background: #3a4258;
 }
 
-/* With a mouse the labels give way to the buttons' hover tips and the rail
-   narrows to icons; main.ts sets --rail-width to match. A touch screen has
-   no hover, so it keeps the labels. */
-@media (hover: hover) and (pointer: fine) {
-  .rail-label {
-    display: none;
-  }
+/* The labels give way to the buttons' tips (hover, or a tap on touch) and the
+   rail narrows to icons; main.ts sets --rail-width to match. */
+.rail-label {
+  display: none;
+}
 
+.rail-item {
+  padding: 9px 0;
+}
+
+.rail-item svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* A thumb needs a taller target than a pointer does. */
+@media (pointer: coarse) {
   .rail-item {
-    padding: 9px 0;
-  }
-
-  .rail-item svg {
-    width: 20px;
-    height: 20px;
-  }
-
-  .rail-dot {
-    right: 6px;
-  }
-
-  .rail-badge {
-    letter-spacing: 0.02em;
-    font-size: 7px;
+    padding: 12px 0;
   }
 }
 
@@ -775,7 +770,7 @@ button,
 .rail-dot {
   position: absolute;
   top: 4px;
-  right: 9px;
+  right: 6px;
   width: 7px;
   height: 7px;
   border-radius: 50%;
@@ -4245,12 +4240,12 @@ button.ops-item:hover {
 
 /* The rail's Alpha badge (main.ts): opens the Game screen. */
 .rail-badge {
-  margin: 0 4px 6px;
+  margin: 0 2px 6px;
   padding: 3px 0;
   font: inherit;
-  font-size: 8px;
+  font-size: 7px;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.04em;
   color: #0a0c12;
   background: #e8c170;
   border: none;
