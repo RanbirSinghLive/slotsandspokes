@@ -1,87 +1,98 @@
-import { geoPath } from 'd3-geo';
+import { geoInterpolate, geoPath } from 'd3-geo';
 import { projection } from './projection';
 import { airports, isAirportKnown } from './airports';
-import { CARGO_GOODS, airportCargoVolume, bestCargoPartners, lanesBetween, laneDollarsPerDay } from '../sim/cargo';
+import { CARGO_GOODS, airportCargo, bestCargoPartners, lanesBetween, laneDollarsPerDay, producedTonnes, neededTonnes, type Lane } from '../sim/cargo';
 import type { SimState } from '../sim/state';
 
 /**
- * The Cargo lens: where the goods are, readable at a glance (sim/cargo.ts).
+ * The Cargo lens: which goods an airport makes and which it needs, read
+ * from pictures and two colours, with no words.
  *
- * - **A circle per airport**, sized by the tonnes a day it makes and needs,
- *   amber where it mostly ships (▲ makes) and teal where it mostly takes in
- *   (▼ needs).
- * - **Your routes that carry freight**: a line coloured by the good that
- *   pays most on the pair, thicker the more matched freight a day.
- * - **Lines only on request**: hovering (or selecting) an airport draws its
- *   best matched partners, dashed where you don't fly them yet.
+ * - **A badge is a good**: a round icon (a fish for seafood). An **amber**
+ *   ring with a ▲ means the airport makes it, a **teal** ring with a ▼
+ *   means it needs it.
+ * - **A lane is amber to teal**: a line shaded from the airport that
+ *   makes the good to the one that needs it, the good's icon at its middle.
+ * - **Idle**: each airport shows its specialty and its biggest need, thinned
+ *   so badges never overlap; airports on your routes come first. Your
+ *   freight-carrying routes are drawn as lanes, thicker the more it pays.
+ * - **Focus** (hover or select an airport): everything else drops away and
+ *   you see that airport's goods, its best partners, and only the goods
+ *   that match between them. Dashed lanes are ones you don't fly yet.
  *
  * Reads only sim/cargo.ts's numbers, and draws under the airport dots.
  */
 
-/** One colour per good; main.ts's legend swatches are literally these. */
-export const CARGO_GOOD_COLORS: Record<string, string> = {
-  seafood: '#4aa3df',
-  produce: '#7fd88f',
-  autoparts: '#b0b6c3',
-  aerospace: '#c792ea',
-  electronics: '#ffd166',
-  parcels: '#e8a87c',
-  medical: '#ff7f9f',
-  minerals: '#a67c52',
-  supplies: '#5ed6c4',
-  textiles: '#e07bd8',
+/** One icon per good, in the order of data/cargo-goods.json. */
+export const CARGO_GOOD_GLYPHS: Record<string, string> = {
+  seafood: '🐟',
+  produce: '🥬',
+  autoparts: '⚙️',
+  aerospace: '🚀',
+  electronics: '💻',
+  parcels: '📦',
+  medical: '💊',
+  minerals: '⛏️',
+  supplies: '🧰',
+  textiles: '👕',
 };
 
-const MAKES_RGB: [number, number, number] = [255, 179, 71];
-const NEEDS_RGB: [number, number, number] = [94, 214, 196];
+export function cargoGlyph(goodId: string): string {
+  return CARGO_GOOD_GLYPHS[goodId] ?? '•';
+}
+
+export const MAKES_COLOR = '#ffb347';
+export const NEEDS_COLOR = '#5ed6c4';
+const BADGE_RADIUS = 9;
+const BADGE_FONT = '11px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+/** Idle badges closer than this on screen are thinned to the busier airport. */
+const IDLE_MIN_GAP_PX = 34;
 const FOCUS_PARTNERS = 6;
 const FLOWN_MIN_WIDTH = 1.5;
 const FLOWN_MAX_WIDTH = 5;
 /** Daily dollars of matched freight that draw a flown route at full width. */
 const FULL_WIDTH_DOLLARS = 4000;
+/** Lanes shorter than this on screen skip the middle icon. */
+const MIN_LANE_PX_FOR_ICON = 48;
 
 const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]));
-const volumeByAirport = new Map<string, { makes: number; needs: number }>();
+/** Airports in busiest-first order for thinning idle badges, computed once. */
+const airportsBusiestFirst = airports
+  .map((airport) => {
+    const cargo = airportCargo(airport.iata);
+    const volume =
+      cargo.produces.reduce((total, id) => total + producedTonnes(airport.iata, id), 0) +
+      cargo.needs.reduce((total, id) => total + neededTonnes(airport.iata, id), 0);
+    return { airport, cargo, volume };
+  })
+  .filter((entry) => entry.volume > 0)
+  .sort((x, y) => y.volume - x.volume);
 
-function volumeAt(iata: string): { makes: number; needs: number } {
-  let volume = volumeByAirport.get(iata);
-  if (!volume) {
-    volume = airportCargoVolume(iata);
-    volumeByAirport.set(iata, volume);
-  }
-  return volume;
-}
+type FlownLane = { lane: Lane; dollarsPerDay: number; bothWays: boolean };
 
-/** The pair's lanes both ways, with the good that pays most and the total matched dollars a day. */
-function pairSummary(a: string, b: string): { topGood: string; dollarsPerDay: number } | null {
-  const lanes = [...lanesBetween(a, b), ...lanesBetween(b, a)];
-  if (lanes.length === 0) return null;
-  let top = lanes[0];
-  let total = 0;
-  for (const lane of lanes) {
-    const dollars = laneDollarsPerDay(lane);
-    total += dollars;
-    if (dollars > laneDollarsPerDay(top)) top = lane;
-  }
-  return { topGood: top.good.id, dollarsPerDay: total };
-}
+let flownCache: { signature: string; lanes: FlownLane[]; ends: Set<string> } | null = null;
 
-let flownCache: { signature: string; pairs: { a: string; b: string; topGood: string; dollarsPerDay: number }[] } | null = null;
-
-/** Your flown markets that have matched freight, cached until the schedule changes. */
-function flownLanes(state: SimState): { a: string; b: string; topGood: string; dollarsPerDay: number }[] {
+/** The best lane each way on each market you fly, cached until the schedule changes. */
+function flownLanes(state: SimState): { lanes: FlownLane[]; ends: Set<string> } {
   const markets = new Map<string, [string, string]>();
   for (const leg of state.schedule) markets.set(leg.origin < leg.dest ? `${leg.origin}-${leg.dest}` : `${leg.dest}-${leg.origin}`, [leg.origin, leg.dest]);
   const signature = [...markets.keys()].sort().join('|');
   if (flownCache?.signature !== signature) {
-    const pairs: { a: string; b: string; topGood: string; dollarsPerDay: number }[] = [];
+    const lanes: FlownLane[] = [];
+    const ends = new Set<string>();
     for (const [a, b] of markets.values()) {
-      const summary = pairSummary(a, b);
-      if (summary) pairs.push({ a, b, ...summary });
+      const forward = lanesBetween(a, b)[0];
+      const back = lanesBetween(b, a)[0];
+      for (const lane of [forward, back]) {
+        if (!lane) continue;
+        lanes.push({ lane, dollarsPerDay: laneDollarsPerDay(lane), bothWays: Boolean(forward && back) });
+        ends.add(a);
+        ends.add(b);
+      }
     }
-    flownCache = { signature, pairs };
+    flownCache = { signature, lanes, ends };
   }
-  return flownCache.pairs;
+  return flownCache;
 }
 
 let focusCache: { iata: string; known: number; partners: ReturnType<typeof bestCargoPartners> } | null = null;
@@ -97,64 +108,162 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-/** `focus` is the airport whose partners get lines: the hovered one, else the selected one, else none. */
-export function drawCargoLayer(ctx: CanvasRenderingContext2D, state: SimState, focus: string | null): void {
-  const path = geoPath(projection, ctx);
-
-  for (const airport of airports) {
-    if (!isAirportKnown(airport.iata)) continue;
-    const { makes, needs } = volumeAt(airport.iata);
-    const total = makes + needs;
-    if (total <= 0) continue;
-    const point = projection([airport.lon, airport.lat]);
-    if (!point) continue;
-    const makesShare = makes / total;
-    const rgb = [0, 1, 2].map((i) => Math.round(lerp(NEEDS_RGB[i], MAKES_RGB[i], makesShare)));
-    const radius = 2 + 1.4 * Math.sqrt(total);
-    ctx.beginPath();
-    ctx.arc(point[0], point[1], radius, 0, 2 * Math.PI);
-    ctx.fillStyle = `rgba(${rgb.join(', ')}, 0.3)`;
-    ctx.fill();
-    ctx.strokeStyle = `rgba(${rgb.join(', ')}, 0.75)`;
-    ctx.lineWidth = 1;
-    ctx.stroke();
-  }
-
-  for (const lane of flownLanes(state)) {
-    const from = airportsByIata.get(lane.a);
-    const to = airportsByIata.get(lane.b);
-    if (!from || !to || !isAirportKnown(lane.a) || !isAirportKnown(lane.b)) continue;
-    ctx.beginPath();
-    path({ type: 'LineString', coordinates: [[from.lon, from.lat], [to.lon, to.lat]] });
-    ctx.strokeStyle = CARGO_GOOD_COLORS[lane.topGood] ?? '#9aa3b8';
-    ctx.globalAlpha = 0.9;
-    ctx.lineWidth = lerp(FLOWN_MIN_WIDTH, FLOWN_MAX_WIDTH, Math.min(1, lane.dollarsPerDay / FULL_WIDTH_DOLLARS));
-    ctx.stroke();
-  }
-  ctx.globalAlpha = 1;
-
-  if (!focus || !isAirportKnown(focus)) return;
-  const origin = airportsByIata.get(focus);
-  if (!origin) return;
-  const flown = new Set(state.schedule.map((leg) => (leg.origin === focus ? leg.dest : leg.origin)));
-  const partners = focusPartners(state, focus);
-  const biggest = partners[0]?.dollarsPerDay || 1;
-  ctx.save();
-  for (const entry of partners) {
-    const to = airportsByIata.get(entry.partner);
-    if (!to || !isAirportKnown(entry.partner)) continue;
-    ctx.beginPath();
-    path({ type: 'LineString', coordinates: [[origin.lon, origin.lat], [to.lon, to.lat]] });
-    ctx.setLineDash(flown.has(entry.partner) ? [] : [5, 4]);
-    ctx.strokeStyle = CARGO_GOOD_COLORS[entry.goods[0]] ?? '#9aa3b8';
-    ctx.globalAlpha = 0.85;
-    ctx.lineWidth = 1 + 3 * (entry.dollarsPerDay / biggest);
-    ctx.stroke();
-  }
-  ctx.restore();
+/** One good as a round icon: amber ring and ▲ for "makes", teal ring and ▼ for "needs". */
+function drawBadge(ctx: CanvasRenderingContext2D, x: number, y: number, goodId: string, role: 'makes' | 'needs'): void {
+  const color = role === 'makes' ? MAKES_COLOR : NEEDS_COLOR;
+  ctx.beginPath();
+  ctx.arc(x, y, BADGE_RADIUS, 0, 2 * Math.PI);
+  ctx.fillStyle = 'rgba(14, 18, 28, 0.88)';
+  ctx.fill();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.font = BADGE_FONT;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#fff';
+  ctx.fillText(cargoGlyph(goodId), x, y + 0.5);
+  // The triangle repeats the ring colour for anyone who can't tell amber from teal.
+  const tipY = role === 'makes' ? y - BADGE_RADIUS - 4 : y + BADGE_RADIUS + 4;
+  const baseY = role === 'makes' ? y - BADGE_RADIUS : y + BADGE_RADIUS;
+  ctx.beginPath();
+  ctx.moveTo(x, tipY);
+  ctx.lineTo(x - 3.5, baseY);
+  ctx.lineTo(x + 3.5, baseY);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
 }
 
-/** Legend rows for main.ts: every good with its colour and name. */
-export function cargoLegend(): { color: string; label: string }[] {
-  return CARGO_GOODS.map((good) => ({ color: CARGO_GOOD_COLORS[good.id] ?? '#9aa3b8', label: good.name }));
+/** A row of badges centred on `x`. */
+function drawBadgeRow(ctx: CanvasRenderingContext2D, x: number, y: number, goodIds: string[], role: 'makes' | 'needs'): void {
+  const step = BADGE_RADIUS * 2 + 3;
+  const left = x - ((goodIds.length - 1) * step) / 2;
+  goodIds.forEach((id, index) => drawBadge(ctx, left + index * step, y, id, role));
+}
+
+/** A lane: a line shaded amber (makes) to teal (needs), with the good's icon at its middle. */
+function drawLane(ctx: CanvasRenderingContext2D, lane: Lane, width: number, dashed: boolean, offsetPx: number): void {
+  const from = airportsByIata.get(lane.from);
+  const to = airportsByIata.get(lane.to);
+  if (!from || !to) return;
+  const start = projection([from.lon, from.lat]);
+  const end = projection([to.lon, to.lat]);
+  const middle = projection(geoInterpolate([from.lon, from.lat], [to.lon, to.lat])(0.5));
+  if (!start || !end || !middle) return;
+  const length = Math.hypot(end[0] - start[0], end[1] - start[1]);
+  const dx = length > 0 ? (-(end[1] - start[1]) / length) * offsetPx : 0;
+  const dy = length > 0 ? ((end[0] - start[0]) / length) * offsetPx : 0;
+  const gradient = ctx.createLinearGradient(start[0], start[1], end[0], end[1]);
+  gradient.addColorStop(0, MAKES_COLOR);
+  gradient.addColorStop(1, NEEDS_COLOR);
+  ctx.save();
+  ctx.translate(dx, dy);
+  ctx.beginPath();
+  geoPath(projection, ctx)({ type: 'LineString', coordinates: [[from.lon, from.lat], [to.lon, to.lat]] });
+  ctx.setLineDash(dashed ? [5, 4] : []);
+  ctx.strokeStyle = gradient;
+  ctx.globalAlpha = 0.9;
+  ctx.lineWidth = width;
+  ctx.stroke();
+  ctx.restore();
+  if (length >= MIN_LANE_PX_FOR_ICON) {
+    ctx.save();
+    ctx.translate(dx, dy);
+    ctx.font = BADGE_FONT;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.beginPath();
+    ctx.arc(middle[0], middle[1], 8, 0, 2 * Math.PI);
+    ctx.fillStyle = 'rgba(14, 18, 28, 0.88)';
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.fillText(cargoGlyph(lane.good.id), middle[0], middle[1] + 0.5);
+    ctx.restore();
+  }
+}
+
+/** `focus` is the airport whose partners get lanes: the hovered one, else the selected one, else none. */
+export function drawCargoLayer(ctx: CanvasRenderingContext2D, state: SimState, focus: string | null): void {
+  const focused = focus !== null && isAirportKnown(focus) && airportsByIata.has(focus);
+  if (focused) drawFocus(ctx, state, focus);
+  else drawIdle(ctx, state);
+  ctx.globalAlpha = 1;
+}
+
+function drawIdle(ctx: CanvasRenderingContext2D, state: SimState): void {
+  const { lanes, ends } = flownLanes(state);
+  for (const entry of lanes) {
+    if (!isAirportKnown(entry.lane.from) || !isAirportKnown(entry.lane.to)) continue;
+    const width = lerp(FLOWN_MIN_WIDTH, FLOWN_MAX_WIDTH, Math.min(1, entry.dollarsPerDay / FULL_WIDTH_DOLLARS));
+    drawLane(ctx, entry.lane, width, false, entry.bothWays ? 2.5 : 0);
+  }
+
+  // Badges: your airports first, then the busiest, skipping any too close to one already placed.
+  const ordered = [...airportsBusiestFirst].sort((x, y) => Number(ends.has(y.airport.iata)) - Number(ends.has(x.airport.iata)));
+  const placed: [number, number][] = [];
+  for (const { airport, cargo } of ordered) {
+    if (!isAirportKnown(airport.iata)) continue;
+    const point = projection([airport.lon, airport.lat]);
+    if (!point) continue;
+    if (placed.some((other) => Math.hypot(other[0] - point[0], other[1] - point[1]) < IDLE_MIN_GAP_PX)) continue;
+    placed.push(point);
+    const makes = cargo.produces[0];
+    const needs = cargo.needs[0];
+    const gap = BADGE_RADIUS + 2;
+    if (makes && needs) {
+      drawBadge(ctx, point[0] - gap, point[1] - BADGE_RADIUS - 6, makes, 'makes');
+      drawBadge(ctx, point[0] + gap, point[1] - BADGE_RADIUS - 6, needs, 'needs');
+    } else if (makes) drawBadge(ctx, point[0], point[1] - BADGE_RADIUS - 6, makes, 'makes');
+    else if (needs) drawBadge(ctx, point[0], point[1] - BADGE_RADIUS - 6, needs, 'needs');
+  }
+}
+
+function drawFocus(ctx: CanvasRenderingContext2D, state: SimState, focus: string): void {
+  // A veil over the routes and basemap drawn so far, so the lanes and icons are what you read.
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = 'rgba(8, 11, 18, 0.6)';
+  ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  ctx.restore();
+  const flown = new Set(state.schedule.map((leg) => (leg.origin === focus ? leg.dest : leg.origin)));
+  const partners = focusPartners(state, focus).filter((entry) => isAirportKnown(entry.partner));
+  const biggest = partners[0]?.dollarsPerDay || 1;
+
+  // Lanes first, so the badges sit on top of them.
+  for (const entry of partners) {
+    const outbound = lanesBetween(focus, entry.partner);
+    const inbound = lanesBetween(entry.partner, focus);
+    const bothWays = outbound.length > 0 && inbound.length > 0;
+    const width = 1 + 3 * (entry.dollarsPerDay / biggest);
+    const dashed = !flown.has(entry.partner);
+    if (outbound[0]) drawLane(ctx, outbound[0], width, dashed, bothWays ? 2.5 : 0);
+    if (inbound[0]) drawLane(ctx, inbound[0], width, dashed, bothWays ? 2.5 : 0);
+  }
+
+  // Partners show only the goods that match with the focus, so what lines up is what you see.
+  for (const entry of partners) {
+    const airport = airportsByIata.get(entry.partner);
+    const point = airport && projection([airport.lon, airport.lat]);
+    if (!point) continue;
+    const makes = lanesBetween(entry.partner, focus).map((lane) => lane.good.id);
+    const needs = lanesBetween(focus, entry.partner).map((lane) => lane.good.id);
+    const above = point[1] - BADGE_RADIUS - 6;
+    if (makes.length > 0) drawBadgeRow(ctx, point[0], above, makes, 'makes');
+    if (needs.length > 0) drawBadgeRow(ctx, point[0], makes.length > 0 ? above - BADGE_RADIUS * 2 - 8 : above, needs, 'needs');
+  }
+
+  // The focus airport shows everything it makes (above) and needs (below).
+  const origin = airportsByIata.get(focus);
+  const point = origin && projection([origin.lon, origin.lat]);
+  const cargo = airportCargo(focus);
+  if (point) {
+    drawBadgeRow(ctx, point[0], point[1] - BADGE_RADIUS - 6, cargo.produces, 'makes');
+    drawBadgeRow(ctx, point[0], point[1] + BADGE_RADIUS + 6, cargo.needs, 'needs');
+  }
+}
+
+/** The key under the lens: each good's icon and name (the name is its hover tip). */
+export function cargoLegend(): { glyph: string; label: string }[] {
+  return CARGO_GOODS.map((good) => ({ glyph: cargoGlyph(good.id), label: good.name }));
 }

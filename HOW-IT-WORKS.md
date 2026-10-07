@@ -2386,10 +2386,16 @@ one.
   partners among the airports you reach, by matched dollars a day at the
   base rate (`bestCargoPartners()`); the Money screen shows yesterday's
   freight and the lifetime total; the **Cargo lens** (key 6,
-  `render/cargo.ts`) draws a circle per airport (amber where it mostly
-  makes, teal where it mostly needs), your freight-carrying routes in
-  the colour of their best good, and the hovered or selected airport's
-  best partners (dashed where you don't fly them).
+  `render/cargo.ts`) shows goods as icons, with no words: a round badge
+  per good (a fish for seafood), ringed amber with a ▲ where the airport
+  makes it and teal with a ▼ where it needs it. A lane is a line shaded
+  amber to teal from the maker to the taker, the good's icon at its
+  middle. Idle, each airport shows its specialty and biggest need
+  (thinned so badges don't overlap, your airports first) and your
+  freight-carrying routes are drawn as lanes, thicker the more they pay.
+  Hovering or selecting an airport veils the rest of the map and shows
+  its goods, its best partners, and only the goods that match between
+  them (dashed lanes: not flown yet). Hub views are off in this lens.
 
 Not built: cargo terminals and shipper contracts, freighters, goods
 that change hands through a hub, a prop cargo hold (props carry what
