@@ -411,7 +411,7 @@ function render(nowMs: number = performance.now()): void {
   // unless the Competition overlay's own card is covering airports.
   const hoveredAirport =
     hoverPoint && !hoveredFlight && !isRouteBuilderActive() && !isMapMenuOpen() ? nearestAirportCandidate(hoverPoint.x, hoverPoint.y) : null;
-  if (hoveredAirport && hasHubView(state, hoveredAirport.airport.iata)) drawHubView(ctx, state, hoveredAirport.airport.iata);
+  if (hoveredAirport && !cargoOverlayOn && hasHubView(state, hoveredAirport.airport.iata)) drawHubView(ctx, state, hoveredAirport.airport.iata);
   if (hoveredAirport && hoverPoint && !competitionOverlayOn) {
     showAirportTooltip(state, hoveredAirport.airport.iata, hoverPoint.x, hoverPoint.y);
   } else {
@@ -784,13 +784,12 @@ function updateLensLegend(): void {
     lensLegendTitle.textContent = 'Rival networks · pick one to narrow';
     lensLegendScale.innerHTML = '';
   } else if (lens === 'cargo') {
-    lensLegendTitle.textContent = 'Cargo · hover an airport for its best matches';
+    lensLegendTitle.textContent = 'Cargo · hover an airport';
     lensLegendScale.innerHTML =
-      swatch('rgb(255, 179, 71)', '▲ makes more') +
-      swatch('rgb(94, 214, 196)', '▼ needs more') +
-      '<div class="legend-note"><span>line colour = good · width = $/day · dashed = not flown</span></div>' +
+      '<div class="legend-note"><span class="cargo-key-ring is-makes">▲</span><span class="cargo-key-lane"></span><span class="cargo-key-ring is-needs">▼</span>' +
+      '<span class="cargo-key-lane is-dashed" title="not flown yet"></span></div>' +
       cargoLegend()
-        .map((entry) => `<div class="legend-good"><span class="mapmode-legend-swatch" style="background:${entry.color}"></span><span>${entry.label}</span></div>`)
+        .map((entry) => `<div class="legend-good" title="${entry.label}"><span>${entry.glyph}</span></div>`)
         .join('');
   }
 }

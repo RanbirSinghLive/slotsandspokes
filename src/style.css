@@ -363,7 +363,35 @@ button,
   display: none;
 }
 
+/* The Cargo key: ▲ makes, amber to teal lane, ▼ needs, dashed lane = not flown. */
+.cargo-key-ring {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  line-height: 13px;
+  text-align: center;
+  font-size: 9px;
+  border-radius: 50%;
+  border: 2px solid;
+  box-sizing: border-box;
+}
+.cargo-key-ring.is-makes { border-color: #ffb347; color: #ffb347; }
+.cargo-key-ring.is-needs { border-color: #5ed6c4; color: #5ed6c4; }
+.cargo-key-lane {
+  display: inline-block;
+  width: 36px;
+  height: 3px;
+  margin: 0 5px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #ffb347, #5ed6c4);
+}
+.cargo-key-lane.is-dashed {
+  background: repeating-linear-gradient(90deg, #9aa3b8 0 5px, transparent 5px 9px);
+  width: 24px;
+}
+
 #lens-legend-scale.is-wrapped > div.legend-note {
+  align-items: center;
   flex-basis: 100%;
   justify-content: flex-end;
 }

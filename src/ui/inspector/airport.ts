@@ -30,7 +30,8 @@ import { aircraftLink } from './aircraft';
 import { linkToMap } from '../mapLink';
 import { airportRightsMark } from './rights';
 import { contractsOf } from '../../sim/contracts';
-import { airportCargo, bestCargoPartners, cargoGood, neededTonnes, producedTonnes, shortagePremium } from '../../sim/cargo';
+import { cargoGlyph } from '../../render/cargo';
+import { airportCargo, bestCargoPartners, neededTonnes, producedTonnes, shortagePremium } from '../../sim/cargo';
 
 /**
  * The inspector's view of one airport (ui/inspector/inspector.ts): how
@@ -168,18 +169,18 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
 function cargoLines(state: SimState, iata: string): HTMLElement[] {
   const cargo = airportCargo(iata);
   const tonnes = (n: number) => `${n.toFixed(1)} t/d`;
-  const makes = cargo.produces.map((id) => `${cargoGood(id).name} ${tonnes(producedTonnes(iata, id))}`);
+  const makes = cargo.produces.map((id) => `${cargoGlyph(id)} ${tonnes(producedTonnes(iata, id))}`);
   const needs = cargo.needs.map((id) => {
     const premium = shortagePremium(state, iata, id);
-    return `${cargoGood(id).name} ${tonnes(neededTonnes(iata, id))}${premium >= 0.05 ? ` +${Math.round(premium * 100)}%` : ''}`;
+    return `${cargoGlyph(id)} ${tonnes(neededTonnes(iata, id))}${premium >= 0.05 ? ` +${Math.round(premium * 100)}%` : ''}`;
   });
   const lines = [
     lineWithInfo(
-      `Makes ▲ ${makes.join(' · ')}`,
+      `▲ ${makes.join(' · ')}`,
       'Goods this airport ships out each day, from its trade. The first is its specialty. Freight earns where one end makes what the other needs, whatever the passenger demand: a small town can be a rich origin. Flights carry it in the hold the passengers\' bags leave free.',
     ),
     lineWithInfo(
-      `Needs ▼ ${needs.join(' · ')}`,
+      `▼ ${needs.join(' · ')}`,
       'Goods this airport takes in each day. A need nobody is filling pays a shortage premium (+%), which fades as you fill it and comes back if you stop, so the edge is temporary.',
     ),
   ];
@@ -192,7 +193,7 @@ function cargoLines(state: SimState, iata: string): HTMLElement[] {
         'The airports you can reach whose goods best match this one\'s, by matched freight a day at the base rate, both ways, before the hold limit and any rival. A lane only earns on a market you fly.',
       ),
       ...partners.map((entry) =>
-        line(`${entry.partner} · ${entry.goods.map((id) => cargoGood(id).name).join(', ')} · ${shortMoney(entry.dollarsPerDay)}/day${flown.has(entry.partner) ? ' · flown' : ''}`, flown.has(entry.partner) ? 'inspector-line is-good' : 'inspector-line'),
+        line(`${entry.partner} · ${entry.goods.map((id) => cargoGlyph(id)).join('')} · ${shortMoney(entry.dollarsPerDay)}/day${flown.has(entry.partner) ? ' · flown' : ''}`, flown.has(entry.partner) ? 'inspector-line is-good' : 'inspector-line'),
       ),
     );
   }
