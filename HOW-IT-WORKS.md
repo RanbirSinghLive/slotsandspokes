@@ -3476,7 +3476,7 @@ who may fly or overfly where is the rights layer, not this.
   line for each flight on a detour. Only closures within 600 nm of a known
   airport are drawn or announced. The ticker and alert strip carry each stage.
 
-## Priority flights (`src/sim/mandates.ts`)
+## Events (priority flights, `src/sim/mandates.ts`)
 
 An offer to carry someone who must get there on time, on a route already
 flown: a touring band, a delegation, a children's wish trip. A window opens
@@ -3497,8 +3497,10 @@ failure costs.
 - **Priority.** `rollDailyCrews()` crews a plane flying a priority flight
   first, so a shortage falls on another plane. There is no curfew or
   turn-buffer exemption.
-- **UI.** The offer window and a list at the top of the Schedule panel;
-  Ops-lens stars on running routes. The headless player accepts when the plane's
+- **UI.** The offer window, which pauses the clock (Space resumes); an amber
+  ★ count in the HUD ops row that opens the Fleet screen, its tip listing each
+  open or running event; a list at the top of the Schedule panel; Ops-lens
+  stars on running routes. The headless player accepts when the plane's
   base has a spare crew and won't drop a market carrying one.
 
 ## What isn't built yet

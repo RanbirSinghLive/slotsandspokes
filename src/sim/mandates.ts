@@ -139,9 +139,9 @@ export function acceptMandate(state: SimState, id: number): { ok: true; message:
   if (!mandate) return { ok: false, reason: 'No such offer.' };
   if (mandate.status !== 'offered') return { ok: false, reason: 'No longer on offer.' };
   if (dayIndex(state) >= mandate.startDay) return { ok: false, reason: 'The offer has lapsed.' };
-  if (mandatesOf(state).filter((m) => m.status === 'accepted').length >= MAX_ACCEPTED) return { ok: false, reason: `Already carrying ${MAX_ACCEPTED} priority flights.` };
+  if (mandatesOf(state).filter((m) => m.status === 'accepted').length >= MAX_ACCEPTED) return { ok: false, reason: `Already carrying ${MAX_ACCEPTED} events.` };
   mandate.status = 'accepted';
-  return { ok: true, message: `Priority flight accepted · ${mandate.origin}-${mandate.dest}` };
+  return { ok: true, message: `Event accepted · ${mandate.origin}-${mandate.dest}` };
 }
 
 function settle(state: SimState, mandate: Mandate, amount: number): void {

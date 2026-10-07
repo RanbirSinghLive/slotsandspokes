@@ -35,7 +35,7 @@ const PIXELS_PER_SECOND = 60;
  * ("AOG YUL · C-P002 · hydraulics · back 3d"). Kept apart from the text so
  * the ticker can style it on its own.
  */
-type TickerTag = 'AOG' | 'CNX' | 'CREW' | 'FLEET' | 'LESSOR' | 'RIVAL' | 'FARE' | 'FUEL' | 'SHOCK' | 'AIRSPACE' | 'PRIORITY' | 'WX' | 'GOAL' | 'REACH' | 'CONTRACT' | 'EVENT';
+type TickerTag = 'AOG' | 'CNX' | 'CREW' | 'FLEET' | 'LESSOR' | 'RIVAL' | 'FARE' | 'FUEL' | 'SHOCK' | 'AIRSPACE' | 'EVENT' | 'WX' | 'GOAL' | 'REACH' | 'CONTRACT';
 
 /**
  * A line, and the inspector view that explains it, when one does: clicking
@@ -251,10 +251,10 @@ function pollAirspaceEvents(state: SimState): void {
   seenClosures = now;
 }
 
-// Each priority flight's status and whether it was running at the last poll (sim/mandates.ts).
+// Each event's status and whether it was running at the last poll (sim/mandates.ts).
 let seenMandates: Map<number, string> | undefined;
 
-/** A priority flight offered, starting and finished. */
+/** An event offered, starting and finished. */
 function pollMandateEvents(state: SimState): void {
   const now = new Map(mandatesOf(state).map((m) => [m.id, `${m.status}:${mandateIsActive(state, m)}`]));
   if (seenMandates) {
@@ -263,9 +263,9 @@ function pollMandateEvents(state: SimState): void {
       const after = now.get(m.id);
       if (before === after) continue;
       const route = `${m.origin}-${m.dest}`;
-      if (m.status === 'offered' && before === undefined) pushEvent(state.simMinute, 'PRIORITY', `${route} offered · +${shortMoney(m.premium)}/flt`, { kind: 'fleet' }, true);
-      else if (m.status === 'accepted' && mandateIsActive(state, m)) pushEvent(state.simMinute, 'PRIORITY', `${route} starts today · ${shortMoney(m.premium)}/flt`);
-      else if (m.status === 'ended') pushEvent(state.simMinute, 'PRIORITY', `${route} done · ${m.flown} flown · ${m.failed} failed · ${m.netTotal >= 0 ? '+' : '-'}${shortMoney(Math.abs(m.netTotal))}`);
+      if (m.status === 'offered' && before === undefined) pushEvent(state.simMinute, 'EVENT', `${route} offered · +${shortMoney(m.premium)}/flt`, { kind: 'fleet' }, true);
+      else if (m.status === 'accepted' && mandateIsActive(state, m)) pushEvent(state.simMinute, 'EVENT', `${route} starts today · ${shortMoney(m.premium)}/flt`);
+      else if (m.status === 'ended') pushEvent(state.simMinute, 'EVENT', `${route} done · ${m.flown} flown · ${m.failed} failed · ${m.netTotal >= 0 ? '+' : '-'}${shortMoney(Math.abs(m.netTotal))}`);
     }
   }
   seenMandates = now;

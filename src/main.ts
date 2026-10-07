@@ -302,7 +302,7 @@ function render(nowMs: number = performance.now()): void {
   // comment for why that's the point. An alert with no view of its own
   // (a schedule problem) opens Fleet, where the rotations are.
   updateAlerts(state, () => select({ kind: 'fleet' }), choosingHome);
-  updateMandates(state, choosingHome);
+  if (updateMandates(state, choosingHome, () => select({ kind: 'fleet' }))) runwayPauseRequested = true;
 
   // The game-over screen is a global overlay, not part of any one sidebar
   // tab, so it keeps refreshing whichever one is showing. Pausing on
