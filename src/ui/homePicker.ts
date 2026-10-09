@@ -53,15 +53,17 @@ const listEl = document.querySelector<HTMLDivElement>('#home-picker-list')!;
 const backButton = document.querySelector<HTMLButtonElement>('#home-picker-back')!;
 const seasonButtons = document.querySelectorAll<HTMLButtonElement>('[data-season]');
 const difficultyButtons = document.querySelectorAll<HTMLButtonElement>('[data-difficulty]');
+const eventsButtons = document.querySelectorAll<HTMLButtonElement>('[data-events]');
 const difficultyNoteEl = document.querySelector<HTMLElement>('#home-world-difficulty-note')!;
 
 let chosenSeason: StartSeason = 'summer';
 let chosenDifficulty: GameDifficulty = 'medium';
+let chosenEventsOff = false;
 let options: HomeOption[] = [];
 let featured: (PickerPoint & { option: HomeOption; story: Story })[] = [];
 let lifted: (typeof featured)[number] | null = null;
 let pinned: (typeof featured)[number] | null = null;
-let choose: (iata: string, season: StartSeason, difficulty: GameDifficulty) => void = () => {};
+let choose: (iata: string, season: StartSeason, difficulty: GameDifficulty, eventsOff: boolean) => void = () => {};
 
 /**
  * The picker's own zoom and pan, on top of the whole-world fit: a factor
@@ -99,13 +101,25 @@ seasonButtons.forEach((button) =>
 function difficultyNote(): string {
   const settings = DIFFICULTY_SETTINGS[chosenDifficulty];
   const cash = `$${settings.startingCash / 1_000}k`;
-  return `${cash} · rivals d${settings.rivalFirstEntryDay} · shocks d${settings.firstShockDay}`;
+  return `${cash} · rivals d${settings.rivalFirstEntryDay} · shocks d${settings.firstShockDay}${chosenEventsOff ? ' · no events' : ''}`;
 }
 
 function showDifficulty(): void {
   difficultyButtons.forEach((button) => button.classList.toggle('active', button.dataset.difficulty === chosenDifficulty));
+  eventsButtons.forEach((button) => {
+    button.classList.toggle('active', !chosenEventsOff);
+    button.setAttribute('aria-pressed', String(!chosenEventsOff));
+    button.title = chosenEventsOff ? 'Events off · no priority flights' : 'Events on · priority flights pay a premium';
+  });
   difficultyNoteEl.textContent = difficultyNote();
 }
+
+eventsButtons.forEach((button) =>
+  button.addEventListener('click', () => {
+    chosenEventsOff = !chosenEventsOff;
+    showDifficulty();
+  }),
+);
 
 difficultyButtons.forEach((button) =>
   button.addEventListener('click', () => {
@@ -299,7 +313,7 @@ window.visualViewport?.addEventListener('resize', drawWorld);
 function start(iata: string): void {
   worldEl.hidden = true;
   modalEl.hidden = true;
-  choose(iata, chosenSeason, chosenDifficulty);
+  choose(iata, chosenSeason, chosenDifficulty, chosenEventsOff);
 }
 
 /** One city's row in the full list: its code, name and reach. Choosing it starts the game there. */
@@ -321,7 +335,7 @@ function fillList(): void {
   listEl.replaceChildren(...options.map(optionButton));
 }
 
-export function showHomePicker(homes: HomeOption[], onChoose: (iata: string, season: StartSeason, difficulty: GameDifficulty) => void): void {
+export function showHomePicker(homes: HomeOption[], onChoose: (iata: string, season: StartSeason, difficulty: GameDifficulty, eventsOff: boolean) => void): void {
   options = homes;
   choose = onChoose;
   const optionByIata = new Map(homes.map((option) => [option.iata, option]));
