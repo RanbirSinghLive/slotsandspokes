@@ -82,6 +82,8 @@ export type RetimeOptions = {
   forceDeferred?: boolean;
   /** For an unwrap: where to put the out-and-back if it fits. */
   unwrapStart?: number;
+  /** Let the move sit on top of the new plane's other flights; a draft (sim/scheduleDraft.ts) checks the whole day once it's done. */
+  allowOverlap?: boolean;
 };
 
 /** The schedule as it will stand after the midnight rollover applies the pending retimes. */
@@ -178,7 +180,7 @@ export function planRetime(state: SimState, legIds: string[], toTail: string, st
     // Its new plane's other rotations, with a turn either side. (A wrap or
     // an unwrap is planned round them by sim/nightStops.ts.)
     const others = world.schedule.filter((leg) => leg.tail === toTail && !legIds.includes(leg.legId));
-    for (const other of others) {
+    for (const other of options.allowOverlap ? [] : others) {
       const otherEnd = other.departMinute + other.blockMinutes;
       const turnAfter = scheduledTurnMinutes(world, other.origin, other.dest);
       const turnBefore = scheduledTurnMinutes(world, last.origin, last.dest);
@@ -187,7 +189,7 @@ export function planRetime(state: SimState, legIds: string[], toTail: string, st
       }
     }
     // The plane's day still has to join up (a night stop's half dragged into the middle of it wouldn't).
-    const chain = chainProblem([...others, ...moved]);
+    const chain = options.allowOverlap ? null : chainProblem([...others, ...moved]);
     if (chain) return fail(chain);
   }
 
