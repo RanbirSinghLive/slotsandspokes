@@ -181,6 +181,10 @@ the economy's rules, so a route pays the same on every tier:
 | Medium | $500,000 | day 15 | ×1 | day 60 |
 | Hard | $350,000 | day 10 | ×1.5 | day 40 |
 
+Next to the tiers, a ★ button turns events (priority flights, below) off for the
+game: `state.eventsOff` is set at the start and `rollDailyMandates()` then offers
+none (absent in older saves, which have events). It is not a difficulty tier.
+
 Medium is the game `balance-reference.json` measures. The headless
 runner takes `--difficulty easy|medium|hard` (`npm run headless`). Home
 cities carry no rating: the picker lists them by catchment and leaves

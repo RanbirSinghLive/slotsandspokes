@@ -203,6 +203,8 @@ export type SimState = {
   startDayOfYear?: number;
   /** Chosen with the home city (sim/difficulty.ts); absent in older saves, which play as medium. */
   difficulty?: GameDifficulty;
+  /** Chosen with the home city: true means no events (sim/mandates.ts) are offered. Absent in older saves, which have them. */
+  eventsOff?: boolean;
   homeAirport: string;
   /**
    * Airports the player can see and use (fog by reach, sim/reach.ts).

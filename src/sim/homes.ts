@@ -61,9 +61,10 @@ export function homeOptions(): HomeOption[] {
  * Start the game from `iata`. Only meant for the very start: it replaces
  * the fleet, so calling it once routes are flying would strand them.
  */
-export function chooseHome(state: SimState, iata: string, season: StartSeason = 'summer', difficulty: GameDifficulty = 'medium'): void {
+export function chooseHome(state: SimState, iata: string, season: StartSeason = 'summer', difficulty: GameDifficulty = 'medium', eventsOff = false): void {
   state.homeAirport = iata;
   state.difficulty = difficulty;
+  if (eventsOff) state.eventsOff = true;
   state.cash = DIFFICULTY_SETTINGS[difficulty].startingCash;
   // The calendar starts on the chosen season's date (sim/clock.ts).
   state.startDayOfYear = START_DAY_OF_YEAR[season];

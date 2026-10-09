@@ -220,7 +220,7 @@ export function rollDailyMandates(state: SimState): void {
   const [termRoll, s5] = nextRandom(s4);
   state.mandateSeed = s5;
 
-  if (today < FIRST_OFFER_DAY || state.mandates.filter((m) => m.status === 'offered').length >= MAX_OFFERED) return;
+  if (state.eventsOff || today < FIRST_OFFER_DAY || state.mandates.filter((m) => m.status === 'offered').length >= MAX_OFFERED) return;
   const thinning = 1 + Math.max(0, state.aircraft.length - THIN_AFTER_PLANES) / THIN_PER_PLANES;
   if (chanceRoll >= OFFER_CHANCE_PER_DAY / thinning) return;
 
