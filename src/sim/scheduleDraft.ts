@@ -1,7 +1,7 @@
 import { commitRetime, planRetime, tomorrowView, type RetimePlan } from './retime';
 import type { ScheduleLeg } from './schedule';
 import type { SimState } from './state';
-import { rotationsForTail, scheduledTurnMinutes } from './utilisation';
+import { rotationsForTail, scheduledTurnMinutes, USABLE_DAY_END_MINUTE, USABLE_DAY_START_MINUTE } from './utilisation';
 
 /**
  * Planning the Gantt (the Schedule timeline, ui/panels.ts) without the
@@ -180,4 +180,40 @@ function planDropOn(state: SimState, legIds: string[], toTail: string, start: nu
     }
   }
   return { ok: true, kind: 'hold', plan: loose, moves: [move], swapWith: [], reason: plain.reason };
+}
+
+/** How close, in minutes, a dragged rotation must be to a neighbour's edge for `snapStart()` to pull it in. */
+export const SNAP_MINUTES = 10;
+
+/**
+ * Where a rotation dragged to `rawStart` on `toTail` lands when it is pulled
+ * to a nearby edge: just after the flight before it (its turn included), just
+ * before the flight after it, or the ends of the usable day. A start already
+ * clear of every edge stays as it is. Ties go to the closer edge.
+ */
+export function snapStart(state: SimState, legIds: string[], toTail: string, rawStart: number): number {
+  const view = tomorrowView(state);
+  const own = view.schedule.filter((leg) => legIds.includes(leg.legId)).sort((a, b) => a.departMinute - b.departMinute);
+  if (own.length === 0) return rawStart;
+  const first = own[0];
+  const last = own[own.length - 1];
+  const span = last.departMinute + last.blockMinutes - first.departMinute;
+  const turnAfterOwn = scheduledTurnMinutes(view, last.origin, last.dest);
+  const candidates = [USABLE_DAY_START_MINUTE, USABLE_DAY_END_MINUTE - span];
+  for (const other of view.schedule) {
+    if (other.tail !== toTail || legIds.includes(other.legId)) continue;
+    // Just after it, and just before it; rounded to the 5 minutes a move steps in, away from the neighbour.
+    candidates.push(Math.ceil((other.departMinute + other.blockMinutes + scheduledTurnMinutes(view, other.origin, other.dest)) / 5) * 5);
+    candidates.push(Math.floor((other.departMinute - turnAfterOwn - span) / 5) * 5);
+  }
+  let best = rawStart;
+  let bestGap = SNAP_MINUTES + 1;
+  for (const candidate of candidates) {
+    const gap = Math.abs(candidate - rawStart);
+    if (gap <= SNAP_MINUTES && gap < bestGap) {
+      best = candidate;
+      bestGap = gap;
+    }
+  }
+  return best;
 }

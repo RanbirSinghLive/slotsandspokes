@@ -1150,6 +1150,16 @@ button,
   border-radius: 3px;
 }
 
+/* A line at each hour tick on a plane's row (ui/panels.ts). */
+.timeline-gridline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.07);
+  pointer-events: none;
+}
+
 /* Planes are grouped by type under a header that folds the group away;
    every rotation block takes its type's colour (--puck, TYPE_COLOURS in
    ui/planeIcons.ts). */
@@ -1490,6 +1500,37 @@ button,
 .timeline-rotation .rotation-remove-button.is-armed,
 .timeline-rotation .rotation-remove-button.is-linked {
   display: block;
+}
+
+/* On touch: taller rows to hit, and × always showing, since there is no hover to reveal it. */
+@media (pointer: coarse) {
+  .timeline-track {
+    height: 30px;
+  }
+
+  .timeline-rotation .rotation-remove-button {
+    display: block;
+    opacity: 0.6;
+    top: -9px;
+    right: -9px;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    line-height: 1;
+    font-size: 14px;
+  }
+
+  .timeline-rotation .rotation-remove-button.is-armed {
+    opacity: 1;
+  }
+
+  .timeline-rotation .night-home-button {
+    top: -9px;
+    left: -9px;
+    width: 22px;
+    height: 22px;
+    font-size: 14px;
+  }
 }
 
 #rotations-empty {

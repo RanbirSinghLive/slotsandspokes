@@ -1,7 +1,7 @@
 import { nightStopLegs } from '../sim/nightStops';
 import { hasLineBase, outstationCheck } from '../sim/bases';
 import { deferredItems, MX_HOLD_AT, tonightCheck } from '../sim/mxChecks';
-import { bringNightStopHome, draftProblem, dropRotation, dropRotationInDraft, overlappingLegs, planBringNightStopHome, planDropRotation, removeRotation as removeRotationFromSchedule, saveDraft, type DraftMove, type DropPlan } from '../sim/playerActions';
+import { bringNightStopHome, draftProblem, dropRotation, dropRotationInDraft, overlappingLegs, planBringNightStopHome, planDropRotation, removeRotation as removeRotationFromSchedule, saveDraft, snappedStart, type DraftMove, type DropPlan } from '../sim/playerActions';
 import type { RetimePlan } from '../sim/retime';
 import { airportHours, FIRST_OPEN_HOUR, freeInHour, OPEN_HOURS } from '../sim/hours';
 import { money, shortMoney } from './format';
@@ -220,6 +220,7 @@ let liveState: SimState | null = null;
 
 function renderRotations(live: SimState): void {
   liveState = live;
+  restoreDraft(live);
   // While a draft is open the timeline draws and plans on its copy of the state.
   const state = draft ? draft.world : live;
   lastTimelineState = state;
@@ -308,7 +309,53 @@ function updateDraftBar(): void {
 
 function discardDraft(): void {
   draft = null;
+  storeDraft();
   rebuildTimeline();
+}
+
+// The open draft is kept in this browser, so a reload doesn't lose it. It is
+// replayed on the real state when the page comes back, and dropped if it no
+// longer fits or belongs to another game.
+const DRAFT_KEY = 'slotsandspokes-gantt-draft';
+
+/** Which game a stored draft belongs to (rngSeed moves every day; these don't). */
+function gameKey(state: SimState): string {
+  return `${state.homeAirport}|${state.airspaceSeed ?? 0}`;
+}
+
+function storeDraft(): void {
+  try {
+    if (draft && liveState) localStorage.setItem(DRAFT_KEY, JSON.stringify({ game: gameKey(liveState), drops: draft.drops }));
+    else localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    // Storage blocked: the draft just lives until the page closes.
+  }
+}
+
+/** Bring a stored draft back, once, the first time the timeline draws. */
+let draftRestored = false;
+function restoreDraft(live: SimState): void {
+  if (draftRestored) return;
+  draftRestored = true;
+  try {
+    const stored = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null') as { game: string; drops: DraftMove[][] } | null;
+    if (!stored || stored.game !== gameKey(live) || stored.drops.length === 0) return;
+    const world = structuredClone(live);
+    for (const moves of stored.drops) if (!dropRotationInDraft(world, moves).ok) throw new Error('draft no longer fits');
+    draft = { world, drops: stored.drops };
+  } catch {
+    draft = null;
+    storeDraft();
+  }
+}
+
+/** Whether every flight in the draft is back where the real schedule has it: nothing left to save. */
+function draftChangesNothing(live: SimState, world: SimState): boolean {
+  const byId = new Map(live.schedule.map((leg) => [leg.legId, leg]));
+  return world.schedule.every((leg) => {
+    const was = byId.get(leg.legId);
+    return was && was.tail === leg.tail && was.departMinute === leg.departMinute;
+  });
 }
 
 /** The real state's rotations, drawn where the draft has put their flights. */
@@ -332,6 +379,15 @@ function addToDraft(moves: DraftMove[]): void {
     return;
   }
   draft.drops.push(moves);
+  closeIfUnchanged();
+  storeDraft();
+}
+
+/** A draft that has put everything back closes itself: there is nothing to verify. */
+function closeIfUnchanged(): void {
+  if (!draft || !liveState || !draftChangesNothing(liveState, draft.world)) return;
+  draft = null;
+  flashTip('Back as it was', false);
 }
 
 function undoDraftDrop(): void {
@@ -344,6 +400,8 @@ function undoDraftDrop(): void {
   const world = structuredClone(liveState);
   for (const moves of drops) dropRotationInDraft(world, moves);
   draft = { world, drops };
+  closeIfUnchanged();
+  storeDraft();
   rebuildTimeline();
 }
 
@@ -360,6 +418,7 @@ function saveTheDraft(): void {
   flashTip(result.ok ? `Saved · ${draft.drops.length} move${draft.drops.length === 1 ? '' : 's'}` : result.reason, !result.ok);
   if (!result.ok) return;
   draft = null;
+  storeDraft();
   renderScheduleWarnings(scheduleProblems(liveState));
   rebuildTimeline();
 }
@@ -392,7 +451,9 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
   // Hour ticks every four hours, labelled.
   const axis = document.createElement('div');
   axis.className = 'timeline-axis';
+  const tickHours: number[] = [];
   for (let hour = Math.ceil(start / 240) * 4; hour * 60 <= end; hour += 4) {
+    tickHours.push(hour);
     const tick = document.createElement('span');
     tick.style.left = at(hour * 60);
     tick.textContent = String(hour % 24).padStart(2, '0');
@@ -468,6 +529,13 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
       track.dataset.tail = aircraft.tail;
       track.dataset.type = aircraft.typeCode;
       track.style.setProperty('--puck', colour);
+      // A faint line at each hour tick on the axis, so a block's time reads down the rows.
+      for (const hour of tickHours) {
+        const line = document.createElement('span');
+        line.className = 'timeline-gridline';
+        line.style.left = at(hour * 60);
+        track.append(line);
+      }
       // A night stop's two halves (sim/nightStops.ts): the morning flight home and the evening flight out.
       const nightStop = nightStopLegs(state, aircraft.tail);
       const halfButtons: HTMLButtonElement[] = [];
@@ -674,8 +742,9 @@ function onDragMove(event: PointerEvent): void {
     }) ?? drag.homeTrack;
   drag.span.style.transform = `translateY(${track.getBoundingClientRect().top - homeRect.top}px)`;
   for (const candidate of sameType) candidate.classList.toggle('is-drop-target', candidate === track && track !== drag.homeTrack);
-  const start = Math.round((drag.rotation.departMinute + dx * drag.minutesPerPx) / 5) * 5;
   const tail = track.dataset.tail!;
+  // In 5-minute steps, pulled to a neighbouring flight or the day's ends when close (sim/scheduleDraft.ts).
+  const start = snappedStart(lastTimelineState, drag.rotation.legs.map((leg) => leg.legId), tail, Math.round((drag.rotation.departMinute + dx * drag.minutesPerPx) / 5) * 5);
   drag.span.style.left = `${((start - timelineWindow.start) / (timelineWindow.end - timelineWindow.start)) * 100}%`;
 
   if (!drag.target || drag.target.tail !== tail || drag.target.start !== start) {

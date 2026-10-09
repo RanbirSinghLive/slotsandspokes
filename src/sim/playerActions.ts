@@ -98,7 +98,7 @@ import { deferredItems, heavyBankedMinutes, heavyBayTails, heavyCheckDueIn, heav
 import { rebaseOptions, rebasePlane, type RebaseOption } from './rebase';
 import { cabinGainPerDay, cabinOf, cancelRefit as cancelRefitRule, orderRefit as orderRefitRule, refitBlockedReason, refitCost, refitDays, type Cabin } from './cabins';
 import { commitBringHome, commitRetime, planBringHome, planRetime, type RetimePlan } from './retime';
-import { commitDraft, conflictingLegIds, planDrop, type DraftMove, type DropPlan } from './scheduleDraft';
+import { commitDraft, conflictingLegIds, planDrop, snapStart, type DraftMove, type DropPlan } from './scheduleDraft';
 import { daysUntilNextListing, listingsOf, returnBlockedReason, returnFee, returnLease, takeListing, type MarketListing } from './market';
 import { airlineCalled, classOpen, tierThatOpens } from './ladder';
 import { actualDailyDemand, currentPotentialDemand } from './marketDemand';
@@ -622,6 +622,11 @@ export function retimeRotation(state: SimState, legIds: string[], toTail: string
 /** What dropping a rotation here would do: a move, a swap with the rotations in its way, or a hold in the draft (sim/scheduleDraft.ts). */
 export function planDropRotation(state: SimState, legIds: string[], toTail: string, startMinute: number, inDraft = false): DropPlan {
   return planDrop(state, legIds, toTail, startMinute, inDraft);
+}
+
+/** Where a rotation dragged to this start settles when it is pulled to a neighbouring flight or the day's ends (sim/scheduleDraft.ts). */
+export function snappedStart(state: SimState, legIds: string[], toTail: string, startMinute: number): number {
+  return snapStart(state, legIds, toTail, startMinute);
 }
 
 /** Make a drop's moves for real: all or nothing, the planes they touch checked afterwards. */

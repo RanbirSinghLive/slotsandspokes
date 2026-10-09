@@ -1572,8 +1572,16 @@ tooltip "Verify and save") replays every drop on the real state with
 checks every plane they touched joins up (no flight on top of another,
 each leaving from where the plane is). Any failure puts everything back
 and says why, and the draft stays open. ↶ takes back the last drop and ✕
-throws the draft away. The draft is UI-only and is not saved. Inside a
-draft a night stop can't be made or undone.
+throws the draft away. The draft is UI-only: it is kept in this browser's storage (not in the save)
+and replayed when the page reloads, dropped if it no longer fits or is
+another game's. A draft whose flights are all back where the real
+schedule has them closes itself. Inside a draft a night stop can't be
+made or undone.
+
+A dragged rotation **snaps** (`snapStart()`) to within 10 minutes of the
+flight before it (its turn included), the flight after it, or the ends of
+the usable day. On touch the × shows on every rotation and rows are
+taller, and a faint line marks each hour tick down the rows.
 
 `rotationsForTail()` (in `sim/utilisation.ts`, so it stays testable
 without a browser) derives rotations by splitting a tail's departure-
