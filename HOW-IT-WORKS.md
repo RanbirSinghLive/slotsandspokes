@@ -1980,11 +1980,13 @@ old planes) to +26, and a bad route loses passengers to its rival.
 Rivals' own profit estimates (sim/rivalEconomics.ts) see the same edge.
 
 **It also pays on every route** (`nameYieldMultiplier()`): each point
-above (or below) a typical rival's 10 moves a market's ticket revenue
-0.15%, held within ±6%, so +30 is worth 4.5% on any route, flown alone
-or against a rival. It rides in `bookingPerks().yieldMultiplier` beside
-online booking and the revenue CCO. Before it, NPS did nothing until a
-rival arrived.
+above (or below) 15, what a careful airline reaches, moves a market's
+ticket revenue 0.04%, held within ±2%, so +20 over that is worth 0.8%
+on any route, flown alone or against a rival. It rides in
+`bookingPerks().yieldMultiplier` beside online booking and the revenue
+CCO. It is small on purpose: margins are thin, and at 0.15% a point
+(±6%) the quick balance read doubled PHL and sent YUL from −$2k to
+$20M. Before it, NPS did nothing until a rival arrived.
 
 Shown on the Network panel (NPS row), in the route view (with what it
 does against a rival, `brandInWords()`), on the airport view's routes,
