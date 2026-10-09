@@ -3533,6 +3533,17 @@ failure costs.
   stars on running routes. The headless player accepts when the plane's
   base has a spare crew and won't drop a market carrying one.
 
+## Daily brief and season review (`src/sim/briefs.ts`, `src/ui/briefWindow.ts`)
+
+Two read-only briefs. They change no economy; `sim/briefs.ts` decides when each is due and what it says, `ui/briefWindow.ts` draws it.
+
+- **Daily brief** at 05:30 home time, once a day. Icon chips, each with a tooltip and a tap that opens the screen that fixes it: weather (and closed airports), closed or announced airspace, AOGs, maintenance holds, crews short within 3 days, events flying today, and yesterday's cancellations. A line gives yesterday's DEP, OTP and CNX. A quiet morning shows a green tick and folds itself into its tab after a few seconds. At 100x it arrives already folded.
+- **Season review** every 182 days, counted from the game's first frame (a save from before briefs starts its count when loaded). Routes ranked by profit over that half year (revenue less route costs, from `marketTotals` against the snapshot taken at the last review), top three outlined green and bottom three red; a ▲/▼/▬ for how the seasonal demand curve (`sim/seasons.ts`) changes in the next half year against the last; a dot where demand exceeds seats, a ring for a route no longer flown; and the three airports with the most unserved passengers. Tapping a row opens that route. The first appearance pauses the clock (Space resumes).
+- **The window** floats over the map and is dragged by its header (mouse or pen); on touch it docks above the tab strip instead. Minimizing folds it into an icon tab under the map. Position and tabs are screen state, not saved.
+- **Settings** (Game screen, Messages): daily on/off, season on/off, pause on season on/off, and a reopen button for each. Off means no pop-up; reopening still works. Stored in `state.briefs` (optional; an old save has both on).
+
+`npm run briefstest` checks one brief a day, the review on day 182, ranked rows and a save round trip.
+
 ## What isn't built yet
 
 The current plan is the newest `WEEK-*.md`. As of September 2026:
