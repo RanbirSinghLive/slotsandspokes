@@ -94,7 +94,7 @@ import { cashNeededToLease, LEASE_RESERVE_DAYS, leaseRateFor, loadLeaseRates } f
 import { inboundAt, orderLease } from './fleetTiming';
 import { startSeatSale as startSeatSaleRule } from './seatSale';
 import { SEASON_DAYS, SEASONAL_PREMIUM } from './seasonalLease';
-import { deferredItems, heavyBankedMinutes, heavyBayTails, heavyCheckDueIn, heavyCheckOpen, heavyCheckWorkMinutes, sleepersNow, tonightCheck } from './mxChecks';
+import { cyclesSinceHeavy, deferredItems, flightHoursSinceHeavy, heavyBankedMinutes, heavyBayTails, heavyCheckDueIn, heavyCheckOpen, heavyCheckWorkMinutes, sleepersNow, tonightCheck } from './mxChecks';
 import { rebaseOptions, rebasePlane, type RebaseOption } from './rebase';
 import { cabinGainPerDay, cabinOf, cancelRefit as cancelRefitRule, orderRefit as orderRefitRule, refitBlockedReason, refitCost, refitDays, type Cabin } from './cabins';
 import { commitBringHome, commitRetime, planBringHome, planRetime, type RetimePlan } from './retime';
@@ -682,6 +682,9 @@ export type HeavyCheckReadout = {
   /** Whether nights at base are counting toward it yet. */
   open: boolean;
   bankedHours: number;
+  /** Airborne hours and cycles since the last heavy check (sim/mxChecks.ts). */
+  flightHours: number;
+  cycles: number;
   workHours: number;
   /** Grounded for it, having gone too far overdue. */
   inCheck: boolean;
@@ -702,6 +705,8 @@ export function heavyCheckReadouts(state: SimState): HeavyCheckReadout[] {
       dueIn: heavyCheckDueIn(aircraft),
       open: heavyCheckOpen(aircraft),
       bankedHours: Math.round((heavyBankedMinutes(aircraft) / 60) * 10) / 10,
+      flightHours: Math.round(flightHoursSinceHeavy(aircraft)),
+      cycles: cyclesSinceHeavy(aircraft),
       workHours: heavyCheckWorkMinutes(aircraft.typeCode) / 60,
       inCheck: state.aogs.some((event) => event.tail === aircraft.tail && event.check),
       inBay: bays.has(aircraft.tail),

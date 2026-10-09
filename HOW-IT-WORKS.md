@@ -3232,6 +3232,12 @@ An earlier version took every plane out for 1–3 days every 30 days. A
 fleet flown near capacity had no spare planes to take its flying, so
 the cancellations cost Toronto most of its year on 18 seeds.
 
+**Usage clocks.** Each landed flight adds its airborne minutes (ground delay
+excluded) and one cycle to the plane (`recordFlown()`); a finished heavy check
+resets both. Nothing reads them yet except the Mtc card's clock line ("12h ·
+9 cyc"). A plane from an older save counts from zero. They are what the A and
+C checks will run on (WEEK-TWENTYTWO.md).
+
 **What you see:**
 - **The Mtc screen's Fleet board:** a strip of how many planes are
   serviceable, on watch, due for action (held, or a heavy check overdue),
