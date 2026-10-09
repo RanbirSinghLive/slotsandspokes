@@ -3348,6 +3348,22 @@ Each cause has a different answer available:
   between two airports every day, while its other routes silently never
   flew.
 
+- **Cancelled by you** (`sim/controller.ts`) — a plane waiting on the
+  ground whose day is projected to run late shows **Needs a call** on its
+  page (Fleet › plane › Today), with a ✕ on each rotation it hasn't
+  started. The curfew cancels the *last* rotation that can't get home,
+  whatever it earns; ✕ lets the player give up a cheaper one earlier, so
+  the plane's day recovers and the better rotation flies. Whole rotations
+  only, from base, as the curfew does. The confirm step prices it by
+  replaying the plane's day twice (`projectGroundedDay()` in
+  `sim/cascade.ts`, step()'s own rules), with and without the rotation:
+  flights lost and saved from the curfew, late legs and minutes, estimated
+  revenue (the market's last 7 days over its flights a day), and the
+  priority-flight penalty if it carries one. It counts as any
+  cancellation does: Completion, -80 NPS each, slot fees still paid,
+  nothing refunded. A plane in the air, AOG or grounded for the day can't
+  be steered.
+
 A cancellation scores a flat **-80 NPS** rather than extending the delay
 curve, which floors at -50: a cancellation isn't a very late flight, it's
 a different failure. NPS therefore divides by its own denominator

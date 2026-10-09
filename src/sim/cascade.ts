@@ -37,25 +37,23 @@ export type ProjectedLeg = {
 };
 
 /**
- * The legs `tail` still has to fly today after the one it's in the air on,
- * projected forward. Empty if the tail isn't airborne.
+ * The legs of one plane's day still to come, in the order they will be
+ * flown: the rest of a rotation already under way (always flown, the plane
+ * is away from base) and then each later rotation (leaving from base,
+ * where the curfew can cancel it, or the controller can: sim/controller.ts).
  */
-export function projectRestOfDay(state: SimState, tail: string): ProjectedLeg[] {
-  const flight = state.activeFlights.find((f) => f.tail === tail);
-  if (!flight) return [];
+type RemainingRotation = { legs: ScheduleLeg[]; mustFly: boolean };
 
-  // The schedule's day this flight belongs to, from when it was due to
-  // leave — not from "now", which may already be past midnight.
-  const dayStart = dayStartMinute(state, flight.scheduledDepartMinute);
-  const current = state.schedule.find((leg) => leg.legId === flight.legId);
-  if (!current) return [];
-
-  const rotations = rotationsForTail(state, tail);
-  const currentIndex = rotations.findIndex((rotation) => rotation.legs.includes(current));
-  if (currentIndex === -1) return [];
-
+/** Replays the remaining rotations from `readyAt`, step() rule for step() rule. */
+function replayRemaining(
+  state: SimState,
+  dayStart: number,
+  readyAtStart: number,
+  remaining: RemainingRotation[],
+  controllerCancelled: ReadonlySet<string>,
+): ProjectedLeg[] {
   const projected: ProjectedLeg[] = [];
-  let readyAt = flight.arriveMinute + MIN_TURN_MINUTES;
+  let readyAt = readyAtStart;
 
   const fly = (leg: ScheduleLeg): void => {
     const scheduledDepart = dayStart + leg.departMinute;
@@ -74,30 +72,90 @@ export function projectRestOfDay(state: SimState, tail: string): ProjectedLeg[] 
     readyAt = arriveMinute + MIN_TURN_MINUTES;
   };
 
-  // The rest of the rotation it's on: already away from base, so it
-  // always flies home.
-  const currentRotation = rotations[currentIndex];
-  currentRotation.legs.slice(currentRotation.legs.indexOf(current) + 1).forEach(fly);
+  const markCancelled = (legs: ScheduleLeg[]): void => {
+    for (const leg of legs) {
+      const scheduledDepart = dayStart + leg.departMinute;
+      projected.push({
+        leg,
+        projectedDepartMinute: scheduledDepart,
+        projectedArriveMinute: scheduledDepart + leg.blockMinutes,
+        lateMinutes: 0,
+        onTime: false,
+        cancelled: true,
+      });
+    }
+  };
 
-  // Each later rotation starts from base, where the curfew can cancel it.
-  for (const rotation of rotations.slice(currentIndex + 1)) {
-    const first = rotation.legs[0];
-    const departMinute = Math.max(dayStart + first.departMinute, readyAt);
-    if (breaksCurfew(state, rotation, departMinute, dayStart)) {
-      for (const leg of rotation.legs) {
-        const scheduledDepart = dayStart + leg.departMinute;
-        projected.push({
-          leg,
-          projectedDepartMinute: scheduledDepart,
-          projectedArriveMinute: scheduledDepart + leg.blockMinutes,
-          lateMinutes: 0,
-          onTime: false,
-          cancelled: true,
-        });
-      }
-      continue; // the plane stays at base, so readyAt doesn't move
+  for (const rotation of remaining) {
+    if (rotation.mustFly) {
+      rotation.legs.forEach(fly);
+      continue;
+    }
+    const departMinute = Math.max(dayStart + rotation.legs[0].departMinute, readyAt);
+    // The plane stays at base when a rotation is cancelled, so readyAt doesn't move.
+    if (controllerCancelled.has(rotation.legs[0].legId) || breaksCurfew(state, rotationOf(state, rotation.legs), departMinute, dayStart)) {
+      markCancelled(rotation.legs);
+      continue;
     }
     rotation.legs.forEach(fly);
   }
   return projected;
+}
+
+/** breaksCurfew() reads a Rotation; the one of these legs, rebuilt from the schedule. */
+function rotationOf(state: SimState, legs: ScheduleLeg[]) {
+  return rotationsForTail(state, legs[0].tail).find((rotation) => rotation.legs[0] === legs[0])!;
+}
+
+/**
+ * The legs `tail` still has to fly today after the one it's in the air on,
+ * projected forward. Empty if the tail isn't airborne.
+ */
+export function projectRestOfDay(state: SimState, tail: string): ProjectedLeg[] {
+  const flight = state.activeFlights.find((f) => f.tail === tail);
+  if (!flight) return [];
+
+  // The schedule's day this flight belongs to, from when it was due to
+  // leave — not from "now", which may already be past midnight.
+  const dayStart = dayStartMinute(state, flight.scheduledDepartMinute);
+  const current = state.schedule.find((leg) => leg.legId === flight.legId);
+  if (!current) return [];
+
+  const rotations = rotationsForTail(state, tail);
+  const currentIndex = rotations.findIndex((rotation) => rotation.legs.includes(current));
+  if (currentIndex === -1) return [];
+
+  const currentRotation = rotations[currentIndex];
+  const remaining: RemainingRotation[] = [
+    { legs: currentRotation.legs.slice(currentRotation.legs.indexOf(current) + 1), mustFly: true },
+    ...rotations.slice(currentIndex + 1).map((rotation) => ({ legs: rotation.legs, mustFly: false })),
+  ];
+  return replayRemaining(state, dayStart, flight.arriveMinute + MIN_TURN_MINUTES, remaining, new Set());
+}
+
+/**
+ * The same projection for a plane waiting on the ground: the part of its
+ * day not flown, cancelled or moved to tomorrow yet, from the moment it is
+ * ready to leave. `cancelRotationsStarting` names rotations (by their first
+ * leg's id) to leave out, so the controller can price a cancellation by
+ * comparing two replays. Empty for a plane in the air, AOG or grounded for
+ * the day, which can't be steered.
+ */
+export function projectGroundedDay(state: SimState, tail: string, cancelRotationsStarting: ReadonlySet<string> = new Set()): ProjectedLeg[] {
+  const aircraft = state.aircraft.find((a) => a.tail === tail);
+  if (!aircraft || aircraft.status !== 'ground' || state.aogs.some((event) => event.tail === tail) || state.groundedTails.includes(tail)) return [];
+
+  const handled = new Set([...state.completedToday, ...state.cancelledToday, ...(state.retimedToday ?? [])]);
+  const remaining: RemainingRotation[] = [];
+  for (const rotation of rotationsForTail(state, tail)) {
+    const pending = rotation.legs.filter((leg) => !handled.has(leg.legId));
+    if (pending.length === 0) continue;
+    // Part-flown: the plane is away from base and always flies home.
+    remaining.push({ legs: pending, mustFly: pending.length < rotation.legs.length });
+  }
+  if (remaining.length === 0) return [];
+
+  const dayStart = dayStartMinute(state, state.simMinute);
+  const readyAt = Math.max(state.simMinute, aircraft.groundSinceMinute + MIN_TURN_MINUTES);
+  return replayRemaining(state, dayStart, readyAt, remaining, cancelRotationsStarting);
 }

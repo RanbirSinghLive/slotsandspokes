@@ -653,7 +653,7 @@ export type SimState = {
    * was due (stranded by an earlier disruption); optional so older saves
    * load, absent meaning none.
    */
-  cancellationsByCause: { crew: number; mechanical: number; weather: number; curfew: number; position?: number; maintenance?: number; airspace?: number };
+  cancellationsByCause: { crew: number; mechanical: number; weather: number; curfew: number; controller?: number; position?: number; maintenance?: number; airspace?: number };
   /**
    * Cancellations: legs that should have operated today and
    * didn't. `flightsScheduled*` counts what was on the books, so

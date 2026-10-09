@@ -5318,3 +5318,16 @@ button.ops-item:hover {
 .home-season button[data-events] {
   padding: 5px 7px;
 }
+
+/* The controller's ✕ on a rotation row: a real tap target on touch. */
+.inspector-day-row .inspector-plan-hub {
+  margin: 0 0 0 8px;
+  min-width: 36px;
+}
+
+@media (pointer: coarse) {
+  .inspector-day-row .inspector-plan-hub {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
