@@ -137,19 +137,21 @@ export const STARTING_NPS = RIVAL_NPS;
 export const NPS_UTILITY_PER_POINT = 0.008;
 
 /**
- * Revenue per point of NPS above (or below) a typical rival's, on every
- * route, rival or not. The name lifts the fare a market clears at, the
+ * Revenue per point of NPS above (or below) the neutral 15 a careful
+ * airline reaches, on every route, rival or not. The name lifts the fare a market clears at, the
  * way the CCO's yield perk does, so NPS pays from the first route
- * instead of only where a rival flies. 30 points is worth 4.5%, about
- * what NPS_UTILITY_PER_POINT is worth against a rival in fare terms.
+ * instead of only where a rival flies. Margins are thin (a point of
+ * yield is a large share of profit), so it is small: +20 is worth 2%.
  */
-export const NAME_YIELD_PER_POINT = 0.0015;
+export const NAME_YIELD_PER_POINT = 0.001;
+/** The NPS a careful airline reaches in its first year: where the name is neutral. */
+export const NAME_NEUTRAL_NPS = 15;
 /** The most a name adds or costs in ticket revenue. */
-const NAME_YIELD_CAP = 0.06;
+const NAME_YIELD_CAP = 0.04;
 
 /** What the airline's name does to ticket revenue on this market, as a multiplier (1 = nothing). */
 export function nameYieldMultiplier(state: SimState, origin: string, dest: string): number {
-  const gap = marketNps(state, origin, dest) - RIVAL_NPS;
+  const gap = marketNps(state, origin, dest) - NAME_NEUTRAL_NPS;
   return 1 + clamp(gap * NAME_YIELD_PER_POINT, -NAME_YIELD_CAP, NAME_YIELD_CAP);
 }
 

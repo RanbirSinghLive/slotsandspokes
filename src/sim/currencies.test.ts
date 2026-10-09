@@ -15,17 +15,17 @@ function newState() {
   return state;
 }
 
-// The name: neutral at a rival's NPS, +4.5% at +30, capped at ±6%.
+// The name: neutral at NPS 15, +2% at 35, capped at ±4%.
 {
   const state = newState();
-  state.trailingNps = 10;
+  state.trailingNps = 15;
   assert.equal(nameYieldMultiplier(state, 'YHZ', 'YYZ'), 1);
-  state.trailingNps = 40;
-  assert.ok(Math.abs(nameYieldMultiplier(state, 'YHZ', 'YYZ') - 1.045) < 1e-9);
+  state.trailingNps = 35;
+  assert.ok(Math.abs(nameYieldMultiplier(state, 'YHZ', 'YYZ') - 1.02) < 1e-9);
   state.trailingNps = 100;
-  assert.ok(Math.abs(nameYieldMultiplier(state, 'YHZ', 'YYZ') - 1.06) < 1e-9);
+  assert.ok(Math.abs(nameYieldMultiplier(state, 'YHZ', 'YYZ') - 1.04) < 1e-9);
   state.trailingNps = -100;
-  assert.ok(Math.abs(nameYieldMultiplier(state, 'YHZ', 'YYZ') - 0.94) < 1e-9);
+  assert.ok(Math.abs(nameYieldMultiplier(state, 'YHZ', 'YYZ') - 0.96) < 1e-9);
 }
 
 // A flight's score has no fare in it: the same flight scores the same at any price.
