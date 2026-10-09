@@ -59,7 +59,7 @@ const MOVEMENTS_PER_PAIR = 2;
 /** Days a pair must be held, unbroken, to count as heritage. */
 export const HERITAGE_DAYS = 180;
 /** Share off the daily fee of a heritage pair. */
-const HERITAGE_DISCOUNT = 0.2;
+const HERITAGE_DISCOUNT = 0;
 /** A rival's slot fee rises by this times the heritage share of an airport's movements, up to the cap. */
 const HERITAGE_RIVAL_SURCHARGE = 1;
 const HERITAGE_RIVAL_SURCHARGE_CAP = 0.5;
