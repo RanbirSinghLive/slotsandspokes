@@ -981,7 +981,8 @@ button,
   color: #ffd166;
 }
 
-.stat-value.runway-critical {
+.stat-value.runway-critical,
+.stat-trend.runway-critical {
   color: #ff8080;
 }
 

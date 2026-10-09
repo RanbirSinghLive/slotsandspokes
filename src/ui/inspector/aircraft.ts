@@ -14,7 +14,7 @@ import { planeIconElement } from '../planeIcons';
 import * as ops from '../routeActions';
 import { select, selectRoute } from '../selection';
 import { linkToMap } from '../mapLink';
-import { showConfirm } from '../confirmModal';
+import { cashAfterRows, showConfirm } from '../confirmModal';
 import { REBASE_DAYS, REBASE_FEE_LEASE_DAYS } from '../../sim/rebase';
 import { CABIN_PRICE, cabinLayout, cabinOf } from '../../sim/cabins';
 import { DEFERRED_AGE_YEARS, deferredItems, HEAVY_INTERVAL_DAYS, heavyBankedMinutes, heavyCheckDueIn, heavyCheckOpen, heavyCheckWorkMinutes, MX_HOLD_AT, tonightCheck } from '../../sim/mxChecks';
@@ -374,7 +374,7 @@ function buildCabin(state: SimState, tail: string, changed: () => void): HTMLEle
         { label: 'Refit cost', value: money(option.cost) },
         { label: 'Out of service', value: `${option.days} days` },
         { label: 'Forecast', value: `${option.gainPerDay >= 0 ? '+' : '−'}${money(Math.abs(option.gainPerDay))}/day` },
-        { label: 'Cash after', value: money(state.cash - option.cost) },
+        ...cashAfterRows(state, option.cost),
       ],
       facts: ['Starts next morning at base; the plane flies nothing while it is out. Calling it off before then refunds the cost.'],
       confirmLabel: `Order · ${money(option.cost)}`,
@@ -428,7 +428,7 @@ function buildRebase(state: SimState, tail: string, changed: () => void): HTMLEl
           { label: 'Ferry cost', value: money(option.fee) },
           { label: 'Away', value: `${REBASE_DAYS} days, based day ${option.arrivesDay}` },
           { label: 'Crews at new base', value: `${option.crews}/${option.crewsNeeded}` },
-          { label: 'Cash after', value: money(state.cash - option.fee) },
+          ...cashAfterRows(state, option.fee),
         ],
         facts: [
           `Flies nothing while ferrying and the lease is still charged. Crews stay where they are: ${option.to} needs ${CREWS_PER_NEW_PLANE} crews rated on this type.`,
@@ -475,7 +475,7 @@ function buildReturn(state: SimState, tail: string, changed: () => void): HTMLEl
       rows: [
         { label: 'Return fee', value: money(option.fee) },
         { label: 'Lease saved', value: `${money(option.saves)}/day` },
-        { label: 'Cash after', value: money(state.cash - option.fee) },
+        ...cashAfterRows(state, option.fee),
       ],
       facts: ['Goes back for good; leasing another means a new airframe at the market rate.'],
       confirmLabel: `Return · ${money(option.fee)}`,
