@@ -1557,6 +1557,24 @@ it back. The rules:
   warns when its new plane's longer day needs more crews than the base
   has.
 
+**Swap, and planning a draft** (`sim/scheduleDraft.ts`). A drop onto a
+plane that has other rotations in that time of day **swaps**: those
+rotations go to the dragged one's plane at their own times (a lone one
+can also take the place the dragged one left), all or nothing. One long
+flight dropped on two short ones sends both across. The tip reads "⇄
+C-P001 ×2" and the rotations that would trade are outlined green. A drop
+that fails only because it sits on other flights (and can't swap) is
+**held as a draft** instead of refused: the timeline plans on a copy of
+the state (`structuredClone`), flights may overlap, and overlaps draw red
+and striped. A pencil bar with a count shows over the timeline: ✓ (green,
+tooltip "Verify and save") replays every drop on the real state with
+`commitDraft()`, which makes the moves with overlaps allowed and then
+checks every plane they touched joins up (no flight on top of another,
+each leaving from where the plane is). Any failure puts everything back
+and says why, and the draft stays open. ↶ takes back the last drop and ✕
+throws the draft away. The draft is UI-only and is not saved. Inside a
+draft a night stop can't be made or undone.
+
 `rotationsForTail()` (in `sim/utilisation.ts`, so it stays testable
 without a browser) derives rotations by splitting a tail's departure-
 sorted legs wherever one lands at its base. Nothing is stored: a

@@ -1,7 +1,7 @@
 import { nightStopLegs } from '../sim/nightStops';
 import { hasLineBase, outstationCheck } from '../sim/bases';
 import { deferredItems, MX_HOLD_AT, tonightCheck } from '../sim/mxChecks';
-import { bringNightStopHome, planBringNightStopHome, planRetimeRotation, removeRotation as removeRotationFromSchedule, retimeRotation } from '../sim/playerActions';
+import { bringNightStopHome, draftProblem, dropRotation, dropRotationInDraft, overlappingLegs, planBringNightStopHome, planDropRotation, removeRotation as removeRotationFromSchedule, saveDraft, type DraftMove, type DropPlan } from '../sim/playerActions';
 import type { RetimePlan } from '../sim/retime';
 import { airportHours, FIRST_OPEN_HOUR, freeInHour, OPEN_HOURS } from '../sim/hours';
 import { money, shortMoney } from './format';
@@ -214,16 +214,21 @@ let rotationsSignature: string | null = null;
 
 /** Types whose group of rows is folded away, by type code: remembered for the session. */
 const collapsedTypes = new Set<string>();
+/** The state the timeline draws and plans on: the real one, or the draft's copy while one is open. */
 let lastTimelineState: SimState | null = null;
+let liveState: SimState | null = null;
 
-function renderRotations(state: SimState): void {
+function renderRotations(live: SimState): void {
+  liveState = live;
+  // While a draft is open the timeline draws and plans on its copy of the state.
+  const state = draft ? draft.world : live;
   lastTimelineState = state;
   // Mid-drag the timeline is the player's; a rebuild would drop what they
   // hold. Unless what they hold is already gone (the panel rebuilt around
   // it): then the drag is over.
   if (drag && drag.span.isConnected) return;
   if (drag) cancelDrag();
-  const rotations = allRotations(state);
+  const rotations = draft ? draftRotations(live, draft.world) : allRotations(live);
   const signature =
     [...collapsedTypes].join(',') +
     '|' +
@@ -231,19 +236,132 @@ function renderRotations(state: SimState): void {
     '|' +
     rotations.map((r) => `${r.tail}:${r.airports.join('>')}:${r.departMinute}:${r.arriveMinute}:${r.closed}`).join('|') +
     '|' +
-    JSON.stringify(state.pendingRetimes ?? []);
+    JSON.stringify(state.pendingRetimes ?? []) +
+    '|' +
+    (draft ? draft.drops.length : 'live');
   if (signature === rotationsSignature) return;
   rotationsSignature = signature;
 
   rotationsEmptyEl.hidden = rotations.length > 0;
   rotationsTimelineEl.replaceChildren(...(rotations.length > 0 ? buildTimeline(state, rotations) : []));
+  rotationsTimelineEl.classList.toggle('is-planning', draft !== null);
+  updateDraftBar();
   updateNightCells(state, true);
 }
 
 /** Rebuild now, whatever the signature says: a group folded or unfolded, a move made. */
 function rebuildTimeline(): void {
   rotationsSignature = null;
-  if (lastTimelineState) renderRotations(lastTimelineState);
+  if (liveState) renderRotations(liveState);
+}
+
+// --- Planning a draft -------------------------------------------------------
+
+/**
+ * A drop that fails only because it sits on other flights is kept in a
+ * **draft**: the timeline then plans on a copy of the state, where flights
+ * may overlap (red where they do), until the green ✓ replays every drop on
+ * the real state (sim/scheduleDraft.ts), all or nothing. ✕ throws the draft
+ * away, ↶ takes back the last drop.
+ */
+type Draft = {
+  world: SimState;
+  /** Each drop's moves (a swap is several), in the order they were made. */
+  drops: DraftMove[][];
+};
+let draft: Draft | null = null;
+
+const draftBar = document.createElement('div');
+draftBar.id = 'timeline-draft-bar';
+draftBar.hidden = true;
+rotationsTimelineEl.before(draftBar);
+
+function draftButton(className: string, glyph: string, label: string, onClick: () => void): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = `draft-button ${className}`;
+  button.textContent = glyph;
+  button.title = label;
+  button.setAttribute('aria-label', label);
+  button.addEventListener('click', onClick);
+  return button;
+}
+
+/** The bar over the timeline while a draft is open: ✎ and a count, then ✓ save, ↶ undo, ✕ discard. Icons only; the tips say which is which. */
+function updateDraftBar(): void {
+  draftBar.hidden = draft === null;
+  if (!draft) {
+    draftBar.replaceChildren();
+    return;
+  }
+  const mark = document.createElement('span');
+  mark.className = 'draft-mark';
+  mark.textContent = `✎ ${draft.drops.length}`;
+  mark.title = 'Planning · flights may overlap until you save';
+  draftBar.replaceChildren(
+    mark,
+    draftButton('is-save', '✓', 'Verify and save', saveTheDraft),
+    draftButton('is-undo', '↶', 'Undo the last move', undoDraftDrop),
+    draftButton('is-discard', '✕', 'Discard all', discardDraft),
+  );
+}
+
+function discardDraft(): void {
+  draft = null;
+  rebuildTimeline();
+}
+
+/** The real state's rotations, drawn where the draft has put their flights. */
+function draftRotations(live: SimState, world: SimState): Rotation[] {
+  const byId = new Map(world.schedule.map((leg) => [leg.legId, leg]));
+  return allRotations(live).map((rotation) => {
+    const legs = rotation.legs.map((leg) => byId.get(leg.legId) ?? leg).sort((a, b) => a.departMinute - b.departMinute);
+    const last = legs[legs.length - 1];
+    return { ...rotation, tail: legs[0].tail, legs, airports: [legs[0].origin, ...legs.map((leg) => leg.dest)], departMinute: legs[0].departMinute, arriveMinute: last.departMinute + last.blockMinutes };
+  });
+}
+
+/** Start a draft, or carry on with the open one: make a drop's moves on its copy of the state. */
+function addToDraft(moves: DraftMove[]): void {
+  if (!liveState) return;
+  if (!draft) draft = { world: structuredClone(liveState), drops: [] };
+  const result = dropRotationInDraft(draft.world, moves);
+  if (!result.ok) {
+    flashTip(result.reason, true);
+    if (draft.drops.length === 0) draft = null;
+    return;
+  }
+  draft.drops.push(moves);
+}
+
+function undoDraftDrop(): void {
+  if (!draft || !liveState) return;
+  const drops = draft.drops.slice(0, -1);
+  if (drops.length === 0) {
+    discardDraft();
+    return;
+  }
+  const world = structuredClone(liveState);
+  for (const moves of drops) dropRotationInDraft(world, moves);
+  draft = { world, drops };
+  rebuildTimeline();
+}
+
+function saveTheDraft(): void {
+  if (!draft || !liveState) return;
+  const moves = draft.drops.flat();
+  const problem = draftProblem(liveState, moves);
+  if (problem) {
+    // Stays open, its overlaps red: the player fixes them and verifies again.
+    flashTip(`Not saved · ${problem}`, true);
+    return;
+  }
+  const result = saveDraft(liveState, moves);
+  flashTip(result.ok ? `Saved · ${draft.drops.length} move${draft.drops.length === 1 ? '' : 's'}` : result.reason, !result.ok);
+  if (!result.ok) return;
+  draft = null;
+  renderScheduleWarnings(scheduleProblems(liveState));
+  rebuildTimeline();
 }
 
 /**
@@ -265,6 +383,9 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
   const start = Math.min(USABLE_DAY_START_MINUTE, ...rotations.map((r) => r.departMinute));
   const end = Math.max(USABLE_DAY_END_MINUTE, ...rotations.map((r) => r.arriveMinute));
   timelineWindow = { start, end };
+  // In a draft: which flights have been moved in it, and which now sit on others.
+  const drafted = new Set(draft?.drops.flat().flatMap((move) => move.legIds));
+  const conflicted = draft ? overlappingLegs(state) : null;
   const at = (minute: number) => `${((minute - start) / (end - start)) * 100}%`;
   const width = (minutes: number) => `${(minutes / (end - start)) * 100}%`;
 
@@ -356,6 +477,9 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
         span.className = 'timeline-rotation';
         span.classList.toggle('is-open', !rotation.closed && !half);
         span.classList.toggle('is-night-stop', half);
+        span.dataset.legs = rotation.legs.map((leg) => leg.legId).join(',');
+        span.classList.toggle('is-draft', rotation.legs.some((leg) => drafted.has(leg.legId)));
+        span.classList.toggle('is-conflict', rotation.legs.some((leg) => conflicted?.has(leg.legId)));
         span.style.left = at(rotation.departMinute);
         span.style.width = width(rotation.arriveMinute - rotation.departMinute);
         span.title =
@@ -385,6 +509,11 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
             span.append(groundLabel(before.dest, within((before.departMinute + before.blockMinutes + leg.departMinute) / 2)));
           }
         });
+        // Not in a draft: ⌂ and × act on the real schedule.
+        if (draft) {
+          track.append(span);
+          continue;
+        }
         if (half) span.append(nightHomeButtonFor(aircraft.tail, state));
         const removeButton = removeButtonFor(rotation, state, half ? own.find((other) => other !== rotation && (other.legs[0] === nightStop!.morning || other.legs[0] === nightStop!.evening)) : undefined);
         if (half) halfButtons.push(removeButton);
@@ -457,7 +586,7 @@ type Drag = {
   minutesPerPx: number;
   moved: boolean;
   target: { tail: string; start: number } | null;
-  plan: RetimePlan | null;
+  drop: DropPlan | null;
 };
 
 let drag: Drag | null = null;
@@ -498,7 +627,7 @@ function startDrag(event: PointerEvent, span: HTMLElement, rotation: Rotation, t
     minutesPerPx: (timelineWindow.end - timelineWindow.start) / Math.max(1, rect.width),
     moved: false,
     target: null,
-    plan: null,
+    drop: null,
   };
   // Keep the pointer while it's held, even off the row; not every pointer can be captured.
   try {
@@ -551,18 +680,35 @@ function onDragMove(event: PointerEvent): void {
 
   if (!drag.target || drag.target.tail !== tail || drag.target.start !== start) {
     drag.target = { tail, start };
-    drag.plan = planRetimeRotation(lastTimelineState, drag.rotation.legs.map((leg) => leg.legId), tail, start);
+    drag.drop = planDropRotation(lastTimelineState, drag.rotation.legs.map((leg) => leg.legId), tail, start, draft !== null);
+    // A swap lights the rotations that would trade places with the held one.
+    const swapping = new Set(drag.drop.kind === 'swap' ? drag.drop.moves.slice(1).flatMap((move) => move.legIds) : []);
+    for (const other of rotationsTimelineEl.querySelectorAll<HTMLElement>('.timeline-rotation')) {
+      other.classList.toggle('is-swapping', other !== drag.span && (other.dataset.legs ?? '').split(',').some((id) => swapping.has(id)));
+    }
   }
-  const plan = drag.plan!;
-  drag.span.classList.toggle('is-bad', !plan.ok);
+  const { plan, kind } = drag.drop!;
+  drag.span.classList.toggle('is-bad', !drag.drop!.ok);
+  drag.span.classList.toggle('is-hold', drag.drop!.ok && kind === 'hold');
   drag.span.dataset.time = minuteOfDayToTimeString(start);
-  dragTip.textContent = plan.ok ? describeRetime(plan, tail, drag.rotation.tail, start) : `${minuteOfDayToTimeString(start)} · ${plan.reason}`;
-  dragTip.classList.toggle('is-bad', !plan.ok);
+  dragTip.textContent = !drag.drop!.ok
+    ? `${minuteOfDayToTimeString(start)} · ${drag.drop!.reason}`
+    : kind === 'swap'
+      ? `⇄ ${swapName(drag.drop!)} · ${describeRetime(plan, tail, drag.rotation.tail, start)}`
+      : kind === 'hold'
+        ? `✎ ${minuteOfDayToTimeString(start)} · ${tail} · ${drag.drop!.reason}`
+        : describeRetime(plan, tail, drag.rotation.tail, start);
+  dragTip.classList.toggle('is-bad', !drag.drop!.ok);
   dragTip.hidden = false;
   const spanRect = drag.span.getBoundingClientRect();
   dragTip.style.left = `${Math.max(8, Math.min(window.innerWidth - dragTip.offsetWidth - 8, spanRect.left))}px`;
   // Under the block: its time is on top of it.
   dragTip.style.top = `${Math.min(window.innerHeight - dragTip.offsetHeight - 8, spanRect.bottom + 6)}px`;
+}
+
+/** The rotations a swap trades with, short: "C-P001 PHL→MHT→PHL", or "C-P001 ×2" when there are several. */
+function swapName(drop: DropPlan): string {
+  return drop.swapWith.length === 1 ? drop.swapWith[0] : `${drop.swapWith[0].split(' ')[0]} ×${drop.swapWith.length}`;
 }
 
 /** What a move would do, in ops shorthand: "08:10 · C-P004 · +$1,200/day · slots +$40/day". */
@@ -590,19 +736,25 @@ function describeRetime(plan: RetimePlan, tail: string, fromTail: string, start:
 
 function onDragEnd(): void {
   if (!drag) return;
-  const { moved, plan, target, rotation } = drag;
+  const { moved, drop, target, rotation } = drag;
   finishDrag();
   if (!moved) return;
   // The click that follows a drag isn't a click on the route.
   justDragged = true;
   setTimeout(() => (justDragged = false), 0);
-  if (plan?.ok && target && lastTimelineState && (target.start !== rotation.departMinute || target.tail !== rotation.tail)) {
-    const result = retimeRotation(lastTimelineState, rotation.legs.map((leg) => leg.legId), target.tail, target.start);
-    renderScheduleWarnings(scheduleProblems(lastTimelineState));
-    flashTip(result.ok ? result.message : result.reason, !result.ok);
-  } else if (plan && !plan.ok) {
+  if (drop?.ok && target && liveState && (target.start !== rotation.departMinute || target.tail !== rotation.tail)) {
+    if (draft || drop.kind === 'hold') {
+      // Planning: it goes in the draft and nothing real changes yet.
+      addToDraft(drop.moves);
+      if (draft && drop.kind === 'hold') flashTip(`✎ ${drop.reason} · ✓ saves when nothing overlaps`, false);
+    } else {
+      const result = dropRotation(liveState, drop.moves);
+      renderScheduleWarnings(scheduleProblems(liveState));
+      flashTip(result.ok ? (drop.kind === 'swap' ? `⇄ ${rotation.tail} ↔ ${swapName(drop)}` : result.message) : result.reason, !result.ok);
+    }
+  } else if (drop && !drop.ok) {
     // Snapped back: say why, where the tip was, so the player isn't left guessing.
-    flashTip(`Not moved · ${plan.reason}`, true);
+    flashTip(`Not moved · ${drop.reason}`, true);
   }
   rebuildTimeline();
 }
@@ -638,7 +790,8 @@ function finishDrag(): void {
 
 window.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && drag) {
-    event.stopPropagation();
+    // Immediate: main.ts's Esc, on this same window, would otherwise step the inspector back too.
+    event.stopImmediatePropagation();
     cancelDrag();
   }
 }, true);

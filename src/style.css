@@ -1351,6 +1351,89 @@ button,
   background: #9fb4ff;
 }
 
+/* Planning a draft (ui/panels.ts): flights may overlap until the green
+   check saves them. The bar holds icons only; their tips name them. */
+#timeline-draft-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+#timeline-draft-bar[hidden] {
+  display: none;
+}
+
+#timeline-draft-bar .draft-mark {
+  margin-right: auto;
+  font-size: 12px;
+  color: #ffd166;
+}
+
+.draft-button {
+  width: 26px;
+  height: 22px;
+  padding: 0;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1;
+  color: #e6e9f0;
+  background: #11151f;
+  border: 1px solid #2a3142;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.draft-button.is-save {
+  color: #0a0c12;
+  background: #3ddc84;
+  border-color: #3ddc84;
+}
+
+.draft-button.is-discard:hover {
+  color: #ff8080;
+  border-color: #ff8080;
+}
+
+@media (pointer: coarse) {
+  .draft-button {
+    width: 44px;
+    height: 36px;
+    font-size: 18px;
+  }
+}
+
+#rotations-timeline.is-planning {
+  outline: 1px dashed #ffd166;
+  outline-offset: 3px;
+}
+
+/* A rotation moved in the draft, and red where flights now sit on each other. */
+.timeline-rotation.is-draft {
+  z-index: 1;
+  border-style: dashed;
+  border-color: #ffd166;
+}
+
+.timeline-rotation.is-conflict {
+  background: repeating-linear-gradient(135deg, rgba(255, 92, 92, 0.35) 0 4px, rgba(255, 92, 92, 0.12) 4px 8px);
+  border-color: #ff5c5c;
+}
+
+/* While dragging: the rotations that would trade places with the held one, and a drop that will be held as an overlap. */
+.timeline-rotation.is-swapping {
+  box-shadow: 0 0 0 1px #3ddc84;
+  background: color-mix(in srgb, #3ddc84 25%, transparent);
+}
+
+.timeline-rotation.is-dragging.is-hold {
+  box-shadow: 0 0 0 1px #ffd166, 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+.timeline-rotation.is-dragging.is-hold::after {
+  background: #ffd166;
+}
+
 /* A move held for tomorrow (sim/retime.ts): dashed where it will sit. */
 .timeline-pending {
   position: absolute;
