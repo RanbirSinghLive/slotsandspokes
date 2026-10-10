@@ -376,16 +376,55 @@ export function morningHolds(state: SimState): { tail: string; legIds: string[] 
  * contracted, paid here.
  */
 export function forcedHeavyChecks(state: SimState): { aircraft: Aircraft; days: number }[] {
-  const forced = state.aircraft
-    .filter((aircraft) => heavyCheckDueIn(aircraft) <= -OVERDUE_GRACE_DAYS)
+  return groundForHeavyCheck(state, state.aircraft.filter((aircraft) => heavyCheckDueIn(aircraft) <= -OVERDUE_GRACE_DAYS));
+}
+
+/**
+ * Checks the player booked (bookHeavyCheck): the same grounding as a forced
+ * one, taken the next morning. A booked plane that isn't at its base or
+ * night stop that morning stays booked until it is. Planes in `skip` (already
+ * forced this morning) are left alone.
+ */
+export function bookedHeavyChecks(state: SimState, skip: Aircraft[]): { aircraft: Aircraft; days: number }[] {
+  const booked = groundForHeavyCheck(state, state.aircraft.filter((aircraft) => aircraft.heavyCheckBooked && !skip.includes(aircraft)));
+  for (const { aircraft } of booked) delete aircraft.heavyCheckBooked;
+  return booked;
+}
+
+function groundForHeavyCheck(state: SimState, candidates: Aircraft[]): { aircraft: Aircraft; days: number }[] {
+  const grounded = candidates
     // At its base, or where it sleeps on a night stop (sim/nightStops.ts).
     .filter((aircraft) => aircraft.status === 'ground' && (aircraft.atAirport === aircraft.baseAirport || aircraft.atAirport === nightStopStation(state, aircraft.tail)) && !aircraft.rebase)
     .filter((aircraft) => !state.aogs.some((event) => event.tail === aircraft.tail));
-  return forced.map((aircraft) => {
+  return grounded.map((aircraft) => {
     const workLeft = heavyCheckWorkMinutes(aircraft.typeCode) - heavyBankedMinutes(aircraft);
     if (!heavyRated(state, aircraft.atAirport ?? '', aircraft.typeCode)) chargeMaintenance(state, contractCost(workLeft));
     return { aircraft, days: Math.max(1, Math.ceil(workLeft / MINUTES_PER_DAY)) };
   });
+}
+
+/** What booking a plane's C check now would do: days grounded, contract cost (0 in house) and rotations it takes off the plane. Null when it can't be booked. */
+export function previewHeavyCheckBooking(state: SimState, tail: string): { days: number; cost: number; rotations: number } | null {
+  const aircraft = state.aircraft.find((a) => a.tail === tail);
+  if (!aircraft || !canBookHeavyCheck(state, aircraft)) return null;
+  const workLeft = heavyCheckWorkMinutes(aircraft.typeCode) - heavyBankedMinutes(aircraft);
+  return {
+    days: Math.max(1, Math.ceil(workLeft / MINUTES_PER_DAY)),
+    cost: heavyRated(state, aircraft.atAirport ?? '', aircraft.typeCode) ? 0 : contractCost(workLeft),
+    rotations: rotationsForTail(state, tail).length,
+  };
+}
+
+/** Bookable: parked at its base, C check inside its window, not already booked, in check or rebasing. */
+export function canBookHeavyCheck(state: SimState, aircraft: Aircraft): boolean {
+  return (
+    !aircraft.heavyCheckBooked &&
+    heavyCheckOpen(aircraft) &&
+    aircraft.status === 'ground' &&
+    aircraft.atAirport === aircraft.baseAirport &&
+    !aircraft.rebase &&
+    !state.aogs.some((event) => event.tail === aircraft.tail)
+  );
 }
 
 /** A heavy check done: the interval starts again, every deferred item is cleared and the maintenance reserve is paid. */
@@ -393,6 +432,7 @@ export function finishHeavyCheck(state: SimState, aircraft: Aircraft): void {
   settleMaintenance(state, aircraft);
   aircraft.daysSinceHeavyCheck = 0;
   delete aircraft.deferredItems;
+  delete aircraft.heavyCheckBooked;
   delete aircraft.heavyBankedMinutes;
   delete aircraft.flightMinutesSinceHeavy;
   delete aircraft.cyclesSinceHeavy;

@@ -11,7 +11,7 @@ import { linkToMap } from '../mapLink';
 import { planeIconElement, TYPE_COLOURS } from '../planeIcons';
 import { select } from '../selection';
 import { MX_RATING_FEE, MX_RATING_PER_DAY } from '../../sim/bases';
-import { costRows, showConfirm } from '../confirmModal';
+import { cashAfterRows, costRows, showConfirm } from '../confirmModal';
 import { baseSection, noneLine } from './bases';
 import { heading, line } from './dom';
 
@@ -226,6 +226,8 @@ function buildFleetBoard(state: SimState, changed: () => void): HTMLElement[] {
 
   const list = box('mx-cards');
   const cardOf = ({ plane, aircraft, life, standing }: (typeof cards)[number]): HTMLElement => {
+    // The card is a button, so its actions sit beside it, not inside.
+    const wrap = box('mx-card-wrap');
     const card = linkToMap(document.createElement('button'), { kind: 'aircraft', tail: plane.tail });
     card.type = 'button';
     card.className = `mx-card mx-card-${standing}`;
@@ -292,7 +294,47 @@ function buildFleetBoard(state: SimState, changed: () => void): HTMLElement[] {
     const row = box('mx-card-row');
     row.append(items, clockLine);
     card.append(head, clock, aLane, aLine, row, wear, dials);
-    return card;
+    wrap.append(card);
+    // Book the C check once its window is open, instead of waiting out the overdue grace.
+    if (plane.booked) {
+      const unbook = document.createElement('button');
+      unbook.type = 'button';
+      unbook.textContent = 'C booked · tomorrow ✕';
+      unbook.title = 'Cancel the booking';
+      unbook.className = 'mx-card-action';
+      unbook.addEventListener('click', () => {
+        ops.cancelBookedCheck(state, plane.tail);
+        changed();
+      });
+      wrap.append(unbook);
+    } else if (plane.canBook) {
+      const preview = ops.previewHeavyCheckBooking(state, plane.tail);
+      if (preview) {
+        const book = document.createElement('button');
+        book.type = 'button';
+        book.textContent = `Book C check · ${preview.days}d${preview.cost > 0 ? ` · ${money(preview.cost)}` : ''}`;
+        book.className = 'mx-card-action';
+        book.addEventListener('click', () =>
+          showConfirm({
+            title: `Book C check · ${plane.tail}`,
+            rows: [
+              { label: 'Grounded', value: `${preview.days}d from tomorrow` },
+              { label: 'Check cost', value: preview.cost > 0 ? money(preview.cost) : 'in house' },
+              { label: 'Rotations', value: `${preview.rotations} · other planes cover them where pools allow` },
+              ...(preview.cost > 0 ? cashAfterRows(state, preview.cost) : []),
+            ],
+            facts: ['Rotations nobody can cover are cancelled. Cancel the booking any time before it goes in.'],
+            confirmLabel: 'Book check',
+            run: () => {
+              ops.bookHeavyCheck(state, plane.tail);
+              changed();
+            },
+          }),
+        );
+        wrap.append(book);
+      }
+    }
+    return wrap;
   };
 
   // One folding group per type, worst plane first within it.

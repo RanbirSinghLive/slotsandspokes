@@ -24,7 +24,8 @@ is saved only when the owner accepts the read.
 4. The heavy check is the C check on screen, due by days, 300 flight hours or
    250 cycles; a hatched Gantt night cell (A, C) when the night's spare hours
    go to a check. **Built.**
-5. Planning: pick the night or bay, quiet-night hint, headless-player policy.
+5. Planning: a Book C check button on the Mtc card (grounded next morning, cancellable). No
+   quiet-night hint; the headless player doesn't book. **Built.**
 
 ## Not in this week
 

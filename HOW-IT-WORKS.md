@@ -3351,6 +3351,16 @@ moved to spare planes, until the work left is done, by contract at a
 base without maintenance. A plane from an
 older save starts part-way through its interval, staggered by tail.
 
+**Booking the C check.** Once the window is open, a plane parked at its base
+shows "Book C check" on its Mtc card (`bookHeavyCheck()`). The confirm shows
+the days grounded, the contract cost (nothing in house) and the rotations that
+move to other planes. The plane goes in the next morning, grounded the same way
+as a forced check (`bookedHeavyChecks()`, fault "C check booked"), so the
+player picks a quiet week instead of taking the 7-day grace. The booking is
+cancelled with ✕ any time before then; a booked plane away from base waits at
+the booking until it is back. The headless player never books: checks bank
+on nights, then force.
+
 An earlier version took every plane out for 1–3 days every 30 days. A
 fleet flown near capacity had no spare planes to take its flying, so
 the cancellations cost Toronto most of its year on 18 seeds.

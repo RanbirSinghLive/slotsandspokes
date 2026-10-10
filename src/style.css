@@ -4928,6 +4928,27 @@ button.ops-item:hover {
   cursor: pointer;
 }
 
+.mx-card-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.mx-card-action {
+  padding: 4px 9px;
+  font: inherit;
+  text-align: left;
+  color: #ffb347;
+  background: #0e1016;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 0;
+  border-radius: 0 0 4px 4px;
+  cursor: pointer;
+}
+
+.mx-card-action:hover {
+  background: #171b26;
+}
+
 .mx-card:hover {
   background: #171b26;
 }
