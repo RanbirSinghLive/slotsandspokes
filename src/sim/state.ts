@@ -297,6 +297,12 @@ export type SimState = {
    */
   retimedToday?: string[];
   /**
+   * Legs a controller swap (sim/controller.ts) moved to another plane for
+   * today, with the plane they were scheduled on; handed back at rollover.
+   * Optional: made on first use.
+   */
+  swappedToday?: { legId: string; fromTail: string }[];
+  /**
    * Gantt moves held for the midnight rollover (sim/retime.ts): a rotation
    * in the air, or part flown, keeps today's flying and takes its new
    * times and plane tomorrow. Optional: made on first use.

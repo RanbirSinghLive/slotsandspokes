@@ -16,7 +16,12 @@ for (let day = 1; day <= 40; day++) {
   player.playDay(state);
 }
 
-const tail = state.aircraft.map((a) => a.tail).find((t) => rotationsForTail(state, t).length >= 2);
+const tail = state.aircraft
+  .map((a) => a.tail)
+  .find((t) => {
+    const found = rotationsForTail(state, t);
+    return found.length >= 2 && found.every((r) => r.legs[0].origin === found[0].legs[0].origin);
+  });
 assert.ok(tail, 'no plane with two rotations to test with');
 
 // Midday with nothing flown: the plane has been waiting at base for hours,
@@ -73,4 +78,35 @@ console.log('controller cancel: ok');
   aircraft.groundSinceMinute = state.simMinute - 60;
   assert.equal(callsNeeded(state).some((call) => call.tail === tail), false, 'a plane not yet behind needs no call');
   console.log('controller calls: ok');
+}
+
+// Live swap: an idle plane of the same type and base takes a late plane's
+// rotation for today only, for a fee, and it goes back at the rollover.
+{
+  const { swapTargets, swapRotation, handBackSwaps } = await import('./controller');
+  const late = state.aircraft.find((a) => a.tail === tail)!;
+  const spare = { ...late, tail: 'T-SPARE', status: 'ground' as const, atAirport: late.baseAirport, groundSinceMinute: state.simMinute - 600 };
+  state.aircraft.push(spare);
+  late.status = 'ground';
+  late.atAirport = rotations[0].legs[0].origin;
+  state.cancelledToday = [];
+  state.completedToday = [];
+  state.simMinute = dayStartMinute(state) + 12 * 60;
+  late.groundSinceMinute = state.simMinute - 60;
+
+  const targets = swapTargets(state, rotations[0].legs[0].legId);
+  assert.ok(Array.isArray(targets), 'swapTargets refused');
+  const offer = Array.isArray(targets) ? targets.find((t) => t.tail === 'T-SPARE') : undefined;
+  assert.ok(offer && offer.refusal === null, 'idle plane should be offered: ' + JSON.stringify(offer));
+  assert.ok(offer!.curfewCancelsAfter < offer!.curfewCancelsBefore || offer!.lateMinutesAfter < offer!.lateMinutesBefore, 'swap should help');
+
+  const cash = state.cash;
+  const done = swapRotation(state, rotations[0].legs[0].legId, 'T-SPARE');
+  assert.ok(done.ok, 'swap refused');
+  assert.equal(state.cash, cash - offer!.fee);
+  assert.ok(rotations[0].legs.every((leg) => state.schedule.find((l) => l.legId === leg.legId)!.tail === 'T-SPARE'));
+  handBackSwaps(state);
+  assert.ok(rotations[0].legs.every((leg) => state.schedule.find((l) => l.legId === leg.legId)!.tail === tail), 'hand back');
+  state.aircraft.pop();
+  console.log('controller swap: ok');
 }
