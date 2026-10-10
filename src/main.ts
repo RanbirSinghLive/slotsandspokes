@@ -9,6 +9,7 @@ import { drawTerminator } from './render/terminator';
 import { drawAirportChips } from './render/airportChips';
 import { drawRoutes,drawSelectedRoute } from './render/routes';
 import { drawPainGauges } from './render/pain';
+import { drawCallPulse, callPulseActive } from './render/callPulse';
 import { drawAirports, drawSelectedAirport, airports, setKnownAirports, nearestAirportCandidate, setAirportHold } from './render/airports';
 import { drawHubView, hasHubView } from './render/hubs';
 import { drawFog } from './render/fog';
@@ -59,6 +60,7 @@ import { updateTicker } from './ui/ticker';
 import { updateStamps } from './ui/stamp';
 import { updateOpsBoard } from './ui/opsBoard';
 import { updateCalls } from './ui/callAlert';
+import { openCallPopup } from './ui/callPopup';
 import { updateHudPnl } from './ui/hudPnl';
 import { updateAlerts } from './ui/alerts';
 import { updatePoolBars } from './ui/poolBars';
@@ -309,7 +311,11 @@ function render(nowMs: number = performance.now()): void {
   updateAlerts(state, () => select({ kind: 'fleet' }), choosingHome);
   if (updateMandates(state, choosingHome, () => select({ kind: 'fleet' }))) runwayPauseRequested = true;
   if (updateBriefs(state, choosingHome, briefSpeed)) runwayPauseRequested = true;
-  if (updateCalls(state, choosingHome)) runwayPauseRequested = true;
+  const newCall = updateCalls(state, choosingHome);
+  if (newCall) {
+    openCallPopup(state, newCall.tail, newCall.kind);
+    runwayPauseRequested = true;
+  }
 
   // The game-over screen is a global overlay, not part of any one sidebar
   // tab, so it keeps refreshing whichever one is showing. Pausing on
@@ -405,6 +411,7 @@ function render(nowMs: number = performance.now()): void {
 
   drawDisruptions(ctx, state);
   // The airport the side panel is showing, on top of its dot.
+  drawCallPulse(ctx, performance.now());
   if (selection.kind === 'airport') drawSelectedAirport(ctx, selection.iata);
   if (mapHover?.kind === 'airport') drawSelectedAirport(ctx, mapHover.iata);
 
@@ -558,6 +565,8 @@ let lastFrameTimeMs: number | null = null;
 // game, the picture only needs a refresh a few times a second (clocks,
 // flashes); on a phone, moving planes are drawn at 30 fps, which a map hides.
 const PAUSED_REDRAW_MS = 250;
+// A breathing ring needs more than four frames a second to look smooth.
+const PULSE_REDRAW_MS = 66;
 const PHONE_FRAME_MS = 1000 / 30 - 3;
 const isPhoneScreen = window.matchMedia('(pointer: coarse)').matches;
 let lastRenderMs = 0;
@@ -568,7 +577,7 @@ for (const type of ['pointerdown', 'pointermove', 'pointerup', 'touchstart', 'ke
 
 function frameNeedsRender(nowMs: number): boolean {
   const sinceRenderMs = nowMs - lastRenderMs;
-  if (speedMultiplier === 0) return inputSinceRender || sinceRenderMs >= PAUSED_REDRAW_MS;
+  if (speedMultiplier === 0) return inputSinceRender || sinceRenderMs >= (callPulseActive() ? PULSE_REDRAW_MS : PAUSED_REDRAW_MS);
   return !isPhoneScreen || sinceRenderMs >= PHONE_FRAME_MS;
 }
 

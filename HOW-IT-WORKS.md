@@ -3578,6 +3578,13 @@ Each cause has a different answer available:
   (`swappedToday`) and go back to their plane at the morning rollover.
   Crew duty isn't checked: same type and base means the same pool.
 
+  **The call popup** (`ui/callPopup.ts`). When a plane needs a call the
+  clock pauses once (per plane, kind and day) and a popup opens over the
+  map with the same Needs a call rows and ✕ / ⇄ buttons, so the player
+  decides without leaving the map. Its airport breathes amber on the map
+  (`render/callPulse.ts`). ↗ opens the plane's page, where the block
+  flashes. The ops row's CALL count opens the same popup.
+
   **The call.** `callsNeeded()` lists waiting planes with a rotation to
   cancel whose day is about to break once a flight is 20 minutes overdue:
   `curfew` (the curfew will cancel a rotation), `event` (a priority flight

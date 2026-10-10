@@ -5733,3 +5733,83 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
 .rival-gauge s { position: absolute; top: -3px; width: 2px; height: 10px; background: #fff; }
 .rival-gauge s.mid { left: 50%; background: #556; }
 .rival-ladder { color: #8b94a7; font-size: 12px; }
+
+/* The call popup (ui/callPopup.ts). Below the confirm dialogs (45) so ✕ and ⇄
+   can ask first, above the phone panel sheet (40) and rail (41). A card, not a
+   backdrop: the map stays visible so the breathing ring shows which plane. */
+.call-popup {
+  position: fixed;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 44;
+  width: min(380px, calc(100vw - 16px));
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  background: #0a0c12;
+  border: 1px solid #ffb040;
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 13px;
+  color: #cdd3e0;
+}
+
+.call-popup-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 176, 64, 0.35);
+}
+
+.call-popup-title {
+  flex: 1;
+  color: #ffb040;
+  font-weight: bold;
+}
+
+.call-popup-head button {
+  min-width: 32px;
+  min-height: 32px;
+  background: #3a4258;
+  border: 1px solid #6b7694;
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+}
+
+.call-popup-body {
+  overflow-y: auto;
+  padding: 0 10px 10px;
+}
+
+@media (pointer: coarse) {
+  .call-popup {
+    top: auto;
+    bottom: 8px;
+    max-height: 55vh;
+  }
+
+  .call-popup-head button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* The Needs a call block on the plane page after the popup's open button: a
+   few slow amber pulses, then still. */
+.call-flash {
+  animation: call-flash 1.6s ease-in-out 3;
+}
+
+@keyframes call-flash {
+  0%, 100% { background-color: transparent; }
+  50% { background-color: rgba(255, 176, 64, 0.28); }
+}
+
+.call-popup .inspector-return h2 {
+  margin: 10px 0 4px;
+  font-size: 12px;
+}

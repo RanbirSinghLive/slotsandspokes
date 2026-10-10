@@ -2,12 +2,11 @@ import { briefSettings } from '../sim/briefs';
 import { dayIndex } from '../sim/clock';
 import { callsNeeded, LATE_CALL_MINUTES, type Call } from '../sim/controller';
 import type { SimState } from '../sim/state';
-import { select } from './selection';
 
 /**
  * The controller's call (sim/controller.ts), put in front of the player: a
  * waiting plane whose day is about to break pauses the clock once and opens
- * its page, where Needs a call has the ✕ for each rotation it can still
+ * a popup (ui/callPopup.ts) with the ✕ for each rotation it can still
  * cancel. The ops row's CALL count (ui/opsBoard.ts) lists the planes
  * whatever the setting, so turning the pause off loses nothing but the stop.
  *
@@ -36,8 +35,19 @@ export function pendingCalls(state: SimState): Call[] {
   return calls;
 }
 
-/** Called every frame; true on the frame a new call is put in front of the player, so the caller can pause the clock. */
-export function updateCalls(state: SimState, choosingHome: boolean): boolean {
+/** Set when the plane page is opened from the popup, so its Needs a call block flashes once (ui/inspector/aircraft.ts). */
+let flashTail: string | null = null;
+export function flashCallBlockFor(tail: string): void {
+  flashTail = tail;
+}
+export function takeCallBlockFlash(tail: string): boolean {
+  const flash = flashTail === tail;
+  if (flash) flashTail = null;
+  return flash;
+}
+
+/** Called every frame; the call put in front of the player on this frame, so the caller can pause the clock and open the popup. */
+export function updateCalls(state: SimState, choosingHome: boolean): Call | null {
   const now = pendingCalls(state);
   const today = dayIndex(state);
   const fresh = now.filter((call) => !raised.has(`${today}:${call.tail}:${call.kind}`));
@@ -45,10 +55,9 @@ export function updateCalls(state: SimState, choosingHome: boolean): boolean {
   // What a loaded game already holds isn't news.
   if (!primed) {
     primed = true;
-    return false;
+    return null;
   }
-  if (choosingHome || fresh.length === 0 || !briefSettings(state).callPause) return false;
-  if (document.querySelector('.modal-overlay:not([hidden])')) return false;
-  select({ kind: 'aircraft', tail: fresh[0].tail });
-  return true;
+  if (choosingHome || fresh.length === 0 || !briefSettings(state).callPause) return null;
+  if (document.querySelector('.modal-overlay:not([hidden])')) return null;
+  return fresh[0];
 }
