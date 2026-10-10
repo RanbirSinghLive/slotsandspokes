@@ -67,6 +67,7 @@ import {
 import airportsData from '../../data/airports.json';
 import {
   appointBlockedReason,
+  chairOpensAt,
   appointedCandidate,
   appointExecutive,
   candidatesForRole,
@@ -842,7 +843,7 @@ export type ExecutiveOption = ExecutiveCandidate & {
 };
 
 /** Each chair (sim/executives.ts): who holds it, and every candidate with why they can't be hired yet. */
-export function executiveOptions(state: SimState): { role: ExecutiveRole; label: string; holder: ExecutiveCandidate | null; hiredDay: number | null; candidates: ExecutiveOption[] }[] {
+export function executiveOptions(state: SimState): { role: ExecutiveRole; label: string; holder: ExecutiveCandidate | null; hiredDay: number | null; opensAt: string | null; candidates: ExecutiveOption[] }[] {
   return EXECUTIVE_ROLES.map((role) => {
     const holder = appointedCandidate(state, role) ?? null;
     const appointment = state.executives[role];
@@ -851,6 +852,7 @@ export function executiveOptions(state: SimState): { role: ExecutiveRole; label:
       label: ROLE_LABELS[role],
       holder,
       hiredDay: appointment ? dayIndex(state, appointment.hiredAtMinute) : null,
+      opensAt: chairOpensAt(state, role),
       candidates: candidatesForRole(role).map((candidate) => ({
         ...candidate,
         appointed: holder?.id === candidate.id,

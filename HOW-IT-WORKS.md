@@ -3594,21 +3594,26 @@ cash rises 5–65% by home (WEEK-TEN.md, thread 2).
 
 ## Executives (`src/sim/executives.ts`)
 
-The player is the chief executive; three chairs are theirs to fill, at
-Head office (Network › Head office): **COO**, **CFO** and **CCO**. Each
+The player is the chief executive; seven chairs are theirs to fill, at
+Head office (Network › Head office): **COO**, **CFO** and **CCO** from
+the start, and four more that open as the airline climbs the ladder:
+Chief Pilot (Network airline), Director of Maintenance
+(International), Head of Cargo and Head of Government Affairs (International).
+A chair none of whose candidates the airline has reached yet shows greyed
+with a lock and the tier that opens it. Each
 candidate (`data/executives.json`) is a named person with a background,
 hired for a **signing fee** (not refunded) and a **daily salary**
 (charged at rollover, cost category `executives`), for one lasting
 effect on a system already in the game. "Let go" stops the salary.
 Replacing a holder costs the new candidate's full fee.
 
-Head office shows the three chairs as **tiles**, each with its holder's
+Head office shows the chairs as **tiles**, each with its holder's
 portrait (or an empty chair), name and background, or how many
 candidates are available. Clicking a chair opens it below: the holder,
 then each candidate with a portrait, what they'd do and cost, and
 Appoint or why not yet. Portraits are flat cartoon faces drawn as SVG
 (`ui/portraits.ts`), one set of traits per candidate, the jacket in the
-chair's colour (COO teal, CFO amber, CCO violet).
+chair's colour (COO teal, CFO amber, CCO violet, Chief Pilot blue, Maintenance coral, Cargo green, Government pink).
 
 **The pool widens as NPS rises**: each chair has a journeyman open to
 anyone, a hire who needs a trailing network NPS of 15, and a star who
@@ -3622,7 +3627,28 @@ needs 20 (judged at hiring). A hire with a line must keep it: network NPS under 
 
 A fourth CCO, Akira Sato (NPS 25, $500,000, $5,000 a day), lifts the share of seats a plane can sell by 3 points (see Innovations; the 90% ceiling holds).
 
-Fees run $150,000 (journeymen) to $400,000, salaries $1,500 to $4,000 a
+**Second tiers.** Each chair also has candidates that need a ladder tier
+as well as NPS (`requiresTier` in the data; a candidate's card says "Needs
+<tier>" until then). A senior hire replaces the junior in the same chair
+and costs a full new fee: COO Kenji Watanabe (Operator, NPS 25): delays
+25% shorter; CFO Marguerite Dufresne (Operator, NPS 25): new leases −20%;
+CCO Rafael Ortega (Operator, NPS 25): +30% connecting passengers. They
+cost $700,000 to $800,000 and $7,000 to $8,000 a day.
+
+| New chair | Opens | First hire | Second hire |
+|---|---|---|---|
+| Chief Pilot | Network airline | Ingrid Solheim: hiring and retraining 10% faster ($400,000, $4,000 a day) | Dev Malhotra (Operator, NPS 15): 20% faster ($700,000, $7,000) |
+| Director of Maintenance | International | Birgit Aaltonen: base running costs −5% ($500,000, $5,000) | Tunde Bakare (Operator, NPS 15): −30% ($700,000, $7,000) |
+| Head of Cargo | International | Nadia Karimova: freight revenue +10% ($300,000, $3,000) | Sven Lindahl (Established carrier, NPS 15): +25% ($500,000, $5,000) |
+| Head of Government Affairs | International | Lucía Fontaine: event premiums +25%, penalties −20% ($300,000, $3,000) | Obinna Eze (Established carrier, NPS 15): +50%, −40% ($500,000, $5,000) |
+
+The crew effect multiplies with the crew academy (`crewTrainingTimeFactor()`),
+the base effect scales `mxCostPerDay()`, the freight effect scales each
+load's revenue in `carryCargo()`, and the event effect scales a new
+offer's premium and its penalty (sim/mandates.ts). A save from before the
+new chairs has no slots for them and fills them as it hires.
+
+Fees run $150,000 (journeymen) to $800,000, salaries $1,500 to $8,000 a
 day. The effects are read where they apply: delays (sim/cascade.ts,
 step.ts), NPS, AOG age (sim/aog.ts), overhead (sim/overhead.ts), hedge
 quotes (sim/fuelPrice.ts), lease rates (`asLeased()` in
@@ -3633,7 +3659,9 @@ The steady headless player hires when last week's margin covers ten
 times the salary and the fee leaves its cash reserve, filling empty
 chairs and upgrading to stronger candidates. Measured: journeymen around
 days 80–170, the NPS 15 hires from day 109, the stars rarely (once in
-five sample games, day 314).
+five sample games, day 314). It fills the new chairs the same way as they
+open, which moves `npm run quick` (below). The reference
+(`balance-reference.json`) was not re-saved with the chairs.
 
 ---
 

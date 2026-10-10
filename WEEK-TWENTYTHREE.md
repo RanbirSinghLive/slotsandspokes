@@ -21,7 +21,10 @@ checks are untouched, so `npm run quick` reads as before.
    `tierNeeded()`, `tierCounts()`, `tierComplete()`; five tiers become eight.
 2. `lastAogDay` in state, set by `sim/aog.ts`.
 3. Goals view: Next up strip and every tier as a row.
-4. Not done: second executive tiers and new chairs (a follow-up), cargo
+4. Executives follow the ladder: four new chairs (Chief Pilot, Director of
+   Maintenance, Head of Cargo, Head of Government Affairs) that open by tier,
+   and a senior hire per original chair that needs the Operator tier.
+5. Not done: cargo
    terminals and aircraft finance milestones (greyed with the features, when built).
 
 ## Notes

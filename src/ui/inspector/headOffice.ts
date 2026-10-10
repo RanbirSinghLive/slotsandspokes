@@ -131,7 +131,7 @@ function candidateCard(state: SimState, candidate: ExecutiveOption, role: string
 let openChair: string | null = null;
 
 /**
- * The three chairs as tiles, each with who holds it (their portrait, or an
+ * The chairs as tiles, each with who holds it (their portrait, or an
  * empty chair) and, at a glance, what they do or how many candidates are
  * talking to you. Click one to open it: its holder, then each candidate
  * with what they'd do, cost and whether they'll come yet.
@@ -139,7 +139,7 @@ let openChair: string | null = null;
 function executivesSection(state: SimState, changed: () => void): HTMLElement[] {
   const chairs = ops.executiveOptions(state);
   const nodes: HTMLElement[] = [
-    heading('Executives', 'You are the chief executive; these three chairs are yours to fill. The strongest candidates only talk to an airline passengers rate well. A hire with an NPS line leaves if the airline stays under it for 30 days in a row. Click a chair to see who it could be.'),
+    heading('Executives', 'You are the chief executive; these chairs are yours to fill, and more open as the airline climbs the ladder. The strongest candidates only talk to an airline passengers rate well. A hire with an NPS line leaves if the airline stays under it for 30 days in a row. Click a chair to see who it could be.'),
     line(`Airline NPS ${formatNps(networkNps(state))}`),
   ];
   const row = document.createElement('div');
@@ -150,8 +150,9 @@ function executivesSection(state: SimState, changed: () => void): HTMLElement[] 
     tile.className = 'office-chair-tile';
     tile.classList.toggle('is-open', openChair === chair.role);
     tile.classList.toggle('is-filled', chair.holder !== null);
+    tile.classList.toggle('is-locked', chair.opensAt !== null);
     tile.style.setProperty('--role', ROLE_COLOURS[chair.role] ?? '#8a93a6');
-    tile.title = chair.label;
+    tile.title = chair.opensAt ? `${chair.label} · opens at ${chair.opensAt}` : chair.label;
     const available = chair.candidates.filter((c) => !c.appointed && !c.blocked).length;
     const role = document.createElement('span');
     role.className = 'office-chair-role';
@@ -161,7 +162,7 @@ function executivesSection(state: SimState, changed: () => void): HTMLElement[] 
     who.textContent = chair.holder ? chair.holder.name : 'Vacant';
     const note = document.createElement('span');
     note.className = 'office-chair-note';
-    note.textContent = chair.holder ? chair.holder.background : `${available} available`;
+    note.textContent = chair.holder ? chair.holder.background : chair.opensAt ? `🔒 ${chair.opensAt}` : `${available} available`;
     tile.append(portraitElement(chair.holder?.id ?? null, chair.role, 56), role, who, note);
     tile.addEventListener('click', () => {
       openChair = openChair === chair.role ? null : chair.role;
