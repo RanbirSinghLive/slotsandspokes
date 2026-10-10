@@ -1,5 +1,10 @@
 import airportsData from '../../data/airports.json';
 import { lastWeekMargin } from './pnlHistory';
+import { hasHeavyBase, hasLineBase, mxStationList } from './bases';
+import { crewBases } from './crews';
+import { loadFactorCap } from './innovations';
+import { mandatesOf } from './mandates';
+import { countryOf, homeCountry } from './rights';
 import { airportLoad, dailyMovementsAt } from './airports';
 import { dayIndex } from './clock';
 import { connectingPassengersThrough } from './hubs';
@@ -38,6 +43,14 @@ export type Milestone = {
   description: string;
   /** Whether it's met now. */
   met: (state: SimState) => boolean;
+  /**
+   * An extra teaches a mechanic and counts toward a tier being complete, but
+   * is not one of the tier's gate set: the tier climbs without it, and
+   * rivals (sim/rivalLadder.ts) never judge it.
+   */
+  extra?: boolean;
+  /** False when this game has no way to meet it (events switched off): it is left out of the count. */
+  applies?: (state: SimState) => boolean;
   /** How close the airline is, for the Goals view. Null when there's nothing to count. */
   progress: (state: SimState) => Progress | null;
 };
@@ -45,7 +58,7 @@ export type Milestone = {
 export type Tier = {
   id: string;
   name: string;
-  /** How many of this tier's milestones reach the next tier. */
+  /** How many of this tier's gate milestones (not extras) reach the next tier. */
   needed: number;
   milestones: Milestone[];
   /** What climbing this tier opens, in words. */
@@ -127,6 +140,72 @@ export function roundTheWorld(state: SimState): { spanDegrees: number; complete:
   const span = complete ? 360 : Math.max(...lons) - Math.min(...lons);
   return { spanDegrees: Math.min(360, span), complete };
 }
+
+
+/** The milestones that gate a tier: everything but its extras. */
+export function gateMilestones(tier: Tier): Milestone[] {
+  return tier.milestones.filter((milestone) => !milestone.extra);
+}
+
+function appliesIn(state: SimState, milestone: Milestone): boolean {
+  return milestone.applies?.(state) ?? true;
+}
+
+/** How many gate milestones reach the next tier in this game: fewer when one cannot be met here. */
+export function tierNeeded(state: SimState, tier: Tier): number {
+  return Math.min(tier.needed, gateMilestones(tier).filter((milestone) => appliesIn(state, milestone)).length);
+}
+
+/** Gate milestones met, and extras met, for the Goals view. */
+export function tierCounts(state: SimState, tier: Tier): { gates: number; extras: number; extrasTotal: number } {
+  const met = (milestone: Milestone) => isMilestoneMet(state, milestone.id);
+  return {
+    gates: gateMilestones(tier).filter(met).length,
+    extras: tier.milestones.filter((milestone) => milestone.extra && met(milestone)).length,
+    extrasTotal: tier.milestones.filter((milestone) => milestone.extra && appliesIn(state, milestone)).length,
+  };
+}
+
+/** Whether every milestone of a tier that applies here, extras included, is met. */
+export function tierComplete(state: SimState, tier: Tier): boolean {
+  return tier.milestones.filter((milestone) => appliesIn(state, milestone)).every((milestone) => isMilestoneMet(state, milestone.id));
+}
+
+// --- More helpers over the airline ------------------------------------------
+
+function countriesServed(state: SimState): number {
+  return new Set([...networkAirports(state)].map((iata) => countryOf(iata)).filter(Boolean)).size;
+}
+
+/** Events taken on, flown or not: offered ones that lapsed do not count. */
+function eventsAccepted(state: SimState): number {
+  return mandatesOf(state).filter((mandate) => mandate.status === 'accepted' || mandate.status === 'ended').length;
+}
+
+/** Lanes the airline fills a need on, at half or better, from cargo goods matching (sim/cargo.ts). */
+function cargoLanesFilled(state: SimState): number {
+  return Object.entries(state.cargoSatisfaction ?? {}).filter(([, filled]) => filled >= 0.5).length;
+}
+
+function cabinTeamsOnRegionals(state: SimState): number {
+  return Object.values(crewBases(state)).reduce((sum, base) => sum + (base.cabinByClass?.REGIONAL ?? 0), 0);
+}
+
+function awayFromHome(state: SimState, hasBase: (state: SimState, iata: string) => boolean): boolean {
+  return mxStationList(state).some((iata) => iata !== state.homeAirport && hasBase(state, iata));
+}
+
+/** Days in a row the last month of margins have all been in the black. */
+function profitableRun(state: SimState, days: number): boolean {
+  const recent = state.marginHistory.slice(-days);
+  return recent.length === days && recent.every((margin) => margin > 0);
+}
+
+function hubsOver(state: SimState, passengers: number): number {
+  return [...networkAirports(state)].filter((iata) => connectingPassengersThrough(state, iata) >= passengers).length;
+}
+
+const noProgress = () => null;
 
 // --- The ladder -----------------------------------------------------------------
 
@@ -210,6 +289,22 @@ export const LADDER: Tier[] = [
         },
         progress: () => null,
       },
+      {
+        id: 'second-route',
+        name: 'Two routes',
+        description: 'Fly two different routes at once.',
+        extra: true,
+        met: (state) => markets(state).length >= 2,
+        progress: (state) => ({ current: Math.min(2, markets(state).length), target: 2, unit: 'routes' }),
+      },
+      {
+        id: 'home-base-crew',
+        name: 'A crew of your own',
+        description: 'Have a crew based at a second airport, not just home.',
+        extra: true,
+        met: (state) => Object.keys(crewBases(state)).some((iata) => iata !== state.homeAirport),
+        progress: noProgress,
+      },
     ],
   },
   {
@@ -245,6 +340,23 @@ export const LADDER: Tier[] = [
           return lastWeek.length === 7 && lastWeek.every((margin) => margin > 0);
         },
         progress: () => null,
+      },
+      {
+        id: 'cabin-crew',
+        name: 'Cabin crew aboard',
+        description: 'Have cabin teams trained for a Regional: regional aircraft and up carry them, and a shortage hurts NPS.',
+        extra: true,
+        met: (state) => cabinTeamsOnRegionals(state) > 0,
+        progress: noProgress,
+      },
+      {
+        id: 'first-event',
+        name: 'Special request',
+        description: 'Accept an event: a priority flight on a route you already fly.',
+        extra: true,
+        applies: (state) => !state.eventsOff,
+        met: (state) => eventsAccepted(state) >= 1,
+        progress: noProgress,
       },
     ],
   },
@@ -293,6 +405,22 @@ export const LADDER: Tier[] = [
         }),
       },
       flyTheClass('fly-narrowbody', 'Mainline', 'NARROWBODY', 'Narrowbody'),
+      {
+        id: 'away-line-base',
+        name: 'Nights away from home',
+        description: 'Open a line base at an airport that is not home: planes sleeping there get their nightly check.',
+        extra: true,
+        met: (state) => awayFromHome(state, hasLineBase),
+        progress: noProgress,
+      },
+      {
+        id: 'first-cargo',
+        name: 'Belly freight',
+        description: 'Earn from freight: match a good one airport makes with one that needs it.',
+        extra: true,
+        met: (state) => (state.cargoRevenueTotal ?? 0) > 0,
+        progress: noProgress,
+      },
     ],
   },
   {
@@ -315,13 +443,155 @@ export const LADDER: Tier[] = [
         met: (state) => biggestHub(state) >= BIG_HUB_PASSENGERS,
         progress: (state) => ({ current: Math.round(biggestHub(state)), target: BIG_HUB_PASSENGERS, unit: 'connecting a day' }),
       },
+      {
+        id: 'five-countries',
+        name: 'Five flags',
+        description: 'Serve airports in 5 countries.',
+        met: (state) => countriesServed(state) >= 5,
+        progress: (state) => ({ current: countriesServed(state), target: 5, unit: 'countries' }),
+      },
+      {
+        id: 'foreign-base',
+        name: 'A base abroad',
+        description: 'Base a plane at an airport outside your home country. Air rights decide which routes it can fly (see the rights icon on an airport).',
+        met: (state) => {
+          const home = homeCountry(state);
+          return state.aircraft.some((aircraft) => aircraft.baseAirport && countryOf(aircraft.baseAirport) !== home);
+        },
+        progress: noProgress,
+      },
+    ],
+  },
+  {
+    id: 'operator',
+    name: 'Operator',
+    needed: 3,
+    opens: [],
+    milestones: [
+      {
+        id: 'away-heavy-base',
+        name: 'A hangar away from home',
+        description: 'Open a heavy base (hangar bays) at an airport that is not home.',
+        met: (state) => awayFromHome(state, hasHeavyBase),
+        progress: noProgress,
+      },
+      {
+        id: 'line-and-heavy',
+        name: 'Line and heavy',
+        description: 'Run a line base and a hangar at the same airport.',
+        met: (state) => mxStationList(state).some((iata) => hasLineBase(state, iata) && hasHeavyBase(state, iata) && iata !== state.homeAirport),
+        progress: noProgress,
+      },
+      {
+        id: 'clean-month',
+        name: 'A clean month',
+        description: 'Go 30 days with no breakdown or overdue heavy check grounding a plane, flying at least 3 aircraft.',
+        met: (state) => state.aircraft.length >= 3 && dayIndex(state) - (state.lastAogDay ?? 0) >= 30 && dayIndex(state) >= 30,
+        progress: (state) => ({
+          current: Math.min(30, Math.max(0, dayIndex(state) - (state.lastAogDay ?? 0))),
+          target: 30,
+          unit: 'days without an AOG',
+        }),
+      },
+      {
+        id: 'train-a-type',
+        name: 'Cross-trained',
+        description: 'Retrain a crew for another aircraft class.',
+        met: (state) => Object.values(crewBases(state)).some((base) => base.retraining.length > 0),
+        progress: noProgress,
+      },
+      {
+        id: 'ten-planes',
+        name: 'Ten tails',
+        description: 'Operate 10 aircraft.',
+        met: (state) => state.aircraft.length >= 10,
+        progress: (state) => ({ current: Math.min(10, state.aircraft.length), target: 10, unit: 'aircraft' }),
+      },
+    ],
+  },
+  {
+    id: 'established',
+    name: 'Established carrier',
+    needed: 3,
+    opens: [],
+    milestones: [
+      {
+        id: 'matched-lane',
+        name: 'Goods in, goods out',
+        description: 'Fill a need on a cargo lane to half or better.',
+        met: (state) => cargoLanesFilled(state) >= 1,
+        progress: noProgress,
+      },
+      {
+        id: 'five-lanes',
+        name: 'A freight network',
+        description: 'Fill needs on 5 cargo lanes at once.',
+        met: (state) => cargoLanesFilled(state) >= 5,
+        progress: (state) => ({ current: Math.min(5, cargoLanesFilled(state)), target: 5, unit: 'lanes' }),
+      },
+      {
+        id: 'five-events',
+        name: 'Always on call',
+        description: 'Accept 5 events.',
+        applies: (state) => !state.eventsOff,
+        met: (state) => eventsAccepted(state) >= 5,
+        progress: (state) => ({ current: Math.min(5, eventsAccepted(state)), target: 5, unit: 'events' }),
+      },
+      {
+        id: 'ninety-in-the-black',
+        name: 'A quarter in the black',
+        description: 'Make money every day for 90 days running.',
+        met: (state) => profitableRun(state, 90),
+        progress: (state) => {
+          let run = 0;
+          for (let i = state.marginHistory.length - 1; i >= 0 && state.marginHistory[i] > 0; i--) run++;
+          return { current: Math.min(90, run), target: 90, unit: 'days' };
+        },
+      },
+    ],
+  },
+  {
+    id: 'flagship',
+    name: 'Flagship',
+    needed: 3,
+    opens: ['Innovations: spoilage management IV–V'],
+    milestones: [
+      {
+        id: 'name-25',
+        name: 'A name to trust',
+        description: 'Reach an NPS of 25 over the last month, with 3,000 flights flown in all.',
+        met: (state) => state.npsScoredFlightsTotal >= 3000 && networkNps(state) >= 25,
+        progress: (state) => ({ current: Math.round(networkNps(state)), target: 25, unit: 'NPS' }),
+      },
+      {
+        id: 'cap-80',
+        name: 'Nearly full',
+        description: 'Raise how much of its seats a plane can sell to 80% (spoilage management and a commercial officer).',
+        met: (state) => loadFactorCap(state) >= 0.8,
+        progress: (state) => ({ current: Math.round(loadFactorCap(state) * 100), target: 80, unit: '% seat cap' }),
+      },
+      {
+        id: 'three-hubs',
+        name: 'Three real hubs',
+        description: `Connect ${BIG_HUB_PASSENGERS} passengers a day through each of 3 airports.`,
+        met: (state) => hubsOver(state, BIG_HUB_PASSENGERS) >= 3,
+        progress: (state) => ({ current: Math.min(3, hubsOver(state, BIG_HUB_PASSENGERS)), target: 3, unit: 'hubs' }),
+      },
+      {
+        id: 'young-mixed-fleet',
+        name: 'A modern mixed fleet',
+        description: 'Fly 3 or more aircraft types, every plane under 8 years old.',
+        met: (state) =>
+          new Set(state.aircraft.map((aircraft) => aircraft.typeCode)).size >= 3 && state.aircraft.every((aircraft) => aircraft.ageYears < 8),
+        progress: noProgress,
+      },
     ],
   },
   {
     id: 'global',
     name: 'Global',
     needed: 1,
-    opens: ['Innovations: spoilage management IV–V'],
+    opens: [],
     milestones: [
       {
         id: 'round-the-world',
@@ -381,8 +651,8 @@ export function isMilestoneMet(state: SimState, id: string): boolean {
 export function tiersClimbed(state: SimState): number {
   let climbed = 0;
   for (const tier of LADDER) {
-    const met = tier.milestones.filter((milestone) => isMilestoneMet(state, milestone.id)).length;
-    if (met < tier.needed) break;
+    const met = gateMilestones(tier).filter((milestone) => isMilestoneMet(state, milestone.id)).length;
+    if (met < tierNeeded(state, tier)) break;
     climbed++;
   }
   return climbed;

@@ -3,7 +3,7 @@ import { dayIndex } from './clock';
 import type { CompetitorOffering } from './competitors';
 import competitorsData from '../../data/competitors.json';
 import { classByCode, pluralClassName } from './aircraftClasses';
-import { airlineCalled, BUSY_AIRPORT_LOAD, HOLD_DAYS, LADDER, NEARLY_FULL } from './ladder';
+import { airlineCalled, BUSY_AIRPORT_LOAD, gateMilestones, HOLD_DAYS, LADDER, NEARLY_FULL } from './ladder';
 import { activeShock } from './shocks';
 import type { SimState } from './state';
 
@@ -93,7 +93,7 @@ function milestonesOf(state: SimState, code: string): Record<string, number> {
   const all = (state.rivalMilestones ??= {});
   if (!all[code]) {
     all[code] = {};
-    if (SEED_CODES.has(code)) for (const milestone of LADDER[0].milestones) all[code][milestone.id] = 0;
+    if (SEED_CODES.has(code)) for (const milestone of gateMilestones(LADDER[0])) all[code][milestone.id] = 0;
   }
   return all[code];
 }
@@ -103,7 +103,7 @@ export function rivalTiersClimbed(state: SimState, code: string): number {
   const met = milestonesOf(state, code);
   let climbed = 0;
   for (const tier of LADDER) {
-    const count = tier.milestones.filter((milestone) => met[milestone.id] !== undefined).length;
+    const count = gateMilestones(tier).filter((milestone) => met[milestone.id] !== undefined).length;
     if (count < tier.needed) break;
     climbed += 1;
   }
@@ -117,7 +117,7 @@ export function rivalLadderInWords(state: SimState, code: string): string {
   const current = LADDER[climbed];
   const becameName = climbed === 0 ? 'a start-up' : airlineCalled(LADDER[climbed]);
   if (!current || !current.opensClasses) return `${becameName}, flying every class`;
-  const count = current.milestones.filter((milestone) => met[milestone.id] !== undefined).length;
+  const count = gateMilestones(current).filter((milestone) => met[milestone.id] !== undefined).length;
   const next = LADDER[climbed + 1];
   const opens = current.opensClasses.map((typeCode) => pluralClassName(classByCode(typeCode)?.name ?? typeCode)).join(', ');
   return `${becameName} · ${Math.min(count, current.needed)}/${current.needed} to ${next ? airlineCalled(next) : 'the next tier'} · opens ${opens}`;
@@ -147,7 +147,7 @@ export function rollDailyRivalMilestones(state: SimState): void {
     // report two-thirds slower (the slot-control check is costly).
     const tier = tiers[rivalTiersClimbed(state, code)];
     if (!tier) continue;
-    for (const milestone of tier.milestones) {
+    for (const milestone of gateMilestones(tier)) {
       if (met[milestone.id] !== undefined) continue;
       if (RIVAL_CHECKS[milestone.id]?.(state, routes, code)) met[milestone.id] = today;
     }

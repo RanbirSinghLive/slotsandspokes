@@ -1,4 +1,5 @@
 import { nextRandom } from './rng';
+import { dayIndex } from './clock';
 import { executiveMaintenanceMultiplier } from './executives';
 import { airportLoadAt } from './airports';
 import { hourOf } from './hours';
@@ -160,6 +161,7 @@ export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
   startRefits(state, dayStartMinute);
   // Heavy checks overdue past the grace (sim/mxChecks.ts): grounded, the same way, for the work left.
   for (const { aircraft, days } of forcedHeavyChecks(state)) {
+    state.lastAogDay = dayIndex(state);
     state.aogs.push({
       tail: aircraft.tail,
       base: aircraft.atAirport ?? aircraft.baseAirport!,
@@ -192,6 +194,7 @@ export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
 
     const maxExtraDays = DURATION_BASE_EXTRA_DAYS + Math.round(effectiveAge(state, aircraft) * DURATION_EXTRA_DAYS_PER_EFFECTIVE_YEAR);
     const days = 1 + Math.floor(durationRoll * durationRoll * (maxExtraDays + 1));
+    state.lastAogDay = dayIndex(state);
     state.aogs.push({
       tail: aircraft.tail,
       base: aircraft.baseAirport,
