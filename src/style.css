@@ -5507,3 +5507,43 @@ button.ops-item:hover {
     min-height: 40px;
   }
 }
+
+/* Delay causes as icons (ui/delayCodes.ts). */
+.delay-icon {
+  display: inline-flex;
+  vertical-align: -2px;
+  color: #ffd166;
+}
+
+.delay-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.delay-icon-weather {
+  color: #7fb6ff;
+}
+
+.delay-icon-congestion {
+  color: #ff9f6b;
+}
+
+.delay-icon-executive {
+  color: #7fd88f;
+}
+
+.delay-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+#flight-tooltip .flight-tooltip-code-id {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: 7ch;
+  white-space: nowrap;
+}
