@@ -92,6 +92,8 @@ export type Aircraft = {
   /** Hangar minutes done at night toward its heavy check this time round (sim/mxChecks.ts). */
   heavyBankedMinutes?: number;
   /** Airborne minutes flown since the last heavy check (sim/mxChecks.ts). Absent: none counted yet. */
+  /** The player booked its C check: it goes in the next morning. */
+  heavyCheckBooked?: boolean;
   flightMinutesSinceHeavy?: number;
   /** Takeoff-and-landing cycles since the last heavy check (sim/mxChecks.ts). Absent: none counted yet. */
   cyclesSinceHeavy?: number;
