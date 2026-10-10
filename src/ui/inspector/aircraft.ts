@@ -8,7 +8,7 @@ import { projectGroundedDay, projectRestOfDay } from '../../sim/cascade';
 import { cancelRotation, cancellableRotations, previewCancelRotation } from '../../sim/controller';
 import { minuteOfDay, minuteOfDayToTimeString } from '../../sim/clock';
 import { formatLoadFactor, marketLoadFactor } from '../../sim/loadFactor';
-import { ageDelayParameters, type DelayBreakdown } from '../../sim/delays';
+import { ageDelayParameters } from '../../sim/delays';
 import type { SimState } from '../../sim/state';
 import { aircraftUtilisation, rotationsForTail } from '../../sim/utilisation';
 import { planeIconElement } from '../planeIcons';
@@ -19,6 +19,8 @@ import { cashAfterRows, showConfirm } from '../confirmModal';
 import { REBASE_DAYS, REBASE_FEE_LEASE_DAYS } from '../../sim/rebase';
 import { CABIN_PRICE, cabinLayout, cabinOf } from '../../sim/cabins';
 import { DEFERRED_AGE_YEARS, deferredItems, HEAVY_INTERVAL_DAYS, heavyBankedMinutes, heavyCheckDueIn, heavyCheckOpen, heavyCheckWorkMinutes, MX_HOLD_AT, tonightCheck } from '../../sim/mxChecks';
+import { delayIconsFor } from '../delayCodes';
+import { flightNumber } from '../../sim/flightNumbers';
 import { CREWS_PER_NEW_PLANE } from '../../sim/crews';
 
 /**
@@ -40,21 +42,6 @@ function title(text: string): HTMLElement {
 /** A home-local time of day for an absolute simMinute, as the HUD shows it. */
 function clock(state: SimState, absoluteMinute: number): string {
   return minuteOfDayToTimeString(minuteOfDay(state, absoluteMinute));
-}
-
-/** Why a flight ran late, in words, biggest cause first: "knock-on 12, age 8". */
-function describeCauses(delay: DelayBreakdown): string {
-  const causes: [string, number][] = [
-    ['knock-on', delay.knockOn],
-    ['age', delay.age],
-    ['weather', delay.weather],
-    ['congestion', delay.congestion],
-  ];
-  return causes
-    .filter(([, minutes]) => minutes > 0)
-    .sort((a, b) => b[1] - a[1])
-    .map(([name, minutes]) => `${name} ${minutes}`)
-    .join(', ');
 }
 
 /** Where a plane is right now, in a few words. */
@@ -278,23 +265,23 @@ function buildDay(state: SimState, tail: string): HTMLElement {
     const row = document.createElement('div');
     row.className = 'inspector-row inspector-day-row';
     const name = document.createElement('span');
-    name.textContent = `${minuteOfDayToTimeString(leg.departMinute)} ${leg.origin} → ${leg.dest}`;
+    name.textContent = `${flightNumber(state.schedule, leg)} · ${minuteOfDayToTimeString(leg.departMinute)} ${leg.origin} → ${leg.dest}`;
     const detail = document.createElement('span');
     detail.className = 'inspector-row-detail';
 
     const result = results[leg.legId];
     const plan = projected.get(leg.legId);
     if (result) {
-      const causes = describeCauses(result.delayByCause);
+      const causes = delayIconsFor(result.delayByCause);
       const full = result.seats ? ` · LF ${Math.round((result.passengers / result.seats) * 100)}%` : '';
-      detail.textContent =
-        (result.onTime ? 'on time' : `+${result.arriveLateMinutes} min${causes ? ` (${causes})` : ''}`) +
-        ` · ${result.passengers} pax${full} · ${money(result.margin)}`;
+      detail.textContent = result.onTime ? 'on time' : `+${result.arriveLateMinutes} min`;
+      if (!result.onTime) detail.append(...causes);
+      detail.append(` · ${result.passengers} pax${full} · ${money(result.margin)}`);
       if (!result.onTime) detail.classList.add('is-warn');
     } else if (flight?.legId === leg.legId) {
       const late = flight.arriveMinute - flight.scheduledArriveMinute;
-      const causes = describeCauses(flight.delayByCause);
-      detail.textContent = `airborne · ETA ${clock(state, flight.arriveMinute)}` + (late > 0 ? ` · +${late} min${causes ? ` (${causes})` : ''}` : '');
+      detail.textContent = `airborne · ETA ${clock(state, flight.arriveMinute)}` + (late > 0 ? ` · +${late} min` : '');
+      if (late > 0) detail.append(...delayIconsFor(flight.delayByCause));
       if (late > 0) detail.classList.add('is-warn');
     } else if (state.cancelledToday.includes(leg.legId)) {
       detail.textContent = 'CNX';

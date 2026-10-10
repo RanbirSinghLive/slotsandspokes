@@ -1281,6 +1281,15 @@ row of jump chips pinned at its top, one per section (an icon with the heading a
 over (`--panel-width` covers rail and panel, kept in sync via
 `PANEL_WIDTH_PX` and `RAIL_WIDTH_PX`).
 
+**Delay icons and flight numbers.** A delay cause shows as an icon
+(`ui/delayCodes.ts`): rotation, knock-on, age, weather, congestion, and the
+flight-ops executive. Each has an IATA-style code and a plain meaning in its
+tip (tap on a phone). They appear on the plane's hover card and in the
+aircraft view's day rows. Flight numbers (`sim/flightNumbers.ts`) are worked
+out from the route and not stored: a route is one number even, its return
+the next odd, and a second departure that day on the same route and way
+adds a thousand (SS 1214). They show in the day rows and on the plane hover.
+
 Each screen has one job. Sections that live in index.html and update
 themselves (Fare policy, the Lessor, the rotations timeline, Reliability,
 Game) wait hidden in `#panel-parts` until a screen adopts them

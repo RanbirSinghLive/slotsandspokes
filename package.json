@@ -20,6 +20,7 @@
     "rights": "tsx src/headless/rightsReport.ts",
     "cloudtest": "tsx src/worker/saveRoutes.test.ts",
     "contracttest": "tsx src/sim/contracts.test.ts",
+    "flightnumbertest": "tsx src/sim/flightNumbers.test.ts",
     "currencytest": "tsx src/sim/currencies.test.ts",
     "controllertest": "tsx src/sim/controller.test.ts",
     "briefstest": "tsx src/sim/briefs.test.ts"
