@@ -87,7 +87,8 @@ export function setupInfoTooltips(): void {
   // Tapping a mark on touch focuses it, which shows the tooltip; tapping
   // anywhere else should put it away again.
   panel.addEventListener('click', (event) => {
-    if (!markFrom(event.target)) hide();
+    // A [data-tip] icon shows its own tip on tap (ui/mapTools.ts); leave it up.
+    if (!markFrom(event.target) && !(event.target instanceof Element && event.target.closest('[data-tip]'))) hide();
   });
 
   // A native `title` never shows on touch. Tapping a bar, mark or row that
