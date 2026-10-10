@@ -92,11 +92,18 @@ export type Aircraft = {
   /** Hangar minutes done at night toward its heavy check this time round (sim/mxChecks.ts). */
   heavyBankedMinutes?: number;
   /** Airborne minutes flown since the last heavy check (sim/mxChecks.ts). Absent: none counted yet. */
+  /** The player booked its C check: it goes in the next morning. */
+  heavyCheckBooked?: boolean;
   flightMinutesSinceHeavy?: number;
   /** Takeoff-and-landing cycles since the last heavy check (sim/mxChecks.ts). Absent: none counted yet. */
   cyclesSinceHeavy?: number;
   /** Maintenance cost flown but not yet paid: held back from each landed flight and paid at its heavy check (sim/mxChecks.ts). Absent: none. */
   maintenanceReserve?: number;
+  /** Airborne minutes and cycles since the last A check (sim/mxChecks.ts). Absent minutes: staggered by tail; absent cycles: none. */
+  flightMinutesSinceA?: number;
+  cyclesSinceA?: number;
+  /** Hangar minutes done at night toward its A check this time round (sim/mxChecks.ts). */
+  aBankedMinutes?: number;
 };
 
 /** How one leg went, once it has landed. */
@@ -389,6 +396,10 @@ export type SimState = {
   milestonesMet?: Record<string, number>;
   /** The day the last breakdown or overdue heavy check grounded a plane (sim/aog.ts); the ladder's clean-run goal reads it. Absent until the first. */
   lastAogDay?: number;
+  /** Foreign countries where the airline bought domestic rights (sim/rightsLicences.ts): the day bought, and the last day it flew a domestic leg there. Optional: older saves hold none. */
+  domesticRights?: { country: string; sinceDay: number; lastFlownDay: number }[];
+  /** Days of qualifying international service into each foreign country, toward being offered its domestic rights (sim/rightsLicences.ts). */
+  rightsProgress?: Record<string, number>;
   /** The shock running now, or the last one until another starts (sim/shocks.ts's activeShock() says which). Optional: older saves have none. */
   shock?: Shock | null;
   /**
@@ -654,7 +665,7 @@ export type SimState = {
   mxHoldsToday?: string[];
   /** Daily brief and season review: which the player wants, and when each last appeared (sim/briefs.ts). Absent in an older save: both on, first review half a year on. */
   briefs?: {
-    settings?: { daily: boolean; season: boolean; seasonPause: boolean };
+    settings?: { daily: boolean; season: boolean; seasonPause: boolean; callPause?: boolean };
     lastDailyDay?: number;
     lastSeasonDay?: number;
     /** `marketTotals` when the last review appeared, so the next one reads only its half year. */

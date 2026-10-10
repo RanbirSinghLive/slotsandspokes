@@ -1336,8 +1336,8 @@ The rail's screens are selections too; the detail views sit under
 | A route | click its line, or a market row | the route view: flights, demand, rivals, fare stances, pools, margin and on-time |
 | Fleet list | the rail, the map's fleet bars, or the breadcrumb from a plane | every aircraft: base, how much of its day it uses, on time today, AOG |
 | An aircraft | click it in flight on the map, its row in the Fleet list or timeline, or its tail in an airport's view | its specs and age (and what the age does to its delays), where it is now, how much of the day it uses, its whole day in order (flown legs with how late and why, passengers and margin; the one in the air; upcoming legs with projected lateness; cancelled ones), its rotations, and Return to lessor |
-| Rivals list | the rail, "All" among the Rivals lens's chips, or the breadcrumb | every rival airline, biggest first: routes (and how many against you), estimated margin a day, routes losing money |
-| A rival | its name anywhere in the panel, or its chip under the Rivals lens | its fleet, routes against the 20-route cap, its average seats per flight and any planes beyond what its flying needs, every route worst first (fare against the going rate, margin a day, losing streak, grace left, about when it closes), and markets it closed recently |
+| Rivals list | the rail, "All" among the Rivals lens's chips, or the breadcrumb | a card per rival in reach, the ones on markets you fly first: generated logo tile, flag, a pip per plane coloured by class, a block per route (green earns, red loses, amber ring = you fly it too), estimated margin a day, and ⚔ / ⏱ counts. Chips at the top total them. Rivals you can't see yet stay as greyed locked cards with their flag. Every symbol has a tip (on tap on a phone); hovering or selecting a card marks its routes on the map |
+| A rival | its name anywhere in the panel, or its chip under the Rivals lens | logo, flag and fleet pips, estimated margin a day, four tiles (routes against the 20-route cap, flights a day, ⚔ vs you, ⏱ losing), its network sketched small (green or red by margin), and every route worst first: a margin bar, frequency, a fare gauge against the going rate and the days until it pulls out. Markets it closed recently are listed under that |
 
 The breadcrumb reads Network › Airports › YYZ › YYZ – ORD, or Network ›
 Rivals › Ironbridge Airlines. A route opened from the map goes under its
@@ -2948,6 +2948,35 @@ country is unknown the rule allows it, so a missing row never stops a route.
 | Connection A–hub–B, A and B in one other country | **barred**, whatever the hub: a Canadian carrier can't sell Boston to New York through Toronto |
 | Connection with A and B in different countries | allowed when both legs are |
 
+**Buying domestic rights abroad** (`src/sim/rightsLicences.ts`, plan in
+`roadmap/air-rights-earn-buy.md`). Once widebodies are open (the Network
+tier is climbed), the airline can buy domestic rights in one foreign
+country, so it may fly and sell inside it like a bloc member.
+- **Earned.** Each day the airline flies at least two international
+  departures a day touching the country (14 a week) and is on time at least
+  60% of the time over the last 30 days on those routes, it earns a day
+  (`state.rightsProgress`); a day missed costs one. At 120 days the country
+  is offered.
+- **Bought.** A setup fee ($250k to $15M, $60k per million people in the
+  country's airports) and a yearly levy of 15% of it, charged daily under
+  overhead. One licence once widebodies open, one more per tier climbed after.
+- **Kept.** The licence lapses after 60 days with no domestic leg flown
+  there and the earned days start again. Legs already flying stay (the
+  planner checks only new rotations); their connections stop.
+- **Capped.** Domestic departures there are limited to 14 a week, plus 14
+  every 90 days held, up to 70. `planRotation()` refuses a rotation that
+  would pass it.
+- **Saved** in two optional state fields (`domesticRights`,
+  `rightsProgress`), so no save format change. `npm run rightstest` checks
+  the rules; `npm run rights -- 700 YUL --buy` plays a year with a player that
+  buys every offer. The Head office view has a Rights section (`rightsSection()`
+  in `ui/inspector/headOffice.ts`): a card per foreign country flown into with
+  days earned, then Buy once offered, or weekly use and Give back once held.
+  The Ops lens tints an offered country amber and edges one still being earned
+  with a dashed amber line (`render/rightsView.ts`). While drawing a route, a
+  barred airport in an offered country rings amber, and its hover says the
+  rights are offered or how many days are earned.
+
 **Seeing it.** The Ops lens tints the countries where your airline may
 fly domestic routes (its own, plus a cabotage bloc it belongs to) in soft
 green (`render/rightsView.ts`). Everywhere untinted is foreign: international
@@ -3304,7 +3333,12 @@ held that morning where it slept: its first rotation is cancelled (cause
 by contract (a line check's price for each) away from a maintenance
 base.
 
-**The heavy check** is hangar work every 30 days the plane flies:
+**The heavy check is the C check** (the screens call it C; the code says heavy).
+It is due after 30 flying days, 300 flight hours or 250 cycles, whichever comes
+first (`heavyCheckProgressDays()`), so a plane flown hard comes due sooner than
+one flown lightly. The 10-day window and 7-day grace below are the same
+fraction of that interval whichever clock is furthest along. It is hangar work
+every 30 days the plane flies:
 8 hours for a Propeller, 10 for a Regional, 12 for a Narrowbody, 16 for
 a Widebody. It's done at night. From 10 days before it's due, whatever
 each night in a hangar bay has left after the line check goes toward it
@@ -3317,20 +3351,42 @@ moved to spare planes, until the work left is done, by contract at a
 base without maintenance. A plane from an
 older save starts part-way through its interval, staggered by tail.
 
+**Booking the C check.** Once the window is open, a plane parked at its base
+shows "Book C check" on its Mtc card (`bookHeavyCheck()`). The confirm shows
+the days grounded, the contract cost (nothing in house) and the rotations that
+move to other planes. The plane goes in the next morning, grounded the same way
+as a forced check (`bookedHeavyChecks()`, fault "C check booked"), so the
+player picks a quiet week instead of taking the 7-day grace. The booking is
+cancelled with ✕ any time before then; a booked plane away from base waits at
+the booking until it is back. The headless player never books: checks bank
+on nights, then force.
+
 An earlier version took every plane out for 1–3 days every 30 days. A
 fleet flown near capacity had no spare planes to take its flying, so
 the cancellations cost Toronto most of its year on 18 seeds.
 
 **Usage clocks.** Each landed flight adds its airborne minutes (ground delay
-excluded) and one cycle to the plane (`recordFlown()`); a finished heavy check
-resets both. Nothing reads them yet except the Mtc card's clock line ("12h ·
-9 cyc"). A plane from an older save counts from zero. They are what the A and
-C checks will run on (WEEK-TWENTYTWO.md).
+excluded) and one cycle to the plane (`recordFlown()`), counted since the last
+A check and since the last heavy check. A plane from an older save counts the
+heavy clock from zero and starts its A clock part-way through the interval,
+staggered by tail, so a fleet doesn't come due together.
+
+**The A check** (WEEK-TWENTYTWO.md) is a light check due every 100 flight hours
+or 80 cycles, whichever comes first, so a plane on short hops is due as soon as
+one on long ones. Its work is 4 hours for a Propeller, 5 for a Regional, 6 for
+a Narrowbody and 8 for a Widebody. From 80% of the interval, whatever a night
+has left after the line check goes to the A check first (at a line base, or
+contracted at a station that has none, paid by the hour), and what is left
+after that goes toward the heavy check as before. A done A check restarts its
+interval and pays the plane's maintenance reserve. A plane 25% past due adds a
+deferred item every night it flies (not on top of a night already adding one),
+so one that never gets its A check ends up held. A night away or at a station
+set to defer makes no progress.
 
 **Maintenance is paid at the check.** One fifth of a flight's non-fuel block
 cost (`MAINTENANCE_SHARE_OF_NON_FUEL`) is maintenance. A landed flight does
-not pay it: it goes to the plane's reserve (`maintenanceReserve`), and the
-heavy check pays it all when it finishes (`settleMaintenance()`), as a
+not pay it: it goes to the plane's reserve (`maintenanceReserve`), and an A or
+heavy check pays all of it when it finishes (`settleMaintenance()`), as a
 maintenance cost that day. A plane handed back to the lessor pays what it has
 built up first, so returning a plane just before its check saves nothing.
 Route margins, rivals and planners still count the whole flight cost, so
@@ -3341,7 +3397,8 @@ only when the money leaves moves. The Mtc card shows what is due.
   serviceable, on watch, due for action (held, or a heavy check overdue),
   in the hangar or on the ground, then a card per plane, worst first. Each
   card has the heavy-check clock (days since the last check, the window
-  where nights bank hours, the due mark, the overdue grace), its deferred
+  where nights bank hours, the due mark, the overdue grace) with a thinner
+  A-check lane under it (percent of its interval, same marks), its deferred
   items as slots filling toward the hold, the hours banked, last night's
   check, and its age, life, tech and AOG figures. Display only: the
   standing is worked out in `ui/inspector/maintenance.ts` from the same
@@ -3354,8 +3411,11 @@ only when the money leaves moves. The Mtc card shows what is due.
 - **The Gantt:** a key above the rows explains the night cell, and each
   plane's label carries tonight's check as the day is going ("☾✓", "☾c" contracted,
   "☾−40m" short, "☾✗" away). The plane's own view says the same in words
-  ("Tonight ☾✓ · 9h 24m at base for 4h 24m of work · heavy due 11d"). It works from the projected
-  rest of the day, so a late afternoon shows tonight getting shorter.
+  ("Tonight ☾✓ · 9h 24m at base for 4h 24m of work · C due 11d"). It works from the projected
+  rest of the day, so a late afternoon shows tonight getting shorter. When
+  the night's spare hours will go to a check, the cell is hatched amber and
+  ends in "A", "C" or "AC" (`tonightCheck().banking`): the A check first, then
+  the C check if the plane holds a hangar bay.
 
 ---
 
@@ -3467,6 +3527,15 @@ Each cause has a different answer available:
   cancellation does: Completion, -80 NPS each, slot fees still paid,
   nothing refunded. A plane in the air, AOG or grounded for the day can't
   be steered.
+
+  **The call.** `callsNeeded()` lists waiting planes with a rotation to
+  cancel whose day is about to break once a flight is 20 minutes overdue:
+  `curfew` (the curfew will cancel a rotation), `event` (a priority flight
+  is projected more than 60 minutes late) or `late` (a flight 90+ minutes
+  late), worst first. The first time each is seen in a day the clock pauses
+  once and the plane's page opens (`ui/callAlert.ts`, the same pause as
+  events; Space resumes). The Messages switch ✋ on the Game screen turns
+  the pause off; the ops row's CALL count still lists the planes.
 
 A cancellation scores a flat **-80 NPS** rather than extending the delay
 curve, which floors at -50: a cancellation isn't a very late flight, it's

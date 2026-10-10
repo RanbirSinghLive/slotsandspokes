@@ -54,6 +54,13 @@ export const DEFERRED_AGE_YEARS = 3;
 /** Deferred items at which the plane is held at base for a morning. */
 export const MX_HOLD_AT = 3;
 export const HEAVY_INTERVAL_DAYS = 30;
+/**
+ * The heavy check is the C check. It is due after HEAVY_INTERVAL_DAYS flying
+ * days, C_INTERVAL_HOURS airborne or C_INTERVAL_CYCLES landed, whichever
+ * comes first, so a plane flown hard comes due sooner than one flown lightly.
+ */
+export const C_INTERVAL_HOURS = 300;
+export const C_INTERVAL_CYCLES = 250;
 /** The heavy check's work starts being done this many days before it's due. */
 export const HEAVY_WINDOW_DAYS = 10;
 export const OVERDUE_GRACE_DAYS = 7;
@@ -68,6 +75,21 @@ const HEAVY_WORK_MINUTES: Record<string, number> = { PROP: 480, REGIONAL: 600, N
  * when the money leaves changes.
  */
 export const MAINTENANCE_SHARE_OF_NON_FUEL = 0.2;
+
+/**
+ * The A check: a light check due every A_INTERVAL_HOURS flown or
+ * A_INTERVAL_CYCLES landed, whichever comes first, so a plane on short hops
+ * is due as soon as one on long ones. It is done on nights at a line base,
+ * out of what the line check leaves, before anything goes toward the heavy
+ * check. It opens A_WINDOW of the way to due, and a plane past A_OVERDUE of
+ * the interval adds a deferred item every night it flies.
+ */
+export const A_INTERVAL_HOURS = 100;
+export const A_INTERVAL_CYCLES = 80;
+export const A_WINDOW = 0.8;
+export const A_OVERDUE = 1.25;
+/** Hangar minutes an A check takes, by class. */
+const A_WORK_MINUTES: Record<string, number> = { PROP: 240, REGIONAL: 300, NARROWBODY: 360, WIDEBODY: 480 };
 
 const MINUTES_PER_DAY = 1440;
 
@@ -128,8 +150,51 @@ export function settleMaintenance(state: SimState, aircraft: Aircraft): void {
 
 /** One landed flight on the plane's clocks: its airborne minutes and one cycle. */
 export function recordFlown(aircraft: Aircraft, airborneMinutes: number): void {
+  aircraft.flightMinutesSinceA = flightMinutesSinceA(aircraft) + Math.max(0, airborneMinutes);
+  aircraft.cyclesSinceA = (aircraft.cyclesSinceA ?? 0) + 1;
   aircraft.flightMinutesSinceHeavy = (aircraft.flightMinutesSinceHeavy ?? 0) + Math.max(0, airborneMinutes);
   aircraft.cyclesSinceHeavy = (aircraft.cyclesSinceHeavy ?? 0) + 1;
+}
+
+/**
+ * Airborne minutes since the last A check. A plane from an older save, or one
+ * just leased, starts part-way through the interval, staggered by its tail.
+ */
+export function flightMinutesSinceA(aircraft: Aircraft): number {
+  if (aircraft.flightMinutesSinceA !== undefined) return aircraft.flightMinutesSinceA;
+  let hash = 0;
+  for (let i = 0; i < aircraft.tail.length; i++) hash = (hash * 17 + aircraft.tail.charCodeAt(i)) % 991;
+  return (hash % A_INTERVAL_HOURS) * 60;
+}
+
+/** How far through its A interval the plane is: 1 is due, whichever of hours and cycles is further along. */
+export function aCheckProgress(aircraft: Aircraft): number {
+  return Math.max(flightMinutesSinceA(aircraft) / 60 / A_INTERVAL_HOURS, (aircraft.cyclesSinceA ?? 0) / A_INTERVAL_CYCLES);
+}
+
+export function aCheckWorkMinutes(typeCode: string): number {
+  return A_WORK_MINUTES[typeCode] ?? A_WORK_MINUTES.PROP;
+}
+
+export function aBankedMinutes(aircraft: Aircraft): number {
+  return aircraft.aBankedMinutes ?? 0;
+}
+
+/** Whether nights at a line base count toward the A check yet. */
+export function aCheckOpen(aircraft: Aircraft): boolean {
+  return aCheckProgress(aircraft) >= A_WINDOW;
+}
+
+export function aCheckOverdue(aircraft: Aircraft): boolean {
+  return aCheckProgress(aircraft) >= A_OVERDUE;
+}
+
+/** An A check done: the interval starts again and the maintenance built up is paid. */
+export function finishACheck(state: SimState, aircraft: Aircraft): void {
+  settleMaintenance(state, aircraft);
+  aircraft.flightMinutesSinceA = 0;
+  aircraft.cyclesSinceA = 0;
+  delete aircraft.aBankedMinutes;
 }
 
 /** Whether nights at base count toward the heavy check yet. */
@@ -150,9 +215,21 @@ export function daysSinceHeavyCheck(aircraft: Aircraft): number {
   return (hash * 11) % HEAVY_INTERVAL_DAYS;
 }
 
+/**
+ * How far through its heavy interval the plane is, in days: its flying days,
+ * or its hours or cycles scaled to the same interval, whichever is furthest.
+ */
+export function heavyCheckProgressDays(aircraft: Aircraft): number {
+  return Math.max(
+    daysSinceHeavyCheck(aircraft),
+    (flightHoursSinceHeavy(aircraft) / C_INTERVAL_HOURS) * HEAVY_INTERVAL_DAYS,
+    (cyclesSinceHeavy(aircraft) / C_INTERVAL_CYCLES) * HEAVY_INTERVAL_DAYS,
+  );
+}
+
 /** Days until the heavy check is due: negative once overdue. */
 export function heavyCheckDueIn(aircraft: Aircraft): number {
-  return HEAVY_INTERVAL_DAYS - daysSinceHeavyCheck(aircraft);
+  return Math.round(HEAVY_INTERVAL_DAYS - heavyCheckProgressDays(aircraft));
 }
 
 /** The night just ended, judged at midnight: whether the plane got its check. */
@@ -194,12 +271,21 @@ export function rollNightlyChecks(state: SimState, dayStartMinute: number): void
     } else {
       result = night < work ? 'short' : night >= work + CLEAR_SPARE_MINUTES && deferredItems(aircraft) > 0 ? 'cleared' : 'checked';
     }
-    // What the night has left after the line check goes toward the heavy check, once it's open, in a hangar bay.
-    if (station && result !== 'away' && bays.has(aircraft.tail) && night > work) {
-      aircraft.heavyBankedMinutes = heavyBankedMinutes(aircraft) + Math.round(night - work);
+    // What the night has left after the line check goes to the A check first, once it's open (contracted where there's no line base), then toward the heavy check in a hangar bay.
+    let spare = night > work ? Math.round(night - work) : 0;
+    if (station && result !== 'away' && spare > 0 && aCheckOpen(aircraft)) {
+      const used = Math.min(spare, aCheckWorkMinutes(aircraft.typeCode) - aBankedMinutes(aircraft));
+      if (!inHouse.has(aircraft.tail)) chargeMaintenance(state, contractCost(used));
+      aircraft.aBankedMinutes = aBankedMinutes(aircraft) + used;
+      spare -= used;
+      if (aBankedMinutes(aircraft) >= aCheckWorkMinutes(aircraft.typeCode)) finishACheck(state, aircraft);
+    }
+    if (station && result !== 'away' && bays.has(aircraft.tail) && spare > 0) {
+      aircraft.heavyBankedMinutes = heavyBankedMinutes(aircraft) + spare;
       if (heavyBankedMinutes(aircraft) >= heavyCheckWorkMinutes(aircraft.typeCode)) finishHeavyCheck(state, aircraft);
     }
-    if (result === 'away' || result === 'short') aircraft.deferredItems = deferredItems(aircraft) + 1;
+    // A night away or too short, or an A check long overdue, leaves an item for tomorrow.
+    if (result === 'away' || result === 'short' || aCheckOverdue(aircraft)) aircraft.deferredItems = deferredItems(aircraft) + 1;
     if (result === 'cleared') {
       // A heavy check finished tonight has already cleared them all.
       aircraft.deferredItems = Math.max(0, deferredItems(aircraft) - 1);
@@ -290,16 +376,55 @@ export function morningHolds(state: SimState): { tail: string; legIds: string[] 
  * contracted, paid here.
  */
 export function forcedHeavyChecks(state: SimState): { aircraft: Aircraft; days: number }[] {
-  const forced = state.aircraft
-    .filter((aircraft) => heavyCheckDueIn(aircraft) <= -OVERDUE_GRACE_DAYS)
+  return groundForHeavyCheck(state, state.aircraft.filter((aircraft) => heavyCheckDueIn(aircraft) <= -OVERDUE_GRACE_DAYS));
+}
+
+/**
+ * Checks the player booked (bookHeavyCheck): the same grounding as a forced
+ * one, taken the next morning. A booked plane that isn't at its base or
+ * night stop that morning stays booked until it is. Planes in `skip` (already
+ * forced this morning) are left alone.
+ */
+export function bookedHeavyChecks(state: SimState, skip: Aircraft[]): { aircraft: Aircraft; days: number }[] {
+  const booked = groundForHeavyCheck(state, state.aircraft.filter((aircraft) => aircraft.heavyCheckBooked && !skip.includes(aircraft)));
+  for (const { aircraft } of booked) delete aircraft.heavyCheckBooked;
+  return booked;
+}
+
+function groundForHeavyCheck(state: SimState, candidates: Aircraft[]): { aircraft: Aircraft; days: number }[] {
+  const grounded = candidates
     // At its base, or where it sleeps on a night stop (sim/nightStops.ts).
     .filter((aircraft) => aircraft.status === 'ground' && (aircraft.atAirport === aircraft.baseAirport || aircraft.atAirport === nightStopStation(state, aircraft.tail)) && !aircraft.rebase)
     .filter((aircraft) => !state.aogs.some((event) => event.tail === aircraft.tail));
-  return forced.map((aircraft) => {
+  return grounded.map((aircraft) => {
     const workLeft = heavyCheckWorkMinutes(aircraft.typeCode) - heavyBankedMinutes(aircraft);
     if (!heavyRated(state, aircraft.atAirport ?? '', aircraft.typeCode)) chargeMaintenance(state, contractCost(workLeft));
     return { aircraft, days: Math.max(1, Math.ceil(workLeft / MINUTES_PER_DAY)) };
   });
+}
+
+/** What booking a plane's C check now would do: days grounded, contract cost (0 in house) and rotations it takes off the plane. Null when it can't be booked. */
+export function previewHeavyCheckBooking(state: SimState, tail: string): { days: number; cost: number; rotations: number } | null {
+  const aircraft = state.aircraft.find((a) => a.tail === tail);
+  if (!aircraft || !canBookHeavyCheck(state, aircraft)) return null;
+  const workLeft = heavyCheckWorkMinutes(aircraft.typeCode) - heavyBankedMinutes(aircraft);
+  return {
+    days: Math.max(1, Math.ceil(workLeft / MINUTES_PER_DAY)),
+    cost: heavyRated(state, aircraft.atAirport ?? '', aircraft.typeCode) ? 0 : contractCost(workLeft),
+    rotations: rotationsForTail(state, tail).length,
+  };
+}
+
+/** Bookable: parked at its base, C check inside its window, not already booked, in check or rebasing. */
+export function canBookHeavyCheck(state: SimState, aircraft: Aircraft): boolean {
+  return (
+    !aircraft.heavyCheckBooked &&
+    heavyCheckOpen(aircraft) &&
+    aircraft.status === 'ground' &&
+    aircraft.atAirport === aircraft.baseAirport &&
+    !aircraft.rebase &&
+    !state.aogs.some((event) => event.tail === aircraft.tail)
+  );
 }
 
 /** A heavy check done: the interval starts again, every deferred item is cleared and the maintenance reserve is paid. */
@@ -307,6 +432,7 @@ export function finishHeavyCheck(state: SimState, aircraft: Aircraft): void {
   settleMaintenance(state, aircraft);
   aircraft.daysSinceHeavyCheck = 0;
   delete aircraft.deferredItems;
+  delete aircraft.heavyCheckBooked;
   delete aircraft.heavyBankedMinutes;
   delete aircraft.flightMinutesSinceHeavy;
   delete aircraft.cyclesSinceHeavy;
@@ -323,7 +449,7 @@ export function finishHeavyCheck(state: SimState, aircraft: Aircraft): void {
 export function tonightCheck(
   state: SimState,
   tail: string,
-): { night: number; work: number; station: string; inHouse: boolean; away: boolean; contracted: boolean; short: boolean } | null {
+): { night: number; work: number; station: string; inHouse: boolean; away: boolean; contracted: boolean; short: boolean; banking: 'A' | 'C' | 'A+C' | null } | null {
   const aircraft = state.aircraft.find((a) => a.tail === tail);
   const legs = state.schedule.filter((leg) => leg.tail === tail).sort((a, b) => a.departMinute - b.departMinute);
   if (!aircraft || legs.length === 0) return null;
@@ -342,5 +468,11 @@ export function tonightCheck(
   const inHouse = lineCheckedTails(state, sleepers).has(tail);
   const contracted = !inHouse && outstationCheck(state, station) === 'contract';
   const away = !inHouse && !contracted;
-  return { night, work, station, inHouse, away, contracted, short: !away && night < work };
+  const short = !away && night < work;
+  // Whether the night's spare hours go to an A check, then a C check in a bay, as rollNightlyChecks() will do.
+  let spare = !away && night > work ? night - work : 0;
+  const bankingA = spare > 0 && aCheckOpen(aircraft);
+  if (bankingA) spare -= Math.min(spare, aCheckWorkMinutes(aircraft.typeCode) - aBankedMinutes(aircraft));
+  const bankingC = !away && spare > 0 && heavyBayTails(state, sleepers).has(tail);
+  return { night, work, station, inHouse, away, contracted, short, banking: bankingA && bankingC ? 'A+C' : bankingA ? 'A' : bankingC ? 'C' : null };
 }

@@ -356,7 +356,7 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
       id: `base:${kind}`,
       label: exists
         ? `${airport.iata} is already a ${word} base`
-        : `Create ${word} base · ${money(preview.fee)} + ${money(preview.perDay)}/day · ${kind === 'crew' ? 'crews live here, planes can be based' : kind === 'line' ? 'nights here are line checks' : 'bays for heavy checks'}`,
+        : `Create ${word} base · ${money(preview.fee)} + ${money(preview.perDay)}/day · ${kind === 'crew' ? 'crews live here, planes can be based' : kind === 'line' ? 'nights here are line checks' : 'bays for C checks'}`,
       icon: kind === 'crew' ? ICON.crew : ICON.wrench,
       large: true,
       angleDeg: 0,

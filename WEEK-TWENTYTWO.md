@@ -19,10 +19,13 @@ is saved only when the owner accepts the read.
    the Mtc cards. No change to play. **Built.**
 2. Maintenance cost (a fifth of non-fuel block cost) is held back per flight
    and paid at the heavy check. Needs an OK on the balance read.
-3. The A-check lane at line bases.
-4. The heavy check becomes C, with hours, cycles and calendar triggers;
-   a hatched Gantt block for nights in a bay.
-5. Planning: pick the night or bay, quiet-night hint, headless-player policy.
+3. The A-check lane: due every 100 flight hours or 80 cycles, banked on nights
+   ahead of the heavy check, with a lane on each Mtc card. **Built.**
+4. The heavy check is the C check on screen, due by days, 300 flight hours or
+   250 cycles; a hatched Gantt night cell (A, C) when the night's spare hours
+   go to a check. **Built.**
+5. Planning: a Book C check button on the Mtc card (grounded next morning, cancellable). No
+   quiet-night hint; the headless player doesn't book. **Built.**
 
 ## Not in this week
 

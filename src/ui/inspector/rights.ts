@@ -1,4 +1,4 @@
-import { countryOf, domesticRightsCountries, homeCountry } from '../../sim/rights';
+import { countryOf, domesticRightsCountries, grantedCountries, homeCountry } from '../../sim/rights';
 import type { SimState } from '../../sim/state';
 
 /**
@@ -26,7 +26,7 @@ export function airportRightsMark(state: SimState, iata: string): HTMLElement | 
   const home = homeCountry(state);
   const country = countryOf(iata);
   if (!home || !country) return null;
-  const domestic = domesticRightsCountries(home).includes(country);
+  const domestic = domesticRightsCountries(home, grantedCountries(state)).includes(country);
   return mark(
     domestic,
     domestic

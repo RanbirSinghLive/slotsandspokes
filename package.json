@@ -23,9 +23,11 @@
     "flightnumbertest": "tsx src/sim/flightNumbers.test.ts",
     "currencytest": "tsx src/sim/currencies.test.ts",
     "controllertest": "tsx src/sim/controller.test.ts",
+    "checkbookingtest": "tsx src/sim/checkbooking.test.ts",
     "briefstest": "tsx src/sim/briefs.test.ts",
     "laddertest": "tsx src/sim/ladder.test.ts",
     "executivetest": "tsx src/sim/executives.test.ts",
+    "rightstest": "tsx src/sim/rightsLicences.test.ts",
     "stationtest": "tsx src/sim/stations.test.ts"
   },
   "devDependencies": {

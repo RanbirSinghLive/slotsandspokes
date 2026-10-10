@@ -470,8 +470,8 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
   const key = document.createElement('div');
   key.className = 'timeline-key';
   key.append(
-    '☾ ✓ · c · −40m · ✗ · ● ',
-    info(`Tonight's line check, beside each plane. ✓ at a maintenance base. c contracted at a station. −40m short by that long. ✗ deferred, no check. ● a deferred item (${MX_HOLD_AT} holds the plane a morning).`),
+    '☾ ✓ · c · −40m · ✗ · ● · ☾A ☾C ',
+    info(`Tonight's line check, beside each plane. ✓ at a maintenance base. c contracted at a station. −40m short by that long. ✗ deferred, no check. ● a deferred item (${MX_HOLD_AT} holds the plane a morning). A hatched cell with A or C: the night's spare hours go to that plane's A check or its C check in a hangar bay.`),
   );
   rows.push(key);
 
@@ -968,13 +968,15 @@ function updateNightCells(state: SimState, force = false): void {
       continue;
     }
     const status = tonight.away ? '☾✗' : tonight.short ? `☾−${tonight.work - tonight.night}m` : tonight.contracted ? '☾c' : '☾✓';
-    cell.textContent = status + pips;
-    cell.className = `timeline-night${tonight.away || tonight.short ? ' is-short' : ''}${deferred >= MX_HOLD_AT - 1 ? ' is-hold' : ''}`;
+    // The label is narrow, so a check night shows its letters in place of the tick.
+    cell.textContent = (tonight.banking && !tonight.short ? `☾${tonight.banking.replace('+', '')}` : status) + pips;
+    cell.className = `timeline-night${tonight.away || tonight.short ? ' is-short' : ''}${deferred >= MX_HOLD_AT - 1 ? ' is-hold' : ''}${tonight.banking ? ' is-check' : ''}`;
     cell.title =
       (tonight.away
         ? `Tonight at ${tonight.station}, no maintenance base, checks deferred: no line check, so a deferred item.`
         : `Tonight at ${tonight.station}${tonight.contracted ? ', contracted check' : ', maintenance base'}: ${Math.floor(tonight.night / 60)}h ${String(tonight.night % 60).padStart(2, '0')}m for ${Math.floor(tonight.work / 60)}h ${String(tonight.work % 60).padStart(2, '0')}m of work` +
           (tonight.short ? ', so the check is cut short: a deferred item.' : '.')) +
+      (tonight.banking ? ` The spare hours go to its ${tonight.banking === 'A' ? 'A check' : tonight.banking === 'C' ? 'C check, in a hangar bay' : 'A check, then its C check in a hangar bay'}.` : '') +
       (deferred > 0 ? ` ${deferred} deferred item${deferred === 1 ? '' : 's'} (●): at ${MX_HOLD_AT}, held for a morning.` : '');
   }
 }

@@ -8,7 +8,8 @@ import { minuteOfDayToTimeString } from './clock';
 import { greatCircleDistanceNm } from './geo';
 import { fareClassPolicy, policyFare } from './pricing';
 import { revealReach } from './reach';
-import { homeCountry, legRights } from './rights';
+import { grantedCountries, homeCountry, legRights } from './rights';
+import { capRefusal } from './rightsLicences';
 import {
   computeBlockMinutes,
   isAircraftTypeAllowedAt,
@@ -340,9 +341,11 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
   // rotations are checked: legs a save already flies stay.
   const home = homeCountry(state);
   for (const leg of legs) {
-    const rights = legRights(home, leg.origin, leg.dest);
+    const rights = legRights(home, leg.origin, leg.dest, grantedCountries(state));
     if (!rights.ok) return fail(rights.reason);
   }
+  const overCap = capRefusal(state, legs);
+  if (overCap) return fail(overCap);
 
   // Slots (sim/slots.ts): every departure needs a slot pair at its
   // airport. Counted across the whole chain — a rotation that passes

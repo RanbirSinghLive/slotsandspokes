@@ -8,7 +8,7 @@ import { marketKey } from './schedule';
 import { aircraftUtilisation, rotationsForTail, type Rotation } from './utilisation';
 import { coverRotations } from './turnBuffer';
 import { refitDays } from './cabins';
-import { finishHeavyCheck, forcedHeavyChecks, wornAge } from './mxChecks';
+import { bookedHeavyChecks, finishHeavyCheck, forcedHeavyChecks, wornAge } from './mxChecks';
 import { nightStopStation } from './nightStops';
 import type { Aircraft, SimState } from './state';
 
@@ -160,12 +160,17 @@ export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
   }
   startRefits(state, dayStartMinute);
   // Heavy checks overdue past the grace (sim/mxChecks.ts): grounded, the same way, for the work left.
-  for (const { aircraft, days } of forcedHeavyChecks(state)) {
+  const forced = forcedHeavyChecks(state);
+  const checksToStart = [
+    ...forced.map((check) => ({ ...check, fault: 'C check overdue' })),
+    ...bookedHeavyChecks(state, forced.map((check) => check.aircraft)).map((check) => ({ ...check, fault: 'C check booked' })),
+  ];
+  for (const { aircraft, days, fault } of checksToStart) {
     state.lastAogDay = dayIndex(state);
     state.aogs.push({
       tail: aircraft.tail,
       base: aircraft.atAirport ?? aircraft.baseAirport!,
-      fault: 'heavy check overdue',
+      fault,
       returnsAtMinute: dayStartMinute + days * MINUTES_PER_DAY,
       uncoveredRoutes: [],
       coveredRotations: 0,

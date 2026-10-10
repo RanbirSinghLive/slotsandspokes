@@ -4,7 +4,7 @@ import { dayIndex } from './clock';
 import { marketDistanceNm, potentialDailyDemand } from './demand';
 import { marketNps } from './nps';
 import { bestRangeNm, networkAirports } from './reach';
-import { homeCountry, legRights } from './rights';
+import { grantedCountries, homeCountry, legRights } from './rights';
 import { nextRandom } from './rng';
 import { trailingMarketOtp } from './routeOtp';
 import { legsServingMarket, marketKey } from './schedule';
@@ -242,7 +242,7 @@ export function makeOffers(state: SimState, atStart: boolean): void {
       if (taken.has(key) || legsServingMarket(a, b, state.schedule) > 0) continue;
       if (marketDistanceNm(a, b) > range || potentialDailyDemand(a, b) <= 0) continue;
       // An offer the airline's own country's rights bar (two US airports for a Canadian carrier) could never be flown.
-      if (!legRights(home, a, b).ok) continue;
+      if (!legRights(home, a, b, grantedCountries(state)).ok) continue;
       candidates.push({ a, b });
     }
   }

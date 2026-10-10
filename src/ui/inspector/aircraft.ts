@@ -191,11 +191,11 @@ export function buildAircraftView(state: SimState, tail: string, changed: () => 
     const text = tonight.away
       ? `Tonight ☾✗ · ${tonight.station} · checks deferred · no line check`
       : `Tonight ☾${tonight.short ? `−${tonight.work - tonight.night}m` : tonight.contracted ? 'c' : '✓'} · ${tonight.station}${tonight.contracted ? ' contracted' : ''} · ${hours(tonight.night)} for ${hours(tonight.work)} of work`;
-    const heavy = heavyCheckOpen(plane) ? ` · heavy ${Math.round(heavyBankedMinutes(plane) / 6) / 10}/${heavyCheckWorkMinutes(plane.typeCode) / 60}h` : ` · heavy due ${heavyCheckDueIn(plane)}d`;
+    const heavy = heavyCheckOpen(plane) ? ` · C ${Math.round(heavyBankedMinutes(plane) / 6) / 10}/${heavyCheckWorkMinutes(plane.typeCode) / 60}h` : ` · C due ${heavyCheckDueIn(plane)}d`;
     root.append(
       lineWithInfo(
         text + heavy + (deferred > 0 ? ` · ${'●'.repeat(Math.min(deferred, MX_HOLD_AT))} ${deferred} deferred` : ''),
-        `The line check: each night the plane needs hangar work, more for more flights a day, between landing and an hour before its first departure. ☾✓ means tonight is at a maintenance base with time for it, ☾c a contracted check at a station without one, ☾−40m that it's that much short, ☾✗ a station set to defer, so no check. A short or missed check leaves a deferred item (●): each wears the plane like ${DEFERRED_AGE_YEARS} more years, and at ${MX_HOLD_AT} it's held a morning. The heavy check is hangar work every ${HEAVY_INTERVAL_DAYS} flying days, done from the spare hours of nights at a maintenance base. The Mtc screen lists every plane's, and its bases and stations.`,
+        `The line check: each night the plane needs hangar work, more for more flights a day, between landing and an hour before its first departure. ☾✓ means tonight is at a maintenance base with time for it, ☾c a contracted check at a station without one, ☾−40m that it's that much short, ☾✗ a station set to defer, so no check. A short or missed check leaves a deferred item (●): each wears the plane like ${DEFERRED_AGE_YEARS} more years, and at ${MX_HOLD_AT} it's held a morning. The A check (every 100 flight hours or 80 cycles) and the C check (every ${HEAVY_INTERVAL_DAYS} flying days, 300 flight hours or 250 cycles) are hangar work, done from the spare hours of nights at a maintenance base: A first, then C in a hangar bay. The Mtc screen lists every plane's, and its bases and stations.`,
         tonight.away || tonight.short || deferred >= MX_HOLD_AT - 1 ? 'inspector-line is-warn' : 'inspector-line',
       ),
     );
