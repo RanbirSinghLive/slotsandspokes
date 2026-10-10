@@ -1,5 +1,6 @@
 import { projectGroundedDay, type ProjectedLeg } from './cascade';
-import { mandatedLeg, mandateIsActive, mandatesOf } from './mandates';
+import { dayStartMinute } from './clock';
+import { LATE_MINUTES, mandatedLeg, mandateIsActive, mandatesOf } from './mandates';
 import { marketKey, type ScheduleLeg } from './schedule';
 import { recordCancellation } from './step';
 import { rotationsForTail, type Rotation } from './utilisation';
@@ -129,4 +130,51 @@ export function cancelRotation(state: SimState, legId: string): { ok: true; mess
   }
   const route = [found.rotation.legs[0].origin, ...found.rotation.legs.map((leg) => leg.dest)].join('–');
   return { ok: true, message: `CNX ${found.tail} · ${route}` };
+}
+
+/**
+ * Planes whose day is about to break while they wait, for the pause alert
+ * (ui/callAlert.ts): the thing to decide, worst first.
+ *
+ * - `curfew`: the 22:00 curfew will cancel a rotation (sim/curfew.ts).
+ * - `event`: a priority flight (sim/mandates.ts) is projected more than
+ *   LATE_MINUTES late, so it will fail.
+ * - `late`: a flight is projected LATE_CALL_MINUTES or more late.
+ *
+ * Only planes with something they can cancel are listed, and only once a
+ * flight is overdue by OVERDUE_MINUTES, so a plane a few minutes behind
+ * doesn't stop the game.
+ */
+export type CallKind = 'curfew' | 'event' | 'late';
+export type Call = { tail: string; kind: CallKind };
+
+export const LATE_CALL_MINUTES = 90;
+const OVERDUE_MINUTES = 20;
+const KIND_ORDER: CallKind[] = ['curfew', 'event', 'late'];
+
+export function callsNeeded(state: SimState): Call[] {
+  const dayStart = dayStartMinute(state);
+  const handled = new Set([...state.completedToday, ...state.cancelledToday, ...(state.retimedToday ?? [])]);
+  const mandatedIds = new Set<string>();
+  for (const mandate of mandatesOf(state)) {
+    if (!mandateIsActive(state, mandate)) continue;
+    const leg = mandatedLeg(state, mandate);
+    if (leg) mandatedIds.add(leg.legId);
+  }
+
+  const calls: Call[] = [];
+  for (const aircraft of state.aircraft) {
+    if (aircraft.status !== 'ground') continue;
+    const overdue = state.schedule.some(
+      (leg) => leg.tail === aircraft.tail && !handled.has(leg.legId) && state.simMinute - (dayStart + leg.departMinute) >= OVERDUE_MINUTES,
+    );
+    if (!overdue || cancellableRotations(state, aircraft.tail).length === 0) continue;
+    const projection = projectGroundedDay(state, aircraft.tail);
+    let kind: CallKind | null = null;
+    if (projection.some((p) => p.cancelled)) kind = 'curfew';
+    else if (projection.some((p) => mandatedIds.has(p.leg.legId) && p.lateMinutes > LATE_MINUTES)) kind = 'event';
+    else if (projection.some((p) => p.lateMinutes >= LATE_CALL_MINUTES)) kind = 'late';
+    if (kind) calls.push({ tail: aircraft.tail, kind });
+  }
+  return calls.sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
 }

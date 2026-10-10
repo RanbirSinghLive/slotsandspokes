@@ -1,6 +1,7 @@
 import { ON_TIME_GRACE_MINUTES } from '../sim/delays';
 import { marketKey } from '../sim/schedule';
 import type { SimState } from '../sim/state';
+import { CALL_TITLES, pendingCalls } from './callAlert';
 import { select } from './selection';
 
 /**
@@ -13,7 +14,7 @@ import { select } from './selection';
 
 const boardEl = document.querySelector<HTMLDivElement>('#ops-items')!;
 
-type Today = { landed: number; airborne: number; toGo: number; late: number; cancelled: number; worst: { a: string; b: string } | null };
+type Today = { calls: string; landed: number; airborne: number; toGo: number; late: number; cancelled: number; worst: { a: string; b: string } | null };
 
 function today(state: SimState): Today {
   const results = state.todayLegResults ?? {};
@@ -34,7 +35,9 @@ function today(state: SimState): Today {
   const worst = [...lateByMarket.values()].sort((x, y) => y.count - x.count)[0] ?? null;
   const airborne = state.activeFlights.length;
   const cancelled = state.cancelledToday.length;
+  const calls = pendingCalls(state).map((call) => `${call.tail} ${call.kind}`).join(',');
   return {
+    calls,
     landed: landedIds.length,
     airborne,
     toGo: Math.max(0, state.schedule.length - landedIds.length - airborne - cancelled),
@@ -69,6 +72,7 @@ export function updateOpsBoard(state: SimState, openOnTime: () => void): void {
     return el;
   };
   const worst = now.worst;
+  const callList = pendingCalls(state);
   boardEl.replaceChildren(
     item('DEP', now.landed, 'Flights flown and landed today'),
     item('AIR', now.airborne, 'In the air now'),
@@ -80,6 +84,9 @@ export function updateOpsBoard(state: SimState, openOnTime: () => void): void {
       worst ? () => select({ kind: 'route', a: worst.a, b: worst.b }) : undefined,
       now.late > 0,
     ),
+    ...(callList.length > 0
+      ? [item('CALL', callList.length, `Planes whose day will break: ${callList.map((call) => `${call.tail} (${CALL_TITLES[call.kind]})`).join(', ')}. Click to open the worst.`, () => select({ kind: 'aircraft', tail: callList[0].tail }), true)]
+      : []),
     item('CNX', now.cancelled, 'Cancelled today; click for causes in the On-time tab', now.cancelled > 0 ? openOnTime : undefined, now.cancelled > 0),
   );
 }

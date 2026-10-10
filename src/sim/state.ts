@@ -654,7 +654,7 @@ export type SimState = {
   mxHoldsToday?: string[];
   /** Daily brief and season review: which the player wants, and when each last appeared (sim/briefs.ts). Absent in an older save: both on, first review half a year on. */
   briefs?: {
-    settings?: { daily: boolean; season: boolean; seasonPause: boolean };
+    settings?: { daily: boolean; season: boolean; seasonPause: boolean; callPause?: boolean };
     lastDailyDay?: number;
     lastSeasonDay?: number;
     /** `marketTotals` when the last review appeared, so the next one reads only its half year. */
