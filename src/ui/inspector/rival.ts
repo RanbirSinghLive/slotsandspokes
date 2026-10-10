@@ -1,5 +1,5 @@
 import { classByCode } from '../../sim/aircraftClasses';
-import { rivalLadderInWords } from '../../sim/rivalLadder';
+import { rivalHubs, rivalLadderInWords } from '../../sim/rivalLadder';
 import { info, line, heading, lineWithInfo } from './dom';
 import { money, shortMoney } from '../format';
 import { dayIndex } from '../../sim/clock';
@@ -143,6 +143,8 @@ export function buildRivalsView(state: SimState): HTMLElement {
     const sub = document.createElement('span');
     sub.className = 'rival-sub';
     sub.append(fleetPips(state.competitorFleets[rival.code] ?? []), routeBlocks(rival.outlooks));
+    const hub = hubChip(rival.outlooks.map(({ route }) => route));
+    if (hub) sub.append(hub);
     if (rival.againstYou > 0) sub.append(chip('⚔', String(rival.againstYou), `${rival.againstYou} route${rival.againstYou === 1 ? '' : 's'} on markets you fly`, 'is-warn'));
     if (rival.losing > 0) sub.append(chip('⏱', String(rival.losing), `${rival.losing} route${rival.losing === 1 ? '' : 's'} losing money`, 'is-bad'));
     card.append(rivalLogo(rival.code, 44), name, marginText(rival.margin), sub);
@@ -177,7 +179,14 @@ export function buildRivalsView(state: SimState): HTMLElement {
 }
 
 /** The rival's network drawn small, each route green or red by its margin. Plain lon/lat fit: it only has to read, and the map owns the one projection. */
+/** ★ chip naming a rival's hub airports, or nothing when it has none. */
+function hubChip(routes: CompetitorOffering[]): HTMLElement | null {
+  const hubs = rivalHubs(routes);
+  return hubs.length > 0 ? chip('★', hubs.join(' '), `Hub${hubs.length === 1 ? '' : 's'} ${hubs.join(' · ')}: 4+ of its routes`, 'is-hub') : null;
+}
+
 function networkSketch(outlooks: { route: CompetitorOffering; margin: number }[]): SVGSVGElement {
+  const hubs = new Set(rivalHubs(outlooks.map(({ route }) => route)));
   const width = 400;
   const height = 170;
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -212,7 +221,8 @@ function networkSketch(outlooks: { route: CompetitorOffering; margin: number }[]
     markup += `<path d="M${x(a.lon)} ${y(a.lat)} Q${mx} ${my} ${x(b.lon)} ${y(b.lat)}" fill="none" stroke="${margin < 0 ? '#c24848' : '#3b8f5c'}" stroke-width="${1 + route.dailyFrequency / 2}" opacity="0.9"/>`;
   }
   for (const [iata, p] of points) {
-    markup += `<circle cx="${x(p.lon)}" cy="${y(p.lat)}" r="3" fill="#cfd6e4"/><text x="${x(p.lon) + 5}" y="${y(p.lat) - 4}" font-size="9" fill="#8b94a7">${iata}</text>`;
+    if (hubs.has(iata)) markup += `<circle cx="${x(p.lon)}" cy="${y(p.lat)}" r="8" fill="none" stroke="#6fb3ff" stroke-width="2"/>`;
+    markup += `<circle cx="${x(p.lon)}" cy="${y(p.lat)}" r="${hubs.has(iata) ? 4.5 : 3}" fill="${hubs.has(iata) ? '#6fb3ff' : '#cfd6e4'}"/><text x="${x(p.lon) + 5}" y="${y(p.lat) - 4}" font-size="9" fill="#8b94a7">${iata}</text>`;
   }
   svg.innerHTML = markup;
   return svg;
@@ -261,6 +271,7 @@ export function buildRivalView(state: SimState, code: string): HTMLElement {
   stats.append(
     stat(`${routes.length}/${RIVAL_MAX_ROUTES_PER_AIRLINE}`, 'routes', 'Routes flown out of the most it will run'),
     stat(String(flights), 'flights/day', `${seatsPerFlight} seats a flight on average` + (spare > 0 ? ` · ${spare} spare plane${spare === 1 ? '' : 's'}` : '')),
+    stat(`★ ${rivalHubs(routes).join(' ') || '–'}`, 'hubs', 'Airports with 4 or more of its routes', rivalHubs(routes).length > 0 ? 'is-hub' : ''),
     stat(`⚔ ${againstYou}`, 'vs you', 'Routes on markets you fly too', againstYou > 0 ? 'is-warn' : ''),
     stat(`⏱ ${losing}`, 'losing', 'Routes losing money', losing > 0 ? 'is-bad' : ''),
   );

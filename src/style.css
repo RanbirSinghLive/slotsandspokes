@@ -5684,6 +5684,7 @@ button.ops-item:hover {
 .rival-summary { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0 12px; }
 .rival-chip { display: inline-flex; gap: 4px; align-items: center; padding: 2px 8px; border-radius: 99px; font-size: 12px; color: #9aa3b8; background: #141925; border: 1px solid #232a3a; white-space: nowrap; }
 .rival-chip.is-warn { color: #ffb347; border-color: #5a4220; }
+.rival-chip.is-hub { color: #6fb3ff; border-color: #274566; }
 .rival-chip.is-bad { color: #ff8080; border-color: #5a2a2a; }
 .rival-cards { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
 .rival-card { display: grid; grid-template-columns: 44px 1fr auto; gap: 4px 10px; align-items: center; padding: 10px; font: inherit; text-align: left; color: #cdd3e0; background: #111623; border: 1px solid #1d2434; border-radius: 12px; cursor: pointer; }
@@ -5709,9 +5710,10 @@ button.ops-item:hover {
 .rival-hero { display: flex; gap: 12px; align-items: center; margin: 6px 0 10px; }
 .rival-hero-names { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .rival-hero-name { display: flex; gap: 8px; align-items: center; font-size: 17px; font-weight: 700; color: #fff; }
-.rival-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px 0; }
+.rival-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 10px 0; }
 .rival-stat { display: flex; flex-direction: column; align-items: center; padding: 7px 4px; background: #111623; border: 1px solid #1d2434; border-radius: 10px; color: #cdd3e0; font-weight: 700; }
 .rival-stat small { color: #6f788c; font-weight: 400; font-size: 10px; }
+.rival-stat.is-hub { color: #6fb3ff; }
 .rival-stat.is-warn { color: #ffb347; }
 .rival-stat.is-bad { color: #ff8080; }
 .rival-sketch-box { margin: 8px 0; background: #0d1220; border: 1px solid #1d2434; border-radius: 12px; }

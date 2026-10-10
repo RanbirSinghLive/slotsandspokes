@@ -43,6 +43,17 @@ function routesByAirport(routes: CompetitorOffering[]): Map<string, number> {
   return count;
 }
 
+/** Routes from one airport that make it a hub for a rival. */
+export const RIVAL_HUB_ROUTES = 4;
+
+/** Airports where a rival has at least RIVAL_HUB_ROUTES routes, busiest first. */
+export function rivalHubs(routes: CompetitorOffering[]): string[] {
+  return [...routesByAirport(routes)]
+    .filter(([, count]) => count >= RIVAL_HUB_ROUTES)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([iata]) => iata);
+}
+
 const RIVAL_CHECKS: Record<string, RivalCheck> = {
   'first-route': (_state, routes) => routes.length > 0,
   'route-pays': (_state, routes) => routes.some((route) => (route.profitableDays ?? 0) >= 7),
@@ -59,7 +70,7 @@ const RIVAL_CHECKS: Record<string, RivalCheck> = {
         ),
     ),
   'eight-airports': (_state, routes) => routesByAirport(routes).size >= 8,
-  'hub': (_state, routes) => [...routesByAirport(routes).values()].some((count) => count >= 4),
+  'hub': (_state, routes) => rivalHubs(routes).length > 0,
   'weather-the-storm': (state, routes) => {
     const shock = activeShock(state);
     if (!shock || dayIndex(state) - shock.startDay < 7) return false;
