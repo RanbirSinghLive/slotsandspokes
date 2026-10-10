@@ -91,7 +91,7 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
   root.append(
     lineWithInfo(
       [crewBase ? 'Crew base' : 'No crew base', lineLevel > 0 ? mtcText : `${mtcText} · nights ${outstationCheck(state, iata) === 'contract' ? 'contracted' : 'deferred'}`].join(' · '),
-      'A crew base is where planes can be leased and based (open one on the Crews screen). A line base checks as many planes a night as its level; a hangar has a bay for each level and is where heavy-check hours are banked (the Mtc screen). A plane sleeping anywhere else, or past a base\'s capacity, has its check contracted or deferred, by the station\'s setting there.',
+      'A crew base is where planes can be leased and based (open one on the Crews screen). A line base checks as many planes a night as its level; a hangar has a bay for each level and is where C-check hours are banked (the Mtc screen). A plane sleeping anywhere else, or past a base\'s capacity, has its check contracted or deferred, by the station\'s setting there.',
     ),
   );
 
