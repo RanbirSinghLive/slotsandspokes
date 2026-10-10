@@ -23,9 +23,9 @@ export type AncillaryLevel = 0 | 1 | 2;
 export const ANCILLARY_LEVELS: readonly AncillaryLevel[] = [0, 1, 2];
 export const ANCILLARY_NAMES: Record<AncillaryLevel, string> = { 0: 'Bags included', 1: 'Checked bag fee', 2: 'All bags and seat fee' };
 /** Dollars charged per paying passenger, by level. */
-export const ANCILLARY_FEE: Record<AncillaryLevel, number> = { 0: 0, 1: 15, 2: 30 };
+export const ANCILLARY_FEE: Record<AncillaryLevel, number> = { 0: 0, 1: 10, 2: 20 };
 /** NPS points lost per flight at a level, before the segment weighting. */
-const ANCILLARY_NPS_COST: Record<AncillaryLevel, number> = { 0: 0, 1: 6, 2: 14 };
+const ANCILLARY_NPS_COST: Record<AncillaryLevel, number> = { 0: 0, 1: 6, 2: 16 };
 /** The share of each segment that pays the fee. */
 const PAYING_SHARE: Record<SegmentName, number> = { business: 0.25, leisure: 0.85, vfr: 0.6 };
 /** How strongly each segment marks the airline down for a fee (1 = the average traveller). */

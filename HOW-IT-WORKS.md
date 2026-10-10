@@ -3603,11 +3603,40 @@ Two read-only briefs. They change no economy; `sim/briefs.ts` decides when each 
 
 `npm run briefstest` checks one brief a day, the review on day 182, ranked rows and a save round trip.
 
+## Ancillary fees (`src/sim/ancillaries.ts`)
+
+An airline-wide dial at Head office › Fees: bags included (level 0, the
+default and the old game), checked bag fee ($10), all bags and seat fee
+($20). It moves once a month (`ANCILLARY_LOCK_DAYS`).
+
+- **Revenue.** Each passenger pays the fee times the share of their
+  segment that pays: 25% of business, 85% of leisure, 60% of VFR, weighted
+  by the market's mix (`marketMix()`). It is added in `flightResult()` as
+  `ancillaryRevenue`, inside revenue, so the route forecasts
+  (`summarizeMarket()`) see it too. The Money screen shows fees a day.
+- **Bookings.** The fee is added to the price each segment compares
+  (`ancillaryPriceDrag()`), so a fee costs bookings, most where
+  passengers are price-sensitive.
+- **NPS.** Each flight loses points (level 1: 6, level 2: 16) weighted by
+  how much the segment minds fees (business 0.5, leisure 1.2, VFR 1.1).
+  Half is permanent; the other half scales with the gap to
+  `state.rivalFeeLevel`, which closes by 1/120 of the gap a day toward the
+  player's level, so rivals copy a fee over about four months and the
+  goodwill cost eases while the revenue stays.
+- **Headless player.** The steady player sets `STEADY_FEE_LEVEL` on its
+  first day (default 0, overridable with `AIRGAME_FEE_LEVEL` for balance
+  reads).
+
+New fields (`ancillaryLevel`, `ancillaryChangedDay`, `rivalFeeLevel` and
+the revenue counters) are optional, so old saves load as level 0.
+
+---
+
 ## What isn't built yet
 
 The current plan is the newest `WEEK-*.md`. As of September 2026:
 
-- **Ancillary revenue** (bag fees), designed twice and never built.
+- **Per-route ancillary levers and extras** (WEEK-TWENTYTHREE step B). The airline-wide fee dial is built (see Ancillary fees).
 - **Per-base time zones** — every plane flies on the home clock.
 
 Open balance questions rather than missing features: margin favoured
