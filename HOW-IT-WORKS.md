@@ -3322,15 +3322,27 @@ fleet flown near capacity had no spare planes to take its flying, so
 the cancellations cost Toronto most of its year on 18 seeds.
 
 **Usage clocks.** Each landed flight adds its airborne minutes (ground delay
-excluded) and one cycle to the plane (`recordFlown()`); a finished heavy check
-resets both. Nothing reads them yet except the Mtc card's clock line ("12h ·
-9 cyc"). A plane from an older save counts from zero. They are what the A and
-C checks will run on (WEEK-TWENTYTWO.md).
+excluded) and one cycle to the plane (`recordFlown()`), counted since the last
+A check and since the last heavy check. A plane from an older save counts the
+heavy clock from zero and starts its A clock part-way through the interval,
+staggered by tail, so a fleet doesn't come due together.
+
+**The A check** (WEEK-TWENTYTWO.md) is a light check due every 100 flight hours
+or 80 cycles, whichever comes first, so a plane on short hops is due as soon as
+one on long ones. Its work is 4 hours for a Propeller, 5 for a Regional, 6 for
+a Narrowbody and 8 for a Widebody. From 80% of the interval, whatever a night
+has left after the line check goes to the A check first (at a line base, or
+contracted at a station that has none, paid by the hour), and what is left
+after that goes toward the heavy check as before. A done A check restarts its
+interval and pays the plane's maintenance reserve. A plane 25% past due adds a
+deferred item every night it flies (not on top of a night already adding one),
+so one that never gets its A check ends up held. A night away or at a station
+set to defer makes no progress.
 
 **Maintenance is paid at the check.** One fifth of a flight's non-fuel block
 cost (`MAINTENANCE_SHARE_OF_NON_FUEL`) is maintenance. A landed flight does
-not pay it: it goes to the plane's reserve (`maintenanceReserve`), and the
-heavy check pays it all when it finishes (`settleMaintenance()`), as a
+not pay it: it goes to the plane's reserve (`maintenanceReserve`), and an A or
+heavy check pays all of it when it finishes (`settleMaintenance()`), as a
 maintenance cost that day. A plane handed back to the lessor pays what it has
 built up first, so returning a plane just before its check saves nothing.
 Route margins, rivals and planners still count the whole flight cost, so
@@ -3341,7 +3353,8 @@ only when the money leaves moves. The Mtc card shows what is due.
   serviceable, on watch, due for action (held, or a heavy check overdue),
   in the hangar or on the ground, then a card per plane, worst first. Each
   card has the heavy-check clock (days since the last check, the window
-  where nights bank hours, the due mark, the overdue grace), its deferred
+  where nights bank hours, the due mark, the overdue grace) with a thinner
+  A-check lane under it (percent of its interval, same marks), its deferred
   items as slots filling toward the hold, the hours banked, last night's
   check, and its age, life, tech and AOG figures. Display only: the
   standing is worked out in `ui/inspector/maintenance.ts` from the same
