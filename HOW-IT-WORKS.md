@@ -3623,9 +3623,17 @@ default and the old game), checked bag fee ($10), all bags and seat fee
   `state.rivalFeeLevel`, which closes by 1/120 of the gap a day toward the
   player's level, so rivals copy a fee over about four months and the
   goodwill cost eases while the revenue stays.
+- **Per route.** Each route can set its own level (`RouteSettings.feeLevel`,
+  Route view › Fees: Airline, Included, $10, $20); it moves once every 14
+  days. Revenue, price drag and NPS cost all read the route's level
+  (`feeLevelOn()`). Where a rival flies the market the NPS cost is x1.5
+  (passengers can compare); where nobody does it is x0.6. So the edge is to
+  charge where you are alone and go easy where you meet a rival.
 - **Headless player.** The steady player sets `STEADY_FEE_LEVEL` on its
-  first day (default 0, overridable with `AIRGAME_FEE_LEVEL` for balance
-  reads).
+  first day (default 0, overridable with `AIRGAME_FEE_LEVEL`), and can set
+  per-route levels by whether a rival flies the route
+  (`AIRGAME_ALONE_FEE`, `AIRGAME_CONTESTED_FEE`, default off) for balance
+  reads.
 
 New fields (`ancillaryLevel`, `ancillaryChangedDay`, `rivalFeeLevel` and
 the revenue counters) are optional, so old saves load as level 0.
@@ -3636,7 +3644,7 @@ the revenue counters) are optional, so old saves load as level 0.
 
 The current plan is the newest `WEEK-*.md`. As of September 2026:
 
-- **Per-route ancillary levers and extras** (WEEK-TWENTYTHREE step B). The airline-wide fee dial is built (see Ancillary fees).
+- **Fee extras** (priority boarding, paid seats as separate products) from WEEK-TWENTYTHREE step B: only the per-route level is built (see Ancillary fees).
 - **Per-base time zones** — every plane flies on the home clock.
 
 Open balance questions rather than missing features: margin favoured

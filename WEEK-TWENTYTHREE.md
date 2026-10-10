@@ -4,7 +4,7 @@ Handoff document. Ancillary revenue was designed in weeks five to seven and
 in `WEEK-ELEVEN.md` (slice 3) and never built. This week builds it in two
 steps, chosen by the owner from three options.
 
-**Status:** step A built. Step B is next.
+**Status:** steps A and B built.
 
 ## The idea
 
@@ -23,9 +23,10 @@ it does not (a business trunk).
 A. **The fee dial.** An airline-wide level: bags included, checked bag fee,
    all bags and seat fee. Head office has the dial; the Money screen shows
    what fees earn. `sim/ancillaries.ts`.
-B. **Per-route levers.** The same fees set per route, plus extras that
-   unlock with the ladder. The NPS cost on a route with a rival that
-   charges nothing is higher; on an uncontested route it is lower.
+B. **Per-route levers.** The same fees set per route. The NPS cost on a
+   route a rival flies is higher; on an uncontested route it is lower.
+   Extras that unlock with the ladder (priority boarding, paid seats as
+   their own products) were left out: not built.
 
 ## Costs to flag
 
