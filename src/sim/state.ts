@@ -312,6 +312,12 @@ export type SimState = {
   todayAncillaryRevenue?: number;
   yesterdayAncillaryRevenue?: number;
   ancillaryRevenueTotal?: number;
+  /** Fee extras switched on (sim/ancillaries.ts); absent is none. */
+  extras?: ('priority' | 'seats')[];
+  /** The day each extra last switched, for the lock. */
+  extraChangedDay?: Record<string, number>;
+  /** How far rivals have copied each extra, 0-1. */
+  rivalExtras?: Partial<Record<'priority' | 'seats', number>>;
   todayRevenue: number;
   todayCost: number;
   todayMargin: number;

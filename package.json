@@ -28,7 +28,8 @@
     "laddertest": "tsx src/sim/ladder.test.ts",
     "executivetest": "tsx src/sim/executives.test.ts",
     "rightstest": "tsx src/sim/rightsLicences.test.ts",
-    "stationtest": "tsx src/sim/stations.test.ts"
+    "stationtest": "tsx src/sim/stations.test.ts",
+    "extrastest": "tsx src/sim/extras.test.ts"
   },
   "devDependencies": {
     "@types/d3-geo": "^3.1.0",

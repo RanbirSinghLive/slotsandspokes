@@ -3794,8 +3794,19 @@ default and the old game), checked bag fee ($10), all bags and seat fee
   (`AIRGAME_ALONE_FEE`, `AIRGAME_CONTESTED_FEE`, default off) for balance
   reads.
 
-New fields (`ancillaryLevel`, `ancillaryChangedDay`, `rivalFeeLevel` and
-the revenue counters) are optional, so old saves load as level 0.
+- **Extras.** Priority boarding ($8, paid mostly by business travellers)
+  and paid seats ($8, mostly leisure and VFR) are switched on for the whole
+  airline at Head office › Fees, once online booking is adopted, and move
+  once every 30 days each. Each adds revenue, price drag and NPS cost beside
+  the dial, with its own rival copy (`state.rivalExtras`, same 1/120 a day,
+  half the NPS cost permanent). Paid seats earn nothing on a market at
+  level 2, whose fee already includes seat choice. Not per route.
+  The steady headless player switches them on from `AIRGAME_EXTRAS`
+  (default none).
+
+New fields (`ancillaryLevel`, `ancillaryChangedDay`, `rivalFeeLevel`,
+`extras`, `extraChangedDay`, `rivalExtras` and the revenue counters) are
+optional, so old saves load with fees and extras off.
 
 ---
 
@@ -3803,7 +3814,6 @@ the revenue counters) are optional, so old saves load as level 0.
 
 The current plan is the newest `WEEK-*.md`. As of September 2026:
 
-- **Fee extras** (priority boarding, paid seats as separate products) from WEEK-TWENTYFOUR step B: only the per-route level is built (see Ancillary fees).
 - **Per-base time zones** — every plane flies on the home clock.
 
 Open balance questions rather than missing features: margin favoured
