@@ -66,7 +66,7 @@ export function showFlightTooltip(
   const lateOnArrival = flight.arriveMinute - flight.scheduledArriveMinute;
   const leftLate = flight.departMinute - flight.scheduledDepartMinute;
   const rolled =
-    flight.delayByCause.age + flight.delayByCause.weather + flight.delayByCause.knockOn + flight.delayByCause.congestion;
+    flight.delayByCause.age + flight.delayByCause.weather + flight.delayByCause.knockOn + flight.delayByCause.congestion + (flight.delayByCause.ground ?? 0);
   const executiveSaving = flight.delayMinutes - rolled;
 
   const nodes: HTMLElement[] = [
@@ -96,6 +96,7 @@ export function showFlightTooltip(
     const busier = airportLoad(state, flight.origin) >= airportLoad(state, flight.dest) ? flight.origin : flight.dest;
     codes.push(row('CONG', `Congestion at ${busier}`, flight.delayByCause.congestion));
   }
+  if ((flight.delayByCause.ground ?? 0) > 0) codes.push(row('GND', `Ground handling at ${flight.origin}`, flight.delayByCause.ground));
   if (executiveSaving < 0) codes.push(row('COO', 'Flight-ops executive', executiveSaving));
   if (codes.length > 0) {
     nodes.push(line('Delay codes', 'flight-tooltip-section'));

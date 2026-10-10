@@ -48,6 +48,7 @@ function describeCauses(delay: DelayBreakdown): string {
     ['age', delay.age],
     ['weather', delay.weather],
     ['congestion', delay.congestion],
+    ['ground', delay.ground ?? 0],
   ];
   return causes
     .filter(([, minutes]) => minutes > 0)

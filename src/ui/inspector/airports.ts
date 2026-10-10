@@ -5,6 +5,8 @@ import { airportDemandSize, sizeRank, type Size } from '../../sim/marketSize';
 import type { SimState } from '../../sim/state';
 import { unmetDemandByAirport } from '../../sim/unmetDemand';
 import { airports } from '../../render/airports';
+import { stationReadout, stationTier } from '../../sim/stations';
+import { CAUSE_STYLE, TIER_GLYPH, minutesText } from './station';
 import { select } from '../selection';
 import { linkToMap } from '../mapLink';
 
@@ -26,6 +28,10 @@ type Row = {
   waiting: number;
   /** Bases here (sim/bases.ts): 2 for a maintenance base, 1 for a crew base, both added. */
   bases: number;
+  /** Minutes a departure from here is delayed, on average (sim/stations.ts); -1 before any departure so it sorts last. */
+  delay: number;
+  /** The handler glyph and the leading cause, shown beside the delay. */
+  delayText: string;
 };
 
 type Column = { key: keyof Row; label: string; title: string; format: (row: Row) => string; numeric: boolean };
@@ -52,6 +58,13 @@ const COLUMNS: Column[] = [
     label: 'Base',
     title: 'Your bases here: crew (where planes are based) and mtc (where a night is a line check)',
     format: (row) => [row.bases & 1 ? 'crew' : '', row.bases & 2 ? 'mtc' : ''].filter(Boolean).join(' · ') || '—',
+    numeric: true,
+  },
+  {
+    key: 'delay',
+    label: 'Delay',
+    title: 'Minutes a departure from here is delayed, on average over the last week, with the biggest cause. The circle is who handles the ground work: open for a contract handler, half for your own staff, full for hub-grade',
+    format: (row) => row.delayText,
     numeric: true,
   },
   {
@@ -84,7 +97,16 @@ function buildRows(state: SimState): Row[] {
     // Sorted by size, not by the hidden number (sim/marketSize.ts).
     waiting: sizeRank(airportDemandSize(unmet.get(iata)?.latent ?? 0)),
     bases: (hasCrewBase(state, iata) ? 1 : 0) + (hasLineBase(state, iata) || hasHeavyBase(state, iata) ? 2 : 0),
+    ...delayCells(state, iata),
   }));
+}
+
+function delayCells(state: SimState, iata: string): Pick<Row, 'delay' | 'delayText'> {
+  const readout = stationReadout(state, iata);
+  const glyph = TIER_GLYPH[stationTier(state, iata)];
+  if (!readout) return { delay: -1, delayText: '—' };
+  const cause = readout.topCause ? ` ${CAUSE_STYLE[readout.topCause].code}` : '';
+  return { delay: readout.totalPerDeparture, delayText: `${glyph} ${minutesText(readout.totalPerDeparture)}${cause}` };
 }
 
 function compare(a: Row, b: Row): number {
@@ -185,6 +207,7 @@ export function buildAirportsView(state: SimState, changed: () => void): HTMLEle
         td.textContent = column.format(row);
       }
       if (column.key === 'load' && row.load >= 1) td.classList.add('is-over');
+      if (column.key === 'delay') td.classList.add('is-nowrap');
       tr.append(td);
     }
     tr.addEventListener('click', () => select({ kind: 'airport', iata: row.iata }));

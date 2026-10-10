@@ -2,7 +2,7 @@ import { nextRandom } from './rng';
 import { WEATHER_ON_TIME_PROBABILITY, WEATHER_MAX_DELAY_MINUTES } from './weather';
 
 /**
- * The four causes a departing flight's arrival delay is built from, kept
+ * The five causes a departing flight's arrival delay is built from, kept
  * apart from the tick loop (sim/step.ts).
  *
  * Each cause addresses a different question:
@@ -24,6 +24,10 @@ import { WEATHER_ON_TIME_PROBABILITY, WEATHER_MAX_DELAY_MINUTES } from './weathe
  *      airports, judged against its capacity (sim/airports.ts's
  *      airportLoad()). Nothing at a quiet field; a steep rise as an
  *      airport fills up. This is the on-time price of building a hub.
+ *
+ *   5. Ground handling (rollGroundDelay) — the handler at the origin
+ *      (sim/stations.ts): a contracted one is slowest, hub-grade handling
+ *      the quickest.
  *
  * Deliberately additive and independent rather than one combined
  * distribution, so another cause (crew, ATC) can join this same list
@@ -134,6 +138,12 @@ function rollCongestionDelay(seed: number, load: number): [delayMinutes: number,
   return rollCauseDelay(seed, 1 - delayChance, maxDelayMinutes);
 }
 
+/** Cause 5: ground handling at the origin. No draw where the handler never delays. */
+function rollGroundDelay(seed: number, handling: { chance: number; maxMinutes: number }): [delayMinutes: number, nextSeed: number] {
+  if (handling.chance <= 0) return [0, seed];
+  return rollCauseDelay(seed, 1 - handling.chance, handling.maxMinutes);
+}
+
 /**
  * Cause 3: knock-on. `lateAtDepartureMinutes` is how far past its
  * scheduled slot this flight is *actually* departing — zero for a flight
@@ -172,7 +182,7 @@ export function isOnTimeArrival(arriveMinute: number, scheduledArriveMinute: num
  * attribute minutes to age/weather/knock-on individually, not just know
  * the total that actually delayed the flight.
  */
-export type DelayBreakdown = { age: number; weather: number; knockOn: number; congestion: number };
+export type DelayBreakdown = { age: number; weather: number; knockOn: number; congestion: number; ground: number };
 
 /**
  * Roll a departing flight's total arrival delay from all four causes
@@ -189,10 +199,12 @@ export function rollTotalDelayMinutes(
   lateAtDepartureMinutes: number,
   congestionLoad: number,
   maintenanceFactor = 1,
+  handling: { chance: number; maxMinutes: number } = { chance: 0, maxMinutes: 0 },
 ): [breakdown: DelayBreakdown, nextSeed: number] {
   const [age, seedAfterAge] = rollAgeDelay(seed, ageYears, maintenanceFactor);
   const [weather, seedAfterWeather] = rollWeatherDelay(seedAfterAge, hasWeatherAtOrigin);
   const [congestion, seedAfterCongestion] = rollCongestionDelay(seedAfterWeather, congestionLoad);
+  const [ground, seedAfterGround] = rollGroundDelay(seedAfterCongestion, handling);
   const knockOn = knockOnDelayMinutes(lateAtDepartureMinutes);
-  return [{ age, weather, knockOn, congestion }, seedAfterCongestion];
+  return [{ age, weather, knockOn, congestion, ground }, seedAfterGround];
 }
