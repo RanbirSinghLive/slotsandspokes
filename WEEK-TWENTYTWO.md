@@ -1,33 +1,31 @@
-# airgame — Week twenty-two (stations)
+# airgame — Week twenty-two (the check ladder)
 
-Handoff document. Origin: the "turnaround strip" idea (project file
-`ideas/airline-ops-flavour.md`, item 4) judged to have no repeat value as a
-plane-level animation, and rebuilt as a station-level read-out tied to a real
-decision.
+Handoff document. Week twenty (maintenance depth) built bases, bays and ratings;
+this week adds the A and C check lanes on top. Plan and prerequisites:
+`roadmap/check-ladder-prereqs.md` in the project files.
 
-**Status:** a sim change. Ground handling adds a fifth delay cause, so
-on-time numbers move a little; a game that never builds a station plays
-with contract handling everywhere but home.
+**Status:** a sim change in steps, each ending runnable. Steps 3 onward move
+balance, so `npm run quick` is read against the reference and a new reference
+is saved only when the owner accepts the read.
 
 ## Decisions (from the owner)
 
-- Do the whole slice: ledger, tiers, strip, headless policy.
-
-## Defaults picked
-
-- Delay is attributed to the **origin** airport: the turn happens there.
-- Turn length itself is unchanged (still 30 minutes plus the route buffer);
-  handling adds delay rather than changing the schedule's packing.
-- Tiers: contract (default), own staff (needs a base), hub-grade (needs own
-  staff and 6 departures a day). Slow to build, paid by the day.
-- Strip, not a minigame: icons, colours and tooltips; no new words.
+- Lanes A and C only. No B (airlines fold it into A). D later.
+- C stays banked at night, with no flying lost, until spare aircraft exist.
 
 ## Slices
 
-1. `sim/stations.ts`: tiers, build, cost, ledger, read-out.
-2. `sim/delays.ts` and `sim/step.ts`: the ground cause, ledger recording,
-   daily rollover and running cost.
-3. `ui/inspector/station.ts`, the airport view section and the Airports Delay column.
-4. Headless player `keepStations()`; `npm run stationtest`.
+1. Usage clocks: flight hours and cycles since the last heavy check, shown on
+   the Mtc cards. No change to play. **Built.**
+2. Split in-house check cost out of the per-block-hour bundle. Needs an OK on
+   the balance read.
+3. The A-check lane at line bases.
+4. The heavy check becomes C, with hours, cycles and calendar triggers;
+   a hatched Gantt block for nights in a bay.
+5. Planning: pick the night or bay, quiet-night hint, headless-player policy.
 
-How it works lives in HOW-IT-WORKS.md (Stations).
+## Not in this week
+
+- D checks and life-limited parts, spares and engine pools, spare aircraft.
+
+How it works lives in HOW-IT-WORKS.md (Maintenance checks).

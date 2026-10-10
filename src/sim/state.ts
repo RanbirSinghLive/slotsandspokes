@@ -91,6 +91,10 @@ export type Aircraft = {
   daysSinceHeavyCheck?: number;
   /** Hangar minutes done at night toward its heavy check this time round (sim/mxChecks.ts). */
   heavyBankedMinutes?: number;
+  /** Airborne minutes flown since the last heavy check (sim/mxChecks.ts). Absent: none counted yet. */
+  flightMinutesSinceHeavy?: number;
+  /** Takeoff-and-landing cycles since the last heavy check (sim/mxChecks.ts). Absent: none counted yet. */
+  cyclesSinceHeavy?: number;
 };
 
 /** How one leg went, once it has landed. */
@@ -580,6 +584,8 @@ export type SimState = {
    * by one appointment.
    */
   executives: ExecutiveSlots;
+  /** The last hire to walk out for NPS under their line (sim/executives.ts's rollExecutiveStanding()), for the ticker. Optional: absent until it happens. */
+  lastExecutiveLapse?: { candidateId: string; simMinute: number };
   /** Each rival airline's milestones met on the ladder, by code then milestone id: the day met (sim/rivalLadder.ts). Optional: made on first use. */
   rivalMilestones?: Record<string, Record<string, number>>;
   /** Leases signed and not yet delivered (sim/fleetTiming.ts). Optional: absent in an older save. */
@@ -610,6 +616,12 @@ export type SimState = {
    */
   slotsHeld: Record<string, number[]>;
   /**
+   * Days each held pair has been held, by IATA, in the same order as
+   * `slotsHeld` (sim/slots.ts): the clock behind heritage pairs. Optional:
+   * an older save starts every pair at 0.
+   */
+  slotDaysHeld?: Record<string, number[]>;
+  /**
    * How each hub is run (sim/hubStyle.ts), keyed by IATA. Only airports
    * the player has changed appear; everything else is Rolling.
    */
@@ -622,6 +634,14 @@ export type SimState = {
   aogs: AogEvent[];
   /** Planes held at base this morning for their deferred items (sim/mxChecks.ts), for the ticker. */
   mxHoldsToday?: string[];
+  /** Daily brief and season review: which the player wants, and when each last appeared (sim/briefs.ts). Absent in an older save: both on, first review half a year on. */
+  briefs?: {
+    settings?: { daily: boolean; season: boolean; seasonPause: boolean };
+    lastDailyDay?: number;
+    lastSeasonDay?: number;
+    /** `marketTotals` when the last review appeared, so the next one reads only its half year. */
+    seasonBaseline?: Record<string, { revenue: number; cost: number; passengers: number }>;
+  };
   /** How each flying plane's line check went last night (sim/mxChecks.ts), by tail. */
   lastNightChecks?: Record<string, 'checked' | 'cleared' | 'short' | 'contracted' | 'away'>;
   /** Demand events announced or running (sim/demandEvents.ts). Absent in an older save: none. */
@@ -664,7 +684,7 @@ export type SimState = {
    * was due (stranded by an earlier disruption); optional so older saves
    * load, absent meaning none.
    */
-  cancellationsByCause: { crew: number; mechanical: number; weather: number; curfew: number; position?: number; maintenance?: number; airspace?: number };
+  cancellationsByCause: { crew: number; mechanical: number; weather: number; curfew: number; controller?: number; position?: number; maintenance?: number; airspace?: number };
   /**
    * Cancellations: legs that should have operated today and
    * didn't. `flightsScheduled*` counts what was on the books, so

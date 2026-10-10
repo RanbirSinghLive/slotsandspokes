@@ -1,6 +1,6 @@
 import { endSeasonalLeases } from './seasonalLease';
 import { demandFactors, rollDailyDemandEvents } from './demandEvents';
-import { morningHolds, rollNightlyChecks, wornAge } from './mxChecks';
+import { morningHolds, recordFlown, rollNightlyChecks, wornAge } from './mxChecks';
 import { chargeNightStops } from './nightStops';
 import { applyPendingRetimes } from './retime';
 import { rollDailyFareWars } from './fareWars';
@@ -39,6 +39,7 @@ import { MAINTENANCE_AGE_FACTOR } from './aog';
 import { isAog, rollDailyAogs } from './aog';
 import {
   executiveSalariesPerDay,
+  rollExecutiveStanding,
   executiveDelayMultiplier,
   executiveNpsBonus,
   executiveMaintenanceMultiplier,
@@ -124,7 +125,7 @@ function legBlockedByAirspace(state: SimState, leg: ScheduleLeg): boolean {
   return !!aircraft && legAirspace(state, leg.origin, leg.dest, aircraft.typeCode).kind === 'blocked';
 }
 
-function recordCancellation(state: SimState, leg: ScheduleLeg, cause: keyof SimState['cancellationsByCause']): void {
+export function recordCancellation(state: SimState, leg: ScheduleLeg, cause: keyof SimState['cancellationsByCause']): void {
   state.cancellationsByCause[cause] = (state.cancellationsByCause[cause] ?? 0) + 1;
   state.todayFlightsCancelled += 1;
   state.flightsCancelledTotal += 1;
@@ -181,6 +182,8 @@ export function step(state: SimState): void {
     // The trailing NPS (sim/nps.ts) takes in the day just flown, before
     // today's counts reset below.
     rollTrailingNps(state);
+    // Executives hired on an NPS line leave if the airline stays under it (sim/executives.ts).
+    rollExecutiveStanding(state);
     // Runway forecast (sim/forecast.ts): read before today's
     // own charges touch Cash — this is what makes each entry "yesterday's
     // closing balance."
@@ -525,16 +528,12 @@ export function step(state: SimState): void {
     const routeSettings = state.routeSettings[marketOnTimeKey];
 
     // NPS quality signal (sim/nps.ts): every input this needs —
-    // this flight's just-rolled delay, its fare, and its aircraft's age —
+    // this flight's just-rolled delay and its aircraft's age —
     // is already known by this point in the loop, so it's scored the same
     // moment the on-time counters above are.
     const satisfactionScore = flightSatisfactionScore(
       delayMinutes,
-      routeSettings.fare,
       aircraft.ageYears,
-      leg.origin,
-      leg.dest,
-      state.competitorRoutes,
       // A fresh crew gives full service; a tired one less (sim/crews.ts).
       1 - fatigue,
       // A short cabin loses service points on every flight (sim/crews.ts).
@@ -587,6 +586,8 @@ export function step(state: SimState): void {
       aircraft.atAirport = flight.dest;
       aircraft.activeLegId = null;
       aircraft.groundSinceMinute = state.simMinute;
+      // Ground delay is part of the arrival time but is not time in the air.
+      recordFlown(aircraft, flight.arriveMinute - flight.departMinute - flight.delayMinutes);
 
       const type = aircraftTypesByCode.get(aircraft.typeCode);
       if (type) {

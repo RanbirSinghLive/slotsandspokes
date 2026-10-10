@@ -7,6 +7,8 @@ import { ON_TIME_GRACE_MINUTES } from '../sim/delays';
 import { airportLoad } from '../sim/airports';
 import type { ActiveFlight, SimState } from '../sim/state';
 import { minuteOfDayToTimeString } from './panels';
+import { flightNumber } from '../sim/flightNumbers';
+import { delayIcon, delayCodeFor, type DelayCause } from './delayCodes';
 
 /**
  * What hovering a moving plane tells you: why *this* flight is late, in
@@ -15,12 +17,14 @@ import { minuteOfDayToTimeString } from './panels';
  * flight. Real DOM, like every other readout (CLAUDE.md).
  *
  * The codes add up to the flight's total lateness on arrival:
- *   ROT   left late because the inbound aircraft was late
- *   TURN  the knock-on of that rushed turnaround (sim/delays.ts)
- *   ACFT  this airframe's own unreliability, worse with age
- *   WX    weather at the departure airport
- *   CONG  congestion at the busier of its two airports (sim/airports.ts)
- *   COO   minutes a flight-ops executive clawed back
+ * Each cause is an icon (ui/delayCodes.ts) with its IATA-style code:
+ *   rotation    left late because the inbound aircraft was late
+ *   knock-on    the rushed turnaround that follows (sim/delays.ts)
+ *   age         this airframe's own unreliability, worse with age
+ *   weather     weather at the departure airport
+ *   congestion  the busier of its two airports (sim/airports.ts)
+ *   ground      the handler at the departure airport (sim/stations.ts)
+ *   executive   minutes a flight-ops executive clawed back
  */
 
 const MAX_REST_OF_DAY_ROWS = 5;
@@ -32,12 +36,13 @@ function clock(state: SimState, absoluteMinute: number): string {
   return minuteOfDayToTimeString(minuteOfDay(state, absoluteMinute));
 }
 
-function row(code: string, text: string, minutes: number): HTMLElement {
+function row(cause: DelayCause, text: string, minutes: number): HTMLElement {
   const el = document.createElement('div');
   el.className = 'flight-tooltip-code';
   const codeEl = document.createElement('span');
   codeEl.className = 'flight-tooltip-code-id';
-  codeEl.textContent = code;
+  codeEl.append(delayIcon(cause, text));
+  codeEl.append(delayCodeFor(cause).code);
   const textEl = document.createElement('span');
   textEl.textContent = text;
   const minutesEl = document.createElement('span');
@@ -70,7 +75,7 @@ export function showFlightTooltip(
   const executiveSaving = flight.delayMinutes - rolled;
 
   const nodes: HTMLElement[] = [
-    line(`${flight.tail} · ${className}`, 'flight-tooltip-title'),
+    line(`${flightNumber(state.schedule, state.schedule.find((leg) => leg.legId === flight.legId) ?? { ...flight, blockMinutes: 0 })} · ${flight.tail} · ${className}`, 'flight-tooltip-title'),
     line(`${flight.origin}→${flight.dest} · ETA ${clock(state, flight.arriveMinute)}`),
     // Its passengers are only settled when it lands, so the route's recent
     // load factor stands in (sim/loadFactor.ts).
@@ -88,16 +93,16 @@ export function showFlightTooltip(
   }
 
   const codes: HTMLElement[] = [];
-  if (leftLate > 0) codes.push(row('ROT', 'Late inbound aircraft', leftLate));
-  if (flight.delayByCause.knockOn > 0) codes.push(row('TURN', 'Rushed turnaround', flight.delayByCause.knockOn));
-  if (flight.delayByCause.age > 0) codes.push(row('ACFT', `Aircraft, ${aircraft?.ageYears ?? 0} yrs`, flight.delayByCause.age));
-  if (flight.delayByCause.weather > 0) codes.push(row('WX', `Weather at ${flight.origin}`, flight.delayByCause.weather));
+  if (leftLate > 0) codes.push(row('rotation', 'Late inbound aircraft', leftLate));
+  if (flight.delayByCause.knockOn > 0) codes.push(row('knockOn', 'Rushed turnaround', flight.delayByCause.knockOn));
+  if (flight.delayByCause.age > 0) codes.push(row('age', `Aircraft, ${aircraft?.ageYears ?? 0} yrs`, flight.delayByCause.age));
+  if (flight.delayByCause.weather > 0) codes.push(row('weather', `Weather at ${flight.origin}`, flight.delayByCause.weather));
   if (flight.delayByCause.congestion > 0) {
     const busier = airportLoad(state, flight.origin) >= airportLoad(state, flight.dest) ? flight.origin : flight.dest;
-    codes.push(row('CONG', `Congestion at ${busier}`, flight.delayByCause.congestion));
+    codes.push(row('congestion', `Congestion at ${busier}`, flight.delayByCause.congestion));
   }
-  if ((flight.delayByCause.ground ?? 0) > 0) codes.push(row('GND', `Ground handling at ${flight.origin}`, flight.delayByCause.ground));
-  if (executiveSaving < 0) codes.push(row('COO', 'Flight-ops executive', executiveSaving));
+  if ((flight.delayByCause.ground ?? 0) > 0) codes.push(row('ground', `Ground handling at ${flight.origin}`, flight.delayByCause.ground));
+  if (executiveSaving < 0) codes.push(row('executive', 'Flight-ops executive', executiveSaving));
   if (codes.length > 0) {
     nodes.push(line('Delay codes', 'flight-tooltip-section'));
     nodes.push(...codes);

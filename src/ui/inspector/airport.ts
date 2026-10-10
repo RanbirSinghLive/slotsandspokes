@@ -14,7 +14,7 @@ import { formatLoadFactor, marketLoadFactor } from '../../sim/loadFactor';
 import { airportDemandSize } from '../../sim/marketSize';
 import { describeServiceLevel, hungerAt } from '../../sim/serviceLevel';
 import { HUB_STYLES, hubStyleAt } from '../../sim/hubStyle';
-import { nextSlotFees, slotFeesPerDayAt, slotsHeld } from '../../sim/slots';
+import { HERITAGE_DAYS, heritagePairs, nextSlotFees, slotFeesPerDayAt, slotsHeld } from '../../sim/slots';
 import type { SimState } from '../../sim/state';
 import { unmetDemandByAirport } from '../../sim/unmetDemand';
 import { utilisationPools } from '../../sim/utilisation';
@@ -224,11 +224,14 @@ function loadAndSlots(state: SimState, iata: string): HTMLElement[] {
   loadLine.classList.toggle('is-over', load >= 1);
 
   const held = slotsHeld(state, iata);
+  const heritage = heritagePairs(state, iata);
   const [next] = nextSlotFees(state, iata, 1);
   const nextText = next === null ? 'full' : next === 0 ? 'next pair free' : `next pair ${money(next)}/day`;
   const slotsLine = lineWithInfo(
-    held > 0 ? `Slots ${held} pair${held === 1 ? '' : 's'} · ${money(slotFeesPerDayAt(state, iata))}/day · ${nextText}` : `Slots none held · ${nextText}`,
-    'Each daily departure needs a slot pair. The first pair at an airport nobody serves is free; after that the fee rises with how busy the field is, and is locked when taken. Unused slots are released at midnight.',
+    held > 0
+      ? `Slots ${held} pair${held === 1 ? '' : 's'}${heritage > 0 ? ` · ${heritage} heritage` : ''} · ${money(slotFeesPerDayAt(state, iata))}/day · ${nextText}`
+      : `Slots none held · ${nextText}`,
+    `Each daily departure needs a slot pair. The first pair at an airport nobody serves is free; after that the fee rises with how busy the field is, and is locked when taken. Unused slots are released at midnight, which restarts their clock. A pair held ${HERITAGE_DAYS} days running is heritage: 20% cheaper, and the more of the field's movements fly on heritage pairs, the dearer a rival's slots here (up to +50%).`,
   );
   return [loadLine, hourStrip(hours), slotsLine];
 }

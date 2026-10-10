@@ -1,7 +1,7 @@
 import { nearestAirportCandidate, type Airport } from '../render/airports';
 import { deliveryDays } from '../sim/fleetTiming';
 import { money } from './format';
-import { showConfirm } from './confirmModal';
+import { cashAfterRows, showConfirm } from './confirmModal';
 import { findNearestOwnRoute } from '../render/routes';
 import { projection, mapPoint, type ClientPoint } from '../render/projection';
 import { TURN_BUFFER_CHOICES } from '../sim/turnBuffer';
@@ -188,7 +188,7 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
         rows: [
           { label: 'Return fee', value: money(option.fee) },
           { label: 'Lease saved', value: `${money(option.saves)}/day` },
-          { label: 'Cash after', value: money(state.cash - option.fee) },
+          ...cashAfterRows(state, option.fee),
         ],
         facts: ['Goes back to the lessor for good; leasing another means a new airframe at the market rate.'],
         confirmLabel: `Return · ${money(option.fee)}`,

@@ -1,3 +1,8 @@
+import { basesCostPerDay } from './bases';
+import { executiveSalariesPerDay } from './executives';
+import { runningCostForDay } from './innovations';
+import { networkOverheadPerDay } from './overhead';
+import { slotFeesPerDayAt } from './slots';
 import type { SimState } from './state';
 
 /**
@@ -60,4 +65,26 @@ export function trailingDailyMargin(state: SimState, days = RUNWAY_WINDOW_DAYS):
   const recent = state.marginHistory.slice(-days);
   if (recent.length === 0) return null;
   return recent.reduce((sum, margin) => sum + margin, 0) / recent.length;
+}
+
+/** Days of committed cost cash is kept back for before it counts as free to spend: the Runway card's red line (ui/runway.ts), two weeks with no income. */
+export const RESERVE_DAYS = 14;
+
+/**
+ * What the airline owes every day whether or not a plane flies: leases,
+ * bases, slot fees, network overhead, executives' salaries and adopted
+ * programmes' running costs. Standby crews are left out: they follow the
+ * fleet and are small beside the rest.
+ */
+export function committedCostPerDay(state: SimState): number {
+  const leases = state.aircraft.reduce((total, aircraft) => total + aircraft.leaseCostPerDay, 0);
+  const bases = basesCostPerDay(state);
+  const slots = Object.keys(state.slotsHeld).reduce((total, iata) => total + slotFeesPerDayAt(state, iata), 0);
+  const programmes = runningCostForDay(state, state.revenueHistory[state.revenueHistory.length - 1] ?? 0);
+  return leases + bases.crew + bases.maintenance + slots + networkOverheadPerDay(state) + executiveSalariesPerDay(state) + programmes;
+}
+
+/** Cash less RESERVE_DAYS of committed cost: what can go into growth without eating the reserve. Negative once the reserve is spent. */
+export function freeCash(state: SimState, spend = 0): number {
+  return state.cash - spend - RESERVE_DAYS * committedCostPerDay(state);
 }

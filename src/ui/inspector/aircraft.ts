@@ -4,20 +4,23 @@ import { dayIndex } from '../../sim/clock';
 import { line, heading, lineWithInfo } from './dom';
 import { gameDate, money } from '../format';
 import { aogFor, daysUntilReturn } from '../../sim/aog';
-import { projectRestOfDay } from '../../sim/cascade';
+import { projectGroundedDay, projectRestOfDay } from '../../sim/cascade';
+import { cancelRotation, cancellableRotations, previewCancelRotation } from '../../sim/controller';
 import { minuteOfDay, minuteOfDayToTimeString } from '../../sim/clock';
 import { formatLoadFactor, marketLoadFactor } from '../../sim/loadFactor';
-import { ageDelayParameters, type DelayBreakdown } from '../../sim/delays';
+import { ageDelayParameters } from '../../sim/delays';
 import type { SimState } from '../../sim/state';
 import { aircraftUtilisation, rotationsForTail } from '../../sim/utilisation';
 import { planeIconElement } from '../planeIcons';
 import * as ops from '../routeActions';
 import { select, selectRoute } from '../selection';
 import { linkToMap } from '../mapLink';
-import { showConfirm } from '../confirmModal';
+import { cashAfterRows, showConfirm } from '../confirmModal';
 import { REBASE_DAYS, REBASE_FEE_LEASE_DAYS } from '../../sim/rebase';
 import { CABIN_PRICE, cabinLayout, cabinOf } from '../../sim/cabins';
 import { DEFERRED_AGE_YEARS, deferredItems, HEAVY_INTERVAL_DAYS, heavyBankedMinutes, heavyCheckDueIn, heavyCheckOpen, heavyCheckWorkMinutes, MX_HOLD_AT, tonightCheck } from '../../sim/mxChecks';
+import { delayIconsFor } from '../delayCodes';
+import { flightNumber } from '../../sim/flightNumbers';
 import { CREWS_PER_NEW_PLANE } from '../../sim/crews';
 
 /**
@@ -39,22 +42,6 @@ function title(text: string): HTMLElement {
 /** A home-local time of day for an absolute simMinute, as the HUD shows it. */
 function clock(state: SimState, absoluteMinute: number): string {
   return minuteOfDayToTimeString(minuteOfDay(state, absoluteMinute));
-}
-
-/** Why a flight ran late, in words, biggest cause first: "knock-on 12, age 8". */
-function describeCauses(delay: DelayBreakdown): string {
-  const causes: [string, number][] = [
-    ['knock-on', delay.knockOn],
-    ['age', delay.age],
-    ['weather', delay.weather],
-    ['congestion', delay.congestion],
-    ['ground', delay.ground ?? 0],
-  ];
-  return causes
-    .filter(([, minutes]) => minutes > 0)
-    .sort((a, b) => b[1] - a[1])
-    .map(([name, minutes]) => `${name} ${minutes}`)
-    .join(', ');
 }
 
 /** Where a plane is right now, in a few words. */
@@ -220,6 +207,8 @@ export function buildAircraftView(state: SimState, tail: string, changed: () => 
   root.append(useLine);
 
   root.append(heading('Today'), buildDay(state, tail));
+  const controllerBlock = buildController(state, tail, changed);
+  if (controllerBlock) root.append(controllerBlock);
 
   const rotations = rotationsForTail(state, tail);
   if (rotations.length > 0) {
@@ -276,23 +265,23 @@ function buildDay(state: SimState, tail: string): HTMLElement {
     const row = document.createElement('div');
     row.className = 'inspector-row inspector-day-row';
     const name = document.createElement('span');
-    name.textContent = `${minuteOfDayToTimeString(leg.departMinute)} ${leg.origin} → ${leg.dest}`;
+    name.textContent = `${flightNumber(state.schedule, leg)} · ${minuteOfDayToTimeString(leg.departMinute)} ${leg.origin} → ${leg.dest}`;
     const detail = document.createElement('span');
     detail.className = 'inspector-row-detail';
 
     const result = results[leg.legId];
     const plan = projected.get(leg.legId);
     if (result) {
-      const causes = describeCauses(result.delayByCause);
+      const causes = delayIconsFor(result.delayByCause);
       const full = result.seats ? ` · LF ${Math.round((result.passengers / result.seats) * 100)}%` : '';
-      detail.textContent =
-        (result.onTime ? 'on time' : `+${result.arriveLateMinutes} min${causes ? ` (${causes})` : ''}`) +
-        ` · ${result.passengers} pax${full} · ${money(result.margin)}`;
+      detail.textContent = result.onTime ? 'on time' : `+${result.arriveLateMinutes} min`;
+      if (!result.onTime) detail.append(...causes);
+      detail.append(` · ${result.passengers} pax${full} · ${money(result.margin)}`);
       if (!result.onTime) detail.classList.add('is-warn');
     } else if (flight?.legId === leg.legId) {
       const late = flight.arriveMinute - flight.scheduledArriveMinute;
-      const causes = describeCauses(flight.delayByCause);
-      detail.textContent = `airborne · ETA ${clock(state, flight.arriveMinute)}` + (late > 0 ? ` · +${late} min${causes ? ` (${causes})` : ''}` : '');
+      detail.textContent = `airborne · ETA ${clock(state, flight.arriveMinute)}` + (late > 0 ? ` · +${late} min` : '');
+      if (late > 0) detail.append(...delayIconsFor(flight.delayByCause));
       if (late > 0) detail.classList.add('is-warn');
     } else if (state.cancelledToday.includes(leg.legId)) {
       detail.textContent = 'CNX';
@@ -310,6 +299,78 @@ function buildDay(state: SimState, tail: string): HTMLElement {
     list.append(row);
   }
   return list;
+}
+
+/**
+ * The controller's call (sim/controller.ts): a waiting plane whose day is
+ * projected to run late or lose a rotation to the curfew, with one ✕ per
+ * rotation it can still cancel. Shown only when there is something to
+ * decide; the confirm step states what the choice changes in numbers.
+ */
+function buildController(state: SimState, tail: string, changed: () => void): HTMLElement | null {
+  const projection = projectGroundedDay(state, tail);
+  if (!projection.some((p) => p.cancelled || p.lateMinutes > 0)) return null;
+  const rotations = cancellableRotations(state, tail);
+  if (rotations.length === 0) return null;
+
+  const block = document.createElement('div');
+  block.className = 'inspector-return';
+  block.append(
+    heading(
+      'Needs a call',
+      'This plane is waiting and its day is projected to run late. The 22:00 curfew cancels the last rotation that cannot get home, whatever it earns. ✕ cancels a rotation you choose instead: the plane stays at base and the rest of its day recovers. A cancelled flight counts against Completion and NPS (−80 each), its slots are still paid and nothing is refunded. A priority flight cancelled this way fails.',
+    ),
+  );
+  const projectedByLeg = new Map(projection.map((p) => [p.leg.legId, p]));
+  const list = document.createElement('div');
+  list.className = 'inspector-rows';
+  for (const rotation of rotations) {
+    const first = rotation.legs[0];
+    const plan = projectedByLeg.get(first.legId);
+    const row = document.createElement('div');
+    row.className = 'inspector-row inspector-day-row';
+    const name = document.createElement('span');
+    name.textContent = `${minuteOfDayToTimeString(first.departMinute)} ${[first.origin, ...rotation.legs.map((leg) => leg.dest)].join('–')}`;
+    const detail = document.createElement('span');
+    detail.className = 'inspector-row-detail';
+    detail.textContent = plan?.cancelled ? 'CNX · curfew' : `+${Math.max(0, plan?.lateMinutes ?? 0)}`;
+    if (plan?.cancelled) detail.classList.add('is-over');
+    else if ((plan?.lateMinutes ?? 0) > 0) detail.classList.add('is-warn');
+    row.append(name, detail);
+
+    const preview = plan?.cancelled ? null : previewCancelRotation(state, first.legId);
+    if (preview?.ok) {
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.className = 'inspector-plan-hub';
+      cancel.textContent = '✕';
+      cancel.title = 'Cancel this rotation';
+      cancel.setAttribute('aria-label', 'Cancel this rotation');
+      cancel.addEventListener('click', () =>
+        showConfirm({
+          title: `Cancel ${tail} · ${name.textContent}`,
+          rows: [
+            { label: 'Flights', value: `−${preview.flightsCancelled}${preview.flightsRescued > 0 ? ` · +${preview.flightsRescued} saved from curfew` : ''}` },
+            { label: 'Late legs', value: `${preview.lateLegsBefore} → ${preview.lateLegsAfter}` },
+            { label: 'Late minutes', value: `${preview.lateMinutesBefore} → ${preview.lateMinutesAfter}` },
+            { label: 'Revenue, est.', value: `−${money(preview.revenueGivenUp)}${preview.revenueRescued > 0 ? ` · +${money(preview.revenueRescued)}` : ''}` },
+            { label: 'NPS', value: `−80 × ${preview.flightsCancelled}` },
+            ...(preview.mandatedLegs > 0 ? [{ label: 'Priority flight', value: `fails · −${money(preview.mandatePenalty)}` }] : []),
+          ],
+          facts: ['Slots are still paid and nothing is refunded.'],
+          confirmLabel: 'Cancel rotation',
+          run: () => {
+            cancelRotation(state, first.legId);
+            changed();
+          },
+        }),
+      );
+      row.append(cancel);
+    }
+    list.append(row);
+  }
+  block.append(list);
+  return block;
 }
 
 function seatsText(seats: number | undefined, cabin: 'economy' | 'business'): string {
@@ -375,7 +436,7 @@ function buildCabin(state: SimState, tail: string, changed: () => void): HTMLEle
         { label: 'Refit cost', value: money(option.cost) },
         { label: 'Out of service', value: `${option.days} days` },
         { label: 'Forecast', value: `${option.gainPerDay >= 0 ? '+' : '−'}${money(Math.abs(option.gainPerDay))}/day` },
-        { label: 'Cash after', value: money(state.cash - option.cost) },
+        ...cashAfterRows(state, option.cost),
       ],
       facts: ['Starts next morning at base; the plane flies nothing while it is out. Calling it off before then refunds the cost.'],
       confirmLabel: `Order · ${money(option.cost)}`,
@@ -429,7 +490,7 @@ function buildRebase(state: SimState, tail: string, changed: () => void): HTMLEl
           { label: 'Ferry cost', value: money(option.fee) },
           { label: 'Away', value: `${REBASE_DAYS} days, based day ${option.arrivesDay}` },
           { label: 'Crews at new base', value: `${option.crews}/${option.crewsNeeded}` },
-          { label: 'Cash after', value: money(state.cash - option.fee) },
+          ...cashAfterRows(state, option.fee),
         ],
         facts: [
           `Flies nothing while ferrying and the lease is still charged. Crews stay where they are: ${option.to} needs ${CREWS_PER_NEW_PLANE} crews rated on this type.`,
@@ -476,7 +537,7 @@ function buildReturn(state: SimState, tail: string, changed: () => void): HTMLEl
       rows: [
         { label: 'Return fee', value: money(option.fee) },
         { label: 'Lease saved', value: `${money(option.saves)}/day` },
-        { label: 'Cash after', value: money(state.cash - option.fee) },
+        ...cashAfterRows(state, option.fee),
       ],
       facts: ['Goes back for good; leasing another means a new airframe at the market rate.'],
       confirmLabel: `Return · ${money(option.fee)}`,

@@ -1,3 +1,5 @@
+import { freeCash } from '../sim/forecast';
+import type { SimState } from '../sim/state';
 import { money } from './format';
 
 /**
@@ -99,5 +101,12 @@ export function costRows(fee: number, perDayBefore: number, perDayAfter: number,
   if (fee > 0) rows.push({ label: 'Fee now', value: money(fee) });
   rows.push({ label: 'Running cost', value: `${money(perDayBefore)}/day → ${money(perDayAfter)}/day` });
   if (fee > 0) rows.push({ label: 'Cash after', value: money(cashAfter) });
+  return rows;
+}
+
+/** "Cash after", and how much of it is free to spend: cash less 14 days of daily commitments (sim/forecast.ts). */
+export function cashAfterRows(state: SimState, spend: number): ConfirmRow[] {
+  const rows: ConfirmRow[] = [{ label: 'Cash after', value: money(state.cash - spend) }];
+  rows.push({ label: 'Free after', value: money(freeCash(state, spend)) });
   return rows;
 }

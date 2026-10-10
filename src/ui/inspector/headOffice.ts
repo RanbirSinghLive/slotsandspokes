@@ -1,13 +1,13 @@
 import { dayIndex } from '../../sim/clock';
 import { info, line, heading, lineWithInfo } from './dom';
 import { money } from '../format';
-import { showConfirm } from '../confirmModal';
+import { cashAfterRows, showConfirm } from '../confirmModal';
 import { FUEL_PRICE_BASELINE } from '../../sim/fuel';
 import { activeHedge, describeFuelPrice } from '../../sim/fuelPrice';
 import type { SimState } from '../../sim/state';
 import * as ops from '../routeActions';
 import type { ExecutiveOption, InnovationOption } from '../routeActions';
-import { describeEffect, type ExecutiveRole } from '../../sim/executives';
+import { describeEffect, EXECUTIVE_LAPSE_DAYS, type ExecutiveRole } from '../../sim/executives';
 import { formatNps, networkNps } from '../../sim/nps';
 import { averagePerformance, contractsOf, paymentShare, performanceFactor, RENEW_MIN_PERFORMANCE, SNAP_BACK_SHARE, type Contract } from '../../sim/contracts';
 import { select } from '../selection';
@@ -51,7 +51,7 @@ function innovationCard(state: SimState, option: InnovationOption, changed: () =
     const rows = [];
     if (option.oneOffPrice > 0) rows.push({ label: 'Price', value: `${money(option.oneOffPrice)} once` });
     if (option.runningCost) rows.push({ label: 'Running cost', value: option.runningCost });
-    rows.push({ label: 'Cash after', value: money(state.cash - option.oneOffPrice) });
+    rows.push(...cashAfterRows(state, option.oneOffPrice));
     showConfirm({
       title: `Adopt ${option.name}`,
       rows,
@@ -103,7 +103,7 @@ function candidateCard(state: SimState, candidate: ExecutiveOption, role: string
           rows: [
             { label: 'Signing fee', value: money(candidate.signingFee) },
             { label: 'Salary', value: `${money(candidate.salaryPerDay)}/day` },
-            { label: 'Cash after', value: money(state.cash - candidate.signingFee) },
+            ...cashAfterRows(state, candidate.signingFee),
           ],
           facts: [describeEffect(candidate.effect), ...(holder ? [`${holder} leaves, with no refund of their fee.`] : [])],
           confirmLabel: holder ? `Replace ${holder}` : 'Appoint',
@@ -131,7 +131,7 @@ let openChair: string | null = null;
 function executivesSection(state: SimState, changed: () => void): HTMLElement[] {
   const chairs = ops.executiveOptions(state);
   const nodes: HTMLElement[] = [
-    heading('Executives', 'You are the chief executive; these three chairs are yours to fill. The strongest candidates only talk to an airline passengers rate well. Once hired, they stay if NPS falls. Click a chair to see who it could be.'),
+    heading('Executives', 'You are the chief executive; these three chairs are yours to fill. The strongest candidates only talk to an airline passengers rate well. A hire with an NPS line leaves if the airline stays under it for 30 days in a row. Click a chair to see who it could be.'),
     line(`Airline NPS ${formatNps(networkNps(state))}`),
   ];
   const row = document.createElement('div');
@@ -180,6 +180,7 @@ function executivesSection(state: SimState, changed: () => void): HTMLElement[] 
         name,
         line(describeEffect(chair.holder.effect)),
         line(`Since day ${chair.hiredDay} · ${money(chair.holder.salaryPerDay)}/day`, 'inspector-line office-card-price'),
+        ...lapseLine(state, chair.role as ExecutiveRole, chair.holder.npsNeeded),
         confirmButton('Let go', {
           title: `Let ${chair.holder.name} go`,
           rows: [
@@ -201,6 +202,13 @@ function executivesSection(state: SimState, changed: () => void): HTMLElement[] 
     }
   }
   return nodes;
+}
+
+/** Under their NPS line: how many days are left before the hire walks, in a warning line. Nothing otherwise. */
+function lapseLine(state: SimState, role: ExecutiveRole, npsNeeded: number | null): HTMLElement[] {
+  const below = state.executives[role]?.daysBelowLine ?? 0;
+  if (below === 0 || npsNeeded === null) return [];
+  return [line(`NPS under ${npsNeeded} · leaves in ${EXECUTIVE_LAPSE_DAYS - below}d`, 'inspector-line office-card-price')];
 }
 
 /** The innovation opened below the tree, if any, kept while the view rebuilds. */
@@ -344,7 +352,7 @@ function hedgeButtons(state: SimState, changed: () => void): HTMLElement[] {
           { label: 'Runs to', value: `day ${dayIndex(state) + option.days}` },
           { label: 'Premium', value: `${money(option.premium)} (spent either way)` },
           { label: 'Fuel covered', value: money(option.covers) },
-          { label: 'Cash after', value: money(state.cash - option.premium) },
+          ...cashAfterRows(state, option.premium),
         ],
         facts: ['If fuel rises you pay less than the market; if it falls you still pay today\'s price.'],
         confirmLabel: 'Hedge',

@@ -69,6 +69,7 @@ const YEAR_ONE_DAY = 365;
 import { updateRunway } from './ui/runway';
 import { isInsolvent } from './sim/insolvency';
 import { setupGameControls } from './ui/gameControls';
+import { setupBriefs, updateBriefs } from './ui/briefWindow';
 import { startCloudSave } from './ui/cloudSave';
 import { setupCloudSaveControls } from './ui/cloudSaveControls';
 import { setupRail, updateRail } from './ui/rail';
@@ -117,6 +118,7 @@ setupInfoTooltips();
 setupMapToolTips();
 setupGameOver();
 setupGameControls(state);
+setupBriefs(state);
 setupCloudSaveControls();
 void startCloudSave(state);
 
@@ -285,6 +287,8 @@ let hoverPoint: { x: number; y: number } | null = null;
 // insolvency pause below, for the same reason: render() can run before
 // speedMultiplier exists.
 let runwayPauseRequested = false;
+// The speed the clock runs at, copied in by tick() so render() can hand it to the briefs.
+let briefSpeed = 1;
 
 function render(nowMs: number = performance.now()): void {
   updateClock(state);
@@ -303,6 +307,7 @@ function render(nowMs: number = performance.now()): void {
   // (a schedule problem) opens Fleet, where the rotations are.
   updateAlerts(state, () => select({ kind: 'fleet' }), choosingHome);
   if (updateMandates(state, choosingHome, () => select({ kind: 'fleet' }))) runwayPauseRequested = true;
+  if (updateBriefs(state, choosingHome, briefSpeed)) runwayPauseRequested = true;
 
   // The game-over screen is a global overlay, not part of any one sidebar
   // tab, so it keeps refreshing whichever one is showing. Pausing on
@@ -623,6 +628,7 @@ function tick(nowMs: number): void {
 
   // The runway pop-up pauses once so the warning can't scroll past at
   // 100x. speedBeforePause is left alone, so Space resumes at the old speed.
+  briefSpeed = speedMultiplier;
   if (runwayPauseRequested) {
     runwayPauseRequested = false;
     speedMultiplier = 0;

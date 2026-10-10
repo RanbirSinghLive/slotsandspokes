@@ -239,6 +239,16 @@
             <input type="file" id="import-save-input" accept="application/json,.json" hidden />
             <div id="save-file-status"></div>
           </section>
+          <section id="brief-settings-section">
+            <h2>Messages <button type="button" class="info-mark" aria-label="What this means" data-info="The daily brief shows the morning's operation at 05:30. The season review ranks your routes every half year and looks ahead to the next. Off means no pop-up; the reopen buttons still show them.">i</button></h2>
+            <div id="brief-settings">
+              <label title="Daily brief at 05:30"><input type="checkbox" id="brief-setting-daily" /> ☀ Daily</label>
+              <button type="button" id="brief-reopen-daily" title="Show today's brief now">↗</button>
+              <label title="Season review every half year"><input type="checkbox" id="brief-setting-season" /> 📅 Season</label>
+              <button type="button" id="brief-reopen-season" title="Show the season review now">↗</button>
+              <label title="Pause the clock when a season review opens"><input type="checkbox" id="brief-setting-pause" /> ⏸ Pause on season</label>
+            </div>
+          </section>
           <section id="new-game-section">
                     <h2>New Game <button type="button" class="info-mark" aria-label="What this means" data-info="Erase this save entirely and start a brand-new airline.">i</button></h2>
             <button type="button" id="new-game-button">New Game</button>
@@ -272,6 +282,12 @@
       <input id="jump-input" type="text" autocomplete="off" spellcheck="false" placeholder="Jump to an airport, plane, rival, route or screen" aria-label="Jump to" />
       <div id="jump-results"></div>
     </div>
+    <!-- The daily brief and season review (ui/briefWindow.ts): a floating window and, when minimized, tabs above the ticker. -->
+    <div id="brief-window" hidden>
+      <div id="brief-header"><span id="brief-title"></span><button type="button" id="brief-minimize" title="Minimize to a tab" aria-label="Minimize">–</button></div>
+      <div id="brief-body"></div>
+    </div>
+    <div id="brief-tabs" hidden></div>
     <div id="ticker">
       <div id="ticker-track"></div>
     </div>
