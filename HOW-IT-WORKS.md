@@ -3245,6 +3245,16 @@ turn buffer on that station's routes (sim/turnBuffer.ts); GND to a better tier;
 CONG to fewer movements in the busy hour (the hour strip); WX to nothing;
 ACFT to a younger or better-maintained fleet.
 
+**The hub moat.** A station at own or hub tier stretches its airport's room in
+the congestion roll, so a busy hub queues later (`stationLoadAt()` divides the
+airport's hour load by 1 + the lift; congestion only, your flights only, rivals
+use the plain load). The lift is earned: each rollover a station at its floor
+(own 3 departures a day, hub 6) gains a day toward 60, and one under its floor
+loses 2 (`rollDailyMoats()`, `state.stationMoatDays`). Full lift is 4% at own
+staff and 12% at hub-grade, scaled by days earned over 60, so it can't be
+bought once and left. The Station row tooltip shows the days and the lift; the
+strip's CONG bar shrinking is how it reads. Separate from slot tenure.
+
 A save from before stations has no tiers or ledger: every station reads as
 contracted (home as own staff) and the ledger fills from the next departure.
 The headless player steps a station up once a week when the ground minutes it

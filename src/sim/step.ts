@@ -21,7 +21,6 @@ import { legAirspace, rollDailyAirspace } from './airspace';
 import { rollDailyMandates, settleMandateArrival, settleMandateCancellation } from './mandates';
 import { rollDailyShocks } from './shocks';
 import { airlineFuelPrice, recordHedgedFuel, rollDailyFuelPrice } from './fuelPrice';
-import { airportLoadAt } from './airports';
 import { hourOf } from './hours';
 import { connectingDemandOnMarket } from './hubs';
 import { rollTotalDelayMinutes, isOnTimeArrival } from './delays';
@@ -30,7 +29,7 @@ import { bookingPerks, runningCostForDay } from './innovations';
 import { rollDailyFleet } from './fleetTiming';
 import { rollDailyRebases } from './rebase';
 import { rollDailyRights } from './rightsLicences';
-import { handlingParameters, recordStationDeparture, rollDailyStations, rollStationLedgers, stationCostPerDay } from './stations';
+import { handlingParameters, recordStationDeparture, rollDailyMoats, rollDailyStations, rollStationLedgers, stationCostPerDay, stationLoadAt } from './stations';
 import { addTally, emptyTally } from './fareClasses';
 import { networkOverheadPerDay } from './overhead';
 import { basesCostPerDay } from './bases';
@@ -269,6 +268,7 @@ export function step(state: SimState): void {
     // go into the ledger, and own and hub-grade stations are paid for with
     // the rest of the overhead.
     rollDailyStations(state);
+    rollDailyMoats(state);
     rollStationLedgers(state);
 
     // Network overhead (sim/overhead.ts): grows with the square of the fleet.
@@ -504,7 +504,7 @@ export function step(state: SimState): void {
       // Congestion is judged at the busier of the two ends, each in the
       // hour this flight uses it (sim/hours.ts): a full hour queues its
       // departures and holds its arrivals alike.
-      Math.max(airportLoadAt(state, leg.origin, hourOf(leg.departMinute)), airportLoadAt(state, leg.dest, hourOf(leg.departMinute + leg.blockMinutes))),
+      Math.max(stationLoadAt(state, leg.origin, hourOf(leg.departMinute)), stationLoadAt(state, leg.dest, hourOf(leg.departMinute + leg.blockMinutes))),
       MAINTENANCE_AGE_FACTOR * executiveMaintenanceMultiplier(state),
       handlingParameters(state, leg.origin),
     );

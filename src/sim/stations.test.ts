@@ -5,10 +5,17 @@ import { createNewGameState } from './state';
 import {
   HANDLING,
   HUB_MIN_DEPARTURES,
+  MOAT_LAPSE_PER_DAY,
+  MOAT_MAX_LIFT,
+  MOAT_RAMP_DAYS,
   STATION_BUILD_DAYS,
   STATION_FEE,
   downgradeStation,
   handlingParameters,
+  moatDays,
+  moatLift,
+  rollDailyMoats,
+  stationLoadAt,
   pendingStation,
   recordStationDeparture,
   rollDailyStations,
@@ -82,6 +89,27 @@ for (let day = 0; day < 10; day++) {
 }
 assert.ok(state.stationLedger!.YUL.past.length <= 7, 'ledger window should be capped');
 assert.equal(stationReadout(state, 'nowhere'), null);
+
+// The hub moat is earned a day at a time at the floor and lapses faster when it is lost.
+const moat = createNewGameState(7, 'YUL');
+chooseHome(moat, 'YUL', 'summer', 'medium');
+const floorLegs = moat.schedule.filter((leg) => leg.origin === 'YUL').length;
+assert.equal(moatLift(moat, 'YUL'), 0, 'no lift before any day is earned');
+const baseLoad = stationLoadAt(moat, 'YUL', 12);
+for (let day = 0; day < 10; day++) rollDailyMoats(moat);
+if (floorLegs >= 3) {
+  assert.equal(moatDays(moat, 'YUL'), 10);
+  assert.ok(moatLift(moat, 'YUL') > 0 && moatLift(moat, 'YUL') < MOAT_MAX_LIFT.own);
+}
+moat.stationMoatDays = { YUL: MOAT_RAMP_DAYS };
+assert.ok(Math.abs(moatLift(moat, 'YUL') - MOAT_MAX_LIFT.own) < 1e-9, 'full ramp gives the full lift');
+moat.schedule = [];
+rollDailyMoats(moat);
+assert.equal(moatDays(moat, 'YUL'), MOAT_RAMP_DAYS - MOAT_LAPSE_PER_DAY, 'below the floor it lapses');
+moat.stationTiers = { ZZZ: 'contract' };
+moat.stationMoatDays = { ZZZ: 5 };
+assert.equal(moatLift(moat, 'ZZZ'), 0, 'a contracted station has no lift');
+assert.ok(baseLoad >= 0);
 
 // The ledger and tiers survive a save.
 const reloaded = JSON.parse(JSON.stringify(state));
