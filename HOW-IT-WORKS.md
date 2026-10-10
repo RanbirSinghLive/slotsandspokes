@@ -3644,7 +3644,7 @@ the revenue counters) are optional, so old saves load as level 0.
 
 The current plan is the newest `WEEK-*.md`. As of September 2026:
 
-- **Fee extras** (priority boarding, paid seats as separate products) from WEEK-TWENTYTHREE step B: only the per-route level is built (see Ancillary fees).
+- **Fee extras** (priority boarding, paid seats as separate products) from WEEK-TWENTYFOUR step B: only the per-route level is built (see Ancillary fees).
 - **Per-base time zones** — every plane flies on the home clock.
 
 Open balance questions rather than missing features: margin favoured

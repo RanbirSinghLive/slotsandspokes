@@ -5,7 +5,7 @@ import type { SimState } from './state';
 import type { SegmentName } from './timeOfDay';
 
 /**
- * Ancillary fees (WEEK-TWENTYTHREE.md): an airline-wide dial for what a
+ * Ancillary fees (WEEK-TWENTYFOUR.md): an airline-wide dial for what a
  * ticket does not include. Level 0 is today's game, bags included. Level 1
  * charges for a checked bag; level 2 for every bag plus seat choice.
  *

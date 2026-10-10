@@ -1,4 +1,4 @@
-# airgame — Week twenty-three (ancillary fees)
+# airgame — Week twenty-four (ancillary fees)
 
 Handoff document. Ancillary revenue was designed in weeks five to seven and
 in `WEEK-ELEVEN.md` (slice 3) and never built. This week builds it in two
