@@ -25,6 +25,7 @@ export {
   currentTurnBuffer,
   hedgeFuel,
   setAncillaryFees,
+  setFeeExtra,
   setRouteFees,
   hedgeOptions,
   innovationOptions,

@@ -1,4 +1,5 @@
 import { dayIndex } from './clock';
+import { isAdopted } from './innovations';
 import { marketMix } from './marketCharacter';
 import { marketKey } from './schedule';
 import type { SimState } from './state';
@@ -48,6 +49,76 @@ const RIVAL_COPY_RATE = 1 / 120;
 /** The part of the NPS cost that never fades. */
 const PERMANENT_SHARE = 0.5;
 
+/**
+ * Extras: products sold on top of the dial, each switched on for the whole
+ * airline. They need online booking (nobody sells a seat map or a boarding
+ * group over the phone). Each has its own price, who pays, who minds, and
+ * its own rival copy, so a business-heavy network leans on priority boarding
+ * and a leisure one on paid seats. Paid seats overlap level 2, whose fee
+ * already includes seat choice, so a market at level 2 earns nothing more
+ * from them.
+ */
+export type ExtraId = 'priority' | 'seats';
+export const EXTRA_IDS: readonly ExtraId[] = ['priority', 'seats'];
+export type Extra = {
+  name: string;
+  /** Dollars per paying passenger. */
+  fee: number;
+  /** NPS points lost per flight, before the segment weighting. */
+  npsCost: number;
+  paying: Record<SegmentName, number>;
+  annoyance: Record<SegmentName, number>;
+};
+export const EXTRAS: Record<ExtraId, Extra> = {
+  priority: { name: 'Priority boarding', fee: 8, npsCost: 3, paying: { business: 0.5, leisure: 0.1, vfr: 0.1 }, annoyance: { business: 0.3, leisure: 1.0, vfr: 0.8 } },
+  seats: { name: 'Paid seats', fee: 8, npsCost: 4, paying: { business: 0.15, leisure: 0.7, vfr: 0.5 }, annoyance: { business: 0.5, leisure: 1.0, vfr: 1.0 } },
+};
+/** Days an extra stays put after it is switched. */
+export const EXTRA_LOCK_DAYS = 30;
+
+export function extraOn(state: SimState, id: ExtraId): boolean {
+  return state.extras?.includes(id) ?? false;
+}
+
+/** The extras that earn on this market: paid seats earn nothing where the fee level already includes them. */
+function activeExtras(state: SimState, origin: string, dest: string): ExtraId[] {
+  return EXTRA_IDS.filter((id) => extraOn(state, id) && !(id === 'seats' && feeLevelOn(state, origin, dest) === 2));
+}
+
+export function extraBlockedReason(state: SimState, id: ExtraId): string | null {
+  if (!isAdopted(state, 'online-booking')) return 'Needs online booking.';
+  const since = dayIndex(state) - (state.extraChangedDay?.[id] ?? -Infinity);
+  if (since < EXTRA_LOCK_DAYS) return `Locked ${EXTRA_LOCK_DAYS - since}d more.`;
+  return null;
+}
+
+export function setExtra(state: SimState, id: ExtraId, on: boolean): { ok: true; message: string } | { ok: false; reason: string } {
+  if (extraOn(state, id) === on) return { ok: false, reason: 'Already set.' };
+  const blocked = extraBlockedReason(state, id);
+  if (blocked) return { ok: false, reason: blocked };
+  const current = state.extras ?? [];
+  state.extras = on ? [...current, id] : current.filter((other) => other !== id);
+  state.extraChangedDay = { ...(state.extraChangedDay ?? {}), [id]: dayIndex(state) };
+  return { ok: true, message: `${EXTRAS[id].name} ${on ? 'on' : 'off'} from today.` };
+}
+
+function extrasPerPassenger(state: SimState, origin: string, dest: string): number {
+  let total = 0;
+  for (const id of activeExtras(state, origin, dest)) total += EXTRAS[id].fee * mixWeighted(origin, dest, EXTRAS[id].paying);
+  return total;
+}
+
+function extrasNpsPenalty(state: SimState, origin: string, dest: string): number {
+  const comparison = isContested(state, origin, dest) ? CONTESTED_NPS_FACTOR : UNCONTESTED_NPS_FACTOR;
+  let total = 0;
+  for (const id of activeExtras(state, origin, dest)) {
+    const rival = state.rivalExtras?.[id] ?? 0;
+    const share = PERMANENT_SHARE + (1 - PERMANENT_SHARE) * (1 - rival);
+    total += EXTRAS[id].npsCost * share * comparison * mixWeighted(origin, dest, EXTRAS[id].annoyance);
+  }
+  return total;
+}
+
 export function ancillaryLevel(state: SimState): AncillaryLevel {
   return (state.ancillaryLevel ?? 0) as AncillaryLevel;
 }
@@ -71,8 +142,8 @@ function mixWeighted(origin: string, dest: string, weight: Record<SegmentName, n
 /** Fee revenue per passenger on this market at the current level. */
 export function ancillaryPerPassenger(state: SimState, origin: string, dest: string): number {
   const level = feeLevelOn(state, origin, dest);
-  if (level === 0) return 0;
-  return ANCILLARY_FEE[level] * mixWeighted(origin, dest, PAYING_SHARE);
+  const dial = level === 0 ? 0 : ANCILLARY_FEE[level] * mixWeighted(origin, dest, PAYING_SHARE);
+  return dial + extrasPerPassenger(state, origin, dest);
 }
 
 /**
@@ -82,17 +153,24 @@ export function ancillaryPerPassenger(state: SimState, origin: string, dest: str
  */
 export function ancillaryPriceDrag(state: SimState, origin: string, dest: string): Record<SegmentName, number> {
   const fee = ANCILLARY_FEE[feeLevelOn(state, origin, dest)];
-  return { business: fee * PAYING_SHARE.business, leisure: fee * PAYING_SHARE.leisure, vfr: fee * PAYING_SHARE.vfr };
+  const drag = { business: fee * PAYING_SHARE.business, leisure: fee * PAYING_SHARE.leisure, vfr: fee * PAYING_SHARE.vfr };
+  for (const id of activeExtras(state, origin, dest)) {
+    const extra = EXTRAS[id];
+    drag.business += extra.fee * extra.paying.business;
+    drag.leisure += extra.fee * extra.paying.leisure;
+    drag.vfr += extra.fee * extra.paying.vfr;
+  }
+  return drag;
 }
 
 /** The NPS points a flight on this market loses to the fee; 0 at level 0. */
 export function ancillaryNpsPenalty(state: SimState, origin: string, dest: string): number {
   const level = feeLevelOn(state, origin, dest);
-  if (level === 0) return 0;
+  if (level === 0) return extrasNpsPenalty(state, origin, dest);
   const gap = Math.max(0, (level - (state.rivalFeeLevel ?? 0)) / level);
   const share = PERMANENT_SHARE + (1 - PERMANENT_SHARE) * gap;
   const comparison = isContested(state, origin, dest) ? CONTESTED_NPS_FACTOR : UNCONTESTED_NPS_FACTOR;
-  return ANCILLARY_NPS_COST[level] * share * comparison * mixWeighted(origin, dest, FEE_ANNOYANCE);
+  return ANCILLARY_NPS_COST[level] * share * comparison * mixWeighted(origin, dest, FEE_ANNOYANCE) + extrasNpsPenalty(state, origin, dest);
 }
 
 /** Why the dial can't move now, or null. */
@@ -117,6 +195,12 @@ export function rollAncillaries(state: SimState): void {
   state.yesterdayAncillaryRevenue = earned;
   state.ancillaryRevenueTotal = (state.ancillaryRevenueTotal ?? 0) + earned;
   state.todayAncillaryRevenue = 0;
+  for (const id of EXTRA_IDS) {
+    const rivalShare = state.rivalExtras?.[id] ?? 0;
+    const targetShare = extraOn(state, id) ? 1 : 0;
+    if (rivalShare === targetShare) continue;
+    state.rivalExtras = { ...(state.rivalExtras ?? {}), [id]: rivalShare + (targetShare - rivalShare) * RIVAL_COPY_RATE };
+  }
   const target = ancillaryLevel(state);
   const rival = state.rivalFeeLevel ?? 0;
   if (target === 0 && rival === 0) return;

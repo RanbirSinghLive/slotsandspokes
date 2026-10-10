@@ -81,7 +81,7 @@ import {
 import { AIRCRAFT_CLASSES, classByCode, classRank, pluralClassName } from './aircraftClasses';
 import { applyHubStyleChange, planHubStyleChange } from './hubs';
 import { HUB_STYLES, type HubStyle } from './hubStyle';
-import { setAncillaryLevel, setRouteFeeLevel, type AncillaryLevel } from './ancillaries';
+import { setAncillaryLevel, setExtra, setRouteFeeLevel, type AncillaryLevel, type ExtraId } from './ancillaries';
 import { buyHedge, HEDGE_TERMS, hedgeQuote, type HedgeQuote } from './fuelPrice';
 import {
   adoptBlockedReason,
@@ -854,6 +854,10 @@ export function hedgeFuel(state: SimState, days: number): Outcome<{ message: str
 
 export function setAncillaryFees(state: SimState, level: AncillaryLevel): Outcome<{ message: string }> {
   return setAncillaryLevel(state, level);
+}
+
+export function setFeeExtra(state: SimState, id: ExtraId, on: boolean): Outcome<{ message: string }> {
+  return setExtra(state, id, on);
 }
 
 export function setRouteFees(state: SimState, origin: string, dest: string, level: AncillaryLevel | null): Outcome<{ message: string }> {

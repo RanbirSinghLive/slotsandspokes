@@ -1,4 +1,4 @@
-import { ancillaryLevel, feeLevelOn, isContested } from '../sim/ancillaries';
+import { ancillaryLevel, extraOn, feeLevelOn, isContested, type ExtraId } from '../sim/ancillaries';
 import { DIFFICULTIES, type GameDifficulty } from '../sim/difficulty';
 import { currentPotentialDemand } from '../sim/marketDemand';
 import { marketLoadFactor } from '../sim/loadFactor';
@@ -1204,8 +1204,16 @@ export const STEADY_FEE_LEVEL = Number(process.env.AIRGAME_FEE_LEVEL ?? 0) as 0 
 export const STEADY_ALONE_FEE_LEVEL = Number(process.env.AIRGAME_ALONE_FEE ?? -1);
 export const STEADY_CONTESTED_FEE_LEVEL = Number(process.env.AIRGAME_CONTESTED_FEE ?? -1);
 
+/** Extras the steady player switches on once online booking is adopted, e.g. AIRGAME_EXTRAS=priority,seats (default none). */
+export const STEADY_EXTRAS = (process.env.AIRGAME_EXTRAS ?? '').split(',').filter((id): id is ExtraId => id === 'priority' || id === 'seats');
+
 function setFees(state: SimState): string[] {
   const done: string[] = [];
+  for (const id of STEADY_EXTRAS) {
+    if (extraOn(state, id)) continue;
+    const set = actions.setFeeExtra(state, id, true);
+    if (set.ok) done.push(set.message);
+  }
   if (ancillaryLevel(state) !== STEADY_FEE_LEVEL) {
     const set = actions.setAncillaryFees(state, STEADY_FEE_LEVEL);
     if (set.ok) done.push(set.message);

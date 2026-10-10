@@ -18,6 +18,10 @@ import {
   ANCILLARY_LEVELS,
   ANCILLARY_NAMES,
   ancillaryBlockedReason,
+  EXTRA_IDS,
+  EXTRAS,
+  extraBlockedReason,
+  extraOn,
   ancillaryLevel,
 } from '../../sim/ancillaries';
 import { LADDER, tiersClimbed } from '../../sim/ladder';
@@ -442,8 +446,24 @@ function feesSection(state: SimState, changed: () => void): HTMLElement[] {
     });
     rows.push(button);
   }
+  for (const id of EXTRA_IDS) {
+    const on = extraOn(state, id);
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'inspector-plan-hub';
+    if (on) button.classList.add('is-current');
+    button.textContent = `${EXTRAS[id].name} · $${EXTRAS[id].fee}${on ? ' · on' : ''}`;
+    const blocked = extraBlockedReason(state, id);
+    button.disabled = blocked !== null;
+    button.title = blocked ?? (id === 'seats' ? 'Earns nothing on a route at the $20 level, which already includes seat choice.' : 'Business travellers pay; leisure ones mind.');
+    button.addEventListener('click', () => {
+      ops.setFeeExtra(state, id, !on);
+      changed();
+    });
+    rows.push(button);
+  }
   const earned = state.yesterdayAncillaryRevenue ?? 0;
-  if (current > 0 || (state.ancillaryRevenueTotal ?? 0) > 0) {
+  if (current > 0 || (state.extras?.length ?? 0) > 0 || (state.ancillaryRevenueTotal ?? 0) > 0) {
     rows.push(line(`Fees ${money(earned)}/day · total ${money(state.ancillaryRevenueTotal ?? 0)} · rivals at ${(state.rivalFeeLevel ?? 0).toFixed(1)} of ${current}`));
   }
   return rows;
