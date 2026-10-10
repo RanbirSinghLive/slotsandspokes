@@ -2,6 +2,7 @@ import { ON_TIME_GRACE_MINUTES } from '../sim/delays';
 import { marketKey } from '../sim/schedule';
 import type { SimState } from '../sim/state';
 import { CALL_TITLES, pendingCalls } from './callAlert';
+import { openCallPopup } from './callPopup';
 import { select } from './selection';
 
 /**
@@ -85,7 +86,7 @@ export function updateOpsBoard(state: SimState, openOnTime: () => void): void {
       now.late > 0,
     ),
     ...(callList.length > 0
-      ? [item('CALL', callList.length, `Planes whose day will break: ${callList.map((call) => `${call.tail} (${CALL_TITLES[call.kind]})`).join(', ')}. Click to open the worst.`, () => select({ kind: 'aircraft', tail: callList[0].tail }), true)]
+      ? [item('CALL', callList.length, `Planes whose day will break: ${callList.map((call) => `${call.tail} (${CALL_TITLES[call.kind]})`).join(', ')}. Click to open the worst.`, () => openCallPopup(state, callList[0].tail, callList[0].kind), true)]
       : []),
     item('CNX', now.cancelled, 'Cancelled today; click for causes in the On-time tab', now.cancelled > 0 ? openOnTime : undefined, now.cancelled > 0),
   );
