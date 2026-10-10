@@ -44,25 +44,30 @@ export function homeCountry(state: Pick<SimState, 'homeAirport'>): string | unde
 }
 
 /** True when airlines of `home` may carry domestic traffic inside `country`: it is theirs, or a bloc they share with it grants cabotage. */
-function mayFlyInside(home: string, country: string): boolean {
-  return home === country || cabotageBlocs.some((bloc) => bloc.has(home) && bloc.has(country));
+export function mayFlyInside(home: string, country: string, granted: readonly string[] = []): boolean {
+  return home === country || granted.includes(country) || cabotageBlocs.some((bloc) => bloc.has(home) && bloc.has(country));
+}
+
+/** Countries whose domestic rights the airline bought (sim/rightsLicences.ts), for the `granted` argument below. */
+export function grantedCountries(state: Pick<SimState, 'domesticRights'>): string[] {
+  return (state.domesticRights ?? []).map((licence) => licence.country);
 }
 
 /** Every country where an airline of `home` may carry domestic traffic: its own, plus the members of a cabotage bloc it belongs to. */
-export function domesticRightsCountries(home: string | undefined): string[] {
+export function domesticRightsCountries(home: string | undefined, granted: readonly string[] = []): string[] {
   if (!home) return [];
-  const result = new Set([home]);
+  const result = new Set([home, ...granted]);
   for (const bloc of cabotageBlocs) if (bloc.has(home)) for (const country of bloc) result.add(country);
   return [...result];
 }
 
 /** May an airline of `home` fly a leg between `a` and `b`? */
-export function legRights(home: string | undefined, a: string, b: string): Rights {
+export function legRights(home: string | undefined, a: string, b: string, granted: readonly string[] = []): Rights {
   const countryA = countryOf(a);
   const countryB = countryOf(b);
   if (!home || !countryA || !countryB) return ALLOWED;
   if (countryA === countryB) {
-    return mayFlyInside(home, countryA) ? ALLOWED : { ok: false, reason: `${a} → ${b} · cabotage barred for ${home} carriers` };
+    return mayFlyInside(home, countryA, granted) ? ALLOWED : { ok: false, reason: `${a} → ${b} · cabotage barred for ${home} carriers` };
   }
   if (closedPairs.has([countryA, countryB].sort().join('-'))) {
     return { ok: false, reason: `${a} → ${b} · no air services between ${countryA} and ${countryB}` };
@@ -71,14 +76,14 @@ export function legRights(home: string | undefined, a: string, b: string): Right
 }
 
 /** May an airline of `home` sell a connection from `a` to `b` through `hub`? Both legs must be flyable, and two airports in one foreign country can't be joined through anywhere. */
-export function flowRights(home: string | undefined, a: string, hub: string, b: string): Rights {
+export function flowRights(home: string | undefined, a: string, hub: string, b: string, granted: readonly string[] = []): Rights {
   const countryA = countryOf(a);
   const countryB = countryOf(b);
-  if (home && countryA && countryA === countryB && !mayFlyInside(home, countryA)) {
+  if (home && countryA && countryA === countryB && !mayFlyInside(home, countryA, granted)) {
     return { ok: false, reason: `${a}–${b} via ${hub} · cabotage barred for ${home} carriers` };
   }
-  const first = legRights(home, a, hub);
-  return first.ok ? legRights(home, hub, b) : first;
+  const first = legRights(home, a, hub, granted);
+  return first.ok ? legRights(home, hub, b, granted) : first;
 }
 
 /**

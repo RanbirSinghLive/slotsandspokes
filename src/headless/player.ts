@@ -32,7 +32,7 @@ import { overheadAddedByNextPlane, overheadSavedByOneFewer } from '../sim/overhe
 import * as actions from '../sim/playerActions';
 import { forecastStance } from '../sim/fareForecast';
 import { setFareClasses, setFareStance } from '../sim/pricing';
-import { legRights, homeCountry } from '../sim/rights';
+import { grantedCountries, legRights, homeCountry } from '../sim/rights';
 import { applyRotation, planRotation, type RotationPlan, type RotationStop } from '../sim/rotations';
 import { isAircraftTypeAllowedAt, legsServingMarket, marketKey, recommendedFare } from '../sim/schedule';
 import type { FareStance, SimState } from '../sim/state';
@@ -704,7 +704,7 @@ function fillPlane(state: SimState, tail: string, options: FillOptions): string[
     const candidates: { dest: RotationStop; score: number }[] = [];
     for (const dest of airports) {
       if (dest.iata === home.iata || !state.knownAirports.includes(dest.iata)) continue;
-      if (!legRights(homeCountry(state), home.iata, dest.iata).ok) continue;
+      if (!legRights(homeCountry(state), home.iata, dest.iata, grantedCountries(state)).ok) continue;
       const demand = marketScore(state, home.iata, dest.iata);
       if (demand <= 0) continue;
       if (options.avoid?.(marketKey(home.iata, dest.iata))) continue;
@@ -1034,7 +1034,7 @@ function bestMarketFor(state: SimState, home: string, typeCode: string, memory: 
   let best: { dest: string; score: number } | null = null;
   for (const dest of airports) {
     if (dest.iata === home || !state.knownAirports.includes(dest.iata)) continue;
-    if (!legRights(homeCountry(state), home, dest.iata).ok) continue;
+    if (!legRights(homeCountry(state), home, dest.iata, grantedCountries(state)).ok) continue;
     if (!isAircraftTypeAllowedAt(dest.iata, typeCode)) continue;
     if (greatCircleDistanceNm(from, dest) > spec.rangeNm) continue;
     if (coolingDown(state, memory, marketKey(home, dest.iata))) continue;

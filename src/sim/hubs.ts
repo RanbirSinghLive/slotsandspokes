@@ -2,7 +2,7 @@ import { marketDistanceNm } from './demand';
 import { executiveConnectingMultiplier } from './executives';
 import { connectingFeedMultiplier } from './innovations';
 import { actualDailyDemand, currentPotentialDemand } from './marketDemand';
-import { flowRights, homeCountry } from './rights';
+import { flowRights, grantedCountries, homeCountry } from './rights';
 import { marketKey } from './schedule';
 import { hubStyleAt, type HubStyle } from './hubStyle';
 import { planRespace, applyRespace, workingCopy, type TurnBufferPlan } from './turnBuffer';
@@ -267,6 +267,7 @@ export function connectingFlowsAt(state: SimState, hub: string): ConnectingFlow[
     spokes.map(([spoke, flights], i) => `${spoke}:${flights}:${established[i]}`).join(','),
     [...nonstop].sort().join(','),
     home,
+    grantedCountries(state).join(','),
   ].join('|');
   const cached = flowCache.get(hub);
   if (cached && cached.inputs === inputs) return cached.flows;
@@ -277,7 +278,7 @@ export function connectingFlowsAt(state: SimState, hub: string): ConnectingFlow[
       const [a] = spokes[i];
       const [b] = spokes[j];
       // Air rights (sim/rights.ts): two airports in one foreign country can't be joined through any hub.
-      if (!flowRights(home, a, hub, b).ok) continue;
+      if (!flowRights(home, a, hub, b, grantedCountries(state)).ok) continue;
       const passengers = flowBetween(state, hub, a, b, times, established[i], established[j], nonstop.has(marketKey(a, b)));
       if (passengers >= 0.5) flows.push({ hub, a, b, passengers });
     }
@@ -294,7 +295,7 @@ export function barredSpokePairsAt(state: SimState, hub: string): number {
   let barred = 0;
   for (let i = 0; i < spokes.length; i++) {
     for (let j = i + 1; j < spokes.length; j++) {
-      if (!flowRights(home, spokes[i], hub, spokes[j]).ok) barred++;
+      if (!flowRights(home, spokes[i], hub, spokes[j], grantedCountries(state)).ok) barred++;
     }
   }
   return barred;

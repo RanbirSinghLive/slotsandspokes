@@ -28,6 +28,7 @@ import { rollCompetitorRouteOpenings, rollCompetitorFrequencyGrowth, rollRivalEn
 import { bookingPerks, runningCostForDay } from './innovations';
 import { rollDailyFleet } from './fleetTiming';
 import { rollDailyRebases } from './rebase';
+import { rollDailyRights } from './rightsLicences';
 import { addTally, emptyTally } from './fareClasses';
 import { networkOverheadPerDay } from './overhead';
 import { basesCostPerDay } from './bases';
@@ -242,6 +243,8 @@ export function step(state: SimState): void {
     // Seasonal leases whose season is over go back (sim/seasonalLease.ts).
     endSeasonalLeases(state);
     rollDailyRebases(state);
+    // Foreign domestic rights earn, cost their levy and lapse (sim/rightsLicences.ts).
+    rollDailyRights(state);
 
     // Lease cost: a flat per-day charge, not tied to whether the aircraft
     // actually flew that day. Every aircraft is leased (sim/leasing.ts).
