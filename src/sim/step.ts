@@ -1,6 +1,6 @@
 import { endSeasonalLeases } from './seasonalLease';
 import { demandFactors, rollDailyDemandEvents } from './demandEvents';
-import { morningHolds, recordFlown, rollNightlyChecks, wornAge } from './mxChecks';
+import { accrueMaintenance, morningHolds, recordFlown, rollNightlyChecks, wornAge } from './mxChecks';
 import { chargeNightStops } from './nightStops';
 import { applyPendingRetimes } from './retime';
 import { rollDailyFareWars } from './fareWars';
@@ -644,6 +644,12 @@ export function step(state: SimState): void {
           state.todayCostByCategory.blockNonFuel += result.costBreakdown.blockNonFuel;
           state.todayCostByCategory.departure += result.costBreakdown.departure;
           state.todayMargin += result.margin;
+          // The maintenance slice is paid at the heavy check, not now.
+          const heldBack = accrueMaintenance(aircraft, result.costBreakdown.blockNonFuel);
+          state.cash += heldBack;
+          state.todayCost -= heldBack;
+          state.todayCostByCategory.blockNonFuel -= heldBack;
+          state.todayMargin += heldBack;
           // Same numbers, split by market — sim/pnlHistory.ts rolls these
           // into revenueHistoryByMarket/costHistoryByMarket at rollover.
           state.todayRevenueByMarket[key] = (state.todayRevenueByMarket[key] ?? 0) + result.revenue;

@@ -1,33 +1,32 @@
-# airgame — Week twenty-three (stations)
+# airgame — Week twenty-three (ladder rework)
 
-Handoff document. Origin: the "turnaround strip" idea (project file
-`ideas/airline-ops-flavour.md`, item 4) judged to have no repeat value as a
-plane-level animation, and rebuilt as a station-level read-out tied to a real
-decision.
+Handoff document. Design: `review/exec-missions/ladder-rework-spec.md` in the project files.
 
-**Status:** a sim change. Ground handling adds a fifth delay cause, so
-on-time numbers move a little; a game that never builds a station plays
-with contract handling everywhere but home.
+**Status:** a sim and UI change to the ladder (Goals). It must not move the
+balance reference: the first three tiers' gates, thresholds and the rival
+checks are untouched, so `npm run quick` reads as before.
 
 ## Decisions (from the owner)
 
-- Do the whole slice: ledger, tiers, strip, headless policy.
-
-## Defaults picked
-
-- Delay is attributed to the **origin** airport: the turn happens there.
-- Turn length itself is unchanged (still 30 minutes plus the route buffer);
-  handling adds delay rather than changing the schedule's packing.
-- Tiers: contract (default), own staff (needs a base), hub-grade (needs own
-  staff and 6 departures a day). Slow to build, paid by the day.
-- Strip, not a minigame: icons, colours and tooltips; no new words.
+- Rework the ladder itself, not optional badges on top.
+- Keep the first three tiers' gates (rivals judge them); add teaching
+  milestones there as extras that never gate.
+- Rebuild the tiers rivals never see: International gains two gates; new
+  Operator, Established carrier and Flagship tiers sit before Global.
+- Every tier is visible from day 0, greyed until reached.
 
 ## Slices
 
-1. `sim/stations.ts`: tiers, build, cost, ledger, read-out.
-2. `sim/delays.ts` and `sim/step.ts`: the ground cause, ledger recording,
-   daily rollover and running cost.
-3. `ui/inspector/station.ts`, the airport view section and the Airports Delay column.
-4. Headless player `keepStations()`; `npm run stationtest`.
+1. `sim/ladder.ts`: `extra` and `applies` on a milestone, `gateMilestones()`,
+   `tierNeeded()`, `tierCounts()`, `tierComplete()`; five tiers become eight.
+2. `lastAogDay` in state, set by `sim/aog.ts`.
+3. Goals view: Next up strip and every tier as a row.
+4. Not done: second executive tiers and new chairs (a follow-up), cargo
+   terminals and aircraft finance milestones (greyed with the features, when built).
 
-How it works lives in HOW-IT-WORKS.md (Stations).
+## Notes
+
+- A save that had climbed Global before this change drops back to International
+  until Operator, Established carrier and Flagship are climbed. Milestones met
+  stay met; adopted innovations keep working.
+- Spoilage IV–V now open with Flagship, not Global.

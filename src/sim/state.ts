@@ -95,6 +95,8 @@ export type Aircraft = {
   flightMinutesSinceHeavy?: number;
   /** Takeoff-and-landing cycles since the last heavy check (sim/mxChecks.ts). Absent: none counted yet. */
   cyclesSinceHeavy?: number;
+  /** Maintenance cost flown but not yet paid: held back from each landed flight and paid at its heavy check (sim/mxChecks.ts). Absent: none. */
+  maintenanceReserve?: number;
 };
 
 /** How one leg went, once it has landed. */
@@ -371,6 +373,8 @@ export type SimState = {
   loadHistory?: { passengers: number[]; seats: number[] };
   /** The day each milestone on the ladder was met, by id (sim/ladder.ts). Optional: older saves have met none. */
   milestonesMet?: Record<string, number>;
+  /** The day the last breakdown or overdue heavy check grounded a plane (sim/aog.ts); the ladder's clean-run goal reads it. Absent until the first. */
+  lastAogDay?: number;
   /** The shock running now, or the last one until another starts (sim/shocks.ts's activeShock() says which). Optional: older saves have none. */
   shock?: Shock | null;
   /**

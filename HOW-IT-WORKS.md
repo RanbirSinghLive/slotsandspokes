@@ -1222,7 +1222,7 @@ When a milestone is met or a tier climbed, a stamp lands over the map
 about two seconds and fades. Several at one rollover queue and show in
 turn. It keeps its own record of what it has seen, like the ticker, and
 its first call only records where the airline stands, so loading a save
-stamps nothing. The Goals view shows the current tier's milestones as
+stamps nothing. The Goals view shows milestones as
 badges, each with a bar filling toward it or stamped with the day it was met.
 
 ## The P&L strip (`src/ui/hudPnl.ts`)
@@ -2200,29 +2200,43 @@ is everyone's, one built on cheap fares is one a rival can enter and
 share: building it is an investment, not a moat.
 
 **The ladder** (`src/sim/ladder.ts`, the Goals view in
-`src/ui/inspector/goals.ts`): tiers of milestones, each naming an edge or
-moat. A tier is climbed when enough of its milestones are met, and only
-after the one below it. Checked once a day at rollover; a milestone met
-stays met.
+`src/ui/inspector/goals.ts`): eight tiers of milestones, each naming an edge
+or moat. A tier has a **gate set**: it is climbed when enough of those are
+met (the Needed column), and only after the one below it. It may also have
+**extras** (dashed in the Goals view): milestones that teach a mechanic and
+count toward the tier being *complete* (★ n/m on its row) but never gate
+it, and rivals never judge them. A milestone that cannot be met in this
+game (event goals when events are off) is left out of the count. Checked
+once a day at rollover; a milestone met stays met.
 
-| Tier | Needed | Milestones | Opens |
-|---|---|---|---|
-| Start-up | 4 of 4 | fly your first route; a route that makes money for a week after its share of fixed costs; a route 72% full over a week; hold a starved city no rival flies to, on a route flown 30 days | Regional aircraft |
-| Regional carrier | 3 of 4 | serve 8 airports; connect 150 a day through one airport; put a Regional into service; make money every day for a week of a shock | Narrowbody; online booking, younger airframes |
-| Network airline | 3 of 5 | fly 60% of the movements at a busy airport; four routes 4+ a day each way; trailing NPS 15, with 1,000 flights flown; planes based at two airports; put a Narrowbody into service | Widebody; loyalty scheme, winglet retrofits |
-| International | 2 of 2 | a route to another continent; connect 750 a day through one airport | codeshare feed, spoilage management I–III |
-| Global | 1 of 1 | round the world: a loop of your routes that goes all the way round the globe, reachable from home | spoilage management IV–V |
+| Tier | Needed | Gate milestones | Extras | Opens |
+|---|---|---|---|---|
+| Start-up | 4 of 4 | fly your first route; a route that makes money for a week after its share of fixed costs; a route 72% full over a week; hold a starved city no rival flies to, on a route flown 30 days | two routes; a crew based away from home | Regional aircraft |
+| Regional carrier | 3 of 4 | serve 8 airports; connect 150 a day through one airport; put a Regional into service; make money every day for a week of a shock | cabin teams for a Regional; accept an event | Narrowbody; online booking, younger airframes |
+| Network airline | 3 of 5 | fly 60% of the movements at a busy airport; four routes 4+ a day each way; trailing NPS 15, with 1,000 flights flown; planes based at two airports; put a Narrowbody into service | a line base away from home; first freight revenue | Widebody; loyalty scheme, winglet retrofits |
+| International | 2 of 4 | a route to another continent; connect 750 a day through one airport; airports in 5 countries; a plane based outside the home country | | codeshare feed, spoilage management I–III |
+| Operator | 3 of 5 | a hangar away from home; a line base and hangar at one away airport; 30 days with no AOG (3+ planes); a crew retraining for another class; 10 aircraft | | |
+| Established carrier | 3 of 4 | a cargo need filled to half; 5 such lanes; accept 5 events; 90 profitable days running | | |
+| Flagship | 3 of 4 | NPS 25 with 3,000 flights; seat cap 80%; three airports each connecting 750 a day; 3+ aircraft types, none 8 years old | | spoilage management IV–V |
+| Global | 1 of 1 | round the world: a loop of your routes that goes all the way round the globe, reachable from home | | |
 
-What a tier opens is in force: aircraft classes (see the aircraft
+The first three tiers' gates are the ones rivals climb (see Rivals on the
+ladder); only the player is judged on the others. The clean-month goal
+reads `lastAogDay`, set when a breakdown or an overdue heavy check grounds
+a plane. What a tier opens is in force: aircraft classes (see the aircraft
 market above) and innovations (see Innovations). Round the world is judged by walking the
 network from home and giving each airport an unwrapped longitude; an
 airport reached again a whole turn away closes a loop round the globe.
-The Network view's Goals row says the tier and how many of its
-milestones are met, and opens the view; the ticker announces each
-milestone and each new tier. Thresholds were set from headless runs: a
-full plane shows about 76% load (the 75% load-factor ceiling), a careful
-airline from Montréal connects about 150 a day by day 60, and its
-trailing NPS sits at 12–17 from its fourth month.
+The Goals view shows a Next up strip (the three gates nearest done in the
+current tier) and every tier as a row: climbed ones ticked, ahead ones
+greyed with a lock, the current one open. The Network view's Goals row says
+the tier and how many of its gates are met, and opens the view; the ticker
+announces each milestone and each new tier. Thresholds in the first three
+tiers were set from headless runs: a full plane shows about 76% load (the
+75% load-factor ceiling), a careful airline from Montréal connects about
+150 a day by day 60, and its trailing NPS sits at 12–17 from its fourth
+month. The later tiers' thresholds are untuned guesses until someone plays
+that far.
 
 **Shocks** (`src/sim/shocks.ts`): announced events that make the world
 less steady for a while, so growth at any cost is dangerous and a thin
@@ -3312,6 +3326,15 @@ excluded) and one cycle to the plane (`recordFlown()`); a finished heavy check
 resets both. Nothing reads them yet except the Mtc card's clock line ("12h ·
 9 cyc"). A plane from an older save counts from zero. They are what the A and
 C checks will run on (WEEK-TWENTYTWO.md).
+
+**Maintenance is paid at the check.** One fifth of a flight's non-fuel block
+cost (`MAINTENANCE_SHARE_OF_NON_FUEL`) is maintenance. A landed flight does
+not pay it: it goes to the plane's reserve (`maintenanceReserve`), and the
+heavy check pays it all when it finishes (`settleMaintenance()`), as a
+maintenance cost that day. A plane handed back to the lessor pays what it has
+built up first, so returning a plane just before its check saves nothing.
+Route margins, rivals and planners still count the whole flight cost, so
+only when the money leaves moves. The Mtc card shows what is due.
 
 **What you see:**
 - **The Mtc screen's Fleet board:** a strip of how many planes are

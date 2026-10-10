@@ -1,4 +1,4 @@
-import { airlineCalled, currentTier, isMilestoneMet, LADDER, openedSoFar, tiersClimbed, type Milestone } from '../../sim/ladder';
+import { airlineCalled, currentTier, gateMilestones, isMilestoneMet, LADDER, tierComplete, tierCounts, tierNeeded, tiersClimbed, type Milestone, type Tier } from '../../sim/ladder';
 import { info, line, heading } from './dom';
 import type { SimState } from '../../sim/state';
 import { select } from '../selection';
@@ -20,6 +20,7 @@ function milestoneBadge(state: SimState, milestone: Milestone): HTMLElement {
   badge.className = 'goal-badge';
   const met = isMilestoneMet(state, milestone.id);
   badge.classList.toggle('is-met', met);
+  badge.classList.toggle('is-extra', !!milestone.extra);
   const name = document.createElement('div');
   name.className = 'goal-badge-name';
   name.append(`${milestone.name} `, info(milestone.description));
@@ -55,8 +56,39 @@ function milestoneBadge(state: SimState, milestone: Milestone): HTMLElement {
 export function goalsSummary(state: SimState): string {
   const tier = currentTier(state);
   if (!tier) return 'Every tier climbed';
-  const met = tier.milestones.filter((milestone) => isMilestoneMet(state, milestone.id)).length;
-  return `${tier.name} · ${Math.min(met, tier.needed)} of ${tier.needed}`;
+  const met = tierCounts(state, tier).gates;
+  const needed = tierNeeded(state, tier);
+  return `${tier.name} · ${Math.min(met, needed)} of ${needed}`;
+}
+
+/** How close an unmet milestone is, 0 to 1; milestones with nothing to count rank last. */
+function closeness(state: SimState, milestone: Milestone): number {
+  const progress = milestone.progress(state);
+  return progress ? progress.current / Math.max(1, progress.target) : -1;
+}
+
+/** A tier as a collapsible row: climbed (✓), current (open) or ahead (greyed). Gate milestones first, then extras. */
+function tierRow(state: SimState, tier: Tier, index: number, climbed: number): HTMLElement {
+  const row = document.createElement('details');
+  row.className = 'goal-tier';
+  row.classList.toggle('is-climbed', index < climbed);
+  row.classList.toggle('is-current', index === climbed);
+  row.classList.toggle('is-ahead', index > climbed);
+  row.open = index === climbed;
+  const counts = tierCounts(state, tier);
+  const needed = tierNeeded(state, tier);
+  const summary = document.createElement('summary');
+  const mark = index < climbed ? '✓ ' : index > climbed ? '🔒 ' : '';
+  const extras = counts.extrasTotal > 0 ? ` · ★ ${counts.extras}/${counts.extrasTotal}` : '';
+  summary.textContent = `${mark}${tier.name} · ${Math.min(counts.gates, needed)}/${needed}${extras}${tierComplete(state, tier) ? ' · complete' : ''}`;
+  row.append(summary);
+  if (tier.opens.length > 0) row.append(line(`Opens ${tier.opens.join(' · ')}`, 'inspector-line is-good'));
+  const list = document.createElement('div');
+  list.className = 'goal-badges';
+  const applicable = tier.milestones.filter((milestone) => milestone.applies?.(state) ?? true);
+  list.append(...applicable.map((milestone) => milestoneBadge(state, milestone)));
+  row.append(list);
+  return row;
 }
 
 export function buildGoalsView(state: SimState): HTMLElement {
@@ -70,37 +102,29 @@ export function buildGoalsView(state: SimState): HTMLElement {
   const climbed = tiersClimbed(state);
   const tier = currentTier(state);
   if (tier) {
-    const met = tier.milestones.filter((milestone) => isMilestoneMet(state, milestone.id)).length;
     const next = LADDER[climbed + 1];
+    const needed = tierNeeded(state, tier);
     root.append(
-      line(`Now ${airlineCalled(tier)} · ${met}/${tier.needed} to ` + (next ? `become ${airlineCalled(next)}` : 'climb the last tier')),
+      line(`Now ${airlineCalled(tier)} · ${Math.min(tierCounts(state, tier).gates, needed)}/${needed} to ` + (next ? `become ${airlineCalled(next)}` : 'climb the last tier')),
     );
-    if (tier.opens.length > 0) root.append(line(`Opens ${tier.opens.join(' · ')}`, 'inspector-line is-good'));
-    const list = document.createElement('div');
-    list.className = 'goal-badges';
-    list.append(...tier.milestones.map((milestone) => milestoneBadge(state, milestone)));
-    root.append(heading(tier.name), list);
+    // The nearest unmet gates: what to do next.
+    const nearest = gateMilestones(tier)
+      .filter((milestone) => !isMilestoneMet(state, milestone.id) && (milestone.applies?.(state) ?? true))
+      .sort((a, b) => closeness(state, b) - closeness(state, a))
+      .slice(0, 3);
+    if (nearest.length > 0) {
+      const strip = document.createElement('div');
+      strip.className = 'goal-badges';
+      strip.append(...nearest.map((milestone) => milestoneBadge(state, milestone)));
+      root.append(heading('Next up'), strip);
+    }
   } else {
     root.append(line('Top tier reached', 'inspector-line is-good'));
   }
 
-  const opened = openedSoFar(state);
-  if (opened.length > 0) root.append(heading('Opened so far'), ...opened.map((thing) => line(thing)));
-
-  // The whole ladder as a row of rungs, climbed, current and ahead, each
-  // with what it opens in its tooltip.
-  const ladder = document.createElement('div');
-  ladder.className = 'goal-ladder';
-  LADDER.forEach((each, i) => {
-    const rung = document.createElement('span');
-    rung.className = 'goal-rung';
-    rung.classList.toggle('is-climbed', i < climbed);
-    rung.classList.toggle('is-current', i === climbed);
-    rung.textContent = `${i < climbed ? '✓ ' : ''}${each.name}`;
-    if (each.opens.length > 0) rung.title = `Opens ${each.opens.join(' · ')}`;
-    ladder.append(rung);
-  });
-  root.append(heading('The ladder'), ladder);
+  // Every tier, climbed, current and ahead; ★ counts the extras that teach a mechanic.
+  root.append(heading('The ladder'));
+  LADDER.forEach((each, index) => root.append(tierRow(state, each, index, climbed)));
 
   // Innovations the ladder opens are adopted at Head office.
   const link = document.createElement('button');

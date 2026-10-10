@@ -78,8 +78,8 @@ function spoilageLevel(level: number): Innovation {
     name: `Spoilage mgmt ${ROMAN[level - 1]}`,
     summary: `Seats sold +${points} point`,
     description: `Spoilage management: unsold seats are spoiled stock: they can't be sold after the door closes. Better overbooking and last-minute selling let every plane sell ${points} point more of its seats, ${Math.round(LOAD_FACTOR * 100)}% before any programme. Level ${level} of 5; each needs the one before it. With a commercial officer's help, no airline passes ${Math.round(LOAD_FACTOR_CEILING * 100)}%.`,
-    // The first three open with the international tier, the last two only at the top.
-    openedBy: level <= 3 ? 'international' : 'global',
+    // The first three open with the international tier, the last two with the flagship tier.
+    openedBy: level <= 3 ? 'international' : 'flagship',
     oneOffPrice: SPOILAGE_PRICES[level - 1],
     runningCost: null,
   };
