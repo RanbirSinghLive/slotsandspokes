@@ -5383,6 +5383,8 @@ button.ops-item:hover {
 }
 
 .inspector-table td.is-nowrap {
+  white-space: nowrap;
+}
 
 /* The controller's ✕ on a rotation row: a real tap target on touch. */
 .inspector-day-row .inspector-plan-hub {
@@ -5629,3 +5631,57 @@ button.ops-item:hover {
   width: 7ch;
   white-space: nowrap;
 }
+
+/* The Rivals screen (ui/inspector/rival.ts, ui/rivalBadge.ts): cards and symbols, tips for the words. */
+.rival-summary { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0 12px; }
+.rival-chip { display: inline-flex; gap: 4px; align-items: center; padding: 2px 8px; border-radius: 99px; font-size: 12px; color: #9aa3b8; background: #141925; border: 1px solid #232a3a; white-space: nowrap; }
+.rival-chip.is-warn { color: #ffb347; border-color: #5a4220; }
+.rival-chip.is-bad { color: #ff8080; border-color: #5a2a2a; }
+.rival-cards { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.rival-card { display: grid; grid-template-columns: 44px 1fr auto; gap: 4px 10px; align-items: center; padding: 10px; font: inherit; text-align: left; color: #cdd3e0; background: #111623; border: 1px solid #1d2434; border-radius: 12px; cursor: pointer; }
+.rival-card:hover { background: #151b2b; }
+.rival-card.is-threat { border-color: #6a4b1c; box-shadow: inset 3px 0 0 #ffb347; }
+.rival-card.is-unseen { cursor: default; opacity: 0.55; background: #0d1019; border-style: dashed; }
+.rival-card .rival-logo { grid-row: 1 / 3; }
+.rival-logo { display: inline-flex; }
+.rival-name { display: flex; gap: 6px; align-items: center; color: #fff; font-weight: 600; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rival-flag.is-unseen { filter: grayscale(1); }
+.rival-margin { font-weight: 700; text-align: right; }
+.rival-margin.is-good { color: #5fd68a; }
+.rival-margin.is-over { color: #ff8080; }
+.rival-margin.is-big { font-size: 20px; }
+.rival-sub { grid-column: 2 / 4; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; }
+.rival-pips { display: inline-flex; gap: 2px; align-items: center; }
+.rival-pips i { display: block; width: 6px; height: 12px; border-radius: 2px; }
+.rival-blocks { display: inline-flex; gap: 2px; }
+.rival-blocks b { display: block; width: 10px; height: 10px; border-radius: 2px; }
+.rival-blocks b.is-earning { background: #3b8f5c; }
+.rival-blocks b.is-losing { background: #c24848; }
+.rival-blocks b.is-vs-you { outline: 2px solid #ffb347; outline-offset: 1px; }
+.rival-hero { display: flex; gap: 12px; align-items: center; margin: 6px 0 10px; }
+.rival-hero-names { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.rival-hero-name { display: flex; gap: 8px; align-items: center; font-size: 17px; font-weight: 700; color: #fff; }
+.rival-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px 0; }
+.rival-stat { display: flex; flex-direction: column; align-items: center; padding: 7px 4px; background: #111623; border: 1px solid #1d2434; border-radius: 10px; color: #cdd3e0; font-weight: 700; }
+.rival-stat small { color: #6f788c; font-weight: 400; font-size: 10px; }
+.rival-stat.is-warn { color: #ffb347; }
+.rival-stat.is-bad { color: #ff8080; }
+.rival-sketch-box { margin: 8px 0; background: #0d1220; border: 1px solid #1d2434; border-radius: 12px; }
+.rival-sketch { display: block; width: 100%; height: auto; }
+.rival-routes { display: flex; flex-direction: column; }
+.rival-route { display: grid; grid-template-columns: 76px 1fr auto; gap: 8px; align-items: center; padding: 7px 4px; font: inherit; text-align: left; color: #cdd3e0; background: transparent; border: none; border-bottom: 1px solid #161c2a; }
+button.rival-route { cursor: pointer; }
+button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
+.rival-route-od { color: #fff; white-space: nowrap; }
+.rival-route-od em { font-style: normal; color: #ffb347; margin-left: 4px; }
+.rival-route-mid { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.rival-bar { position: relative; display: block; height: 10px; background: #141925; border-radius: 5px; }
+.rival-bar::before { content: ''; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: #3a4357; }
+.rival-bar u { position: absolute; top: 0; bottom: 0; border-radius: 5px; text-decoration: none; }
+.rival-bar u.is-earning { left: 50%; background: #3b8f5c; }
+.rival-bar u.is-losing { right: 50%; background: #c24848; }
+.rival-route-meta { display: flex; gap: 8px; align-items: center; font-size: 11px; color: #8b94a7; }
+.rival-gauge { position: relative; width: 60px; height: 4px; background: #232a3a; border-radius: 2px; }
+.rival-gauge s { position: absolute; top: -3px; width: 2px; height: 10px; background: #fff; }
+.rival-gauge s.mid { left: 50%; background: #556; }
+.rival-ladder { color: #8b94a7; font-size: 12px; }
