@@ -1,37 +1,31 @@
-# airgame — Week twenty-two (ancillary fees)
+# airgame — Week twenty-two (the check ladder)
 
-Handoff document. Ancillary revenue was designed in weeks five to seven and
-in `WEEK-ELEVEN.md` (slice 3) and never built. This week builds it in two
-steps, chosen by the owner from three options.
+Handoff document. Week twenty (maintenance depth) built bases, bays and ratings;
+this week adds the A and C check lanes on top. Plan and prerequisites:
+`roadmap/check-ladder-prereqs.md` in the project files.
 
-**Status:** step A built. Step B is next.
+**Status:** a sim change in steps, each ending runnable. Steps 3 onward move
+balance, so `npm run quick` is read against the reference and a new reference
+is saved only when the owner accepts the read.
 
-## The idea
+## Decisions (from the owner)
 
-A ticket can leave things out and charge for them. Fees are the cheapest new
-revenue, and they pay per passenger, not per city, so a thin home like YHZ
-gains as much per flight as a big one.
+- Lanes A and C only. No B (airlines fold it into A). D later.
+- C stays banked at night, with no flying lost, until spare aircraft exist.
 
-They must not be a free permanent edge (CLAUDE.md): every fee costs NPS, a
-leisure or VFR traveller minds it more than a business one, and rivals copy
-a fee, so half of the goodwill cost fades while the revenue stays. The
-point is to find where a fee pays (leisure routes with no rival) and where
-it does not (a business trunk).
+## Slices
 
-## Steps
+1. Usage clocks: flight hours and cycles since the last heavy check, shown on
+   the Mtc cards. No change to play. **Built.**
+2. Split in-house check cost out of the per-block-hour bundle. Needs an OK on
+   the balance read.
+3. The A-check lane at line bases.
+4. The heavy check becomes C, with hours, cycles and calendar triggers;
+   a hatched Gantt block for nights in a bay.
+5. Planning: pick the night or bay, quiet-night hint, headless-player policy.
 
-A. **The fee dial.** An airline-wide level: bags included, checked bag fee,
-   all bags and seat fee. Head office has the dial; the Money screen shows
-   what fees earn. `sim/ancillaries.ts`.
-B. **Per-route levers.** The same fees set per route, plus extras that
-   unlock with the ladder. The NPS cost on a route with a rival that
-   charges nothing is higher; on an uncontested route it is lower.
+## Not in this week
 
-## Costs to flag
+- D checks and life-limited parts, spares and engine pools, spare aircraft.
 
-- New state fields are optional so old saves load; `SAVE_FORMAT` stays.
-- Level 0 is today's game, so `npm run quick` reads the same at the
-  default. The headless player needs a fee policy (it has one in
-  `src/headless/player.ts`); the balance read is in HOW-IT-WORKS.md.
-- Not in this week: ancillaries for rivals as simulated carriers, bundles,
-  loyalty-scheme links.
+How it works lives in HOW-IT-WORKS.md (Maintenance checks).
