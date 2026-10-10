@@ -198,6 +198,10 @@ export type RouteSettings = {
    * spend flying.
    */
   turnBufferMinutes: number;
+  /** This route's own ancillary fee level (sim/ancillaries.ts); absent follows the airline's dial. */
+  feeLevel?: 0 | 1 | 2;
+  /** The day it last changed, for the lock. */
+  feeChangedDay?: number;
 };
 
 export type SimState = {

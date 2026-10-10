@@ -1,4 +1,4 @@
-import { ancillaryLevel } from '../sim/ancillaries';
+import { ancillaryLevel, feeLevelOn, isContested } from '../sim/ancillaries';
 import { DIFFICULTIES, type GameDifficulty } from '../sim/difficulty';
 import { currentPotentialDemand } from '../sim/marketDemand';
 import { marketLoadFactor } from '../sim/loadFactor';
@@ -1192,13 +1192,30 @@ function hedgeWhenCheap(state: SimState): string[] {
 
 // --- Fees ----------------------------------------------------------------------------
 
-/** The fee level the steady player runs from its first day. */
+/** The airline-wide fee level the steady player runs from its first day. */
 export const STEADY_FEE_LEVEL = Number(process.env.AIRGAME_FEE_LEVEL ?? 0) as 0 | 1 | 2;
+/**
+ * Per-route fees: the level on a route no rival flies, and on one a rival
+ * does (both -1: the route follows the airline dial).
+ */
+export const STEADY_ALONE_FEE_LEVEL = Number(process.env.AIRGAME_ALONE_FEE ?? -1);
+export const STEADY_CONTESTED_FEE_LEVEL = Number(process.env.AIRGAME_CONTESTED_FEE ?? -1);
 
 function setFees(state: SimState): string[] {
-  if (ancillaryLevel(state) === STEADY_FEE_LEVEL) return [];
-  const set = actions.setAncillaryFees(state, STEADY_FEE_LEVEL);
-  return set.ok ? [set.message] : [];
+  const done: string[] = [];
+  if (ancillaryLevel(state) !== STEADY_FEE_LEVEL) {
+    const set = actions.setAncillaryFees(state, STEADY_FEE_LEVEL);
+    if (set.ok) done.push(set.message);
+  }
+  if (STEADY_ALONE_FEE_LEVEL < 0 && STEADY_CONTESTED_FEE_LEVEL < 0) return done;
+  for (const key of Object.keys(state.routeSettings)) {
+    const [a, b] = key.split('-');
+    const target = isContested(state, a, b) ? STEADY_CONTESTED_FEE_LEVEL : STEADY_ALONE_FEE_LEVEL;
+    if (target < 0 || feeLevelOn(state, a, b) === target) continue;
+    const set = actions.setRouteFees(state, a, b, target as 0 | 1 | 2);
+    if (set.ok) done.push(set.message);
+  }
+  return done;
 }
 
 // --- Executives --------------------------------------------------------------------

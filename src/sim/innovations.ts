@@ -221,7 +221,7 @@ export function bookingPerks(state: SimState, origin: string, dest: string): Boo
     loadFactor: loadFactorCap(state),
     recaptureRate: isAdopted(state, 'loyalty-scheme') ? LOYALTY_RECAPTURE_RATE : RECAPTURE_RATE,
     ancillaryPerPassenger: ancillaryPerPassenger(state, origin, dest),
-    ancillaryPriceDrag: ancillaryPriceDrag(state),
+    ancillaryPriceDrag: ancillaryPriceDrag(state, origin, dest),
   };
 }
 

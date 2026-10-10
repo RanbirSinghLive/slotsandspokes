@@ -1,4 +1,15 @@
 import { routeRightsMark } from './rights';
+import {
+  ANCILLARY_FEE,
+  ANCILLARY_LEVELS,
+  ANCILLARY_NAMES,
+  ROUTE_FEE_LOCK_DAYS,
+  ancillaryPerPassenger,
+  feeLevelOn,
+  isContested,
+  routeFeeBlockedReason,
+  type AncillaryLevel,
+} from '../../sim/ancillaries';
 import { forecastStance, type StanceForecast } from '../../sim/fareForecast';
 import { inboundAt } from '../../sim/fleetTiming';
 import { cabinShare, crewShare } from '../../sim/crews';
@@ -237,6 +248,8 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
 
   const stances = buildStances(state, a, b, changed);
   if (stances) root.append(stances);
+  const fees = buildFees(state, a, b, changed);
+  if (fees) root.append(fees);
   root.append(...buildFare(state, a, b, changed));
 
   // The planes this route draws on, pooled at its base.
@@ -701,6 +714,53 @@ function buildStances(state: SimState, a: string, b: string, changed: () => void
     block.append(row);
   }
 
+  return block;
+}
+
+/**
+ * This route's ancillary fee (sim/ancillaries.ts): follow the airline's
+ * dial, or set bags included, a checked bag fee or all bags and seat fee
+ * for this route alone. A fee costs more NPS where a rival flies the
+ * market and less where nobody does.
+ */
+function buildFees(state: SimState, a: string, b: string, changed: () => void): HTMLElement | null {
+  const settings = state.routeSettings[marketKey(a, b)];
+  if (!settings) return null;
+  const block = document.createElement('div');
+  block.className = 'stance-block';
+  const heading = document.createElement('div');
+  heading.className = 'stance-heading';
+  const effective = feeLevelOn(state, a, b);
+  heading.textContent = `Fees · ${ANCILLARY_NAMES[effective]}${settings.feeLevel === undefined ? ' (airline)' : ''}`;
+  heading.append(
+    ' ',
+    info(
+      `Bag and seat fees on this route alone; by default it follows the airline's dial at Head office. A fee adds ${money(ancillaryPerPassenger(state, a, b))} a passenger here at the current level, adds to the price travellers compare, and costs NPS: more where a rival flies this market (${isContested(state, a, b) ? 'one does' : 'none does'}), less where you are alone. A route's level moves once every ${ROUTE_FEE_LOCK_DAYS} days.`,
+    ),
+  );
+  block.append(heading);
+  const choices: { level: AncillaryLevel | null; label: string }[] = [
+    { level: null, label: 'Airline' },
+    ...ANCILLARY_LEVELS.map((level) => ({ level, label: level === 0 ? 'Included' : `$${ANCILLARY_FEE[level]}` })),
+  ];
+  const row = document.createElement('div');
+  row.className = 'stance-row';
+  for (const { level, label } of choices) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'stance-button';
+    button.classList.toggle('is-active', (settings.feeLevel ?? null) === level);
+    button.textContent = label;
+    const blocked = routeFeeBlockedReason(state, a, b, level);
+    button.disabled = blocked !== null && (settings.feeLevel ?? null) !== level;
+    if (blocked && (settings.feeLevel ?? null) !== level) button.title = blocked;
+    button.addEventListener('click', () => {
+      ops.setRouteFees(state, a, b, level);
+      changed();
+    });
+    row.append(button);
+  }
+  block.append(row);
   return block;
 }
 
