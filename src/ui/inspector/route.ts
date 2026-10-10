@@ -744,7 +744,7 @@ function buildFees(state: SimState, a: string, b: string, changed: () => void): 
     ...ANCILLARY_LEVELS.map((level) => ({ level, label: level === 0 ? 'Included' : `$${ANCILLARY_FEE[level]}` })),
   ];
   const row = document.createElement('div');
-  row.className = 'stance-row';
+  row.className = 'stance-row is-fees';
   for (const { level, label } of choices) {
     const button = document.createElement('button');
     button.type = 'button';
