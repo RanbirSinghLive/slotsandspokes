@@ -25,6 +25,7 @@
     "controllertest": "tsx src/sim/controller.test.ts",
     "briefstest": "tsx src/sim/briefs.test.ts",
     "laddertest": "tsx src/sim/ladder.test.ts",
+    "rightstest": "tsx src/sim/rightsLicences.test.ts",
     "stationtest": "tsx src/sim/stations.test.ts"
   },
   "devDependencies": {

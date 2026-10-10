@@ -6,7 +6,7 @@ import worldTopology from '../../data/world-110m.json';
 import { projection } from './projection';
 import { airports } from './airports';
 import { isOpsView } from './opsView';
-import { countryOf, domesticRightsCountries, homeCountry } from '../sim/rights';
+import { countryOf, domesticRightsCountries, grantedCountries, homeCountry } from '../sim/rights';
 import type { SimState } from '../sim/state';
 
 /**
@@ -51,7 +51,7 @@ function findShapeCountries(): (string | undefined)[] {
 export function drawRightsView(ctx: CanvasRenderingContext2D, state: SimState): void {
   if (!isOpsView()) return;
   const home = homeCountry(state);
-  const open = new Set(domesticRightsCountries(home));
+  const open = new Set(domesticRightsCountries(home, grantedCountries(state)));
   if (open.size === 0) return;
 
   const isoCodes = findShapeCountries();

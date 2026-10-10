@@ -5,7 +5,7 @@ import type { LineString } from 'geojson';
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { projection, mapPoint, type ClientPoint } from '../render/projection';
 import { airports, findNearestAirport, isAirportKnown, type Airport } from '../render/airports';
-import { homeCountry, legRights } from '../sim/rights';
+import { grantedCountries, homeCountry, legRights } from '../sim/rights';
 import { greatCircleDistanceNm } from '../sim/geo';
 import { demandAgainstSeats, marketSize, neverFills } from '../sim/marketSize';
 import { suppressedMarketReason } from '../sim/demand';
@@ -114,7 +114,7 @@ function showRouteHoverTooltip(
   }
 
   // Air rights come first and need no plane: a barred stop says why before it is picked.
-  const rights = legRights(homeCountry(state), origin.iata, candidate.iata);
+  const rights = legRights(homeCountry(state), origin.iata, candidate.iata, grantedCountries(state));
   if (!rights.ok) {
     routeHoverTooltipBody.textContent = rights.reason;
     routeHoverTooltipBody.classList.remove('out-of-range', 'thin-market', 'needs-another-stop');
@@ -387,7 +387,7 @@ export function drawRoutePreview(ctx: CanvasRenderingContext2D, state: SimState)
     ctx.stroke();
   }
 
-  if (builderState.mode === 'armed') drawBarredAirports(ctx, origin, homeCountry(state));
+  if (builderState.mode === 'armed') drawBarredAirports(ctx, origin, homeCountry(state), grantedCountries(state));
 
   if (builderState.mode !== 'armed' || !previewGeo) return;
 
@@ -420,13 +420,13 @@ export function drawRoutePreview(ctx: CanvasRenderingContext2D, state: SimState)
 }
 
 /** A grey slashed ring on every airport the carrier's home country can't fly to from `origin` (sim/rights.ts). */
-function drawBarredAirports(ctx: CanvasRenderingContext2D, origin: Airport, country: string | undefined): void {
+function drawBarredAirports(ctx: CanvasRenderingContext2D, origin: Airport, country: string | undefined, granted: readonly string[]): void {
   ctx.save();
   ctx.strokeStyle = BARRED_STROKE;
   ctx.lineWidth = 1.5;
   for (const airport of airports) {
     if (airport.iata === origin.iata || !isAirportKnown(airport.iata)) continue;
-    if (legRights(country, origin.iata, airport.iata).ok) continue;
+    if (legRights(country, origin.iata, airport.iata, granted).ok) continue;
     const point = projection([airport.lon, airport.lat]);
     if (!point) continue;
     ctx.beginPath();

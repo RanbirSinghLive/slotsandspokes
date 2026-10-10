@@ -1,6 +1,9 @@
 import { barredSpokePairsAt, connectingFlowsAt } from '../sim/hubs';
 import { isInsolvent } from '../sim/insolvency';
-import { homeCountry, legRights } from '../sim/rights';
+import { tiersClimbed } from '../sim/ladder';
+import { grantedCountries, homeCountry, legRights } from '../sim/rights';
+import { buyRights, rightsCountries, rightsOffer } from '../sim/rightsLicences';
+import { dayIndex } from '../sim/clock';
 import { marketKey, networkAirports } from '../sim/schedule';
 import { step } from '../sim/step';
 import { startHeadlessGame } from './newGame';
@@ -17,14 +20,18 @@ import { createPlayer } from './player';
  */
 
 const MINUTES_PER_DAY = 1440;
-const days = Number(process.argv[2]) || 365;
-const homes = process.argv[3] ? [process.argv[3]] : ['YUL', 'YYZ', 'PHL', 'YHZ'];
+// --buy: the player buys every domestic-rights offer it can afford (sim/rightsLicences.ts), the day it appears.
+const buying = process.argv.includes('--buy');
+const args = process.argv.slice(2).filter((arg) => !arg.startsWith('--'));
+const days = Number(args[0]) || 365;
+const homes = args[1] ? [args[1]] : ['YUL', 'YYZ', 'PHL', 'YHZ'];
 const seeds = [1, 2];
 
 console.log(`\n  Air rights · steady player · ${days} days\n`);
 for (const home of homes) {
   for (const seed of seeds) {
     const player = createPlayer('steady');
+    const bought: string[] = [];
     const state = startHeadlessGame(home, seed, player);
     for (let day = 1; day <= days; day++) {
       let bust = false;
@@ -34,6 +41,13 @@ for (const home of homes) {
       }
       if (bust) break;
       player.playDay(state);
+      if (buying) {
+        for (const country of rightsCountries(state)) {
+          if (rightsOffer(state, country).status !== 'offered') continue;
+          const result = buyRights(state, country);
+          if (result.ok) bought.push(`${country}@d${dayIndex(state)}`);
+        }
+      }
     }
 
     const country = homeCountry(state);
@@ -52,6 +66,11 @@ for (const home of homes) {
     console.log(
       `  ${home} s${seed} · ${country} carrier · ${markets.size} markets, ${barredMarkets.length} barred` +
         ` · connecting ${Math.round(connecting)}/day · ${barredPairs} spoke pairs barred`,
+    );
+    const offers = rightsCountries(state).map((c) => rightsOffer(state, c)).map((o) => `${o.country} ${o.status} ${o.progressDays}d`);
+    console.log(
+      `    tier ${tiersClimbed(state)} · cash $${Math.round(state.cash / 1000)}k · rights: ${offers.join(', ') || 'none'}` +
+        ` · held ${grantedCountries(state).join(',') || '-'} · bought ${bought.join(',') || '-'}`,
     );
   }
 }

@@ -394,6 +394,10 @@ export type SimState = {
   milestonesMet?: Record<string, number>;
   /** The day the last breakdown or overdue heavy check grounded a plane (sim/aog.ts); the ladder's clean-run goal reads it. Absent until the first. */
   lastAogDay?: number;
+  /** Foreign countries where the airline bought domestic rights (sim/rightsLicences.ts): the day bought, and the last day it flew a domestic leg there. Optional: older saves hold none. */
+  domesticRights?: { country: string; sinceDay: number; lastFlownDay: number }[];
+  /** Days of qualifying international service into each foreign country, toward being offered its domestic rights (sim/rightsLicences.ts). */
+  rightsProgress?: Record<string, number>;
   /** The shock running now, or the last one until another starts (sim/shocks.ts's activeShock() says which). Optional: older saves have none. */
   shock?: Shock | null;
   /**

@@ -2948,6 +2948,31 @@ country is unknown the rule allows it, so a missing row never stops a route.
 | Connection A–hub–B, A and B in one other country | **barred**, whatever the hub: a Canadian carrier can't sell Boston to New York through Toronto |
 | Connection with A and B in different countries | allowed when both legs are |
 
+**Buying domestic rights abroad** (`src/sim/rightsLicences.ts`, plan in
+`roadmap/air-rights-earn-buy.md`). Once widebodies are open (the Network
+tier is climbed), the airline can buy domestic rights in one foreign
+country, so it may fly and sell inside it like a bloc member.
+- **Earned.** Each day the airline flies at least two international
+  departures a day touching the country (14 a week) and is on time at least
+  60% of the time over the last 30 days on those routes, it earns a day
+  (`state.rightsProgress`); a day missed costs one. At 120 days the country
+  is offered.
+- **Bought.** A setup fee ($250k to $15M, $60k per million people in the
+  country's airports) and a yearly levy of 15% of it, charged daily under
+  overhead. One licence once widebodies open, one more per tier climbed after.
+- **Kept.** The licence lapses after 60 days with no domestic leg flown
+  there and the earned days start again. Legs already flying stay (the
+  planner checks only new rotations); their connections stop.
+- **Capped.** Domestic departures there are limited to 14 a week, plus 14
+  every 90 days held, up to 70. `planRotation()` refuses a rotation that
+  would pass it.
+- **Saved** in two optional state fields (`domesticRights`,
+  `rightsProgress`), so no save format change. `npm run rightstest` checks
+  the rules; `npm run rights -- 700 YUL --buy` plays a year with a player that
+  buys every offer. The Head office view has a Rights section (`rightsSection()`
+  in `ui/inspector/headOffice.ts`): a card per foreign country flown into with
+  days earned, then Buy once offered, or weekly use and Give back once held.
+
 **Seeing it.** The Ops lens tints the countries where your airline may
 fly domestic routes (its own, plus a cabotage bloc it belongs to) in soft
 green (`render/rightsView.ts`). Everywhere untinted is foreign: international

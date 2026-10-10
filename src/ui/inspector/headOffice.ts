@@ -21,6 +21,7 @@ import {
   ancillaryLevel,
 } from '../../sim/ancillaries';
 import { LADDER, tiersClimbed } from '../../sim/ladder';
+import { buyRights, dropRights, EARN_DAYS, LAPSE_DAYS, licencesAllowed, rightsBlocked, rightsCountries, rightsOffer } from '../../sim/rightsLicences';
 
 /**
  * The Head office view (Network › Head office): the airline's decisions
@@ -407,6 +408,7 @@ export function buildHeadOfficeView(state: SimState, changed: () => void): HTMLE
   root.append(...feesSection(state, changed));
   root.append(...contractsSection(state));
   root.append(...executivesSection(state, changed));
+  root.append(...rightsSection(state, changed));
 
   root.append(
     heading('Innovations', 'Programmes the ladder opens (see Goals): each tier down the tree opens the ones branching from it. Each is yours to adopt, for good, if it pays for your airline. Click one for what it does and costs.'),
@@ -494,6 +496,72 @@ function contractsSection(state: SimState): HTMLElement[] {
       );
     } else {
       card.append(line(contract.status === 'ended' ? `Ended · paid ${money(contract.paidTotal)}` : 'Lapsed, not taken up', 'inspector-line goal-ahead'));
+    }
+    nodes.push(card);
+  }
+  return nodes;
+}
+
+/**
+ * Domestic rights abroad (sim/rightsLicences.ts): one card per foreign
+ * country the airline has flown into, with a ring of earned days and the
+ * state in an icon. Greyed, not hidden, until widebodies open.
+ */
+function rightsSection(state: SimState, changed: () => void): HTMLElement[] {
+  const nodes: HTMLElement[] = [
+    heading(
+      'Rights',
+      `Domestic rights in a foreign country, for the late game (opens with widebodies). Fly international service into a country — two departures a day, 60% on time — for ${EARN_DAYS} days and it is offered. Buy it for a setup fee and a yearly levy. Fly a domestic leg there at least every ${LAPSE_DAYS} days or it lapses. Weekly domestic departures there are capped, and the cap grows with the time held. One licence once widebodies open, one more with each tier after.`,
+    ),
+  ];
+  const countries = rightsCountries(state);
+  const open = licencesAllowed(state) > 0;
+  if (countries.length === 0) {
+    nodes.push(line(open ? 'Fly abroad to earn' : '🔒 Widebodies', 'inspector-line goal-ahead'));
+    return nodes;
+  }
+  for (const country of countries) {
+    const offer = rightsOffer(state, country);
+    const card = document.createElement('div');
+    card.className = 'office-card';
+    card.classList.toggle('is-adopted', offer.status === 'held');
+    card.classList.toggle('is-locked', offer.status === 'locked' || offer.status === 'earning');
+    const name = document.createElement('div');
+    name.className = 'office-card-name';
+    const icon = { locked: '🔒', earning: '◔', offered: '🔑', held: '🛡', home: '🛡' }[offer.status];
+    name.append(`${icon} ${country} `, info(`${country} domestic rights · ${offer.progressDays}/${EARN_DAYS} days earned · setup ${money(offer.setup)} · ${money(offer.levyPerYear)}/yr`));
+    card.append(name);
+    if (offer.status === 'held') {
+      card.append(
+        line(`${offer.weeklyUsed}/${offer.weeklyCap} per week · ${money(offer.levyPerYear)}/yr`),
+        confirmButton(
+          'Give back',
+          { title: `Give back ${country} rights`, rows: [{ label: 'Refund', value: 'None' }], facts: [`The earned ${EARN_DAYS} days start again.`], confirmLabel: 'Give back' },
+          () => {
+            dropRights(state, country);
+            changed();
+          },
+        ),
+      );
+    } else if (offer.status === 'offered') {
+      const blocked = rightsBlocked(state, country);
+      const rows = [
+        { label: 'Setup', value: money(offer.setup) },
+        { label: 'Levy', value: `${money(offer.levyPerYear)}/yr` },
+        ...cashAfterRows(state, offer.setup),
+      ];
+      card.append(line(`${money(offer.setup)} · ${money(offer.levyPerYear)}/yr`));
+      if (blocked) card.append(line(blocked, 'inspector-line goal-ahead'));
+      else {
+        card.append(
+          confirmButton('Buy', { title: `Buy ${country} domestic rights`, rows, facts: ['Starts at 14 domestic departures a week; the cap grows with time held.'], confirmLabel: 'Buy' }, () => {
+            buyRights(state, country);
+            changed();
+          }),
+        );
+      }
+    } else {
+      card.append(line(`${offer.progressDays}/${EARN_DAYS}d`, 'inspector-line office-card-price'));
     }
     nodes.push(card);
   }
