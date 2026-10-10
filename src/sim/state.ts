@@ -642,6 +642,8 @@ export type SimState = {
   mxBases?: string[];
   /** Line bases by IATA, each with its level: planes it can check in a night (sim/bases.ts). */
   lineBases?: Record<string, number>;
+  /** Spare engines held by class, and the ones out for a shop visit (sim/enginePool.ts). Absent: none. */
+  enginePool?: import('./enginePool').EnginePool;
   /** Hangars by IATA, each with its level: bays for heavy checks at once (sim/bases.ts). */
   heavyBases?: Record<string, number>;
   /** The aircraft classes each station's mechanics are rated for; missing in a save from before ratings, which rates every class everywhere. */

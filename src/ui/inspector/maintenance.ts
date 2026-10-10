@@ -453,6 +453,7 @@ function buildMxBases(state: SimState, changed: () => void): HTMLElement[] {
     );
   }
   nodes.push(...buildRatings(state, changed));
+  nodes.push(...buildEngines(state, changed));
   const stations = ops.mxStationsReadout(state);
   nodes.push(
     heading(
@@ -546,6 +547,45 @@ function buildRatings(state: SimState, changed: () => void): HTMLElement[] {
       chips.append(chip);
     }
     row.append(name, chips);
+    list.append(row);
+  }
+  nodes.push(list);
+  return nodes;
+}
+
+/** The spare engine pool: a row per class with its spares ready and a − / + to hold more. */
+function buildEngines(state: SimState, changed: () => void): HTMLElement[] {
+  const nodes: HTMLElement[] = [
+    heading(
+      'Engines',
+      'Spare engines by aircraft class. An engine fault waits 4 days for a lease engine; with a spare ready the plane is back the next morning and the pulled engine goes to the shop for 20 days (paid then), rejoining the pool. Each spare costs its daily holding cost, in the shop or on the shelf, so a pool pays for a fleet that breaks engines often.',
+    ),
+  ];
+  const list = document.createElement('div');
+  list.className = 'inspector-rows';
+  for (const entry of ops.engineReadouts(state)) {
+    const row = document.createElement('div');
+    row.className = 'inspector-row base-row';
+    const name = document.createElement('span');
+    name.textContent = `${entry.classCode} · ${entry.ready}/${entry.held} ready`;
+    const detail = document.createElement('span');
+    detail.className = 'inspector-row-detail';
+    detail.textContent = `${money(entry.held * entry.perDay)}/day · shop ${money(entry.shopVisit)}`;
+    detail.title = `${money(entry.perDay)} a day for each spare`;
+    const controls = box('base-level');
+    for (const delta of [-1, 1] as const) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'base-close';
+      button.textContent = delta > 0 ? '+' : '−';
+      button.title = delta > 0 ? `Hold another ${entry.classCode} spare · ${money(entry.perDay)}/day` : 'Give a spare back';
+      button.addEventListener('click', () => {
+        ops.changeSpareEngines(state, entry.classCode, delta);
+        changed();
+      });
+      controls.append(button);
+    }
+    row.append(name, detail, controls);
     list.append(row);
   }
   nodes.push(list);

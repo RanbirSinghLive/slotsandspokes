@@ -10,6 +10,7 @@ import { coverRotations } from './turnBuffer';
 import { refitDays } from './cabins';
 import { bookedDChecks, bookedHeavyChecks, finishDCheck, finishHeavyCheck, forcedHeavyChecks, wornAge } from './mxChecks';
 import { nightStopStation } from './nightStops';
+import { engineFault, returnEngines } from './enginePool';
 import type { Aircraft, SimState } from './state';
 
 /**
@@ -81,6 +82,14 @@ export type AogEvent = {
   checkKind?: 'D';
 };
 
+/** An engine's shop visit, paid when the spare is swapped in. */
+function chargeEngineShop(state: SimState, cost: number): void {
+  state.cash -= cost;
+  state.todayCost += cost;
+  state.todayCostByCategory.maintenance += cost;
+  state.todayMargin -= cost;
+}
+
 export function isAog(state: SimState, tail: string): boolean {
   return state.aogs.some((event) => event.tail === tail);
 }
@@ -151,6 +160,7 @@ function coverGroundedPlanes(state: SimState): void {
  * as the pools allow.
  */
 export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
+  returnEngines(state, dayStartMinute);
   const repaired = state.aogs.filter((event) => event.returnsAtMinute <= dayStartMinute);
   state.aogs = state.aogs.filter((event) => event.returnsAtMinute > dayStartMinute);
   for (const event of repaired) {
@@ -205,12 +215,17 @@ export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
     if (roll >= aogChance(state, aircraft)) continue;
 
     const maxExtraDays = DURATION_BASE_EXTRA_DAYS + Math.round(effectiveAge(state, aircraft) * DURATION_EXTRA_DAYS_PER_EFFECTIVE_YEAR);
-    const days = 1 + Math.floor(durationRoll * durationRoll * (maxExtraDays + 1));
+    const faultDays = 1 + Math.floor(durationRoll * durationRoll * (maxExtraDays + 1));
+    const fault = FAULTS[Math.floor(durationRoll * 997) % FAULTS.length];
+    // An engine fault waits for a lease engine, or swaps in a spare from the pool (sim/enginePool.ts).
+    const engine = fault === 'engine' ? engineFault(state, aircraft.typeCode, faultDays, dayStartMinute) : null;
+    const days = engine?.days ?? faultDays;
+    if (engine && engine.shopCost > 0) chargeEngineShop(state, engine.shopCost);
     state.lastAogDay = dayIndex(state);
     state.aogs.push({
       tail: aircraft.tail,
       base: aircraft.baseAirport,
-      fault: FAULTS[Math.floor(durationRoll * 997) % FAULTS.length],
+      fault,
       returnsAtMinute: dayStartMinute + days * MINUTES_PER_DAY,
       uncoveredRoutes: [],
       coveredRotations: 0,
