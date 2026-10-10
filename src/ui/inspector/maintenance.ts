@@ -2,7 +2,7 @@ import { AIRCRAFT_CLASSES, pluralClassName } from '../../sim/aircraftClasses';
 import { aogChance, aogFor, daysUntilReturn, expediteCost, expediteRepair } from '../../sim/aog';
 import { ageDelayParameters } from '../../sim/delays';
 import { USEFUL_LIFE_YEARS } from '../../sim/leasing';
-import { DEFERRED_AGE_YEARS, HEAVY_INTERVAL_DAYS, HEAVY_WINDOW_DAYS, MX_HOLD_AT, OVERDUE_GRACE_DAYS, wornAge } from '../../sim/mxChecks';
+import { A_OVERDUE, A_WINDOW, DEFERRED_AGE_YEARS, HEAVY_INTERVAL_DAYS, HEAVY_WINDOW_DAYS, MX_HOLD_AT, OVERDUE_GRACE_DAYS, wornAge } from '../../sim/mxChecks';
 import * as ops from '../routeActions';
 import type { HeavyCheckReadout } from '../../sim/playerActions';
 import type { SimState } from '../../sim/state';
@@ -258,6 +258,22 @@ function buildFleetBoard(state: SimState, changed: () => void): HTMLElement[] {
       : `Heavy ${plane.dueIn > 0 ? `due ${plane.dueIn}d` : `${-plane.dueIn}d overdue`}` + (plane.open ? ` · banked ${plane.bankedHours}/${plane.workHours}h` : '');
     const clockLine = box('mx-clock-text', `${clockText} · ${plane.flightHours}h · ${plane.cycles} cyc · ${money(plane.reserve)} due`);
 
+    // The A-check lane: progress through its interval (hours or cycles), the window where nights bank
+    // hours, and the overdue stretch past the due mark that adds deferred items.
+    const aLane = box('mx-clock mx-clock-a');
+    const aWindow = box('mx-clock-window');
+    aWindow.style.left = `${(A_WINDOW / A_OVERDUE) * 100}%`;
+    aWindow.style.width = `${((1 - A_WINDOW) / A_OVERDUE) * 100}%`;
+    const aGrace = box('mx-clock-grace');
+    aGrace.style.left = `${(1 / A_OVERDUE) * 100}%`;
+    aGrace.style.width = `${((A_OVERDUE - 1) / A_OVERDUE) * 100}%`;
+    const aFill = box('mx-clock-fill');
+    aFill.style.width = `${Math.min(1, Math.max(0, plane.aProgress / A_OVERDUE)) * 100}%`;
+    const aDue = box('mx-clock-due');
+    aDue.style.left = `${(1 / A_OVERDUE) * 100}%`;
+    aLane.append(aWindow, aGrace, aFill, aDue);
+    const aLine = box('mx-clock-text', `A ${Math.round(plane.aProgress * 100)}%` + (plane.aOpen ? ` · banked ${plane.aBankedHours}/${plane.aWorkHours}h` : ''));
+
     // Deferred items as slots filling toward the hold.
     const slots = box('mx-slots');
     for (let i = 0; i < MX_HOLD_AT; i++) slots.append(box(`mx-slot${i < plane.deferred ? ` is-filled${plane.deferred >= MX_HOLD_AT ? ' is-held' : ''}` : ''}`));
@@ -275,7 +291,7 @@ function buildFleetBoard(state: SimState, changed: () => void): HTMLElement[] {
 
     const row = box('mx-card-row');
     row.append(items, clockLine);
-    card.append(head, clock, row, wear, dials);
+    card.append(head, clock, aLane, aLine, row, wear, dials);
     return card;
   };
 

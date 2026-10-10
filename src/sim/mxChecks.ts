@@ -69,6 +69,21 @@ const HEAVY_WORK_MINUTES: Record<string, number> = { PROP: 480, REGIONAL: 600, N
  */
 export const MAINTENANCE_SHARE_OF_NON_FUEL = 0.2;
 
+/**
+ * The A check: a light check due every A_INTERVAL_HOURS flown or
+ * A_INTERVAL_CYCLES landed, whichever comes first, so a plane on short hops
+ * is due as soon as one on long ones. It is done on nights at a line base,
+ * out of what the line check leaves, before anything goes toward the heavy
+ * check. It opens A_WINDOW of the way to due, and a plane past A_OVERDUE of
+ * the interval adds a deferred item every night it flies.
+ */
+export const A_INTERVAL_HOURS = 100;
+export const A_INTERVAL_CYCLES = 80;
+export const A_WINDOW = 0.8;
+export const A_OVERDUE = 1.25;
+/** Hangar minutes an A check takes, by class. */
+const A_WORK_MINUTES: Record<string, number> = { PROP: 240, REGIONAL: 300, NARROWBODY: 360, WIDEBODY: 480 };
+
 const MINUTES_PER_DAY = 1440;
 
 export function lineCheckMinutes(state: SimState, aircraft: Aircraft): number {
@@ -128,8 +143,51 @@ export function settleMaintenance(state: SimState, aircraft: Aircraft): void {
 
 /** One landed flight on the plane's clocks: its airborne minutes and one cycle. */
 export function recordFlown(aircraft: Aircraft, airborneMinutes: number): void {
+  aircraft.flightMinutesSinceA = flightMinutesSinceA(aircraft) + Math.max(0, airborneMinutes);
+  aircraft.cyclesSinceA = (aircraft.cyclesSinceA ?? 0) + 1;
   aircraft.flightMinutesSinceHeavy = (aircraft.flightMinutesSinceHeavy ?? 0) + Math.max(0, airborneMinutes);
   aircraft.cyclesSinceHeavy = (aircraft.cyclesSinceHeavy ?? 0) + 1;
+}
+
+/**
+ * Airborne minutes since the last A check. A plane from an older save, or one
+ * just leased, starts part-way through the interval, staggered by its tail.
+ */
+export function flightMinutesSinceA(aircraft: Aircraft): number {
+  if (aircraft.flightMinutesSinceA !== undefined) return aircraft.flightMinutesSinceA;
+  let hash = 0;
+  for (let i = 0; i < aircraft.tail.length; i++) hash = (hash * 17 + aircraft.tail.charCodeAt(i)) % 991;
+  return (hash % A_INTERVAL_HOURS) * 60;
+}
+
+/** How far through its A interval the plane is: 1 is due, whichever of hours and cycles is further along. */
+export function aCheckProgress(aircraft: Aircraft): number {
+  return Math.max(flightMinutesSinceA(aircraft) / 60 / A_INTERVAL_HOURS, (aircraft.cyclesSinceA ?? 0) / A_INTERVAL_CYCLES);
+}
+
+export function aCheckWorkMinutes(typeCode: string): number {
+  return A_WORK_MINUTES[typeCode] ?? A_WORK_MINUTES.PROP;
+}
+
+export function aBankedMinutes(aircraft: Aircraft): number {
+  return aircraft.aBankedMinutes ?? 0;
+}
+
+/** Whether nights at a line base count toward the A check yet. */
+export function aCheckOpen(aircraft: Aircraft): boolean {
+  return aCheckProgress(aircraft) >= A_WINDOW;
+}
+
+export function aCheckOverdue(aircraft: Aircraft): boolean {
+  return aCheckProgress(aircraft) >= A_OVERDUE;
+}
+
+/** An A check done: the interval starts again and the maintenance built up is paid. */
+export function finishACheck(state: SimState, aircraft: Aircraft): void {
+  settleMaintenance(state, aircraft);
+  aircraft.flightMinutesSinceA = 0;
+  aircraft.cyclesSinceA = 0;
+  delete aircraft.aBankedMinutes;
 }
 
 /** Whether nights at base count toward the heavy check yet. */
@@ -194,12 +252,21 @@ export function rollNightlyChecks(state: SimState, dayStartMinute: number): void
     } else {
       result = night < work ? 'short' : night >= work + CLEAR_SPARE_MINUTES && deferredItems(aircraft) > 0 ? 'cleared' : 'checked';
     }
-    // What the night has left after the line check goes toward the heavy check, once it's open, in a hangar bay.
-    if (station && result !== 'away' && bays.has(aircraft.tail) && night > work) {
-      aircraft.heavyBankedMinutes = heavyBankedMinutes(aircraft) + Math.round(night - work);
+    // What the night has left after the line check goes to the A check first, once it's open (contracted where there's no line base), then toward the heavy check in a hangar bay.
+    let spare = night > work ? Math.round(night - work) : 0;
+    if (station && result !== 'away' && spare > 0 && aCheckOpen(aircraft)) {
+      const used = Math.min(spare, aCheckWorkMinutes(aircraft.typeCode) - aBankedMinutes(aircraft));
+      if (!inHouse.has(aircraft.tail)) chargeMaintenance(state, contractCost(used));
+      aircraft.aBankedMinutes = aBankedMinutes(aircraft) + used;
+      spare -= used;
+      if (aBankedMinutes(aircraft) >= aCheckWorkMinutes(aircraft.typeCode)) finishACheck(state, aircraft);
+    }
+    if (station && result !== 'away' && bays.has(aircraft.tail) && spare > 0) {
+      aircraft.heavyBankedMinutes = heavyBankedMinutes(aircraft) + spare;
       if (heavyBankedMinutes(aircraft) >= heavyCheckWorkMinutes(aircraft.typeCode)) finishHeavyCheck(state, aircraft);
     }
-    if (result === 'away' || result === 'short') aircraft.deferredItems = deferredItems(aircraft) + 1;
+    // A night away or too short, or an A check long overdue, leaves an item for tomorrow.
+    if (result === 'away' || result === 'short' || aCheckOverdue(aircraft)) aircraft.deferredItems = deferredItems(aircraft) + 1;
     if (result === 'cleared') {
       // A heavy check finished tonight has already cleared them all.
       aircraft.deferredItems = Math.max(0, deferredItems(aircraft) - 1);

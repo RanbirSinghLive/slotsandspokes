@@ -97,6 +97,11 @@ export type Aircraft = {
   cyclesSinceHeavy?: number;
   /** Maintenance cost flown but not yet paid: held back from each landed flight and paid at its heavy check (sim/mxChecks.ts). Absent: none. */
   maintenanceReserve?: number;
+  /** Airborne minutes and cycles since the last A check (sim/mxChecks.ts). Absent minutes: staggered by tail; absent cycles: none. */
+  flightMinutesSinceA?: number;
+  cyclesSinceA?: number;
+  /** Hangar minutes done at night toward its A check this time round (sim/mxChecks.ts). */
+  aBankedMinutes?: number;
 };
 
 /** How one leg went, once it has landed. */
