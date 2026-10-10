@@ -3468,6 +3468,15 @@ Each cause has a different answer available:
   nothing refunded. A plane in the air, AOG or grounded for the day can't
   be steered.
 
+  **The call.** `callsNeeded()` lists waiting planes with a rotation to
+  cancel whose day is about to break once a flight is 20 minutes overdue:
+  `curfew` (the curfew will cancel a rotation), `event` (a priority flight
+  is projected more than 60 minutes late) or `late` (a flight 90+ minutes
+  late), worst first. The first time each is seen in a day the clock pauses
+  once and the plane's page opens (`ui/callAlert.ts`, the same pause as
+  events; Space resumes). The Messages switch ✋ on the Game screen turns
+  the pause off; the ops row's CALL count still lists the planes.
+
 A cancellation scores a flat **-80 NPS** rather than extending the delay
 curve, which floors at -50: a cancellation isn't a very late flight, it's
 a different failure. NPS therefore divides by its own denominator

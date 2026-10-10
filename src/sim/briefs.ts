@@ -26,9 +26,11 @@ export type BriefSettings = {
   season: boolean;
   /** The first season review pauses the clock so it can't scroll past at 100x. */
   seasonPause: boolean;
+  /** Pause the clock when a late plane's day will break (sim/controller.ts callsNeeded). */
+  callPause: boolean;
 };
 
-export const DEFAULT_BRIEF_SETTINGS: BriefSettings = { daily: true, season: true, seasonPause: true };
+export const DEFAULT_BRIEF_SETTINGS: BriefSettings = { daily: true, season: true, seasonPause: true, callPause: true };
 
 export function briefSettings(state: SimState): BriefSettings {
   return { ...DEFAULT_BRIEF_SETTINGS, ...state.briefs?.settings };

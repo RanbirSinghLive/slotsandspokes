@@ -228,6 +228,7 @@ function bindSettings(state: SimState): void {
     ['#brief-setting-daily', 'daily'],
     ['#brief-setting-season', 'season'],
     ['#brief-setting-pause', 'seasonPause'],
+    ['#brief-setting-call', 'callPause'],
   ];
   stateRef = state;
   for (const [selector, key] of switches) {
@@ -247,6 +248,7 @@ export function syncBriefSettings(): void {
   document.querySelector<HTMLInputElement>('#brief-setting-daily')!.checked = settings.daily;
   document.querySelector<HTMLInputElement>('#brief-setting-season')!.checked = settings.season;
   document.querySelector<HTMLInputElement>('#brief-setting-pause')!.checked = settings.seasonPause;
+  document.querySelector<HTMLInputElement>('#brief-setting-call')!.checked = settings.callPause;
 }
 
 /** Drag by the header with a mouse or pen; on touch the window stays docked above the tab strip. */
