@@ -60,6 +60,15 @@ export const OVERDUE_GRACE_DAYS = 7;
 /** Hangar minutes a heavy check takes, by class. */
 const HEAVY_WORK_MINUTES: Record<string, number> = { PROP: 480, REGIONAL: 600, NARROWBODY: 720, WIDEBODY: 960 };
 
+/**
+ * The share of a flight's non-fuel block-hour cost that is maintenance.
+ * It is held back from the flight and paid when the plane's heavy check is
+ * done, so maintenance comes as a lump you can see coming rather than a
+ * trickle. Route margins and rivals still count the whole cost, so only
+ * when the money leaves changes.
+ */
+export const MAINTENANCE_SHARE_OF_NON_FUEL = 0.2;
+
 const MINUTES_PER_DAY = 1440;
 
 export function lineCheckMinutes(state: SimState, aircraft: Aircraft): number {
@@ -93,6 +102,28 @@ export function flightHoursSinceHeavy(aircraft: Aircraft): number {
 
 export function cyclesSinceHeavy(aircraft: Aircraft): number {
   return aircraft.cyclesSinceHeavy ?? 0;
+}
+
+export function maintenanceReserve(aircraft: Aircraft): number {
+  return aircraft.maintenanceReserve ?? 0;
+}
+
+/**
+ * A landed flight's maintenance slice, held back from today's cost and
+ * cash and added to the plane's reserve. Returns the amount held back, so
+ * the caller can take it out of what it just booked.
+ */
+export function accrueMaintenance(aircraft: Aircraft, blockNonFuel: number): number {
+  const held = blockNonFuel * MAINTENANCE_SHARE_OF_NON_FUEL;
+  aircraft.maintenanceReserve = maintenanceReserve(aircraft) + held;
+  return held;
+}
+
+/** Pay what the plane has built up: at a heavy check, and when it goes back to the lessor. */
+export function settleMaintenance(state: SimState, aircraft: Aircraft): void {
+  const owed = maintenanceReserve(aircraft);
+  if (owed > 0) chargeMaintenance(state, owed);
+  delete aircraft.maintenanceReserve;
 }
 
 /** One landed flight on the plane's clocks: its airborne minutes and one cycle. */
@@ -166,7 +197,7 @@ export function rollNightlyChecks(state: SimState, dayStartMinute: number): void
     // What the night has left after the line check goes toward the heavy check, once it's open, in a hangar bay.
     if (station && result !== 'away' && bays.has(aircraft.tail) && night > work) {
       aircraft.heavyBankedMinutes = heavyBankedMinutes(aircraft) + Math.round(night - work);
-      if (heavyBankedMinutes(aircraft) >= heavyCheckWorkMinutes(aircraft.typeCode)) finishHeavyCheck(aircraft);
+      if (heavyBankedMinutes(aircraft) >= heavyCheckWorkMinutes(aircraft.typeCode)) finishHeavyCheck(state, aircraft);
     }
     if (result === 'away' || result === 'short') aircraft.deferredItems = deferredItems(aircraft) + 1;
     if (result === 'cleared') {
@@ -271,8 +302,9 @@ export function forcedHeavyChecks(state: SimState): { aircraft: Aircraft; days: 
   });
 }
 
-/** A heavy check done: the interval starts again and every deferred item is cleared. */
-export function finishHeavyCheck(aircraft: Aircraft): void {
+/** A heavy check done: the interval starts again, every deferred item is cleared and the maintenance reserve is paid. */
+export function finishHeavyCheck(state: SimState, aircraft: Aircraft): void {
+  settleMaintenance(state, aircraft);
   aircraft.daysSinceHeavyCheck = 0;
   delete aircraft.deferredItems;
   delete aircraft.heavyBankedMinutes;

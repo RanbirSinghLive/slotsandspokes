@@ -1,6 +1,7 @@
 import { dayIndex } from './clock';
 import { executiveDeliveryMultiplier, executiveReturnMultiplier } from './executives';
 import { leaseAircraft } from './leasing';
+import { settleMaintenance } from './mxChecks';
 import type { MarketListing } from './market';
 import type { Aircraft, SimState } from './state';
 
@@ -108,6 +109,7 @@ export function rollDailyFleet(state: SimState): void {
   }
   const leaving = state.aircraft.filter((aircraft) => aircraft.returningOnDay !== undefined && aircraft.returningOnDay <= today);
   for (const aircraft of leaving) {
+    settleMaintenance(state, aircraft);
     state.aircraft = state.aircraft.filter((a) => a !== aircraft);
     state.market.listings.push({
       id: state.market.nextListingId++,

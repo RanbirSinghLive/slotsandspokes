@@ -3280,8 +3280,8 @@ button.inspector-crumb:hover {
 }
 
 /* The Goals view (ui/inspector/goals.ts): the current tier's milestones
-   as badges, a bar filling toward each, a met one stamped green; the
-   ladder as a row of rungs. */
+   as badges, a bar filling toward each, a met one stamped green (dashed
+   border for an extra); every tier below as a collapsible row. */
 .goal-badges {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -3365,6 +3365,35 @@ button.inspector-crumb:hover {
 
 .goal-ahead {
   color: #6b7694;
+}
+
+.goal-tier {
+  margin: 4px 0;
+  padding: 2px 0;
+}
+
+.goal-tier > summary {
+  cursor: pointer;
+  padding: 4px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #e6e9f0;
+}
+
+.goal-tier.is-climbed > summary {
+  color: #7ed6a8;
+}
+
+.goal-tier.is-ahead > summary {
+  color: #6b7694;
+}
+
+.goal-tier.is-ahead .goal-badge {
+  opacity: 0.6;
+}
+
+.goal-badge.is-extra {
+  border-style: dashed;
 }
 
 /* The fuel chart in the Head office view (ui/inspector/headOffice.ts). */

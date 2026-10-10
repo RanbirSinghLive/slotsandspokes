@@ -17,8 +17,8 @@ is saved only when the owner accepts the read.
 
 1. Usage clocks: flight hours and cycles since the last heavy check, shown on
    the Mtc cards. No change to play. **Built.**
-2. Split in-house check cost out of the per-block-hour bundle. Needs an OK on
-   the balance read.
+2. Maintenance cost (a fifth of non-fuel block cost) is held back per flight
+   and paid at the heavy check. Needs an OK on the balance read.
 3. The A-check lane at line bases.
 4. The heavy check becomes C, with hours, cycles and calendar triggers;
    a hatched Gantt block for nights in a bay.
