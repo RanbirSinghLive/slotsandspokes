@@ -142,6 +142,14 @@ export function buildMoneyView(state: SimState): HTMLElement {
       ),
     );
   }
+  if ((state.ancillaryRevenueTotal ?? 0) > 0) {
+    root.append(
+      lineWithInfo(
+        `Fees ${money(state.yesterdayAncillaryRevenue ?? 0)}/day · total ${shortMoney(state.ancillaryRevenueTotal ?? 0)}`,
+        'Bag and seat fees, already inside revenue above. Set the level at Head office; they cost NPS, and rivals copy a fee over time.',
+      ),
+    );
+  }
 
   const costs = Object.entries(state.todayCostByCategory)
     .filter(([, amount]) => (amount ?? 0) > 0.5)

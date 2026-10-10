@@ -24,6 +24,8 @@ export {
   letExecutiveGo,
   currentTurnBuffer,
   hedgeFuel,
+  setAncillaryFees,
+  setRouteFees,
   hedgeOptions,
   innovationOptions,
   marketPnlHistory,

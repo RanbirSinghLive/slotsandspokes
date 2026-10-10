@@ -201,6 +201,10 @@ export type RouteSettings = {
    * spend flying.
    */
   turnBufferMinutes: number;
+  /** This route's own ancillary fee level (sim/ancillaries.ts); absent follows the airline's dial. */
+  feeLevel?: 0 | 1 | 2;
+  /** The day it last changed, for the lock. */
+  feeChangedDay?: number;
 };
 
 export type SimState = {
@@ -291,6 +295,16 @@ export type SimState = {
    * tail, so bringing it home puts it back (sim/retime.ts). Optional.
    */
   wrappedFrom?: Record<string, { legId: string; start: number }>;
+  /** Ancillary fee level 0-2 (sim/ancillaries.ts); absent is 0, bags included. */
+  ancillaryLevel?: 0 | 1 | 2;
+  /** The day the fee level last changed, for the lock. */
+  ancillaryChangedDay?: number;
+  /** How far rivals have copied the player's fee, 0-2. */
+  rivalFeeLevel?: number;
+  /** Today's and the lifetime fee money, already inside revenue. */
+  todayAncillaryRevenue?: number;
+  yesterdayAncillaryRevenue?: number;
+  ancillaryRevenueTotal?: number;
   todayRevenue: number;
   todayCost: number;
   todayMargin: number;

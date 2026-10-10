@@ -3180,6 +3180,15 @@ button.ticker-item:hover {
   width: 76px;
 }
 
+/* Four buttons: narrower so they fit a phone panel. */
+.stance-row.is-fees {
+  flex-wrap: wrap;
+}
+
+.stance-row.is-fees .stance-button {
+  width: 66px;
+}
+
 .stance-button.is-active {
   color: #0a0c12;
   background: #5ed6c8;
@@ -3804,6 +3813,10 @@ button.inspector-crumb:hover {
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 4px;
   cursor: pointer;
+}
+
+.inspector-plan-hub.is-current {
+  border-color: rgba(94, 214, 200, 0.7);
 }
 
 .inspector-plan-hub.is-warn {
