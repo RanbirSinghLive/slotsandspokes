@@ -165,7 +165,7 @@ export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
     state.aogs.push({
       tail: aircraft.tail,
       base: aircraft.atAirport ?? aircraft.baseAirport!,
-      fault: 'heavy check overdue',
+      fault: 'C check overdue',
       returnsAtMinute: dayStartMinute + days * MINUTES_PER_DAY,
       uncoveredRoutes: [],
       coveredRotations: 0,

@@ -2,7 +2,7 @@ import { AIRCRAFT_CLASSES, pluralClassName } from '../../sim/aircraftClasses';
 import { aogChance, aogFor, daysUntilReturn, expediteCost, expediteRepair } from '../../sim/aog';
 import { ageDelayParameters } from '../../sim/delays';
 import { USEFUL_LIFE_YEARS } from '../../sim/leasing';
-import { A_OVERDUE, A_WINDOW, DEFERRED_AGE_YEARS, HEAVY_INTERVAL_DAYS, HEAVY_WINDOW_DAYS, MX_HOLD_AT, OVERDUE_GRACE_DAYS, wornAge } from '../../sim/mxChecks';
+import { A_OVERDUE, A_WINDOW, C_INTERVAL_CYCLES, C_INTERVAL_HOURS, DEFERRED_AGE_YEARS, HEAVY_INTERVAL_DAYS, HEAVY_WINDOW_DAYS, MX_HOLD_AT, OVERDUE_GRACE_DAYS, wornAge } from '../../sim/mxChecks';
 import * as ops from '../routeActions';
 import type { HeavyCheckReadout } from '../../sim/playerActions';
 import type { SimState } from '../../sim/state';
@@ -116,7 +116,7 @@ function buildHangar(state: SimState): HTMLElement[] {
   const nodes: HTMLElement[] = [
     heading(
       'Hangar',
-      `Heavy checks in work and coming. A filled bay is a plane in its heavy check, grounded until it's done. A dashed bay is a plane whose check is within ${HEAVY_WINDOW_DAYS} days or overdue: nights at a hangar bank hours toward it while it holds one of the hangar's bays (the nearest due first), and if it runs ${OVERDUE_GRACE_DAYS} days overdue it goes in whenever it is.`,
+      `C checks in work and coming. A filled bay is a plane in its C check, grounded until it's done. A dashed bay is a plane whose check is within ${HEAVY_WINDOW_DAYS} days or overdue: nights at a hangar bank hours toward it while it holds one of the hangar's bays (the nearest due first), and if it runs ${OVERDUE_GRACE_DAYS} days overdue it goes in whenever it is.`,
     ),
   ];
   const bays = box('mx-bays');
@@ -130,7 +130,7 @@ function buildHangar(state: SimState): HTMLElement[] {
   }
   const capacity = ops.mxBaseReadout(state, 'heavy').bases.map((base) => `${base.iata} ${base.used}/${base.level} bays`).join(' · ');
   nodes.push(line(capacity || 'No hangar'));
-  nodes.push(bays.childElementCount > 0 ? bays : noneLine('Hangar clear · no heavy check in work or within its window'));
+  nodes.push(bays.childElementCount > 0 ? bays : noneLine('Hangar clear · no C check in work or within its window'));
   return nodes;
 }
 
@@ -145,7 +145,7 @@ const TIMELINE_DAYS = HEAVY_INTERVAL_DAYS;
  */
 function buildDueTimeline(state: SimState): HTMLElement[] {
   const nodes: HTMLElement[] = [
-    heading('Heavy checks due', `Each plane's heavy check on a ${TIMELINE_DAYS}-day axis, today at the left. The amber band is the window where nights at a maintenance base bank hours; a cluster of markers is planes that will want the hangar together. Overdue planes sit at the left edge.`),
+    heading('C checks due', `Each plane's C check on a ${TIMELINE_DAYS}-day axis (due by days, hours or cycles, whichever is first), today at the left. The amber band is the window where nights at a maintenance base bank hours; a cluster of markers is planes that will want the hangar together. Overdue planes sit at the left edge.`),
   ];
   const readouts = ops.heavyCheckReadouts(state).filter((p) => !p.inCheck);
   if (readouts.length === 0) return [...nodes, line('No planes outside the hangar')];
@@ -193,7 +193,7 @@ function buildFleetBoard(state: SimState, changed: () => void): HTMLElement[] {
   const nodes: HTMLElement[] = [
     heading(
       'Fleet',
-      `Release to service, plane by plane. Serviceable: nothing open. Watch: a deferred item, a heavy check in its window or under 2 years of life. Action: held at ${MX_HOLD_AT} deferred items or a heavy check overdue. Heavy-check clock: every ${HEAVY_INTERVAL_DAYS} flying days, 8–16 hours of hangar work done at night; from ${HEAVY_WINDOW_DAYS} days before it's due, each night at a maintenance base banks its spare hours toward it. ${OVERDUE_GRACE_DAYS} days overdue, the plane is grounded until it's done. Items: each deferred item (no line check, or a night too short) wears the plane like ${DEFERRED_AGE_YEARS} more years; at ${MX_HOLD_AT} it is held for a morning and its first rotation cancelled. Tech: the share of flights that leave without a mechanical delay. AOG: today's chance of a fault grounding it. Life: years left before the airframe reaches its useful life.`,
+      `Release to service, plane by plane. Serviceable: nothing open. Watch: a deferred item, a C check in its window or under 2 years of life. Action: held at ${MX_HOLD_AT} deferred items or a C check overdue. C-check clock: every ${HEAVY_INTERVAL_DAYS} flying days, ${C_INTERVAL_HOURS} flight hours or ${C_INTERVAL_CYCLES} cycles, 8–16 hours of hangar work done at night; from ${HEAVY_WINDOW_DAYS} days before it's due, each night at a maintenance base banks its spare hours toward it. ${OVERDUE_GRACE_DAYS} days overdue, the plane is grounded until it's done. Items: each deferred item (no line check, or a night too short) wears the plane like ${DEFERRED_AGE_YEARS} more years; at ${MX_HOLD_AT} it is held for a morning and its first rotation cancelled. Tech: the share of flights that leave without a mechanical delay. AOG: today's chance of a fault grounding it. Life: years left before the airframe reaches its useful life.`,
     ),
   ];
   const readouts = ops.heavyCheckReadouts(state);
@@ -254,8 +254,8 @@ function buildFleetBoard(state: SimState, changed: () => void): HTMLElement[] {
     dueMark.style.left = `${(HEAVY_INTERVAL_DAYS / CLOCK_DAYS) * 100}%`;
     clock.append(windowZone, graceZone, fill, dueMark);
     const clockText = plane.inCheck
-      ? 'Heavy check · in the hangar'
-      : `Heavy ${plane.dueIn > 0 ? `due ${plane.dueIn}d` : `${-plane.dueIn}d overdue`}` + (plane.open ? ` · banked ${plane.bankedHours}/${plane.workHours}h` : '');
+      ? 'C check · in the hangar'
+      : `C ${plane.dueIn > 0 ? `due ${plane.dueIn}d` : `${-plane.dueIn}d overdue`}` + (plane.open ? ` · banked ${plane.bankedHours}/${plane.workHours}h` : '');
     const clockLine = box('mx-clock-text', `${clockText} · ${plane.flightHours}h · ${plane.cycles} cyc · ${money(plane.reserve)} due`);
 
     // The A-check lane: progress through its interval (hours or cycles), the window where nights bank
@@ -337,7 +337,7 @@ function buildMxBases(state: SimState, changed: () => void): HTMLElement[] {
         title: isLine ? 'Line bases' : 'Hangars',
         info: isLine
           ? `Where a night is a line check. The level is how many planes it checks a night, most deferred items first; a plane past that, or of a class it isn't rated for, is treated like a night at an outstation. Opening one costs ${money(readout.fee)}, then ${money(readout.perLevelPerDay)} a day for each level; home starts at level 3, free.`
-          : `Where heavy checks are done. The level is the number of bays: only that many planes, the ones nearest due, bank hours toward their heavy check on a night here; the rest wait. Planes in a forced check take a bay too. Opening one costs ${money(readout.fee)}, then ${money(readout.perLevelPerDay)} a day for each level; home starts at level 3, free. A station without one banks nothing.`,
+          : `Where C checks are done. The level is the number of bays: only that many planes, the ones nearest due, bank hours toward their C check on a night here; the rest wait. Planes in a forced check take a bay too. Opening one costs ${money(readout.fee)}, then ${money(readout.perLevelPerDay)} a day for each level; home starts at level 3, free. A station without one banks nothing.`,
         kind: isLine ? 'line base' : 'hangar',
         bases: readout.bases,
         candidates: readout.candidates,

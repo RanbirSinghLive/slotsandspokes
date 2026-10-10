@@ -54,6 +54,13 @@ export const DEFERRED_AGE_YEARS = 3;
 /** Deferred items at which the plane is held at base for a morning. */
 export const MX_HOLD_AT = 3;
 export const HEAVY_INTERVAL_DAYS = 30;
+/**
+ * The heavy check is the C check. It is due after HEAVY_INTERVAL_DAYS flying
+ * days, C_INTERVAL_HOURS airborne or C_INTERVAL_CYCLES landed, whichever
+ * comes first, so a plane flown hard comes due sooner than one flown lightly.
+ */
+export const C_INTERVAL_HOURS = 300;
+export const C_INTERVAL_CYCLES = 250;
 /** The heavy check's work starts being done this many days before it's due. */
 export const HEAVY_WINDOW_DAYS = 10;
 export const OVERDUE_GRACE_DAYS = 7;
@@ -208,9 +215,21 @@ export function daysSinceHeavyCheck(aircraft: Aircraft): number {
   return (hash * 11) % HEAVY_INTERVAL_DAYS;
 }
 
+/**
+ * How far through its heavy interval the plane is, in days: its flying days,
+ * or its hours or cycles scaled to the same interval, whichever is furthest.
+ */
+export function heavyCheckProgressDays(aircraft: Aircraft): number {
+  return Math.max(
+    daysSinceHeavyCheck(aircraft),
+    (flightHoursSinceHeavy(aircraft) / C_INTERVAL_HOURS) * HEAVY_INTERVAL_DAYS,
+    (cyclesSinceHeavy(aircraft) / C_INTERVAL_CYCLES) * HEAVY_INTERVAL_DAYS,
+  );
+}
+
 /** Days until the heavy check is due: negative once overdue. */
 export function heavyCheckDueIn(aircraft: Aircraft): number {
-  return HEAVY_INTERVAL_DAYS - daysSinceHeavyCheck(aircraft);
+  return Math.round(HEAVY_INTERVAL_DAYS - heavyCheckProgressDays(aircraft));
 }
 
 /** The night just ended, judged at midnight: whether the plane got its check. */
@@ -390,7 +409,7 @@ export function finishHeavyCheck(state: SimState, aircraft: Aircraft): void {
 export function tonightCheck(
   state: SimState,
   tail: string,
-): { night: number; work: number; station: string; inHouse: boolean; away: boolean; contracted: boolean; short: boolean } | null {
+): { night: number; work: number; station: string; inHouse: boolean; away: boolean; contracted: boolean; short: boolean; banking: 'A' | 'C' | 'A+C' | null } | null {
   const aircraft = state.aircraft.find((a) => a.tail === tail);
   const legs = state.schedule.filter((leg) => leg.tail === tail).sort((a, b) => a.departMinute - b.departMinute);
   if (!aircraft || legs.length === 0) return null;
@@ -409,5 +428,11 @@ export function tonightCheck(
   const inHouse = lineCheckedTails(state, sleepers).has(tail);
   const contracted = !inHouse && outstationCheck(state, station) === 'contract';
   const away = !inHouse && !contracted;
-  return { night, work, station, inHouse, away, contracted, short: !away && night < work };
+  const short = !away && night < work;
+  // Whether the night's spare hours go to an A check, then a C check in a bay, as rollNightlyChecks() will do.
+  let spare = !away && night > work ? night - work : 0;
+  const bankingA = spare > 0 && aCheckOpen(aircraft);
+  if (bankingA) spare -= Math.min(spare, aCheckWorkMinutes(aircraft.typeCode) - aBankedMinutes(aircraft));
+  const bankingC = !away && spare > 0 && heavyBayTails(state, sleepers).has(tail);
+  return { night, work, station, inHouse, away, contracted, short, banking: bankingA && bankingC ? 'A+C' : bankingA ? 'A' : bankingC ? 'C' : null };
 }

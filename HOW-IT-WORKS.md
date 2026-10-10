@@ -3329,7 +3329,12 @@ held that morning where it slept: its first rotation is cancelled (cause
 by contract (a line check's price for each) away from a maintenance
 base.
 
-**The heavy check** is hangar work every 30 days the plane flies:
+**The heavy check is the C check** (the screens call it C; the code says heavy).
+It is due after 30 flying days, 300 flight hours or 250 cycles, whichever comes
+first (`heavyCheckProgressDays()`), so a plane flown hard comes due sooner than
+one flown lightly. The 10-day window and 7-day grace below are the same
+fraction of that interval whichever clock is furthest along. It is hangar work
+every 30 days the plane flies:
 8 hours for a Propeller, 10 for a Regional, 12 for a Narrowbody, 16 for
 a Widebody. It's done at night. From 10 days before it's due, whatever
 each night in a hangar bay has left after the line check goes toward it
@@ -3392,8 +3397,11 @@ only when the money leaves moves. The Mtc card shows what is due.
 - **The Gantt:** a key above the rows explains the night cell, and each
   plane's label carries tonight's check as the day is going ("☾✓", "☾c" contracted,
   "☾−40m" short, "☾✗" away). The plane's own view says the same in words
-  ("Tonight ☾✓ · 9h 24m at base for 4h 24m of work · heavy due 11d"). It works from the projected
-  rest of the day, so a late afternoon shows tonight getting shorter.
+  ("Tonight ☾✓ · 9h 24m at base for 4h 24m of work · C due 11d"). It works from the projected
+  rest of the day, so a late afternoon shows tonight getting shorter. When
+  the night's spare hours will go to a check, the cell is hatched amber and
+  ends in "A", "C" or "AC" (`tonightCheck().banking`): the A check first, then
+  the C check if the plane holds a hangar bay.
 
 ---
 

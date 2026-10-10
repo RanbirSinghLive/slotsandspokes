@@ -4826,9 +4826,17 @@ button.ops-item:hover {
 
 /* Tonight's line check on a Gantt row (ui/panels.ts, sim/mxChecks.ts). */
 .timeline-night {
+  flex: none;
   margin-left: 4px;
   color: #6b7694;
   font-variant-numeric: tabular-nums;
+}
+
+.timeline-night.is-check {
+  background: repeating-linear-gradient(135deg, rgba(255, 179, 71, 0.35) 0 3px, rgba(255, 179, 71, 0.08) 3px 6px);
+  border-radius: 3px;
+  padding: 0 3px;
+  color: #ffd08a;
 }
 
 .timeline-night.is-short {
