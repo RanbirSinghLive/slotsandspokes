@@ -31,8 +31,11 @@ is saved only when the owner accepts the read.
    hours, 10 to 24 days grounded by class, with a lane on the Mtc card. Never
    forced; past due the plane wears like 2 more years. **Built.**
 
+7. The spare engine pool: spares by class, a holding cost a day, engine faults
+   back in a day instead of waiting 4, shop visits of 20 days. **Built.**
+
 ## Not in this week
 
-- Life-limited parts, spares and engine pools, spare aircraft.
+- Life-limited parts, a general parts pool, spare aircraft.
 
 How it works lives in HOW-IT-WORKS.md (Maintenance checks).

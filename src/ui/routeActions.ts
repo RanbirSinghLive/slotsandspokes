@@ -46,6 +46,8 @@ export {
   bookHeavyCheck,
   cancelBookedCheck,
   bookDCheck,
+  engineReadouts,
+  changeSpareEngines,
   cancelBookedDCheck,
   previewDCheckBooking,
   previewHeavyCheckBooking,

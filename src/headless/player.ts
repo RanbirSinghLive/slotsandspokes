@@ -1,4 +1,5 @@
 import { ancillaryLevel, extraOn, feeLevelOn, isContested, type ExtraId } from '../sim/ancillaries';
+import { MAX_SPARE_ENGINES, sparesHeld } from '../sim/enginePool';
 import { DIFFICULTIES, type GameDifficulty } from '../sim/difficulty';
 import { currentPotentialDemand } from '../sim/marketDemand';
 import { marketLoadFactor } from '../sim/loadFactor';
@@ -1305,6 +1306,7 @@ function keepStations(state: SimState): string[] {
  * the headless player pays for what it flies.
  */
 const HANGAR_PLANES_PER_BAY = 4;
+const ENGINE_SPARE_PER_PLANES = 6;
 
 function keepMaintenance(state: SimState): string[] {
   const log: string[] = [];
@@ -1330,6 +1332,15 @@ function keepMaintenance(state: SimState): string[] {
         if (!raised.ok) break;
         log.push(raised.message);
       }
+    }
+  }
+  // One spare engine for each ENGINE_SPARE_PER_PLANES planes of a class, so a fleet that breaks engines often doesn't wait on the lease market.
+  for (const cls of AIRCRAFT_CLASSES) {
+    const wanted = Math.floor(state.aircraft.filter((aircraft) => aircraft.typeCode === cls.code).length / ENGINE_SPARE_PER_PLANES);
+    while (sparesHeld(state, cls.code) < Math.min(wanted, MAX_SPARE_ENGINES)) {
+      const added = actions.changeSpareEngines(state, cls.code, 1);
+      if (!added.ok) break;
+      log.push(added.message);
     }
   }
   return log;

@@ -3389,6 +3389,17 @@ it. A plane past due wears like 2 more years of age (`D_WEAR_YEARS`, in
 starts staggered by tail, at least 120 days from due. The headless player
 never books, so its planes wear past day 360.
 
+**Spare engines** (`src/sim/enginePool.ts`, the Engines section of the Mtc
+screen). An AOG whose fault is an engine leaves the plane waiting 4 days more
+for a lease engine. A spare of the plane's class in the pool swaps in at once:
+the plane is back the next morning, and the pulled engine goes to the shop for
+20 days, paid then (40 days of the spare's holding cost), before it rejoins the
+pool. Each spare costs its holding cost a day, on the shelf or in the shop
+(Propeller $60, Regional $150, Narrowbody $350, Widebody $750), under
+maintenance, up to 3 a class and only for a class in the fleet. Spares are
+given back only when on the shelf. The headless player holds one per 6 planes
+of a class.
+
 **Usage clocks.** Each landed flight adds its airborne minutes (ground delay
 excluded) and one cycle to the plane (`recordFlown()`), counted since the last
 A check and since the last heavy check. A plane from an older save counts the

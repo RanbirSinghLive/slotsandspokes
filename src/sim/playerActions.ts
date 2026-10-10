@@ -96,6 +96,7 @@ import { cashNeededToLease, LEASE_RESERVE_DAYS, leaseRateFor, loadLeaseRates } f
 import { inboundAt, orderLease } from './fleetTiming';
 import { startSeatSale as startSeatSaleRule } from './seatSale';
 import { SEASON_DAYS, SEASONAL_PREMIUM } from './seasonalLease';
+import { changeSpareEngines as changeSpareEnginesRule, holdPerDay, shopVisitCost, sparesHeld, sparesReady } from './enginePool';
 import { aBankedMinutes, aCheckOpen, aCheckProgress, aCheckWorkMinutes, cyclesSinceHeavy, deferredItems, flightHoursSinceHeavy, heavyBankedMinutes, maintenanceReserve, heavyBayTails, heavyCheckDueIn, canBookHeavyCheck, canBookDCheck, dCheckDueIn, dCheckOpen, flightHoursSinceD, heavyCheckOpen, heavyCheckWorkMinutes, sleepersNow, tonightCheck } from './mxChecks';
 import { rebaseOptions, rebasePlane, type RebaseOption } from './rebase';
 import { cabinGainPerDay, cabinOf, cancelRefit as cancelRefitRule, orderRefit as orderRefitRule, refitBlockedReason, refitCost, refitDays, type Cabin } from './cabins';
@@ -754,6 +755,24 @@ export function bookHeavyCheck(state: SimState, tail: string): Outcome<{ message
   if (!aircraft || !canBookHeavyCheck(state, aircraft)) return { ok: false, reason: `${tail} can't go in for a C check now.` };
   aircraft.heavyCheckBooked = true;
   return { ok: true, message: `${tail} booked for its C check tomorrow.` };
+}
+
+export type EngineReadout = { classCode: string; held: number; ready: number; perDay: number; shopVisit: number };
+
+/** The spare engine pool by class, for the classes in the fleet or holding spares (sim/enginePool.ts). */
+export function engineReadouts(state: SimState): EngineReadout[] {
+  const classes = new Set([...state.aircraft.map((aircraft) => aircraft.typeCode), ...Object.keys(state.enginePool?.spares ?? {})]);
+  return AIRCRAFT_CLASSES.filter((cls) => classes.has(cls.code)).map((cls) => ({
+    classCode: cls.code,
+    held: sparesHeld(state, cls.code),
+    ready: sparesReady(state, cls.code),
+    perDay: holdPerDay(cls.code),
+    shopVisit: shopVisitCost(cls.code),
+  }));
+}
+
+export function changeSpareEngines(state: SimState, classCode: string, delta: 1 | -1): Outcome<{ message: string }> {
+  return changeSpareEnginesRule(state, classCode, delta);
 }
 
 /** Take a booking back before the plane goes in. */

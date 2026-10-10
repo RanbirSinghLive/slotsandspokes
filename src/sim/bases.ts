@@ -1,4 +1,5 @@
 import { executiveMaintenanceBaseMultiplier } from './executives';
+import { enginePoolCostPerDay } from './enginePool';
 import { CREW_BASE_FEE, crewBases, openCrewBase } from './crews';
 import type { SimState } from './state';
 
@@ -288,6 +289,6 @@ export function mxCostPerDay(state: SimState, iata: string): number {
 export function basesCostPerDay(state: SimState): { crew: number; maintenance: number } {
   return {
     crew: Object.keys(crewBases(state)).filter((iata) => iata !== state.homeAirport).length * CREW_BASE_PER_DAY,
-    maintenance: mxStationList(state).reduce((total, iata) => total + mxCostPerDay(state, iata), 0),
+    maintenance: mxStationList(state).reduce((total, iata) => total + mxCostPerDay(state, iata), 0) + enginePoolCostPerDay(state),
   };
 }
