@@ -94,6 +94,8 @@ export type Aircraft = {
   flightMinutesSinceHeavy?: number;
   /** Takeoff-and-landing cycles since the last heavy check (sim/mxChecks.ts). Absent: none counted yet. */
   cyclesSinceHeavy?: number;
+  /** Maintenance cost flown but not yet paid: held back from each landed flight and paid at its heavy check (sim/mxChecks.ts). Absent: none. */
+  maintenanceReserve?: number;
 };
 
 /** How one leg went, once it has landed. */
