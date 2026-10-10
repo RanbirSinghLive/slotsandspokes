@@ -163,15 +163,23 @@ export function rightsCountries(state: SimState): string[] {
 
 type Outcome = { ok: true; message: string } | { ok: false; reason: string };
 
+/** Why a country's rights can't be bought now, or null when they can. */
+export function rightsBlocked(state: SimState, country: string): string | null {
+  const offer = rightsOffer(state, country);
+  if (offer.status === 'locked') return 'Opens with widebodies';
+  if (offer.status === 'home' || offer.status === 'held') return `${country} · already yours`;
+  if (offer.status !== 'offered') return `${country} · ${offer.progressDays}/${EARN_DAYS} days of service`;
+  const held = state.domesticRights?.length ?? 0;
+  if (held >= licencesAllowed(state)) return `${held}/${licencesAllowed(state)} licences held · another opens with the next tier`;
+  if (state.cash < offer.setup) return `Setup fee $${offer.setup.toLocaleString('en-US')} · cash short`;
+  return null;
+}
+
 /** Buy a country's domestic rights: needs the tier, the earned offer, a free licence and the setup fee in cash. */
 export function buyRights(state: SimState, country: string): Outcome {
+  const blocked = rightsBlocked(state, country);
+  if (blocked) return { ok: false, reason: blocked };
   const offer = rightsOffer(state, country);
-  if (offer.status === 'locked') return { ok: false, reason: 'Opens with widebodies' };
-  if (offer.status === 'home' || offer.status === 'held') return { ok: false, reason: `${country} · already yours` };
-  if (offer.status !== 'offered') return { ok: false, reason: `${country} · ${offer.progressDays}/${EARN_DAYS} days of service` };
-  const held = state.domesticRights?.length ?? 0;
-  if (held >= licencesAllowed(state)) return { ok: false, reason: `${held}/${licencesAllowed(state)} licences held · another opens with the next tier` };
-  if (state.cash < offer.setup) return { ok: false, reason: `Setup fee $${offer.setup.toLocaleString('en-US')} · cash short` };
   state.cash -= offer.setup;
   state.todayCost += offer.setup;
   state.todayCostByCategory.overhead += offer.setup;

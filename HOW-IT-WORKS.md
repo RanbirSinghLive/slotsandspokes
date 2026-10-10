@@ -2969,7 +2969,9 @@ country, so it may fly and sell inside it like a bloc member.
 - **Saved** in two optional state fields (`domesticRights`,
   `rightsProgress`), so no save format change. `npm run rightstest` checks
   the rules; `npm run rights -- 700 YUL --buy` plays a year with a player that
-  buys every offer. No UI yet: the Head Office section is the next slice.
+  buys every offer. The Head office view has a Rights section (`rightsSection()`
+  in `ui/inspector/headOffice.ts`): a card per foreign country flown into with
+  days earned, then Buy once offered, or weekly use and Give back once held.
 
 **Seeing it.** The Ops lens tints the countries where your airline may
 fly domestic routes (its own, plus a cabotage bloc it belongs to) in soft
