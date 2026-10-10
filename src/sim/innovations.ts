@@ -1,4 +1,4 @@
-import { ancillaryPerPassenger } from './ancillaries';
+import { ancillaryPerPassenger, ancillaryPriceDrag } from './ancillaries';
 import { LOAD_FACTOR, RECAPTURE_RATE } from './economy';
 import { executiveLoadFactorBonus, executiveYieldMultiplier } from './executives';
 import { airlineCalled, LADDER, tiersClimbed } from './ladder';
@@ -208,6 +208,8 @@ export type BookingPerks = {
   recaptureRate: number;
   /** Fee revenue per passenger on this market (sim/ancillaries.ts). */
   ancillaryPerPassenger: number;
+  /** Dollars the fee adds to the price each segment compares (sim/ancillaries.ts). */
+  ancillaryPriceDrag: Record<SegmentName, number>;
 };
 
 export function bookingPerks(state: SimState, origin: string, dest: string): BookingPerks {
@@ -219,6 +221,7 @@ export function bookingPerks(state: SimState, origin: string, dest: string): Boo
     loadFactor: loadFactorCap(state),
     recaptureRate: isAdopted(state, 'loyalty-scheme') ? LOYALTY_RECAPTURE_RATE : RECAPTURE_RATE,
     ancillaryPerPassenger: ancillaryPerPassenger(state, origin, dest),
+    ancillaryPriceDrag: ancillaryPriceDrag(state),
   };
 }
 

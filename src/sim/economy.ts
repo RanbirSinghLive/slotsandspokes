@@ -259,7 +259,7 @@ export function flightResult(
     // The season scales how many of each segment want to fly today (sim/seasons.ts).
     mix: seasonalMix(marketMix(leg.origin, leg.dest), timing?.season),
     shareAt: (segment, price) =>
-      segmentShareAt(segment, price, legsServingMarket, leg.origin, leg.dest, competitorRoutes, perks.brandEdge + perks.positionEdge[segment], timing?.marketDepartMinutes),
+      segmentShareAt(segment, price + perks.ancillaryPriceDrag[segment], legsServingMarket, leg.origin, leg.dest, competitorRoutes, perks.brandEdge + perks.positionEdge[segment], timing?.marketDepartMinutes),
     connecting: connecting / legsServingMarket,
     recapturable: spilloverAvailable,
     classes: fareClasses ?? DEFAULT_FARE_CLASSES,

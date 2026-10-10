@@ -53,6 +53,16 @@ export function ancillaryPerPassenger(state: SimState, origin: string, dest: str
   return ANCILLARY_FEE[level] * mixWeighted(origin, dest, PAYING_SHARE);
 }
 
+/**
+ * What the fee adds to the price a segment compares, in dollars: the fee
+ * times the share of that segment that pays it. Passengers weigh the
+ * whole trip cost, so a fee costs bookings as well as NPS.
+ */
+export function ancillaryPriceDrag(state: SimState): Record<SegmentName, number> {
+  const fee = ANCILLARY_FEE[ancillaryLevel(state)];
+  return { business: fee * PAYING_SHARE.business, leisure: fee * PAYING_SHARE.leisure, vfr: fee * PAYING_SHARE.vfr };
+}
+
 /** The NPS points a flight on this market loses to the fee; 0 at level 0. */
 export function ancillaryNpsPenalty(state: SimState, origin: string, dest: string): number {
   const level = ancillaryLevel(state);
