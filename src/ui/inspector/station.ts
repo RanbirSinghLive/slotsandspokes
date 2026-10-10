@@ -10,7 +10,10 @@ import {
   STATION_FEE,
   STATION_PER_DAY,
   downgradeStation,
+  MOAT_RAMP_DAYS,
   handlingParameters,
+  moatDays,
+  moatLift,
   pendingStation,
   stationDowngradeBlocked,
   stationReadout,
@@ -59,13 +62,17 @@ export function stationSection(state: SimState, iata: string, changed: () => voi
       `Who handles the ground work here, and what a typical departure from this airport loses to each cause over the last ${LEDGER_DAYS} days. ` +
         `Handling delays a departure ${Math.round(handling.chance * 100)}% of the time, up to ${Math.round(handling.maxMinutes)} min. ` +
         `Contract handlers are slowest, and slower again at thin fields. Own staff needs a crew or line base here; hub-grade needs own staff and ${HUB_MIN_DEPARTURES} departures a day. ` +
-        `Each step is paid up front, takes ${STATION_BUILD_DAYS.own}–${STATION_BUILD_DAYS.hub} days to build and costs a fixed amount a day. ` +
+        `Held at its departures floor, a station earns up to ${MOAT_RAMP_DAYS} days of room against congestion, and loses it twice as fast when it falls under. Each step is paid up front, takes ${STATION_BUILD_DAYS.own}–${STATION_BUILD_DAYS.hub} days to build and costs a fixed amount a day. ` +
         `A longer turn buffer on a route soaks up TURN delay; handling and congestion need the tier or fewer movements.`,
     ),
   ];
 
   const tierRow = line(`${TIER_GLYPH[tier]} ${TIER_NAME[tier]}`, 'inspector-line station-tier');
   tierRow.title = `${TIER_NAME[tier]} · delays ${Math.round(handling.chance * 100)}% of departures, up to ${handling.maxMinutes} min`;
+  const lift = moatLift(state, iata);
+  if (tier !== 'contract') {
+    tierRow.title += ` · hub moat ${moatDays(state, iata)}/${MOAT_RAMP_DAYS} days · ${(lift * 100).toFixed(1)}% more room before congestion queues departures`;
+  }
   if (tier !== 'contract' && !(tier === 'own' && iata === state.homeAirport)) {
     tierRow.append(` · ${money(STATION_PER_DAY[tier])}/day`);
   }

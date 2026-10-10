@@ -1,4 +1,4 @@
-import { airportCapacityPerDay, dailyDeparturesAt } from './airports';
+import { airportCapacityPerDay, airportLoadAt, dailyDeparturesAt } from './airports';
 import { hasCrewBase, hasLineBase } from './bases';
 import { dayIndex } from './clock';
 import type { DelayBreakdown } from './delays';
@@ -54,6 +54,20 @@ export const STATION_FEE: Record<'own' | 'hub', number> = { own: 120_000, hub: 4
 export const STATION_PER_DAY: Record<'own' | 'hub', number> = { own: 400, hub: 1_200 };
 export const STATION_BUILD_DAYS: Record<'own' | 'hub', number> = { own: 14, hub: 30 };
 export const HUB_MIN_DEPARTURES = 6;
+
+/**
+ * The hub moat: a station at `own` or `hub` tier earns a lift on the room
+ * its airport has in the congestion roll, so a busy hub queues later. It is
+ * earned a day at a time while the station keeps its floor of daily
+ * departures, and lapses twice as fast when it doesn't, so it cannot be
+ * bought once and left. Only the player's own movements feel it: rivals use
+ * the plain load.
+ */
+export const MOAT_MAX_LIFT: Record<'own' | 'hub', number> = { own: 0.04, hub: 0.12 };
+export const MOAT_FLOOR_DEPARTURES: Record<'own' | 'hub', number> = { own: 3, hub: HUB_MIN_DEPARTURES };
+/** Days at the floor to reach the tier's full lift. */
+export const MOAT_RAMP_DAYS = 60;
+export const MOAT_LAPSE_PER_DAY = 2;
 
 /** Finished days the ledger keeps. */
 export const LEDGER_DAYS = 7;
@@ -145,6 +159,38 @@ export function rollDailyStations(state: SimState): void {
     if (upgrade.readyDay > today) continue;
     (state.stationTiers ??= {})[iata] = upgrade.to;
     delete upgrades[iata];
+  }
+}
+
+// --- Hub moat --------------------------------------------------------------
+
+/** Days of earned moat at this station, 0 to MOAT_RAMP_DAYS. */
+export function moatDays(state: SimState, iata: string): number {
+  return state.stationMoatDays?.[iata] ?? 0;
+}
+
+/** The fraction by which this station stretches its airport's room: 0 to MOAT_MAX_LIFT of the tier. */
+export function moatLift(state: SimState, iata: string): number {
+  const tier = stationTier(state, iata);
+  if (tier === 'contract') return 0;
+  return MOAT_MAX_LIFT[tier] * (moatDays(state, iata) / MOAT_RAMP_DAYS);
+}
+
+/** The airport's load in one hour once the station's lift is counted. */
+export function stationLoadAt(state: SimState, iata: string, hour: number): number {
+  return airportLoadAt(state, iata, hour) / (1 + moatLift(state, iata));
+}
+
+/** At rollover: stations keeping their floor earn a day; the rest lose two. */
+export function rollDailyMoats(state: SimState): void {
+  const days = (state.stationMoatDays ??= {});
+  const airports = new Set([...Object.keys(days), ...Object.keys(state.stationTiers ?? {}), state.homeAirport]);
+  for (const iata of airports) {
+    const tier = stationTier(state, iata);
+    const held = tier !== 'contract' && dailyDeparturesAt(state, iata) >= MOAT_FLOOR_DEPARTURES[tier];
+    const next = held ? Math.min(MOAT_RAMP_DAYS, (days[iata] ?? 0) + 1) : Math.max(0, (days[iata] ?? 0) - MOAT_LAPSE_PER_DAY);
+    if (next > 0) days[iata] = next;
+    else delete days[iata];
   }
 }
 

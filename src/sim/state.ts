@@ -703,6 +703,8 @@ export type SimState = {
   stationUpgrades?: Record<string, { to: 'own' | 'hub'; readyDay: number }>;
   /** Delay minutes by cause per departure airport, today and the last finished days (sim/stations.ts). */
   stationLedger?: Record<string, StationLedger>;
+  /** Days each station has earned toward its hub-moat lift (sim/stations.ts). */
+  stationMoatDays?: Record<string, number>;
   /**
    * Lifetime cancellations by cause — the same shape (and the same
    * purpose) as `delayMinutesByCause`. Each cause has a different answer
