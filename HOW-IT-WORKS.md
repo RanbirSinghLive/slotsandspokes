@@ -2972,6 +2972,10 @@ country, so it may fly and sell inside it like a bloc member.
   buys every offer. The Head office view has a Rights section (`rightsSection()`
   in `ui/inspector/headOffice.ts`): a card per foreign country flown into with
   days earned, then Buy once offered, or weekly use and Give back once held.
+  The Ops lens tints an offered country amber and edges one still being earned
+  with a dashed amber line (`render/rightsView.ts`). While drawing a route, a
+  barred airport in an offered country rings amber, and its hover says the
+  rights are offered or how many days are earned.
 
 **Seeing it.** The Ops lens tints the countries where your airline may
 fly domestic routes (its own, plus a cabotage bloc it belongs to) in soft

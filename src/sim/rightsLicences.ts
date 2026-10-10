@@ -240,3 +240,13 @@ export function rollDailyRights(state: SimState): void {
     }
   }
 }
+
+/** A short note for a barred domestic leg in a country whose rights could be bought, or null when none could. */
+export function rightsHint(state: SimState, a: string, b: string): string | null {
+  const country = countryOf(a);
+  if (!country || country !== countryOf(b)) return null;
+  const offer = rightsOffer(state, country);
+  if (offer.status === 'offered') return `${country} rights offered · buy in Head office`;
+  if (offer.status === 'earning') return `${country} rights · ${offer.progressDays}/${EARN_DAYS}d earned`;
+  return null;
+}
