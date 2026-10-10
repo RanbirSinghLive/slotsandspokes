@@ -256,7 +256,7 @@ function buildFleetBoard(state: SimState, changed: () => void): HTMLElement[] {
     const clockText = plane.inCheck
       ? 'Heavy check · in the hangar'
       : `Heavy ${plane.dueIn > 0 ? `due ${plane.dueIn}d` : `${-plane.dueIn}d overdue`}` + (plane.open ? ` · banked ${plane.bankedHours}/${plane.workHours}h` : '');
-    const clockLine = box('mx-clock-text', clockText);
+    const clockLine = box('mx-clock-text', `${clockText} · ${plane.flightHours}h · ${plane.cycles} cyc`);
 
     // Deferred items as slots filling toward the hold.
     const slots = box('mx-slots');

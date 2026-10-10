@@ -90,6 +90,10 @@ export type Aircraft = {
   daysSinceHeavyCheck?: number;
   /** Hangar minutes done at night toward its heavy check this time round (sim/mxChecks.ts). */
   heavyBankedMinutes?: number;
+  /** Airborne minutes flown since the last heavy check (sim/mxChecks.ts). Absent: none counted yet. */
+  flightMinutesSinceHeavy?: number;
+  /** Takeoff-and-landing cycles since the last heavy check (sim/mxChecks.ts). Absent: none counted yet. */
+  cyclesSinceHeavy?: number;
 };
 
 /** How one leg went, once it has landed. */

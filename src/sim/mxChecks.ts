@@ -86,6 +86,21 @@ export function heavyBankedMinutes(aircraft: Aircraft): number {
   return aircraft.heavyBankedMinutes ?? 0;
 }
 
+/** Airborne hours flown since the last heavy check. Counted from when the clocks were added, so an older save starts at zero. */
+export function flightHoursSinceHeavy(aircraft: Aircraft): number {
+  return (aircraft.flightMinutesSinceHeavy ?? 0) / 60;
+}
+
+export function cyclesSinceHeavy(aircraft: Aircraft): number {
+  return aircraft.cyclesSinceHeavy ?? 0;
+}
+
+/** One landed flight on the plane's clocks: its airborne minutes and one cycle. */
+export function recordFlown(aircraft: Aircraft, airborneMinutes: number): void {
+  aircraft.flightMinutesSinceHeavy = (aircraft.flightMinutesSinceHeavy ?? 0) + Math.max(0, airborneMinutes);
+  aircraft.cyclesSinceHeavy = (aircraft.cyclesSinceHeavy ?? 0) + 1;
+}
+
 /** Whether nights at base count toward the heavy check yet. */
 export function heavyCheckOpen(aircraft: Aircraft): boolean {
   return heavyCheckDueIn(aircraft) <= HEAVY_WINDOW_DAYS;
@@ -261,6 +276,8 @@ export function finishHeavyCheck(aircraft: Aircraft): void {
   aircraft.daysSinceHeavyCheck = 0;
   delete aircraft.deferredItems;
   delete aircraft.heavyBankedMinutes;
+  delete aircraft.flightMinutesSinceHeavy;
+  delete aircraft.cyclesSinceHeavy;
 }
 
 /**
