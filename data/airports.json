@@ -37,7 +37,7 @@
     "lat": 44.8808,
     "lon": -63.5086,
     "utcOffsetMinutes": -240,
-    "population": 685603
+    "population": 689932
   },
   {
     "iata": "YSJ",
@@ -117,7 +117,7 @@
     "lat": 48.2061,
     "lon": -78.8356,
     "utcOffsetMinutes": -300,
-    "population": 27214
+    "population": 23504
   },
   {
     "iata": "YBG",
@@ -126,6 +126,198 @@
     "lon": -70.992,
     "utcOffsetMinutes": -300,
     "population": 196575
+  },
+  {
+    "iata": "YQT",
+    "name": "Thunder Bay",
+    "lat": 48.3719,
+    "lon": -89.3239,
+    "utcOffsetMinutes": -300,
+    "population": 118759
+  },
+  {
+    "iata": "YSB",
+    "name": "Sudbury",
+    "lat": 46.625,
+    "lon": -80.7989,
+    "utcOffsetMinutes": -300,
+    "population": 215717
+  },
+  {
+    "iata": "YTS",
+    "name": "Timmins",
+    "lat": 48.5697,
+    "lon": -81.3767,
+    "utcOffsetMinutes": -300,
+    "population": 46020
+  },
+  {
+    "iata": "YAM",
+    "name": "Sault Ste. Marie",
+    "lat": 46.4832,
+    "lon": -84.5085,
+    "utcOffsetMinutes": -300,
+    "population": 72051
+  },
+  {
+    "iata": "YQK",
+    "name": "Kenora",
+    "lat": 49.7883,
+    "lon": -94.3631,
+    "utcOffsetMinutes": -360,
+    "population": 15096
+  },
+  {
+    "iata": "YXL",
+    "name": "Sioux Lookout",
+    "lat": 50.1139,
+    "lon": -91.9053,
+    "utcOffsetMinutes": -360,
+    "population": 8780
+  },
+  {
+    "iata": "YVO",
+    "name": "Val-d'Or",
+    "lat": 48.0533,
+    "lon": -77.7828,
+    "utcOffsetMinutes": -300,
+    "population": 32670
+  },
+  {
+    "iata": "YZV",
+    "name": "Sept-Îles",
+    "lat": 50.2233,
+    "lon": -66.2656,
+    "utcOffsetMinutes": -300,
+    "population": 37459
+  },
+  {
+    "iata": "YBC",
+    "name": "Baie-Comeau",
+    "lat": 49.1325,
+    "lon": -68.2044,
+    "utcOffsetMinutes": -300,
+    "population": 39080
+  },
+  {
+    "iata": "YGP",
+    "name": "Gaspé",
+    "lat": 48.7749,
+    "lon": -64.4819,
+    "utcOffsetMinutes": -300,
+    "population": 29212
+  },
+  {
+    "iata": "YVP",
+    "name": "Kuujjuaq",
+    "lat": 58.0961,
+    "lon": -68.4269,
+    "utcOffsetMinutes": -300,
+    "population": 2668
+  },
+  {
+    "iata": "YWK",
+    "name": "Wabush",
+    "lat": 52.9219,
+    "lon": -66.8644,
+    "utcOffsetMinutes": -240,
+    "population": 12150
+  },
+  {
+    "iata": "YQR",
+    "name": "Regina",
+    "lat": 50.4319,
+    "lon": -104.6609,
+    "utcOffsetMinutes": -360,
+    "population": 236849
+  },
+  {
+    "iata": "YKA",
+    "name": "Kamloops",
+    "lat": 50.703,
+    "lon": -120.4486,
+    "utcOffsetMinutes": -480,
+    "population": 115344
+  },
+  {
+    "iata": "YXS",
+    "name": "Prince George",
+    "lat": 53.8843,
+    "lon": -122.6666,
+    "utcOffsetMinutes": -480,
+    "population": 78943
+  },
+  {
+    "iata": "YXJ",
+    "name": "Fort St. John",
+    "lat": 56.2381,
+    "lon": -120.74,
+    "utcOffsetMinutes": -420,
+    "population": 22782
+  },
+  {
+    "iata": "YMM",
+    "name": "Fort McMurray",
+    "lat": 56.6533,
+    "lon": -111.222,
+    "utcOffsetMinutes": -420,
+    "population": 66573
+  },
+  {
+    "iata": "YQU",
+    "name": "Grande Prairie",
+    "lat": 55.1797,
+    "lon": -118.885,
+    "utcOffsetMinutes": -420,
+    "population": 80795
+  },
+  {
+    "iata": "YTH",
+    "name": "Thompson",
+    "lat": 55.8011,
+    "lon": -97.8642,
+    "utcOffsetMinutes": -360,
+    "population": 13678
+  },
+  {
+    "iata": "YZF",
+    "name": "Yellowknife",
+    "lat": 62.4628,
+    "lon": -114.44,
+    "utcOffsetMinutes": -420,
+    "population": 20340
+  },
+  {
+    "iata": "YEV",
+    "name": "Inuvik",
+    "lat": 68.3042,
+    "lon": -133.483,
+    "utcOffsetMinutes": -420,
+    "population": 3243
+  },
+  {
+    "iata": "YXY",
+    "name": "Whitehorse",
+    "lat": 60.7085,
+    "lon": -135.0657,
+    "utcOffsetMinutes": -420,
+    "population": 28201
+  },
+  {
+    "iata": "YFB",
+    "name": "Iqaluit",
+    "lat": 63.7564,
+    "lon": -68.5558,
+    "utcOffsetMinutes": -300,
+    "population": 7429
+  },
+  {
+    "iata": "YRT",
+    "name": "Rankin Inlet",
+    "lat": 62.8114,
+    "lon": -92.1158,
+    "utcOffsetMinutes": -360,
+    "population": 2975
   },
   {
     "iata": "LGA",
@@ -247,7 +439,7 @@
     "lat": 52.3086,
     "lon": 4.7639,
     "utcOffsetMinutes": 60,
-    "population": 7451681
+    "population": 7450542
   },
   {
     "iata": "FRA",
@@ -415,7 +607,7 @@
     "lat": 51.2895,
     "lon": 6.7668,
     "utcOffsetMinutes": 60,
-    "population": 8535060
+    "population": 8532128
   },
   {
     "iata": "BRU",
@@ -487,7 +679,7 @@
     "lat": 55.6179,
     "lon": 12.656,
     "utcOffsetMinutes": 60,
-    "population": 2168685
+    "population": 2183442
   },
   {
     "iata": "ARN",
@@ -527,7 +719,7 @@
     "lat": 50.1009,
     "lon": 14.2599,
     "utcOffsetMinutes": 60,
-    "population": 2246734
+    "population": 2247203
   },
   {
     "iata": "BUD",
@@ -544,6 +736,14 @@
     "lon": 23.9445,
     "utcOffsetMinutes": 120,
     "population": 2591910
+  },
+  {
+    "iata": "SKG",
+    "name": "Thessaloniki",
+    "lat": 40.5193,
+    "lon": 22.97,
+    "utcOffsetMinutes": 120,
+    "population": 1115301
   },
   {
     "iata": "IST",
@@ -1354,14 +1554,6 @@
     "population": 603889
   },
   {
-    "iata": "YXX",
-    "name": "Abbotsford",
-    "lat": 49.0253,
-    "lon": -122.361,
-    "utcOffsetMinutes": -480,
-    "population": 602222
-  },
-  {
     "iata": "STS",
     "name": "Santa Rosa",
     "lat": 38.509,
@@ -1400,6 +1592,14 @@
     "lon": -82.2189,
     "utcOffsetMinutes": -300,
     "population": 577260
+  },
+  {
+    "iata": "YXX",
+    "name": "Abbotsford",
+    "lat": 49.0253,
+    "lon": -122.361,
+    "utcOffsetMinutes": -480,
+    "population": 576539
   },
   {
     "iata": "TOL",
@@ -1884,10 +2084,10 @@
   {
     "iata": "SVO",
     "name": "Moscow Sheremetyevo",
-    "lat": 55.9769,
-    "lon": 37.4112,
+    "lat": 55.9775,
+    "lon": 37.3867,
     "utcOffsetMinutes": 180,
-    "population": 11914435
+    "population": 11911660
   },
   {
     "iata": "LED",
@@ -2399,7 +2599,7 @@
     "lat": 49.6963,
     "lon": 18.1111,
     "utcOffsetMinutes": 60,
-    "population": 1373021
+    "population": 1371614
   },
   {
     "iata": "GOA",
@@ -2474,6 +2674,14 @@
     "population": 1207579
   },
   {
+    "iata": "GSV",
+    "name": "Saratov",
+    "lat": 51.7128,
+    "lon": 46.1711,
+    "utcOffsetMinutes": 240,
+    "population": 1176727
+  },
+  {
     "iata": "BOD",
     "name": "Bordeaux",
     "lat": 44.8287,
@@ -2512,14 +2720,6 @@
     "lon": 18.3315,
     "utcOffsetMinutes": 60,
     "population": 1119031
-  },
-  {
-    "iata": "SKG",
-    "name": "Thessaloniki",
-    "lat": 40.5193,
-    "lon": 22.97,
-    "utcOffsetMinutes": 120,
-    "population": 1115301
   },
   {
     "iata": "DOH",
@@ -3327,7 +3527,7 @@
     "lat": -6.9707,
     "lon": 110.3732,
     "utcOffsetMinutes": 420,
-    "population": 3912845
+    "population": 3917162
   },
   {
     "iata": "HPH",
@@ -4303,7 +4503,7 @@
     "lat": 37.9868,
     "lon": 58.361,
     "utcOffsetMinutes": 300,
-    "population": 1198818
+    "population": 1298166
   },
   {
     "iata": "SRY",

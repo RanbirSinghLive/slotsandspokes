@@ -90,6 +90,34 @@ const AIRPORTS: [iata: string, name: string][] = [
   ['YQY', 'Sydney, Nova Scotia'],
   ['YUY', 'Rouyn-Noranda'],
   ['YBG', 'Saguenay–Bagotville'],
+  // Northern, regional and boreal-forest Canada: places with few other ways
+  // in, and airports that sit inside wildfire closure zones. Schefferville,
+  // La Grande Rivière and Churchill are left out: GeoNames lists no place of
+  // 1,000 people within 60 km of them, so they would have no population.
+  ['YQT', 'Thunder Bay'],
+  ['YSB', 'Sudbury'],
+  ['YTS', 'Timmins'],
+  ['YAM', 'Sault Ste. Marie'],
+  ['YQK', 'Kenora'],
+  ['YXL', 'Sioux Lookout'],
+  ['YVO', "Val-d'Or"],
+  ['YZV', 'Sept-Îles'],
+  ['YBC', 'Baie-Comeau'],
+  ['YGP', 'Gaspé'],
+  ['YVP', 'Kuujjuaq'],
+  ['YWK', 'Wabush'],
+  ['YQR', 'Regina'],
+  ['YKA', 'Kamloops'],
+  ['YXS', 'Prince George'],
+  ['YXJ', 'Fort St. John'],
+  ['YMM', 'Fort McMurray'],
+  ['YQU', 'Grande Prairie'],
+  ['YTH', 'Thompson'],
+  ['YZF', 'Yellowknife'],
+  ['YEV', 'Inuvik'],
+  ['YXY', 'Whitehorse'],
+  ['YFB', 'Iqaluit'],
+  ['YRT', 'Rankin Inlet'],
   ['LGA', 'LaGuardia'],
   ['BOS', 'Boston Logan'],
   // The rest of North America
@@ -144,6 +172,7 @@ const AIRPORTS: [iata: string, name: string][] = [
   ['PRG', 'Prague'],
   ['BUD', 'Budapest'],
   ['ATH', 'Athens'],
+  ['SKG', 'Thessaloniki'],
   ['IST', 'Istanbul'],
   // Rest of the world
   ['DXB', 'Dubai'],
@@ -835,9 +864,11 @@ async function main(): Promise<void> {
     ? new Map((JSON.parse(readFileSync(AIRPORTS_FILE, 'utf8')) as { iata: string; population: number }[]).map((a) => [a.iata, a.population]))
     : new Map<string, number>();
 
+  const empty = points.filter((airport) => catchments.get(airport.iata)!.length === 0).map((airport) => airport.iata);
+  if (empty.length > 0) throw new Error(`No GeoNames place within ${CATCHMENT_MAX_KM} km of: ${empty.join(', ')}`);
+
   const output = points.map(({ iata, name, lat, lon }) => {
     const catchment = catchments.get(iata)!;
-    if (catchment.length === 0) throw new Error(`${iata}: no GeoNames place within ${CATCHMENT_MAX_KM} km`);
     const biggest = catchment.reduce((best, place) => (place.population > best.population ? place : best));
     return {
       iata,
