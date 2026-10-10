@@ -124,7 +124,7 @@ function legBlockedByAirspace(state: SimState, leg: ScheduleLeg): boolean {
   return !!aircraft && legAirspace(state, leg.origin, leg.dest, aircraft.typeCode).kind === 'blocked';
 }
 
-function recordCancellation(state: SimState, leg: ScheduleLeg, cause: keyof SimState['cancellationsByCause']): void {
+export function recordCancellation(state: SimState, leg: ScheduleLeg, cause: keyof SimState['cancellationsByCause']): void {
   state.cancellationsByCause[cause] = (state.cancellationsByCause[cause] ?? 0) + 1;
   state.todayFlightsCancelled += 1;
   state.flightsCancelledTotal += 1;

@@ -21,6 +21,7 @@
     "cloudtest": "tsx src/worker/saveRoutes.test.ts",
     "contracttest": "tsx src/sim/contracts.test.ts",
     "currencytest": "tsx src/sim/currencies.test.ts",
+    "controllertest": "tsx src/sim/controller.test.ts",
     "briefstest": "tsx src/sim/briefs.test.ts"
   },
   "devDependencies": {
