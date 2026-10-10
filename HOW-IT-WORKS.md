@@ -3567,8 +3567,8 @@ cost $700,000 to $800,000 and $7,000 to $8,000 a day.
 
 | New chair | Opens | First hire | Second hire |
 |---|---|---|---|
-| Chief Pilot | Regional carrier | Ingrid Solheim: hiring and retraining 25% faster ($200,000, $2,000 a day) | Dev Malhotra (Network airline, NPS 15): 50% faster ($400,000, $4,000) |
-| Director of Maintenance | Network airline | Birgit Aaltonen: base running costs −15% ($250,000, $2,500) | Tunde Bakare (Operator, NPS 15): −30% ($450,000, $4,500) |
+| Chief Pilot | Regional carrier | Ingrid Solheim: hiring and retraining 10% faster ($200,000, $2,000 a day) | Dev Malhotra (Network airline, NPS 15): 20% faster ($400,000, $4,000) |
+| Director of Maintenance | Network airline | Birgit Aaltonen: base running costs −5% ($250,000, $2,500) | Tunde Bakare (Operator, NPS 15): −30% ($450,000, $4,500) |
 | Head of Cargo | International | Nadia Karimova: freight revenue +10% ($300,000, $3,000) | Sven Lindahl (Established carrier, NPS 15): +25% ($500,000, $5,000) |
 | Head of Government Affairs | International | Lucía Fontaine: event premiums +25%, penalties −20% ($300,000, $3,000) | Obinna Eze (Established carrier, NPS 15): +50%, −40% ($500,000, $5,000) |
 

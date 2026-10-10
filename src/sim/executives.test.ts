@@ -44,8 +44,8 @@ for (const candidate of everyone) {
   state.milestonesMet = Object.fromEntries(LADDER[0].milestones.filter((milestone) => !milestone.extra).map((milestone) => [milestone.id, 0]));
   assert.equal(chairOpensAt(state, 'cpo'), null);
   assert.equal(appointExecutive(state, 'cpo-solheim').ok, true);
-  assert.equal(executiveCrewTrainingMultiplier(state), 0.75);
-  assert.equal(crewTrainingTimeFactor(state), 0.75);
+  assert.equal(executiveCrewTrainingMultiplier(state), 0.9);
+  assert.equal(crewTrainingTimeFactor(state), 0.9);
 }
 
 // A save from before the new chairs has no slots for them, and nothing breaks.

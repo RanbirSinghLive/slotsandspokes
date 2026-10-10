@@ -212,7 +212,7 @@
     "salaryPerDay": 2000,
     "effect": {
       "kind": "crew-programmes",
-      "trainingTimeMultiplier": 0.75
+      "trainingTimeMultiplier": 0.9
     }
   },
   {
@@ -227,7 +227,7 @@
     "salaryPerDay": 4000,
     "effect": {
       "kind": "crew-programmes",
-      "trainingTimeMultiplier": 0.5
+      "trainingTimeMultiplier": 0.8
     }
   },
   {
@@ -242,7 +242,7 @@
     "salaryPerDay": 2500,
     "effect": {
       "kind": "maintenance-bases",
-      "costMultiplier": 0.85
+      "costMultiplier": 0.95
     }
   },
   {
