@@ -39,6 +39,7 @@ import { revealReach } from './reach';
 import { cabinCover, FATIGUE_DELAY_MULTIPLIER, legFatigue, rollDailyCrews } from './crews';
 import { MAINTENANCE_AGE_FACTOR } from './aog';
 import { isAog, rollDailyAogs } from './aog';
+import { handBackSwaps } from './controller';
 import {
   executiveSalariesPerDay,
   rollExecutiveStanding,
@@ -209,6 +210,7 @@ export function step(state: SimState): void {
     state.cancelledToday = [];
     state.mxHoldsToday = [];
     state.retimedToday = [];
+    handBackSwaps(state);
     // Gantt moves held for tomorrow (sim/retime.ts) take effect with the new day.
     applyPendingRetimes(state);
     // Yesterday's fare-class sales, for the route view (sim/fareClasses.ts).

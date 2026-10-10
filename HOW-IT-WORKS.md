@@ -3529,6 +3529,17 @@ Each cause has a different answer available:
   nothing refunded. A plane in the air, AOG or grounded for the day can't
   be steered.
 
+  **Swap** (⇄, same block, `swapTargets()` / `swapRotation()`). Hands an
+  unstarted rotation to another plane of the same type and base that is
+  on the ground at the rotation's origin with a gap in its day, so it
+  only has targets when some plane is idle; otherwise the icon is greyed.
+  Each target is priced by replaying both planes' days with and without
+  the move (late minutes, curfew cancels) and refused when it saves
+  nothing or costs its own flights. Fee: a quarter of the target's daily
+  lease, booked as maintenance. The legs change tail for today only
+  (`swappedToday`) and go back to their plane at the morning rollover.
+  Crew duty isn't checked: same type and base means the same pool.
+
   **The call.** `callsNeeded()` lists waiting planes with a rotation to
   cancel whose day is about to break once a flight is 20 minutes overdue:
   `curfew` (the curfew will cancel a rotation), `event` (a priority flight

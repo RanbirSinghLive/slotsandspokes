@@ -1,7 +1,9 @@
 import { projectGroundedDay, type ProjectedLeg } from './cascade';
 import { dayStartMinute } from './clock';
 import { LATE_MINUTES, mandatedLeg, mandateIsActive, mandatesOf } from './mandates';
-import { marketKey, type ScheduleLeg } from './schedule';
+import { MIN_TURN_MINUTES, marketKey, type ScheduleLeg } from './schedule';
+import { isAog } from './aog';
+import { nightStopStation } from './nightStops';
 import { recordCancellation } from './step';
 import { rotationsForTail, type Rotation } from './utilisation';
 import type { SimState } from './state';
@@ -130,6 +132,131 @@ export function cancelRotation(state: SimState, legId: string): { ok: true; mess
   }
   const route = [found.rotation.legs[0].origin, ...found.rotation.legs.map((leg) => leg.dest)].join('–');
   return { ok: true, message: `CNX ${found.tail} · ${route}` };
+}
+
+/**
+ * **Swap a rotation onto another plane.** The late plane stays put for its
+ * next rotation; a plane of the same type and base that is idle at the
+ * origin flies this one instead. It only has a target when some plane's
+ * day has a gap, so in a tight network the list is empty. The legs change
+ * tail for today and go back at the morning rollover (`swappedToday`),
+ * so a one-day fix never becomes a permanent re-roster.
+ */
+export const SWAP_FEE_LEASE_DAYS = 0.25;
+
+export type SwapTarget = {
+  tail: string;
+  /** Flat fee for towing, fuelling and paperwork, scaled by what the plane leases for. */
+  fee: number;
+  /** Today's projected late minutes across both planes' remaining legs: as things stand, and after the swap. */
+  lateMinutesBefore: number;
+  lateMinutesAfter: number;
+  /** Flights the curfew would cancel across both planes: as things stand, and after the swap. */
+  curfewCancelsBefore: number;
+  curfewCancelsAfter: number;
+  /** Why this plane can't take it, or null when it can. */
+  refusal: string | null;
+};
+
+function stateWithLegsOn(state: SimState, legIds: Set<string>, tail: string): SimState {
+  return { ...state, schedule: state.schedule.map((leg) => (legIds.has(leg.legId) ? { ...leg, tail } : leg)) };
+}
+
+function dayTotals(projections: ProjectedLeg[][]): { minutes: number; cancels: number } {
+  const all = projections.flat();
+  return { minutes: lateTotals(all).minutes, cancels: all.filter((p) => p.cancelled).length };
+}
+
+/** Every same-type, same-base plane of the late plane, each with what taking the rotation would do or why it can't. */
+export function swapTargets(state: SimState, legId: string): SwapTarget[] | CancelRefusal {
+  const found = findRotation(state, legId);
+  if ('ok' in found) return found;
+  const { rotation, tail } = found;
+  const from = state.aircraft.find((a) => a.tail === tail)!;
+  const first = rotation.legs[0];
+  if (first.origin !== from.baseAirport || rotation.legs[rotation.legs.length - 1].dest !== from.baseAirport) {
+    return { ok: false, reason: 'Only a rotation that starts and ends at base can change plane' };
+  }
+  const ids = new Set(rotation.legs.map((leg) => leg.legId));
+  const handled = new Set([...state.completedToday, ...state.cancelledToday, ...(state.retimedToday ?? [])]);
+
+  const targets: SwapTarget[] = [];
+  for (const other of state.aircraft) {
+    if (other.tail === tail || other.typeCode !== from.typeCode || other.baseAirport !== from.baseAirport) continue;
+    const base: Omit<SwapTarget, 'refusal'> = {
+      tail: other.tail,
+      fee: Math.round(SWAP_FEE_LEASE_DAYS * other.leaseCostPerDay),
+      lateMinutesBefore: 0,
+      lateMinutesAfter: 0,
+      curfewCancelsBefore: 0,
+      curfewCancelsAfter: 0,
+    };
+    const refuse = (reason: string): void => void targets.push({ ...base, refusal: reason });
+    if (isAog(state, other.tail) || state.groundedTails.includes(other.tail)) refuse('Out of service');
+    else if (other.status !== 'ground') refuse('In the air');
+    else if (other.rebase || nightStopStation(state, other.tail) !== null) refuse('Away from base overnight');
+    else if (other.atAirport !== first.origin) refuse(`At ${other.atAirport ?? 'sea'}, not ${first.origin}`);
+    else if (
+      rotationsForTail(state, other.tail).some(
+        (r) => r.legs.some((leg) => !handled.has(leg.legId)) && r.departMinute < rotation.arriveMinute + MIN_TURN_MINUTES && r.arriveMinute + MIN_TURN_MINUTES > rotation.departMinute,
+      )
+    ) {
+      refuse('No gap in its day');
+    } else {
+      const beforeA = projectGroundedDay(state, tail);
+      const beforeB = projectGroundedDay(state, other.tail);
+      const swapped = stateWithLegsOn(state, ids, other.tail);
+      const afterA = projectGroundedDay(swapped, tail);
+      const afterB = projectGroundedDay(swapped, other.tail);
+      const before = dayTotals([beforeA, beforeB]);
+      const after = dayTotals([afterA, afterB]);
+      const target = {
+        ...base,
+        lateMinutesBefore: before.minutes,
+        lateMinutesAfter: after.minutes,
+        curfewCancelsBefore: before.cancels,
+        curfewCancelsAfter: after.cancels,
+      };
+      if (afterB.some((p) => p.cancelled && ids.has(p.leg.legId))) targets.push({ ...target, refusal: 'Would miss the curfew too' });
+      else if (after.cancels > before.cancels) targets.push({ ...target, refusal: 'Would cost its own flights' });
+      else if (after.cancels === before.cancels && after.minutes >= before.minutes) targets.push({ ...target, refusal: 'Saves no time' });
+      else targets.push({ ...target, refusal: null });
+    }
+  }
+  return targets.sort((a, b) => Number(a.refusal !== null) - Number(b.refusal !== null) || a.lateMinutesAfter - b.lateMinutesAfter);
+}
+
+/** Move the rotation that starts with `legId` to `toTail` for today, for a fee. Handed back at the morning rollover. */
+export function swapRotation(state: SimState, legId: string, toTail: string): { ok: true; message: string } | CancelRefusal {
+  const targets = swapTargets(state, legId);
+  if (!Array.isArray(targets)) return targets;
+  const target = targets.find((t) => t.tail === toTail);
+  if (!target) return { ok: false, reason: 'No such plane' };
+  if (target.refusal) return { ok: false, reason: target.refusal };
+  if (state.cash < target.fee) return { ok: false, reason: `Needs $${target.fee.toLocaleString()} on hand.` };
+  const found = findRotation(state, legId);
+  if ('ok' in found) return found;
+
+  state.cash -= target.fee;
+  state.todayCost += target.fee;
+  state.todayCostByCategory.maintenance += target.fee;
+  state.todayMargin -= target.fee;
+  const swapped = (state.swappedToday ??= []);
+  for (const leg of found.rotation.legs) {
+    if (!swapped.some((entry) => entry.legId === leg.legId)) swapped.push({ legId: leg.legId, fromTail: leg.tail });
+    leg.tail = toTail;
+  }
+  const route = [found.rotation.legs[0].origin, ...found.rotation.legs.map((leg) => leg.dest)].join('–');
+  return { ok: true, message: `SWAP ${found.tail} → ${toTail} · ${route}` };
+}
+
+/** Morning rollover: swapped flying goes back to the plane it was scheduled on. */
+export function handBackSwaps(state: SimState): void {
+  for (const { legId, fromTail } of state.swappedToday ?? []) {
+    const leg = state.schedule.find((l) => l.legId === legId);
+    if (leg) leg.tail = fromTail;
+  }
+  state.swappedToday = [];
 }
 
 /**

@@ -5,7 +5,7 @@ import { line, heading, lineWithInfo } from './dom';
 import { gameDate, money } from '../format';
 import { aogFor, daysUntilReturn } from '../../sim/aog';
 import { projectGroundedDay, projectRestOfDay } from '../../sim/cascade';
-import { cancelRotation, cancellableRotations, previewCancelRotation } from '../../sim/controller';
+import { cancelRotation, cancellableRotations, previewCancelRotation, swapRotation, swapTargets } from '../../sim/controller';
 import { minuteOfDay, minuteOfDayToTimeString } from '../../sim/clock';
 import { formatLoadFactor, marketLoadFactor } from '../../sim/loadFactor';
 import { ageDelayParameters } from '../../sim/delays';
@@ -318,7 +318,7 @@ function buildController(state: SimState, tail: string, changed: () => void): HT
   block.append(
     heading(
       'Needs a call',
-      'This plane is waiting and its day is projected to run late. The 22:00 curfew cancels the last rotation that cannot get home, whatever it earns. ✕ cancels a rotation you choose instead: the plane stays at base and the rest of its day recovers. A cancelled flight counts against Completion and NPS (−80 each), its slots are still paid and nothing is refunded. A priority flight cancelled this way fails.',
+      'This plane is waiting and its day is projected to run late. The 22:00 curfew cancels the last rotation that cannot get home, whatever it earns. ✕ cancels a rotation you choose instead: the plane stays at base and the rest of its day recovers. A cancelled flight counts against Completion and NPS (−80 each), its slots are still paid and nothing is refunded. A priority flight cancelled this way fails. ⇄ hands a rotation to an idle plane of the same type and base for the day instead, for a small fee; it needs a gap in that plane\'s day.',
     ),
   );
   const projectedByLeg = new Map(projection.map((p) => [p.leg.legId, p]));
@@ -367,7 +367,50 @@ function buildController(state: SimState, tail: string, changed: () => void): HT
       );
       row.append(cancel);
     }
+
     list.append(row);
+    const targets = plan?.cancelled ? [] : swapTargets(state, first.legId);
+    if (Array.isArray(targets) && targets.length > 0) {
+      const swap = document.createElement('button');
+      swap.type = 'button';
+      swap.className = 'inspector-plan-hub';
+      swap.textContent = '⇄';
+      const eligible = targets.filter((t) => t.refusal === null);
+      swap.disabled = eligible.length === 0;
+      swap.title = eligible.length > 0 ? 'Hand this rotation to an idle plane today' : `No plane can take it: ${targets[0].tail} ${targets[0].refusal}`;
+      swap.setAttribute('aria-label', swap.title);
+      const picker = document.createElement('div');
+      picker.className = 'inspector-rows';
+      picker.hidden = true;
+      for (const target of eligible) {
+        const choose = document.createElement('button');
+        choose.type = 'button';
+        choose.className = 'inspector-plan-hub';
+        choose.textContent = `${target.tail} · ${money(target.fee)}`;
+        choose.addEventListener('click', () =>
+          showConfirm({
+            title: `Swap ${name.textContent} to ${target.tail}`,
+            rows: [
+              { label: 'Late minutes', value: `${target.lateMinutesBefore} → ${target.lateMinutesAfter}` },
+              { label: 'Curfew cancels', value: `${target.curfewCancelsBefore} → ${target.curfewCancelsAfter}` },
+              { label: 'Swap fee', value: `−${money(target.fee)}` },
+            ],
+            facts: [`${target.tail} flies it today; it goes back to ${tail} tomorrow. Both planes' days are counted.`],
+            confirmLabel: 'Swap',
+            run: () => {
+              swapRotation(state, first.legId, target.tail);
+              changed();
+            },
+          }),
+        );
+        picker.append(choose);
+      }
+      swap.addEventListener('click', () => {
+        picker.hidden = !picker.hidden;
+      });
+      row.append(swap);
+      list.append(picker);
+    }
   }
   block.append(list);
   return block;
