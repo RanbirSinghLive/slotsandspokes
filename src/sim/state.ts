@@ -13,6 +13,7 @@ import { revealReach } from './reach';
 import { loadCompetitorRoutes, type CompetitorOffering } from './competitors';
 import type { WeatherEvent } from './weather';
 import type { DelayBreakdown } from './delays';
+import type { HandlingTier, StationLedger } from './stations';
 import type { HubStyle } from './hubStyle';
 import type { AogEvent } from './aog';
 import { createMarket, ensureRivalFleets, type MarketState } from './market';
@@ -403,7 +404,7 @@ export type SimState = {
    * `onTimeByMarket` above — a positioning move's delay doesn't say
    * anything about route service quality.
    */
-  delayMinutesByCause: { age: number; weather: number; knockOn: number; congestion: number };
+  delayMinutesByCause: { age: number; weather: number; knockOn: number; congestion: number; ground?: number };
   /**
    * Spill-and-recapture (sim/economy.ts's `flightResult()`):
    * how many recoverable passengers are currently waiting, per market,
@@ -668,6 +669,16 @@ export type SimState = {
    */
   rivalClosures?: RivalClosure[];
   /**
+   * Who handles the ground work at each station (sim/stations.ts). Absent
+   * means every station is contracted and home is the airline's own.
+   * Optional so older saves load.
+   */
+  stationTiers?: Record<string, HandlingTier>;
+  /** Handling steps being built, by station, and the day each opens. */
+  stationUpgrades?: Record<string, { to: 'own' | 'hub'; readyDay: number }>;
+  /** Delay minutes by cause per departure airport, today and the last finished days (sim/stations.ts). */
+  stationLedger?: Record<string, StationLedger>;
+  /**
    * Lifetime cancellations by cause — the same shape (and the same
    * purpose) as `delayMinutesByCause`. Each cause has a different answer
    * available to the player: crew shortages are answered by reserve
@@ -791,7 +802,7 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     trailingNps: STARTING_NPS,
     trailingNpsByMarket: {},
     todayNpsByMarket: {},
-    delayMinutesByCause: { age: 0, weather: 0, knockOn: 0, congestion: 0 },
+    delayMinutesByCause: { age: 0, weather: 0, knockOn: 0, congestion: 0, ground: 0 },
     spilloverByMarket: {},
     rngSeed,
     cashHistory: [],

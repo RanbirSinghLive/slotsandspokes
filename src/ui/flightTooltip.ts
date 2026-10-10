@@ -23,6 +23,7 @@ import { delayIcon, delayCodeFor, type DelayCause } from './delayCodes';
  *   age         this airframe's own unreliability, worse with age
  *   weather     weather at the departure airport
  *   congestion  the busier of its two airports (sim/airports.ts)
+ *   ground      the handler at the departure airport (sim/stations.ts)
  *   executive   minutes a flight-ops executive clawed back
  */
 
@@ -70,7 +71,7 @@ export function showFlightTooltip(
   const lateOnArrival = flight.arriveMinute - flight.scheduledArriveMinute;
   const leftLate = flight.departMinute - flight.scheduledDepartMinute;
   const rolled =
-    flight.delayByCause.age + flight.delayByCause.weather + flight.delayByCause.knockOn + flight.delayByCause.congestion;
+    flight.delayByCause.age + flight.delayByCause.weather + flight.delayByCause.knockOn + flight.delayByCause.congestion + (flight.delayByCause.ground ?? 0);
   const executiveSaving = flight.delayMinutes - rolled;
 
   const nodes: HTMLElement[] = [
@@ -100,6 +101,7 @@ export function showFlightTooltip(
     const busier = airportLoad(state, flight.origin) >= airportLoad(state, flight.dest) ? flight.origin : flight.dest;
     codes.push(row('congestion', `Congestion at ${busier}`, flight.delayByCause.congestion));
   }
+  if ((flight.delayByCause.ground ?? 0) > 0) codes.push(row('ground', `Ground handling at ${flight.origin}`, flight.delayByCause.ground));
   if (executiveSaving < 0) codes.push(row('executive', 'Flight-ops executive', executiveSaving));
   if (codes.length > 0) {
     nodes.push(line('Delay codes', 'flight-tooltip-section'));

@@ -337,7 +337,7 @@ departs (`??=` in the departure loop), same "create on first use" shape
 deleted when a market's last leg is removed: past reliability is real
 history worth keeping even for a route you've since dropped.
 
-`SimState.delayMinutesByCause: { age, weather, knockOn }` needed
+`SimState.delayMinutesByCause: { age, weather, knockOn, congestion, ground }` needed
 `step.ts`'s `rollTotalDelayMinutes()` to return a `DelayBreakdown`
 object instead of a pre-summed number, so each cause's contribution can
 be attributed before the three are added together into one flight's
@@ -3182,6 +3182,44 @@ class (`mxLevels()`), so no one's planes start deferring. The headless
 player leases only at home, and keeps its maintenance matched to its
 planes: the classes rated, a line level for every plane and a bay for every
 four (`keepMaintenance()`).
+
+## Stations (`src/sim/stations.ts`)
+
+Every departure rolls a fifth delay cause, **ground handling**, at its origin.
+Who does the handling sets the odds:
+
+| Tier | Delays | Needs | Costs |
+|---|---|---|---|
+| contract | 10% of departures, up to 20 min (15% and 25 min at fields under 60 movements a day) | nothing; the default away from home | free |
+| own staff | 5%, up to 12 min | a crew base or a line base there | $120k, $400/day, 14 days to build |
+| hub-grade | 1.5%, up to 8 min | own staff already, and 6 departures a day | $400k, $1,200/day, 30 days to build |
+
+Home starts on its own staff at no running cost and cannot go below it. A step
+up is paid at once and opens after its build days (`rollDailyStations()` at
+rollover); stepping down is instant and refunds nothing. Running costs are
+charged with the daily overhead. The build time and the running cost are what
+make a well-run hub a moat: it only pays where departures spread the cost, and
+a rival cannot copy it overnight.
+
+**The ledger.** `state.stationLedger[iata]` holds today's departures and the
+delay minutes rolled for them by cause (before any executive scaling), plus the
+last 7 finished days. `stationReadout()` turns it into average minutes per
+departure by cause, the leading cause, and how late departures left on average.
+The airport view's Station section draws it as a strip (one bar per cause, all
+on one 30-minute scale so airports compare; a tick marks the 15-minute on-time
+line) and the Airports table has a Delay column (handler circle, minutes per
+departure, leading cause).
+
+What the player can do with a reading: a long TURN share points to a longer
+turn buffer on that station's routes (sim/turnBuffer.ts); GND to a better tier;
+CONG to fewer movements in the busy hour (the hour strip); WX to nothing;
+ACFT to a younger or better-maintained fleet.
+
+A save from before stations has no tiers or ledger: every station reads as
+contracted (home as own staff) and the ledger fills from the next departure.
+The headless player steps a station up once a week when the ground minutes it
+saves, valued at $12 each, beat 1.5 times the running cost plus the fee spread
+over 180 days (`keepStations()`).
 
 ## Night stops (`src/sim/nightStops.ts`)
 

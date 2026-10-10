@@ -24,7 +24,8 @@
     "currencytest": "tsx src/sim/currencies.test.ts",
     "controllertest": "tsx src/sim/controller.test.ts",
     "briefstest": "tsx src/sim/briefs.test.ts",
-    "laddertest": "tsx src/sim/ladder.test.ts"
+    "laddertest": "tsx src/sim/ladder.test.ts",
+    "stationtest": "tsx src/sim/stations.test.ts"
   },
   "devDependencies": {
     "@types/d3-geo": "^3.1.0",

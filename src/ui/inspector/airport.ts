@@ -29,6 +29,7 @@ import { select } from '../selection';
 import { aircraftLink } from './aircraft';
 import { linkToMap } from '../mapLink';
 import { airportRightsMark } from './rights';
+import { stationSection } from './station';
 import { contractsOf } from '../../sim/contracts';
 import { cargoGlyph } from '../../render/cargo';
 import { airportCargo, bestCargoPartners, neededTonnes, producedTonnes, shortagePremium } from '../../sim/cargo';
@@ -93,6 +94,8 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
       'A crew base is where planes can be leased and based (open one on the Crews screen). A line base checks as many planes a night as its level; a hangar has a bay for each level and is where heavy-check hours are banked (the Mtc screen). A plane sleeping anywhere else, or past a base\'s capacity, has its check contracted or deferred, by the station\'s setting there.',
     ),
   );
+
+  root.append(...stationSection(state, iata, changed));
 
   // How many people want to fly from here, in words (sim/marketSize.ts);
   // the passengers you turn away are yours to count, so they stay a number.

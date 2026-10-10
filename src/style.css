@@ -5349,6 +5349,41 @@ button.ops-item:hover {
   padding: 5px 7px;
 }
 
+/* Station turnaround strip (ui/inspector/station.ts): one bar per cause, lengths on a shared scale. */
+.station-strip {
+  position: relative;
+  display: flex;
+  height: 14px;
+  margin: 4px 0;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.station-strip-seg {
+  display: block;
+  height: 100%;
+  flex: none;
+  min-width: 2px;
+}
+
+.station-strip-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #e8ecf5;
+  opacity: 0.6;
+}
+
+.station-actions {
+  display: flex;
+  gap: 6px;
+  margin: 4px 0 8px;
+}
+
+.inspector-table td.is-nowrap {
+
 /* The controller's ✕ on a rotation row: a real tap target on touch. */
 .inspector-day-row .inspector-plan-hub {
   margin: 0 0 0 8px;
@@ -5569,6 +5604,10 @@ button.ops-item:hover {
 
 .delay-icon-congestion {
   color: #ff9f6b;
+}
+
+.delay-icon-ground {
+  color: #b07ad9;
 }
 
 .delay-icon-executive {
