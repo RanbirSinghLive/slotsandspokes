@@ -370,6 +370,8 @@ export type SimState = {
   loadHistory?: { passengers: number[]; seats: number[] };
   /** The day each milestone on the ladder was met, by id (sim/ladder.ts). Optional: older saves have met none. */
   milestonesMet?: Record<string, number>;
+  /** The day the last breakdown or overdue heavy check grounded a plane (sim/aog.ts); the ladder's clean-run goal reads it. Absent until the first. */
+  lastAogDay?: number;
   /** The shock running now, or the last one until another starts (sim/shocks.ts's activeShock() says which). Optional: older saves have none. */
   shock?: Shock | null;
   /**
