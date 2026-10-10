@@ -1,6 +1,7 @@
-import { cashRunway, RUNWAY_WINDOW_DAYS } from '../sim/forecast';
+import { cashRunway, committedCostPerDay, freeCash, RESERVE_DAYS, RUNWAY_WINDOW_DAYS } from '../sim/forecast';
 import type { SimState } from '../sim/state';
 import { money } from './pnlBars';
+import { shortMoney } from './format';
 
 /**
  * The cash runway warning: how many days until Cash hits zero if the last
@@ -23,6 +24,7 @@ export const RUNWAY_CRITICAL_DAYS = 14;
 
 const rowValueEl = document.querySelector<HTMLSpanElement>('#panel-runway')!;
 const rowEl = rowValueEl.closest<HTMLElement>('.stat-card')!;
+const freeEl = rowEl.querySelector<HTMLElement>('.stat-trend')!;
 const modalEl = document.querySelector<HTMLElement>('#runway-modal')!;
 const modalDaysEl = document.querySelector<HTMLElement>('#runway-modal-days')!;
 const modalRateEl = document.querySelector<HTMLElement>('#runway-modal-rate')!;
@@ -65,6 +67,13 @@ export function updateRunway(state: SimState): boolean {
   }
   rowValueEl.textContent = text;
   rowEl.title = title;
+  // Cash left after RESERVE_DAYS of what the airline owes whether or not it flies (sim/forecast.ts).
+  const free = freeCash(state);
+  freeEl.textContent = `FREE ${shortMoney(free)}`;
+  freeEl.title =
+    `Cash less ${RESERVE_DAYS} days of daily commitments (${money(committedCostPerDay(state))}/day: leases, bases, slots, overhead, salaries, programmes). ` +
+    'What can go into growth without eating the reserve.';
+  freeEl.classList.toggle('runway-critical', free < 0);
   rowValueEl.classList.toggle('runway-warn', daysLeft !== null && daysLeft <= RUNWAY_WARN_DAYS && daysLeft > RUNWAY_CRITICAL_DAYS);
   rowValueEl.classList.toggle('runway-critical', daysLeft !== null && daysLeft <= RUNWAY_CRITICAL_DAYS);
 

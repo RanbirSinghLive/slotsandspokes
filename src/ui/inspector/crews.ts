@@ -7,7 +7,7 @@ import type { SimState } from '../../sim/state';
 import { money } from '../format';
 import { linkToMap } from '../mapLink';
 import { planeIconElement } from '../planeIcons';
-import { showConfirm } from '../confirmModal';
+import { cashAfterRows, showConfirm } from '../confirmModal';
 import * as ops from '../routeActions';
 import { select } from '../selection';
 import { baseSection } from './bases';
@@ -142,7 +142,7 @@ function crewBasesSection(state: SimState, plan: ReturnType<typeof crewPlan>, ch
     for (const c of classes) {
       buttons.append(actionButton(`Hire 1 ${c.name} · ${money(hireFee(c.classCode))}`, emptySeats === 0 || state.cash < hireFee(c.classCode), () => ops.hireCrewsAt(state, base.iata, c.classCode, 1), changed, {
         title: `Hire 1 ${c.name} crew · ${base.iata}`,
-        rows: [{ label: 'Fee now', value: money(hireFee(c.classCode)) }, { label: 'Cash after', value: money(state.cash - hireFee(c.classCode)) }],
+        rows: [{ label: 'Fee now', value: money(hireFee(c.classCode)) }, ...cashAfterRows(state, hireFee(c.classCode))],
         confirmLabel: `Hire · ${money(hireFee(c.classCode))}`,
       }));
     }
@@ -230,7 +230,7 @@ function entryRow(state: SimState, iata: string, c: ClassPlan, entry: PlaneEntry
     rows: [
       { label: 'Fee now', value: money(fee) },
       { label: 'Join', value: `day ${today + lead} (${lead}d)` },
-      { label: 'Cash after', value: money(state.cash - fee) },
+      ...cashAfterRows(state, fee),
     ],
     facts: [`Short ${entry.short} at EIS day ${entry.day}${late > 0 ? `: they join ${late}d late` : ''}.`, ...(hireCount < entry.short ? [`Training seats cap this hire at ${hireCount}.`] : [])],
     confirmLabel: `Hire · ${money(fee)}`,
@@ -251,7 +251,7 @@ function entryRow(state: SimState, iata: string, c: ClassPlan, entry: PlaneEntry
           rows: [
             { label: 'Fee now', value: money(retrainFee(c.classCode) * n) },
             { label: 'Ready', value: `day ${ready}` },
-            { label: 'Cash after', value: money(state.cash - retrainFee(c.classCode) * n) },
+            ...cashAfterRows(state, retrainFee(c.classCode) * n),
           ],
           facts: [`${donor.name} reserve drops by ${n}; they fly nothing while retraining.`],
           confirmLabel: `Convert · ${money(retrainFee(c.classCode) * n)}`,
@@ -377,7 +377,7 @@ function classRow(state: SimState, iata: string, c: ClassPlan, siblings: ClassPl
     rows: [
       { label: 'Fee now', value: money(hireFee(c.classCode)) },
       { label: 'Joins', value: `day ${dayIndex(state) + hireLeadDays(state)}` },
-      { label: 'Cash after', value: money(state.cash - hireFee(c.classCode)) },
+      ...cashAfterRows(state, hireFee(c.classCode)),
     ],
     confirmLabel: `Hire · ${money(hireFee(c.classCode))}`,
   }));
@@ -388,7 +388,7 @@ function classRow(state: SimState, iata: string, c: ClassPlan, siblings: ClassPl
       rows: [
         { label: 'Fee now', value: money(retrainFee(c.classCode)) },
         { label: 'Ready', value: `day ${dayIndex(state) + retrainDays(state)}` },
-        { label: 'Cash after', value: money(state.cash - retrainFee(c.classCode)) },
+        ...cashAfterRows(state, retrainFee(c.classCode)),
       ],
       facts: [`A ${donor.name} crew leaves that roster and flies nothing while retraining.`],
       confirmLabel: `Convert · ${money(retrainFee(c.classCode))}`,
@@ -436,7 +436,7 @@ function cabinRow(state: SimState, iata: string, c: ClassPlan, cabin: NonNullabl
     rows: [
       { label: 'Fee now', value: money(cabin.hireFee) },
       { label: 'Joins', value: `day ${dayIndex(state) + (readout?.cabinLeadDays ?? 0)}` },
-      { label: 'Cash after', value: money(state.cash - cabin.hireFee) },
+      ...cashAfterRows(state, cabin.hireFee),
     ],
     confirmLabel: `Hire · ${money(cabin.hireFee)}`,
   }));

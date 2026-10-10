@@ -35,6 +35,13 @@ import { airportHours, freeInDay, hourOf, hourPriceMultiplier } from './hours';
  * has no slots to give only when every hour is full. A slot in a busier
  * hour costs more (hourPriceMultiplier()): the peak is worth paying for,
  * not free.
+ *
+ * Tenure: a pair held HERITAGE_DAYS in a row is heritage. It pays
+ * HERITAGE_DISCOUNT less, and the share of an airport's movements flown
+ * on heritage pairs makes a rival's slots there dearer (rivalSlotQuote()).
+ * It can't be bought: giving a pair back, which happens the day nothing
+ * uses it, starts the clock again. A hub held for months is a moat that
+ * a quiet spell dissolves.
  */
 
 /**
@@ -49,6 +56,13 @@ const SLOT_BASE_FEE_PER_DAY = 50;
 const SLOT_PRICE_EXPONENT = 1.5;
 /** A slot pair adds a takeoff and a landing. */
 const MOVEMENTS_PER_PAIR = 2;
+/** Days a pair must be held, unbroken, to count as heritage. */
+export const HERITAGE_DAYS = 180;
+/** Share off the daily fee of a heritage pair. */
+const HERITAGE_DISCOUNT = 0.2;
+/** A rival's slot fee rises by this times the heritage share of an airport's movements, up to the cap. */
+const HERITAGE_RIVAL_SURCHARGE = 1;
+const HERITAGE_RIVAL_SURCHARGE_CAP = 0.5;
 
 /**
  * Average daily movements across every airport some airline serves; 0 when
@@ -83,9 +97,28 @@ export function slotsNeeded(state: SimState, iata: string): number {
   return dailyDeparturesAt(state, iata);
 }
 
-/** What the airline pays per day for every slot it holds here. */
+/** Whether the pair at this index of the airport's held list has been held long enough to be heritage. */
+function isHeritage(state: SimState, iata: string, index: number): boolean {
+  return (state.slotDaysHeld?.[iata]?.[index] ?? 0) >= HERITAGE_DAYS;
+}
+
+/** Slot pairs here held HERITAGE_DAYS or more. */
+export function heritagePairs(state: SimState, iata: string): number {
+  return (state.slotsHeld[iata] ?? []).filter((_, index) => isHeritage(state, iata, index)).length;
+}
+
+/** What the airline pays per day for every slot it holds here, heritage pairs at their discount. */
 export function slotFeesPerDayAt(state: SimState, iata: string): number {
-  return (state.slotsHeld[iata] ?? []).reduce((total, fee) => total + fee, 0);
+  return (state.slotsHeld[iata] ?? []).reduce(
+    (total, fee, index) => total + (isHeritage(state, iata, index) ? fee * (1 - HERITAGE_DISCOUNT) : fee),
+    0,
+  );
+}
+
+/** The share of this airport's movements, every airline's, flown on the player's heritage pairs. */
+function heritageShare(state: SimState, iata: string): number {
+  const movements = dailyMovementsAt(state, iata);
+  return movements > 0 ? Math.min(1, (heritagePairs(state, iata) * MOVEMENTS_PER_PAIR) / movements) : 0;
 }
 
 /**
@@ -137,7 +170,12 @@ export function rivalSlotQuote(state: SimState, a: string, b: string): number | 
   const [atA] = nextSlotFees(state, a, 1, 0, average);
   const [atB] = nextSlotFees(state, b, 1, 0, average);
   if (atA === null || atB === null) return null;
-  return atA + atB;
+  return Math.round(atA * rivalHeritageSurcharge(state, a) + atB * rivalHeritageSurcharge(state, b));
+}
+
+/** What a rival's fee at this airport is multiplied by, for the player's heritage pairs there (1 = nothing). */
+export function rivalHeritageSurcharge(state: SimState, iata: string): number {
+  return 1 + Math.min(HERITAGE_RIVAL_SURCHARGE_CAP, HERITAGE_RIVAL_SURCHARGE * heritageShare(state, iata));
 }
 
 export type SlotQuote = { iata: string; fees: number[]; full: boolean };
@@ -213,16 +251,32 @@ export function acquireNeededSlots(state: SimState): void {
  * first), then return what the rest cost today. The caller charges it.
  */
 export function settleSlotsForDay(state: SimState): number {
+  const daysHeld = (state.slotDaysHeld ??= {});
   let total = 0;
   for (const iata of Object.keys(state.slotsHeld)) {
     const held = state.slotsHeld[iata];
+    // Tenure runs alongside the fees by position. A pair added without it
+    // (taken today, or from an older save) starts at 0; extras are dropped.
+    const days = daysHeld[iata] ?? [];
+    while (days.length < held.length) days.push(0);
+    days.length = held.length;
     const unused = held.length - slotsNeeded(state, iata);
     if (unused > 0) {
-      held.sort((a, b) => a - b);
-      held.splice(held.length - unused, unused);
+      const dearestFirst = held.map((_, index) => index).sort((a, b) => held[b] - held[a] || b - a);
+      const giveBack = dearestFirst.slice(0, unused).sort((a, b) => b - a);
+      for (const index of giveBack) {
+        held.splice(index, 1);
+        days.splice(index, 1);
+      }
     }
-    if (held.length === 0) delete state.slotsHeld[iata];
-    else total += held.reduce((sum, fee) => sum + fee, 0);
+    if (held.length === 0) {
+      delete state.slotsHeld[iata];
+      delete daysHeld[iata];
+      continue;
+    }
+    daysHeld[iata] = days.map((count) => count + 1);
+    total += slotFeesPerDayAt(state, iata);
   }
+  for (const iata of Object.keys(daysHeld)) if (!state.slotsHeld[iata]) delete daysHeld[iata];
   return total;
 }
