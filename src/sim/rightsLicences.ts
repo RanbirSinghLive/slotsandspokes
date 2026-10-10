@@ -8,12 +8,11 @@ import type { ScheduleLeg } from './schedule';
 import type { SimState } from './state';
 
 /**
- * Buying domestic rights in a foreign country (the plan is
- * roadmap/air-rights-earn-buy.md). Rights are earned, then paid for, then
+ * Buying domestic rights in a foreign country (see HOW-IT-WORKS.md). Rights are earned, then paid for, then
  * kept by flying them, so no one grant is a cheap permanent edge:
  *
  *  - Earned: 120 days of international service into the country, at least
- *    two departures a day touching it (14 a week), on time at least 80% of
+ *    two departures a day touching it (14 a week), on time at least 60% of
  *    the time. Cash cannot rush this.
  *  - Bought: a setup fee and a yearly levy, both scaled to the country's
  *    population. Only after the widebody tier, with one licence per tier

@@ -185,11 +185,11 @@ export function isOnTimeArrival(arriveMinute: number, scheduledArriveMinute: num
 export type DelayBreakdown = { age: number; weather: number; knockOn: number; congestion: number; ground: number };
 
 /**
- * Roll a departing flight's total arrival delay from all four causes
- * above, threading `state.rngSeed` through the three that need it (age,
- * weather, then congestion). Returns [breakdown, nextSeed] — the same second-element
+ * Roll a departing flight's total arrival delay from all five causes
+ * above, threading `state.rngSeed` through the four that need it (age,
+ * weather, congestion, then ground handling). Returns [breakdown, nextSeed] — the same second-element
  * shape nextRandom() itself returns, so the caller just does
- * `state.rngSeed = nextSeed`; sum `breakdown`'s three fields for the
+ * `state.rngSeed = nextSeed`; sum `breakdown`'s five fields for the
  * actual minutes to add to a flight's arrival time.
  */
 export function rollTotalDelayMinutes(
