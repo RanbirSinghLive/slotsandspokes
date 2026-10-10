@@ -29,5 +29,19 @@ with contract handling everywhere but home.
    daily rollover and running cost.
 3. `ui/inspector/station.ts`, the airport view section and the Airports Delay column.
 4. Headless player `keepStations()`; `npm run stationtest`.
+5. Hub moat: a station tier lifts the airport's effective capacity in the
+   congestion roll (`airportLoadAt()` read by `rollCongestionDelay()` in
+   `sim/delays.ts`), so a busy hub queues later. Not built yet. Defaults to
+   settle before building:
+   - The lift is small and scales with tier (own staff a few percent,
+     hub-grade more), and applies to the congestion cause only.
+   - The lift is earned: it builds over weeks at the tier and lapses when daily
+     departures fall under the tier's floor, so it cannot be bought once and
+     left (a cheap permanent edge is a bug).
+   - The airport view's delay strip already splits the causes; congestion
+     shrinking there is how the player sees it work, with no new words.
+   - Separate from slot tenure (slots.ts): the two hub moats are tuned one at a
+     time, tenure first.
+   - Rivals ignore it for now.
 
 How it works lives in HOW-IT-WORKS.md (Stations).
