@@ -207,9 +207,9 @@
     "background": "Training standards",
     "flavor": "A line captain who moved into the simulator building. Her crews come out of training a week sooner and complain less.",
     "npsNeeded": null,
-    "requiresTier": "regional",
-    "signingFee": 200000,
-    "salaryPerDay": 2000,
+    "requiresTier": "network",
+    "signingFee": 400000,
+    "salaryPerDay": 4000,
     "effect": {
       "kind": "crew-programmes",
       "trainingTimeMultiplier": 0.9
@@ -222,9 +222,9 @@
     "background": "Fleet transition",
     "flavor": "Has converted whole pilot groups between types without a cancelled flight. Keeps a spreadsheet of who flies what and why.",
     "npsNeeded": 15,
-    "requiresTier": "network",
-    "signingFee": 400000,
-    "salaryPerDay": 4000,
+    "requiresTier": "operator",
+    "signingFee": 700000,
+    "salaryPerDay": 7000,
     "effect": {
       "kind": "crew-programmes",
       "trainingTimeMultiplier": 0.8
@@ -237,9 +237,9 @@
     "background": "Line maintenance",
     "flavor": "Started on the night shift at an outstation. Runs every base like she is the one waiting for the part.",
     "npsNeeded": null,
-    "requiresTier": "network",
-    "signingFee": 250000,
-    "salaryPerDay": 2500,
+    "requiresTier": "international",
+    "signingFee": 500000,
+    "salaryPerDay": 5000,
     "effect": {
       "kind": "maintenance-bases",
       "costMultiplier": 0.95
@@ -253,8 +253,8 @@
     "flavor": "Planned the bays of a three-hangar overhaul base. Fills a hangar the way a chess player fills a board.",
     "npsNeeded": 15,
     "requiresTier": "operator",
-    "signingFee": 450000,
-    "salaryPerDay": 4500,
+    "signingFee": 700000,
+    "salaryPerDay": 7000,
     "effect": {
       "kind": "maintenance-bases",
       "costMultiplier": 0.7

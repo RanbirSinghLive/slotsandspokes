@@ -33,15 +33,17 @@ for (const candidate of everyone) {
   if (candidate.requiresTier) assert.ok(LADDER.some((tier) => tier.id === candidate.requiresTier), candidate.id);
 }
 
-// A new airline sees the chief pilot's chair locked until it becomes a regional carrier.
+// A new airline sees the chief pilot's chair locked until it becomes a network airline.
 {
   const state = newState();
-  assert.equal(chairOpensAt(state, 'cpo'), 'Regional carrier');
+  assert.equal(chairOpensAt(state, 'cpo'), 'Network airline');
   assert.equal(chairOpensAt(state, 'coo'), null);
-  assert.match(appointBlockedReason(state, candidateById('cpo-solheim')!) ?? '', /Needs Regional carrier/);
+  assert.match(appointBlockedReason(state, candidateById('cpo-solheim')!) ?? '', /Needs Network airline/);
   assert.equal(appointExecutive(state, 'cpo-solheim').ok, false);
   // The same hire works once the tier is climbed.
-  state.milestonesMet = Object.fromEntries(LADDER[0].milestones.filter((milestone) => !milestone.extra).map((milestone) => [milestone.id, 0]));
+  state.milestonesMet = Object.fromEntries(
+    LADDER.slice(0, 2).flatMap((tier) => tier.milestones.filter((milestone) => !milestone.extra).map((milestone) => [milestone.id, 0])),
+  );
   assert.equal(chairOpensAt(state, 'cpo'), null);
   assert.equal(appointExecutive(state, 'cpo-solheim').ok, true);
   assert.equal(executiveCrewTrainingMultiplier(state), 0.9);

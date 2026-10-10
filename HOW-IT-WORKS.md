@@ -3527,8 +3527,8 @@ cash rises 5–65% by home (WEEK-TEN.md, thread 2).
 The player is the chief executive; seven chairs are theirs to fill, at
 Head office (Network › Head office): **COO**, **CFO** and **CCO** from
 the start, and four more that open as the airline climbs the ladder:
-Chief Pilot (Regional carrier), Director of Maintenance (Network
-airline), Head of Cargo and Head of Government Affairs (International).
+Chief Pilot (Network airline), Director of Maintenance
+(International), Head of Cargo and Head of Government Affairs (International).
 A chair none of whose candidates the airline has reached yet shows greyed
 with a lock and the tier that opens it. Each
 candidate (`data/executives.json`) is a named person with a background,
@@ -3567,8 +3567,8 @@ cost $700,000 to $800,000 and $7,000 to $8,000 a day.
 
 | New chair | Opens | First hire | Second hire |
 |---|---|---|---|
-| Chief Pilot | Regional carrier | Ingrid Solheim: hiring and retraining 10% faster ($200,000, $2,000 a day) | Dev Malhotra (Network airline, NPS 15): 20% faster ($400,000, $4,000) |
-| Director of Maintenance | Network airline | Birgit Aaltonen: base running costs −5% ($250,000, $2,500) | Tunde Bakare (Operator, NPS 15): −30% ($450,000, $4,500) |
+| Chief Pilot | Network airline | Ingrid Solheim: hiring and retraining 10% faster ($400,000, $4,000 a day) | Dev Malhotra (Operator, NPS 15): 20% faster ($700,000, $7,000) |
+| Director of Maintenance | International | Birgit Aaltonen: base running costs −5% ($500,000, $5,000) | Tunde Bakare (Operator, NPS 15): −30% ($700,000, $7,000) |
 | Head of Cargo | International | Nadia Karimova: freight revenue +10% ($300,000, $3,000) | Sven Lindahl (Established carrier, NPS 15): +25% ($500,000, $5,000) |
 | Head of Government Affairs | International | Lucía Fontaine: event premiums +25%, penalties −20% ($300,000, $3,000) | Obinna Eze (Established carrier, NPS 15): +50%, −40% ($500,000, $5,000) |
 
