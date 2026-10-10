@@ -154,7 +154,7 @@ export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
     const aircraft = state.aircraft.find((a) => a.tail === event.tail);
     if (aircraft && event.refitTo === 'business') aircraft.cabin = 'business';
     if (aircraft && event.refitTo === 'economy') delete aircraft.cabin;
-    if (aircraft && event.check) finishHeavyCheck(aircraft);
+    if (aircraft && event.check) finishHeavyCheck(state, aircraft);
     handBackFlying(state, event);
   }
   startRefits(state, dayStartMinute);

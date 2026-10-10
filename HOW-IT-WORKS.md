@@ -3238,6 +3238,15 @@ resets both. Nothing reads them yet except the Mtc card's clock line ("12h ·
 9 cyc"). A plane from an older save counts from zero. They are what the A and
 C checks will run on (WEEK-TWENTYTWO.md).
 
+**Maintenance is paid at the check.** One fifth of a flight's non-fuel block
+cost (`MAINTENANCE_SHARE_OF_NON_FUEL`) is maintenance. A landed flight does
+not pay it: it goes to the plane's reserve (`maintenanceReserve`), and the
+heavy check pays it all when it finishes (`settleMaintenance()`), as a
+maintenance cost that day. A plane handed back to the lessor pays what it has
+built up first, so returning a plane just before its check saves nothing.
+Route margins, rivals and planners still count the whole flight cost, so
+only when the money leaves moves. The Mtc card shows what is due.
+
 **What you see:**
 - **The Mtc screen's Fleet board:** a strip of how many planes are
   serviceable, on watch, due for action (held, or a heavy check overdue),
