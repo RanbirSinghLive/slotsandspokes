@@ -3,6 +3,7 @@ import { dayIndex } from '../sim/clock';
 import type { SimState } from '../sim/state';
 import { GAME_VERSION } from './version';
 import { cloudLinkInfo } from './cloudSave';
+import { syncBriefSettings } from './briefWindow';
 
 /**
  * The Game screen: Save, Load, the save as a file (export and import),
@@ -124,4 +125,5 @@ export function setupGameControls(state: SimState): void {
  */
 export function updateGameControls(): void {
   loadGameButton.disabled = !hasSavedState();
+  syncBriefSettings();
 }

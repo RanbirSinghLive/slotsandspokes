@@ -1,6 +1,6 @@
 import { endSeasonalLeases } from './seasonalLease';
 import { demandFactors, rollDailyDemandEvents } from './demandEvents';
-import { morningHolds, rollNightlyChecks, wornAge } from './mxChecks';
+import { morningHolds, recordFlown, rollNightlyChecks, wornAge } from './mxChecks';
 import { chargeNightStops } from './nightStops';
 import { applyPendingRetimes } from './retime';
 import { rollDailyFareWars } from './fareWars';
@@ -576,6 +576,8 @@ export function step(state: SimState): void {
       aircraft.atAirport = flight.dest;
       aircraft.activeLegId = null;
       aircraft.groundSinceMinute = state.simMinute;
+      // Ground delay is part of the arrival time but is not time in the air.
+      recordFlown(aircraft, flight.arriveMinute - flight.departMinute - flight.delayMinutes);
 
       const type = aircraftTypesByCode.get(aircraft.typeCode);
       if (type) {

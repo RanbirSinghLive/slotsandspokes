@@ -1557,6 +1557,32 @@ it back. The rules:
   warns when its new plane's longer day needs more crews than the base
   has.
 
+**Swap, and planning a draft** (`sim/scheduleDraft.ts`). A drop onto a
+plane that has other rotations in that time of day **swaps**: those
+rotations go to the dragged one's plane at their own times (a lone one
+can also take the place the dragged one left), all or nothing. One long
+flight dropped on two short ones sends both across. The tip reads "⇄
+C-P001 ×2" and the rotations that would trade are outlined green. A drop
+that fails only because it sits on other flights (and can't swap) is
+**held as a draft** instead of refused: the timeline plans on a copy of
+the state (`structuredClone`), flights may overlap, and overlaps draw red
+and striped. A pencil bar with a count shows over the timeline: ✓ (green,
+tooltip "Verify and save") replays every drop on the real state with
+`commitDraft()`, which makes the moves with overlaps allowed and then
+checks every plane they touched joins up (no flight on top of another,
+each leaving from where the plane is). Any failure puts everything back
+and says why, and the draft stays open. ↶ takes back the last drop and ✕
+throws the draft away. The draft is UI-only: it is kept in this browser's storage (not in the save)
+and replayed when the page reloads, dropped if it no longer fits or is
+another game's. A draft whose flights are all back where the real
+schedule has them closes itself. Inside a draft a night stop can't be
+made or undone.
+
+A dragged rotation **snaps** (`snapStart()`) to within 10 minutes of the
+flight before it (its turn included), the flight after it, or the ends of
+the usable day. On touch the × shows on every rotation and rows are
+taller, and a faint line marks each hour tick down the rows.
+
 `rotationsForTail()` (in `sim/utilisation.ts`, so it stays testable
 without a browser) derives rotations by splitting a tail's departure-
 sorted legs wherever one lands at its base. Nothing is stored: a
@@ -3234,6 +3260,12 @@ An earlier version took every plane out for 1–3 days every 30 days. A
 fleet flown near capacity had no spare planes to take its flying, so
 the cancellations cost Toronto most of its year on 18 seeds.
 
+**Usage clocks.** Each landed flight adds its airborne minutes (ground delay
+excluded) and one cycle to the plane (`recordFlown()`); a finished heavy check
+resets both. Nothing reads them yet except the Mtc card's clock line ("12h ·
+9 cyc"). A plane from an older save counts from zero. They are what the A and
+C checks will run on (WEEK-TWENTYTWO.md).
+
 **What you see:**
 - **The Mtc screen's Fleet board:** a strip of how many planes are
   serviceable, on watch, due for action (held, or a heavy check overdue),
@@ -3534,6 +3566,17 @@ failure costs.
   open or running event; a list at the top of the Schedule panel; Ops-lens
   stars on running routes. The headless player accepts when the plane's
   base has a spare crew and won't drop a market carrying one.
+
+## Daily brief and season review (`src/sim/briefs.ts`, `src/ui/briefWindow.ts`)
+
+Two read-only briefs. They change no economy; `sim/briefs.ts` decides when each is due and what it says, `ui/briefWindow.ts` draws it.
+
+- **Daily brief** at 05:30 home time, once a day. Icon chips, each with a tooltip and a tap that opens the screen that fixes it: weather (and closed airports), closed or announced airspace, AOGs, maintenance holds, crews short within 3 days, events flying today, and yesterday's cancellations. A line gives yesterday's DEP, OTP and CNX. A quiet morning shows a green tick and folds itself into its tab after a few seconds. At 100x it arrives already folded.
+- **Season review** every 182 days, counted from the game's first frame (a save from before briefs starts its count when loaded). Routes ranked by profit over that half year (revenue less route costs, from `marketTotals` against the snapshot taken at the last review), top three outlined green and bottom three red; a ▲/▼/▬ for how the seasonal demand curve (`sim/seasons.ts`) changes in the next half year against the last; a dot where demand exceeds seats, a ring for a route no longer flown; and the three airports with the most unserved passengers. Tapping a row opens that route. The first appearance pauses the clock (Space resumes).
+- **The window** floats over the map and is dragged by its header (mouse or pen); on touch it docks above the tab strip instead. Minimizing folds it into an icon tab under the map. Position and tabs are screen state, not saved.
+- **Settings** (Game screen, Messages): daily on/off, season on/off, pause on season on/off, and a reopen button for each. Off means no pop-up; reopening still works. Stored in `state.briefs` (optional; an old save has both on).
+
+`npm run briefstest` checks one brief a day, the review on day 182, ranked rows and a save round trip.
 
 ## What isn't built yet
 

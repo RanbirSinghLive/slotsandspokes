@@ -94,10 +94,11 @@ import { cashNeededToLease, LEASE_RESERVE_DAYS, leaseRateFor, loadLeaseRates } f
 import { inboundAt, orderLease } from './fleetTiming';
 import { startSeatSale as startSeatSaleRule } from './seatSale';
 import { SEASON_DAYS, SEASONAL_PREMIUM } from './seasonalLease';
-import { deferredItems, heavyBankedMinutes, heavyBayTails, heavyCheckDueIn, heavyCheckOpen, heavyCheckWorkMinutes, sleepersNow, tonightCheck } from './mxChecks';
+import { cyclesSinceHeavy, deferredItems, flightHoursSinceHeavy, heavyBankedMinutes, heavyBayTails, heavyCheckDueIn, heavyCheckOpen, heavyCheckWorkMinutes, sleepersNow, tonightCheck } from './mxChecks';
 import { rebaseOptions, rebasePlane, type RebaseOption } from './rebase';
 import { cabinGainPerDay, cabinOf, cancelRefit as cancelRefitRule, orderRefit as orderRefitRule, refitBlockedReason, refitCost, refitDays, type Cabin } from './cabins';
 import { commitBringHome, commitRetime, planBringHome, planRetime, type RetimePlan } from './retime';
+import { commitDraft, conflictingLegIds, planDrop, snapStart, type DraftMove, type DropPlan } from './scheduleDraft';
 import { daysUntilNextListing, listingsOf, returnBlockedReason, returnFee, returnLease, takeListing, type MarketListing } from './market';
 import { airlineCalled, classOpen, tierThatOpens } from './ladder';
 import { actualDailyDemand, currentPotentialDemand } from './marketDemand';
@@ -618,6 +619,44 @@ export function retimeRotation(state: SimState, legIds: string[], toTail: string
   return commitRetime(state, legIds, toTail, startMinute);
 }
 
+/** What dropping a rotation here would do: a move, a swap with the rotations in its way, or a hold in the draft (sim/scheduleDraft.ts). */
+export function planDropRotation(state: SimState, legIds: string[], toTail: string, startMinute: number, inDraft = false): DropPlan {
+  return planDrop(state, legIds, toTail, startMinute, inDraft);
+}
+
+/** Where a rotation dragged to this start settles when it is pulled to a neighbouring flight or the day's ends (sim/scheduleDraft.ts). */
+export function snappedStart(state: SimState, legIds: string[], toTail: string, startMinute: number): number {
+  return snapStart(state, legIds, toTail, startMinute);
+}
+
+/** Make a drop's moves for real: all or nothing, the planes they touch checked afterwards. */
+export function dropRotation(state: SimState, moves: DraftMove[]): Outcome<{ message: string }> {
+  return commitDraft(state, moves);
+}
+
+/** Make a drop's moves in a draft copy of the state, where flights may overlap until it is verified. */
+export function dropRotationInDraft(draft: SimState, moves: DraftMove[]): Outcome<{ message: string }> {
+  return commitDraft(draft, moves, { final: false });
+}
+
+/** Check a draft's moves against the real state, changing nothing: null when they would all go through. */
+export function draftProblem(state: SimState, moves: DraftMove[]): string | null {
+  const result = commitDraft(state, moves, { dryRun: true });
+  return result.ok ? null : result.reason;
+}
+
+/** Save a draft: its moves made on the real state, all or nothing. */
+export function saveDraft(state: SimState, moves: DraftMove[]): Outcome<{ message: string }> {
+  return commitDraft(state, moves);
+}
+
+/** The flights in a state that sit on top of one another or break the plane's chain, for marking in a draft. */
+export function overlappingLegs(state: SimState): Set<string> {
+  return conflictingLegIds(state);
+}
+
+export type { DraftMove, DropPlan };
+
 /** Every other crew base a plane could ferry to (sim/rebase.ts), with its cost and crews there. */
 export function rebaseOptionsFor(state: SimState, tail: string): { blocked: string | null; options: RebaseOption[] } {
   return rebaseOptions(state, tail);
@@ -643,6 +682,9 @@ export type HeavyCheckReadout = {
   /** Whether nights at base are counting toward it yet. */
   open: boolean;
   bankedHours: number;
+  /** Airborne hours and cycles since the last heavy check (sim/mxChecks.ts). */
+  flightHours: number;
+  cycles: number;
   workHours: number;
   /** Grounded for it, having gone too far overdue. */
   inCheck: boolean;
@@ -663,6 +705,8 @@ export function heavyCheckReadouts(state: SimState): HeavyCheckReadout[] {
       dueIn: heavyCheckDueIn(aircraft),
       open: heavyCheckOpen(aircraft),
       bankedHours: Math.round((heavyBankedMinutes(aircraft) / 60) * 10) / 10,
+      flightHours: Math.round(flightHoursSinceHeavy(aircraft)),
+      cycles: cyclesSinceHeavy(aircraft),
       workHours: heavyCheckWorkMinutes(aircraft.typeCode) / 60,
       inCheck: state.aogs.some((event) => event.tail === aircraft.tail && event.check),
       inBay: bays.has(aircraft.tail),

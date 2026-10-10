@@ -1151,6 +1151,16 @@ button,
   border-radius: 3px;
 }
 
+/* A line at each hour tick on a plane's row (ui/panels.ts). */
+.timeline-gridline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.07);
+  pointer-events: none;
+}
+
 /* Planes are grouped by type under a header that folds the group away;
    every rotation block takes its type's colour (--puck, TYPE_COLOURS in
    ui/planeIcons.ts). */
@@ -1352,6 +1362,89 @@ button,
   background: #9fb4ff;
 }
 
+/* Planning a draft (ui/panels.ts): flights may overlap until the green
+   check saves them. The bar holds icons only; their tips name them. */
+#timeline-draft-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+#timeline-draft-bar[hidden] {
+  display: none;
+}
+
+#timeline-draft-bar .draft-mark {
+  margin-right: auto;
+  font-size: 12px;
+  color: #ffd166;
+}
+
+.draft-button {
+  width: 26px;
+  height: 22px;
+  padding: 0;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1;
+  color: #e6e9f0;
+  background: #11151f;
+  border: 1px solid #2a3142;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.draft-button.is-save {
+  color: #0a0c12;
+  background: #3ddc84;
+  border-color: #3ddc84;
+}
+
+.draft-button.is-discard:hover {
+  color: #ff8080;
+  border-color: #ff8080;
+}
+
+@media (pointer: coarse) {
+  .draft-button {
+    width: 44px;
+    height: 36px;
+    font-size: 18px;
+  }
+}
+
+#rotations-timeline.is-planning {
+  outline: 1px dashed #ffd166;
+  outline-offset: 3px;
+}
+
+/* A rotation moved in the draft, and red where flights now sit on each other. */
+.timeline-rotation.is-draft {
+  z-index: 1;
+  border-style: dashed;
+  border-color: #ffd166;
+}
+
+.timeline-rotation.is-conflict {
+  background: repeating-linear-gradient(135deg, rgba(255, 92, 92, 0.35) 0 4px, rgba(255, 92, 92, 0.12) 4px 8px);
+  border-color: #ff5c5c;
+}
+
+/* While dragging: the rotations that would trade places with the held one, and a drop that will be held as an overlap. */
+.timeline-rotation.is-swapping {
+  box-shadow: 0 0 0 1px #3ddc84;
+  background: color-mix(in srgb, #3ddc84 25%, transparent);
+}
+
+.timeline-rotation.is-dragging.is-hold {
+  box-shadow: 0 0 0 1px #ffd166, 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+.timeline-rotation.is-dragging.is-hold::after {
+  background: #ffd166;
+}
+
 /* A move held for tomorrow (sim/retime.ts): dashed where it will sit. */
 .timeline-pending {
   position: absolute;
@@ -1408,6 +1501,37 @@ button,
 .timeline-rotation .rotation-remove-button.is-armed,
 .timeline-rotation .rotation-remove-button.is-linked {
   display: block;
+}
+
+/* On touch: taller rows to hit, and × always showing, since there is no hover to reveal it. */
+@media (pointer: coarse) {
+  .timeline-track {
+    height: 30px;
+  }
+
+  .timeline-rotation .rotation-remove-button {
+    display: block;
+    opacity: 0.6;
+    top: -9px;
+    right: -9px;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    line-height: 1;
+    font-size: 14px;
+  }
+
+  .timeline-rotation .rotation-remove-button.is-armed {
+    opacity: 1;
+  }
+
+  .timeline-rotation .night-home-button {
+    top: -9px;
+    left: -9px;
+    width: 22px;
+    height: 22px;
+    font-size: 14px;
+  }
 }
 
 #rotations-empty {
@@ -5194,4 +5318,193 @@ button.ops-item:hover {
 /* The events switch beside the level (ui/homePicker.ts): a star, lit while events are on. */
 .home-season button[data-events] {
   padding: 5px 7px;
+}
+
+/* The daily brief and season review window (ui/briefWindow.ts), and the tabs it folds into. */
+#brief-window {
+  position: fixed;
+  top: 130px;
+  left: 16px;
+  width: 300px;
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  background: rgba(14, 18, 28, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  z-index: 45;
+}
+#brief-window[hidden],
+#brief-tabs[hidden] {
+  display: none;
+}
+#brief-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  cursor: grab;
+  touch-action: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 13px;
+}
+#brief-minimize {
+  min-width: 28px;
+  min-height: 24px;
+}
+#brief-body {
+  overflow-y: auto;
+  padding: 8px;
+}
+#brief-tabs {
+  position: fixed;
+  left: calc(var(--rail-width) + 8px);
+  bottom: 32px;
+  display: flex;
+  gap: 6px;
+  z-index: 44;
+}
+.brief-tab {
+  min-width: 36px;
+  min-height: 32px;
+  border-radius: 8px 8px 0 0;
+  background: rgba(14, 18, 28, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  position: relative;
+}
+.brief-tab.is-open {
+  border-color: #ffd166;
+}
+.brief-tab.is-unread::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ffd166;
+}
+.brief-chips,
+.brief-gaps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.brief-chip {
+  font-size: 13px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  min-height: 28px;
+}
+.brief-chip.is-ok {
+  color: #7fd88f;
+  border-color: #7fd88f;
+}
+.brief-chip.is-aog,
+.brief-chip.is-closure,
+.brief-chip.is-late {
+  border-color: #ff8080;
+}
+.brief-chip.is-hold,
+.brief-chip.is-crew,
+.brief-chip.is-weather,
+.brief-chip.is-event {
+  border-color: #ffd166;
+}
+.brief-yesterday {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  opacity: 0.75;
+  flex-basis: 100%;
+}
+.brief-total {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 18px;
+  color: #7fd88f;
+  margin-bottom: 6px;
+}
+.brief-total.is-loss {
+  color: #ff8080;
+}
+.brief-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.brief-row {
+  display: grid;
+  grid-template-columns: 64px 1fr 16px 16px;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 6px;
+  min-height: 28px;
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.brief-row.is-top {
+  border-color: rgba(127, 216, 143, 0.5);
+}
+.brief-row.is-bottom {
+  border-color: rgba(255, 128, 128, 0.5);
+}
+.brief-bar {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.brief-bar span {
+  display: block;
+  height: 100%;
+}
+.brief-bar .is-gain {
+  background: #7fd88f;
+}
+.brief-bar .is-loss {
+  background: #ff8080;
+}
+.brief-outlook.is-up {
+  color: #7fd88f;
+}
+.brief-outlook.is-down {
+  color: #ff8080;
+}
+.brief-flags {
+  color: #ffd166;
+}
+.brief-gaps {
+  margin-top: 8px;
+}
+#brief-settings {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 10px;
+  align-items: center;
+}
+@media (pointer: coarse) {
+  /* Touch has no drag: the window docks above the tab strip. */
+  #brief-window {
+    top: auto;
+    left: 8px;
+    right: 8px;
+    bottom: 68px;
+    width: auto;
+    max-height: 45vh;
+    z-index: 56;
+  }
+  #brief-tabs {
+    left: 8px;
+    bottom: 32px;
+  }
+  .brief-tab {
+    min-width: 44px;
+    min-height: 40px;
+  }
 }
