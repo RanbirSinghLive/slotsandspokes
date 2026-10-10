@@ -44,7 +44,7 @@ function openScreen(selection: Selection, scrollTo?: string): () => void {
 const STEPS: Step[] = [
   {
     title: 'Pick your home',
-    text: 'Your airline starts with one leased Propeller at the city you choose. Standard homes are the gentlest start; Hard and Brutal ones have thin markets, and more contract help.',
+    text: 'Your airline starts with one leased Propeller at the city you choose. Big-city homes are the gentlest start; small ones have thin markets, and more contract help. Easy, Medium and Hard set your cash and how soon rivals arrive.',
     target: '#home-picker-modal .modal-box',
     until: (_state, choosingHome) => !choosingHome,
     required: true,
@@ -68,7 +68,7 @@ const STEPS: Step[] = [
   },
   {
     title: "Today's operation",
-    text: 'DEP · AIR · TO GO · LATE · CNX is how today is going. The bars under it are each day: green made money, red lost it. Hover them for the whole chart.',
+    text: 'DEP · AIR · TO GO · LATE · CNX is how today is going. The bars under it are each day: green made money, red lost it. Hover them for the whole chart. An amber ★ is an event: a priority flight that pays a premium. The game pauses when one arrives.',
     target: '#hud',
   },
   {
@@ -99,7 +99,7 @@ const STEPS: Step[] = [
   },
   {
     title: 'Head office',
-    text: 'Fuel and hedging, contracts, three executive chairs to fill (click one to meet its candidates), and the innovations each rung of the ladder opens, as a tree.',
+    text: 'Fuel and hedging, contracts, bag and seat fees (they earn per passenger but cost NPS), domestic air rights abroad, seven executive chairs that open up the ladder (click one to meet its candidates), and the innovations each rung opens, as a tree.',
     target: '#rail .rail-item[data-go="headOffice"]',
   },
   {
