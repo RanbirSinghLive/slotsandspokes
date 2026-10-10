@@ -1,3 +1,4 @@
+import { ancillaryLevel } from '../sim/ancillaries';
 import { DIFFICULTIES, type GameDifficulty } from '../sim/difficulty';
 import { currentPotentialDemand } from '../sim/marketDemand';
 import { marketLoadFactor } from '../sim/loadFactor';
@@ -381,6 +382,7 @@ function steadyPlayer(kind: 'steady' | 'sitter' | 'bold'): Player {
         ...runSeatSales(state),
         ...adoptInnovations(state),
         ...(kind === 'steady' ? hedgeWhenCheap(state) : []),
+        ...(kind === 'steady' ? setFees(state) : []),
         ...(kind === 'steady' ? hireExecutives(state) : []),
       ];
     },
@@ -1186,6 +1188,17 @@ function hedgeWhenCheap(state: SimState): string[] {
   if (state.cash < quote.premium + INNOVATION_RESERVE_DAYS * leases) return [];
   const hedged = actions.hedgeFuel(state, quote.days);
   return hedged.ok ? [hedged.message] : [];
+}
+
+// --- Fees ----------------------------------------------------------------------------
+
+/** The fee level the steady player runs from its first day. */
+export const STEADY_FEE_LEVEL = Number(process.env.AIRGAME_FEE_LEVEL ?? 0) as 0 | 1 | 2;
+
+function setFees(state: SimState): string[] {
+  if (ancillaryLevel(state) === STEADY_FEE_LEVEL) return [];
+  const set = actions.setAncillaryFees(state, STEADY_FEE_LEVEL);
+  return set.ok ? [set.message] : [];
 }
 
 // --- Executives --------------------------------------------------------------------

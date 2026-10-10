@@ -11,6 +11,7 @@ import { USABLE_DAY_START_MINUTE } from './utilisation';
 import { crowdingWeight } from './timeOfDay';
 import { cabinLayout, cabinOf } from './cabins';
 import aircraftTypesData from '../../data/aircraft-types.json';
+import { ancillaryNpsPenalty, rollAncillaries } from './ancillaries';
 import { flightResult, type EconomyAircraftType } from './economy';
 import { carryCargo, rollDailyCargo } from './cargo';
 import { MIN_TURN_MINUTES, legsServingMarket, marketDepartMinutes, marketKey, type ScheduleLeg } from './schedule';
@@ -181,6 +182,7 @@ export function step(state: SimState): void {
     // The trailing NPS (sim/nps.ts) takes in the day just flown, before
     // today's counts reset below.
     rollTrailingNps(state);
+    rollAncillaries(state);
     // Executives hired on an NPS line leave if the airline stays under it (sim/executives.ts).
     rollExecutiveStanding(state);
     // Runway forecast (sim/forecast.ts): read before today's
@@ -528,7 +530,7 @@ export function step(state: SimState): void {
       1 - fatigue,
       // A short cabin loses service points on every flight (sim/crews.ts).
       cabinCover(state, leg.tail),
-    ) + executiveNpsBonus(state);
+    ) + executiveNpsBonus(state) - ancillaryNpsPenalty(state, leg.origin, leg.dest);
     recordFlightNps(state, leg.origin, leg.dest, satisfactionScore);
 
     // Flying round an airspace closure adds minutes to the flight and to
@@ -628,6 +630,7 @@ export function step(state: SimState): void {
           recordFlightSeatNm(state, flight.origin, flight.dest, flightSeats);
           state.cash += result.margin;
           state.todayRevenue += result.revenue;
+          if (result.ancillaryRevenue > 0) state.todayAncillaryRevenue = (state.todayAncillaryRevenue ?? 0) + result.ancillaryRevenue;
           state.todayCost += result.cost;
           state.todayCostByCategory.fuel += result.costBreakdown.fuel;
           recordHedgedFuel(state, result.costBreakdown.fuel);

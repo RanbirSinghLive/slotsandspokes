@@ -1,3 +1,4 @@
+import { ancillaryPerPassenger } from './ancillaries';
 import { LOAD_FACTOR, RECAPTURE_RATE } from './economy';
 import { executiveLoadFactorBonus, executiveYieldMultiplier } from './executives';
 import { airlineCalled, LADDER, tiersClimbed } from './ladder';
@@ -205,6 +206,8 @@ export type BookingPerks = {
   loadFactor: number;
   /** Share of turned-away passengers who wait for a later flight. */
   recaptureRate: number;
+  /** Fee revenue per passenger on this market (sim/ancillaries.ts). */
+  ancillaryPerPassenger: number;
 };
 
 export function bookingPerks(state: SimState, origin: string, dest: string): BookingPerks {
@@ -215,6 +218,7 @@ export function bookingPerks(state: SimState, origin: string, dest: string): Boo
     yieldMultiplier: (isAdopted(state, 'online-booking') ? DIRECT_BOOKING_YIELD : 1) * executiveYieldMultiplier(state) * nameYieldMultiplier(state, origin, dest),
     loadFactor: loadFactorCap(state),
     recaptureRate: isAdopted(state, 'loyalty-scheme') ? LOYALTY_RECAPTURE_RATE : RECAPTURE_RATE,
+    ancillaryPerPassenger: ancillaryPerPassenger(state, origin, dest),
   };
 }
 

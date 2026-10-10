@@ -25,6 +25,8 @@ export type EconomyAircraftType = {
 export type FlightResult = {
   pax: number;
   revenue: number;
+  /** The part of `revenue` that is fees (sim/ancillaries.ts). */
+  ancillaryRevenue: number;
   cost: number;
   margin: number;
   /**
@@ -265,12 +267,14 @@ export function flightResult(
   const pax = Math.round(sale.passengers);
   const spilloverDelta = sale.spilled > 0 ? Math.round(sale.spilled * perks.recaptureRate) : -Math.round(sale.recaptured);
   const yieldFactor = rivalYieldFactor(leg.origin, leg.dest, legsServingMarket, competitorRoutes);
-  const revenue = sale.fares * yieldFactor * perks.yieldMultiplier;
+  const ancillaryRevenue = pax * perks.ancillaryPerPassenger;
+  const revenue = sale.fares * yieldFactor * perks.yieldMultiplier + ancillaryRevenue;
   const costBreakdown = legCostBreakdown(leg.blockMinutes, type, fuelPriceIndex, fuelEfficiencyMultiplier);
   const cost = costBreakdown.fuel + costBreakdown.blockNonFuel + costBreakdown.departure;
   return {
     pax,
     revenue,
+    ancillaryRevenue,
     cost,
     margin: revenue - cost,
     spilloverDelta,

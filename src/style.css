@@ -3777,6 +3777,10 @@ button.inspector-crumb:hover {
   cursor: pointer;
 }
 
+.inspector-plan-hub.is-current {
+  border-color: rgba(94, 214, 200, 0.7);
+}
+
 .inspector-plan-hub.is-warn {
   color: #0a0c12;
   background: #ffd166;
