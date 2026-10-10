@@ -1,3 +1,4 @@
+import { executiveMaintenanceBaseMultiplier } from './executives';
 import { CREW_BASE_FEE, crewBases, openCrewBase } from './crews';
 import type { SimState } from './state';
 
@@ -280,7 +281,7 @@ export function mxCostPerDay(state: SimState, iata: string): number {
   const free = iata === state.homeAirport ? MX_HOME_FREE_LEVELS : 0;
   const levels = (['line', 'heavy'] as const).reduce((total, kind) => total + Math.max(0, mxLevel(state, kind, iata) - free) * MX_PER_LEVEL_PER_DAY[kind], 0);
   const ratings = Math.max(0, (mxRatings(state, iata)?.length ?? 0) - 1) * MX_RATING_PER_DAY;
-  return levels + ratings;
+  return (levels + ratings) * executiveMaintenanceBaseMultiplier(state);
 }
 
 /** The bases' running costs a day: crew rooms under crew, maintenance under maintenance. Home's crew room is free. */

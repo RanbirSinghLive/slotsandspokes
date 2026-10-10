@@ -3471,7 +3471,7 @@ button.inspector-crumb:hover {
    in its chair's colour (--role) that opens to its candidates. */
 .office-chairs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
   gap: 8px;
   margin: 6px 0 4px;
 }
@@ -3491,6 +3491,10 @@ button.inspector-crumb:hover {
   border-top: 2px solid color-mix(in srgb, var(--role) 55%, transparent);
   border-radius: 6px;
   cursor: pointer;
+}
+
+.office-chair-tile.is-locked {
+  opacity: 0.55;
 }
 
 .office-chair-tile:hover {

@@ -1,3 +1,4 @@
+import { executiveCargoMultiplier } from './executives';
 import airportsData from '../../data/airports.json';
 import goodsData from '../../data/cargo-goods.json';
 import cargoData from '../../data/airport-cargo.json';
@@ -280,7 +281,7 @@ export function carryCargo(
 
     const spoilage = lane.good.shelfHours ? MAX_SPOILAGE * Math.min(1, flight.transitMinutes / 60 / lane.good.shelfHours) : 0;
     const price = lane.good.ratePerTonneNm * (1 + shortagePremium(state, flight.dest, lane.good.id)) * (1 - spoilage);
-    const revenue = tonnes * price * distance - tonnes * HANDLING_PER_TONNE[lane.good.handling];
+    const revenue = tonnes * price * distance * executiveCargoMultiplier(state) - tonnes * HANDLING_PER_TONNE[lane.good.handling];
     // A load that wouldn't cover its handling (a short hop with cold-chain goods) stays on the ground.
     if (revenue <= 0) continue;
 

@@ -8,7 +8,10 @@
     "npsNeeded": null,
     "signingFee": 150000,
     "salaryPerDay": 1500,
-    "effect": { "kind": "maintenance", "ageFactorMultiplier": 0.85 }
+    "effect": {
+      "kind": "maintenance",
+      "ageFactorMultiplier": 0.85
+    }
   },
   {
     "id": "coo-fleet",
@@ -19,7 +22,11 @@
     "npsNeeded": 10,
     "signingFee": 250000,
     "salaryPerDay": 2500,
-    "effect": { "kind": "fleet-programmes", "deliveryMultiplier": 0.5, "returnMultiplier": 0.5 }
+    "effect": {
+      "kind": "fleet-programmes",
+      "deliveryMultiplier": 0.5,
+      "returnMultiplier": 0.5
+    }
   },
   {
     "id": "coo-flightops",
@@ -30,7 +37,10 @@
     "npsNeeded": 15,
     "signingFee": 300000,
     "salaryPerDay": 3000,
-    "effect": { "kind": "flight-ops", "delayMultiplier": 0.85 }
+    "effect": {
+      "kind": "flight-ops",
+      "delayMultiplier": 0.85
+    }
   },
   {
     "id": "coo-inflight",
@@ -41,7 +51,10 @@
     "npsNeeded": 20,
     "signingFee": 400000,
     "salaryPerDay": 4000,
-    "effect": { "kind": "inflight", "npsBonus": 8 }
+    "effect": {
+      "kind": "inflight",
+      "npsBonus": 8
+    }
   },
   {
     "id": "cfo-mercer",
@@ -52,7 +65,10 @@
     "npsNeeded": null,
     "signingFee": 150000,
     "salaryPerDay": 1500,
-    "effect": { "kind": "overhead", "overheadMultiplier": 0.85 }
+    "effect": {
+      "kind": "overhead",
+      "overheadMultiplier": 0.85
+    }
   },
   {
     "id": "cfo-okafor",
@@ -63,7 +79,11 @@
     "npsNeeded": 15,
     "signingFee": 250000,
     "salaryPerDay": 2500,
-    "effect": { "kind": "treasury", "hedgePremiumMultiplier": 0.5, "overheadMultiplier": 0.95 }
+    "effect": {
+      "kind": "treasury",
+      "hedgePremiumMultiplier": 0.5,
+      "overheadMultiplier": 0.95
+    }
   },
   {
     "id": "cfo-adeyemi",
@@ -74,7 +94,10 @@
     "npsNeeded": 20,
     "signingFee": 350000,
     "salaryPerDay": 3500,
-    "effect": { "kind": "leasing", "leaseMultiplier": 0.88 }
+    "effect": {
+      "kind": "leasing",
+      "leaseMultiplier": 0.88
+    }
   },
   {
     "id": "cco-lindqvist",
@@ -85,7 +108,10 @@
     "npsNeeded": null,
     "signingFee": 150000,
     "salaryPerDay": 1500,
-    "effect": { "kind": "market-building", "growthMultiplier": 1.25 }
+    "effect": {
+      "kind": "market-building",
+      "growthMultiplier": 1.25
+    }
   },
   {
     "id": "cco-carvalho",
@@ -96,7 +122,10 @@
     "npsNeeded": 15,
     "signingFee": 250000,
     "salaryPerDay": 2500,
-    "effect": { "kind": "connections", "connectingMultiplier": 1.15 }
+    "effect": {
+      "kind": "connections",
+      "connectingMultiplier": 1.15
+    }
   },
   {
     "id": "cco-mensah",
@@ -107,7 +136,10 @@
     "npsNeeded": 20,
     "signingFee": 350000,
     "salaryPerDay": 3500,
-    "effect": { "kind": "revenue", "yieldMultiplier": 1.03 }
+    "effect": {
+      "kind": "revenue",
+      "yieldMultiplier": 1.03
+    }
   },
   {
     "id": "cco-sato",
@@ -118,6 +150,176 @@
     "npsNeeded": 25,
     "signingFee": 500000,
     "salaryPerDay": 5000,
-    "effect": { "kind": "load-factor", "points": 3 }
+    "effect": {
+      "kind": "load-factor",
+      "points": 3
+    }
+  },
+  {
+    "id": "coo-director-ops",
+    "role": "coo",
+    "name": "Kenji Watanabe",
+    "background": "Network operations control",
+    "flavor": "Ran a twenty-aircraft operations centre through three winters. Believes a delay is a decision somebody postponed.",
+    "npsNeeded": 25,
+    "requiresTier": "operator",
+    "signingFee": 800000,
+    "salaryPerDay": 8000,
+    "effect": {
+      "kind": "flight-ops",
+      "delayMultiplier": 0.75
+    }
+  },
+  {
+    "id": "cfo-treasurer",
+    "role": "cfo",
+    "name": "Marguerite Dufresne",
+    "background": "Fleet and balance sheet",
+    "flavor": "Has financed more aircraft than she has flown on. Lessors return her calls on the first ring.",
+    "npsNeeded": 25,
+    "requiresTier": "operator",
+    "signingFee": 700000,
+    "salaryPerDay": 7000,
+    "effect": {
+      "kind": "leasing",
+      "leaseMultiplier": 0.8
+    }
+  },
+  {
+    "id": "cco-alliances",
+    "role": "cco",
+    "name": "Rafael Ortega",
+    "background": "Alliances and joint ventures",
+    "flavor": "Built two codeshare partnerships from a napkin. Thinks of a hub as a promise to the airlines on both sides of it.",
+    "npsNeeded": 25,
+    "requiresTier": "operator",
+    "signingFee": 750000,
+    "salaryPerDay": 7500,
+    "effect": {
+      "kind": "connections",
+      "connectingMultiplier": 1.3
+    }
+  },
+  {
+    "id": "cpo-solheim",
+    "role": "cpo",
+    "name": "Ingrid Solheim",
+    "background": "Training standards",
+    "flavor": "A line captain who moved into the simulator building. Her crews come out of training a week sooner and complain less.",
+    "npsNeeded": null,
+    "requiresTier": "regional",
+    "signingFee": 200000,
+    "salaryPerDay": 2000,
+    "effect": {
+      "kind": "crew-programmes",
+      "trainingTimeMultiplier": 0.75
+    }
+  },
+  {
+    "id": "cpo-malhotra",
+    "role": "cpo",
+    "name": "Dev Malhotra",
+    "background": "Fleet transition",
+    "flavor": "Has converted whole pilot groups between types without a cancelled flight. Keeps a spreadsheet of who flies what and why.",
+    "npsNeeded": 15,
+    "requiresTier": "network",
+    "signingFee": 400000,
+    "salaryPerDay": 4000,
+    "effect": {
+      "kind": "crew-programmes",
+      "trainingTimeMultiplier": 0.5
+    }
+  },
+  {
+    "id": "dom-aaltonen",
+    "role": "dom",
+    "name": "Birgit Aaltonen",
+    "background": "Line maintenance",
+    "flavor": "Started on the night shift at an outstation. Runs every base like she is the one waiting for the part.",
+    "npsNeeded": null,
+    "requiresTier": "network",
+    "signingFee": 250000,
+    "salaryPerDay": 2500,
+    "effect": {
+      "kind": "maintenance-bases",
+      "costMultiplier": 0.85
+    }
+  },
+  {
+    "id": "dom-bakare",
+    "role": "dom",
+    "name": "Tunde Bakare",
+    "background": "Hangar and heavy checks",
+    "flavor": "Planned the bays of a three-hangar overhaul base. Fills a hangar the way a chess player fills a board.",
+    "npsNeeded": 15,
+    "requiresTier": "operator",
+    "signingFee": 450000,
+    "salaryPerDay": 4500,
+    "effect": {
+      "kind": "maintenance-bases",
+      "costMultiplier": 0.7
+    }
+  },
+  {
+    "id": "hoc-karimova",
+    "role": "hoc",
+    "name": "Nadia Karimova",
+    "background": "Perishables and cold chain",
+    "flavor": "Knows which shipper will pay double for a Tuesday morning and which will not call back.",
+    "npsNeeded": null,
+    "requiresTier": "international",
+    "signingFee": 300000,
+    "salaryPerDay": 3000,
+    "effect": {
+      "kind": "cargo",
+      "revenueMultiplier": 1.1
+    }
+  },
+  {
+    "id": "hoc-lindahl",
+    "role": "hoc",
+    "name": "Sven Lindahl",
+    "background": "Freight sales",
+    "flavor": "Sold belly space across four continents before anyone called it a product. Every lane has a customer in his notebook.",
+    "npsNeeded": 15,
+    "requiresTier": "established",
+    "signingFee": 500000,
+    "salaryPerDay": 5000,
+    "effect": {
+      "kind": "cargo",
+      "revenueMultiplier": 1.25
+    }
+  },
+  {
+    "id": "hga-fontaine",
+    "role": "hga",
+    "name": "Lucía Fontaine",
+    "background": "Government affairs",
+    "flavor": "A former diplomat who treats a landing permit as the start of a conversation. Ministers take her calls, and tell their staff to.",
+    "npsNeeded": null,
+    "requiresTier": "international",
+    "signingFee": 300000,
+    "salaryPerDay": 3000,
+    "effect": {
+      "kind": "events",
+      "premiumMultiplier": 1.25,
+      "penaltyMultiplier": 0.8
+    }
+  },
+  {
+    "id": "hga-eze",
+    "role": "hga",
+    "name": "Obinna Eze",
+    "background": "Aviation policy",
+    "flavor": "Wrote part of a bilateral agreement and still knows which clause nobody read. Priority flights come with better terms when he is in the room.",
+    "npsNeeded": 15,
+    "requiresTier": "established",
+    "signingFee": 500000,
+    "salaryPerDay": 5000,
+    "effect": {
+      "kind": "events",
+      "premiumMultiplier": 1.5,
+      "penaltyMultiplier": 0.6
+    }
   }
 ]

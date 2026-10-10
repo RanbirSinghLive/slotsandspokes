@@ -1,3 +1,4 @@
+import { executiveEventPenaltyMultiplier, executiveEventPremiumMultiplier } from './executives';
 import { dayIndex } from './clock';
 import { CREW_CLASS_SCALE } from './crews';
 import { homeWeakness } from './contracts';
@@ -231,7 +232,7 @@ export function rollDailyMandates(state: SimState): void {
   if (candidates.length === 0) return;
   const leg = candidates[Math.floor(pickRoll * candidates.length)];
   const plane = state.aircraft.find((a) => a.tail === leg.tail)!;
-  const premium = Math.round((BASE_PREMIUM * homeWeakness(state.homeAirport) * (CREW_CLASS_SCALE[plane.typeCode] ?? 1)) / 50) * 50;
+  const premium = Math.round((BASE_PREMIUM * homeWeakness(state.homeAirport) * (CREW_CLASS_SCALE[plane.typeCode] ?? 1) * executiveEventPremiumMultiplier(state)) / 50) * 50;
   const notice = NOTICE_MIN_DAYS + Math.floor(noticeRoll * (NOTICE_MAX_DAYS - NOTICE_MIN_DAYS + 1));
   const term = TERM_MIN_DAYS + Math.floor(termRoll * (TERM_MAX_DAYS - TERM_MIN_DAYS + 1));
   state.mandates.push({
@@ -245,7 +246,7 @@ export function rollDailyMandates(state: SimState): void {
     endDay: today + notice + term,
     status: 'offered',
     premium,
-    penalty: Math.round((premium * PENALTY_TO_PREMIUM) / 50) * 50,
+    penalty: Math.round((premium * PENALTY_TO_PREMIUM * executiveEventPenaltyMultiplier(state)) / 50) * 50,
     flown: 0,
     failed: 0,
     waived: 0,

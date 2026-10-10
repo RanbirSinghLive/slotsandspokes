@@ -1,6 +1,6 @@
 import { ancillaryPerPassenger, ancillaryPriceDrag } from './ancillaries';
 import { LOAD_FACTOR, RECAPTURE_RATE } from './economy';
-import { executiveLoadFactorBonus, executiveYieldMultiplier } from './executives';
+import { executiveLoadFactorBonus, executiveYieldMultiplier, executiveCrewTrainingMultiplier } from './executives';
 import { airlineCalled, LADDER, tiersClimbed } from './ladder';
 import { brandEdge, nameYieldMultiplier } from './nps';
 import { positionEdge } from './brand';
@@ -262,5 +262,5 @@ export function runningCostForDay(state: SimState, dayRevenue: number): number {
 
 /** Hiring and retraining crews take this share of their usual time (sim/crews.ts). */
 export function crewTrainingTimeFactor(state: SimState): number {
-  return isAdopted(state, 'crew-academy') ? CREW_ACADEMY_TIME_FACTOR : 1;
+  return (isAdopted(state, 'crew-academy') ? CREW_ACADEMY_TIME_FACTOR : 1) * executiveCrewTrainingMultiplier(state);
 }

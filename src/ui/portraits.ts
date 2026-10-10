@@ -25,10 +25,21 @@ const TRAITS: Record<string, Traits> = {
   'cco-carvalho': { skin: SKIN.olive, hair: 'long', hairColour: HAIR.auburn },
   'cco-sato': { skin: SKIN.light, hair: 'short', hairColour: HAIR.black, glasses: true },
   'cco-mensah': { skin: SKIN.deep, hair: 'bald', hairColour: HAIR.black, glasses: true },
+  'coo-director-ops': { skin: SKIN.light, hair: 'short', hairColour: HAIR.black, glasses: true },
+  'cfo-treasurer': { skin: SKIN.fair, hair: 'side', hairColour: HAIR.grey },
+  'cco-alliances': { skin: SKIN.olive, hair: 'curly', hairColour: HAIR.brown, beard: true },
+  'cpo-solheim': { skin: SKIN.fair, hair: 'long', hairColour: HAIR.blond },
+  'cpo-malhotra': { skin: SKIN.brown, hair: 'short', hairColour: HAIR.black, glasses: true },
+  'dom-aaltonen': { skin: SKIN.light, hair: 'bun', hairColour: HAIR.auburn },
+  'dom-bakare': { skin: SKIN.deep, hair: 'bald', hairColour: HAIR.black, beard: true },
+  'hoc-karimova': { skin: SKIN.olive, hair: 'long', hairColour: HAIR.black },
+  'hoc-lindahl': { skin: SKIN.fair, hair: 'short', hairColour: HAIR.blond, beard: true },
+  'hga-fontaine': { skin: SKIN.light, hair: 'side', hairColour: HAIR.grey, glasses: true },
+  'hga-eze': { skin: SKIN.deep, hair: 'curly', hairColour: HAIR.black, glasses: true },
 };
 
 /** Each chair's colour, the jacket in its portraits. */
-export const ROLE_COLOURS: Record<string, string> = { coo: '#5ed6c8', cfo: '#f2a541', cco: '#9d8cf0' };
+export const ROLE_COLOURS: Record<string, string> = { coo: '#5ed6c8', cfo: '#f2a541', cco: '#9d8cf0', cpo: '#6fb4f2', dom: '#e07a5f', hoc: '#8bcf7a', hga: '#e68ac0' };
 
 function hairShape(traits: Traits, behind: boolean): string {
   const c = traits.hairColour;

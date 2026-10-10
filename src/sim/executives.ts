@@ -1,5 +1,6 @@
 import executivesData from '../../data/executives.json';
 import { networkNps } from './nps';
+import { LADDER, tiersClimbed } from './ladder';
 import type { SimState } from './state';
 
 /**
@@ -26,13 +27,17 @@ import type { SimState } from './state';
  * an effect, so callers can multiply unconditionally.
  */
 
-export type ExecutiveRole = 'coo' | 'cfo' | 'cco';
-export const EXECUTIVE_ROLES: ExecutiveRole[] = ['coo', 'cfo', 'cco'];
+export type ExecutiveRole = 'coo' | 'cfo' | 'cco' | 'cpo' | 'dom' | 'hoc' | 'hga';
+export const EXECUTIVE_ROLES: ExecutiveRole[] = ['coo', 'cfo', 'cco', 'cpo', 'dom', 'hoc', 'hga'];
 
 export const ROLE_LABELS: Record<ExecutiveRole, string> = {
   coo: 'Chief Operating Officer',
   cfo: 'Chief Financial Officer',
   cco: 'Chief Commercial Officer',
+  cpo: 'Chief Pilot',
+  dom: 'Director of Maintenance',
+  hoc: 'Head of Cargo',
+  hga: 'Head of Government Affairs',
 };
 
 export type ExecutiveEffect =
@@ -56,7 +61,15 @@ export type ExecutiveEffect =
   | { kind: 'revenue'; yieldMultiplier: number }
   /** Multiplies how long leased planes take to arrive and returned ones to go (sim/fleetTiming.ts). */
   | { kind: 'load-factor'; points: number }
-  | { kind: 'fleet-programmes'; deliveryMultiplier: number; returnMultiplier: number };
+  | { kind: 'fleet-programmes'; deliveryMultiplier: number; returnMultiplier: number }
+  /** Multiplies how long hiring and retraining crews take (sim/innovations.ts's crewTrainingTimeFactor()). */
+  | { kind: 'crew-programmes'; trainingTimeMultiplier: number }
+  /** Multiplies what every maintenance base costs a day (sim/bases.ts's mxCostPerDay()). */
+  | { kind: 'maintenance-bases'; costMultiplier: number }
+  /** Multiplies freight revenue (sim/cargo.ts). */
+  | { kind: 'cargo'; revenueMultiplier: number }
+  /** Multiplies the premium an event pays and the penalty for failing one (sim/mandates.ts). */
+  | { kind: 'events'; premiumMultiplier: number; penaltyMultiplier: number };
 
 export type ExecutiveCandidate = {
   id: string;
@@ -66,6 +79,8 @@ export type ExecutiveCandidate = {
   flavor: string;
   /** The trailing network NPS the airline needs before this candidate will talk to it, or null for anyone. */
   npsNeeded: number | null;
+  /** The ladder tier (sim/ladder.ts) the airline must have become before this chair or candidate exists for it, or absent for any airline. */
+  requiresTier?: string;
   /** Paid once, in cash, on appointment. */
   signingFee: number;
   /** Paid every day while appointed, at rollover. */
@@ -90,7 +105,7 @@ export function loadExecutives(): ExecutiveCandidate[] {
 }
 
 export function createExecutiveSlots(): ExecutiveSlots {
-  return { coo: null, cfo: null, cco: null };
+  return { coo: null, cfo: null, cco: null, cpo: null, dom: null, hoc: null, hga: null };
 }
 
 export function candidateById(id: string): ExecutiveCandidate | undefined {
@@ -107,9 +122,26 @@ export function appointedCandidate(state: SimState, role: ExecutiveRole): Execut
   return appointment ? candidateById(appointment.candidateId) : undefined;
 }
 
+/** Whether the airline has become the tier a candidate needs: true for one with no tier. */
+export function tierReached(state: SimState, candidate: ExecutiveCandidate): boolean {
+  if (!candidate.requiresTier) return true;
+  return tiersClimbed(state) >= LADDER.findIndex((tier) => tier.id === candidate.requiresTier);
+}
+
+/** The tier that opens a chair no candidate of which the airline has reached yet, by name; null once any candidate is open to it. */
+export function chairOpensAt(state: SimState, role: ExecutiveRole): string | null {
+  const candidates = candidatesForRole(role);
+  if (candidates.some((candidate) => tierReached(state, candidate))) return null;
+  const first = candidates
+    .map((candidate) => LADDER.findIndex((tier) => tier.id === candidate.requiresTier))
+    .sort((a, b) => a - b)[0];
+  return LADDER[first]?.name ?? null;
+}
+
 /** Why this candidate can't be appointed now, or null if they can. */
 export function appointBlockedReason(state: SimState, candidate: ExecutiveCandidate): string | null {
   if (state.executives[candidate.role]?.candidateId === candidate.id) return 'Already appointed.';
+  if (!tierReached(state, candidate)) return `Needs ${LADDER.find((tier) => tier.id === candidate.requiresTier)?.name ?? 'a higher tier'}`;
   if (candidate.npsNeeded !== null && networkNps(state) < candidate.npsNeeded) {
     return `Needs NPS ${candidate.npsNeeded}+`;
   }
@@ -235,6 +267,27 @@ export function executiveFareEstimateMultiplier(state: SimState): number {
   return effectOf(state, 'revenue') ? 0.5 : 1;
 }
 
+/** What the crew-programmes executive leaves of the time hiring and retraining take. */
+export function executiveCrewTrainingMultiplier(state: SimState): number {
+  return effectOf(state, 'crew-programmes')?.trainingTimeMultiplier ?? 1;
+}
+
+export function executiveMaintenanceBaseMultiplier(state: SimState): number {
+  return effectOf(state, 'maintenance-bases')?.costMultiplier ?? 1;
+}
+
+export function executiveCargoMultiplier(state: SimState): number {
+  return effectOf(state, 'cargo')?.revenueMultiplier ?? 1;
+}
+
+export function executiveEventPremiumMultiplier(state: SimState): number {
+  return effectOf(state, 'events')?.premiumMultiplier ?? 1;
+}
+
+export function executiveEventPenaltyMultiplier(state: SimState): number {
+  return effectOf(state, 'events')?.penaltyMultiplier ?? 1;
+}
+
 /** What an effect does, in words, for the Head office view. */
 export function describeEffect(effect: ExecutiveEffect): string {
   const percent = (factor: number) => `${Math.round(Math.abs(1 - factor) * 100)}%`;
@@ -259,6 +312,14 @@ export function describeEffect(effect: ExecutiveEffect): string {
       return `Yield +${percent(effect.yieldMultiplier)} · fare estimates twice as sharp`;
     case 'load-factor':
       return `Seats sold +${effect.points} points`;
+    case 'crew-programmes':
+      return `Hiring and retraining −${percent(effect.trainingTimeMultiplier)} time`;
+    case 'maintenance-bases':
+      return `Base running costs −${percent(effect.costMultiplier)}`;
+    case 'cargo':
+      return `Freight revenue +${percent(effect.revenueMultiplier)}`;
+    case 'events':
+      return `Event pay +${percent(effect.premiumMultiplier)} · penalties −${percent(effect.penaltyMultiplier)}`;
     case 'fleet-programmes':
       return `Deliveries −${percent(effect.deliveryMultiplier)} · returns −${percent(effect.returnMultiplier)} time`;
   }
