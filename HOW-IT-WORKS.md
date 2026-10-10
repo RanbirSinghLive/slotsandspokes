@@ -3376,6 +3376,19 @@ An earlier version took every plane out for 1–3 days every 30 days. A
 fleet flown near capacity had no spare planes to take its flying, so
 the cancellations cost Toronto most of its year on 18 seeds.
 
+**The D check** is the overhaul above the C check, due after 360 flying days
+or 3,600 flight hours, whichever comes first (`dCheckDueIn()`). It is
+**booked, never forced**: from 60 days before due, a plane parked at its base
+shows "Book D check" on its Mtc card (`bookDCheck()`). It goes in the next
+morning, grounded as an AOG with its flying moved to spare planes, for 10 days
+(Propeller), 14 (Regional), 18 (Narrowbody) or 24 (Widebody), the same way a
+C check is. Away from a heavy-rated hangar the work is contracted and paid
+when it goes in. It also does the C and A checks, so those clocks restart with
+it. A plane past due wears like 2 more years of age (`D_WEAR_YEARS`, in
+`wornAge()`) until it goes in. A plane from an older save, or just leased,
+starts staggered by tail, at least 120 days from due. The headless player
+never books, so its planes wear past day 360.
+
 **Usage clocks.** Each landed flight adds its airborne minutes (ground delay
 excluded) and one cycle to the plane (`recordFlown()`), counted since the last
 A check and since the last heavy check. A plane from an older save counts the

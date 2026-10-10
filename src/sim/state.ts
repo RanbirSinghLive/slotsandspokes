@@ -104,6 +104,11 @@ export type Aircraft = {
   cyclesSinceA?: number;
   /** Hangar minutes done at night toward its A check this time round (sim/mxChecks.ts). */
   aBankedMinutes?: number;
+  /** Flying days and airborne minutes since the last D check (sim/mxChecks.ts). Absent days: staggered by tail; absent minutes: none counted yet. */
+  daysSinceD?: number;
+  flightMinutesSinceD?: number;
+  /** The player booked its D check: it goes in the next morning. */
+  dCheckBooked?: boolean;
 };
 
 /** How one leg went, once it has landed. */

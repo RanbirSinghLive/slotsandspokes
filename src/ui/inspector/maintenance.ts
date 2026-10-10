@@ -2,7 +2,7 @@ import { AIRCRAFT_CLASSES, pluralClassName } from '../../sim/aircraftClasses';
 import { aogChance, aogFor, daysUntilReturn, expediteCost, expediteRepair } from '../../sim/aog';
 import { ageDelayParameters } from '../../sim/delays';
 import { USEFUL_LIFE_YEARS } from '../../sim/leasing';
-import { A_OVERDUE, A_WINDOW, C_INTERVAL_CYCLES, C_INTERVAL_HOURS, DEFERRED_AGE_YEARS, HEAVY_INTERVAL_DAYS, HEAVY_WINDOW_DAYS, MX_HOLD_AT, OVERDUE_GRACE_DAYS, wornAge } from '../../sim/mxChecks';
+import { A_OVERDUE, A_WINDOW, C_INTERVAL_CYCLES, C_INTERVAL_HOURS, D_INTERVAL_DAYS, D_WEAR_YEARS, D_WINDOW_DAYS, DEFERRED_AGE_YEARS, HEAVY_INTERVAL_DAYS, HEAVY_WINDOW_DAYS, MX_HOLD_AT, OVERDUE_GRACE_DAYS, wornAge } from '../../sim/mxChecks';
 import * as ops from '../routeActions';
 import type { HeavyCheckReadout } from '../../sim/playerActions';
 import type { SimState } from '../../sim/state';
@@ -276,6 +276,26 @@ function buildFleetBoard(state: SimState, changed: () => void): HTMLElement[] {
     aLane.append(aWindow, aGrace, aFill, aDue);
     const aLine = box('mx-clock-text', `A ${Math.round(plane.aProgress * 100)}%` + (plane.aOpen ? ` · banked ${plane.aBankedHours}/${plane.aWorkHours}h` : ''));
 
+    // The D-check lane: days through the overhaul interval, the booking window, and the overdue stretch that wears the plane.
+    const dLane = box('mx-clock mx-clock-a mx-clock-d');
+    const dSpan = D_INTERVAL_DAYS + D_WINDOW_DAYS;
+    const dWindow = box('mx-clock-window');
+    dWindow.style.left = `${((D_INTERVAL_DAYS - D_WINDOW_DAYS) / dSpan) * 100}%`;
+    dWindow.style.width = `${(D_WINDOW_DAYS / dSpan) * 100}%`;
+    const dGrace = box('mx-clock-grace');
+    dGrace.style.left = `${(D_INTERVAL_DAYS / dSpan) * 100}%`;
+    dGrace.style.width = `${(D_WINDOW_DAYS / dSpan) * 100}%`;
+    const dFill = box('mx-clock-fill');
+    dFill.style.width = `${Math.min(1, Math.max(0, (D_INTERVAL_DAYS - plane.dDueIn) / dSpan)) * 100}%`;
+    const dDue = box('mx-clock-due');
+    dDue.style.left = `${(D_INTERVAL_DAYS / dSpan) * 100}%`;
+    dLane.append(dWindow, dGrace, dFill, dDue);
+    const dLine = box(
+      `mx-clock-text${plane.dDueIn < 0 ? ' mx-text-due' : ''}`,
+      plane.dInCheck ? 'D check · in the hangar' : `D ${plane.dDueIn >= 0 ? `due ${plane.dDueIn}d` : `${-plane.dDueIn}d overdue · +${D_WEAR_YEARS} yrs wear`} · ${plane.dFlightHours}h`,
+    );
+    dLine.title = 'D check: overhaul every 360 flying days or 3,600 flight hours. Booked, never forced; past due the plane wears like 2 more years until it goes in.';
+
     // Deferred items as slots filling toward the hold.
     const slots = box('mx-slots');
     for (let i = 0; i < MX_HOLD_AT; i++) slots.append(box(`mx-slot${i < plane.deferred ? ` is-filled${plane.deferred >= MX_HOLD_AT ? ' is-held' : ''}` : ''}`));
@@ -293,7 +313,7 @@ function buildFleetBoard(state: SimState, changed: () => void): HTMLElement[] {
 
     const row = box('mx-card-row');
     row.append(items, clockLine);
-    card.append(head, clock, aLane, aLine, row, wear, dials);
+    card.append(head, clock, aLane, aLine, dLane, dLine, row, wear, dials);
     wrap.append(card);
     // Book the C check once its window is open, instead of waiting out the overdue grace.
     if (plane.booked) {
@@ -327,6 +347,45 @@ function buildFleetBoard(state: SimState, changed: () => void): HTMLElement[] {
             confirmLabel: 'Book check',
             run: () => {
               ops.bookHeavyCheck(state, plane.tail);
+              changed();
+            },
+          }),
+        );
+        wrap.append(book);
+      }
+    }
+    // The D check is booked the same way, from 60 days before it's due.
+    if (plane.dBooked) {
+      const unbook = document.createElement('button');
+      unbook.type = 'button';
+      unbook.textContent = 'D booked · tomorrow ✕';
+      unbook.title = 'Cancel the booking';
+      unbook.className = 'mx-card-action';
+      unbook.addEventListener('click', () => {
+        ops.cancelBookedDCheck(state, plane.tail);
+        changed();
+      });
+      wrap.append(unbook);
+    } else if (plane.dCanBook) {
+      const preview = ops.previewDCheckBooking(state, plane.tail);
+      if (preview) {
+        const book = document.createElement('button');
+        book.type = 'button';
+        book.textContent = `Book D check · ${preview.days}d${preview.cost > 0 ? ` · ${money(preview.cost)}` : ''}`;
+        book.className = 'mx-card-action';
+        book.addEventListener('click', () =>
+          showConfirm({
+            title: `Book D check · ${plane.tail}`,
+            rows: [
+              { label: 'Grounded', value: `${preview.days}d from tomorrow` },
+              { label: 'Check cost', value: preview.cost > 0 ? money(preview.cost) : 'in house' },
+              { label: 'Rotations', value: `${preview.rotations} · other planes cover them where pools allow` },
+              ...(preview.cost > 0 ? cashAfterRows(state, preview.cost) : []),
+            ],
+            facts: ['A full overhaul: it also clears the C and A checks. Rotations nobody can cover are cancelled. Cancel the booking any time before it goes in.'],
+            confirmLabel: 'Book check',
+            run: () => {
+              ops.bookDCheck(state, plane.tail);
               changed();
             },
           }),

@@ -8,7 +8,7 @@ import { marketKey } from './schedule';
 import { aircraftUtilisation, rotationsForTail, type Rotation } from './utilisation';
 import { coverRotations } from './turnBuffer';
 import { refitDays } from './cabins';
-import { bookedHeavyChecks, finishHeavyCheck, forcedHeavyChecks, wornAge } from './mxChecks';
+import { bookedDChecks, bookedHeavyChecks, finishDCheck, finishHeavyCheck, forcedHeavyChecks, wornAge } from './mxChecks';
 import { nightStopStation } from './nightStops';
 import type { Aircraft, SimState } from './state';
 
@@ -77,6 +77,8 @@ export type AogEvent = {
   refitTo?: 'economy' | 'business';
   /** A heavy check (sim/mxChecks.ts) rather than a breakdown. It can't be expedited. */
   check?: boolean;
+  /** Which check it is, when `check` is set: absent is the C check. */
+  checkKind?: 'D';
 };
 
 export function isAog(state: SimState, tail: string): boolean {
@@ -155,7 +157,10 @@ export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
     const aircraft = state.aircraft.find((a) => a.tail === event.tail);
     if (aircraft && event.refitTo === 'business') aircraft.cabin = 'business';
     if (aircraft && event.refitTo === 'economy') delete aircraft.cabin;
-    if (aircraft && event.check) finishHeavyCheck(state, aircraft);
+    if (aircraft && event.check) {
+      if (event.checkKind === 'D') finishDCheck(state, aircraft);
+      else finishHeavyCheck(state, aircraft);
+    }
     handBackFlying(state, event);
   }
   startRefits(state, dayStartMinute);
@@ -165,7 +170,8 @@ export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
     ...forced.map((check) => ({ ...check, fault: 'C check overdue' })),
     ...bookedHeavyChecks(state, forced.map((check) => check.aircraft)).map((check) => ({ ...check, fault: 'C check booked' })),
   ];
-  for (const { aircraft, days, fault } of checksToStart) {
+  const dChecks = bookedDChecks(state, checksToStart.map((check) => check.aircraft)).map((check) => ({ ...check, fault: 'D check booked', checkKind: 'D' as const }));
+  for (const { aircraft, days, fault, checkKind } of [...checksToStart.map((check) => ({ ...check, checkKind: undefined })), ...dChecks]) {
     state.lastAogDay = dayIndex(state);
     state.aogs.push({
       tail: aircraft.tail,
@@ -176,6 +182,7 @@ export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
       coveredRotations: 0,
       movedLegIds: [],
       check: true,
+      ...(checkKind ? { checkKind } : {}),
     });
   }
 
