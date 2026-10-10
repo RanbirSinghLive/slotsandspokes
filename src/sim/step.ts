@@ -11,6 +11,7 @@ import { USABLE_DAY_START_MINUTE } from './utilisation';
 import { crowdingWeight } from './timeOfDay';
 import { cabinLayout, cabinOf } from './cabins';
 import aircraftTypesData from '../../data/aircraft-types.json';
+import { ancillaryNpsPenalty, rollAncillaries } from './ancillaries';
 import { flightResult, type EconomyAircraftType } from './economy';
 import { carryCargo, rollDailyCargo } from './cargo';
 import { MIN_TURN_MINUTES, legsServingMarket, marketDepartMinutes, marketKey, type ScheduleLeg } from './schedule';
@@ -29,6 +30,7 @@ import { bookingPerks, runningCostForDay } from './innovations';
 import { rollDailyFleet } from './fleetTiming';
 import { rollDailyRebases } from './rebase';
 import { rollDailyRights } from './rightsLicences';
+import { handlingParameters, recordStationDeparture, rollDailyStations, rollStationLedgers, stationCostPerDay } from './stations';
 import { addTally, emptyTally } from './fareClasses';
 import { networkOverheadPerDay } from './overhead';
 import { basesCostPerDay } from './bases';
@@ -182,6 +184,7 @@ export function step(state: SimState): void {
     // The trailing NPS (sim/nps.ts) takes in the day just flown, before
     // today's counts reset below.
     rollTrailingNps(state);
+    rollAncillaries(state);
     // Executives hired on an NPS line leave if the airline stays under it (sim/executives.ts).
     rollExecutiveStanding(state);
     // Runway forecast (sim/forecast.ts): read before today's
@@ -262,8 +265,14 @@ export function step(state: SimState): void {
     state.todayCostByCategory.maintenance += basesCost.maintenance;
     state.todayMargin -= basesCost.crew + basesCost.maintenance;
 
+    // Station handling (sim/stations.ts): finished builds open, finished days
+    // go into the ledger, and own and hub-grade stations are paid for with
+    // the rest of the overhead.
+    rollDailyStations(state);
+    rollStationLedgers(state);
+
     // Network overhead (sim/overhead.ts): grows with the square of the fleet.
-    const overhead = networkOverheadPerDay(state);
+    const overhead = networkOverheadPerDay(state) + stationCostPerDay(state);
     state.cash -= overhead;
     state.todayCost += overhead;
     state.todayCostByCategory.overhead += overhead;
@@ -497,12 +506,15 @@ export function step(state: SimState): void {
       // departures and holds its arrivals alike.
       Math.max(airportLoadAt(state, leg.origin, hourOf(leg.departMinute)), airportLoadAt(state, leg.dest, hourOf(leg.departMinute + leg.blockMinutes))),
       MAINTENANCE_AGE_FACTOR * executiveMaintenanceMultiplier(state),
+      handlingParameters(state, leg.origin),
     );
     state.rngSeed = nextSeed;
+    recordStationDeparture(state, leg.origin, delayBreakdown, lateAtDepartureMinutes);
     state.delayMinutesByCause.age += delayBreakdown.age;
     state.delayMinutesByCause.weather += delayBreakdown.weather;
     state.delayMinutesByCause.knockOn += delayBreakdown.knockOn;
     state.delayMinutesByCause.congestion += delayBreakdown.congestion;
+    state.delayMinutesByCause.ground = (state.delayMinutesByCause.ground ?? 0) + delayBreakdown.ground;
     // A flight-ops COO scales the whole rolled delay down. Applied to
     // the summed total rather than to each cause, so the per-cause
     // attribution the On-Time panel reports stays the raw picture of
@@ -511,7 +523,7 @@ export function step(state: SimState): void {
     // A tired crew (sim/crews.ts) runs later still.
     const fatigue = legFatigue(state, leg);
     const delayMinutes = Math.round(
-      (delayBreakdown.age + delayBreakdown.weather + delayBreakdown.knockOn + delayBreakdown.congestion) *
+      (delayBreakdown.age + delayBreakdown.weather + delayBreakdown.knockOn + delayBreakdown.congestion + delayBreakdown.ground) *
         executiveDelayMultiplier(state) *
         (1 + (FATIGUE_DELAY_MULTIPLIER - 1) * fatigue),
     );
@@ -531,7 +543,7 @@ export function step(state: SimState): void {
       1 - fatigue,
       // A short cabin loses service points on every flight (sim/crews.ts).
       cabinCover(state, leg.tail),
-    ) + executiveNpsBonus(state);
+    ) + executiveNpsBonus(state) - ancillaryNpsPenalty(state, leg.origin, leg.dest);
     recordFlightNps(state, leg.origin, leg.dest, satisfactionScore);
 
     // Flying round an airspace closure adds minutes to the flight and to
@@ -631,6 +643,7 @@ export function step(state: SimState): void {
           recordFlightSeatNm(state, flight.origin, flight.dest, flightSeats);
           state.cash += result.margin;
           state.todayRevenue += result.revenue;
+          if (result.ancillaryRevenue > 0) state.todayAncillaryRevenue = (state.todayAncillaryRevenue ?? 0) + result.ancillaryRevenue;
           state.todayCost += result.cost;
           state.todayCostByCategory.fuel += result.costBreakdown.fuel;
           recordHedgedFuel(state, result.costBreakdown.fuel);

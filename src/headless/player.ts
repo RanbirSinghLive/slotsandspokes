@@ -1,3 +1,4 @@
+import { ancillaryLevel, feeLevelOn, isContested } from '../sim/ancillaries';
 import { DIFFICULTIES, type GameDifficulty } from '../sim/difficulty';
 import { currentPotentialDemand } from '../sim/marketDemand';
 import { marketLoadFactor } from '../sim/loadFactor';
@@ -45,6 +46,8 @@ import { summarizeMarket } from '../sim/marketSummary';
 import { congestionParameters } from '../sim/delays';
 import { acceptMandate, mandatedLeg, mandatesOf, marketHasMandate } from '../sim/mandates';
 import { crewReadiness } from '../sim/crews';
+import { HANDLING, STATION_FEE, STATION_PER_DAY, stationTier, stationUpgradeBlocked, upgradeStation, type HandlingTier } from '../sim/stations';
+import { dailyDeparturesAt } from '../sim/airports';
 
 /**
  * The headless "players" that balance runs are played by (WEEK-EIGHT.md,
@@ -373,6 +376,7 @@ function steadyPlayer(kind: 'steady' | 'sitter' | 'bold'): Player {
         ...returnIdle(state, memory),
         ...keepCrews(state, memory),
         ...keepMaintenance(state),
+        ...keepStations(state),
         ...pickStances(state, memory),
         ...runHomeHub(state),
         ...tuneFareClasses(state),
@@ -381,6 +385,7 @@ function steadyPlayer(kind: 'steady' | 'sitter' | 'bold'): Player {
         ...runSeatSales(state),
         ...adoptInnovations(state),
         ...(kind === 'steady' ? hedgeWhenCheap(state) : []),
+        ...(kind === 'steady' ? setFees(state) : []),
         ...(kind === 'steady' ? hireExecutives(state) : []),
       ];
     },
@@ -1188,6 +1193,34 @@ function hedgeWhenCheap(state: SimState): string[] {
   return hedged.ok ? [hedged.message] : [];
 }
 
+// --- Fees ----------------------------------------------------------------------------
+
+/** The airline-wide fee level the steady player runs from its first day. */
+export const STEADY_FEE_LEVEL = Number(process.env.AIRGAME_FEE_LEVEL ?? 0) as 0 | 1 | 2;
+/**
+ * Per-route fees: the level on a route no rival flies, and on one a rival
+ * does (both -1: the route follows the airline dial).
+ */
+export const STEADY_ALONE_FEE_LEVEL = Number(process.env.AIRGAME_ALONE_FEE ?? -1);
+export const STEADY_CONTESTED_FEE_LEVEL = Number(process.env.AIRGAME_CONTESTED_FEE ?? -1);
+
+function setFees(state: SimState): string[] {
+  const done: string[] = [];
+  if (ancillaryLevel(state) !== STEADY_FEE_LEVEL) {
+    const set = actions.setAncillaryFees(state, STEADY_FEE_LEVEL);
+    if (set.ok) done.push(set.message);
+  }
+  if (STEADY_ALONE_FEE_LEVEL < 0 && STEADY_CONTESTED_FEE_LEVEL < 0) return done;
+  for (const key of Object.keys(state.routeSettings)) {
+    const [a, b] = key.split('-');
+    const target = isContested(state, a, b) ? STEADY_CONTESTED_FEE_LEVEL : STEADY_ALONE_FEE_LEVEL;
+    if (target < 0 || feeLevelOn(state, a, b) === target) continue;
+    const set = actions.setRouteFees(state, a, b, target as 0 | 1 | 2);
+    if (set.ok) done.push(set.message);
+  }
+  return done;
+}
+
 // --- Executives --------------------------------------------------------------------
 
 /** Fill or upgrade each chair with the strongest candidate the airline can get and afford. */
@@ -1209,6 +1242,40 @@ function hireExecutives(state: SimState): string[] {
     if (hired.ok) done.push(hired.message);
   }
   return done;
+}
+
+// --- Stations ------------------------------------------------------------------------
+
+/** What a minute of ground delay is worth to the player, a day: on-time, connections and the knock-on down the plane's day. */
+const GROUND_MINUTE_VALUE = 12;
+/** A step up has to save this many times its running cost and its fee spread over STATION_PAYBACK_DAYS. */
+const STATION_PAYBACK_DAYS = 180;
+const STATION_PAYBACK_MARGIN = 1.5;
+
+/** Expected ground delay minutes per departure for a handler: the chance times the mean of a squared-uniform roll. */
+function expectedGroundMinutes(tier: HandlingTier): number {
+  const { chance, maxMinutes } = HANDLING[tier];
+  return chance * (1 + (maxMinutes - 1) / 3);
+}
+
+/** Once a week, step a station up when the ground delays it saves outweigh its fee and running cost. */
+function keepStations(state: SimState): string[] {
+  if (dayIndex(state) % 7 !== 3) return [];
+  const log: string[] = [];
+  const leases = state.aircraft.reduce((sum, aircraft) => sum + aircraft.leaseCostPerDay, 0);
+  const stations = new Set(state.schedule.map((leg) => leg.origin));
+  for (const iata of stations) {
+    const tier = stationTier(state, iata);
+    if (tier === 'hub' || stationUpgradeBlocked(state, iata) !== null) continue;
+    const next = tier === 'contract' ? 'own' : 'hub';
+    const saved = (expectedGroundMinutes(tier) - expectedGroundMinutes(next)) * dailyDeparturesAt(state, iata) * GROUND_MINUTE_VALUE;
+    const cost = STATION_PER_DAY[next] + STATION_FEE[next] / STATION_PAYBACK_DAYS;
+    if (saved < STATION_PAYBACK_MARGIN * cost) continue;
+    if (state.cash < STATION_FEE[next] + INNOVATION_RESERVE_DAYS * leases) continue;
+    const built = upgradeStation(state, iata);
+    if (built.ok) log.push(built.message);
+  }
+  return log;
 }
 
 // --- Crews ----------------------------------------------------------------------------

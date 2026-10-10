@@ -53,3 +53,24 @@ assert.equal(cancelRotation(state, first).ok, false, 'a rotation can only be can
 aircraft.status = 'airborne';
 assert.equal(cancellableRotations(state, tail).length, 0, 'a plane in the air has nothing to cancel');
 console.log('controller cancel: ok');
+
+// callsNeeded(): the plane waiting since morning is raised for its curfew
+// cancellation; one cancellation later, a pending call only if trouble remains.
+{
+  const { callsNeeded } = await import('./controller');
+  aircraft.status = 'ground';
+  aircraft.atAirport = rotations[0].legs[0].origin;
+  state.cancelledToday = [];
+  state.completedToday = [];
+  state.simMinute = dayStartMinute(state) + 12 * 60;
+  aircraft.groundSinceMinute = state.simMinute - 60;
+  const calls = callsNeeded(state);
+  const mine = calls.find((call) => call.tail === tail);
+  assert.ok(mine, 'a plane six hours behind should need a call');
+  assert.equal(mine!.kind, 'curfew');
+  // Early in the day with nothing overdue, nobody needs a call.
+  state.simMinute = dayStartMinute(state) + 5 * 60;
+  aircraft.groundSinceMinute = state.simMinute - 60;
+  assert.equal(callsNeeded(state).some((call) => call.tail === tail), false, 'a plane not yet behind needs no call');
+  console.log('controller calls: ok');
+}

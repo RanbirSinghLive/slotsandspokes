@@ -337,7 +337,7 @@ departs (`??=` in the departure loop), same "create on first use" shape
 deleted when a market's last leg is removed: past reliability is real
 history worth keeping even for a route you've since dropped.
 
-`SimState.delayMinutesByCause: { age, weather, knockOn }` needed
+`SimState.delayMinutesByCause: { age, weather, knockOn, congestion, ground }` needed
 `step.ts`'s `rollTotalDelayMinutes()` to return a `DelayBreakdown`
 object instead of a pre-summed number, so each cause's contribution can
 be attributed before the three are added together into one flight's
@@ -1336,8 +1336,8 @@ The rail's screens are selections too; the detail views sit under
 | A route | click its line, or a market row | the route view: flights, demand, rivals, fare stances, pools, margin and on-time |
 | Fleet list | the rail, the map's fleet bars, or the breadcrumb from a plane | every aircraft: base, how much of its day it uses, on time today, AOG |
 | An aircraft | click it in flight on the map, its row in the Fleet list or timeline, or its tail in an airport's view | its specs and age (and what the age does to its delays), where it is now, how much of the day it uses, its whole day in order (flown legs with how late and why, passengers and margin; the one in the air; upcoming legs with projected lateness; cancelled ones), its rotations, and Return to lessor |
-| Rivals list | the rail, "All" among the Rivals lens's chips, or the breadcrumb | every rival airline, biggest first: routes (and how many against you), estimated margin a day, routes losing money |
-| A rival | its name anywhere in the panel, or its chip under the Rivals lens | its fleet, routes against the 20-route cap, its average seats per flight and any planes beyond what its flying needs, every route worst first (fare against the going rate, margin a day, losing streak, grace left, about when it closes), and markets it closed recently |
+| Rivals list | the rail, "All" among the Rivals lens's chips, or the breadcrumb | a card per rival in reach, the ones on markets you fly first: generated logo tile, flag, a pip per plane coloured by class, a block per route (green earns, red loses, amber ring = you fly it too), estimated margin a day, and ⚔ / ⏱ counts. Chips at the top total them. Rivals you can't see yet stay as greyed locked cards with their flag. Every symbol has a tip (on tap on a phone); hovering or selecting a card marks its routes on the map |
+| A rival | its name anywhere in the panel, or its chip under the Rivals lens | logo, flag and fleet pips, estimated margin a day, four tiles (routes against the 20-route cap, flights a day, ⚔ vs you, ⏱ losing), its network sketched small (green or red by margin), and every route worst first: a margin bar, frequency, a fare gauge against the going rate and the days until it pulls out. Markets it closed recently are listed under that |
 
 The breadcrumb reads Network › Airports › YYZ › YYZ – ORD, or Network ›
 Rivals › Ironbridge Airlines. A route opened from the map goes under its
@@ -3208,6 +3208,44 @@ player leases only at home, and keeps its maintenance matched to its
 planes: the classes rated, a line level for every plane and a bay for every
 four (`keepMaintenance()`).
 
+## Stations (`src/sim/stations.ts`)
+
+Every departure rolls a fifth delay cause, **ground handling**, at its origin.
+Who does the handling sets the odds:
+
+| Tier | Delays | Needs | Costs |
+|---|---|---|---|
+| contract | 10% of departures, up to 20 min (15% and 25 min at fields under 60 movements a day) | nothing; the default away from home | free |
+| own staff | 5%, up to 12 min | a crew base or a line base there | $120k, $400/day, 14 days to build |
+| hub-grade | 1.5%, up to 8 min | own staff already, and 6 departures a day | $400k, $1,200/day, 30 days to build |
+
+Home starts on its own staff at no running cost and cannot go below it. A step
+up is paid at once and opens after its build days (`rollDailyStations()` at
+rollover); stepping down is instant and refunds nothing. Running costs are
+charged with the daily overhead. The build time and the running cost are what
+make a well-run hub a moat: it only pays where departures spread the cost, and
+a rival cannot copy it overnight.
+
+**The ledger.** `state.stationLedger[iata]` holds today's departures and the
+delay minutes rolled for them by cause (before any executive scaling), plus the
+last 7 finished days. `stationReadout()` turns it into average minutes per
+departure by cause, the leading cause, and how late departures left on average.
+The airport view's Station section draws it as a strip (one bar per cause, all
+on one 30-minute scale so airports compare; a tick marks the 15-minute on-time
+line) and the Airports table has a Delay column (handler circle, minutes per
+departure, leading cause).
+
+What the player can do with a reading: a long TURN share points to a longer
+turn buffer on that station's routes (sim/turnBuffer.ts); GND to a better tier;
+CONG to fewer movements in the busy hour (the hour strip); WX to nothing;
+ACFT to a younger or better-maintained fleet.
+
+A save from before stations has no tiers or ledger: every station reads as
+contracted (home as own staff) and the ledger fills from the next departure.
+The headless player steps a station up once a week when the ground minutes it
+saves, valued at $12 each, beat 1.5 times the running cost plus the fee spread
+over 180 days (`keepStations()`).
+
 ## Night stops (`src/sim/nightStops.ts`)
 
 A plane can sleep at the far end of an out-and-back instead of at base:
@@ -3309,15 +3347,27 @@ fleet flown near capacity had no spare planes to take its flying, so
 the cancellations cost Toronto most of its year on 18 seeds.
 
 **Usage clocks.** Each landed flight adds its airborne minutes (ground delay
-excluded) and one cycle to the plane (`recordFlown()`); a finished heavy check
-resets both. Nothing reads them yet except the Mtc card's clock line ("12h ·
-9 cyc"). A plane from an older save counts from zero. They are what the A and
-C checks will run on (WEEK-TWENTYTWO.md).
+excluded) and one cycle to the plane (`recordFlown()`), counted since the last
+A check and since the last heavy check. A plane from an older save counts the
+heavy clock from zero and starts its A clock part-way through the interval,
+staggered by tail, so a fleet doesn't come due together.
+
+**The A check** (WEEK-TWENTYTWO.md) is a light check due every 100 flight hours
+or 80 cycles, whichever comes first, so a plane on short hops is due as soon as
+one on long ones. Its work is 4 hours for a Propeller, 5 for a Regional, 6 for
+a Narrowbody and 8 for a Widebody. From 80% of the interval, whatever a night
+has left after the line check goes to the A check first (at a line base, or
+contracted at a station that has none, paid by the hour), and what is left
+after that goes toward the heavy check as before. A done A check restarts its
+interval and pays the plane's maintenance reserve. A plane 25% past due adds a
+deferred item every night it flies (not on top of a night already adding one),
+so one that never gets its A check ends up held. A night away or at a station
+set to defer makes no progress.
 
 **Maintenance is paid at the check.** One fifth of a flight's non-fuel block
 cost (`MAINTENANCE_SHARE_OF_NON_FUEL`) is maintenance. A landed flight does
-not pay it: it goes to the plane's reserve (`maintenanceReserve`), and the
-heavy check pays it all when it finishes (`settleMaintenance()`), as a
+not pay it: it goes to the plane's reserve (`maintenanceReserve`), and an A or
+heavy check pays all of it when it finishes (`settleMaintenance()`), as a
 maintenance cost that day. A plane handed back to the lessor pays what it has
 built up first, so returning a plane just before its check saves nothing.
 Route margins, rivals and planners still count the whole flight cost, so
@@ -3328,7 +3378,8 @@ only when the money leaves moves. The Mtc card shows what is due.
   serviceable, on watch, due for action (held, or a heavy check overdue),
   in the hangar or on the ground, then a card per plane, worst first. Each
   card has the heavy-check clock (days since the last check, the window
-  where nights bank hours, the due mark, the overdue grace), its deferred
+  where nights bank hours, the due mark, the overdue grace) with a thinner
+  A-check lane under it (percent of its interval, same marks), its deferred
   items as slots filling toward the hold, the hours banked, last night's
   check, and its age, life, tech and AOG figures. Display only: the
   standing is worked out in `ui/inspector/maintenance.ts` from the same
@@ -3454,6 +3505,15 @@ Each cause has a different answer available:
   cancellation does: Completion, -80 NPS each, slot fees still paid,
   nothing refunded. A plane in the air, AOG or grounded for the day can't
   be steered.
+
+  **The call.** `callsNeeded()` lists waiting planes with a rotation to
+  cancel whose day is about to break once a flight is 20 minutes overdue:
+  `curfew` (the curfew will cancel a rotation), `event` (a priority flight
+  is projected more than 60 minutes late) or `late` (a flight 90+ minutes
+  late), worst first. The first time each is seen in a day the clock pauses
+  once and the plane's page opens (`ui/callAlert.ts`, the same pause as
+  events; Space resumes). The Messages switch ✋ on the Game screen turns
+  the pause off; the ops row's CALL count still lists the planes.
 
 A cancellation scores a flat **-80 NPS** rather than extending the delay
 curve, which floors at -50: a cancellation isn't a very late flight, it's
@@ -3651,11 +3711,48 @@ Two read-only briefs. They change no economy; `sim/briefs.ts` decides when each 
 
 `npm run briefstest` checks one brief a day, the review on day 182, ranked rows and a save round trip.
 
+## Ancillary fees (`src/sim/ancillaries.ts`)
+
+An airline-wide dial at Head office › Fees: bags included (level 0, the
+default and the old game), checked bag fee ($10), all bags and seat fee
+($20). It moves once a month (`ANCILLARY_LOCK_DAYS`).
+
+- **Revenue.** Each passenger pays the fee times the share of their
+  segment that pays: 25% of business, 85% of leisure, 60% of VFR, weighted
+  by the market's mix (`marketMix()`). It is added in `flightResult()` as
+  `ancillaryRevenue`, inside revenue, so the route forecasts
+  (`summarizeMarket()`) see it too. The Money screen shows fees a day.
+- **Bookings.** The fee is added to the price each segment compares
+  (`ancillaryPriceDrag()`), so a fee costs bookings, most where
+  passengers are price-sensitive.
+- **NPS.** Each flight loses points (level 1: 6, level 2: 16) weighted by
+  how much the segment minds fees (business 0.5, leisure 1.2, VFR 1.1).
+  Half is permanent; the other half scales with the gap to
+  `state.rivalFeeLevel`, which closes by 1/120 of the gap a day toward the
+  player's level, so rivals copy a fee over about four months and the
+  goodwill cost eases while the revenue stays.
+- **Per route.** Each route can set its own level (`RouteSettings.feeLevel`,
+  Route view › Fees: Airline, Included, $10, $20); it moves once every 14
+  days. Revenue, price drag and NPS cost all read the route's level
+  (`feeLevelOn()`). Where a rival flies the market the NPS cost is x1.5
+  (passengers can compare); where nobody does it is x0.6. So the edge is to
+  charge where you are alone and go easy where you meet a rival.
+- **Headless player.** The steady player sets `STEADY_FEE_LEVEL` on its
+  first day (default 0, overridable with `AIRGAME_FEE_LEVEL`), and can set
+  per-route levels by whether a rival flies the route
+  (`AIRGAME_ALONE_FEE`, `AIRGAME_CONTESTED_FEE`, default off) for balance
+  reads.
+
+New fields (`ancillaryLevel`, `ancillaryChangedDay`, `rivalFeeLevel` and
+the revenue counters) are optional, so old saves load as level 0.
+
+---
+
 ## What isn't built yet
 
 The current plan is the newest `WEEK-*.md`. As of September 2026:
 
-- **Ancillary revenue** (bag fees), designed twice and never built.
+- **Fee extras** (priority boarding, paid seats as separate products) from WEEK-TWENTYFOUR step B: only the per-route level is built (see Ancillary fees).
 - **Per-base time zones** — every plane flies on the home clock.
 
 Open balance questions rather than missing features: margin favoured

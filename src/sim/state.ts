@@ -13,6 +13,7 @@ import { revealReach } from './reach';
 import { loadCompetitorRoutes, type CompetitorOffering } from './competitors';
 import type { WeatherEvent } from './weather';
 import type { DelayBreakdown } from './delays';
+import type { HandlingTier, StationLedger } from './stations';
 import type { HubStyle } from './hubStyle';
 import type { AogEvent } from './aog';
 import { createMarket, ensureRivalFleets, type MarketState } from './market';
@@ -96,6 +97,11 @@ export type Aircraft = {
   cyclesSinceHeavy?: number;
   /** Maintenance cost flown but not yet paid: held back from each landed flight and paid at its heavy check (sim/mxChecks.ts). Absent: none. */
   maintenanceReserve?: number;
+  /** Airborne minutes and cycles since the last A check (sim/mxChecks.ts). Absent minutes: staggered by tail; absent cycles: none. */
+  flightMinutesSinceA?: number;
+  cyclesSinceA?: number;
+  /** Hangar minutes done at night toward its A check this time round (sim/mxChecks.ts). */
+  aBankedMinutes?: number;
 };
 
 /** How one leg went, once it has landed. */
@@ -200,6 +206,10 @@ export type RouteSettings = {
    * spend flying.
    */
   turnBufferMinutes: number;
+  /** This route's own ancillary fee level (sim/ancillaries.ts); absent follows the airline's dial. */
+  feeLevel?: 0 | 1 | 2;
+  /** The day it last changed, for the lock. */
+  feeChangedDay?: number;
 };
 
 export type SimState = {
@@ -290,6 +300,16 @@ export type SimState = {
    * tail, so bringing it home puts it back (sim/retime.ts). Optional.
    */
   wrappedFrom?: Record<string, { legId: string; start: number }>;
+  /** Ancillary fee level 0-2 (sim/ancillaries.ts); absent is 0, bags included. */
+  ancillaryLevel?: 0 | 1 | 2;
+  /** The day the fee level last changed, for the lock. */
+  ancillaryChangedDay?: number;
+  /** How far rivals have copied the player's fee, 0-2. */
+  rivalFeeLevel?: number;
+  /** Today's and the lifetime fee money, already inside revenue. */
+  todayAncillaryRevenue?: number;
+  yesterdayAncillaryRevenue?: number;
+  ancillaryRevenueTotal?: number;
   todayRevenue: number;
   todayCost: number;
   todayMargin: number;
@@ -407,7 +427,7 @@ export type SimState = {
    * `onTimeByMarket` above — a positioning move's delay doesn't say
    * anything about route service quality.
    */
-  delayMinutesByCause: { age: number; weather: number; knockOn: number; congestion: number };
+  delayMinutesByCause: { age: number; weather: number; knockOn: number; congestion: number; ground?: number };
   /**
    * Spill-and-recapture (sim/economy.ts's `flightResult()`):
    * how many recoverable passengers are currently waiting, per market,
@@ -643,7 +663,7 @@ export type SimState = {
   mxHoldsToday?: string[];
   /** Daily brief and season review: which the player wants, and when each last appeared (sim/briefs.ts). Absent in an older save: both on, first review half a year on. */
   briefs?: {
-    settings?: { daily: boolean; season: boolean; seasonPause: boolean };
+    settings?: { daily: boolean; season: boolean; seasonPause: boolean; callPause?: boolean };
     lastDailyDay?: number;
     lastSeasonDay?: number;
     /** `marketTotals` when the last review appeared, so the next one reads only its half year. */
@@ -671,6 +691,16 @@ export type SimState = {
    * once past the cooldown. Optional so older saves load: absent means none.
    */
   rivalClosures?: RivalClosure[];
+  /**
+   * Who handles the ground work at each station (sim/stations.ts). Absent
+   * means every station is contracted and home is the airline's own.
+   * Optional so older saves load.
+   */
+  stationTiers?: Record<string, HandlingTier>;
+  /** Handling steps being built, by station, and the day each opens. */
+  stationUpgrades?: Record<string, { to: 'own' | 'hub'; readyDay: number }>;
+  /** Delay minutes by cause per departure airport, today and the last finished days (sim/stations.ts). */
+  stationLedger?: Record<string, StationLedger>;
   /**
    * Lifetime cancellations by cause — the same shape (and the same
    * purpose) as `delayMinutesByCause`. Each cause has a different answer
@@ -795,7 +825,7 @@ export function createNewGameState(rngSeed: number = Date.now(), homeIata: strin
     trailingNps: STARTING_NPS,
     trailingNpsByMarket: {},
     todayNpsByMarket: {},
-    delayMinutesByCause: { age: 0, weather: 0, knockOn: 0, congestion: 0 },
+    delayMinutesByCause: { age: 0, weather: 0, knockOn: 0, congestion: 0, ground: 0 },
     spilloverByMarket: {},
     rngSeed,
     cashHistory: [],

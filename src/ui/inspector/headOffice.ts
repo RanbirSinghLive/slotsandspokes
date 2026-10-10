@@ -13,6 +13,13 @@ import { averagePerformance, contractsOf, paymentShare, performanceFactor, RENEW
 import { select } from '../selection';
 import { portraitElement, ROLE_COLOURS } from '../portraits';
 import { innovationIconElement } from '../innovationIcons';
+import {
+  ANCILLARY_FEE,
+  ANCILLARY_LEVELS,
+  ANCILLARY_NAMES,
+  ancillaryBlockedReason,
+  ancillaryLevel,
+} from '../../sim/ancillaries';
 import { LADDER, tiersClimbed } from '../../sim/ladder';
 import { buyRights, dropRights, EARN_DAYS, LAPSE_DAYS, licencesAllowed, rightsBlocked, rightsCountries, rightsOffer } from '../../sim/rightsLicences';
 
@@ -398,6 +405,7 @@ export function buildHeadOfficeView(state: SimState, changed: () => void): HTMLE
     ...hedgeButtons(state, changed),
   );
 
+  root.append(...feesSection(state, changed));
   root.append(...contractsSection(state));
   root.append(...executivesSection(state, changed));
   root.append(...rightsSection(state, changed));
@@ -407,6 +415,37 @@ export function buildHeadOfficeView(state: SimState, changed: () => void): HTMLE
     ...techTree(state, changed),
   );
   return root;
+}
+
+/** Ancillary fees (sim/ancillaries.ts): one button per level, the current one marked. */
+function feesSection(state: SimState, changed: () => void): HTMLElement[] {
+  const current = ancillaryLevel(state);
+  const rows: HTMLElement[] = [
+    heading(
+      'Fees',
+      'What a ticket does not include. A fee earns on every passenger, most from leisure and VFR travellers and least from business ones, and costs NPS in the same proportion. Half of that cost fades as rivals copy the fee over about four months, so a fee is a head start, not a lasting edge. The dial moves once a month.',
+    ),
+  ];
+  for (const level of ANCILLARY_LEVELS) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'inspector-plan-hub';
+    if (level === current) button.classList.add('is-current');
+    button.textContent = level === 0 ? ANCILLARY_NAMES[0] : `${ANCILLARY_NAMES[level]} · $${ANCILLARY_FEE[level]}`;
+    const blocked = ancillaryBlockedReason(state, level);
+    button.disabled = blocked !== null;
+    if (blocked && level !== current) button.title = blocked;
+    button.addEventListener('click', () => {
+      ops.setAncillaryFees(state, level);
+      changed();
+    });
+    rows.push(button);
+  }
+  const earned = state.yesterdayAncillaryRevenue ?? 0;
+  if (current > 0 || (state.ancillaryRevenueTotal ?? 0) > 0) {
+    rows.push(line(`Fees ${money(earned)}/day · total ${money(state.ancillaryRevenueTotal ?? 0)} · rivals at ${(state.rivalFeeLevel ?? 0).toFixed(1)} of ${current}`));
+  }
+  return rows;
 }
 
 /**

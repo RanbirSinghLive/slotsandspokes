@@ -80,6 +80,7 @@ import {
 import { AIRCRAFT_CLASSES, classByCode, classRank, pluralClassName } from './aircraftClasses';
 import { applyHubStyleChange, planHubStyleChange } from './hubs';
 import { HUB_STYLES, type HubStyle } from './hubStyle';
+import { setAncillaryLevel, setRouteFeeLevel, type AncillaryLevel } from './ancillaries';
 import { buyHedge, HEDGE_TERMS, hedgeQuote, type HedgeQuote } from './fuelPrice';
 import {
   adoptBlockedReason,
@@ -94,7 +95,7 @@ import { cashNeededToLease, LEASE_RESERVE_DAYS, leaseRateFor, loadLeaseRates } f
 import { inboundAt, orderLease } from './fleetTiming';
 import { startSeatSale as startSeatSaleRule } from './seatSale';
 import { SEASON_DAYS, SEASONAL_PREMIUM } from './seasonalLease';
-import { cyclesSinceHeavy, deferredItems, flightHoursSinceHeavy, heavyBankedMinutes, maintenanceReserve, heavyBayTails, heavyCheckDueIn, heavyCheckOpen, heavyCheckWorkMinutes, sleepersNow, tonightCheck } from './mxChecks';
+import { aBankedMinutes, aCheckOpen, aCheckProgress, aCheckWorkMinutes, cyclesSinceHeavy, deferredItems, flightHoursSinceHeavy, heavyBankedMinutes, maintenanceReserve, heavyBayTails, heavyCheckDueIn, heavyCheckOpen, heavyCheckWorkMinutes, sleepersNow, tonightCheck } from './mxChecks';
 import { rebaseOptions, rebasePlane, type RebaseOption } from './rebase';
 import { cabinGainPerDay, cabinOf, cancelRefit as cancelRefitRule, orderRefit as orderRefitRule, refitBlockedReason, refitCost, refitDays, type Cabin } from './cabins';
 import { commitBringHome, commitRetime, planBringHome, planRetime, type RetimePlan } from './retime';
@@ -687,6 +688,11 @@ export type HeavyCheckReadout = {
   cycles: number;
   /** Maintenance cost flown and not yet paid, due at the heavy check. */
   reserve: number;
+  /** How far through its A interval (1 is due), whether nights bank toward it, and the hours banked of the work. */
+  aProgress: number;
+  aOpen: boolean;
+  aBankedHours: number;
+  aWorkHours: number;
   workHours: number;
   /** Grounded for it, having gone too far overdue. */
   inCheck: boolean;
@@ -710,6 +716,10 @@ export function heavyCheckReadouts(state: SimState): HeavyCheckReadout[] {
       flightHours: Math.round(flightHoursSinceHeavy(aircraft)),
       cycles: cyclesSinceHeavy(aircraft),
       reserve: Math.round(maintenanceReserve(aircraft)),
+      aProgress: aCheckProgress(aircraft),
+      aOpen: aCheckOpen(aircraft),
+      aBankedHours: Math.round((aBankedMinutes(aircraft) / 60) * 10) / 10,
+      aWorkHours: aCheckWorkMinutes(aircraft.typeCode) / 60,
       workHours: heavyCheckWorkMinutes(aircraft.typeCode) / 60,
       inCheck: state.aogs.some((event) => event.tail === aircraft.tail && event.check),
       inBay: bays.has(aircraft.tail),
@@ -789,6 +799,16 @@ export function hedgeOptions(state: SimState): HedgeQuote[] {
 
 export function hedgeFuel(state: SimState, days: number): Outcome<{ message: string }> {
   return buyHedge(state, days);
+}
+
+// --- Ancillary fees ------------------------------------------------------------
+
+export function setAncillaryFees(state: SimState, level: AncillaryLevel): Outcome<{ message: string }> {
+  return setAncillaryLevel(state, level);
+}
+
+export function setRouteFees(state: SimState, origin: string, dest: string, level: AncillaryLevel | null): Outcome<{ message: string }> {
+  return setRouteFeeLevel(state, origin, dest, level);
 }
 
 // --- Executives ------------------------------------------------------------------
