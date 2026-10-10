@@ -27,8 +27,12 @@ is saved only when the owner accepts the read.
 5. Planning: a Book C check button on the Mtc card (grounded next morning, cancellable). No
    quiet-night hint; the headless player doesn't book. **Built.**
 
+6. The D check: a player-booked overhaul every 360 flying days or 3,600
+   hours, 10 to 24 days grounded by class, with a lane on the Mtc card. Never
+   forced; past due the plane wears like 2 more years. **Built.**
+
 ## Not in this week
 
-- D checks and life-limited parts, spares and engine pools, spare aircraft.
+- Life-limited parts, spares and engine pools, spare aircraft.
 
 How it works lives in HOW-IT-WORKS.md (Maintenance checks).

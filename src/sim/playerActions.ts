@@ -96,7 +96,7 @@ import { cashNeededToLease, LEASE_RESERVE_DAYS, leaseRateFor, loadLeaseRates } f
 import { inboundAt, orderLease } from './fleetTiming';
 import { startSeatSale as startSeatSaleRule } from './seatSale';
 import { SEASON_DAYS, SEASONAL_PREMIUM } from './seasonalLease';
-import { aBankedMinutes, aCheckOpen, aCheckProgress, aCheckWorkMinutes, cyclesSinceHeavy, deferredItems, flightHoursSinceHeavy, heavyBankedMinutes, maintenanceReserve, heavyBayTails, heavyCheckDueIn, canBookHeavyCheck, heavyCheckOpen, heavyCheckWorkMinutes, sleepersNow, tonightCheck } from './mxChecks';
+import { aBankedMinutes, aCheckOpen, aCheckProgress, aCheckWorkMinutes, cyclesSinceHeavy, deferredItems, flightHoursSinceHeavy, heavyBankedMinutes, maintenanceReserve, heavyBayTails, heavyCheckDueIn, canBookHeavyCheck, canBookDCheck, dCheckDueIn, dCheckOpen, flightHoursSinceD, heavyCheckOpen, heavyCheckWorkMinutes, sleepersNow, tonightCheck } from './mxChecks';
 import { rebaseOptions, rebasePlane, type RebaseOption } from './rebase';
 import { cabinGainPerDay, cabinOf, cancelRefit as cancelRefitRule, orderRefit as orderRefitRule, refitBlockedReason, refitCost, refitDays, type Cabin } from './cabins';
 import { commitBringHome, commitRetime, planBringHome, planRetime, type RetimePlan } from './retime';
@@ -704,6 +704,13 @@ export type HeavyCheckReadout = {
   /** Holding a hangar bay, so its nights bank hours. */
   inBay: boolean;
   lastNight: 'checked' | 'cleared' | 'short' | 'contracted' | 'away' | null;
+  /** The D check: days to due (negative: overdue), whether booking is open, airborne hours since, booked, bookable now, and whether it is the check in the hangar. */
+  dDueIn: number;
+  dOpen: boolean;
+  dFlightHours: number;
+  dBooked: boolean;
+  dCanBook: boolean;
+  dInCheck: boolean;
 };
 
 /** Every plane's checks (sim/mxChecks.ts), for the Mtc screen, soonest due first. */
@@ -731,6 +738,12 @@ export function heavyCheckReadouts(state: SimState): HeavyCheckReadout[] {
       inCheck: state.aogs.some((event) => event.tail === aircraft.tail && event.check),
       inBay: bays.has(aircraft.tail),
       lastNight: state.lastNightChecks?.[aircraft.tail] ?? null,
+      dDueIn: dCheckDueIn(aircraft),
+      dOpen: dCheckOpen(aircraft),
+      dFlightHours: Math.round(flightHoursSinceD(aircraft)),
+      dBooked: aircraft.dCheckBooked === true,
+      dCanBook: canBookDCheck(state, aircraft),
+      dInCheck: state.aogs.some((event) => event.tail === aircraft.tail && event.checkKind === 'D'),
     }))
     .sort((a, b) => a.dueIn - b.dueIn);
 }
@@ -749,7 +762,20 @@ export function cancelBookedCheck(state: SimState, tail: string): void {
   if (aircraft) delete aircraft.heavyCheckBooked;
 }
 
-export { previewHeavyCheckBooking } from './mxChecks';
+/** Book a plane's D check: grounded for the whole overhaul from tomorrow morning, its rotations covered where pools allow. */
+export function bookDCheck(state: SimState, tail: string): Outcome<{ message: string }> {
+  const aircraft = state.aircraft.find((a) => a.tail === tail);
+  if (!aircraft || !canBookDCheck(state, aircraft)) return { ok: false, reason: `${tail} can't go in for a D check now.` };
+  aircraft.dCheckBooked = true;
+  return { ok: true, message: `${tail} booked for its D check tomorrow.` };
+}
+
+export function cancelBookedDCheck(state: SimState, tail: string): void {
+  const aircraft = state.aircraft.find((a) => a.tail === tail);
+  if (aircraft) delete aircraft.dCheckBooked;
+}
+
+export { previewHeavyCheckBooking, previewDCheckBooking } from './mxChecks';
 
 // --- Seat sales --------------------------------------------------------------
 

@@ -91,6 +91,21 @@ export const A_OVERDUE = 1.25;
 /** Hangar minutes an A check takes, by class. */
 const A_WORK_MINUTES: Record<string, number> = { PROP: 240, REGIONAL: 300, NARROWBODY: 360, WIDEBODY: 480 };
 
+/**
+ * The D check: an overhaul due after D_INTERVAL_DAYS flying days or
+ * D_INTERVAL_HOURS airborne, whichever comes first. It takes the plane out of
+ * service for days, so it is only ever booked by the player, never forced; a
+ * plane past due wears like D_WEAR_YEARS more years of age until it goes in.
+ */
+export const D_INTERVAL_DAYS = 360;
+export const D_INTERVAL_HOURS = 3600;
+/** Booking opens this many days before it's due. */
+export const D_WINDOW_DAYS = 60;
+export const D_WEAR_YEARS = 2;
+/** Days out of service and hangar hours of work, by class. */
+const D_DAYS: Record<string, number> = { PROP: 10, REGIONAL: 14, NARROWBODY: 18, WIDEBODY: 24 };
+const D_WORK_HOURS: Record<string, number> = { PROP: 120, REGIONAL: 200, NARROWBODY: 320, WIDEBODY: 480 };
+
 const MINUTES_PER_DAY = 1440;
 
 export function lineCheckMinutes(state: SimState, aircraft: Aircraft): number {
@@ -105,7 +120,7 @@ export function deferredItems(aircraft: Aircraft): number {
 
 /** The age a plane behaves as for breakdowns and mechanical delays: its own, plus its deferred items. */
 export function wornAge(aircraft: Aircraft): number {
-  return aircraft.ageYears + DEFERRED_AGE_YEARS * deferredItems(aircraft);
+  return aircraft.ageYears + DEFERRED_AGE_YEARS * deferredItems(aircraft) + (dCheckOverdue(aircraft) ? D_WEAR_YEARS : 0);
 }
 
 export function heavyCheckWorkMinutes(typeCode: string): number {
@@ -154,6 +169,7 @@ export function recordFlown(aircraft: Aircraft, airborneMinutes: number): void {
   aircraft.cyclesSinceA = (aircraft.cyclesSinceA ?? 0) + 1;
   aircraft.flightMinutesSinceHeavy = (aircraft.flightMinutesSinceHeavy ?? 0) + Math.max(0, airborneMinutes);
   aircraft.cyclesSinceHeavy = (aircraft.cyclesSinceHeavy ?? 0) + 1;
+  aircraft.flightMinutesSinceD = (aircraft.flightMinutesSinceD ?? 0) + Math.max(0, airborneMinutes);
 }
 
 /**
@@ -195,6 +211,44 @@ export function finishACheck(state: SimState, aircraft: Aircraft): void {
   aircraft.flightMinutesSinceA = 0;
   aircraft.cyclesSinceA = 0;
   delete aircraft.aBankedMinutes;
+}
+
+/**
+ * Flying days since the last D check. A plane just leased or from an older
+ * save starts part-way through, staggered by tail but never within the
+ * booking window, so no fleet comes due at once and no new game opens on one.
+ */
+export function daysSinceD(aircraft: Aircraft): number {
+  if (aircraft.daysSinceD !== undefined) return aircraft.daysSinceD;
+  let hash = 0;
+  for (let i = 0; i < aircraft.tail.length; i++) hash = (hash * 13 + aircraft.tail.charCodeAt(i)) % 983;
+  return (hash * 7) % (D_INTERVAL_DAYS - D_WINDOW_DAYS - 60);
+}
+
+export function flightHoursSinceD(aircraft: Aircraft): number {
+  return (aircraft.flightMinutesSinceD ?? 0) / 60;
+}
+
+/** How far through its D interval, in days: flying days, or hours scaled to the same interval, whichever is further. */
+export function dCheckProgressDays(aircraft: Aircraft): number {
+  return Math.max(daysSinceD(aircraft), (flightHoursSinceD(aircraft) / D_INTERVAL_HOURS) * D_INTERVAL_DAYS);
+}
+
+/** Days until the D check is due: negative once overdue. */
+export function dCheckDueIn(aircraft: Aircraft): number {
+  return Math.round(D_INTERVAL_DAYS - dCheckProgressDays(aircraft));
+}
+
+export function dCheckOpen(aircraft: Aircraft): boolean {
+  return dCheckDueIn(aircraft) <= D_WINDOW_DAYS;
+}
+
+export function dCheckOverdue(aircraft: Aircraft): boolean {
+  return dCheckDueIn(aircraft) < 0;
+}
+
+export function dCheckDays(typeCode: string): number {
+  return D_DAYS[typeCode] ?? D_DAYS.PROP;
 }
 
 /** Whether nights at base count toward the heavy check yet. */
@@ -250,6 +304,7 @@ export function rollNightlyChecks(state: SimState, dayStartMinute: number): void
     if (legs.length === 0 || aircraft.rebase) continue;
     if (state.aogs.some((event) => event.tail === aircraft.tail)) continue;
     aircraft.daysSinceHeavyCheck = daysSinceHeavyCheck(aircraft) + 1;
+    aircraft.daysSinceD = daysSinceD(aircraft) + 1;
     checked.push({ aircraft, station: aircraft.status === 'ground' ? aircraft.atAirport : null });
   }
   const sleepers = checked.flatMap((entry) => (entry.station ? [{ aircraft: entry.aircraft, station: entry.station }] : []));
@@ -419,6 +474,7 @@ export function previewHeavyCheckBooking(state: SimState, tail: string): { days:
 export function canBookHeavyCheck(state: SimState, aircraft: Aircraft): boolean {
   return (
     !aircraft.heavyCheckBooked &&
+    !aircraft.dCheckBooked &&
     heavyCheckOpen(aircraft) &&
     aircraft.status === 'ground' &&
     aircraft.atAirport === aircraft.baseAirport &&
@@ -475,4 +531,61 @@ export function tonightCheck(
   if (bankingA) spare -= Math.min(spare, aCheckWorkMinutes(aircraft.typeCode) - aBankedMinutes(aircraft));
   const bankingC = !away && spare > 0 && heavyBayTails(state, sleepers).has(tail);
   return { night, work, station, inHouse, away, contracted, short, banking: bankingA && bankingC ? 'A+C' : bankingA ? 'A' : bankingC ? 'C' : null };
+}
+
+/** Bookable: parked at its base, D check inside its window, and no other check booked, running or rebasing. */
+export function canBookDCheck(state: SimState, aircraft: Aircraft): boolean {
+  return (
+    !aircraft.dCheckBooked &&
+    !aircraft.heavyCheckBooked &&
+    dCheckOpen(aircraft) &&
+    aircraft.status === 'ground' &&
+    aircraft.atAirport === aircraft.baseAirport &&
+    !aircraft.rebase &&
+    !state.aogs.some((event) => event.tail === aircraft.tail)
+  );
+}
+
+/** What booking a plane's D check now would do: days grounded, contract cost (0 in house) and rotations it takes off the plane. Null when it can't be booked. */
+export function previewDCheckBooking(state: SimState, tail: string): { days: number; cost: number; rotations: number } | null {
+  const aircraft = state.aircraft.find((a) => a.tail === tail);
+  if (!aircraft || !canBookDCheck(state, aircraft)) return null;
+  return {
+    days: dCheckDays(aircraft.typeCode),
+    cost: heavyRated(state, aircraft.atAirport ?? '', aircraft.typeCode) ? 0 : dCheckContractCost(aircraft.typeCode),
+    rotations: rotationsForTail(state, tail).length,
+  };
+}
+
+function dCheckContractCost(typeCode: string): number {
+  return contractCost((D_WORK_HOURS[typeCode] ?? D_WORK_HOURS.PROP) * 60);
+}
+
+/**
+ * D checks the player booked: grounded the next morning for the whole
+ * overhaul, the same way a C check is. A booked plane that isn't at its base
+ * that morning stays booked until it is. Planes in `skip` (already starting a
+ * C check) wait.
+ */
+export function bookedDChecks(state: SimState, skip: Aircraft[]): { aircraft: Aircraft; days: number }[] {
+  const going = state.aircraft
+    .filter((aircraft) => aircraft.dCheckBooked && !skip.includes(aircraft))
+    .filter((aircraft) => aircraft.status === 'ground' && (aircraft.atAirport === aircraft.baseAirport || aircraft.atAirport === nightStopStation(state, aircraft.tail)) && !aircraft.rebase)
+    .filter((aircraft) => !state.aogs.some((event) => event.tail === aircraft.tail));
+  return going.map((aircraft) => {
+    delete aircraft.dCheckBooked;
+    if (!heavyRated(state, aircraft.atAirport ?? '', aircraft.typeCode)) chargeMaintenance(state, dCheckContractCost(aircraft.typeCode));
+    return { aircraft, days: dCheckDays(aircraft.typeCode) };
+  });
+}
+
+/** A D check done: the overhaul clock starts again, and the C and A checks are done with it. */
+export function finishDCheck(state: SimState, aircraft: Aircraft): void {
+  finishHeavyCheck(state, aircraft);
+  aircraft.flightMinutesSinceA = 0;
+  aircraft.cyclesSinceA = 0;
+  delete aircraft.aBankedMinutes;
+  aircraft.daysSinceD = 0;
+  delete aircraft.flightMinutesSinceD;
+  delete aircraft.dCheckBooked;
 }
