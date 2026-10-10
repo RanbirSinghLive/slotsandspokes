@@ -621,6 +621,14 @@ export type SimState = {
   aogs: AogEvent[];
   /** Planes held at base this morning for their deferred items (sim/mxChecks.ts), for the ticker. */
   mxHoldsToday?: string[];
+  /** Daily brief and season review: which the player wants, and when each last appeared (sim/briefs.ts). Absent in an older save: both on, first review half a year on. */
+  briefs?: {
+    settings?: { daily: boolean; season: boolean; seasonPause: boolean };
+    lastDailyDay?: number;
+    lastSeasonDay?: number;
+    /** `marketTotals` when the last review appeared, so the next one reads only its half year. */
+    seasonBaseline?: Record<string, { revenue: number; cost: number; passengers: number }>;
+  };
   /** How each flying plane's line check went last night (sim/mxChecks.ts), by tail. */
   lastNightChecks?: Record<string, 'checked' | 'cleared' | 'short' | 'contracted' | 'away'>;
   /** Demand events announced or running (sim/demandEvents.ts). Absent in an older save: none. */
