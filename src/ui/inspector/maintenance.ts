@@ -9,6 +9,7 @@ import type { SimState } from '../../sim/state';
 import { money } from '../format';
 import { linkToMap } from '../mapLink';
 import { planeIconElement, TYPE_COLOURS } from '../planeIcons';
+import { glyph, pips } from '../glyphs';
 import { select } from '../selection';
 import { MX_RATING_FEE, MX_RATING_PER_DAY } from '../../sim/bases';
 import { cashAfterRows, costRows, showConfirm } from '../confirmModal';
@@ -436,6 +437,7 @@ function buildMxBases(state: SimState, changed: () => void): HTMLElement[] {
     nodes.push(
       ...baseSection({
         title: isLine ? 'Line bases' : 'Hangars',
+        icon: isLine ? 'wrench' : 'hangar',
         info: isLine
           ? `Where a night is a line check. The level is how many planes it checks a night, most deferred items first; a plane past that, or of a class it isn't rated for, is treated like a night at an outstation. Opening one costs ${money(readout.fee)}, then ${money(readout.perLevelPerDay)} a day for each level; home starts at level 3, free.`
           : `Where C checks are done. The level is the number of bays: only that many planes, the ones nearest due, bank hours toward their C check on a night here; the rest wait. Planes in a forced check take a bay too. Opening one costs ${money(readout.fee)}, then ${money(readout.perLevelPerDay)} a day for each level; home starts at level 3, free. A station without one banks nothing.`,
@@ -471,10 +473,11 @@ function buildMxBases(state: SimState, changed: () => void): HTMLElement[] {
     const row = linkToMap(document.createElement('div'), { kind: 'airport', iata: station.iata });
     row.className = 'inspector-row base-row';
     const name = document.createElement('span');
-    name.textContent = `${station.iata} · ${station.planes} plane${station.planes === 1 ? '' : 's'} tonight · ${station.reason}`;
+    name.append(glyph('moon', `${station.planes} plane${station.planes === 1 ? '' : 's'} sleeping here tonight`), ` ${station.iata} · ${station.planes} plane${station.planes === 1 ? '' : 's'} tonight · ${station.reason}`);
     const detail = document.createElement('span');
     detail.className = 'inspector-row-detail';
     detail.textContent = station.check === 'contract' ? `contracted · ${money(station.contractPerNight)}/night` : 'deferred · ● each night';
+    detail.classList.add(station.check === 'contract' ? 'is-contract' : 'is-deferred');
     if (station.check === 'defer') detail.classList.add('is-warn');
     const toggle = document.createElement('button');
     toggle.type = 'button';
@@ -514,7 +517,8 @@ function buildRatings(state: SimState, changed: () => void): HTMLElement[] {
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.className = 'mx-rating is-rated';
-      chip.textContent = classCode;
+      chip.style.setProperty('--puck', TYPE_COLOURS[classCode] ?? '#8ab4ff');
+      chip.append(planeIconElement(classCode), ` ${classCode}`);
       const blocked = entry.dropBlocked[classCode];
       chip.disabled = blocked !== null && blocked !== undefined;
       chip.title = blocked ?? `Rated · click to drop`;
@@ -528,7 +532,8 @@ function buildRatings(state: SimState, changed: () => void): HTMLElement[] {
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.className = 'mx-rating';
-      chip.textContent = `+ ${option.classCode}`;
+      chip.style.setProperty('--puck', TYPE_COLOURS[option.classCode] ?? '#8ab4ff');
+      chip.append('+ ', planeIconElement(option.classCode), ` ${option.classCode}`);
       chip.disabled = option.blocked !== null;
       chip.title = option.blocked ?? `Rate for ${option.classCode} · ${money(MX_RATING_FEE)}`;
       chip.addEventListener('click', () => {
@@ -567,7 +572,7 @@ function buildEngines(state: SimState, changed: () => void): HTMLElement[] {
     const row = document.createElement('div');
     row.className = 'inspector-row base-row';
     const name = document.createElement('span');
-    name.textContent = `${entry.classCode} · ${entry.ready}/${entry.held} ready`;
+    name.append(glyph('engine'), ` ${entry.classCode} · `, pips(entry.ready, entry.held, `${entry.ready} of ${entry.held} spares ready; the rest are in the shop`, 'engine'));
     const detail = document.createElement('span');
     detail.className = 'inspector-row-detail';
     detail.textContent = `${money(entry.held * entry.perDay)}/day · shop ${money(entry.shopVisit)}`;

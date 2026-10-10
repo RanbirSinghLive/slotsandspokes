@@ -1,4 +1,5 @@
 import { dayIndex } from '../../sim/clock';
+import { glyph, type GlyphName } from '../glyphs';
 import { info, line, heading, lineWithInfo } from './dom';
 import { money } from '../format';
 import { cashAfterRows, showConfirm } from '../confirmModal';
@@ -422,6 +423,11 @@ export function buildHeadOfficeView(state: SimState, changed: () => void): HTMLE
   return root;
 }
 
+/** The glyphs in front of a fee button: a bag, a seat, a boarding arrow. */
+function feeIcons(names: GlyphName[]): HTMLElement[] {
+  return names.map((name) => glyph(name, undefined, 'fee-glyph'));
+}
+
 /** Ancillary fees (sim/ancillaries.ts): one button per level, the current one marked. */
 function feesSection(state: SimState, changed: () => void): HTMLElement[] {
   const current = ancillaryLevel(state);
@@ -436,7 +442,8 @@ function feesSection(state: SimState, changed: () => void): HTMLElement[] {
     button.type = 'button';
     button.className = 'inspector-plan-hub';
     if (level === current) button.classList.add('is-current');
-    button.textContent = level === 0 ? ANCILLARY_NAMES[0] : `${ANCILLARY_NAMES[level]} · $${ANCILLARY_FEE[level]}`;
+    button.append(...feeIcons(level === 0 ? ['bagOff'] : level === 1 ? ['bag'] : ['bags', 'seat']), level === 0 ? ANCILLARY_NAMES[0] : ` ${ANCILLARY_NAMES[level]} · $${ANCILLARY_FEE[level]}`);
+    button.classList.add('fee-button');
     const blocked = ancillaryBlockedReason(state, level);
     button.disabled = blocked !== null;
     if (blocked && level !== current) button.title = blocked;
@@ -452,7 +459,8 @@ function feesSection(state: SimState, changed: () => void): HTMLElement[] {
     button.type = 'button';
     button.className = 'inspector-plan-hub';
     if (on) button.classList.add('is-current');
-    button.textContent = `${EXTRAS[id].name} · $${EXTRAS[id].fee}${on ? ' · on' : ''}`;
+    button.append(...feeIcons([id === 'seats' ? 'seat' : 'boarding']), ` ${EXTRAS[id].name} · $${EXTRAS[id].fee}${on ? ' · on' : ''}`);
+    button.classList.add('fee-button');
     const blocked = extraBlockedReason(state, id);
     button.disabled = blocked !== null;
     button.title = blocked ?? (id === 'seats' ? 'Earns nothing on a route at the $20 level, which already includes seat choice.' : 'Business travellers pay; leisure ones mind.');

@@ -119,6 +119,7 @@ function crewBasesSection(state: SimState, plan: ReturnType<typeof crewPlan>, ch
   const readout = ops.crewBaseReadout(state);
   const nodes = baseSection({
     title: 'Crew bases',
+    icon: 'people',
     info: `Where crews live, and the only places planes can be leased or based. Opening one costs ${money(readout.fee)} and ${money(readout.perDay)} a day for the crew room; home's comes with the start. A new base has no crews: hire them before its first plane. A crew base is not a maintenance base: nights there are contracted or deferred unless you open one on the Mtc screen.`,
     kind: 'crew base',
     bases: readout.bases,
