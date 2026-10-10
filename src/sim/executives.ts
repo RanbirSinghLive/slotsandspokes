@@ -12,7 +12,9 @@ import type { SimState } from './state';
  * **The pool widens as NPS rises** (sim/nps.ts): anyone will take a
  * journeyman's job, but the stronger candidates only talk to an airline
  * passengers rate well (`npsNeeded`, judged against the trailing network
- * NPS when hiring). Once hired, they stay if NPS falls.
+ * NPS when hiring). Once hired, they must be kept: a hire whose NPS
+ * line the airline stays under for EXECUTIVE_LAPSE_DAYS in a row leaves
+ * (`rollExecutiveStanding()`), salary and fee gone.
  *
  * Each chair's candidates help in different ways, so hiring is a choice
  * of what the airline needs, not only of the best on offer. Letting one
@@ -74,7 +76,12 @@ export type ExecutiveCandidate = {
 export type ExecutiveAppointment = {
   candidateId: string;
   hiredAtMinute: number;
+  /** Days in a row the network NPS has been under this hire's line. Absent when it hasn't. */
+  daysBelowLine?: number;
 };
+
+/** Days in a row under their NPS line before a hire walks. */
+export const EXECUTIVE_LAPSE_DAYS = 30;
 
 export type ExecutiveSlots = Record<ExecutiveRole, ExecutiveAppointment | null>;
 
@@ -131,6 +138,29 @@ export function dismissExecutive(state: SimState, role: ExecutiveRole): { ok: tr
   if (!candidate) return { ok: false, reason: 'Nobody holds that chair.' };
   state.executives[role] = null;
   return { ok: true, message: `${candidate.name} has left.` };
+}
+
+/**
+ * Each rollover, count the days an appointed executive's NPS line has
+ * gone unmet; at EXECUTIVE_LAPSE_DAYS in a row they leave (recorded in
+ * `lastExecutiveLapse` for the ticker). Journeymen have no line and stay.
+ */
+export function rollExecutiveStanding(state: SimState): void {
+  const nps = networkNps(state);
+  for (const role of EXECUTIVE_ROLES) {
+    const appointment = state.executives[role];
+    const candidate = appointedCandidate(state, role);
+    if (!appointment || !candidate || candidate.npsNeeded === null) continue;
+    if (nps >= candidate.npsNeeded) {
+      delete appointment.daysBelowLine;
+      continue;
+    }
+    appointment.daysBelowLine = (appointment.daysBelowLine ?? 0) + 1;
+    if (appointment.daysBelowLine >= EXECUTIVE_LAPSE_DAYS) {
+      state.executives[role] = null;
+      state.lastExecutiveLapse = { candidateId: candidate.id, simMinute: state.simMinute };
+    }
+  }
 }
 
 /** Every appointed executive's salary, a day. Charged at rollover (sim/step.ts). */

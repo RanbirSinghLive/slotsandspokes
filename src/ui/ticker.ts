@@ -17,6 +17,7 @@ import type { SimState } from '../sim/state';
 import { select, type Selection } from './selection';
 import { rivalsInSight } from '../sim/reach';
 import { contractsOf, SNAP_BACK_SHARE } from '../sim/contracts';
+import { candidateById } from '../sim/executives';
 import { WAR_LEVEL } from '../sim/fareWars';
 import { eventDraws } from '../sim/demandEvents';
 
@@ -202,6 +203,22 @@ function pollLadderEvents(state: SimState): void {
       { kind: 'goals' },
     );
   }
+}
+
+/** The minute of the last executive lapse announced; undefined until the first poll so a loaded save stays quiet. */
+let seenExecutiveLapse: number | null | undefined;
+
+/** A hire who left because NPS stayed under their line (sim/executives.ts). */
+function pollExecutiveEvents(state: SimState): void {
+  const lapse = state.lastExecutiveLapse;
+  if (seenExecutiveLapse === undefined) {
+    seenExecutiveLapse = lapse?.simMinute ?? null;
+    return;
+  }
+  if (!lapse || lapse.simMinute === seenExecutiveLapse) return;
+  seenExecutiveLapse = lapse.simMinute;
+  const candidate = candidateById(lapse.candidateId);
+  if (candidate) pushEvent(state.simMinute, 'GOAL', `${candidate.name} left · NPS under ${candidate.npsNeeded} for 30d`, { kind: 'headOffice' });
 }
 
 /** The shock running at the last poll, by its start day and kind, or null. */
@@ -739,6 +756,7 @@ export function updateTicker(state: SimState): void {
     renderTickerText();
   }
   pollLadderEvents(state);
+  pollExecutiveEvents(state);
   pollContractEvents(state);
   pollShockEvents(state);
   pollAirspaceEvents(state);

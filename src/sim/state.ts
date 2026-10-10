@@ -583,6 +583,8 @@ export type SimState = {
    * by one appointment.
    */
   executives: ExecutiveSlots;
+  /** The last hire to walk out for NPS under their line (sim/executives.ts's rollExecutiveStanding()), for the ticker. Optional: absent until it happens. */
+  lastExecutiveLapse?: { candidateId: string; simMinute: number };
   /** Each rival airline's milestones met on the ladder, by code then milestone id: the day met (sim/rivalLadder.ts). Optional: made on first use. */
   rivalMilestones?: Record<string, Record<string, number>>;
   /** Leases signed and not yet delivered (sim/fleetTiming.ts). Optional: absent in an older save. */
@@ -612,6 +614,12 @@ export type SimState = {
    * entry per pair, holding the daily fee locked in when it was taken.
    */
   slotsHeld: Record<string, number[]>;
+  /**
+   * Days each held pair has been held, by IATA, in the same order as
+   * `slotsHeld` (sim/slots.ts): the clock behind heritage pairs. Optional:
+   * an older save starts every pair at 0.
+   */
+  slotDaysHeld?: Record<string, number[]>;
   /**
    * How each hub is run (sim/hubStyle.ts), keyed by IATA. Only airports
    * the player has changed appear; everything else is Rolling.
@@ -665,7 +673,7 @@ export type SimState = {
    * was due (stranded by an earlier disruption); optional so older saves
    * load, absent meaning none.
    */
-  cancellationsByCause: { crew: number; mechanical: number; weather: number; curfew: number; position?: number; maintenance?: number; airspace?: number };
+  cancellationsByCause: { crew: number; mechanical: number; weather: number; curfew: number; controller?: number; position?: number; maintenance?: number; airspace?: number };
   /**
    * Cancellations: legs that should have operated today and
    * didn't. `flightsScheduled*` counts what was on the books, so

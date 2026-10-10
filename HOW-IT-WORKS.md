@@ -1988,9 +1988,11 @@ Two different things that are easy to confuse:
   It only describes flights that operated.
 - **NPS** is how passengers rate the airline. Each flight gets a score
   (this game has no passengers to survey) from what step.ts knows as it
-  departs: how late it is, how its fare compares to rivals on the
-  market, how old the airframe is, and cabin service. A cancellation
-  scores −80. Bounded to [−100, 100].
+  departs: how late it is, how old the airframe is, and cabin service.
+  A cancellation scores −80. Bounded to [−100, 100]. The fare is not in
+  it: price already moves bookings, market growth and brand position,
+  and scoring it here too paid one dial four times (and made a cheap
+  airline climb to the executives' NPS lines faster than a premium one).
 
 **What passengers respond to is the trailing NPS**: a daily moving
 average weighted 1/30 (`rollTrailingNps()` at rollover), so about the
@@ -2011,6 +2013,15 @@ through its first year, so across the network it's a tie-breaker; on
 one route it's a real lever, since routes range from about −27 (late,
 old planes) to +26, and a bad route loses passengers to its rival.
 Rivals' own profit estimates (sim/rivalEconomics.ts) see the same edge.
+
+**It also pays on every route** (`nameYieldMultiplier()`): each point
+above (or below) 15, what a careful airline reaches, moves a market's
+ticket revenue 0.04%, held within ±2%, so +20 over that is worth 0.8%
+on any route, flown alone or against a rival. It rides in
+`bookingPerks().yieldMultiplier` beside online booking and the revenue
+CCO. It is small on purpose: margins are thin, and at 0.15% a point
+(±6%) the quick balance read doubled PHL and sent YUL from −$2k to
+$20M. Before it, NPS did nothing until a rival arrived.
 
 Shown on the Network panel (NPS row), in the route view (with what it
 does against a rival, `brandInWords()`), on the airport view's routes,
@@ -2046,6 +2057,14 @@ cash ÷ average daily fall. It shows three ways, escalating:
 
 At 100× a fortnight passes in under half a minute, which is why the
 pause exists.
+
+**Free cash** is the other half of that card: the Runway card's second
+line reads `FREE $212k`, cash less 14 days of what the airline owes
+whether or not a plane flies (two weeks with no income, the Runway's red line) (`committedCostPerDay()`: leases, bases,
+slot fees, overhead, salaries, programmes' running costs; standby
+crews are left out). It goes red below zero. Every confirm that spends
+cash also shows `Free after` under `Cash after`
+(`cashAfterRows()` in `ui/confirmModal.ts`).
 
 
 ---
@@ -2738,6 +2757,15 @@ costs more (`hourPriceMultiplier()`): 1.5× the gap between its hour's
 load and the airport's average hour, from half price to double, so a
 peak slot is worth paying for and an off-peak one is cheap.
 
+**Heritage pairs** (`sim/slots.ts`). A pair held 180 days in a row is
+heritage: its fee is 20% lower, and the share of an airport's movements
+flown on the player's heritage pairs raises a rival's slot fee there by
+that share, up to +50% (`rivalSlotQuote()`, so rivals' profit estimates
+see it). Tenure is `state.slotDaysHeld`, a day count per pair beside
+`slotsHeld`. A pair given back at rollover (nothing uses it) starts
+again, so a hub held for months is a moat that a quiet spell dissolves.
+The airport view says "· N heritage" on its Slots line.
+
 **Full means full in that hour.** A new rotation needs room in every
 hour its legs use, at every airport it touches. When the planner
 (`sim/rotations.ts`) finds one full, it starts the rotation later, in
@@ -3363,6 +3391,22 @@ Each cause has a different answer available:
   between two airports every day, while its other routes silently never
   flew.
 
+- **Cancelled by you** (`sim/controller.ts`) — a plane waiting on the
+  ground whose day is projected to run late shows **Needs a call** on its
+  page (Fleet › plane › Today), with a ✕ on each rotation it hasn't
+  started. The curfew cancels the *last* rotation that can't get home,
+  whatever it earns; ✕ lets the player give up a cheaper one earlier, so
+  the plane's day recovers and the better rotation flies. Whole rotations
+  only, from base, as the curfew does. The confirm step prices it by
+  replaying the plane's day twice (`projectGroundedDay()` in
+  `sim/cascade.ts`, step()'s own rules), with and without the rotation:
+  flights lost and saved from the curfew, late legs and minutes, estimated
+  revenue (the market's last 7 days over its flights a day), and the
+  priority-flight penalty if it carries one. It counts as any
+  cancellation does: Completion, -80 NPS each, slot fees still paid,
+  nothing refunded. A plane in the air, AOG or grounded for the day can't
+  be steered.
+
 A cancellation scores a flat **-80 NPS** rather than extending the delay
 curve, which floors at -50: a cancellation isn't a very late flight, it's
 a different failure. NPS therefore divides by its own denominator
@@ -3437,7 +3481,7 @@ chair's colour (COO teal, CFO amber, CCO violet).
 
 **The pool widens as NPS rises**: each chair has a journeyman open to
 anyone, a hire who needs a trailing network NPS of 15, and a star who
-needs 20 (judged at hiring; they stay if NPS falls later).
+needs 20 (judged at hiring). A hire with a line must keep it: network NPS under it for 30 days in a row and they leave (`rollExecutiveStanding()`), the fee gone; the chair's view counts the days down.
 
 | Chair | Anyone | NPS 15 | NPS 20 |
 |---|---|---|---|

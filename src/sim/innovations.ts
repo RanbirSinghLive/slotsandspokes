@@ -1,7 +1,7 @@
 import { LOAD_FACTOR, RECAPTURE_RATE } from './economy';
 import { executiveLoadFactorBonus, executiveYieldMultiplier } from './executives';
 import { airlineCalled, LADDER, tiersClimbed } from './ladder';
-import { brandEdge } from './nps';
+import { brandEdge, nameYieldMultiplier } from './nps';
 import { positionEdge } from './brand';
 import type { SegmentName } from './timeOfDay';
 import type { SimState } from './state';
@@ -211,8 +211,8 @@ export function bookingPerks(state: SimState, origin: string, dest: string): Boo
   return {
     brandEdge: brandEdge(state, origin, dest),
     positionEdge: positionEdge(state),
-    // Online booking, and a revenue-management CCO (sim/executives.ts).
-    yieldMultiplier: (isAdopted(state, 'online-booking') ? DIRECT_BOOKING_YIELD : 1) * executiveYieldMultiplier(state),
+    // Online booking, a revenue-management CCO (sim/executives.ts), and the airline's name (sim/nps.ts).
+    yieldMultiplier: (isAdopted(state, 'online-booking') ? DIRECT_BOOKING_YIELD : 1) * executiveYieldMultiplier(state) * nameYieldMultiplier(state, origin, dest),
     loadFactor: loadFactorCap(state),
     recaptureRate: isAdopted(state, 'loyalty-scheme') ? LOYALTY_RECAPTURE_RATE : RECAPTURE_RATE,
   };

@@ -22,6 +22,7 @@ const CANCEL_CAUSE_LABELS: [keyof SimState['cancellationsByCause'], string][] = 
   ['mechanical', 'Aircraft AOG'],
   ['weather', 'Airport closed'],
   ['curfew', 'Delays ran past 22:00'],
+  ['controller', 'Cancelled by you'],
   ['position', 'Aircraft out of position'],
   ['maintenance', 'Maintenance hold'],
   ['airspace', 'Airspace closed'],

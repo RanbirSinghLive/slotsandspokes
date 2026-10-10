@@ -7,8 +7,10 @@ import type { SimState } from './state';
  * NPS (Net Promoter Score): how passengers rate the airline. Real NPS is
  * a survey; this game has no passengers to survey, so each flight gets a
  * stand-in score from what step.ts knows as it departs: how late it is,
- * how its fare compares to rivals on the market, how old the airframe is,
- * and how fresh its crew is. A cancellation scores worst of all.
+ * how old the airframe is, and how fresh its crew and cabin are. A
+ * cancellation scores worst of all. Price is not in it: the fare already
+ * acts through the choice model, brand position and market growth, and
+ * counting it here too paid one dial four times.
  *
  * Scores add up into a trailing NPS per market and for the network (the
  * second half of this file), and that is what passengers respond to: a
@@ -26,14 +28,6 @@ import type { SimState } from './state';
 const DELAY_BASELINE_POINTS = 30;
 const DELAY_PENALTY_PER_MINUTE = 1;
 const DELAY_FLOOR_POINTS = -50;
-
-// How much being cheaper (or pricier) than the competition on this
-// specific market is worth, in points, per fraction of the average
-// competitor fare you're undercutting them by. No competitor on this
-// market at all: no fare component rather than treating "no comparison
-// available" as either a bonus or a penalty.
-const FARE_SENSITIVITY = 100;
-const FARE_CAP_POINTS = 30;
 
 // Same shape as the delay component: a fresh airframe is a mild positive,
 // an old one a mild negative, floored well short of the delay
@@ -85,11 +79,7 @@ export const CANCELLATION_NPS_SCORE = -80;
  */
 export function flightSatisfactionScore(
   delayMinutes: number,
-  fare: number,
   ageYears: number,
-  origin: string,
-  dest: string,
-  competitorRoutes: CompetitorOffering[],
   /** 0-1: how fresh the crew is (1 − its fatigue, sim/crews.ts). */
   crewFreshness = 1,
   /** 0-1: the share of the cabin teams its plane needs that it has (sim/crews.ts's cabinCover()). */
@@ -101,14 +91,6 @@ export function flightSatisfactionScore(
     DELAY_BASELINE_POINTS,
   );
 
-  const competitorFares = competitorFaresForMarket(origin, dest, competitorRoutes);
-  let fareComponent = 0;
-  if (competitorFares.length > 0) {
-    const avgCompetitorFare = competitorFares.reduce((sum, f) => sum + f, 0) / competitorFares.length;
-    const cheaperFraction = (avgCompetitorFare - fare) / avgCompetitorFare; // positive: you're cheaper
-    fareComponent = clamp(cheaperFraction * FARE_SENSITIVITY, -FARE_CAP_POINTS, FARE_CAP_POINTS);
-  }
-
   const ageComponent = clamp(AGE_BASELINE_POINTS - ageYears * AGE_PENALTY_PER_YEAR, AGE_FLOOR_POINTS, AGE_BASELINE_POINTS);
 
   const cover = clamp(cabinCover, 0, 1);
@@ -117,7 +99,7 @@ export function flightSatisfactionScore(
   // Real NPS is bounded to [-100, 100] by definition (100% detractors to
   // 100% promoters) — the components above rarely sum past that on their
   // own, but this keeps the invariant true regardless.
-  return clamp(delayComponent + fareComponent + ageComponent + serviceComponent, -100, 100);
+  return clamp(delayComponent + ageComponent + serviceComponent, -100, 100);
 }
 
 // --- The trailing score, and what it does ------------------------------------------
@@ -153,6 +135,25 @@ export const STARTING_NPS = RIVAL_NPS;
  * frequency can still outweigh.
  */
 export const NPS_UTILITY_PER_POINT = 0.008;
+
+/**
+ * Revenue per point of NPS above (or below) the neutral 15 a careful
+ * airline reaches, on every route, rival or not. The name lifts the fare a market clears at, the
+ * way the CCO's yield perk does, so NPS pays from the first route
+ * instead of only where a rival flies. Margins are thin (a point of
+ * yield is a large share of profit), so it is small: +20 is worth 0.8%.
+ */
+export const NAME_YIELD_PER_POINT = 0.0004;
+/** The NPS a careful airline reaches in its first year: where the name is neutral. */
+export const NAME_NEUTRAL_NPS = 15;
+/** The most a name adds or costs in ticket revenue. */
+const NAME_YIELD_CAP = 0.02;
+
+/** What the airline's name does to ticket revenue on this market, as a multiplier (1 = nothing). */
+export function nameYieldMultiplier(state: SimState, origin: string, dest: string): number {
+  const gap = marketNps(state, origin, dest) - NAME_NEUTRAL_NPS;
+  return 1 + clamp(gap * NAME_YIELD_PER_POINT, -NAME_YIELD_CAP, NAME_YIELD_CAP);
+}
 
 /** Score one flight: into the lifetime and today's totals, and its market's day. Cancellations score too. */
 export function recordFlightNps(state: SimState, origin: string, dest: string, score: number): void {
