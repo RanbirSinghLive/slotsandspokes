@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import airportCountries from '../../data/airport-countries.json';
-import { counterRenewal, counterTakeover, faceOf, graduation, makeOffers, renewalTerms, rollDailyContracts } from './contracts';
+import { counterRenewal, GRACE_DAYS, performanceFactor, counterTakeover, faceOf, graduation, makeOffers, renewalTerms, rollDailyContracts } from './contracts';
 import { dayIndex } from './clock';
 import { currentPotentialDemand } from './marketDemand';
 import { marketKey } from './schedule';
@@ -176,6 +176,7 @@ console.log('tenders: ok');
   // Perfect flying brings the face back up.
   state.onTimeHistoryByMarket[marketKey(tender.a, tender.b)] = { arrived: [4], onTime: [4] } as never;
   const sadScore = tender.satisfaction!;
+  tender.startedDay = dayIndex(state) - 30;
   rollDailyContracts(state);
   assert.ok(tender.satisfaction! > sadScore, 'a good day lifts it');
   assert.equal(JSON.stringify(JSON.parse(JSON.stringify(tender))), JSON.stringify(tender));
@@ -383,3 +384,37 @@ console.log('takeover: ok');
   assert.ok(standingOf(second.state, rivalKey) < 40, 'losing it to a rival costs standing');
 }
 console.log('buyers: ok');
+
+// --- Grace period and completion smoothing ------------------------------
+
+{
+  // Bad flying in the first two weeks is not judged; after that it is.
+  const { state, contract } = runningContract(30);
+  const key = marketKey(contract.a, contract.b);
+  state.onTimeHistoryByMarket[key] = { arrived: Array(14).fill(2), onTime: Array(14).fill(0), cancelled: Array(14).fill(0) };
+  assert.equal(performanceFactor(state, contract), 1, 'a new contract is not judged yet');
+  const mood = contract.satisfaction ?? 60;
+  contract.startedDay = dayIndex(state) - GRACE_DAYS;
+  assert.ok(performanceFactor(state, contract) < 0.2, 'judged once the grace is over');
+  contract.startedDay = dayIndex(state) - 1;
+  state.simMinute += 1440;
+  state.onTimeHistoryByMarket[key].arrived.push(4);
+  state.onTimeHistoryByMarket[key].onTime.push(0);
+  state.onTimeHistoryByMarket[key].cancelled.push(0);
+  rollDailyContracts(state);
+  assert.equal(contract.satisfaction ?? 60, mood, 'flown days in the grace do not move the mood');
+}
+
+{
+  // One grounded day on a small sample dents performance but does not zero it.
+  const { state, contract } = runningContract(31);
+  contract.startedDay = dayIndex(state) - 30;
+  const key = marketKey(contract.a, contract.b);
+  state.onTimeHistoryByMarket[key] = {
+    arrived: [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0],
+    onTime: [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0],
+    cancelled: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4],
+  };
+  assert.ok(performanceFactor(state, contract) > 0.3, `a grounded day is dented, not zeroed (${performanceFactor(state, contract)})`);
+}
+console.log('grace: ok');
