@@ -2168,6 +2168,19 @@ balance lever for a weak home.
   ends it, the market's built-up demand drops 40%, and the route is put
   out to tender again at the first term's pay, where a rival may win it.
   There is no renewal cap or fixed taper.
+- **Buyers and standing.** The buyer is the far-end community
+  (`buyer:<airport>`, `buyerKey()`), so a route that goes back to tender
+  keeps its buyer. Its type is fixed by the airport (`buyerTypeOf()`):
+  a province or ministry (🏛) weighs price 85% and capability 15% in a
+  bid, a mine or resource camp (⛏) weighs capability (twice-daily flying)
+  60%, and a health authority (✚) weighs 70/30 but its mood falls twice as
+  fast on a day not flown both ways. Standing with a buyer is the generic
+  `sim/standing.ts` number: a term ending happy (mood 70+) earns 12, a
+  neutral one 4, a sad one costs 8, and losing the contract to a rival
+  costs 15; it fades 0.4% a day. At full standing it adds 0.15 to the
+  airline's bid score (rivals get none) and up to 10 points more to a
+  happy buyer's renewal raise. The card shows the type icon and five
+  pips of standing.
 - **Where it shows:** the Contracts screen (rail item, key none), with
   three groups. *Tenders*: route, rivals who may bid (◌ none, ⚔ n),
   days until bids close, and an ask stepper (± 5% of the reference), a

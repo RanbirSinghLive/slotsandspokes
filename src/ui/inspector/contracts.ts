@@ -16,7 +16,8 @@ import {
   type Face,
 } from '../../sim/contracts';
 import type { SimState } from '../../sim/state';
-import { eligibleRivals, frequencyOf, minAskPerDay, placeBid, referencePerDay, reservePerDay } from '../../sim/tenders';
+import { standingOf, standingPips } from '../../sim/standing';
+import { buyerKey, buyerTypeOf, eligibleRivals, frequencyOf, minAskPerDay, placeBid, referencePerDay, reservePerDay } from '../../sim/tenders';
 import { money, shortMoney } from '../format';
 import { select } from '../selection';
 import { heading, line } from './dom';
@@ -35,6 +36,23 @@ const FACE_TIPS: Record<Face, string> = {
   neutral: 'Buyer neutral · renews on the same terms',
   sad: 'Buyer sad · renews for less, and a rival may take it',
 };
+
+const BUYER_ICONS = { province: '🏛', mine: '⛏', health: '✚' } as const;
+const BUYER_TIPS = {
+  province: 'Province or ministry · weighs price most',
+  mine: 'Mine or resource camp · weighs twice-daily flying most',
+  health: 'Health authority · a missed day hurts its mood twice as much',
+} as const;
+
+/** The buyer's type and the airline's standing with it, which lifts bids and the renewal ask. */
+function buyerChips(state: SimState, contract: Contract): HTMLElement[] {
+  const type = buyerTypeOf(contract);
+  const standing = standingOf(state, buyerKey(contract));
+  return [
+    tipper('contract-chip', BUYER_ICONS[type], BUYER_TIPS[type]),
+    tipper('contract-chip', standingPips(standing), `Standing with ${contract.b} ${Math.round(standing)}/100 · built by finishing terms happy, fades slowly · lifts your bid score and the renewal raise`),
+  ];
+}
 
 type Draft = { ask: number; frequency: 1 | 2 };
 /** The bid being set on each open tender, kept while the screen rebuilds. */
@@ -123,7 +141,7 @@ function tenderCard(state: SimState, contract: Contract, changed: () => void): H
   );
   const head = document.createElement('div');
   head.className = 'contract-head';
-  head.append(nameButton(contract), rivalChip);
+  head.append(nameButton(contract), ...buyerChips(state, contract), rivalChip);
   const closes = awarded ? contract.offerEndsDay : (contract.tenderEndsDay ?? contract.offerEndsDay);
   const clock = tipper('contract-chip', `⏱ ${Math.max(0, closes - today)}d`, awarded ? `Fly it both ways by day ${contract.offerEndsDay} or it lapses` : `Bids close day ${closes}`);
   head.append(clock);
@@ -187,7 +205,7 @@ function runningCard(state: SimState, contract: Contract, changed: () => void): 
   const term = ring(termShare, `Term · ${left}d left, ends day ${contract.endsDay}${(contract.renewals ?? 0) > 0 ? ` · renewed ${contract.renewals}×` : ''}`);
   const head = document.createElement('div');
   head.className = 'contract-head';
-  head.append(mood, nameButton(contract), term);
+  head.append(mood, nameButton(contract), ...buyerChips(state, contract), term);
   head.append(tipper('contract-chip', `${left}d`, `Ends day ${contract.endsDay}`));
   card.append(head);
 

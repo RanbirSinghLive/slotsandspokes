@@ -13,7 +13,8 @@ import { legsServingMarket, marketKey, recommendedFare } from './schedule';
 import { rivalSlotQuote } from './slots';
 import { hungerByAirport } from './serviceLevel';
 import type { SimState } from './state';
-import { CONTRACT_STREAM_SALT, eligibleRivals, frequencyOf, settleTender, TENDER_OPEN_DAYS, type Bid } from './tenders';
+import { earnStanding, loseStanding, standingOf } from './standing';
+import { buyerKey, buyerTypeOf, CONTRACT_STREAM_SALT, eligibleRivals, frequencyOf, settleTender, TENDER_OPEN_DAYS, type Bid } from './tenders';
 
 /**
  * Contracts (WEEK-ELEVEN.md, thread 6): route incentives for
@@ -212,6 +213,15 @@ export const HAPPY_FROM = 70;
 export const SAD_BELOW = 40;
 /** Each day moves the mood this share of the way to the day's mark: about a 30-day average. */
 const SATISFACTION_WEIGHT = 1 / 30;
+/** A health authority takes a missed day twice as hard. */
+const HEALTH_MISSED_DAY_WEIGHT = 1 / 15;
+/** Standing with a buyer: earned by finishing a term, lost by a bad one or a takeover (sim/standing.ts). */
+const STANDING_HAPPY_TERM = 12;
+const STANDING_NEUTRAL_TERM = 4;
+const STANDING_BAD_TERM = 8;
+const STANDING_LOST_TO_RIVAL = 15;
+/** A happy buyer's raise on renewal grows by up to this much at full standing. */
+const STANDING_RAISE = 0.1;
 
 export function satisfactionOf(contract: Contract): number {
   return contract.satisfaction ?? SATISFACTION_START;
@@ -228,7 +238,8 @@ export function faceOf(contract: Contract): Face {
  */
 function updateSatisfaction(contract: Contract, dayMark: number): void {
   const score = satisfactionOf(contract);
-  contract.satisfaction = score + (dayMark - score) * SATISFACTION_WEIGHT;
+  const weight = dayMark === 0 && buyerTypeOf(contract) === 'health' ? HEALTH_MISSED_DAY_WEIGHT : SATISFACTION_WEIGHT;
+  contract.satisfaction = score + (dayMark - score) * weight;
   contract.sadDays = faceOf(contract) === 'sad' ? (contract.sadDays ?? 0) + 1 : 0;
 }
 
@@ -289,7 +300,7 @@ export function renewalTerms(state: SimState, contract: Contract): RenewalTerms 
   const baseRiders = contract.baseRidersPerDay ?? contract.ridersPerDay;
   const mood = satisfactionOf(contract);
   const priceMultiplier =
-    mood >= HAPPY_FROM ? 1 + (HAPPY_MAX_RAISE * (mood - HAPPY_FROM)) / (100 - HAPPY_FROM) : mood >= SAD_BELOW ? 1 : 1 - (SAD_MAX_CUT * (SAD_BELOW - mood)) / SAD_BELOW;
+    mood >= HAPPY_FROM ? 1 + ((HAPPY_MAX_RAISE + (STANDING_RAISE * standingOf(state, buyerKey(contract))) / 100) * (mood - HAPPY_FROM)) / (100 - HAPPY_FROM) : mood >= SAD_BELOW ? 1 : 1 - (SAD_MAX_CUT * (SAD_BELOW - mood)) / SAD_BELOW;
   const left = graduation(state, contract);
   const paymentPerDay = Math.round((base * left * priceMultiplier) / 100) * 100;
   return {
@@ -392,6 +403,7 @@ function rollTakeover(state: SimState, contract: Contract, today: number): boole
     contract.status = 'ended';
     contract.lostTo = code;
     contract.takeoverEndsDay = undefined;
+    loseStanding(state, buyerKey(contract), STANDING_LOST_TO_RIVAL);
     const key = marketKey(contract.a, contract.b);
     const built = state.marketDemand[key];
     if (built !== undefined) state.marketDemand[key] = built * (1 - SNAP_BACK_SHARE);
@@ -555,6 +567,10 @@ export function rollDailyContracts(state: SimState): void {
       // buyer too unhappy to renew ends it, snaps the market back and puts
       // the route out to tender again.
       const terms = renewalTerms(state, contract);
+      const mood = satisfactionOf(contract);
+      if (mood >= HAPPY_FROM) earnStanding(state, buyerKey(contract), STANDING_HAPPY_TERM);
+      else if (mood >= SAD_BELOW) earnStanding(state, buyerKey(contract), STANDING_NEUTRAL_TERM);
+      else loseStanding(state, buyerKey(contract), STANDING_BAD_TERM);
       if (terms.outcome === 'renew') {
         const counter = contract.renewalAsk;
         contract.renewals = (contract.renewals ?? 0) + 1;
