@@ -3,6 +3,7 @@ import { dayIndex } from './clock';
 import { CREW_CLASS_SCALE } from './crews';
 import { homeWeakness } from './contracts';
 import { nextRandom } from './rng';
+import { earnStanding, fadeStandings, loseStanding, STANDING_MAX, standingOf, standingPayMultiplier } from './standing';
 import { marketKey, type ScheduleLeg } from './schedule';
 import type { ActiveFlight, SimState } from './state';
 
@@ -23,6 +24,13 @@ import type { ActiveFlight, SimState } from './state';
  * rollDailyCrews): when crews are short the shortage lands on another
  * plane. There is no curfew or turn-buffer exemption, so protection is a
  * shuffle, not a gift.
+ *
+ * Each story is a client, and the airline builds **standing** with it
+ * (sim/standing.ts): each flight kept earns a little, a term kept a lot,
+ * each failure costs more. Standing raises the premium of that client's
+ * next offers (up to double) and brings repeat offers from it that the
+ * thinning below does not touch, which is what lets a large airline keep
+ * the work a small one started.
  *
  * The premium scales with how weak the home market is (homeWeakness()) and
  * with the plane's class, and offers thin out as the fleet grows, so a
@@ -88,8 +96,22 @@ export const MIN_TERM_SUCCESS = 0.95;
 /** The mandated flight is the one on its route nearest the offered time, if it is within this of it: a retime or a turn buffer moves a flight a little, a move to another part of the day drops the commitment. */
 const TIME_WINDOW_MINUTES = 120;
 const HISTORY_KEPT = 5;
+/** Standing earned for a flight on time, a term kept, and lost for a failed flight and a term that fell short. */
+const STANDING_PER_FLIGHT = 0.5;
+const STANDING_PER_TERM = 8;
+const STANDING_LOST_PER_FAILURE = 3;
+const STANDING_LOST_PER_BAD_TERM = 4;
+/** A client with at least this much standing may offer again unprompted, with a chance a day of up to 1 in REPEAT_DAYS at full standing. */
+const REPEAT_MIN_STANDING = 15;
+const REPEAT_DAYS = 12;
+
 /** Cancellation causes that nobody could have prevented. */
 const FORCE_MAJEURE = new Set(['weather', 'airspace']);
+
+/** The key a story's client is kept under (sim/standing.ts). */
+export function clientKey(story: number): string {
+  return `event:${story}`;
+}
 
 export function mandatesOf(state: SimState): Mandate[] {
   return state.mandates ?? [];
@@ -163,9 +185,11 @@ export function settleMandateArrival(state: SimState, flight: ActiveFlight): voi
   if (flight.arriveMinute - flight.scheduledArriveMinute > LATE_MINUTES) {
     mandate.failed += 1;
     settle(state, mandate, -mandate.penalty);
+    loseStanding(state, clientKey(mandate.story), STANDING_LOST_PER_FAILURE);
   } else {
     mandate.flown += 1;
     settle(state, mandate, mandate.premium);
+    earnStanding(state, clientKey(mandate.story), STANDING_PER_FLIGHT);
   }
 }
 
@@ -179,6 +203,7 @@ export function settleMandateCancellation(state: SimState, leg: ScheduleLeg, cau
   }
   mandate.failed += 1;
   settle(state, mandate, -mandate.penalty);
+  loseStanding(state, clientKey(mandate.story), STANDING_LOST_PER_FAILURE);
 }
 
 /**
@@ -201,12 +226,18 @@ export function rollDailyMandates(state: SimState): void {
       if (!scheduled) {
         mandate.failed += 1;
         settle(state, mandate, -mandate.penalty);
+        loseStanding(state, clientKey(mandate.story), STANDING_LOST_PER_FAILURE);
       }
     }
     if (today >= mandate.endDay) {
       mandate.status = 'ended';
       const judged = mandate.flown + mandate.failed;
-      if (judged > 0 && mandate.flown / judged >= MIN_TERM_SUCCESS) settle(state, mandate, mandate.premium * BONUS_IN_PREMIUMS);
+      if (judged > 0 && mandate.flown / judged >= MIN_TERM_SUCCESS) {
+        settle(state, mandate, mandate.premium * BONUS_IN_PREMIUMS);
+        earnStanding(state, clientKey(mandate.story), STANDING_PER_TERM);
+      } else if (judged > 0) {
+        loseStanding(state, clientKey(mandate.story), STANDING_LOST_PER_BAD_TERM);
+      }
     }
   }
   const open = state.mandates.filter((m) => m.status === 'offered' || m.status === 'accepted');
@@ -219,28 +250,53 @@ export function rollDailyMandates(state: SimState): void {
   const [storyRoll, s3] = nextRandom(s2);
   const [noticeRoll, s4] = nextRandom(s3);
   const [termRoll, s5] = nextRandom(s4);
-  state.mandateSeed = s5;
+  const [repeatRoll, s6] = nextRandom(s5);
+  const [clientRoll, s7] = nextRandom(s6);
+  state.mandateSeed = s7;
+  fadeStandings(state);
 
   if (state.eventsOff || today < FIRST_OFFER_DAY || state.mandates.filter((m) => m.status === 'offered').length >= MAX_OFFERED) return;
+
+  // A client that trusts the airline asks again, whatever the fleet's size.
+  const busy = new Set(state.mandates.filter((m) => m.status === 'offered' || m.status === 'accepted').map((m) => m.story));
+  const regulars = STORIES.map((_, story) => ({ story, standing: standingOf(state, clientKey(story)) })).filter(
+    (client) => client.standing >= REPEAT_MIN_STANDING && !busy.has(client.story),
+  );
+  const weight = regulars.reduce((sum, client) => sum + client.standing, 0);
+  const repeatChance = Math.min(0.5, weight / STANDING_MAX / REPEAT_DAYS);
+  if (regulars.length > 0 && repeatRoll < repeatChance) {
+    let pick = clientRoll * weight;
+    const chosen = regulars.find((client) => (pick -= client.standing) < 0) ?? regulars[regulars.length - 1];
+    pushOffer(state, today, chosen.story, pickRoll, noticeRoll, termRoll);
+    return;
+  }
+
   const thinning = 1 + Math.max(0, state.aircraft.length - THIN_AFTER_PLANES) / THIN_PER_PLANES;
   if (chanceRoll >= OFFER_CHANCE_PER_DAY / thinning) return;
+  pushOffer(state, today, Math.min(STORIES.length - 1, Math.floor(storyRoll * STORIES.length)), pickRoll, noticeRoll, termRoll);
+}
 
-  const taken = new Set(state.mandates.filter((m) => m.status === 'offered' || m.status === 'accepted').map((m) => `${m.origin}|${m.dest}`));
+/** Makes an offer from `story`'s client on a route the airline already flies, if one is free. */
+function pushOffer(state: SimState, today: number, story: number, pickRoll: number, noticeRoll: number, termRoll: number): void {
+  const taken = new Set(state.mandates!.filter((m) => m.status === 'offered' || m.status === 'accepted').map((m) => `${m.origin}|${m.dest}`));
   const candidates = state.schedule
     .filter((leg) => state.aircraft.some((a) => a.tail === leg.tail) && !taken.has(`${leg.origin}|${leg.dest}`))
     .sort((a, b) => a.legId.localeCompare(b.legId));
   if (candidates.length === 0) return;
   const leg = candidates[Math.floor(pickRoll * candidates.length)];
   const plane = state.aircraft.find((a) => a.tail === leg.tail)!;
-  const premium = Math.round((BASE_PREMIUM * homeWeakness(state.homeAirport) * (CREW_CLASS_SCALE[plane.typeCode] ?? 1) * executiveEventPremiumMultiplier(state)) / 50) * 50;
+  const premium =
+    Math.round(
+      (BASE_PREMIUM * homeWeakness(state.homeAirport) * (CREW_CLASS_SCALE[plane.typeCode] ?? 1) * executiveEventPremiumMultiplier(state) * standingPayMultiplier(state, clientKey(story))) / 50,
+    ) * 50;
   const notice = NOTICE_MIN_DAYS + Math.floor(noticeRoll * (NOTICE_MAX_DAYS - NOTICE_MIN_DAYS + 1));
   const term = TERM_MIN_DAYS + Math.floor(termRoll * (TERM_MAX_DAYS - TERM_MIN_DAYS + 1));
-  state.mandates.push({
-    id: state.nextMandateId++,
+  state.mandates!.push({
+    id: state.nextMandateId!++,
     origin: leg.origin,
     dest: leg.dest,
     departMinute: leg.departMinute,
-    story: Math.min(STORIES.length - 1, Math.floor(storyRoll * STORIES.length)),
+    story,
     offeredDay: today,
     startDay: today + notice,
     endDay: today + notice + term,
