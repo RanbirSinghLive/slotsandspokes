@@ -3412,6 +3412,14 @@ it waits for (`heavyBookBlocker()`). "Queued" means the plane isn't asleep at a
 hangar bay tonight, not that the bays are full. The headless player never books: checks bank
 on nights, then force.
 
+**Bays are shared by every check that grounds a plane.** A forced or booked C
+check, and a booked D check, go in house only if the base's hangar is rated for
+the class and has a bay free (bays minus planes already in a C or D check there,
+and any started the same morning). With none free the work is contracted out and
+paid by the hour, the same as at a base with no hangar, and the booking confirm
+quotes that cost (`freeHeavyBays()`). So planes that come due together at one
+hangar cost real money; spreading them, adding a bay or rebasing a plane saves it.
+
 An earlier version took every plane out for 1–3 days every 30 days. A
 fleet flown near capacity had no spare planes to take its flying, so
 the cancellations cost Toronto most of its year on 18 seeds.

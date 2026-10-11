@@ -470,8 +470,29 @@ export function morningHolds(state: SimState): { tail: string; legIds: string[] 
  * Done in house at a hangar rated for the class; elsewhere the work is
  * contracted, paid here.
  */
-export function forcedHeavyChecks(state: SimState): { aircraft: Aircraft; days: number }[] {
-  return groundForHeavyCheck(state, state.aircraft.filter((aircraft) => heavyCheckDueIn(aircraft) <= -OVERDUE_GRACE_DAYS));
+export function forcedHeavyChecks(state: SimState, claimed: BayClaims = new Map()): { aircraft: Aircraft; days: number }[] {
+  return groundForHeavyCheck(state, state.aircraft.filter((aircraft) => heavyCheckDueIn(aircraft) <= -OVERDUE_GRACE_DAYS), claimed);
+}
+
+/** Bays taken so far this morning by checks starting, by station. */
+export type BayClaims = Map<string, number>;
+
+/** Bays at a hangar not held by a plane in a C or D check. */
+export function freeHeavyBays(state: SimState, station: string, claimed: BayClaims = new Map()): number {
+  const inCheck = state.aogs.filter((event) => event.check && event.base === station).length;
+  return Math.max(0, heavyBays(state, station) - inCheck - (claimed.get(station) ?? 0));
+}
+
+/**
+ * Whether a check starting at a station is done in house: a hangar rated
+ * for the class with a bay free. Otherwise it's contracted out and paid by
+ * the hour, so a fleet whose checks all fall due together pays for the
+ * bays it didn't stagger around. Takes the bay when it returns true.
+ */
+function takesBay(state: SimState, station: string, typeCode: string, claimed: BayClaims): boolean {
+  if (!heavyRated(state, station, typeCode) || freeHeavyBays(state, station, claimed) === 0) return false;
+  claimed.set(station, (claimed.get(station) ?? 0) + 1);
+  return true;
 }
 
 /**
@@ -480,20 +501,20 @@ export function forcedHeavyChecks(state: SimState): { aircraft: Aircraft; days: 
  * night stop that morning stays booked until it is. Planes in `skip` (already
  * forced this morning) are left alone.
  */
-export function bookedHeavyChecks(state: SimState, skip: Aircraft[]): { aircraft: Aircraft; days: number }[] {
-  const booked = groundForHeavyCheck(state, state.aircraft.filter((aircraft) => aircraft.heavyCheckBooked && !skip.includes(aircraft)));
+export function bookedHeavyChecks(state: SimState, skip: Aircraft[], claimed: BayClaims = new Map()): { aircraft: Aircraft; days: number }[] {
+  const booked = groundForHeavyCheck(state, state.aircraft.filter((aircraft) => aircraft.heavyCheckBooked && !skip.includes(aircraft)), claimed);
   for (const { aircraft } of booked) delete aircraft.heavyCheckBooked;
   return booked;
 }
 
-function groundForHeavyCheck(state: SimState, candidates: Aircraft[]): { aircraft: Aircraft; days: number }[] {
+function groundForHeavyCheck(state: SimState, candidates: Aircraft[], claimed: BayClaims): { aircraft: Aircraft; days: number }[] {
   const grounded = candidates
     // At its base, or where it sleeps on a night stop (sim/nightStops.ts).
     .filter((aircraft) => aircraft.status === 'ground' && (aircraft.atAirport === aircraft.baseAirport || aircraft.atAirport === nightStopStation(state, aircraft.tail)) && !aircraft.rebase)
     .filter((aircraft) => !state.aogs.some((event) => event.tail === aircraft.tail));
   return grounded.map((aircraft) => {
     const workLeft = heavyCheckWorkMinutes(aircraft.typeCode) - heavyBankedMinutes(aircraft);
-    if (!heavyRated(state, aircraft.atAirport ?? '', aircraft.typeCode)) chargeMaintenance(state, contractCost(workLeft));
+    if (!takesBay(state, aircraft.atAirport ?? '', aircraft.typeCode, claimed)) chargeMaintenance(state, contractCost(workLeft));
     return { aircraft, days: Math.max(1, Math.ceil(workLeft / MINUTES_PER_DAY)) };
   });
 }
@@ -505,7 +526,7 @@ export function previewHeavyCheckBooking(state: SimState, tail: string): { days:
   const workLeft = heavyCheckWorkMinutes(aircraft.typeCode) - heavyBankedMinutes(aircraft);
   return {
     days: Math.max(1, Math.ceil(workLeft / MINUTES_PER_DAY)),
-    cost: heavyRated(state, aircraft.atAirport ?? '', aircraft.typeCode) ? 0 : contractCost(workLeft),
+    cost: heavyRated(state, aircraft.atAirport ?? '', aircraft.typeCode) && freeHeavyBays(state, aircraft.atAirport ?? '') > 0 ? 0 : contractCost(workLeft),
     rotations: rotationsForTail(state, tail).length,
   };
 }
@@ -602,7 +623,7 @@ export function previewDCheckBooking(state: SimState, tail: string): { days: num
   if (!aircraft || !canBookDCheck(state, aircraft)) return null;
   return {
     days: dCheckDays(aircraft.typeCode),
-    cost: heavyRated(state, aircraft.atAirport ?? '', aircraft.typeCode) ? 0 : dCheckContractCost(aircraft.typeCode),
+    cost: heavyRated(state, aircraft.atAirport ?? '', aircraft.typeCode) && freeHeavyBays(state, aircraft.atAirport ?? '') > 0 ? 0 : dCheckContractCost(aircraft.typeCode),
     rotations: rotationsForTail(state, tail).length,
   };
 }
@@ -617,14 +638,14 @@ function dCheckContractCost(typeCode: string): number {
  * that morning stays booked until it is. Planes in `skip` (already starting a
  * C check) wait.
  */
-export function bookedDChecks(state: SimState, skip: Aircraft[]): { aircraft: Aircraft; days: number }[] {
+export function bookedDChecks(state: SimState, skip: Aircraft[], claimed: BayClaims = new Map()): { aircraft: Aircraft; days: number }[] {
   const going = state.aircraft
     .filter((aircraft) => aircraft.dCheckBooked && !skip.includes(aircraft))
     .filter((aircraft) => aircraft.status === 'ground' && (aircraft.atAirport === aircraft.baseAirport || aircraft.atAirport === nightStopStation(state, aircraft.tail)) && !aircraft.rebase)
     .filter((aircraft) => !state.aogs.some((event) => event.tail === aircraft.tail));
   return going.map((aircraft) => {
     delete aircraft.dCheckBooked;
-    if (!heavyRated(state, aircraft.atAirport ?? '', aircraft.typeCode)) chargeMaintenance(state, dCheckContractCost(aircraft.typeCode));
+    if (!takesBay(state, aircraft.atAirport ?? '', aircraft.typeCode, claimed)) chargeMaintenance(state, dCheckContractCost(aircraft.typeCode));
     return { aircraft, days: dCheckDays(aircraft.typeCode) };
   });
 }

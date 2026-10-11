@@ -8,7 +8,7 @@ import { marketKey } from './schedule';
 import { aircraftUtilisation, rotationsForTail, type Rotation } from './utilisation';
 import { coverRotations } from './turnBuffer';
 import { refitDays } from './cabins';
-import { bookedDChecks, bookedHeavyChecks, finishDCheck, finishHeavyCheck, forcedHeavyChecks, wornAge } from './mxChecks';
+import { type BayClaims, bookedDChecks, bookedHeavyChecks, finishDCheck, finishHeavyCheck, forcedHeavyChecks, wornAge } from './mxChecks';
 import { nightStopStation } from './nightStops';
 import { engineFault, returnEngines } from './enginePool';
 import type { Aircraft, SimState } from './state';
@@ -175,12 +175,13 @@ export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
   }
   startRefits(state, dayStartMinute);
   // Heavy checks overdue past the grace (sim/mxChecks.ts): grounded, the same way, for the work left.
-  const forced = forcedHeavyChecks(state);
+  const bayClaims: BayClaims = new Map();
+  const forced = forcedHeavyChecks(state, bayClaims);
   const checksToStart = [
     ...forced.map((check) => ({ ...check, fault: 'C check overdue' })),
-    ...bookedHeavyChecks(state, forced.map((check) => check.aircraft)).map((check) => ({ ...check, fault: 'C check booked' })),
+    ...bookedHeavyChecks(state, forced.map((check) => check.aircraft), bayClaims).map((check) => ({ ...check, fault: 'C check booked' })),
   ];
-  const dChecks = bookedDChecks(state, checksToStart.map((check) => check.aircraft)).map((check) => ({ ...check, fault: 'D check booked', checkKind: 'D' as const }));
+  const dChecks = bookedDChecks(state, checksToStart.map((check) => check.aircraft), bayClaims).map((check) => ({ ...check, fault: 'D check booked', checkKind: 'D' as const }));
   for (const { aircraft, days, fault, checkKind } of [...checksToStart.map((check) => ({ ...check, checkKind: undefined })), ...dChecks]) {
     state.lastAogDay = dayIndex(state);
     state.aogs.push({

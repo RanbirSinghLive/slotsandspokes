@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createPlayer } from '../headless/player';
 import { startHeadlessGame } from '../headless/newGame';
 import { bookHeavyCheck, cancelBookedCheck } from './playerActions';
-import { previewHeavyCheckBooking } from './mxChecks';
+import { freeHeavyBays, previewHeavyCheckBooking } from './mxChecks';
 import { step } from './step';
 
 // Run with `npm run checkbookingtest`: a booked C check can't be taken
@@ -33,4 +33,16 @@ const event = state.aogs.find((e) => e.tail === aircraft.tail);
 assert.ok(event?.check, 'booked plane did not go into its check');
 assert.equal(event.fault, 'C check booked');
 assert.equal(aircraft.heavyCheckBooked, undefined);
+
+// A hangar's bays are shared: with the bays all held by planes in a check, the
+// next booking is contracted out and priced, not done free in house.
+const other = state.aircraft.find((a) => a !== aircraft && a.status === 'ground' && a.atAirport === a.baseAirport && a.baseAirport === event.base && !state.aogs.some((e) => e.tail === a.tail));
+if (other) {
+  other.daysSinceHeavyCheck = 24;
+  const bays = freeHeavyBays(state, event.base);
+  for (let i = 0; i < bays; i++) state.aogs.push({ ...event, tail: `FILL-${i}` });
+  assert.equal(freeHeavyBays(state, event.base), 0);
+  const preview = previewHeavyCheckBooking(state, other.tail);
+  assert.ok(preview && preview.cost > 0, 'a full hangar still quoted a free check');
+}
 console.log('check booking ok');
