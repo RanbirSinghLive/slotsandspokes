@@ -1318,7 +1318,7 @@ Game) wait hidden in `#panel-parts` until a screen adopts them
 title and Reliability (delay codes and cancellations by cause) under
 the table; Fleet shows every plane, then the rotations timeline and the
 Lessor; **Crews** (`ui/inspector/crews.ts`) shows every base's crews by
-class with Hire, Retrain and Release, shortest-handed base first.
+class, one line per class (bar, crews/comfortable, status chip, then + hire, ⇄ retrain and − release as icon buttons whose tips carry the fee), shortest-handed base first.
 
 **The Network summary is a grid of cards**: Cash, Runway, On-time,
 Completion, Load factor, NPS, Goals and Head office. Each shows its

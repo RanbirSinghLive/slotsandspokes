@@ -4639,6 +4639,89 @@ button.ops-item:hover {
   background: #ffd166;
 }
 
+/* One line per class: icon, bar, count, chip, then the icon buttons. */
+.crew-row--line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding-top: 4px;
+}
+
+.crew-row--line .crew-bar {
+  flex: 1 1 60px;
+  min-width: 40px;
+  margin: 0;
+}
+
+.crew-row--line .crew-buttons {
+  flex: none;
+  flex-wrap: nowrap;
+  gap: 3px;
+  margin: 0;
+}
+
+.crew-row--cabin {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+  opacity: 0.9;
+}
+
+.crew-row-name {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 34px;
+  color: #e6e9f0;
+}
+
+.crew-row-count {
+  flex: none;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: #c9d0e0;
+}
+
+.crew-row--line .crew-chip {
+  flex: none;
+  padding: 0 5px;
+  font-size: 9px;
+}
+
+.crew-row--cabin::before {
+  content: '';
+  flex: 1 1 60px;
+  min-width: 40px;
+  order: 2;
+  height: 0;
+}
+
+.crew-row--cabin .crew-row-count { order: 3; }
+.crew-row--cabin .crew-chip { order: 4; }
+.crew-row--cabin .info-mark { order: 5; }
+.crew-row--cabin .crew-buttons { order: 6; }
+
+.crew-risk-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.crew-risk-dot.is-warn {
+  background: #ffd166;
+}
+
+.crew-risk-dot.is-over {
+  background: #ff8080;
+}
+
+.crew-action {
+  padding: 1px 7px;
+}
+
 .crew-row-detail {
   font-size: 11px;
   color: #9aa3b8;
