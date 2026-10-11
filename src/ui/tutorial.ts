@@ -78,7 +78,7 @@ const STEPS: Step[] = [
   },
   {
     title: 'Every screen, one click',
-    text: 'The rail has everything: Routes and fares, Fleet to lease planes, Crews, Money, Goals, and Office for fuel, contracts and executives. A dot means something wants a look.',
+    text: 'The rail has everything: Routes and fares, Fleet to lease planes, Crews, Money, Goals, Contracts to bid on, and Office for fuel and executives. A dot means something wants a look.',
     target: '#rail',
   },
   {
@@ -99,7 +99,7 @@ const STEPS: Step[] = [
   },
   {
     title: 'Head office',
-    text: 'Fuel and hedging, contracts, bag and seat fees (they earn per passenger but cost NPS), domestic air rights abroad, seven executive chairs that open up the ladder (click one to meet its candidates), and the innovations each rung opens, as a tree.',
+    text: 'Fuel and hedging, bag and seat fees (they earn per passenger but cost NPS), domestic air rights abroad, seven executive chairs that open up the ladder (click one to meet its candidates), and the innovations each rung opens, as a tree.',
     target: '#rail .rail-item[data-go="headOffice"]',
   },
   {

@@ -723,7 +723,7 @@ function pollContractEvents(state: SimState): void {
           state.simMinute,
           'CONTRACT',
           `New contract · ${market} · ${shortMoney(c.paymentPerDay)}/day · ${c.termDays}d · take by day ${c.offerEndsDay}`,
-          { kind: 'headOffice' },
+          { kind: 'contracts' },
           true,
         );
       } else if (c.status === 'active' && before?.startsWith('offered')) {

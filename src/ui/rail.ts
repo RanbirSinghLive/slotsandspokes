@@ -6,7 +6,7 @@ import { scheduleProblems } from './panels';
 import * as ops from './routeActions';
 import { RUNWAY_WARN_DAYS } from './runway';
 import { getSelection, select, type Selection } from './selection';
-import { contractsOf } from '../sim/contracts';
+import { contractsOf, faceOf } from '../sim/contracts';
 import { anyEntryShort } from '../sim/crewPlan';
 
 /**
@@ -20,11 +20,12 @@ import { anyEntryShort } from '../sim/crewPlan';
  *     (Fleet, red), a plane AOG (Mtc, red), a class short of crews (Crews, red; stretched, or a
  *     plane on its way that would enter service short, amber),
  *     a route that lost money yesterday (Routes, amber), cash running out
- *     within a month (Money, red);
+ *     within a month (Money, red), a running contract whose buyer is sad
+ *     (Contracts, amber);
  *   - something new since the screen was last open, like unread mail: a
  *     milestone met (Goals, green), a rival on one of your markets
- *     (Rivals, amber), an executive, innovation or contract
- *     newly on offer (Office, green). Opening the screen reads it.
+ *     (Rivals, amber), an executive or innovation newly on
+ *     offer (Office, green), a contract newly out to tender (Contracts, green). Opening the screen reads it.
  * The first look only records what's there, so loading a game lights no
  * "new" dots.
  */
@@ -33,7 +34,7 @@ const railEl = document.querySelector<HTMLElement>('#rail')!;
 const items = [...railEl.querySelectorAll<HTMLButtonElement>('.rail-item[data-go]')];
 const hideButton = railEl.querySelector<HTMLButtonElement>('#rail-hide')!;
 
-type Screen = 'network' | 'routes' | 'airports' | 'fleet' | 'crews' | 'maintenance' | 'rivals' | 'money' | 'goals' | 'headOffice' | 'game';
+type Screen = 'network' | 'routes' | 'airports' | 'fleet' | 'crews' | 'maintenance' | 'rivals' | 'money' | 'goals' | 'contracts' | 'headOffice' | 'game';
 
 /** Where each rail item goes. Routes opens worst margin first. */
 function targetOf(screen: Screen): Selection {
@@ -83,12 +84,12 @@ function newsIds(state: SimState): Partial<Record<Screen, string[]>> {
   const offers = [
     ...ops.executiveOptions(state).flatMap((chair) => chair.candidates.filter((c) => !c.blocked).map((c) => `exec:${c.id}`)),
     ...ops.innovationOptions(state).filter((option) => !option.adopted && !option.blocked).map((option) => `innovation:${option.id}`),
-    ...contractsOf(state).filter((c) => c.status === 'offered').map((c) => `contract:${c.id}`),
   ];
   return {
     goals: Object.keys(state.milestonesMet ?? {}),
     rivals: state.competitorRoutes.filter((route) => flown.has(marketKey(route.origin, route.dest))).map((route) => `${route.code}:${marketKey(route.origin, route.dest)}`),
     headOffice: offers,
+    contracts: contractsOf(state).filter((c) => c.status === 'offered').map((c) => `contract:${c.id}`),
   };
 }
 
@@ -113,12 +114,13 @@ function conditions(state: SimState): Partial<Record<Screen, Dot>> {
     fleet: fleetBad ? 'bad' : null,
     crews,
     maintenance: state.aogs.length > 0 ? 'bad' : null,
+    contracts: contractsOf(state).some((c) => c.status === 'active' && faceOf(c) === 'sad') ? 'warn' : null,
     routes: losing ? 'warn' : null,
     money: runway !== null && runway <= RUNWAY_WARN_DAYS ? 'bad' : null,
   };
 }
 
-const NEWS_DOT: Partial<Record<Screen, Dot>> = { goals: 'good', rivals: 'warn', headOffice: 'good' };
+const NEWS_DOT: Partial<Record<Screen, Dot>> = { goals: 'good', rivals: 'warn', headOffice: 'good', contracts: 'good' };
 /** How often the dots are worked out: they read a lot of state, and nothing they show moves faster than this. */
 const DOT_INTERVAL_MS = 500;
 let lastDotsAt = -Infinity;

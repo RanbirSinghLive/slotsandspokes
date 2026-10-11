@@ -10,8 +10,6 @@ import * as ops from '../routeActions';
 import type { ExecutiveOption, InnovationOption } from '../routeActions';
 import { describeEffect, EXECUTIVE_LAPSE_DAYS, type ExecutiveRole } from '../../sim/executives';
 import { formatNps, networkNps } from '../../sim/nps';
-import { averagePerformance, contractsOf, paymentShare, performanceFactor, faceOf, renewalTerms, RENEWAL_WINDOW_DAYS, SNAP_BACK_SHARE, type Contract } from '../../sim/contracts';
-import { select } from '../selection';
 import { portraitElement, ROLE_COLOURS } from '../portraits';
 import { innovationIconElement } from '../innovationIcons';
 import {
@@ -32,7 +30,7 @@ import { buyRights, dropRights, EARN_DAYS, LAPSE_DAYS, licencesAllowed, rightsBl
 /**
  * The Head office view (Network › Head office): the airline's decisions
  * that aren't made on the map. Fuel, with its price chart and the hedge
- * (sim/fuelPrice.ts); contracts; the executives' three chairs
+ * (sim/fuelPrice.ts); the executives' three chairs
  * (sim/executives.ts), each opening to its candidates; and the
  * innovations the ladder opens (sim/innovations.ts), as a tech tree.
  */
@@ -431,7 +429,6 @@ export function buildHeadOfficeView(state: SimState, changed: () => void): HTMLE
   );
 
   root.append(...feesSection(state, changed));
-  root.append(...contractsSection(state));
   root.append(...executivesSection(state, changed));
   root.append(...rightsSection(state, changed));
 
@@ -494,74 +491,6 @@ function feesSection(state: SimState, changed: () => void): HTMLElement[] {
     rows.push(line(`Fees ${money(earned)}/day · total ${money(state.ancillaryRevenueTotal ?? 0)} · rivals at ${(state.rivalFeeLevel ?? 0).toFixed(1)} of ${current}`));
   }
   return rows;
-}
-
-/**
- * Contracts (sim/contracts.ts): offers to take up, running ones
- * with how they're paying, and the last few finished. Each opens its far
- * airport, where the market is drawn from.
- */
-function contractsSection(state: SimState): HTMLElement[] {
-  const contracts = contractsOf(state);
-  const nodes: HTMLElement[] = [
-    heading(
-      'Contracts',
-      `Route contracts for small, underserved communities, funded to keep them connected. Fly the market at least once a day each way and the contract pays so much a day for the term and sends contract riders. The riders, and half the pay, depend on the route's on-time, completion and NPS against stricter bars than ordinary passengers hold it to; the other half is guaranteed. In the last ${RENEWAL_WINDOW_DAYS} days the renewal terms show: pay moves with the buyer's mood and shrinks as the market builds and no longer needs the subsidy. A buyer left too unhappy ends it, the market's built-up demand drops ${Math.round(SNAP_BACK_SHARE * 100)}% and the route goes out to tender again.`,
-    ),
-  ];
-  if (contracts.length === 0) {
-    nodes.push(line('None on offer', 'inspector-line goal-ahead'));
-    return nodes;
-  }
-  const today = dayIndex(state);
-  const order: Record<Contract['status'], number> = { active: 0, offered: 1, ended: 2, lapsed: 3 };
-  for (const contract of [...contracts].sort((x, y) => order[x.status] - order[y.status] || x.id - y.id)) {
-    const card = document.createElement('div');
-    card.className = 'office-card';
-    card.classList.toggle('is-adopted', contract.status === 'active');
-    card.classList.toggle('is-locked', contract.status === 'ended' || contract.status === 'lapsed');
-    const name = document.createElement('button');
-    name.type = 'button';
-    name.className = 'inspector-link office-card-name';
-    name.textContent = `${contract.a}–${contract.b}`;
-    name.addEventListener('click', () => select({ kind: 'airport', iata: contract.b }));
-    card.append(name);
-    if (contract.status === 'offered') {
-      card.append(
-        line(`Offer · ${money(contract.paymentPerDay)}/day · ${contract.ridersPerDay} riders/day · ${contract.termDays}d`),
-        line(`Fly both ways daily by day ${contract.offerEndsDay} · ${contract.offerEndsDay - today}d left`, 'inspector-line office-card-price'),
-      );
-    } else if (contract.status === 'active') {
-      const performance = performanceFactor(state, contract);
-      const renewals = contract.renewals ?? 0;
-      card.append(
-        line(`Running · ends day ${contract.endsDay} (${(contract.endsDay ?? today) - today}d)${renewals > 0 ? ` · renewed ${renewals}×` : ''}`),
-        line(
-          `Pay ${Math.round(paymentShare(performance) * 100)}% of ${money(contract.paymentPerDay)} · riders ${Math.round(contract.ridersPerDay * performance)}/${contract.ridersPerDay}`,
-          performance < 0.5 ? 'inspector-line is-over' : 'inspector-line',
-        ),
-        line(`Term average ${Math.round(averagePerformance(contract) * 100)}% · ${{ happy: '😀', neutral: '😐', sad: '☹' }[faceOf(contract)]} · paid ${money(contract.paidTotal)}`, 'inspector-line office-card-price'),
-        ...renewalLines(state, contract, today),
-      );
-    } else {
-      card.append(line(contract.status === 'ended' ? `Ended · paid ${money(contract.paidTotal)}` : 'Lapsed, not taken up', 'inspector-line goal-ahead'));
-    }
-    nodes.push(card);
-  }
-  return nodes;
-}
-
-/** Renewal terms once the window opens: the new pay a day, or why it will not renew. */
-function renewalLines(state: SimState, contract: Contract, today: number): HTMLElement[] {
-  if ((contract.endsDay ?? Infinity) - today > RENEWAL_WINDOW_DAYS) return [];
-  const terms = renewalTerms(state, contract);
-  const text =
-    terms.outcome === 'renew'
-      ? `Renews at ${money(contract.renewalAsk ?? terms.paymentPerDay)}/day · ${terms.ridersPerDay} riders/day`
-      : terms.outcome === 'graduated'
-        ? 'Market stands on its own · ends'
-        : 'Buyer unhappy · goes to tender';
-  return [line(text, terms.outcome === 'renew' ? 'inspector-line office-card-price' : 'inspector-line is-over')];
 }
 
 /**
