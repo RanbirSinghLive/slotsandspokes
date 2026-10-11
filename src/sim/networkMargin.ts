@@ -213,3 +213,28 @@ export function marginTrend(state: SimState): number[] {
   }
   return out;
 }
+
+export type CostWeek = {
+  /** Finished days behind the figures. */
+  days: number;
+  /** A day's average cost by kind over the last week, biggest first. */
+  perDay: { kind: string; amount: number }[];
+  /** Checks, engine shop visits and contracted work a day over the week (the `maintenance` kind). */
+  checksPerDay: number;
+  /** Days of the week on which those cost more than three times the week's daily average, and so spiked the day's profit. */
+  spikeDays: number;
+};
+
+/** The week's costs by kind; null before a day has closed with kinds on record. */
+export function costWeek(state: SimState): CostWeek | null {
+  const kinds = Object.entries(state.costHistoryByCategory ?? {});
+  const days = Math.min(MARGIN_WINDOW_DAYS, ...kinds.map(([, history]) => history.length));
+  if (kinds.length === 0 || days < MIN_DAYS) return null;
+  const perDay = kinds
+    .map(([kind, history]) => ({ kind, amount: sum(history.slice(-days)) / days }))
+    .filter((row) => row.amount > 0.5)
+    .sort((x, y) => y.amount - x.amount);
+  const checks = (state.costHistoryByCategory?.maintenance ?? []).slice(-days);
+  const average = sum(checks) / days;
+  return { days, perDay, checksPerDay: average, spikeDays: average > 0 ? checks.filter((n) => n > 3 * average).length : 0 };
+}

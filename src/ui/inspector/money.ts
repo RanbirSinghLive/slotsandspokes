@@ -4,7 +4,7 @@ import { money, shortMoney } from '../format';
 import { chartLegend } from '../chartLegend';
 import { unitEconomicsHistory } from '../../sim/unitEconomics';
 import type { SimState } from '../../sim/state';
-import { flownMarkets, marginBand, marginTrend, networkMargin, routeGroups, routeMarginShare, routeWeek, type RouteGroupBy } from '../../sim/networkMargin';
+import { costWeek, flownMarkets, marginBand, marginTrend, networkMargin, routeGroups, routeMarginShare, routeWeek, type RouteGroupBy } from '../../sim/networkMargin';
 import { percentText, trendMark } from '../marginChip';
 import { sparkline } from '../sparkline';
 import { select } from '../selection';
@@ -161,6 +161,29 @@ function extremes(state: SimState): HTMLElement | null {
   return list;
 }
 
+/** Cost kinds as rows with a share bar behind each; `span` is how the tooltip names the period. */
+function costRows(costs: [string, number][], span: string, perDay = false): HTMLElement {
+  const rows = document.createElement('div');
+  rows.className = 'inspector-rows';
+  const total = costs.reduce((sum, [, amount]) => sum + amount, 0);
+  for (const [kind, amount] of costs) {
+    const row = document.createElement('div');
+    row.className = 'inspector-row cost-row';
+    // Each row's share of the period's costs, drawn behind it so the shape reads at a glance.
+    const share = Math.round((amount / total) * 100);
+    row.style.setProperty('--share', `${share}%`);
+    row.title = `${share}% of ${span}'s costs`;
+    const name = document.createElement('span');
+    name.textContent = COST_NAMES[kind] ?? kind;
+    const detail = document.createElement('span');
+    detail.className = 'inspector-row-detail';
+    detail.textContent = `${money(amount)}${perDay ? '/d' : ''}`;
+    row.append(name, detail);
+    rows.append(row);
+  }
+  return rows;
+}
+
 const COST_NAMES: Record<string, string> = {
   fuel: 'Fuel',
   blockNonFuel: 'Flying (crews, maintenance)',
@@ -168,7 +191,7 @@ const COST_NAMES: Record<string, string> = {
   lease: 'Leases',
   crew: 'Crews on standby',
   slots: 'Slot fees',
-  maintenance: 'Expedited repairs',
+  maintenance: 'Checks and repairs',
   overhead: 'Network overhead',
   innovations: 'Innovations',
   executives: 'Executives',
@@ -211,6 +234,16 @@ export function buildMoneyView(state: SimState): HTMLElement {
         'inspector-line goal-ahead',
       ),
     );
+    const costs = costWeek(state);
+    if (costs) {
+      root.append(
+        lineWithInfo(
+          `Checks and repairs ${shortMoney(costs.checksPerDay)}/day${costs.spikeDays > 0 ? ` · ${costs.spikeDays} spike day${costs.spikeDays === 1 ? '' : 's'}` : ''}`,
+          'Contracted checks, engine shop visits and expedited repairs land on the day they happen, so one day can lose $10–28k that the other days do not. They are inside all-in margin and the daily bars, and kept out of the routes\' flying margin and each route\'s margin. A spike day here is one that cost more than three times the week\'s daily average.',
+          'inspector-line goal-ahead',
+        ),
+      );
+    }
     const trendLine = marginTrend(state);
     if (trendLine.length > 1) root.append(marginChart(trendLine), line(`7-day flying margin · ${trendLine.length}d · dashed 0%`, 'inspector-line goal-ahead'));
     root.append(heading('By hub'), groupTable(state, 'hub'), heading('By sector'), groupTable(state, 'sector'));
@@ -267,26 +300,19 @@ export function buildMoneyView(state: SimState): HTMLElement {
 
   const costs = Object.entries(state.todayCostByCategory)
     .filter(([, amount]) => (amount ?? 0) > 0.5)
-    .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0));
-  root.append(heading('Costs today'));
-  const rows = document.createElement('div');
-  rows.className = 'inspector-rows';
-  const total = costs.reduce((sum, [, amount]) => sum + (amount ?? 0), 0);
-  for (const [kind, amount] of costs) {
-    const row = document.createElement('div');
-    row.className = 'inspector-row cost-row';
-    // Each row's share of the day's costs, drawn behind it so the shape reads at a glance.
-    const share = Math.round(((amount ?? 0) / total) * 100);
-    row.style.setProperty('--share', `${share}%`);
-    row.title = `${share}% of today's costs`;
-    const name = document.createElement('span');
-    name.textContent = COST_NAMES[kind] ?? kind;
-    const detail = document.createElement('span');
-    detail.className = 'inspector-row-detail';
-    detail.textContent = money(amount ?? 0);
-    row.append(name, detail);
-    rows.append(row);
+    .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0)) as [string, number][];
+  const costsWeek = costWeek(state);
+  if (costsWeek) {
+    root.append(
+      heading(`Costs · ${costsWeek.days}d average a day`),
+      costRows(
+        costsWeek.perDay.map((row) => [row.kind, row.amount] as [string, number]),
+        `the last ${costsWeek.days} days`,
+        true,
+      ),
+    );
   }
-  root.append(costs.length > 0 ? rows : line('None yet'));
+  root.append(heading('Costs today'));
+  root.append(costs.length > 0 ? costRows(costs, 'today') : line('None yet'));
   return root;
 }

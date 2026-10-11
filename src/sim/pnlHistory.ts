@@ -30,6 +30,13 @@ export function recordDailyPnlHistory(state: SimState): void {
   pushCapped(state.revenueHistory, state.todayRevenue);
   pushCapped(state.costHistory, state.todayCost);
   pushCapped(state.marginHistory, state.todayMargin);
+  const categories = (state.costHistoryByCategory ??= {});
+  for (const [kind, amount] of Object.entries(state.todayCostByCategory)) {
+    const history = (categories[kind] ??= []);
+    // A kind first seen late: pad so every kind's days line up with the network's.
+    while (history.length < state.costHistory.length - 1) history.push(0);
+    pushCapped(history, amount ?? 0);
+  }
 
   // Every market currently in the schedule gets an entry, even a zero
   // one — a route that flew nothing today (every flight cancelled, or it
