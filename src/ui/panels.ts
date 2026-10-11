@@ -1,3 +1,4 @@
+import { powertrainMark } from './powertrainMark';
 import { nightStopLegs } from '../sim/nightStops';
 import { hasLineBase, outstationCheck } from '../sim/bases';
 import { deferredItems, MX_HOLD_AT, tonightCheck } from '../sim/mxChecks';
@@ -511,6 +512,8 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
       plane.type = 'button';
       plane.className = 'inspector-link timeline-plane';
       plane.append(aircraft.tail);
+      const mark = powertrainMark(aircraft);
+      if (mark) plane.append(mark);
       const share = own.reduce((sum, rotation) => sum + rotation.share, 0);
       const shareEl = document.createElement('span');
       shareEl.className = 'timeline-share';

@@ -1,5 +1,5 @@
 import { AIRCRAFT_CLASSES, classByCode } from './aircraftClasses';
-import { crewTrainingTimeFactor } from './innovations';
+import { crewHireTimeFactor, crewRetrainTimeFactor } from './innovations';
 import { dayIndex } from './clock';
 import { mandatedTails } from './mandates';
 import { nextRandom } from './rng';
@@ -211,12 +211,12 @@ export function retrainFee(classCode: string): number {
 
 /** Days until a crew hired today flies: shorter with a crew academy (sim/innovations.ts). */
 export function hireLeadDays(state: SimState): number {
-  return Math.max(1, Math.round(HIRE_LEAD_DAYS * crewTrainingTimeFactor(state)));
+  return Math.max(1, Math.round(HIRE_LEAD_DAYS * crewHireTimeFactor(state)));
 }
 
-/** Days a crew is away retraining: shorter with a crew academy. */
+/** Days a crew is away retraining: shorter with a chief people officer (sim/executives.ts). */
 export function retrainDays(state: SimState): number {
-  return Math.max(1, Math.round(RETRAIN_DAYS * crewTrainingTimeFactor(state)));
+  return Math.max(1, Math.round(RETRAIN_DAYS * crewRetrainTimeFactor(state)));
 }
 
 /** Whether planes of this class carry cabin crew at all. */
@@ -236,7 +236,7 @@ export function cabinStandbyCost(classCode: string): number {
 
 /** Days until a cabin team hired today flies: shorter with a crew academy. */
 export function cabinLeadDays(state: SimState): number {
-  return Math.max(1, Math.round(CABIN_HIRE_LEAD_DAYS * crewTrainingTimeFactor(state)));
+  return Math.max(1, Math.round(CABIN_HIRE_LEAD_DAYS * crewHireTimeFactor(state)));
 }
 
 /** Cabin teams of this class a base has now. */

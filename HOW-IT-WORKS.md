@@ -3023,7 +3023,7 @@ Narrowbody, 3× for Widebody. **Hiring** takes 7 days. **Retraining**
 moves crews to another class for half a hire there, taking 10 days, out
 of their old class at once: gauging up (or down) costs less than hiring
 fresh but takes longer. Crews can be let go. A crew academy (see
-Innovations) halves hiring and retraining times. All of it is at the
+Innovations) halves hiring times; retraining times are the chief pilot's. All of it is at the
 airport view's Crews section, a row per class.
 
 Crewing is decided once a day, at rollover: a rotation added during the
@@ -3098,7 +3098,7 @@ every two crews already on the roster. A hire, and for pilots a
 retraining, takes a seat from the day it is paid until the crews join,
 and a hire or conversion that doesn't fit is refused. So a new base
 trains two crews at a time, and a big roster can grow faster than a small
-one; a crew academy shortens the courses and so frees seats sooner. The
+one; a crew academy shortens hiring courses and a chief pilot retraining ones, which frees seats sooner. The
 headless player hires up to the free seats each day and the rest the
 days after. Seats are shown per base on the Crews screen.
 
@@ -3507,7 +3507,7 @@ ahead rather than reacted with:
 - **Crews** join 7 days after hiring, 10 after retraining (above).
 
 A fleet programmes COO (Lena Fischer) halves delivery and return times,
-a crew academy hiring and retraining times.
+a crew academy hiring times.
 
 **On the map**, an airport with anything under way shows one amber line
 under its dot (`pendingByAirport()`): a plane glyph "+1 3d", a crew
@@ -3629,7 +3629,7 @@ Research button.
 |---|---|---|---|
 | Online booking | Network airline | 400,000 | network overhead −15% |
 | Younger airframes | Network airline | 300,000 | every plane leased from then on is refurbished 8 years younger (not below 5), at the younger airframe's rate |
-| Crew academy | Regional carrier | 150,000 | hiring and retraining crews take half the time |
+| Crew academy | Regional carrier | 150,000 | hiring crews takes half the time |
 | Loyalty scheme | International | 500,000, then 2% of revenue a day | 60% of turned-away passengers rebook with you, not 40%; rivals see 25% less money on the table on your routes (sim/attractiveness.ts) |
 | Winglet retrofits | International | 800,000 | 10% less fuel burned (`fuelEfficiencyMultiplier`) |
 | Codeshare feed | International | $6,000 a day | 30% more connecting passengers at every hub (sim/hubs.ts) |
@@ -3650,8 +3650,8 @@ one, and the plane can only be leased where one stands. Planes handed back go
 to the lessor as ordinary planes, and planes already flying never change.
 
 Spoilage management is the way to fuller planes (an unsold seat is
-spoiled stock). `loadFactorCap()` adds one point per level and the
-CCO's points to the 75% base and clamps at 90%, and goes into every
+spoiled stock). `loadFactorCap()` adds one point per level to the
+75% base and clamps at 90%, and goes into every
 `flightResult()` through `bookingPerks()`, and into a market's seat
 ceiling. Rivals stay at 75%. Each point is worth a few percent of profit
 on a seat-capped route, hence the late gate and the steep prices.
@@ -3706,7 +3706,7 @@ needs 20 (judged at hiring). A hire with a line must keep it: network NPS under 
 | CFO | Dale Mercer: overhead −15% | Hana Okafor: hedge premiums halved, overhead −5% | Simone Adeyemi: new leases −12% |
 | CCO | Tomas Lindqvist: markets grow 25% faster | Inês Carvalho: +15% connecting passengers | Kofi Mensah: +3% yield |
 
-A fourth CCO, Akira Sato (NPS 25, $500,000, $5,000 a day), lifts the share of seats a plane can sell by 3 points (see Innovations; the 90% ceiling holds).
+A fourth CCO, Akira Sato (NPS 25, $500,000, $5,000 a day), lifts yield 5% (and sharpens fare estimates like Mensah). Seats sold belong to Spoilage management alone (see Innovations).
 
 **Second tiers.** Each chair also has candidates that need a ladder tier
 as well as NPS (`requiresTier` in the data; a candidate's card says "Needs
@@ -3718,12 +3718,12 @@ cost $700,000 to $800,000 and $7,000 to $8,000 a day.
 
 | New chair | Opens | First hire | Second hire |
 |---|---|---|---|
-| Chief Pilot | Network airline | Ingrid Solheim: hiring and retraining 10% faster ($400,000, $4,000 a day) | Dev Malhotra (Operator, NPS 15): 20% faster ($700,000, $7,000) |
+| Chief Pilot | Network airline | Ingrid Solheim: retraining 20% faster ($400,000, $4,000 a day) | Dev Malhotra (Operator, NPS 15): 40% faster ($700,000, $7,000) |
 | Director of Maintenance | International | Birgit Aaltonen: base running costs −5% ($500,000, $5,000) | Tunde Bakare (Operator, NPS 15): −30% ($700,000, $7,000) |
 | Head of Cargo | International | Nadia Karimova: freight revenue +10% ($300,000, $3,000) | Sven Lindahl (Established carrier, NPS 15): +25% ($500,000, $5,000) |
 | Head of Government Affairs | International | Lucía Fontaine: event premiums +25%, penalties −20% ($300,000, $3,000) | Obinna Eze (Established carrier, NPS 15): +50%, −40% ($500,000, $5,000) |
 
-The crew effect multiplies with the crew academy (`crewTrainingTimeFactor()`),
+The crew effect is the only lever on retraining time (`crewRetrainTimeFactor()`); hiring time is the crew academy's (`crewHireTimeFactor()`),
 the base effect scales `mxCostPerDay()` and the spare engine pool's holding cost, the freight effect scales each
 load's revenue in `carryCargo()`, and the event effect scales a new
 offer's premium and its penalty (sim/mandates.ts). A save from before the

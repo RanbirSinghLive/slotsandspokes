@@ -12,7 +12,7 @@ import {
   loadExecutives,
 } from './executives';
 import { chooseHome } from './homes';
-import { crewTrainingTimeFactor } from './innovations';
+import { crewRetrainTimeFactor, crewHireTimeFactor } from './innovations';
 import { LADDER } from './ladder';
 import { createNewGameState } from './state';
 
@@ -46,8 +46,9 @@ for (const candidate of everyone) {
   );
   assert.equal(chairOpensAt(state, 'cpo'), null);
   assert.equal(appointExecutive(state, 'cpo-solheim').ok, true);
-  assert.equal(executiveCrewTrainingMultiplier(state), 0.9);
-  assert.equal(crewTrainingTimeFactor(state), 0.9);
+  assert.equal(executiveCrewTrainingMultiplier(state), 0.8);
+  assert.equal(crewRetrainTimeFactor(state), 0.8);
+  assert.equal(crewHireTimeFactor(state), 1);
 }
 
 // A save from before the new chairs has no slots for them, and nothing breaks.
