@@ -8,7 +8,8 @@ import { CABIN_TEAMS_PER_SHIFT, crewsForRisk } from '../sim/crews';
 import { mxLevel } from '../sim/bases';
 import { dayOfYear, marketSeasonOn } from '../sim/seasons';
 import { SEASONAL_PREMIUM } from '../sim/seasonalLease';
-import { contractOn, contractsOf, performanceFactor } from '../sim/contracts';
+import { contractOn, contractsOf, counterTakeover, performanceFactor, takeoverOpen } from '../sim/contracts';
+import { placeBid, reservePerDay } from '../sim/tenders';
 import airportsData from '../../data/airports.json';
 import { inboundAt } from '../sim/fleetTiming';
 import { styleAdvice } from '../sim/hubPlanner';
@@ -611,6 +612,9 @@ function takeContracts(state: SimState, memory: Memory): string[] {
     if (contract.status !== 'offered' || legsServingMarket(contract.a, contract.b, state.schedule) > 0) continue;
     // A small one isn't worth a slot in the plane's day that a real market could fill.
     if (contract.paymentPerDay < CONTRACT_WORTH_PER_DAY) continue;
+    // Bid once at 90% of what the buyer will pay: a solo bidder wins it at
+    // that price, and a contested one is decided at the deadline.
+    if (!contract.bid) placeBid(state, contract.id, Math.floor((reservePerDay(contract, 1) * CONTRACT_BID_OF_RESERVE) / 100) * 100, 1);
     for (const [base, far] of [
       [contract.a, contract.b],
       [contract.b, contract.a],
@@ -635,6 +639,10 @@ function takeContracts(state: SimState, memory: Memory): string[] {
 
 /** The smallest contract this player takes, in dollars a day at full pay. */
 const CONTRACT_WORTH_PER_DAY = 3000;
+/** Its ask on a tender, as a share of the buyer's reserve. */
+const CONTRACT_BID_OF_RESERVE = 0.9;
+/** The price cut it offers to keep a contract a rival is circling. */
+const CONTRACT_TAKEOVER_CUT = 0.9;
 /** A contract earning less than this share of its pay gets its plane's turns padded. */
 const CONTRACT_PAY_TO_BUFFER = 0.5;
 
@@ -649,6 +657,10 @@ function keepContractsOnTime(state: SimState, memory: Memory): string[] {
   const log: string[] = [];
   for (const contract of contractsOf(state)) {
     const key = marketKey(contract.a, contract.b);
+    if (takeoverOpen(contract)) {
+      const kept = counterTakeover(state, contract.id, contract.paymentPerDay * CONTRACT_TAKEOVER_CUT);
+      if (kept.ok) log.push(`contract ${contract.a}–${contract.b} kept from a rival: ${kept.message}`);
+    }
     if (contract.status !== 'active' || !settled(state, memory, key)) continue;
     if (performanceFactor(state, contract) >= CONTRACT_PAY_TO_BUFFER) continue;
     const tails = new Set(state.schedule.filter((leg) => marketKey(leg.origin, leg.dest) === key).map((leg) => leg.tail));
