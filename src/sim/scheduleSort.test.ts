@@ -3,7 +3,7 @@ import { createPlayer } from '../headless/player';
 import { startHeadlessGame } from '../headless/newGame';
 import { commitDraft, planDrop, scheduleConflicts } from './scheduleDraft';
 import { planSort, type SortMode } from './scheduleSort';
-import { marketKey } from './schedule';
+import { marketKey, nextLegId, repairDuplicateLegIds } from './schedule';
 import { step } from './step';
 import { nightStopLegs } from './nightStops';
 import { allRotations } from './utilisation';
@@ -84,3 +84,19 @@ assert.ok(planDrop(longHaul, longIds, rotation.tail, 365).ok, 'a long-haul round
 assert.equal(planDrop(longHaul, longIds, rotation.tail, 355).ok, false, 'but not before the day opens');
 console.log('long-haul move: ok');
 console.log('schedule sort: ok');
+
+// A leg moved to another plane keeps its id, so a new leg on the plane it left must not reuse its number,
+// and a save that already holds two legs with one id is repaired.
+const ids = structuredClone(state);
+const moved = ids.schedule.find((leg) => leg.legId.startsWith(`${leg.tail}-`))!;
+const originalTail = moved.tail;
+const taken = nextLegId(originalTail, ids.schedule);
+moved.tail = 'C-ELSEWHERE';
+assert.equal(nextLegId(originalTail, ids.schedule), taken === moved.legId ? `${originalTail}-${Number(taken.slice(originalTail.length + 1)) + 1}` : taken);
+assert.notEqual(nextLegId(originalTail, ids.schedule), moved.legId, 'a moved leg\'s id was handed out again');
+const twin = { ...moved, tail: originalTail };
+ids.schedule.push(twin);
+assert.equal(repairDuplicateLegIds(ids), 1, 'one duplicate should be renamed');
+assert.equal(new Set(ids.schedule.map((leg) => leg.legId)).size, ids.schedule.length, 'ids still collide');
+assert.equal(repairDuplicateLegIds(ids), 0, 'repair should be safe to run twice');
+console.log('leg ids: ok');

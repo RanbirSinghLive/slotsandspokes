@@ -1610,6 +1610,8 @@ result goes into the draft (planned on the draft's copy when one is open)
 and is read on the timeline and saved with the ✓; the whole sort is checked
 first and refused with a reason if it wouldn't hold. `npm run sorttest`.
 
+A leg keeps its id (`<tail>-<n>`) when its rotation moves to another plane, and a new leg's number counts every leg carrying that tail's name, wherever it flies now (`nextLegId()`), so ids stay unique. A save that already holds two legs with one id has the second renamed on load (`repairDuplicateLegIds()`).
+
 A dragged rotation **snaps** (`snapStart()`) to within 10 minutes of the
 flight before it (its turn included), the flight after it, or the ends of
 the usable day. On touch the × shows on every rotation and rows are
