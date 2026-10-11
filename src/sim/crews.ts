@@ -166,16 +166,20 @@ export const CREW_SWAP_GAP_MINUTES = 120;
  * each run of legs from its first departure to its last landing, split at
  * every long wait at base (CREW_SWAP_GAP_MINUTES).
  */
-function dutyStretches(state: SimState, tail: string): { start: number; end: number }[] {
+export function dutyStretches(state: SimState, tail: string): { start: number; end: number; legs: ScheduleLeg[] }[] {
   const legs = legsOf(state, tail);
   const base = state.aircraft.find((aircraft) => aircraft.tail === tail)?.baseAirport;
-  const stretches: { start: number; end: number }[] = [];
+  const stretches: { start: number; end: number; legs: ScheduleLeg[] }[] = [];
   for (let i = 0; i < legs.length; i++) {
     const leg = legs[i];
     const previous = legs[i - 1];
     const waitAtBase = previous && previous.dest === base && leg.departMinute - (previous.departMinute + previous.blockMinutes) >= CREW_SWAP_GAP_MINUTES;
-    if (!previous || waitAtBase) stretches.push({ start: leg.departMinute - REPORT_MINUTES, end: leg.departMinute + leg.blockMinutes });
-    else stretches[stretches.length - 1].end = leg.departMinute + leg.blockMinutes;
+    if (!previous || waitAtBase) stretches.push({ start: leg.departMinute - REPORT_MINUTES, end: leg.departMinute + leg.blockMinutes, legs: [leg] });
+    else {
+      const open = stretches[stretches.length - 1];
+      open.end = leg.departMinute + leg.blockMinutes;
+      open.legs.push(leg);
+    }
   }
   return stretches;
 }

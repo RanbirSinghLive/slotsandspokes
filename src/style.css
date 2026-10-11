@@ -6641,3 +6641,73 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
 .routes-scroll {
   overflow-x: auto;
 }
+
+/* Pairings (ui/inspector/pairings.ts): a row per plane across the home-local day. */
+.pairing-group {
+  margin: 6px 0 10px;
+}
+
+.pairing-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.pairing-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #e6e9f0;
+}
+
+.pairing-stats {
+  color: #9aa3b8;
+  text-align: right;
+}
+
+.pairing-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+}
+
+.pairing-tail {
+  flex: none;
+  width: 38px;
+  font-size: 10px;
+  text-align: left;
+}
+
+.pairing-track {
+  position: relative;
+  flex: 1;
+  height: 12px;
+  border-radius: 3px;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 calc(16.666% - 1px), rgba(255, 255, 255, 0.08) calc(16.666% - 1px) 16.666%),
+    rgba(255, 255, 255, 0.04);
+}
+
+.pairing-bar {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  min-width: 3px;
+  border-radius: 2px;
+  background: #7fd88f;
+}
+
+.pairing-bar.is-late {
+  background: #ffd166;
+}
+
+.pairing-bar.is-night {
+  background: #ff8080;
+}
+
+.pairing-bar.is-away {
+  background: #7d8499;
+}
