@@ -3,7 +3,7 @@ import { createPlayer } from '../headless/player';
 import { startHeadlessGame } from '../headless/newGame';
 import { dayIndex } from './clock';
 import { type Crisis, openCrisis, previewCrisis, setCrisisWaived, shouldWaive } from './crisis';
-import { setOrder } from './orders';
+import { setCallPolicy, setRoutePriority } from './priority';
 import { step } from './step';
 
 // Run with `npm run crisistest`: a storm forecast two days out is settled at
@@ -12,6 +12,7 @@ import { step } from './step';
 // NPS hit; a forecast that misses costs nothing unless it was waived.
 const player = createPlayer('steady');
 const state = startHeadlessGame('YYZ', 1, player);
+state.callPolicy = 'ask'; // the tests set the policy they need
 for (let day = 1; day <= 40; day++) {
   for (let minute = 0; minute < 1440; minute++) step(state);
   player.playDay(state);
@@ -93,17 +94,23 @@ assert.ok(setCrisisWaived(state, 99, true).ok && crisis.waived);
 crisis.day = dayIndex(state);
 assert.equal(setCrisisWaived(state, 99, false).ok, false, 'no changing your mind once the day has begun');
 
-// Auto waives above the break-even and protect never does.
+// The priority policy waives above the break-even, unless a route there is keep; ask never waives by itself.
 restore();
 crisis = forecast(0.95);
-setOrder(state, null, 'auto');
+setCallPolicy(state, 'priority');
 assert.ok(shouldWaive(state, crisis));
 throughRollover();
-assert.ok(crisis.waived, 'auto should waive a near-certain storm');
+assert.ok(crisis.waived, 'priority should waive a near-certain storm');
 restore();
 crisis = forecast(0.95);
-setOrder(state, null, 'protect');
+setCallPolicy(state, 'priority');
+for (const leg of state.schedule) if (leg.origin === crisis.airport || leg.dest === crisis.airport) setRoutePriority(state, leg.origin, leg.dest, 'keep');
 throughRollover();
-assert.equal(crisis.waived, false, 'protect never waives');
+assert.equal(crisis.waived, false, 'a keep route at the airport flies on');
+restore();
+crisis = forecast(0.95);
+setCallPolicy(state, 'ask');
+throughRollover();
+assert.equal(crisis.waived, false, 'ask never waives by itself');
 assert.equal(openCrisis(state), undefined);
-console.log('crisis orders: ok');
+console.log('crisis policy: ok');

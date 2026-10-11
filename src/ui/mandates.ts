@@ -1,6 +1,7 @@
 import { acceptMandate, clientKey, LATE_MINUTES, mandateIsActive, mandatesOf, MIN_TERM_SUCCESS, STORIES, type Mandate } from '../sim/mandates';
 import { dayIndex, minuteOfDayToTimeString } from '../sim/clock';
 import type { SimState } from '../sim/state';
+import { callPolicy } from '../sim/priority';
 import { standingOf, standingPips } from '../sim/standing';
 import { showConfirm } from './confirmModal';
 import { money, shortMoney } from './format';
@@ -121,6 +122,8 @@ export function updateMandates(state: SimState, choosingHome: boolean, openSched
   const fresh = shown.find((m) => m.status === 'offered' && !announced.has(m.id));
   if (fresh) {
     announced.add(fresh.id);
+    // With the priority policy offers wait behind the ★ chip (a keep route takes its own, sim/priority.ts) instead of stopping the game.
+    if (callPolicy(state) !== 'ask') return false;
     showOffer(state, fresh, refresh);
     return true;
   }

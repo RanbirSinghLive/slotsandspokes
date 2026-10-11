@@ -70,6 +70,8 @@ export type DailyBrief = {
   chips: DailyChip[];
   /** Yesterday across the network, from the on-time history. Null with no flying yet. */
   yesterday: { flown: number; onTime: number; cancelled: number } | null;
+  /** What the priority policy settled yesterday (sim/priority.ts), each on a route whose rank the brief can change. */
+  settled: { a: string; b: string; text: string }[];
 };
 
 export function buildDailyBrief(state: SimState): DailyBrief {
@@ -143,7 +145,8 @@ export function buildDailyBrief(state: SimState): DailyBrief {
     chips.push({ kind: 'late', count: yesterday.cancelled, tip: `${yesterday.cancelled} cancelled yesterday; opens Routes by completion`, target: { screen: 'routes' } });
   }
 
-  return { day: today, chips, yesterday };
+  const settled = (state.priorityLog ?? []).filter((entry) => entry.day === today - 1).map(({ a, b, text }) => ({ a, b, text }));
+  return { day: today, chips, yesterday, settled };
 }
 
 /** True once a season review is due; the first call only starts the clock, so a new game or an old save gets its first review half a year on. */

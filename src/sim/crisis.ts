@@ -2,7 +2,7 @@ import aircraftTypesData from '../../data/aircraft-types.json';
 import { dayIndex } from './clock';
 import { revenuePerFlight } from './controller';
 import { marketLoadFactor } from './loadFactor';
-import { fleetOrder } from './orders';
+import { airportHasKeepRoute, callPolicy } from './priority';
 import { recordCancellation } from './step';
 import { nextRandom } from './rng';
 import type { ScheduleLeg } from './schedule';
@@ -30,9 +30,10 @@ import type { SimState } from './state';
  * its flying spread over several airports loses a smaller share of its day
  * to one closure than one whose flying runs through a single hub.
  *
- * The fleet's standing order (sim/orders.ts) decides who answers: ask puts
- * the card to the player, protect always flies on, auto waives whenever
- * the forecast is above the break-even. Rolled from its own stream so a
+ * The fleet's call policy (sim/priority.ts) decides who answers: ask puts
+ * the card to the player; priority flies on when the airport carries a
+ * keep route and otherwise waives whenever the forecast is above the
+ * break-even. Rolled from its own stream so a
  * game that never meets one plays as it did without them.
  */
 export type CrisisStatus = 'forecast' | 'hit' | 'missed';
@@ -164,7 +165,7 @@ export function rollDailyCrisis(state: SimState): void {
 
   for (const crisis of state.crises) {
     if (crisis.status !== 'forecast' || crisis.day > today) continue;
-    if (fleetOrder(state) === 'auto' && !crisis.waived) crisis.waived = shouldWaive(state, crisis);
+    if (callPolicy(state) === 'priority' && !crisis.waived && !airportHasKeepRoute(state, crisis.airport)) crisis.waived = shouldWaive(state, crisis);
     const hit = hitRoll < crisis.chance;
     crisis.status = hit ? 'hit' : 'missed';
     const legs = departuresFrom(state, crisis.airport).filter((leg) => !state.cancelledToday.includes(leg.legId));

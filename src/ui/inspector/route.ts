@@ -1,3 +1,4 @@
+import { priorityButton } from '../priority';
 import { routeRightsMark } from './rights';
 import {
   ANCILLARY_FEE,
@@ -98,6 +99,7 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   title.textContent = `${a} – ${b}`;
   const rights = routeRightsMark(state, a, b);
   if (rights) title.append(rights);
+  title.append(priorityButton(state, a, b, changed));
   root.append(title);
 
   // Flights that should have flown and didn't: everything below that

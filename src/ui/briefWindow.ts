@@ -1,5 +1,5 @@
 import { briefSettings, buildDailyBrief, buildSeasonReview, dailyBriefDue, markSeasonReviewShown, seasonReviewDue, setBriefSetting, type BriefSettings, type DailyBrief, type SeasonReview } from '../sim/briefs';
-import { mountFleetOrders } from './orders';
+import { mountCallPolicy, priorityButton } from './priority';
 import type { SimState } from '../sim/state';
 import { select } from './selection';
 import { shortMoney } from './format';
@@ -112,6 +112,13 @@ function dailyContent(brief: DailyBrief): HTMLElement {
     line.className = 'brief-yesterday';
     line.title = 'Yesterday: flights landed · on time · cancelled';
     line.textContent = `DEP ${y.flown} · OTP ${y.flown > 0 ? Math.round((y.onTime / y.flown) * 100) : 0}% · CNX ${y.cancelled}`;
+    wrap.append(line);
+  }
+  for (const item of brief.settled) {
+    const line = document.createElement('span');
+    line.className = 'brief-yesterday brief-settled';
+    line.title = item.text;
+    line.append(`✂ ${item.a}–${item.b} `, priorityButton(stateRef!, item.a, item.b, () => {}));
     wrap.append(line);
   }
   return wrap;
@@ -250,7 +257,7 @@ export function syncBriefSettings(): void {
   document.querySelector<HTMLInputElement>('#brief-setting-season')!.checked = settings.season;
   document.querySelector<HTMLInputElement>('#brief-setting-pause')!.checked = settings.seasonPause;
   document.querySelector<HTMLInputElement>('#brief-setting-call')!.checked = settings.callPause;
-  mountFleetOrders(stateRef);
+  mountCallPolicy(stateRef);
 }
 
 /** Drag by the header with a mouse or pen; on touch the window stays docked above the tab strip. */

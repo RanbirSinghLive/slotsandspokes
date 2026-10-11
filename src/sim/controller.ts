@@ -3,7 +3,7 @@ import { dayStartMinute } from './clock';
 import { LATE_MINUTES, mandatedLeg, mandateIsActive, mandatesOf } from './mandates';
 import { MIN_TURN_MINUTES, marketKey, type ScheduleLeg } from './schedule';
 import { isAog } from './aog';
-import { orderFor } from './orders';
+import { callPolicy } from './priority';
 import { nightStopStation } from './nightStops';
 import { recordCancellation } from './step';
 import { rotationsForTail, type Rotation } from './utilisation';
@@ -293,8 +293,8 @@ export function callsNeeded(state: SimState, includeOrdered = false): Call[] {
   const calls: Call[] = [];
   for (const aircraft of state.aircraft) {
     if (aircraft.status !== 'ground') continue;
-    // 'auto' and 'protect' planes are never put to the player (sim/orders.ts); the order pass asks for them with includeOrdered.
-    if (!includeOrdered && orderFor(state, aircraft.tail) !== 'ask') continue;
+    // With the priority policy no plane is put to the player (sim/priority.ts); its pass asks for them with includeOrdered.
+    if (!includeOrdered && callPolicy(state) !== 'ask') continue;
     const overdue = state.schedule.some(
       (leg) => leg.tail === aircraft.tail && !handled.has(leg.legId) && state.simMinute - (dayStart + leg.departMinute) >= OVERDUE_MINUTES,
     );
