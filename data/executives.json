@@ -242,7 +242,8 @@
     "salaryPerDay": 5000,
     "effect": {
       "kind": "maintenance-bases",
-      "costMultiplier": 0.95
+      "costMultiplier": 0.95,
+      "toleranceCostMultiplier": 0.8
     }
   },
   {
@@ -257,7 +258,8 @@
     "salaryPerDay": 7000,
     "effect": {
       "kind": "maintenance-bases",
-      "costMultiplier": 0.7
+      "costMultiplier": 0.7,
+      "toleranceCostMultiplier": 0.5
     }
   },
   {

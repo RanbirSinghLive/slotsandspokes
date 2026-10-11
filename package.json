@@ -26,6 +26,7 @@
     "checkbookingtest": "tsx src/sim/checkbooking.test.ts",
     "rdtest": "tsx src/sim/rd.test.ts",
     "dchecktest": "tsx src/sim/dcheck.test.ts",
+    "tolerancetest": "tsx src/sim/tolerance.test.ts",
     "enginepooltest": "tsx src/sim/enginepool.test.ts",
     "briefstest": "tsx src/sim/briefs.test.ts",
     "laddertest": "tsx src/sim/ladder.test.ts",

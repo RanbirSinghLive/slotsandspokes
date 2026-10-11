@@ -1,5 +1,6 @@
 import { contractCost, heavyBays, heavyRated, lineCapacity, lineRated, outstationCheck } from './bases';
 import { dayStartMinute } from './clock';
+import { executiveToleranceMultiplier } from './executives';
 import { nightStopStation } from './nightStops';
 import { projectRestOfDay } from './cascade';
 import { rotationsForTail } from './utilisation';
@@ -283,7 +284,46 @@ export function heavyCheckProgressDays(aircraft: Aircraft): number {
 
 /** Days until the heavy check is due: negative once overdue. */
 export function heavyCheckDueIn(aircraft: Aircraft): number {
-  return Math.round(HEAVY_INTERVAL_DAYS - heavyCheckProgressDays(aircraft));
+  return Math.round(HEAVY_INTERVAL_DAYS - heavyCheckProgressDays(aircraft)) + (aircraft.heavyShiftDays ?? 0);
+}
+
+/**
+ * Tolerance: a C check inside its window can be pushed later by 1, 5 or 15
+ * days, for a fee, to spread out checks that fall together. The fee is a
+ * multiple of the check's contract price, and the Director of Maintenance
+ * cuts it. A plane can't be pushed more than TOLERANCE_CAP_DAYS in all
+ * before its check, so the grace after the due date is still the limit.
+ */
+export const TOLERANCE_STEPS = [1, 5, 15] as const;
+export const TOLERANCE_CAP_DAYS = 15;
+const TOLERANCE_COST_FACTOR: Record<number, number> = { 1: 0.5, 5: 2, 15: 5 };
+
+/** What pushing this plane's C check later by `days` costs. */
+export function heavyToleranceCost(state: SimState, aircraft: Aircraft, days: number): number {
+  return Math.round(contractCost(heavyCheckWorkMinutes(aircraft.typeCode)) * (TOLERANCE_COST_FACTOR[days] ?? 0) * executiveToleranceMultiplier(state));
+}
+
+export function heavyShiftOf(aircraft: Aircraft): number {
+  return aircraft.heavyShiftDays ?? 0;
+}
+
+/** Why a plane's C check can't be pushed by `days` now, or null when it can. */
+export function heavyToleranceBlocker(state: SimState, aircraft: Aircraft, days: number): string | null {
+  if (!heavyCheckOpen(aircraft)) return `Opens ${HEAVY_WINDOW_DAYS}d before due`;
+  if (state.aogs.some((event) => event.tail === aircraft.tail) || aircraft.heavyCheckBooked) return 'Grounded or booked already';
+  if ((aircraft.heavyShiftDays ?? 0) + days > TOLERANCE_CAP_DAYS) return `At most ${TOLERANCE_CAP_DAYS}d of tolerance per check`;
+  const cost = heavyToleranceCost(state, aircraft, days);
+  if (state.cash < cost) return `Needs $${cost.toLocaleString()} on hand`;
+  return null;
+}
+
+/** Push the C check later by `days`, paying the fee. Returns the fee, or null when it isn't allowed. */
+export function applyHeavyTolerance(state: SimState, aircraft: Aircraft, days: number): number | null {
+  if (!TOLERANCE_STEPS.includes(days as 1 | 5 | 15) || heavyToleranceBlocker(state, aircraft, days)) return null;
+  const cost = heavyToleranceCost(state, aircraft, days);
+  chargeMaintenance(state, cost);
+  aircraft.heavyShiftDays = (aircraft.heavyShiftDays ?? 0) + days;
+  return cost;
 }
 
 /** The night just ended, judged at midnight: whether the plane got its check. */
@@ -498,6 +538,7 @@ export function finishHeavyCheck(state: SimState, aircraft: Aircraft): void {
   aircraft.daysSinceHeavyCheck = 0;
   delete aircraft.deferredItems;
   delete aircraft.heavyCheckBooked;
+  delete aircraft.heavyShiftDays;
   delete aircraft.heavyBankedMinutes;
   delete aircraft.flightMinutesSinceHeavy;
   delete aircraft.cyclesSinceHeavy;

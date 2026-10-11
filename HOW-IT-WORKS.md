@@ -3401,6 +3401,15 @@ An earlier version took every plane out for 1–3 days every 30 days. A
 fleet flown near capacity had no spare planes to take its flying, so
 the cancellations cost Toronto most of its year on 18 seeds.
 
+**Tolerance.** Inside its window, tap a plane's puck on the "C checks due"
+axis to induct it (the booking above) or push the check later by 1, 5 or 15
+days (`applyHeavyTolerance()`, `heavyShiftDays`), so checks that fall together
+can be spread over the hangar. Each push costs a multiple of the check's
+contract price (0.5, 2 and 5 times), at most 15 days in all per check, and the
+grace still runs from the pushed date. The Director of Maintenance cuts the
+fee (Aaltonen −20%, Bakare −50%). The push is cleared when the check is done.
+The headless player never pushes.
+
 **The D check** is the overhaul above the C check, due after 360 flying days
 or 3,600 flight hours, whichever comes first (`dCheckDueIn()`). It is
 **booked, never forced**: from 60 days before due, a plane parked at its base

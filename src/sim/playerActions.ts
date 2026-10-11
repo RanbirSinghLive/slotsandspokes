@@ -98,7 +98,7 @@ import { inboundAt, orderLease } from './fleetTiming';
 import { startSeatSale as startSeatSaleRule } from './seatSale';
 import { SEASON_DAYS, SEASONAL_PREMIUM } from './seasonalLease';
 import { changeSpareEngines as changeSpareEnginesRule, holdPerDay, shopVisitCost, sparesHeld, sparesReady } from './enginePool';
-import { aBankedMinutes, aCheckOpen, aCheckProgress, aCheckWorkMinutes, cyclesSinceHeavy, deferredItems, flightHoursSinceHeavy, heavyBankedMinutes, maintenanceReserve, heavyBayTails, heavyCheckDueIn, canBookHeavyCheck, heavyBookBlocker, canBookDCheck, dCheckDueIn, dCheckOpen, flightHoursSinceD, heavyCheckOpen, heavyCheckWorkMinutes, sleepersNow, tonightCheck } from './mxChecks';
+import { aBankedMinutes, aCheckOpen, aCheckProgress, aCheckWorkMinutes, cyclesSinceHeavy, deferredItems, flightHoursSinceHeavy, heavyBankedMinutes, maintenanceReserve, heavyBayTails, heavyCheckDueIn, canBookHeavyCheck, heavyBookBlocker, applyHeavyTolerance, heavyToleranceBlocker, heavyToleranceCost, heavyShiftOf, TOLERANCE_STEPS, canBookDCheck, dCheckDueIn, dCheckOpen, flightHoursSinceD, heavyCheckOpen, heavyCheckWorkMinutes, sleepersNow, tonightCheck } from './mxChecks';
 import { rebaseOptions, rebasePlane, type RebaseOption } from './rebase';
 import { cabinGainPerDay, cabinOf, cancelRefit as cancelRefitRule, orderRefit as orderRefitRule, refitBlockedReason, refitCost, refitDays, type Cabin } from './cabins';
 import { commitBringHome, commitRetime, planBringHome, planRetime, type RetimePlan } from './retime';
@@ -721,6 +721,9 @@ export type HeavyCheckReadout = {
   /** Parked at its base with the check open, so it can be booked now. */
   canBook: boolean;
   bookBlocker: string | null;
+  /** The C-check tolerance steps: days, fee and why not (null: allowed). */
+  tolerance: { days: number; cost: number; blocker: string | null }[];
+  shiftDays: number;
   /** Grounded for it, booked or having gone too far overdue. */
   inCheck: boolean;
   /** Holding a hangar bay, so its nights bank hours. */
@@ -758,6 +761,8 @@ export function heavyCheckReadouts(state: SimState): HeavyCheckReadout[] {
       booked: aircraft.heavyCheckBooked === true,
       canBook: canBookHeavyCheck(state, aircraft),
       bookBlocker: heavyBookBlocker(state, aircraft),
+      tolerance: TOLERANCE_STEPS.map((days) => ({ days, cost: heavyToleranceCost(state, aircraft, days), blocker: heavyToleranceBlocker(state, aircraft, days) })),
+      shiftDays: heavyShiftOf(aircraft),
       inCheck: state.aogs.some((event) => event.tail === aircraft.tail && event.check),
       inBay: bays.has(aircraft.tail),
       lastNight: state.lastNightChecks?.[aircraft.tail] ?? null,
@@ -795,6 +800,16 @@ export function engineReadouts(state: SimState): EngineReadout[] {
 
 export function changeSpareEngines(state: SimState, classCode: string, delta: 1 | -1): Outcome<{ message: string }> {
   return changeSpareEnginesRule(state, classCode, delta);
+}
+
+/** Push a plane's C check later by `days` for a fee (sim/mxChecks.ts). */
+export function toleranceHeavyCheck(state: SimState, tail: string, days: number): Outcome<{ message: string }> {
+  const aircraft = state.aircraft.find((a) => a.tail === tail);
+  if (!aircraft) return { ok: false, reason: `No aircraft ${tail}.` };
+  const blocker = heavyToleranceBlocker(state, aircraft, days);
+  if (blocker) return { ok: false, reason: blocker };
+  const cost = applyHeavyTolerance(state, aircraft, days);
+  return cost === null ? { ok: false, reason: `${tail} can't be pushed ${days}d.` } : { ok: true, message: `${tail} C check pushed ${days}d · $${cost.toLocaleString()}.` };
 }
 
 /** Take a booking back before the plane goes in. */
