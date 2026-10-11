@@ -3654,6 +3654,26 @@ Each cause has a different answer available:
   that is only `late` is left alone. What auto did is in `state.orderLog`,
   shown on the plane's page. A game that never sets auto does no extra work.
 
+  **Crisis days** (`sim/crisis.ts`, `ui/crisis.ts`). Rarely (a 1-in-100
+  chance a day, from day 30, never when events are off) a severe storm is
+  forecast two days out for one of the airline's busy airports (4+ flights
+  a day leave it) with a stated chance, 50 to 90%. At that day's rollover the
+  chance is rolled from the crisis's own stream (`crisisSeed`). **Fly on**:
+  if it comes, the airport is closed for the day (the ordinary severe
+  weather, `sim/weather.ts`), its flights cancel at -80 NPS each and the
+  airline pays $120 a booked passenger stranded (booked = seats x the
+  market's recent load factor), booked as overhead. **Waive**: the airport's
+  day is cancelled ahead (cause `waived`, -20 NPS a flight, a quarter of the
+  care bill) whether the storm comes or not, and the day's revenue is lost
+  either way. Waiving costs less on average when the forecast chance is
+  above (revenue + waived care) / (revenue + care), shown on the card. The
+  fleet's standing order answers: ✋ ask shows the card when the forecast
+  arrives (and pauses if Pause on call is on), 🛡 always flies on, ✂ waives
+  when the chance is above that break-even. A ⛈ chip in the ops row opens
+  the card until the day begins. A network spread over several airports
+  loses a smaller share of its day to one closure; that is the preparation.
+  The headless player waives whenever the chance is above the break-even.
+
 A cancellation scores a flat **-80 NPS** rather than extending the delay
 curve, which floors at -50: a cancellation isn't a very late flight, it's
 a different failure. NPS therefore divides by its own denominator

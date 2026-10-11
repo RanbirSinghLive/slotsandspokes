@@ -42,6 +42,7 @@ import { MAINTENANCE_AGE_FACTOR } from './aog';
 import { isAog, rollDailyAogs } from './aog';
 import { handBackSwaps } from './controller';
 import { applyStandingOrders } from './orders';
+import { rollDailyCrisis } from './crisis';
 import {
   executiveSalariesPerDay,
   rollExecutiveStanding,
@@ -49,7 +50,7 @@ import {
   executiveNpsBonus,
   executiveMaintenanceMultiplier,
 } from './executives';
-import { CANCELLATION_NPS_SCORE, flightSatisfactionScore, recordFlightNps, rollTrailingNps } from './nps';
+import { CANCELLATION_NPS_SCORE, WAIVED_NPS_SCORE, flightSatisfactionScore, recordFlightNps, rollTrailingNps } from './nps';
 import { recordDailyCashHistory } from './forecast';
 import { recordDailyPnlHistory } from './pnlHistory';
 import { recordFlightSeatNm, recordDailySeatNmHistory } from './unitEconomics';
@@ -135,7 +136,7 @@ export function recordCancellation(state: SimState, leg: ScheduleLeg, cause: key
   state.todayFlightsCancelled += 1;
   state.flightsCancelledTotal += 1;
   settleMandateCancellation(state, leg, cause);
-  recordFlightNps(state, leg.origin, leg.dest, CANCELLATION_NPS_SCORE);
+  recordFlightNps(state, leg.origin, leg.dest, cause === 'waived' ? WAIVED_NPS_SCORE : CANCELLATION_NPS_SCORE);
   const market = (state.todayOnTimeByMarket[marketKey(leg.origin, leg.dest)] ??= { arrived: 0, onTime: 0, cancelled: 0 });
   market.cancelled += 1;
 }
@@ -342,6 +343,7 @@ export function step(state: SimState): void {
     // Airspace closures (sim/airspace.ts) come before the day's cancellations,
     // which read them.
     rollDailyAirspace(state);
+    rollDailyCrisis(state);
     rollDailyMandates(state);
 
     // Cancellations. Everything on the schedule that has an aircraft is a

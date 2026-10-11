@@ -35,6 +35,7 @@
     "stationtest": "tsx src/sim/stations.test.ts",
     "extrastest": "tsx src/sim/extras.test.ts",
     "orderstest": "tsx src/sim/orders.test.ts",
+    "crisistest": "tsx src/sim/crisis.test.ts",
     "sorttest": "tsx src/sim/scheduleSort.test.ts"
   },
   "devDependencies": {

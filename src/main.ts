@@ -16,6 +16,7 @@ import { drawFog } from './render/fog';
 import { drawWeatherEffects } from './render/weather';
 import { drawAirspaceClosures } from './render/airspace';
 import { updateMandates } from './ui/mandates';
+import { updateCrisis } from './ui/crisis';
 import { drawMandateStars } from './render/mandates';
 import { drawAircraft, findFlightAt, flightScreenPoint } from './render/aircraft';
 import { OTP_BASELINE } from './sim/routeOtp';
@@ -310,6 +311,7 @@ function render(nowMs: number = performance.now()): void {
   // (a schedule problem) opens Fleet, where the rotations are.
   updateAlerts(state, () => select({ kind: 'fleet' }), choosingHome);
   if (updateMandates(state, choosingHome, () => select({ kind: 'fleet' }))) runwayPauseRequested = true;
+  if (updateCrisis(state, choosingHome)) runwayPauseRequested = true;
   if (updateBriefs(state, choosingHome, briefSpeed)) runwayPauseRequested = true;
   const newCall = updateCalls(state, choosingHome);
   if (newCall) {

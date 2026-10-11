@@ -4080,6 +4080,11 @@ button.inspector-crumb:hover {
   display: contents;
 }
 
+#crisis-chip {
+  color: #8ec5ff;
+  cursor: pointer;
+}
+
 #events-chip {
   color: #ffb454;
   cursor: pointer;

@@ -50,6 +50,7 @@ import { acceptMandate, mandatedLeg, mandatesOf, marketHasMandate } from '../sim
 import { crewReadiness } from '../sim/crews';
 import { HANDLING, STATION_FEE, STATION_PER_DAY, stationTier, stationUpgradeBlocked, upgradeStation, type HandlingTier } from '../sim/stations';
 import { dailyDeparturesAt } from '../sim/airports';
+import { openCrisis, setCrisisWaived, shouldWaive } from '../sim/crisis';
 
 /**
  * The headless "players" that balance runs are played by (WEEK-EIGHT.md,
@@ -372,6 +373,7 @@ function steadyPlayer(kind: 'steady' | 'sitter' | 'bold'): Player {
         ...fillDelivered(state, memory),
         ...takeContracts(state, memory),
         ...takePriorityFlights(state),
+        ...answerStormForecast(state),
         ...keepContractsOnTime(state, memory),
         ...(harvesting ? [] : [...feedSpill(state, memory), ...openMarkets(state, memory), ...leaseWhenFull(state, memory, kind === 'bold')]),
         ...shedWhenOverheadBites(state, memory),
@@ -584,6 +586,13 @@ function runHomeHub(state: SimState): string[] {
  * flies it has a spare crew at its base: protection is only worth having
  * with crews to protect it. Everything else is left to lapse.
  */
+function answerStormForecast(state: SimState): string[] {
+  const crisis = openCrisis(state);
+  if (!crisis || crisis.waived || !shouldWaive(state, crisis)) return [];
+  setCrisisWaived(state, crisis.id, true);
+  return [`Waived ${crisis.airport} ahead of a ${Math.round(crisis.chance * 100)}% storm`];
+}
+
 function takePriorityFlights(state: SimState): string[] {
   const log: string[] = [];
   for (const mandate of mandatesOf(state)) {

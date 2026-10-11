@@ -14,7 +14,7 @@ const TIP: Record<CallOrder, string> = {
   auto: 'Auto: swap or cancel the cheaper rotation when the day breaks',
 };
 export const ORDERS_INFO =
-  'What happens when a waiting plane\'s day is about to break (the curfew will cancel a rotation, or a priority flight will fail). ✋ asks you, with a pause if Pause on call is on. 🛡 never asks and never cancels: the plane takes its delay. ✂ settles it without a stop: a swap to an idle plane when that saves a flight for less than the rotation earns, else cancelling the rotation that recovers the most when that earns more than it gives up. A plane that is only late is left alone. A plane\'s own choice beats the fleet default (Game screen).';
+  'What happens when a waiting plane\'s day is about to break (the curfew will cancel a rotation, or a priority flight will fail). ✋ asks you, with a pause if Pause on call is on. 🛡 never asks and never cancels: the plane takes its delay. ✂ settles it without a stop: a swap to an idle plane when that saves a flight for less than the rotation earns, else cancelling the rotation that recovers the most when that earns more than it gives up. A plane that is only late is left alone. A plane\'s own choice beats the fleet default (Game screen). The fleet default also answers a storm forecast for a busy airport: ✋ shows the card, 🛡 flies on, ✂ waives the day when the forecast is above the break-even.';
 
 export function orderButtons(state: SimState, tail: string | null, changed: () => void): HTMLElement {
   const group = document.createElement('span');
