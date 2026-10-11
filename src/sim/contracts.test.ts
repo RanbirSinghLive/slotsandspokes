@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import airportCountries from '../../data/airport-countries.json';
-import { counterRenewal, faceOf, graduation, makeOffers, renewalTerms, rollDailyContracts } from './contracts';
+import { counterRenewal, counterTakeover, faceOf, graduation, makeOffers, renewalTerms, rollDailyContracts } from './contracts';
 import { dayIndex } from './clock';
 import { currentPotentialDemand } from './marketDemand';
 import { marketKey } from './schedule';
@@ -266,3 +266,72 @@ function runningContract(seed: number) {
   assert.equal(again!.paymentPerDay, contract.basePaymentPerDay);
 }
 console.log('renewal: ok');
+
+// --- Takeover (sim/contracts.ts) ----------------------------------------
+
+function circledContract(seed: number) {
+  const { state, contract } = runningContract(seed);
+  // A Canadian rival already at the far end may take a sad buyer's contract.
+  state.competitorRoutes = [
+    { airline: 'CC', code: 'CC', origin: 'YYZ', dest: 'YUL', dailyFrequency: 2, fare: 100, baseFare: 100, openedAtMinute: -999_999, homeCountry: 'CA' },
+  ];
+  contract.satisfaction = 10;
+  contract.sadDays = 14;
+  return { state, contract };
+}
+
+{
+  // A buyer sad for 14 days opens a window; with no rival eligible nothing happens.
+  const { state, contract } = circledContract(11);
+  state.competitorRoutes = [];
+  rollDailyContracts(state);
+  assert.equal(contract.takeoverEndsDay, undefined, 'no rival, no takeover');
+}
+
+{
+  // The window opens, then the rival takes the contract at the end and opens the market.
+  const { state, contract } = circledContract(12);
+  const key = marketKey(contract.a, contract.b);
+  state.marketDemand[key] = 30;
+  state.simMinute += 1440;
+  rollDailyContracts(state);
+  assert.equal(contract.takeoverBy, 'CC');
+  assert.equal(contract.takeoverEndsDay, dayIndex(state) + 14);
+  assert.equal(contract.status, 'active', 'the airline still has the contract during the window');
+  state.simMinute += 1440 * 14;
+  rollDailyContracts(state);
+  assert.equal(contract.status, 'ended');
+  assert.equal(contract.lostTo, 'CC');
+  assert.ok(state.marketDemand[key] < 30, 'the market snaps back');
+  assert.ok(state.competitorRoutes.some((r) => r.code === 'CC' && marketKey(r.origin, r.dest) === key), 'the rival opens the market');
+  assert.equal(JSON.stringify(JSON.parse(JSON.stringify(contract))), JSON.stringify(contract));
+}
+
+{
+  // A recovered buyer closes the window.
+  const { state, contract } = circledContract(13);
+  state.simMinute += 1440;
+  rollDailyContracts(state);
+  assert.ok(contract.takeoverEndsDay !== undefined);
+  contract.satisfaction = 80;
+  rollDailyContracts(state);
+  assert.equal(contract.takeoverEndsDay, undefined);
+  assert.equal(contract.status, 'active');
+}
+
+{
+  // A price cut keeps it, lowers the renewal base, and restarts the sad streak.
+  const { state, contract } = circledContract(14);
+  state.simMinute += 1440;
+  rollDailyContracts(state);
+  const pay = contract.paymentPerDay;
+  assert.equal(counterTakeover(state, contract.id, pay).ok, false, 'no cut is refused');
+  assert.equal(counterTakeover(state, contract.id, pay * 0.5).ok, false, 'too deep a cut is refused');
+  const base = contract.basePaymentPerDay!;
+  assert.equal(counterTakeover(state, contract.id, pay * 0.8).ok, true);
+  assert.ok(contract.paymentPerDay < pay);
+  assert.ok(contract.basePaymentPerDay! < base);
+  assert.equal(contract.takeoverEndsDay, undefined);
+  assert.equal(contract.sadDays, 0);
+}
+console.log('takeover: ok');

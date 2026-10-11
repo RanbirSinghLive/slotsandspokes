@@ -5,13 +5,15 @@ import { marketDistanceNm, potentialDailyDemand } from './demand';
 import { actualDailyDemand, currentPotentialDemand, VIRGIN_MARKET_PDEW } from './marketDemand';
 import { marketNps } from './nps';
 import { bestRangeNm, networkAirports } from './reach';
-import { grantedCountries, homeCountry, legRights } from './rights';
+import { addRivalFlight } from './competitors';
+import { grantedCountries, homeCountry, legRights, rivalHomeCountry } from './rights';
 import { nextRandom } from './rng';
 import { trailingMarketOtp } from './routeOtp';
-import { legsServingMarket, marketKey } from './schedule';
+import { legsServingMarket, marketKey, recommendedFare } from './schedule';
+import { rivalSlotQuote } from './slots';
 import { hungerByAirport } from './serviceLevel';
 import type { SimState } from './state';
-import { CONTRACT_STREAM_SALT, frequencyOf, settleTender, TENDER_OPEN_DAYS, type Bid } from './tenders';
+import { CONTRACT_STREAM_SALT, eligibleRivals, frequencyOf, settleTender, TENDER_OPEN_DAYS, type Bid } from './tenders';
 
 /**
  * Contracts (WEEK-ELEVEN.md, thread 6): route incentives for
@@ -86,6 +88,9 @@ export type Contract = {
   satisfaction?: number;
   /** Consecutive days the buyer has been sad, for the takeover window. */
   sadDays?: number;
+  /** While a rival is circling a sad buyer: the day the window closes and the rival that will take the contract. */
+  takeoverEndsDay?: number;
+  takeoverBy?: string;
   /** What the contract paid and sent riders at when it first started, which renewals scale from without compounding. */
   basePaymentPerDay?: number;
   baseRidersPerDay?: number;
@@ -314,6 +319,96 @@ export function counterRenewal(state: SimState, contractId: number, askPerDay: n
   return { ok: true, message: `Renewal ask $${ask}/day` };
 }
 
+/** Consecutive sad days before an eligible rival starts circling. */
+export const TAKEOVER_AFTER_SAD_DAYS = 14;
+/** Days the airline has to win the buyer back or cut its price once a rival circles. */
+export const TAKEOVER_WINDOW_DAYS = 14;
+/** The cut the airline may offer to keep a circled contract, as a share of today's pay. */
+export const TAKEOVER_MIN_COUNTER = 0.7;
+export const TAKEOVER_MAX_COUNTER = 0.9;
+
+export function takeoverOpen(contract: Contract): boolean {
+  return contract.status === 'active' && contract.takeoverEndsDay !== undefined;
+}
+
+/** Keep a circled contract by cutting its pay; the cut also lowers the base renewals scale from. The sad streak starts over. */
+export function counterTakeover(state: SimState, contractId: number, askPerDay: number): Outcome {
+  const contract = contractsOf(state).find((c) => c.id === contractId);
+  if (!contract || !takeoverOpen(contract)) return { ok: false, reason: 'No rival is circling that contract' };
+  const ask = Math.round(askPerDay / 100) * 100;
+  const lowest = Math.ceil((contract.paymentPerDay * TAKEOVER_MIN_COUNTER) / 100) * 100;
+  const highest = Math.floor((contract.paymentPerDay * TAKEOVER_MAX_COUNTER) / 100) * 100;
+  if (ask < lowest) return { ok: false, reason: `Under the lowest cut, $${lowest}/day` };
+  if (ask > highest) return { ok: false, reason: `Not enough of a cut to keep the buyer, $${highest}/day at most` };
+  const share = ask / contract.paymentPerDay;
+  contract.basePaymentPerDay = Math.round(((contract.basePaymentPerDay ?? contract.paymentPerDay) * share) / 100) * 100;
+  contract.paymentPerDay = ask;
+  contract.takeoverEndsDay = undefined;
+  contract.takeoverBy = undefined;
+  contract.sadDays = 0;
+  return { ok: true, message: `Kept · $${ask}/day` };
+}
+
+/** The rival opens the contract's market, or adds a flight if it already flies it. */
+function rivalOpensMarket(state: SimState, code: string, a: string, b: string): void {
+  const key = marketKey(a, b);
+  const existing = state.competitorRoutes.find((route) => route.code === code && marketKey(route.origin, route.dest) === key);
+  if (existing) {
+    addRivalFlight(state, existing);
+    return;
+  }
+  const home = state.competitorRoutes.find((route) => route.code === code);
+  if (!home) return;
+  state.competitorRoutes.push({
+    airline: home.airline,
+    code,
+    origin: a,
+    dest: b,
+    dailyFrequency: 1,
+    fare: recommendedFare(a, b),
+    baseFare: recommendedFare(a, b),
+    openedAtMinute: state.simMinute,
+    slotFeesPerDay: rivalSlotQuote(state, a, b) ?? 0,
+    homeCountry: rivalHomeCountry(state.competitorRoutes, code),
+  });
+}
+
+/**
+ * Daily, for a running contract: a buyer sad for TAKEOVER_AFTER_SAD_DAYS
+ * draws an eligible rival, who has until the window closes. A buyer that
+ * recovers closes it; otherwise the rival takes the contract at the full
+ * rate, opens the market and the airline takes the snap-back. Whether the
+ * contract was taken.
+ */
+function rollTakeover(state: SimState, contract: Contract, today: number): boolean {
+  if (contract.takeoverEndsDay !== undefined) {
+    if (faceOf(contract) !== 'sad') {
+      contract.takeoverEndsDay = undefined;
+      contract.takeoverBy = undefined;
+      return false;
+    }
+    if (today < contract.takeoverEndsDay) return false;
+    const code = contract.takeoverBy ?? '';
+    contract.status = 'ended';
+    contract.lostTo = code;
+    contract.takeoverEndsDay = undefined;
+    const key = marketKey(contract.a, contract.b);
+    const built = state.marketDemand[key];
+    if (built !== undefined) state.marketDemand[key] = built * (1 - SNAP_BACK_SHARE);
+    rivalOpensMarket(state, code, contract.a, contract.b);
+    return true;
+  }
+  if ((contract.sadDays ?? 0) < TAKEOVER_AFTER_SAD_DAYS) return false;
+  const rivals = eligibleRivals(state, contract);
+  if (rivals.length === 0) return false;
+  state.contractSeed ??= state.rngSeed ^ CONTRACT_STREAM_SALT;
+  const [roll, next] = nextRandom(state.contractSeed);
+  state.contractSeed = next;
+  contract.takeoverBy = rivals[Math.min(rivals.length - 1, Math.floor(roll * rivals.length))];
+  contract.takeoverEndsDay = today + TAKEOVER_WINDOW_DAYS;
+  return false;
+}
+
 export function contractsOf(state: SimState): Contract[] {
   return state.contracts ?? [];
 }
@@ -451,6 +546,8 @@ export function rollDailyContracts(state: SimState): void {
       state.todayRevenueByMarket[key] = (state.todayRevenueByMarket[key] ?? 0) + payment;
       contract.paidTotal += payment;
     }
+
+    if (rollTakeover(state, contract, today)) continue;
 
     if (today >= (contract.endsDay ?? today)) {
       // Renewed on the buyer's terms unless the airline countered inside the

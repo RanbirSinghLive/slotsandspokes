@@ -2,6 +2,7 @@ import { dayIndex } from '../../sim/clock';
 import {
   contractsOf,
   counterRenewal,
+  counterTakeover,
   faceOf,
   graduation,
   paymentShare,
@@ -10,6 +11,7 @@ import {
   RENEWAL_WINDOW_DAYS,
   satisfactionOf,
   SNAP_BACK_SHARE,
+  takeoverOpen,
   type Contract,
   type Face,
 } from '../../sim/contracts';
@@ -206,11 +208,38 @@ function runningCard(state: SimState, contract: Contract, changed: () => void): 
   tip(bar, `Market ${Math.round(built * 100)}% of the way to standing on its own · the subsidy shrinks as it builds and the contract ends near 75%`);
   card.append(bar);
 
-  if (left <= RENEWAL_WINDOW_DAYS) card.append(...renewalControls(state, contract, changed));
+  if (takeoverOpen(contract)) card.append(...takeoverControls(state, contract, changed));
+  else if (left <= RENEWAL_WINDOW_DAYS) card.append(...renewalControls(state, contract, changed));
   const answer = answers.get(contract.id);
   if (answer) card.append(line(answer, 'inspector-line office-card-price'));
   card.append(line(`Paid ${money(contract.paidTotal)}`, 'inspector-line office-card-price'));
   return card;
+}
+
+/** A rival circling a sad buyer: days left, and a price cut that keeps the contract. */
+function takeoverControls(state: SimState, contract: Contract, changed: () => void): HTMLElement[] {
+  const days = (contract.takeoverEndsDay ?? 0) - dayIndex(state);
+  const row = document.createElement('div');
+  row.className = 'contract-controls';
+  const pay = contract.paymentPerDay;
+  const cuts = [0.9, 0.8, 0.7].map((share) => Math.floor((pay * share) / 100) * 100);
+  row.append(
+    tipper(
+      'contract-chip is-over',
+      `⚔ ${contract.takeoverBy ?? ''} ${days}d`,
+      `${contract.takeoverBy ?? 'A rival'} takes this contract at the full rate in ${days}d unless the buyer is won back above sad, or you cut the price`,
+    ),
+  );
+  for (const [i, ask] of cuts.entries()) {
+    row.append(
+      glyphButton(`−${(i + 1) * 10}%`, `Keep it at ${money(ask)}/day · the cut stays through renewals and the sad count starts over`, () => {
+        const outcome = counterTakeover(state, contract.id, ask);
+        answers.set(contract.id, outcome.ok ? outcome.message : outcome.reason);
+        changed();
+      }),
+    );
+  }
+  return [row];
 }
 
 /** The renewal terms once the window opens, with a counter when the buyer will take one. */
@@ -242,7 +271,7 @@ function pastCard(contract: Contract): HTMLElement {
   card.append(nameButton(contract));
   card.append(
     line(
-      contract.status === 'ended' ? `Ended · paid ${money(contract.paidTotal)}` : contract.lostTo ? `Lost to ${contract.lostTo}` : 'Lapsed, not taken up',
+      contract.status === 'ended' ? (contract.lostTo ? `Taken by ${contract.lostTo} · paid ${money(contract.paidTotal)}` : `Ended · paid ${money(contract.paidTotal)}`) : contract.lostTo ? `Lost to ${contract.lostTo}` : 'Lapsed, not taken up',
       'inspector-line goal-ahead',
     ),
   );
