@@ -2108,6 +2108,21 @@ balance lever for a weak home.
   picked from the contracts' own random stream (begun from the game's
   seed, so offers never shift any other roll). Untaken for 30 days, an
   offer lapses; taken, it starts at the next rollover.
+- **Tenders and bids** (`src/sim/tenders.ts`). An offer is a call for bids.
+  `placeBid()` names an ask a day and a frequency (1x or 2x a day each
+  way; 2x pays 1.6× the reference and sends 1.5× the riders, and needs
+  four legs to start). The ask runs from 70% to 130% of the reference;
+  130% is the buyer's reserve. Rivals whose home country may fly the
+  market and that already serve the small community (or, from day 180
+  with 6+ routes, the network end) are eligible. With none eligible the
+  bid is awarded at once, so early on a solo bidder wins at any ask under
+  the reserve. Otherwise it is decided 20 days after the offer: each
+  eligible rival bids half the time, asking 80–115% of the reference;
+  score is 70% price against the reserve and 30% capability, and a tie
+  goes to you. A loss shows as lapsed with the winning rival. Once
+  awarded you have 30 days to fly it, then it starts. Flying an unbid
+  offer places a bid at the reference. Dealt from the contracts' own
+  random stream. No screen for bidding yet.
 - **Sized by the home's weakness.** `homeWeakness()`: the median home's
   five best Propeller markets over this home's, from 0.5 (New York,
   Toronto, London) to 4 (the thinnest). Payment a day is $2,500 × that ×
