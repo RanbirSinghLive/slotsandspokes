@@ -22,6 +22,8 @@ import { minuteOfDay, minuteOfDayToTimeString } from '../sim/clock';
 import { info } from './inspector/dom';
 import { linkToMap } from './mapLink';
 import { glyphSvg, type GlyphName } from './glyphs';
+import { marginTip, percentText, trendMark } from './marginChip';
+import { networkMargin, type NetworkMargin } from '../sim/networkMargin';
 
 // Must match the --panel-width custom property's default value in
 // style.css — see the comment there. Wide enough for the tab bar, the
@@ -30,6 +32,7 @@ export const PANEL_WIDTH_PX = 420;
 
 const cashEl = document.querySelector<HTMLSpanElement>('#panel-cash')!;
 const otpEl = document.querySelector<HTMLSpanElement>('#panel-otp')!;
+const marginEl = document.querySelector<HTMLSpanElement>('#panel-margin')!;
 const completionEl = document.querySelector<HTMLSpanElement>('#panel-completion')!;
 const loadEl = document.querySelector<HTMLSpanElement>('#panel-load')!;
 const npsEl = document.querySelector<HTMLElement>('#panel-nps')!;
@@ -45,6 +48,7 @@ const headOfficeEl = document.querySelector<HTMLButtonElement>('#panel-head-offi
 const cardTargets: [string, Selection][] = [
   ['#card-cash', { kind: 'money' }],
   ['#card-runway', { kind: 'money' }],
+  ['#card-margin', { kind: 'money' }],
   ['#card-otp', { kind: 'routes', sort: 'onTime' }],
   ['#card-completion', { kind: 'routes', sort: 'completion' }],
   ['#card-load', { kind: 'routes', sort: 'loadFactor' }],
@@ -71,6 +75,28 @@ function showTrend(card: HTMLElement, measure: Measure, change: (now: number, be
   const arrow = measure.direction === 'better' ? '▲' : measure.direction === 'worse' ? '▼' : '■';
   trendEl.textContent = measure.direction === 'steady' ? `${arrow} holding` : `${arrow} ${change(measure.now, measure.before)}`;
   trendEl.title = 'Against the same point last week';
+}
+
+/** The Margin card: the week's flying margin, coloured by band, with its move against the week before. */
+function showMargin(card: HTMLElement, valueEl: HTMLElement, margin: NetworkMargin | null): void {
+  const trendEl = card.querySelector<HTMLElement>('.stat-trend')!;
+  if (margin === null) {
+    valueEl.textContent = '—';
+    trendEl.textContent = '';
+    card.dataset.trend = '';
+    card.dataset.tip = 'Shown after 3 flown days';
+    return;
+  }
+  valueEl.textContent = percentText(margin.flying);
+  card.dataset.trend = margin.previousFlying === null ? '' : margin.flying - margin.previousFlying > 0.01 ? 'better' : margin.flying - margin.previousFlying < -0.01 ? 'worse' : 'steady';
+  if (margin.previousFlying === null) {
+    trendEl.textContent = '';
+  } else {
+    const mark = trendMark(margin.flying, margin.previousFlying);
+    trendEl.textContent = mark === '' ? '■ holding' : `${mark} ${points(margin.flying, margin.previousFlying)}`;
+  }
+  trendEl.title = 'Against the week before';
+  card.dataset.tip = marginTip(margin);
 }
 
 function points(now: number, before: number): string {
@@ -169,6 +195,8 @@ export function updatePanel(state: SimState): void {
         ? '—'
         : percent((state.flightsScheduledTotal - state.flightsCancelledTotal) / state.flightsScheduledTotal);
   showTrend(completionEl.closest<HTMLElement>('.stat-card')!, trends.completion, points);
+  // Flying margin (sim/networkMargin.ts): what the routes keep of their revenue, last 7 days.
+  showMargin(marginEl.closest<HTMLElement>('.stat-card')!, marginEl, networkMargin(state));
   // Load factor (sim/loadFactor.ts): how full the airline flies, last 7 days.
   loadEl.textContent = formatLoadFactor(networkLoadFactor(state));
   showTrend(loadEl.closest<HTMLElement>('.stat-card')!, trends.loadFactor, points);

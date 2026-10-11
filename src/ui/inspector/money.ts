@@ -4,6 +4,11 @@ import { money, shortMoney } from '../format';
 import { chartLegend } from '../chartLegend';
 import { unitEconomicsHistory } from '../../sim/unitEconomics';
 import type { SimState } from '../../sim/state';
+import { costWeek, flownMarkets, marginBand, marginTrend, networkMargin, routeGroups, routeMarginShare, routeWeek, type RouteGroupBy } from '../../sim/networkMargin';
+import { percentText, trendMark } from '../marginChip';
+import { sparkline } from '../sparkline';
+import { select } from '../selection';
+import { setGrouping } from './routes';
 
 /**
  * The Money view (Network › Money, opened from the Cash and Runway
@@ -69,6 +74,116 @@ function unitChart(days: { rasm: number; casm: number }[]): SVGSVGElement {
   return svg;
 }
 
+
+/** The week's flying margin as a line over the last weeks, a dashed line at 0%. */
+function marginChart(history: number[]): SVGSVGElement {
+  const low = Math.min(0, ...history);
+  const high = Math.max(0, ...history);
+  const span = high - low || 1;
+  const x = (i: number) => (history.length > 1 ? (i / (history.length - 1)) * CHART_WIDTH : 0);
+  const y = (value: number) => CHART_HEIGHT - 4 - ((value - low) / span) * (CHART_HEIGHT - 8);
+  const svg = document.createElementNS(SVG, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`);
+  svg.setAttribute('class', 'fuel-chart');
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', `Flying margin, 7-day, over the last ${history.length} days`);
+  const zero = document.createElementNS(SVG, 'line');
+  zero.setAttribute('x1', '0');
+  zero.setAttribute('x2', String(CHART_WIDTH));
+  zero.setAttribute('y1', String(y(0)));
+  zero.setAttribute('y2', String(y(0)));
+  zero.setAttribute('class', 'fuel-chart-usual');
+  const path = document.createElementNS(SVG, 'polyline');
+  path.setAttribute('points', history.map((value, i) => `${x(i).toFixed(1)},${y(value).toFixed(1)}`).join(' '));
+  path.setAttribute('class', 'money-chart-cash');
+  svg.append(zero, path);
+  return svg;
+}
+
+/** Hub and sector tables: each group's week, summed over its routes. */
+function groupTable(state: SimState, by: RouteGroupBy): HTMLElement {
+  const table = document.createElement('table');
+  table.className = 'money-group-table';
+  const head = document.createElement('tr');
+  for (const text of [by === 'hub' ? 'Hub' : 'Sector', 'Routes', '$/day', 'Margin', '']) {
+    const th = document.createElement('th');
+    th.textContent = text;
+    head.append(th);
+  }
+  const thead = document.createElement('thead');
+  thead.append(head);
+  const body = document.createElement('tbody');
+  for (const group of routeGroups(state, by)) {
+    const tr = document.createElement('tr');
+    tr.className = 'routes-row';
+    const cells = [group.name, String(group.keys.length), shortMoney(group.perDay), group.share === null ? '—' : percentText(group.share), group.previousPerDay === null ? '' : trendMark(group.perDay, group.previousPerDay)];
+    cells.forEach((text, i) => {
+      const td = document.createElement('td');
+      td.textContent = text;
+      if (i === 3 && group.share !== null) td.classList.add(`is-${marginBand(group.share)}`);
+      tr.append(td);
+    });
+    tr.dataset.tip = `Open ${group.name} in Routes`;
+    tr.addEventListener('click', () => {
+      setGrouping(by);
+      select({ kind: 'routes', sort: 'margin' });
+    });
+    body.append(tr);
+  }
+  table.append(thead, body);
+  return table;
+}
+
+/** The three best and three worst routes of the week, each with its line. */
+function extremes(state: SimState): HTMLElement | null {
+  const rows = flownMarkets(state)
+    .map((market) => ({ market, week: routeWeek(state, market.key) }))
+    .filter((row) => row.week.perDay !== null)
+    .sort((x, y) => (y.week.perDay ?? 0) - (x.week.perDay ?? 0));
+  if (rows.length < 2) return null;
+  const picked = rows.length <= 6 ? rows : [...rows.slice(0, 3), ...rows.slice(-3)];
+  const list = document.createElement('div');
+  list.className = 'inspector-rows';
+  for (const { market, week } of picked) {
+    const row = document.createElement('div');
+    row.className = 'inspector-row';
+    const share = routeMarginShare(week);
+    const name = document.createElement('span');
+    name.textContent = `${market.a} – ${market.b}`;
+    const detail = document.createElement('span');
+    detail.className = 'inspector-row-detail';
+    detail.append(sparkline(week.series, `${market.a} – ${market.b} · last 14 days`), ` ${shortMoney(week.perDay ?? 0)}/d${share === null ? '' : ` · ${percentText(share)}`}`);
+    if (share !== null) detail.classList.add(`is-${marginBand(share)}`);
+    row.append(name, detail);
+    row.addEventListener('click', () => select({ kind: 'route', a: market.a, b: market.b }));
+    list.append(row);
+  }
+  return list;
+}
+
+/** Cost kinds as rows with a share bar behind each; `span` is how the tooltip names the period. */
+function costRows(costs: [string, number][], span: string, perDay = false): HTMLElement {
+  const rows = document.createElement('div');
+  rows.className = 'inspector-rows';
+  const total = costs.reduce((sum, [, amount]) => sum + amount, 0);
+  for (const [kind, amount] of costs) {
+    const row = document.createElement('div');
+    row.className = 'inspector-row cost-row';
+    // Each row's share of the period's costs, drawn behind it so the shape reads at a glance.
+    const share = Math.round((amount / total) * 100);
+    row.style.setProperty('--share', `${share}%`);
+    row.title = `${share}% of ${span}'s costs`;
+    const name = document.createElement('span');
+    name.textContent = COST_NAMES[kind] ?? kind;
+    const detail = document.createElement('span');
+    detail.className = 'inspector-row-detail';
+    detail.textContent = `${money(amount)}${perDay ? '/d' : ''}`;
+    row.append(name, detail);
+    rows.append(row);
+  }
+  return rows;
+}
+
 const COST_NAMES: Record<string, string> = {
   fuel: 'Fuel',
   blockNonFuel: 'Flying (crews, maintenance)',
@@ -76,7 +191,7 @@ const COST_NAMES: Record<string, string> = {
   lease: 'Leases',
   crew: 'Crews on standby',
   slots: 'Slot fees',
-  maintenance: 'Expedited repairs',
+  maintenance: 'Checks and repairs',
   overhead: 'Network overhead',
   innovations: 'Innovations',
   executives: 'Executives',
@@ -103,6 +218,38 @@ export function buildMoneyView(state: SimState): HTMLElement {
 
   const history = state.cashHistory;
   if (history.length > 1) root.append(cashChart(history), line(`Closing cash · ${history.length}d · dashed $0`, 'inspector-line goal-ahead'));
+
+  const margin = networkMargin(state);
+  if (margin) {
+    const trend = trendMark(margin.flying, margin.previousFlying);
+    root.append(
+      heading('Margin · 7d'),
+      lineWithInfo(
+        `Flying ${percentText(margin.flying)}${trend ? ` ${trend}` : ''} · all-in ${percentText(margin.allIn)} · ${shortMoney(margin.revenuePerDay)}/day revenue`,
+        'Flying margin is what the routes keep of their revenue over the last 7 days: revenue less what the flights cost. All-in also takes leases, overhead and checks. The week smooths out which flights landed before midnight and when a check fell due, so two weeks compare fairly and a small airline reads like a large one. Below 0% loses money, 0–10% is thin, above is healthy.',
+        `inspector-line is-${marginBand(margin.flying) === 'poor' ? 'over' : 'good'}`,
+      ),
+      line(
+        `Upkeep ${margin.upkeepPerDay >= 0 ? '−' : '+'}${shortMoney(Math.abs(margin.upkeepPerDay))}/day · leases, overhead, checks${margin.paidShare > 0.005 ? ` · ${percentText(margin.paidShare)} paid by contracts and events` : ''}`,
+        'inspector-line goal-ahead',
+      ),
+    );
+    const costs = costWeek(state);
+    if (costs) {
+      root.append(
+        lineWithInfo(
+          `Checks and repairs ${shortMoney(costs.checksPerDay)}/day${costs.spikeDays > 0 ? ` · ${costs.spikeDays} spike day${costs.spikeDays === 1 ? '' : 's'}` : ''}`,
+          'Contracted checks, engine shop visits and expedited repairs land on the day they happen, so one day can lose $10–28k that the other days do not. They are inside all-in margin and the daily bars, and kept out of the routes\' flying margin and each route\'s margin. A spike day here is one that cost more than three times the week\'s daily average.',
+          'inspector-line goal-ahead',
+        ),
+      );
+    }
+    const trendLine = marginTrend(state);
+    if (trendLine.length > 1) root.append(marginChart(trendLine), line(`7-day flying margin · ${trendLine.length}d · dashed 0%`, 'inspector-line goal-ahead'));
+    root.append(heading('By hub'), groupTable(state, 'hub'), heading('By sector'), groupTable(state, 'sector'));
+    const best = extremes(state);
+    if (best) root.append(heading('Best and worst routes · 7d'), best);
+  }
 
   const units = unitEconomicsHistory(state);
   if (units.length > 1) {
@@ -153,26 +300,19 @@ export function buildMoneyView(state: SimState): HTMLElement {
 
   const costs = Object.entries(state.todayCostByCategory)
     .filter(([, amount]) => (amount ?? 0) > 0.5)
-    .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0));
-  root.append(heading('Costs today'));
-  const rows = document.createElement('div');
-  rows.className = 'inspector-rows';
-  const total = costs.reduce((sum, [, amount]) => sum + (amount ?? 0), 0);
-  for (const [kind, amount] of costs) {
-    const row = document.createElement('div');
-    row.className = 'inspector-row cost-row';
-    // Each row's share of the day's costs, drawn behind it so the shape reads at a glance.
-    const share = Math.round(((amount ?? 0) / total) * 100);
-    row.style.setProperty('--share', `${share}%`);
-    row.title = `${share}% of today's costs`;
-    const name = document.createElement('span');
-    name.textContent = COST_NAMES[kind] ?? kind;
-    const detail = document.createElement('span');
-    detail.className = 'inspector-row-detail';
-    detail.textContent = money(amount ?? 0);
-    row.append(name, detail);
-    rows.append(row);
+    .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0)) as [string, number][];
+  const costsWeek = costWeek(state);
+  if (costsWeek) {
+    root.append(
+      heading(`Costs · ${costsWeek.days}d average a day`),
+      costRows(
+        costsWeek.perDay.map((row) => [row.kind, row.amount] as [string, number]),
+        `the last ${costsWeek.days} days`,
+        true,
+      ),
+    );
   }
-  root.append(costs.length > 0 ? rows : line('None yet'));
+  root.append(heading('Costs today'));
+  root.append(costs.length > 0 ? costRows(costs, 'today') : line('None yet'));
   return root;
 }

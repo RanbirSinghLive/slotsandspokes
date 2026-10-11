@@ -566,6 +566,7 @@ export function rollDailyContracts(state: SimState): void {
       state.todayRevenue += payment;
       state.todayMargin += payment;
       state.todayRevenueByMarket[key] = (state.todayRevenueByMarket[key] ?? 0) + payment;
+      (state.todayBonusByMarket ??= {})[key] = (state.todayBonusByMarket[key] ?? 0) + payment;
       contract.paidTotal += payment;
     }
 

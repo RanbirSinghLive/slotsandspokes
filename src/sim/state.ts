@@ -565,6 +565,31 @@ export type SimState = {
   revenueHistoryByMarket: Record<string, number[]>;
   costHistoryByMarket: Record<string, number[]>;
   /**
+   * Contract pay and event premiums booked today, by market: the slice of
+   * `todayRevenueByMarket` a buyer chose to pay rather than passengers.
+   * Reset at rollover into `bonusHistoryByMarket`, so a route's margin can
+   * be shown with and without it. Optional: made on first use.
+   */
+  todayBonusByMarket?: Record<string, number>;
+  bonusHistoryByMarket?: Record<string, number[]>;
+  /**
+   * Network totals of the market figures, one entry per finished day in
+   * step with `revenueHistory`: revenue and margin summed over every
+   * market flown that day, and the contract and event part of it. A route
+   * dropped from the schedule leaves the per-market arrays, so the network
+   * margin (sim/networkMargin.ts) reads these instead of summing them.
+   * Optional: made on first use, so an older save starts from now.
+   */
+  routeRevenueHistory?: number[];
+  routeMarginHistory?: number[];
+  bonusRevenueHistory?: number[];
+  /**
+   * Each finished day's cost by kind (`todayCostByCategory`'s keys), a
+   * window like `costHistory`, for the Money page's costs over a week and
+   * its checks-and-repairs line. Optional: made on first use.
+   */
+  costHistoryByCategory?: Record<string, number[]>;
+  /**
    * The market's fuel price index (sim/fuel.ts, sim/fuelPrice.ts): 1.0
    * is baseline, and a flight's fuel-sensitive cost slice scales with it.
    * Moves daily, spikes with a fuel shock (sim/shocks.ts). Rivals pay it;

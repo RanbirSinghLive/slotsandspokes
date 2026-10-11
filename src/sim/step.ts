@@ -231,6 +231,7 @@ export function step(state: SimState): void {
     // with them for the same reason as todayCostByCategory above.
     state.todayRevenueByMarket = {};
     state.todayCostByMarket = {};
+    state.todayBonusByMarket = {};
     state.todayOnTimeByMarket = {};
     state.todayFlightsScheduled = 0;
     state.todayFlightsCancelled = 0;

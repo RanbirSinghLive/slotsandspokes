@@ -30,6 +30,13 @@ export function recordDailyPnlHistory(state: SimState): void {
   pushCapped(state.revenueHistory, state.todayRevenue);
   pushCapped(state.costHistory, state.todayCost);
   pushCapped(state.marginHistory, state.todayMargin);
+  const categories = (state.costHistoryByCategory ??= {});
+  for (const [kind, amount] of Object.entries(state.todayCostByCategory)) {
+    const history = (categories[kind] ??= []);
+    // A kind first seen late: pad so every kind's days line up with the network's.
+    while (history.length < state.costHistory.length - 1) history.push(0);
+    pushCapped(history, amount ?? 0);
+  }
 
   // Every market currently in the schedule gets an entry, even a zero
   // one — a route that flew nothing today (every flight cancelled, or it
@@ -46,6 +53,26 @@ export function recordDailyPnlHistory(state: SimState): void {
     // A market flown before fares were kept: pad (−1, "not known") so its fares line up with its margins.
     while (fares.length < state.revenueHistoryByMarket[key].length - 1) fares.push(-1);
     pushCapped(fares, state.routeSettings[key]?.fare ?? -1);
+  }
+
+  // The same day summed over every market, and its contract and event part:
+  // the network margin (sim/networkMargin.ts) reads these.
+  let routeRevenue = 0;
+  let routeMargin = 0;
+  let bonus = 0;
+  for (const key of new Set([...Object.keys(state.todayRevenueByMarket), ...Object.keys(state.todayCostByMarket)])) {
+    routeRevenue += state.todayRevenueByMarket[key] ?? 0;
+    routeMargin += (state.todayRevenueByMarket[key] ?? 0) - (state.todayCostByMarket[key] ?? 0);
+  }
+  for (const key of Object.keys(state.todayBonusByMarket ?? {})) bonus += state.todayBonusByMarket?.[key] ?? 0;
+  pushCapped((state.routeRevenueHistory ??= []), routeRevenue);
+  pushCapped((state.routeMarginHistory ??= []), routeMargin);
+  pushCapped((state.bonusRevenueHistory ??= []), bonus);
+  for (const key of activeMarkets) {
+    const history = ((state.bonusHistoryByMarket ??= {})[key] ??= []);
+    // A market flown before bonuses were kept: pad so its days line up with its margins.
+    while (history.length < state.revenueHistoryByMarket[key].length - 1) history.push(0);
+    pushCapped(history, state.todayBonusByMarket?.[key] ?? 0);
   }
 
   // The running totals the year one report reads (sim/yearReport.ts):
