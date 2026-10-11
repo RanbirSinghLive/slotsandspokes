@@ -2138,7 +2138,11 @@ balance lever for a weak home.
   book like connecting passengers (no share lost to rivals); the payment
   is half guaranteed on any day flown both ways and half earned by it
   (`paymentShare()`). Paid at rollover for the day before, into the
-  market's revenue.
+  market's revenue. A new contract is not judged for its first 14 days
+  (`GRACE_DAYS`): performance counts as full, so it pays in full, and
+  flown days leave the buyer's mood alone (a missed day still lowers it).
+  Completion is smoothed with ten imagined flights that all landed, so a
+  grounded day on a small sample dents the score instead of zeroing it.
 - **Satisfaction.** Each running contract has a buyer mood, 0 to 100,
   starting at 60. Every day it moves 1/30 of the way to the day's mark:
   the day's performance ×100, or 0 for a day not flown both ways. Face:

@@ -142,6 +142,10 @@ const NPS_NONE = -10;
 const GUARANTEED_SHARE = 0.5;
 /** Judged over two weeks, like a contract's monthly review, not flight by flight. */
 const JUDGED_DAYS = 14;
+/** A new contract is not judged until it has run this long, since the first two weeks of flying a worn plane say little about the route. */
+export const GRACE_DAYS = 14;
+/** Completion is smoothed with this many imagined flights that all landed, so one grounded day on a small sample does not zero the contract. */
+const COMPLETION_PRIOR_FLIGHTS = 10;
 
 type AirportSpec = { iata: string; population: number };
 const allIatas = (airportsData as AirportSpec[]).map((airport) => airport.iata);
@@ -178,16 +182,22 @@ function lerp01(value: number, none: number, full: number): number {
   return Math.min(1, Math.max(0, (value - none) / (full - none)));
 }
 
+/** The contract's first GRACE_DAYS: paid in full, and flown days neither lift nor lower the buyer's mood. */
+export function inGrace(state: SimState, contract: Contract): boolean {
+  return contract.startedDay !== undefined && dayIndex(state) - contract.startedDay < GRACE_DAYS;
+}
+
 /**
  * How well the route meets the contract's terms, 0 to 1: the worst of its
  * on-time, completion and NPS against the strict bars. Before there are
  * enough flights to judge, full.
  */
 export function performanceFactor(state: SimState, contract: Contract): number {
+  if (inGrace(state, contract)) return 1;
   const trailing = trailingMarketOtp(state, contract.a, contract.b, JUDGED_DAYS);
   const flights = trailing.arrived + trailing.cancelled;
   if (trailing.otp === null || flights === 0) return 1;
-  const completion = trailing.arrived / flights;
+  const completion = (trailing.arrived + COMPLETION_PRIOR_FLIGHTS) / (flights + COMPLETION_PRIOR_FLIGHTS);
   return Math.min(
     lerp01(trailing.otp, OTP_NONE, OTP_FULL),
     lerp01(completion, COMPLETION_NONE, COMPLETION_FULL),
@@ -548,7 +558,7 @@ export function rollDailyContracts(state: SimState): void {
     if (landedYesterday < 2 * frequencyOf(contract)) updateSatisfaction(contract, 0);
     if (landedYesterday >= 2 * frequencyOf(contract)) {
       const performance = performanceFactor(state, contract);
-      updateSatisfaction(contract, performance * 100);
+      if (!inGrace(state, contract)) updateSatisfaction(contract, performance * 100);
       contract.performanceSum = (contract.performanceSum ?? 0) + performance;
       contract.performanceDays = (contract.performanceDays ?? 0) + 1;
       const payment = Math.round(contract.paymentPerDay * paymentShare(performance));
