@@ -173,6 +173,7 @@ function settle(state: SimState, mandate: Mandate, amount: number): void {
   state.todayRevenue += amount;
   state.todayMargin += amount;
   state.todayRevenueByMarket[key] = (state.todayRevenueByMarket[key] ?? 0) + amount;
+  (state.todayBonusByMarket ??= {})[key] = (state.todayBonusByMarket[key] ?? 0) + amount;
   mandate.netTotal += amount;
 }
 

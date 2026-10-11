@@ -2,6 +2,9 @@ import { dayIndex } from '../sim/clock';
 import type { SimState } from '../sim/state';
 import { shortMoney } from './format';
 import { buildPnlCharts } from './pnlHistory';
+import { marginChip } from './marginChip';
+import { networkMargin } from '../sim/networkMargin';
+import { select } from './selection';
 
 /**
  * The P&L strip in the map's top-left corner: the last days as small bars,
@@ -26,7 +29,7 @@ let shown = '';
 let latest: SimState | null = null;
 
 function signature(state: SimState): string {
-  return `${dayIndex(state)}:${Math.round(state.todayMargin)}:${Math.round(state.todayRevenue)}`;
+  return `${dayIndex(state)}:${Math.round(state.todayMargin)}:${Math.round(state.todayRevenue)}:${state.routeRevenueHistory?.length ?? 0}`;
 }
 
 export function updateHudPnl(state: SimState): void {
@@ -51,7 +54,11 @@ export function updateHudPnl(state: SimState): void {
   const today = document.createElement('span');
   today.className = 'hud-pnl-today';
   today.textContent = `${state.todayMargin >= 0 ? '+' : ''}${shortMoney(state.todayMargin)} today`;
-  stripEl.replaceChildren(label, bars, today);
+  // The week's flying margin: the steady figure beside the day's noisy one.
+  const chip = marginChip(networkMargin(state));
+  chip.classList.add('hud-pnl-margin');
+  chip.addEventListener('click', () => select({ kind: 'money' }));
+  stripEl.replaceChildren(label, bars, today, chip);
   if (!cardEl.hidden) cardEl.replaceChildren(...buildPnlCharts(state));
 }
 

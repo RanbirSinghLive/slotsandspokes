@@ -24,6 +24,12 @@ const PATHS = {
   sortFifo: '<path d="M4 6h16M4 12h11M4 18h6"/><path d="M19 14v6M16.5 17.5 19 20l2.5-2.5"/>',
   sortLifo: '<path d="M4 6h6M4 12h11M4 18h16"/><path d="M19 10V4M16.5 6.5 19 4l2.5 2.5"/>',
   sortBest: '<path d="M10 3l1.8 5.2L17 10l-5.2 1.8L10 17l-1.8-5.2L3 10l5.2-1.8z"/><path d="M19 15v6M16 18h6"/>',
+  contract: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h7"/>',
+  event: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
+  sprout: '<path d="M12 21v-8"/><path d="M12 13c0-4-3-6-7-6 0 4 3 6 7 6z"/><path d="M12 15c0-3 2-5 6-5 0 3-2 5-6 5z"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
+  flag: '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
+  hub: '<circle cx="12" cy="12" r="3"/><path d="M12 9V3M12 15v6M9 12H3M15 12h6"/>',
   boarding: '<path d="M4 12h12M11 6l6 6-6 6"/><path d="M20 4v16"/>',
 } as const;
 

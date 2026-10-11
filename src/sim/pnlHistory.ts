@@ -48,6 +48,26 @@ export function recordDailyPnlHistory(state: SimState): void {
     pushCapped(fares, state.routeSettings[key]?.fare ?? -1);
   }
 
+  // The same day summed over every market, and its contract and event part:
+  // the network margin (sim/networkMargin.ts) reads these.
+  let routeRevenue = 0;
+  let routeMargin = 0;
+  let bonus = 0;
+  for (const key of new Set([...Object.keys(state.todayRevenueByMarket), ...Object.keys(state.todayCostByMarket)])) {
+    routeRevenue += state.todayRevenueByMarket[key] ?? 0;
+    routeMargin += (state.todayRevenueByMarket[key] ?? 0) - (state.todayCostByMarket[key] ?? 0);
+  }
+  for (const key of Object.keys(state.todayBonusByMarket ?? {})) bonus += state.todayBonusByMarket?.[key] ?? 0;
+  pushCapped((state.routeRevenueHistory ??= []), routeRevenue);
+  pushCapped((state.routeMarginHistory ??= []), routeMargin);
+  pushCapped((state.bonusRevenueHistory ??= []), bonus);
+  for (const key of activeMarkets) {
+    const history = ((state.bonusHistoryByMarket ??= {})[key] ??= []);
+    // A market flown before bonuses were kept: pad so its days line up with its margins.
+    while (history.length < state.revenueHistoryByMarket[key].length - 1) history.push(0);
+    pushCapped(history, state.todayBonusByMarket?.[key] ?? 0);
+  }
+
   // The running totals the year one report reads (sim/yearReport.ts):
   // every market that earned, cost or carried anything today.
   if (!state.marketTotals) state.marketTotalsSinceDay = dayIndex(state);

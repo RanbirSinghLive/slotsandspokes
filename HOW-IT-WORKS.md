@@ -1237,7 +1237,20 @@ Under the ops board: the last 10 finished days as small bars, green for
 a day that made money and red for one that lost it, tallest for the
 biggest either way, then today's running margin ("−$4k today").
 Hovering it opens the full Revenue, Cost and Margin chart, built by the
-same `buildPnlCharts()` as the Overview's Last 7 days.
+same `buildPnlCharts()` as the Overview's Last 7 days. A margin chip at
+its right end shows the week's flying margin (see "Margin: the week, not
+the day"); clicking it opens Money.
+
+## Margin: the week, not the day (`src/sim/networkMargin.ts`)
+
+One day's profit is noisy: a flight landing after midnight books to the next day, a contract's performance moves its pay and its riders, an event premium lands in a lump, and a check falls due on one day. So the pages that judge the network read a 7-day window.
+
+- **Flying margin** = the routes' revenue less what their flights cost, over their revenue, last 7 finished days. **All-in** takes the whole airline's profit (leases, overhead, checks) over its revenue. The gap shows as "Upkeep" on the Money page. Below 0% is red, 0 to 10% amber, above green. The arrow compares with the 7 days before.
+- **Paid by buyers** is the share of route revenue that is contract pay and event premiums (`todayBonusByMarket`, booked in `contracts.ts` and `mandates.ts`), so a network held up by subsidy can be told apart from one that earns it.
+- The sim keeps network totals per finished day (`routeRevenueHistory`, `routeMarginHistory`, `bonusRevenueHistory`) beside the per-market arrays, because a route dropped from the schedule leaves the per-market arrays and would shrink a sum. Saves from before have none of them and read "—" until 3 days have closed.
+- **Routes page:** the Margin column is the 7-day average a day with a 14-day sparkline (dashed = $0) and an arrow against the week before; yesterday's figure is in the tooltip. Tags: contract, event, and a sprout for a route with under 14 days of history. "All / Hub / Sector" groups the table: a route's hub is its end with more routes (home airport on a tie), sector is domestic when both ends are in the home country. Group headers sum their routes and collapse by hand; they start closed once there are more than 12 routes. The choice is remembered in the browser only.
+- **Overview and HUD:** a Margin card and a chip on the P&L strip show the flying margin. **Money** adds the margin line, the 7-day margin chart, tables by hub and by sector, and the three best and three worst routes of the week.
+- Test: `npm run margintest`.
 
 ## The ops board (`src/ui/opsBoard.ts`)
 
