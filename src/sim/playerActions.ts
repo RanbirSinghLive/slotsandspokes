@@ -103,6 +103,7 @@ import { rebaseOptions, rebasePlane, type RebaseOption } from './rebase';
 import { cabinGainPerDay, cabinOf, cancelRefit as cancelRefitRule, orderRefit as orderRefitRule, refitBlockedReason, refitCost, refitDays, type Cabin } from './cabins';
 import { commitBringHome, commitRetime, planBringHome, planRetime, type RetimePlan } from './retime';
 import { commitDraft, conflictingLegIds, planDrop, snapStart, type DraftMove, type DropPlan } from './scheduleDraft';
+import { planSort, type SortMode, type SortPlan } from './scheduleSort';
 import { daysUntilNextListing, listingsOf, returnBlockedReason, returnFee, returnLease, takeListing, type MarketListing } from './market';
 import { airlineCalled, classOpen, tierThatOpens } from './ladder';
 import { actualDailyDemand, currentPotentialDemand } from './marketDemand';
@@ -672,7 +673,12 @@ export function overlappingLegs(state: SimState): Set<string> {
   return conflictingLegIds(state);
 }
 
-export type { DraftMove, DropPlan };
+/** One-click re-sort of the planes' rotations: FIFO, LIFO or optimise (sim/scheduleSort.ts). A list of moves for the draft. */
+export function planFleetSort(state: SimState, mode: SortMode): SortPlan {
+  return planSort(state, mode);
+}
+
+export type { DraftMove, DropPlan, SortMode };
 
 /** Every other crew base a plane could ferry to (sim/rebase.ts), with its cost and crews there. */
 export function rebaseOptionsFor(state: SimState, tail: string): { blocked: string | null; options: RebaseOption[] } {
