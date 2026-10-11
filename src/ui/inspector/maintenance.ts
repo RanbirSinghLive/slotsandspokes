@@ -75,7 +75,7 @@ export function buildMaintenanceView(state: SimState, changed: () => void): HTML
     }
   }
 
-  root.append(...buildHangar(state, changed), ...buildDueTimeline(state), ...buildFleetBoard(state, changed));
+  root.append(...buildHangar(state, changed), ...buildDueTimeline(state, changed), ...buildFleetBoard(state, changed));
   root.append(...buildMxBases(state, changed));
   return root;
 }
@@ -171,6 +171,42 @@ function confirmHeavyBooking(state: SimState, plane: HeavyCheckReadout, changed:
   });
 }
 
+/** The plane whose puck on the due axis is open, kept across redraws. */
+let openPuck: string | null = null;
+
+/**
+ * What a puck offers: induct the C check now (the booking), or push it
+ * later by 1, 5 or 15 days for a fee, to spread checks that fall together.
+ */
+function puckMenu(state: SimState, plane: HeavyCheckReadout, changed: () => void): HTMLElement {
+  const menu = box('mx-puck-menu');
+  menu.append(box('mx-puck-who', `${plane.tail} · ${plane.dueIn > 0 ? `due ${plane.dueIn}d` : `${-plane.dueIn}d over`}${plane.shiftDays > 0 ? ` · +${plane.shiftDays}d` : ''}`));
+  const action = (label: string | HTMLElement, tip: string | null, run: () => void, ready: boolean): HTMLButtonElement => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'mx-puck-action';
+    button.append(label);
+    button.disabled = !ready;
+    if (tip) button.dataset.tip = tip;
+    button.addEventListener('click', run);
+    return button;
+  };
+  const induct = plane.booked
+    ? action(glyph('wrench'), 'C booked · tomorrow', () => undefined, false)
+    : action(glyph('wrench'), plane.canBook ? 'Induct now · books it for tomorrow' : (plane.bookBlocker ?? `Opens ${HEAVY_WINDOW_DAYS}d before due`), () => confirmHeavyBooking(state, plane, changed), plane.canBook);
+  induct.append(' induct');
+  menu.append(induct);
+  for (const step of plane.tolerance) {
+    menu.append(
+      action(`+${step.days}d · ${money(step.cost)}`, step.blocker ?? `Push the C check ${step.days}d later for ${money(step.cost)}`, () => {
+        ops.toleranceHeavyCheck(state, plane.tail, step.days);
+        changed();
+      }, step.blocker === null),
+    );
+  }
+  return menu;
+}
+
 /** The timeline's reach: the longest wait to a heavy check is its whole interval. */
 const TIMELINE_DAYS = HEAVY_INTERVAL_DAYS;
 
@@ -180,7 +216,7 @@ const TIMELINE_DAYS = HEAVY_INTERVAL_DAYS;
  * the hangar shows as a cluster. Markers that would overlap take a lane
  * of their own.
  */
-function buildDueTimeline(state: SimState): HTMLElement[] {
+function buildDueTimeline(state: SimState, changed: () => void): HTMLElement[] {
   const nodes: HTMLElement[] = [
     heading('C checks due', `Each plane's C check on a ${TIMELINE_DAYS}-day axis (due by days, hours or cycles, whichever is first), today at the left. The amber band is the window where nights at a maintenance base bank hours; a cluster of markers is planes that will want the hangar together. Overdue planes sit at the left edge.`),
   ];
@@ -200,10 +236,17 @@ function buildDueTimeline(state: SimState): HTMLElement[] {
     let lane = laneEnds.findIndex((end) => at - end >= MARKER_SPAN_PCT);
     if (lane === -1) lane = laneEnds.length;
     laneEnds[lane] = at;
-    const marker = box(`mx-marker${plane.dueIn <= 0 ? ' is-late' : plane.open ? ' is-open' : ''}`, plane.tail.slice(-4));
+    const marker = document.createElement('button');
+    marker.type = 'button';
+    marker.className = `mx-marker${plane.dueIn <= 0 ? ' is-late' : plane.open ? ' is-open' : ''}${plane.tail === openPuck ? ' is-picked' : ''}`;
+    marker.textContent = plane.tail.slice(-4);
+    marker.addEventListener('click', () => {
+      openPuck = openPuck === plane.tail ? null : plane.tail;
+      changed();
+    });
     marker.style.left = `${at}%`;
     marker.style.top = `${lane * 18 + 2}px`;
-    marker.title = `${plane.tail} · ${plane.dueIn > 0 ? `due ${plane.dueIn}d` : `${-plane.dueIn}d overdue`}`;
+    marker.dataset.tip = `${plane.tail} · ${plane.dueIn > 0 ? `due ${plane.dueIn}d` : `${-plane.dueIn}d overdue`}${plane.shiftDays > 0 ? ` · pushed ${plane.shiftDays}d` : ''} · tap for options`;
     axis.append(marker);
   }
   axis.style.height = `${laneEnds.length * 18 + 6}px`;
@@ -214,6 +257,8 @@ function buildDueTimeline(state: SimState): HTMLElement[] {
     ticks.append(tick);
   }
   nodes.push(axis, ticks);
+  const picked = readouts.find((plane) => plane.tail === openPuck);
+  if (picked) nodes.push(puckMenu(state, picked, changed));
   return nodes;
 }
 

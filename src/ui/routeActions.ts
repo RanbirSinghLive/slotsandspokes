@@ -48,6 +48,7 @@ export {
   refitOptionFor,
   heavyCheckReadouts,
   bookHeavyCheck,
+  toleranceHeavyCheck,
   cancelBookedCheck,
   bookDCheck,
   engineReadouts,

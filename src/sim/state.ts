@@ -96,6 +96,8 @@ export type Aircraft = {
   /** Airborne minutes flown since the last heavy check (sim/mxChecks.ts). Absent: none counted yet. */
   /** The player booked its C check: it goes in the next morning. */
   heavyCheckBooked?: boolean;
+  /** Days its C check was pushed later by paid tolerance (sim/mxChecks.ts). Absent: none. */
+  heavyShiftDays?: number;
   flightMinutesSinceHeavy?: number;
   /** Takeoff-and-landing cycles since the last heavy check (sim/mxChecks.ts). Absent: none counted yet. */
   cyclesSinceHeavy?: number;

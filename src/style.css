@@ -5254,6 +5254,13 @@ button.ops-item:hover {
   cursor: default;
 }
 
+.mx-marker {
+  border: 0;
+  font-weight: inherit;
+  cursor: pointer;
+}
+
+.mx-marker.is-picked { outline: 2px solid #e6e9f2; }
 .mx-marker.is-open { background: #ffb347; }
 .mx-marker.is-late { background: #ff8080; }
 
@@ -6034,4 +6041,33 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
     padding: 6px 10px;
     margin: -6px -4px -6px 2px;
   }
+}
+
+.mx-puck-menu {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+}
+
+.mx-puck-who { color: #e6e9f2; margin-right: 4px; }
+
+.mx-puck-action {
+  padding: 3px 8px;
+  font: inherit;
+  color: #ffb347;
+  background: #0e1016;
+  border: 1px solid rgba(255, 179, 71, 0.5);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.mx-puck-action svg { width: 12px; height: 12px; vertical-align: -2px; }
+.mx-puck-action:disabled { color: #7c869c; border-color: rgba(255, 255, 255, 0.12); cursor: default; }
+
+@media (pointer: coarse) {
+  .mx-puck-action { padding: 8px 12px; }
 }
