@@ -37,7 +37,8 @@
     "orderstest": "tsx src/sim/orders.test.ts",
     "crisistest": "tsx src/sim/crisis.test.ts",
     "standingtest": "tsx src/sim/standing.test.ts",
-    "sorttest": "tsx src/sim/scheduleSort.test.ts"
+    "sorttest": "tsx src/sim/scheduleSort.test.ts",
+    "margintest": "tsx src/sim/networkMargin.test.ts"
   },
   "devDependencies": {
     "@types/d3-geo": "^3.1.0",

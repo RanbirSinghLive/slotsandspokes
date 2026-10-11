@@ -6269,3 +6269,116 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
   color: #6b7488;
   text-align: right;
 }
+
+/* Margin figures: sparkline, trend arrow, tags and groups (ui/sparkline.ts, ui/marginChip.ts, ui/inspector/routes.ts). */
+.sparkline {
+  vertical-align: middle;
+}
+.sparkline-zero {
+  stroke: rgba(255, 255, 255, 0.18);
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+}
+.sparkline-line {
+  fill: none;
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.sparkline-line.is-up {
+  stroke: #7ed6a8;
+}
+.sparkline-line.is-down {
+  stroke: #ff8080;
+}
+.route-tags {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: 5px;
+  vertical-align: middle;
+}
+.route-tags .glyph {
+  width: 11px;
+  height: 11px;
+  color: #9aa3b8;
+}
+.route-tags .glyph svg {
+  width: 100%;
+  height: 100%;
+}
+.route-group-row td {
+  background: rgba(255, 255, 255, 0.04);
+  font-weight: 600;
+  cursor: pointer;
+}
+.route-group-row .glyph {
+  width: 12px;
+  height: 12px;
+  margin-right: 4px;
+  vertical-align: -2px;
+}
+.route-group-row .glyph svg {
+  width: 100%;
+  height: 100%;
+}
+.route-group-caret {
+  display: inline-block;
+  width: 10px;
+  color: #9aa3b8;
+}
+.routes-grouping {
+  display: flex;
+  gap: 4px;
+  margin: 4px 0 6px;
+}
+.routes-grouping button {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: #9aa3b8;
+  font: inherit;
+  font-size: 11px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.routes-grouping button.is-active {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+.margin-chip {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.margin-chip.is-good {
+  color: #7ed6a8;
+}
+.margin-chip.is-fair {
+  color: #ffd166;
+}
+.margin-chip.is-poor {
+  color: #ff8080;
+}
+.money-group-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.money-group-table td,
+.money-group-table th {
+  padding: 3px;
+  text-align: right;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  white-space: nowrap;
+}
+.money-group-table td:first-child,
+.money-group-table th:first-child {
+  text-align: left;
+}
+.hud-pnl-margin {
+  margin-left: 6px;
+  cursor: pointer;
+}
+.routes-scroll {
+  overflow-x: auto;
+}
