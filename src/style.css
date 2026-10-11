@@ -5851,3 +5851,9 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
   margin: 10px 0 4px;
   font-size: 12px;
 }
+
+.powertrain-mark {
+  margin-left: 2px;
+  font-size: 10px;
+  color: #ffb347;
+}

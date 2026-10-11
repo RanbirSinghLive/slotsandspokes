@@ -1,6 +1,6 @@
 import { ancillaryPerPassenger, ancillaryPriceDrag } from './ancillaries';
 import { LOAD_FACTOR, RECAPTURE_RATE } from './economy';
-import { executiveLoadFactorBonus, executiveYieldMultiplier, executiveCrewTrainingMultiplier } from './executives';
+import { executiveYieldMultiplier, executiveCrewTrainingMultiplier } from './executives';
 import { airlineCalled, LADDER, tiersClimbed } from './ladder';
 import { brandEdge, nameYieldMultiplier } from './nps';
 import { positionEdge } from './brand';
@@ -123,8 +123,8 @@ export const INNOVATIONS: Innovation[] = [
   {
     id: 'crew-academy',
     name: 'Crew academy',
-    summary: 'Hiring and retraining 2× faster',
-    description: `Train your own crews: hiring and retraining them take half the time, so a new plane or a new type is crewed sooner.`,
+    summary: 'Hiring 2× faster',
+    description: `Train your own crews: hiring them takes half the time, so a new plane is crewed sooner. Retraining stays with the chief people officer.`,
     openedBy: 'start-up',
     oneOffPrice: 150_000,
     runningCost: null,
@@ -237,7 +237,7 @@ export function bookingPerks(state: SimState, origin: string, dest: string): Boo
 /** The share of its seats a plane of this airline can sell: the base, spoilage management levels, and a CCO, never past the ceiling. */
 export function loadFactorCap(state: SimState): number {
   const levels = SPOILAGE_LEVELS.filter((id) => isAdopted(state, id)).length;
-  return Math.min(LOAD_FACTOR_CEILING, LOAD_FACTOR + levels * SPOILAGE_STEP + executiveLoadFactorBonus(state));
+  return Math.min(LOAD_FACTOR_CEILING, LOAD_FACTOR + levels * SPOILAGE_STEP);
 }
 
 /** How much of the money on the table the loyalty scheme keeps from rivals, 0 without one. */
@@ -269,9 +269,14 @@ export function runningCostForDay(state: SimState, dayRevenue: number): number {
   return INNOVATIONS.filter((innovation) => isAdopted(state, innovation.id)).reduce((sum, innovation) => sum + runningCostOf(innovation.id, dayRevenue), 0);
 }
 
-/** Hiring and retraining crews take this share of their usual time (sim/crews.ts). */
-export function crewTrainingTimeFactor(state: SimState): number {
-  return (isAdopted(state, 'crew-academy') ? CREW_ACADEMY_TIME_FACTOR : 1) * executiveCrewTrainingMultiplier(state);
+/** Hiring crews takes this share of its usual time: the academy's lever (sim/crews.ts). */
+export function crewHireTimeFactor(state: SimState): number {
+  return isAdopted(state, 'crew-academy') ? CREW_ACADEMY_TIME_FACTOR : 1;
+}
+
+/** Retraining crews takes this share of its usual time: the crew executive's lever (sim/crews.ts). */
+export function crewRetrainTimeFactor(state: SimState): number {
+  return executiveCrewTrainingMultiplier(state);
 }
 
 /** Network overhead is multiplied by this (sim/overhead.ts). */
