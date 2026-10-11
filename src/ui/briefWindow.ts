@@ -1,4 +1,5 @@
 import { briefSettings, buildDailyBrief, buildSeasonReview, dailyBriefDue, markSeasonReviewShown, seasonReviewDue, setBriefSetting, type BriefSettings, type DailyBrief, type SeasonReview } from '../sim/briefs';
+import { mountFleetOrders } from './orders';
 import type { SimState } from '../sim/state';
 import { select } from './selection';
 import { shortMoney } from './format';
@@ -249,6 +250,7 @@ export function syncBriefSettings(): void {
   document.querySelector<HTMLInputElement>('#brief-setting-season')!.checked = settings.season;
   document.querySelector<HTMLInputElement>('#brief-setting-pause')!.checked = settings.seasonPause;
   document.querySelector<HTMLInputElement>('#brief-setting-call')!.checked = settings.callPause;
+  mountFleetOrders(stateRef);
 }
 
 /** Drag by the header with a mouse or pen; on touch the window stays docked above the tab strip. */

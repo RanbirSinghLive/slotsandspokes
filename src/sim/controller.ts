@@ -3,6 +3,7 @@ import { dayStartMinute } from './clock';
 import { LATE_MINUTES, mandatedLeg, mandateIsActive, mandatesOf } from './mandates';
 import { MIN_TURN_MINUTES, marketKey, type ScheduleLeg } from './schedule';
 import { isAog } from './aog';
+import { orderFor } from './orders';
 import { nightStopStation } from './nightStops';
 import { recordCancellation } from './step';
 import { rotationsForTail, type Rotation } from './utilisation';
@@ -67,7 +68,7 @@ export function cancellableRotations(state: SimState, tail: string): Rotation[] 
 }
 
 /** Recent revenue a flight on this leg's market brings in: the market's average day over the flights it has a day. */
-function revenuePerFlight(state: SimState, leg: ScheduleLeg): number {
+export function revenuePerFlight(state: SimState, leg: ScheduleLeg): number {
   const history = (state.revenueHistoryByMarket[marketKey(leg.origin, leg.dest)] ?? []).slice(-REVENUE_DAYS);
   if (history.length === 0) return 0;
   const perDay = history.reduce((sum, value) => sum + value, 0) / history.length;
@@ -279,7 +280,7 @@ export const LATE_CALL_MINUTES = 90;
 const OVERDUE_MINUTES = 20;
 const KIND_ORDER: CallKind[] = ['curfew', 'event', 'late'];
 
-export function callsNeeded(state: SimState): Call[] {
+export function callsNeeded(state: SimState, includeOrdered = false): Call[] {
   const dayStart = dayStartMinute(state);
   const handled = new Set([...state.completedToday, ...state.cancelledToday, ...(state.retimedToday ?? [])]);
   const mandatedIds = new Set<string>();
@@ -292,6 +293,8 @@ export function callsNeeded(state: SimState): Call[] {
   const calls: Call[] = [];
   for (const aircraft of state.aircraft) {
     if (aircraft.status !== 'ground') continue;
+    // 'auto' and 'protect' planes are never put to the player (sim/orders.ts); the order pass asks for them with includeOrdered.
+    if (!includeOrdered && orderFor(state, aircraft.tail) !== 'ask') continue;
     const overdue = state.schedule.some(
       (leg) => leg.tail === aircraft.tail && !handled.has(leg.legId) && state.simMinute - (dayStart + leg.departMinute) >= OVERDUE_MINUTES,
     );
