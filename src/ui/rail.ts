@@ -6,7 +6,7 @@ import { scheduleProblems } from './panels';
 import * as ops from './routeActions';
 import { RUNWAY_WARN_DAYS } from './runway';
 import { getSelection, select, type Selection } from './selection';
-import { contractsOf, faceOf } from '../sim/contracts';
+import { contractsOf, faceOf, takeoverOpen } from '../sim/contracts';
 import { anyEntryShort } from '../sim/crewPlan';
 
 /**
@@ -21,7 +21,7 @@ import { anyEntryShort } from '../sim/crewPlan';
  *     plane on its way that would enter service short, amber),
  *     a route that lost money yesterday (Routes, amber), cash running out
  *     within a month (Money, red), a running contract whose buyer is sad
- *     (Contracts, amber);
+ *     (Contracts, amber; red once a rival circles it);
  *   - something new since the screen was last open, like unread mail: a
  *     milestone met (Goals, green), a rival on one of your markets
  *     (Rivals, amber), an executive or innovation newly on
@@ -114,7 +114,7 @@ function conditions(state: SimState): Partial<Record<Screen, Dot>> {
     fleet: fleetBad ? 'bad' : null,
     crews,
     maintenance: state.aogs.length > 0 ? 'bad' : null,
-    contracts: contractsOf(state).some((c) => c.status === 'active' && faceOf(c) === 'sad') ? 'warn' : null,
+    contracts: contractsOf(state).some(takeoverOpen) ? 'bad' : contractsOf(state).some((c) => c.status === 'active' && faceOf(c) === 'sad') ? 'warn' : null,
     routes: losing ? 'warn' : null,
     money: runway !== null && runway <= RUNWAY_WARN_DAYS ? 'bad' : null,
   };

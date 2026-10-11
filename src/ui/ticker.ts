@@ -710,7 +710,7 @@ let seenContracts: Map<number, string> | undefined;
 
 /** Contracts: offered, started, renewed, ended (with the snap-back), or lapsed. */
 function pollContractEvents(state: SimState): void {
-  const now = new Map(contractsOf(state).map((c) => [c.id, `${c.status}:${c.renewals ?? 0}`]));
+  const now = new Map(contractsOf(state).map((c) => [c.id, `${c.status}:${c.renewals ?? 0}:${c.takeoverEndsDay ?? ''}`]));
   if (seenContracts) {
     for (const c of contractsOf(state)) {
       const before = seenContracts.get(c.id);
@@ -726,10 +726,16 @@ function pollContractEvents(state: SimState): void {
           { kind: 'contracts' },
           true,
         );
+      } else if (c.status === 'active' && c.takeoverEndsDay !== undefined) {
+        pushEvent(state.simMinute, 'CONTRACT', `${market} buyer sad · ${c.takeoverBy ?? 'a rival'} circling · fix it by day ${c.takeoverEndsDay}`, { kind: 'contracts' }, true);
       } else if (c.status === 'active' && before?.startsWith('offered')) {
         pushEvent(state.simMinute, 'CONTRACT', `${market} contract started · ends day ${c.endsDay}`, route);
+      } else if (c.status === 'active' && before?.split(':')[1] === String(c.renewals ?? 0)) {
+        pushEvent(state.simMinute, 'CONTRACT', `${market} rival stood down`, route);
       } else if (c.status === 'active') {
         pushEvent(state.simMinute, 'CONTRACT', `${market} renewed · ${shortMoney(c.paymentPerDay)}/day to day ${c.endsDay}`, route);
+      } else if (c.status === 'ended' && c.lostTo) {
+        pushEvent(state.simMinute, 'CONTRACT', `${market} taken by ${c.lostTo} · demand −${Math.round(SNAP_BACK_SHARE * 100)}%`, route);
       } else if (c.status === 'ended') {
         pushEvent(state.simMinute, 'CONTRACT', `${market} contract over · demand −${Math.round(SNAP_BACK_SHARE * 100)}%`, route);
       } else if (c.status === 'lapsed') {

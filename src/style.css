@@ -6118,6 +6118,10 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
   white-space: nowrap;
 }
 
+.contract-chip.is-over {
+  color: #ff6b6b;
+}
+
 .contract-face {
   font-size: 20px;
   line-height: 1;

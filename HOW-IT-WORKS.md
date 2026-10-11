@@ -2142,8 +2142,18 @@ balance lever for a weak home.
 - **Satisfaction.** Each running contract has a buyer mood, 0 to 100,
   starting at 60. Every day it moves 1/30 of the way to the day's mark:
   the day's performance ×100, or 0 for a day not flown both ways. Face:
-  happy from 70, neutral to 40, sad below. Sad days are counted for the
-  takeover window (not built yet).
+  happy from 70, neutral to 40, sad below. Sad days in a row
+  are counted for the takeover.
+- **Takeover.** After 14 sad days in a row, if a rival could bid on the
+  market (`eligibleRivals()`), one is drawn and circles it for a 14-day
+  window (`takeoverEndsDay`, `takeoverBy`). The window closes if the mood
+  climbs back to neutral. The airline can also keep the contract by
+  cutting its pay 10%, 20% or 30% (`counterTakeover()`): the cut stays
+  through renewals (the base pay drops too) and the sad count restarts.
+  If the buyer is still sad when the window ends, the rival takes the
+  contract at the full rate: it ends with `lostTo` set, the market's built
+  demand drops 40%, and the rival opens the market or adds a flight there.
+  The game does not pause for it.
 - **Renewal, graduation or the snap-back.** In the last 30 days of a
   term the buyer's terms show (`renewalTerms()`): the first term's pay
   (not compounded from earlier renewals) × a mood multiplier (−25% at
@@ -2170,7 +2180,9 @@ balance lever for a weak home.
   tap. Also CONTRACT lines in the ticker, a line in the route and airport
   views, and a dashed gold line and ring under the Demand lens. The
   Contracts rail dot is green for a new tender (opening the screen reads
-  it) and amber while a running contract's buyer is sad. A new offer is
+  it) and amber while a running contract's buyer is sad, red once a rival circles
+  it (a ⚔ chip with the rival and days left, and three cut buttons on the
+  card; a ticker line opens Contracts). A new offer is
   news to act on, so its ticker line ("New contract · YHZ–YSJ · $9k/day ·
   93d · take by day 30") scrolls first, bright, its tag pulsing, for 90
   seconds or until clicked; clicking opens Contracts.
