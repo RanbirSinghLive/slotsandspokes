@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createPlayer } from '../headless/player';
 import { startHeadlessGame } from '../headless/newGame';
-import { flownMarkets, networkMargin, routeGroups, routeMarginShare, routeTags, routeWeek } from './networkMargin';
+import { costWeek, flownMarkets, networkMargin, routeGroups, routeMarginShare, routeTags, routeWeek } from './networkMargin';
 import { step } from './step';
 
 // Run with `npm run margintest`: the week's margin figures add up to the
@@ -46,11 +46,20 @@ assert.equal(week.series.length, 14);
 assert.ok(routeMarginShare(week) === null || Math.abs(routeMarginShare(week)!) < 5);
 assert.equal(typeof routeTags(state, first.a, first.b).new, 'boolean');
 
+// The week's costs add up to the days' costs.
+const cw = costWeek(state);
+assert.ok(cw, 'costs by kind after two months');
+const weekCost = state.costHistory.slice(-cw.days).reduce((a, b) => a + b, 0) / cw.days;
+const kindsTotal = cw.perDay.reduce((a, row) => a + row.amount, 0);
+assert.ok(Math.abs(kindsTotal - weekCost) < 1, `kinds ${kindsTotal} vs days ${weekCost}`);
+
 // An older save has none of the new fields.
 delete state.routeRevenueHistory;
 delete state.routeMarginHistory;
 delete state.bonusRevenueHistory;
 delete state.bonusHistoryByMarket;
+delete state.costHistoryByCategory;
+assert.equal(costWeek(state), null);
 assert.equal(networkMargin(state), null);
 assert.equal(routeWeek(state, first.key).paidPerDay, 0);
 

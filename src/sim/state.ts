@@ -581,6 +581,12 @@ export type SimState = {
   routeMarginHistory?: number[];
   bonusRevenueHistory?: number[];
   /**
+   * Each finished day's cost by kind (`todayCostByCategory`'s keys), a
+   * window like `costHistory`, for the Money page's costs over a week and
+   * its checks-and-repairs line. Optional: made on first use.
+   */
+  costHistoryByCategory?: Record<string, number[]>;
+  /**
    * The market's fuel price index (sim/fuel.ts, sim/fuelPrice.ts): 1.0
    * is baseline, and a flight's fuel-sensitive cost slice scales with it.
    * Moves daily, spikes with a fuel shock (sim/shocks.ts). Rivals pay it;
