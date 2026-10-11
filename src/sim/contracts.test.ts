@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import airportCountries from '../../data/airport-countries.json';
-import { makeOffers, rollDailyContracts } from './contracts';
+import { faceOf, makeOffers, rollDailyContracts } from './contracts';
+import { marketKey } from './schedule';
 import { eligibleRivals, minAskPerDay, placeBid, reservePerDay, TENDER_OPEN_DAYS } from './tenders';
 import { chooseHome } from './homes';
 import { createNewGameState } from './state';
@@ -142,3 +143,38 @@ function freshTender(seed: number): { state: ReturnType<typeof createNewGameStat
   assert.ok(lowWins > 0, 'a cheap bid should win when the rival stays out');
 }
 console.log('tenders: ok');
+
+// --- Satisfaction (sim/contracts.ts) -------------------------------------
+
+{
+  const { state, id } = freshTender(7);
+  const tender = state.contracts!.find((c) => c.id === id)!;
+  assert.equal(faceOf(tender), 'neutral', 'a new contract starts neutral');
+  placeBid(state, id, tender.paymentPerDay, 1);
+  state.schedule = [
+    { legId: 's-0', tail: 'C-P001', origin: tender.a, dest: tender.b, departMinute: 360, blockMinutes: 90 },
+    { legId: 's-1', tail: 'C-P001', origin: tender.b, dest: tender.a, departMinute: 600, blockMinutes: 90 },
+  ];
+  state.simMinute += 1440;
+  rollDailyContracts(state);
+  assert.equal(tender.status, 'active');
+  // Days where nothing lands: the mood sinks slowly, not at once.
+  rollDailyContracts(state);
+  const afterOne = tender.satisfaction!;
+  assert.ok(afterOne < 60 && afterOne > 55, `one missed day dents it (${afterOne})`);
+  let days = 1;
+  while (faceOf(tender) !== 'sad' && days < 60) {
+    rollDailyContracts(state);
+    days++;
+  }
+  assert.equal(faceOf(tender), 'sad');
+  assert.ok(days > 5 && days < 30, `goes sad after a few weeks of missed days (${days})`);
+  assert.ok((tender.sadDays ?? 0) >= 1);
+  // Perfect flying brings the face back up.
+  state.onTimeHistoryByMarket[marketKey(tender.a, tender.b)] = { arrived: [4], onTime: [4] } as never;
+  const sadScore = tender.satisfaction!;
+  rollDailyContracts(state);
+  assert.ok(tender.satisfaction! > sadScore, 'a good day lifts it');
+  assert.equal(JSON.stringify(JSON.parse(JSON.stringify(tender))), JSON.stringify(tender));
+}
+console.log('satisfaction: ok');
