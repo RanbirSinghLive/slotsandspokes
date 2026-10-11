@@ -129,50 +129,221 @@ button,
 }
 
 
-/* The Game tab: New Game, Save and Load (ui/gameControls.ts). */
-#game-tab section {
-  margin-bottom: 24px;
+/* The Game screen (ui/gameControls.ts): one card per job. Icon tiles carry
+   the action, the words ride in data-tip; the card edge colours say which
+   kind it is (teal cloud, amber messages, red erase). */
+#game-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-#save-game-button,
-#load-game-button,
-#new-game-button {
+.game-card {
+  --card-accent: #6b7694;
+  padding: 10px 12px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 3px solid var(--card-accent);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.game-card--save { --card-accent: #7fb6ff; }
+.game-card--cloud { --card-accent: #5ed6c8; }
+.game-card--messages { --card-accent: #ffd166; }
+.game-card--about { --card-accent: #6b7694; }
+.game-card--danger { --card-accent: #ff8080; }
+
+#game-tab .game-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+
+#game-tab .game-card h2 .gi {
+  color: var(--card-accent);
+}
+
+.gi {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.game-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.game-tiles-gap {
+  width: 1px;
+  margin: 2px 4px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.game-tile {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 58px;
+  min-height: 44px;
+  padding: 6px 10px;
   font-family: inherit;
-  font-size: 13px;
-  color: #9aa3b8;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  padding: 4px 10px;
+  font-size: 11px;
+  color: #c3cadb;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
   cursor: pointer;
 }
 
-#save-game-button:hover,
-#load-game-button:hover:not(:disabled) {
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.5);
+.game-tile .gi {
+  width: 18px;
+  height: 18px;
+  color: var(--card-accent);
 }
 
-#load-game-button:disabled {
+.game-tile:hover:not(:disabled),
+.game-tile:focus-visible {
+  color: #fff;
+  border-color: var(--card-accent);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.game-tile:disabled {
   color: #4a5266;
-  border-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.06);
   cursor: default;
 }
 
-#save-game-status {
+.game-tile:disabled .gi {
+  color: #4a5266;
+}
+
+.game-tile--off:hover {
+  color: #ff8080;
+  border-color: #ff8080;
+}
+
+.game-tile--wide {
+  flex-direction: row;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.game-tile[hidden],
+.game-confirm[hidden] {
+  display: none;
+}
+
+/* New Game is the one action that erases the save, so it stays red. */
+.game-card--danger .game-tile:hover {
+  color: #ff8080;
+  background: rgba(255, 128, 128, 0.1);
+}
+
+.game-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
   margin-top: 8px;
-  min-height: 1.2em;
+  font-size: 12px;
+  color: #ffb3b3;
+}
+
+.game-confirm span {
+  flex: 1 1 100%;
+}
+
+.game-confirm button {
+  min-height: 32px;
+  padding: 4px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  color: #c3cadb;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.game-confirm button:first-of-type {
+  color: #ff8080;
+  border-color: #ff8080;
+}
+
+.game-status {
   color: #6b7694;
   font-size: 12px;
 }
 
-/* New Game's own hover stays a deliberate red warning — unlike Save or
-   Load, it's the one action here that erases the save outright rather
-   than just reading from or writing to it. */
-#new-game-button:hover {
-  color: #ff8080;
-  border-color: #ff8080;
+.game-status:not(:empty) {
+  margin-top: 8px;
 }
+
+.credits-fold {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #9aa3b8;
+}
+
+.credits-fold summary {
+  cursor: pointer;
+  color: #6b7694;
+}
+
+#about-version {
+  margin-bottom: 8px;
+  font-size: 11px;
+  color: #6b7694;
+}
+
+#brief-settings .game-pair {
+  display: flex;
+  gap: 4px;
+}
+
+#brief-settings .game-switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: #9aa3b8;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+#brief-settings .game-switch:has(input:checked) {
+  color: #fff;
+  border-color: rgba(255, 209, 102, 0.55);
+  background: rgba(255, 209, 102, 0.08);
+}
+
+#brief-settings .game-reopen {
+  min-width: 32px;
+  min-height: 32px;
+  font-family: inherit;
+  color: #ffd166;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+
 
 /* Real inline confirmation for Load and New Game, not window.confirm()
    — native dialogs are silently blocked in some embedded/preview
@@ -4534,24 +4705,10 @@ button.ops-item:hover {
   color: #5ed6c8;
 }
 
-#save-file-section button {
-  margin-right: 6px;
-}
-
 .problem-feedback {
   align-self: center;
   margin-right: auto;
   color: #5ed6c8;
-}
-
-.about-feedback {
-  margin: 8px 0 0;
-  font-size: 12px;
-  color: #9aa3b8;
-}
-
-.about-feedback button {
-  margin-left: 4px;
 }
 
 /* The tutorial (ui/tutorial.ts): a spotlight that dims everything but its
@@ -5329,23 +5486,16 @@ button.ops-item:hover {
   color: #fff;
 }
 
-#cloud-save-section button {
-  margin-right: 6px;
-}
-
 .cloud-save-code {
   margin-bottom: 8px;
+  padding: 6px 8px;
+  background: rgba(94, 214, 200, 0.08);
+  border-radius: 4px;
+  overflow-wrap: anywhere;
   font-family: ui-monospace, Consolas, monospace;
   letter-spacing: 0.08em;
   color: #fff;
   user-select: all;
-}
-
-#cloud-save-status {
-  margin-top: 8px;
-  min-height: 1.2em;
-  color: #6b7694;
-  font-size: 12px;
 }
 
 .home-world-cloud {
@@ -5676,7 +5826,7 @@ button.ops-item:hover {
   margin-top: 8px;
 }
 #fleet-orders {
-  grid-column: 1 / -1;
+  flex: 1 1 100%;
 }
 .order-buttons .inspector-plan-hub {
   margin: 0 4px 0 0;
@@ -5712,9 +5862,9 @@ button.ops-item:hover {
   }
 }
 #brief-settings {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 6px 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   align-items: center;
 }
 @media (pointer: coarse) {
