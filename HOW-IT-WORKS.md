@@ -2124,7 +2124,7 @@ balance lever for a weak home.
   goes to you. A loss shows as lapsed with the winning rival. Once
   awarded you have 30 days to fly it, then it starts. Flying an unbid
   offer places a bid at the reference. Dealt from the contracts' own
-  random stream. No screen for bidding yet.
+  random stream.
 - **Sized by the home's weakness.** `homeWeakness()`: the median home's
   five best Propeller markets over this home's, from 0.5 (New York,
   Toronto, London) to 4 (the thinnest). Payment a day is $2,500 × that ×
@@ -2143,7 +2143,7 @@ balance lever for a weak home.
   starting at 60. Every day it moves 1/30 of the way to the day's mark:
   the day's performance ×100, or 0 for a day not flown both ways. Face:
   happy from 70, neutral to 40, sad below. Sad days are counted for the
-  takeover window (not built yet). No screen shows it yet.
+  takeover window (not built yet).
 - **Renewal, graduation or the snap-back.** In the last 30 days of a
   term the buyer's terms show (`renewalTerms()`): the first term's pay
   (not compounded from earlier renewals) × a mood multiplier (−25% at
@@ -2158,13 +2158,22 @@ balance lever for a weak home.
   ends it, the market's built-up demand drops 40%, and the route is put
   out to tender again at the first term's pay, where a rival may win it.
   There is no renewal cap or fixed taper.
-- **Where it shows:** CONTRACT lines in the ticker, a Contracts section
-  in Head office, a line in the route and airport views, the Office dot
-  for a new offer, and a dashed gold line and ring under the Demand lens.
-  A new offer is news to act on, so its ticker line ("New contract ·
-  YHZ–YSJ · $9k/day · 93d · take by day 30") scrolls first, bright, its
-  tag pulsing, for 90 seconds or until clicked; clicking opens Head
-  office.
+- **Where it shows:** the Contracts screen (rail item, key none), with
+  three groups. *Tenders*: route, rivals who may bid (◌ none, ⚔ n),
+  days until bids close, and an ask stepper (± 5% of the reference), a
+  1×/2× toggle and a bid button (✋; ↻ to change a bid); an awarded tender
+  reads "Won" with its fly-by day. *Running*: the buyer's face (😀 😐 ☹,
+  mood in its tip), a ring of the term, pay and riders, a bar of how far
+  the market has built toward standing on its own, and in the last 30
+  days the renewal terms with a counter stepper. *Past*: the last eight,
+  with who won a lost tender. Every icon is a button so its tip shows on
+  tap. Also CONTRACT lines in the ticker, a line in the route and airport
+  views, and a dashed gold line and ring under the Demand lens. The
+  Contracts rail dot is green for a new tender (opening the screen reads
+  it) and amber while a running contract's buyer is sad. A new offer is
+  news to act on, so its ticker line ("New contract · YHZ–YSJ · $9k/day ·
+  93d · take by day 30") scrolls first, bright, its tag pulsing, for 90
+  seconds or until clicked; clicking opens Contracts.
 
 The headless player takes an offer worth at least $3,000 a day that a
 plane based at either end can fit, keeps its last round trip while the
