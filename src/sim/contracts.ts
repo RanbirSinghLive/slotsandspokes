@@ -10,6 +10,7 @@ import { trailingMarketOtp } from './routeOtp';
 import { legsServingMarket, marketKey } from './schedule';
 import { hungerByAirport } from './serviceLevel';
 import type { SimState } from './state';
+import { CONTRACT_STREAM_SALT, frequencyOf, settleTender, TENDER_OPEN_DAYS, type Bid } from './tenders';
 
 /**
  * Contracts (WEEK-ELEVEN.md, thread 6): route incentives for
@@ -67,6 +68,16 @@ export type Contract = {
   performanceDays?: number;
   /** How many times it has been renewed. */
   renewals?: number;
+  /** The airline's bid on the open tender (sim/tenders.ts); once awarded, `paymentPerDay` and `ridersPerDay` are the bid's. */
+  bid?: Bid;
+  /** Flights a day each way the contract asks for: 1 unless the awarded bid was for 2. */
+  frequency?: 1 | 2;
+  /** The last day a contested tender is decided. */
+  tenderEndsDay?: number;
+  /** The day the tender was awarded to the airline; it then has until `offerEndsDay` to start flying. */
+  awardedDay?: number;
+  /** The rival airline that won the tender instead. */
+  lostTo?: string;
 };
 
 const OFFER_OPEN_DAYS = 30;
@@ -97,8 +108,6 @@ export const RENEW_MIN_PERFORMANCE = 0.5;
 const RENEWAL_SIZE = 0.75;
 /** After this many renewals it ends whatever the performance. */
 const MAX_RENEWALS = 3;
-/** Mixed into the game's seed to start the contracts' own random stream. */
-const CONTRACT_STREAM_SALT = 0x5eed_c0de;
 /** Finished contracts kept to show in Head office. */
 const HISTORY_KEPT = 8;
 
@@ -272,6 +281,7 @@ export function makeOffers(state: SimState, atStart: boolean): void {
       termDays: MIN_TERM_DAYS + Math.floor(termRoll * (TERM_SPREAD_DAYS + 1)),
       offeredDay: today,
       offerEndsDay: today + OFFER_OPEN_DAYS,
+      tenderEndsDay: today + TENDER_OPEN_DAYS,
       status: 'offered',
       paidTotal: 0,
     });
@@ -291,7 +301,10 @@ export function rollDailyContracts(state: SimState): void {
   for (const contract of contractsOf(state)) {
     const key = marketKey(contract.a, contract.b);
     if (contract.status === 'offered') {
-      if (legsServingMarket(contract.a, contract.b, state.schedule) >= 2) {
+      const legs = legsServingMarket(contract.a, contract.b, state.schedule);
+      settleTender(state, contract, legs >= 2);
+      if (contract.status !== 'offered') continue;
+      if (contract.awardedDay !== undefined && legs >= 2 * frequencyOf(contract)) {
         contract.status = 'active';
         contract.startedDay = today;
         contract.endsDay = today + contract.termDays;
@@ -305,7 +318,7 @@ export function rollDailyContracts(state: SimState): void {
     // Paid for a day it flew both ways: yesterday's landings on the market.
     const history = state.onTimeHistoryByMarket[key];
     const landedYesterday = history?.arrived[history.arrived.length - 1] ?? 0;
-    if (landedYesterday >= 2) {
+    if (landedYesterday >= 2 * frequencyOf(contract)) {
       const performance = performanceFactor(state, contract);
       contract.performanceSum = (contract.performanceSum ?? 0) + performance;
       contract.performanceDays = (contract.performanceDays ?? 0) + 1;
