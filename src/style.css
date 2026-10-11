@@ -5859,6 +5859,7 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
 
 .fee-button.is-current .fee-glyph {
   color: #7fd88f;
+}
 
 /* The call popup (ui/callPopup.ts). Below the confirm dialogs (45) so ✕ and ⇄
    can ask first, above the phone panel sheet (40) and rail (41). A card, not a
