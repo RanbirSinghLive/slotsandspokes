@@ -1,5 +1,6 @@
 import type { FareClassSettings, FareClassTally } from './fareClasses';
 import type { CallOrder } from './orders';
+import type { Crisis } from './crisis';
 import type { GameDifficulty } from './difficulty';
 import type { FareWar, FareWarEvent } from './fareWars';
 import type { DemandEvent } from './demandEvents';
@@ -583,6 +584,10 @@ export type SimState = {
   nextClosureId?: number;
   /** The closures' own random stream, apart from rngSeed so they don't shift every other roll. */
   airspaceSeed?: number;
+  /** Storm forecasts for busy airports and how they turned out (sim/crisis.ts). Optional: made on first use. */
+  crises?: Crisis[];
+  crisisSeed?: number;
+  nextCrisisId?: number;
   /** Priority flights offered, accepted or just finished (sim/mandates.ts). */
   mandates?: Mandate[];
   nextMandateId?: number;
@@ -750,7 +755,7 @@ export type SimState = {
    * was due (stranded by an earlier disruption); optional so older saves
    * load, absent meaning none.
    */
-  cancellationsByCause: { crew: number; mechanical: number; weather: number; curfew: number; controller?: number; position?: number; maintenance?: number; airspace?: number };
+  cancellationsByCause: { crew: number; mechanical: number; weather: number; curfew: number; controller?: number; waived?: number; position?: number; maintenance?: number; airspace?: number };
   /**
    * Cancellations: legs that should have operated today and
    * didn't. `flightsScheduled*` counts what was on the books, so

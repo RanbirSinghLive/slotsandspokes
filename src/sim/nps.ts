@@ -72,6 +72,9 @@ function competitorFaresForMarket(origin: string, dest: string, competitorRoutes
  */
 export const CANCELLATION_NPS_SCORE = -80;
 
+/** A flight cancelled ahead of time with the passengers told (sim/crisis.ts): unhappy, but not stranded. */
+export const WAIVED_NPS_SCORE = -20;
+
 /**
  * One departing flight's score, recorded by recordFlightNps() below.
  * Called from step.ts's departure loop, when every input it needs (this

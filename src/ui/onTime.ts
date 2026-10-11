@@ -25,6 +25,7 @@ const CANCEL_CAUSE_LABELS: [keyof SimState['cancellationsByCause'], string, Glyp
   ['weather', 'Airport closed', 'snow', '#4a90d9'],
   ['curfew', 'Delays ran past 22:00', 'moon', '#ffd166'],
   ['controller', 'Cancelled by you', 'user', '#7fd88f'],
+  ['waived', 'Waived ahead of a storm', 'snow', '#8ec5ff'],
   ['position', 'Aircraft out of position', 'mapPin', '#ffb347'],
   ['maintenance', 'Maintenance hold', 'hangar', '#5ed6c8'],
   ['airspace', 'Airspace closed', 'alert', '#ff5c5c'],
