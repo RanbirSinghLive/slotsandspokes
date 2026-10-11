@@ -208,76 +208,77 @@
           </table>
         </section>
         <div id="game-tab" hidden>
-          <section id="save-game-section">
-                    <h2>Save <button type="button" class="info-mark" aria-label="What this means" data-info="Save happens automatically once a simulated day, but you can force one right now.">i</button></h2>
-            <button type="button" id="save-game-button">Save Game</button>
-            <div id="save-game-status"></div>
-          </section>
-          <section id="load-game-section">
-                    <h2>Load <button type="button" class="info-mark" aria-label="What this means" data-info="Reload your last save, discarding anything that&#x27;s happened since.">i</button></h2>
-            <button type="button" id="load-game-button">Load Game</button>
-            <div id="load-game-confirm" hidden>
-              <span>Reload from your last save? Anything since then will be lost.</span>
-              <button type="button" id="load-game-confirm-yes">Yes, reload</button>
+          <section id="save-game-section" class="game-card game-card--save">
+            <h2><svg class="gi" viewBox="0 0 24 24"><path d="M5 3h11l3 3v15H5z"/><path d="M8 3v5h7V3M8 21v-7h8v7"/></svg>Save <button type="button" class="info-mark" aria-label="What this means" data-info="Save happens automatically once a simulated day, but you can force one right now. Load reloads your last save and discards anything since. Export keeps a copy as a file, to move to another browser or computer or attach to a bug report; import plays one here and replaces the game in this browser.">i</button></h2>
+            <div class="game-tiles">
+              <button type="button" id="save-game-button" class="game-tile" data-tip="Save now"><svg class="gi" viewBox="0 0 24 24"><path d="M5 3h11l3 3v15H5z"/><path d="M8 3v5h7V3M8 21v-7h8v7"/></svg>Save</button>
+              <button type="button" id="load-game-button" class="game-tile" data-tip="Reload last save"><svg class="gi" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>Load</button>
+              <span class="game-tiles-gap" aria-hidden="true"></span>
+              <button type="button" id="export-save-button" class="game-tile" data-tip="Export save file"><svg class="gi" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>Export</button>
+              <button type="button" id="import-save-button" class="game-tile" data-tip="Import save file"><svg class="gi" viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5M4 21h16"/></svg>Import</button>
+            </div>
+            <input type="file" id="import-save-input" accept="application/json,.json" hidden />
+            <div id="load-game-confirm" class="game-confirm" hidden>
+              <span>Reload last save · anything since is lost</span>
+              <button type="button" id="load-game-confirm-yes">Reload</button>
               <button type="button" id="load-game-confirm-cancel">Cancel</button>
             </div>
+            <div id="save-game-status" class="game-status"></div>
+            <div id="save-file-status" class="game-status"></div>
           </section>
-          <section id="cloud-save-section" hidden>
-            <h2>Cloud save <button type="button" class="info-mark" aria-label="What this means" data-info="Play one game on your phone and your computer. Turning it on makes a sync code on this device and copies your game to the cloud after every autosave. Open the share link or type the code on another device to join. Whoever has the code can play your game, so keep it private. If both devices have played since they last synced, you choose which game to keep.">i</button></h2>
-            <div id="cloud-save-off">
-              <button type="button" id="cloud-save-enable">Turn on cloud save</button>
-              <button type="button" id="cloud-save-join">Use a code</button>
+          <section id="cloud-save-section" class="game-card game-card--cloud" hidden>
+            <h2><svg class="gi" viewBox="0 0 24 24"><path d="M7 18a4 4 0 0 1-.5-8 6 6 0 0 1 11.5 1.5A3.5 3.5 0 0 1 17.5 18z"/></svg>Cloud <button type="button" class="info-mark" aria-label="What this means" data-info="Play one game on your phone and your computer. Turning it on makes a sync code on this device and copies your game to the cloud after every autosave. Open the share link or type the code on another device to join. Whoever has the code can play your game, so keep it private. If both devices have played since they last synced, you choose which game to keep.">i</button></h2>
+            <div id="cloud-save-off" class="game-tiles">
+              <button type="button" id="cloud-save-enable" class="game-tile" data-tip="Turn on cloud save"><svg class="gi" viewBox="0 0 24 24"><path d="M7 18a4 4 0 0 1-.5-8 6 6 0 0 1 11.5 1.5A3.5 3.5 0 0 1 17.5 18z"/><path d="M12 15v-4M10 13l2-2 2 2"/></svg>Turn on</button>
+              <button type="button" id="cloud-save-join" class="game-tile" data-tip="Use a sync code from another device"><svg class="gi" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/></svg>Code</button>
             </div>
             <div id="cloud-save-on" hidden>
-              <div class="cloud-save-code" id="cloud-save-code"></div>
-              <button type="button" id="cloud-save-copy-link">Copy share link</button>
-              <button type="button" id="cloud-save-copy-code">Copy code</button>
-              <button type="button" id="cloud-save-disable">Turn off</button>
+              <div class="cloud-save-code" id="cloud-save-code" data-tip="Sync code · keep it private"></div>
+              <div class="game-tiles">
+                <button type="button" id="cloud-save-copy-link" class="game-tile" data-tip="Copy share link"><svg class="gi" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3A4 4 0 0 0 11 18.7l1-1"/></svg>Link</button>
+                <button type="button" id="cloud-save-copy-code" class="game-tile" data-tip="Copy code"><svg class="gi" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>Code</button>
+                <button type="button" id="cloud-save-disable" class="game-tile game-tile--off" data-tip="Turn off cloud save"><svg class="gi" viewBox="0 0 24 24"><path d="M12 3v9"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>Off</button>
+              </div>
             </div>
-            <div id="cloud-save-status"></div>
+            <div id="cloud-save-status" class="game-status"></div>
           </section>
-          <section id="save-file-section">
-            <h2>Save file <button type="button" class="info-mark" aria-label="What this means" data-info="Your game lives in this browser. Export it to keep a copy, move it to another browser or computer, or attach it to a bug report; import one to play it here. Importing replaces the game in this browser.">i</button></h2>
-            <button type="button" id="export-save-button">Export save</button>
-            <button type="button" id="import-save-button">Import save</button>
-            <input type="file" id="import-save-input" accept="application/json,.json" hidden />
-            <div id="save-file-status"></div>
-          </section>
-          <section id="brief-settings-section">
-            <h2>Messages <button type="button" class="info-mark" aria-label="What this means" data-info="The daily brief shows the morning's operation at 05:30. The season review ranks your routes every half year and looks ahead to the next. A late plane whose day will break (curfew, a priority flight or 90+ minutes late) pauses the clock and opens its page. Off means no pop-up or pause; the reopen buttons still show them, and CALL in the ops row still counts the planes.">i</button></h2>
+          <section id="brief-settings-section" class="game-card game-card--messages">
+            <h2><svg class="gi" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/></svg>Messages <button type="button" class="info-mark" aria-label="What this means" data-info="The daily brief shows the morning's operation at 05:30. The season review ranks your routes every half year and looks ahead to the next. A late plane whose day will break (curfew, a priority flight or 90+ minutes late) pauses the clock and opens its page. Off means no pop-up or pause; the reopen buttons still show them, and CALL in the ops row still counts the planes.">i</button></h2>
             <div id="brief-settings">
-              <label title="Daily brief at 05:30"><input type="checkbox" id="brief-setting-daily" /> ☀ Daily</label>
-              <button type="button" id="brief-reopen-daily" title="Show today's brief now">↗</button>
-              <label title="Season review every half year"><input type="checkbox" id="brief-setting-season" /> 📅 Season</label>
-              <button type="button" id="brief-reopen-season" title="Show the season review now">↗</button>
-              <label title="Pause the clock when a season review opens"><input type="checkbox" id="brief-setting-pause" /> ⏸ Pause on season</label>
-              <label title="Pause the clock when a late plane's day will break"><input type="checkbox" id="brief-setting-call" /> ✋ Pause on call</label>
+              <span class="game-pair"><label class="game-switch" data-tip="Daily brief at 05:30"><input type="checkbox" id="brief-setting-daily" /> ☀ Daily</label><button type="button" id="brief-reopen-daily" class="game-reopen" data-tip="Show today's brief now" aria-label="Show today's brief now">↗</button></span>
+              <span class="game-pair"><label class="game-switch" data-tip="Season review every half year"><input type="checkbox" id="brief-setting-season" /> 📅 Season</label><button type="button" id="brief-reopen-season" class="game-reopen" data-tip="Show the season review now" aria-label="Show the season review now">↗</button></span>
+              <label class="game-switch" data-tip="Pause the clock when a season review opens"><input type="checkbox" id="brief-setting-pause" /> ⏸ Pause on season</label>
+              <label class="game-switch" data-tip="Pause the clock when a late plane's day will break"><input type="checkbox" id="brief-setting-call" /> ✋ Pause on call</label>
               <span id="fleet-orders"></span>
             </div>
           </section>
-          <section id="new-game-section">
-                    <h2>New Game <button type="button" class="info-mark" aria-label="What this means" data-info="Erase this save entirely and start a brand-new airline.">i</button></h2>
-            <button type="button" id="new-game-button">New Game</button>
-            <div id="new-game-confirm" hidden>
+          <section id="about-section" class="game-card game-card--about">
+            <h2><svg class="gi" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>About</h2>
+            <div id="about-version"></div>
+            <div class="game-tiles">
+              <button type="button" id="about-tutorial-button" class="game-tile" data-tip="Play the tutorial"><svg class="gi" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></svg>Tutorial</button>
+              <button type="button" id="about-report-button" class="game-tile" data-tip="Report so far · how the airline is doing"><svg class="gi" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>Report</button>
+              <button type="button" id="about-feedback-button" class="game-tile" data-tip="Send feedback · what broke, confused or bored you"><svg class="gi" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>Feedback</button>
+            </div>
+            <details class="credits-fold">
+              <summary data-tip="Credits">Credits</summary>
+              <ul class="credits">
+                <li>Airports: <a href="https://ourairports.com/data/" target="_blank" rel="noopener">OurAirports</a> (public domain)</li>
+                <li>Map: <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a> (public domain)</li>
+                <li>Populations: <a href="https://www.geonames.org/" target="_blank" rel="noopener">GeoNames</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>; checked against Statistics Canada census metropolitan areas (<a href="https://open.canada.ca/en/open-government-licence-canada" target="_blank" rel="noopener">Open Government Licence – Canada</a>)</li>
+                <li>Code: <a href="https://d3js.org/" target="_blank" rel="noopener">d3-geo</a> and <a href="https://github.com/topojson/topojson-client" target="_blank" rel="noopener">topojson-client</a> (ISC licence)</li>
+                <li>Airlines, rivals and every number in the game are made up: no real airline's data is used.</li>
+              </ul>
+            </details>
+          </section>
+          <section id="new-game-section" class="game-card game-card--danger">
+            <h2><svg class="gi" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>New Game <button type="button" class="info-mark" aria-label="What this means" data-info="Erase this save entirely and start a brand-new airline.">i</button></h2>
+            <button type="button" id="new-game-button" class="game-tile game-tile--wide" data-tip="Erase this save and start over"><svg class="gi" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>New Game</button>
+            <div id="new-game-confirm" class="game-confirm" hidden>
               <span id="new-game-confirm-text">Erase current game?</span>
-              <button type="button" id="new-game-confirm-yes">Yes, start over</button>
+              <button type="button" id="new-game-confirm-yes">Erase</button>
               <button type="button" id="new-game-confirm-cancel">Cancel</button>
             </div>
-          </section>
-          <section id="about-section">
-            <h2>About</h2>
-            <div id="about-version"></div>
-            <p class="about-feedback">New to it? <button type="button" id="about-tutorial-button">Play the tutorial</button></p>
-            <p class="about-feedback">How's the airline doing? <button type="button" id="about-report-button">Report so far</button></p>
-            <p class="about-feedback">It's an alpha: what broke, confused or bored you is the most useful thing you can send. <button type="button" id="about-feedback-button">Send feedback</button></p>
-            <h2>Credits</h2>
-            <ul class="credits">
-              <li>Airports: <a href="https://ourairports.com/data/" target="_blank" rel="noopener">OurAirports</a> (public domain)</li>
-              <li>Map: <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a> (public domain)</li>
-              <li>Populations: <a href="https://www.geonames.org/" target="_blank" rel="noopener">GeoNames</a>, licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>; checked against Statistics Canada census metropolitan areas (<a href="https://open.canada.ca/en/open-government-licence-canada" target="_blank" rel="noopener">Open Government Licence – Canada</a>)</li>
-              <li>Code: <a href="https://d3js.org/" target="_blank" rel="noopener">d3-geo</a> and <a href="https://github.com/topojson/topojson-client" target="_blank" rel="noopener">topojson-client</a> (ISC licence)</li>
-              <li>Airlines, rivals and every number in the game are made up: no real airline's data is used.</li>
-            </ul>
           </section>
         </div>
       </div>
