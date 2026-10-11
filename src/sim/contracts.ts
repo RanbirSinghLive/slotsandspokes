@@ -78,7 +78,13 @@ export type Contract = {
   awardedDay?: number;
   /** The rival airline that won the tender instead. */
   lostTo?: string;
+  /** The buyer's mood, 0 to 100, moving slowly with performance; absent means SATISFACTION_START. */
+  satisfaction?: number;
+  /** Consecutive days the buyer has been sad, for the takeover window. */
+  sadDays?: number;
 };
+
+export type Face = 'happy' | 'neutral' | 'sad';
 
 const OFFER_OPEN_DAYS = 30;
 const OFFER_INTERVAL_DAYS = 45;
@@ -190,6 +196,32 @@ export function performanceFactor(state: SimState, contract: Contract): number {
  */
 export function paymentShare(performance: number): number {
   return GUARANTEED_SHARE + (1 - GUARANTEED_SHARE) * performance;
+}
+
+/** A new contract starts neutral-to-warm. */
+export const SATISFACTION_START = 60;
+export const HAPPY_FROM = 70;
+export const SAD_BELOW = 40;
+/** Each day moves the mood this share of the way to the day's mark: about a 30-day average. */
+const SATISFACTION_WEIGHT = 1 / 30;
+
+export function satisfactionOf(contract: Contract): number {
+  return contract.satisfaction ?? SATISFACTION_START;
+}
+
+export function faceOf(contract: Contract): Face {
+  const score = satisfactionOf(contract);
+  return score >= HAPPY_FROM ? 'happy' : score < SAD_BELOW ? 'sad' : 'neutral';
+}
+
+/**
+ * One day's mood move: the day's performance as a mark out of 100, or 0 for
+ * a day not flown both ways (the buyer notices a missed day more than a late one).
+ */
+function updateSatisfaction(contract: Contract, dayMark: number): void {
+  const score = satisfactionOf(contract);
+  contract.satisfaction = score + (dayMark - score) * SATISFACTION_WEIGHT;
+  contract.sadDays = faceOf(contract) === 'sad' ? (contract.sadDays ?? 0) + 1 : 0;
 }
 
 /** A term's average performance, the renewal test; full before any day was judged. */
@@ -318,8 +350,10 @@ export function rollDailyContracts(state: SimState): void {
     // Paid for a day it flew both ways: yesterday's landings on the market.
     const history = state.onTimeHistoryByMarket[key];
     const landedYesterday = history?.arrived[history.arrived.length - 1] ?? 0;
+    if (landedYesterday < 2 * frequencyOf(contract)) updateSatisfaction(contract, 0);
     if (landedYesterday >= 2 * frequencyOf(contract)) {
       const performance = performanceFactor(state, contract);
+      updateSatisfaction(contract, performance * 100);
       contract.performanceSum = (contract.performanceSum ?? 0) + performance;
       contract.performanceDays = (contract.performanceDays ?? 0) + 1;
       const payment = Math.round(contract.paymentPerDay * paymentShare(performance));

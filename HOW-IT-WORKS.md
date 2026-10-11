@@ -2137,6 +2137,11 @@ balance lever for a weak home.
   is half guaranteed on any day flown both ways and half earned by it
   (`paymentShare()`). Paid at rollover for the day before, into the
   market's revenue.
+- **Satisfaction.** Each running contract has a buyer mood, 0 to 100,
+  starting at 60. Every day it moves 1/30 of the way to the day's mark:
+  the day's performance ×100, or 0 for a day not flown both ways. Face:
+  happy from 70, neutral to 40, sad below. Sad days are counted for the
+  takeover window (not built yet). No screen shows it yet.
 - **Renewal or the snap-back.** A term averaging 50% performance or more
   is renewed at 75% of the size, up to three times. Otherwise, or at the
   end, the payment and riders stop and the market's built-up demand
