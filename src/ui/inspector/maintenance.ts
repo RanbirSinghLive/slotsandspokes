@@ -75,7 +75,7 @@ export function buildMaintenanceView(state: SimState, changed: () => void): HTML
     }
   }
 
-  root.append(...buildHangar(state), ...buildDueTimeline(state), ...buildFleetBoard(state, changed));
+  root.append(...buildHangar(state, changed), ...buildDueTimeline(state), ...buildFleetBoard(state, changed));
   root.append(...buildMxBases(state, changed));
   return root;
 }
@@ -113,7 +113,7 @@ const collapsedTypes = new Set<string>();
  * it's out, and a dashed bay for each plane whose check is next to come
  * due (its window open or overdue), so the hangar's coming load shows.
  */
-function buildHangar(state: SimState): HTMLElement[] {
+function buildHangar(state: SimState, changed: () => void): HTMLElement[] {
   const nodes: HTMLElement[] = [
     heading(
       'Hangar',
@@ -127,12 +127,48 @@ function buildHangar(state: SimState): HTMLElement[] {
     const bay = box(`mx-bay ${event ? 'is-working' : plane.inBay ? 'is-banking' : 'is-waiting'}`);
     bay.append(box('mx-bay-tail', plane.tail), box('mx-bay-state', event ? `out in ${daysUntilReturn(state, event)}d` : `${plane.dueIn > 0 ? `due ${plane.dueIn}d` : `${-plane.dueIn}d over`} · ${plane.inBay ? 'in bay' : 'queued'}`));
     if (!event) bay.classList.toggle('is-late', plane.dueIn <= 0);
+    // The action sits on the bay itself: book when the plane is parked at base, else the tip says what it waits for.
+    if (!event && plane.canBook) {
+      const book = document.createElement('button');
+      book.type = 'button';
+      book.className = 'mx-bay-book';
+      book.append(glyph('wrench'));
+      book.dataset.tip = `Book C check · ${plane.tail}`;
+      book.addEventListener('click', () => confirmHeavyBooking(state, plane, changed));
+      bay.classList.add('is-bookable');
+      bay.append(book);
+    } else if (!event && plane.bookBlocker) {
+      const wait = box('mx-bay-wait');
+      wait.append(glyph('plane', plane.bookBlocker));
+      bay.append(wait);
+    }
     bays.append(bay);
   }
   const capacity = ops.mxBaseReadout(state, 'heavy').bases.map((base) => `${base.iata} ${base.used}/${base.level} bays`).join(' · ');
   nodes.push(line(capacity || 'No hangar'));
   nodes.push(bays.childElementCount > 0 ? bays : noneLine('Hangar clear · no C check in work or within its window'));
   return nodes;
+}
+
+/** The C-check booking dialog, from the hangar bay or the plane's card. */
+function confirmHeavyBooking(state: SimState, plane: HeavyCheckReadout, changed: () => void): void {
+  const preview = ops.previewHeavyCheckBooking(state, plane.tail);
+  if (!preview) return;
+  showConfirm({
+    title: `Book C check · ${plane.tail}`,
+    rows: [
+      { label: 'Grounded', value: `${preview.days}d from tomorrow` },
+      { label: 'Check cost', value: preview.cost > 0 ? money(preview.cost) : 'in house' },
+      { label: 'Rotations', value: `${preview.rotations} · other planes cover them where pools allow` },
+      ...(preview.cost > 0 ? cashAfterRows(state, preview.cost) : []),
+    ],
+    facts: ['Rotations nobody can cover are cancelled. Cancel the booking any time before it goes in.'],
+    confirmLabel: 'Book check',
+    run: () => {
+      ops.bookHeavyCheck(state, plane.tail);
+      changed();
+    },
+  });
 }
 
 /** The timeline's reach: the longest wait to a heavy check is its whole interval. */
@@ -336,21 +372,7 @@ function buildFleetBoard(state: SimState, changed: () => void): HTMLElement[] {
         book.textContent = `Book C check · ${preview.days}d${preview.cost > 0 ? ` · ${money(preview.cost)}` : ''}`;
         book.className = 'mx-card-action';
         book.addEventListener('click', () =>
-          showConfirm({
-            title: `Book C check · ${plane.tail}`,
-            rows: [
-              { label: 'Grounded', value: `${preview.days}d from tomorrow` },
-              { label: 'Check cost', value: preview.cost > 0 ? money(preview.cost) : 'in house' },
-              { label: 'Rotations', value: `${preview.rotations} · other planes cover them where pools allow` },
-              ...(preview.cost > 0 ? cashAfterRows(state, preview.cost) : []),
-            ],
-            facts: ['Rotations nobody can cover are cancelled. Cancel the booking any time before it goes in.'],
-            confirmLabel: 'Book check',
-            run: () => {
-              ops.bookHeavyCheck(state, plane.tail);
-              changed();
-            },
-          }),
+          confirmHeavyBooking(state, plane, changed),
         );
         wrap.append(book);
       }
