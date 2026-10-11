@@ -1,3 +1,4 @@
+import { powertrainMark } from '../powertrainMark';
 import { nightStopCostPerNight, nightStopLegs } from '../../sim/nightStops';
 import { classByCode } from '../../sim/aircraftClasses';
 import { dayIndex } from '../../sim/clock';
@@ -107,6 +108,8 @@ export function buildFleetView(state: SimState): HTMLElement {
     row.className = 'inspector-row';
     const name = document.createElement('span');
     name.append(planeIconElement(aircraft.typeCode), ` ${aircraft.tail}`);
+    const mark = powertrainMark(aircraft);
+    if (mark) name.append(' ', mark);
     const detail = document.createElement('span');
     detail.className = 'inspector-row-detail';
     detail.textContent =
@@ -134,7 +137,7 @@ export function buildAircraftView(state: SimState, tail: string, changed: () => 
   root.className = 'inspector-view';
   const aircraft = state.aircraft.find((a) => a.tail === tail)!;
   const spec = classByCode(aircraft.typeCode);
-  root.append(title(`${tail} — ${spec?.name ?? aircraft.typeCode}`));
+  root.append(title(`${tail} — ${aircraft.powertrain === 'electric' ? 'Electric 25-seater' : aircraft.powertrain === 'hybrid' ? `Hybrid ${spec?.name ?? aircraft.typeCode}` : (spec?.name ?? aircraft.typeCode)}`));
 
   const reliability = ageDelayParameters(aircraft.ageYears);
   root.append(

@@ -60,7 +60,6 @@ export type ExecutiveEffect =
   /** Multiplies every ticket's revenue (sim/innovations.ts's bookingPerks()). */
   | { kind: 'revenue'; yieldMultiplier: number }
   /** Multiplies how long leased planes take to arrive and returned ones to go (sim/fleetTiming.ts). */
-  | { kind: 'load-factor'; points: number }
   | { kind: 'fleet-programmes'; deliveryMultiplier: number; returnMultiplier: number }
   /** Multiplies how long hiring and retraining crews take (sim/innovations.ts's crewTrainingTimeFactor()). */
   | { kind: 'crew-programmes'; trainingTimeMultiplier: number }
@@ -253,11 +252,6 @@ export function executiveReturnMultiplier(state: SimState): number {
   return effectOf(state, 'fleet-programmes')?.returnMultiplier ?? 1;
 }
 
-/** Extra share of its seats a plane can sell (sim/innovations.ts's loadFactorCap()). */
-export function executiveLoadFactorBonus(state: SimState): number {
-  return (effectOf(state, 'load-factor')?.points ?? 0) / 100;
-}
-
 export function executiveYieldMultiplier(state: SimState): number {
   return effectOf(state, 'revenue')?.yieldMultiplier ?? 1;
 }
@@ -267,7 +261,7 @@ export function executiveFareEstimateMultiplier(state: SimState): number {
   return effectOf(state, 'revenue') ? 0.5 : 1;
 }
 
-/** What the crew-programmes executive leaves of the time hiring and retraining take. */
+/** What the crew-programmes executive leaves of the time retraining takes; hiring is the crew academy's (sim/innovations.ts). */
 export function executiveCrewTrainingMultiplier(state: SimState): number {
   return effectOf(state, 'crew-programmes')?.trainingTimeMultiplier ?? 1;
 }
@@ -310,10 +304,8 @@ export function describeEffect(effect: ExecutiveEffect): string {
       return `Connecting pax +${percent(effect.connectingMultiplier)}`;
     case 'revenue':
       return `Yield +${percent(effect.yieldMultiplier)} · fare estimates twice as sharp`;
-    case 'load-factor':
-      return `Seats sold +${effect.points} points`;
     case 'crew-programmes':
-      return `Hiring and retraining −${percent(effect.trainingTimeMultiplier)} time`;
+      return `Retraining −${percent(effect.trainingTimeMultiplier)} time`;
     case 'maintenance-bases':
       return `Base running costs −${percent(effect.costMultiplier)}`;
     case 'cargo':

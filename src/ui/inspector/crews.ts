@@ -281,7 +281,7 @@ function roster(state: SimState, plan: ReturnType<typeof crewPlan>, today: numbe
       card.append(
         lineWithInfo(
           `Training seats · pilots ${training.pilot.used}/${training.pilot.seats} · cabin ${training.cabin.used}/${training.cabin.seats}`,
-          'Crews hired or retraining take a training seat until they join. A base has 2 seats for each workforce plus 1 for every 2 crews it already has, so a small base can only grow so fast: ask for more crews than seats and the rest wait. A crew academy shortens the courses, which frees seats sooner.',
+          'Crews hired or retraining take a training seat until they join. A base has 2 seats for each workforce plus 1 for every 2 crews it already has, so a small base can only grow so fast: ask for more crews than seats and the rest wait. A crew academy shortens hiring courses and a chief pilot retraining ones, which frees seats sooner.',
           training.pilot.free === 0 || training.cabin.free === 0 ? 'inspector-line is-warn' : 'inspector-line',
         ),
       );
