@@ -33,6 +33,8 @@ export type RivalClosure = { code: string; market: string; closedAtMinute: numbe
 export type Aircraft = {
   tail: string;
   typeCode: string;
+  /** A hybrid or electric build (sim/powertrain.ts); absent for the usual turbine or piston plane. */
+  powertrain?: 'hybrid' | 'electric';
   status: AircraftStatus;
   atAirport: string | null;
   activeLegId: string | null;
@@ -589,6 +591,10 @@ export type SimState = {
    * Optional: absent in a save made before innovations existed.
    */
   adoptedInnovations?: string[];
+  /** The R&D shop (sim/rd.ts). Optional: absent in a save made before it. */
+  rd?: { budgetLevel: number; active: string | null; points: Record<string, number> };
+  /** Airports with a charger (sim/powertrain.ts), which electric planes need at every stop. Optional: absent in an older save. */
+  chargers?: string[];
   /**
    * Market stimulation model (sim/marketDemand.ts): how many
    * people actually fly each market on an average day right now, keyed by

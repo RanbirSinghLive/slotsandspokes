@@ -1,3 +1,4 @@
+import { missingChargers } from './powertrain';
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { classRank } from './aircraftClasses';
 import { dailyMovementsAt } from './airports';
@@ -321,6 +322,10 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
   };
 
   const fail = (error: string, blocksAddStop = true): RotationPlan => ({ ...plan, error, blocksAddStop });
+
+  // An electric plane flies only between airports with a charger (sim/powertrain.ts).
+  const unchargedStops = aircraft ? missingChargers(state, aircraft, rotationAirports.map((stop) => stop.iata)) : [];
+  if (unchargedStops.length > 0) return fail(`${tail} is electric: no charger at ${unchargedStops.join(', ')}. Build one in the airport view.`, false);
 
   // Grow the network one airport at a time: a rotation's base has to
   // already be somewhere the player flies. Only the base is checked, not

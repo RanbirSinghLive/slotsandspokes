@@ -21,7 +21,7 @@ import { LOAD_FACTOR, RECAPTURE_RATE } from '../sim/economy';
 import { connectingPassengersThrough } from '../sim/hubs';
 import {
   CODESHARE_FEED_FACTOR,
-  DIRECT_BOOKING_YIELD,
+  ONLINE_BOOKING_OVERHEAD,
   LOYALTY_RECAPTURE_RATE,
   runningCostOf,
   WINGLET_FUEL_FACTOR,
@@ -29,6 +29,7 @@ import {
   SPOILAGE_STEP,
 } from '../sim/innovations';
 import { greatCircleDistanceNm } from '../sim/geo';
+import { networkOverheadPerDay } from '../sim/overhead';
 import { cashNeededToLease } from '../sim/leasing';
 import { overheadAddedByNextPlane, overheadSavedByOneFewer } from '../sim/overhead';
 import * as actions from '../sim/playerActions';
@@ -1142,7 +1143,7 @@ function leaseWhenFull(state: SimState, memory: Memory, bold: boolean): string[]
 function innovationGainPerDay(state: SimState, id: InnovationId): number {
   const lastWeek = state.revenueHistory.slice(-7);
   const revenue = lastWeek.length > 0 ? lastWeek.reduce((sum, r) => sum + r, 0) / lastWeek.length : 0;
-  if (id === 'online-booking') return revenue * (DIRECT_BOOKING_YIELD - 1);
+  if (id === 'online-booking') return networkOverheadPerDay(state) * (1 - ONLINE_BOOKING_OVERHEAD);
   if (id === 'winglets') return state.todayCostByCategory.fuel * (1 - WINGLET_FUEL_FACTOR);
   // Recapture only helps flights that turn people away: a tenth of revenue is a fair guess at how much that is.
   if (id === 'loyalty-scheme') return revenue * 0.1 * (LOYALTY_RECAPTURE_RATE - RECAPTURE_RATE);
@@ -1165,19 +1166,35 @@ function innovationGainPerDay(state: SimState, id: InnovationId): number {
   return leaseBill * 0.1;
 }
 
-/** Adopt whichever open innovations pay for themselves soon enough and leave cash to spare. */
+/** The electric path changes how planes are leased, which the steady player does not model; it never researches it. */
+const ELECTRIC_PATH = new Set(['efficiency-study', 'hybrid-certification', 'hybrid-retrofit', 'charging-tech', 'electric-25']);
+/** The R&D budget level (sim/rd.ts) the steady player runs when it has cash to spare. */
+const RESEARCH_BUDGET_LEVEL = 2;
+
+/**
+ * Keep the R&D shop working: the same projects as before, picked by the
+ * same payback rule on their point cost, funded at a modest budget while
+ * the airline holds its usual cash reserve.
+ */
 function adoptInnovations(state: SimState): string[] {
-  const done: string[] = [];
   const leases = state.aircraft.reduce((sum, aircraft) => sum + aircraft.leaseCostPerDay, 0);
-  for (const option of actions.innovationOptions(state)) {
-    if (option.adopted || option.blocked) continue;
-    if (state.cash < option.oneOffPrice + INNOVATION_RESERVE_DAYS * leases) continue;
-    const gain = innovationGainPerDay(state, option.id);
-    const runningCost = runningCostOf(option.id, state.revenueHistory.slice(-1)[0] ?? 0);
-    if (runningCost > 0 ? gain < runningCost * INNOVATION_RUNNING_MARGIN : option.oneOffPrice > gain * INNOVATION_PAYBACK_DAYS) continue;
-    const adopted = actions.adoptInnovation(state, option.id);
-    if (adopted.ok) done.push(adopted.message);
+  const reserve = INNOVATION_RESERVE_DAYS * leases;
+  const done: string[] = [];
+  const busy = actions.innovationOptions(state).find((option) => option.active);
+  if (!busy) {
+    for (const option of actions.innovationOptions(state)) {
+      if (option.adopted || option.blocked || ELECTRIC_PATH.has(option.id)) continue;
+      const gain = innovationGainPerDay(state, option.id);
+      const runningCost = runningCostOf(option.id, state.revenueHistory.slice(-1)[0] ?? 0);
+      if (runningCost > 0 ? gain < runningCost * INNOVATION_RUNNING_MARGIN : option.oneOffPrice > gain * INNOVATION_PAYBACK_DAYS) continue;
+      const started = actions.startResearch(state, option.id);
+      if (started.ok) done.push(started.message);
+      break;
+    }
   }
+  // Funds follow cash: off below the reserve, so research never starves the leases.
+  const wanted = state.cash >= reserve ? RESEARCH_BUDGET_LEVEL : 0;
+  if (actions.rdReadout(state).level !== wanted && (busy || done.length > 0 || wanted === 0)) actions.setRdBudget(state, wanted);
   return done;
 }
 

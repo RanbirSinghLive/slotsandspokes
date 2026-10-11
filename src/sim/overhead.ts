@@ -1,4 +1,5 @@
 import { executiveOverheadMultiplier } from './executives';
+import { innovationOverheadMultiplier } from './innovations';
 import type { SimState } from './state';
 
 /**
@@ -44,17 +45,17 @@ export function networkOverheadFor(planes: number): number {
 /** What the airline pays in overhead a day now. */
 export function networkOverheadPerDay(state: SimState): number {
   // A cost-cutting CFO trims it (sim/executives.ts).
-  return networkOverheadFor(state.aircraft.length) * executiveOverheadMultiplier(state);
+  return networkOverheadFor(state.aircraft.length) * executiveOverheadMultiplier(state) * innovationOverheadMultiplier(state);
 }
 
 /** How much the daily overhead would fall with one plane fewer. */
 export function overheadSavedByOneFewer(state: SimState): number {
   const planes = state.aircraft.length;
   if (planes === 0) return 0;
-  return (networkOverheadFor(planes) - networkOverheadFor(planes - 1)) * executiveOverheadMultiplier(state);
+  return (networkOverheadFor(planes) - networkOverheadFor(planes - 1)) * executiveOverheadMultiplier(state) * innovationOverheadMultiplier(state);
 }
 
 /** How much one more plane would add to the daily overhead. */
 export function overheadAddedByNextPlane(state: SimState): number {
-  return (networkOverheadFor(state.aircraft.length + 1) - networkOverheadFor(state.aircraft.length)) * executiveOverheadMultiplier(state);
+  return (networkOverheadFor(state.aircraft.length + 1) - networkOverheadFor(state.aircraft.length)) * executiveOverheadMultiplier(state) * innovationOverheadMultiplier(state);
 }

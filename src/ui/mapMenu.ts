@@ -31,6 +31,7 @@ import { hasCrewBase, mxLevel } from '../sim/bases';
 import { classOpen, tierThatOpens } from '../sim/ladder';
 import { cabinHireFee, hireFee, needsCabinCrew } from '../sim/crews';
 import { SEASON_DAYS, SEASONAL_PREMIUM } from '../sim/seasonalLease';
+import { CHARGER_FEE, CHARGER_PER_DAY } from '../sim/powertrain';
 
 /**
  * Click something on the map, get a ring of actions for it at the click,
@@ -206,7 +207,7 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
   const termPrice = (perDay: number) => (seasonalTerm ? Math.round(perDay * SEASONAL_PREMIUM) : perDay);
   const termWords = seasonalTerm ? ` · for ${SEASON_DAYS} days, back by itself` : '';
   const planeChoices: RadialAction[] = ops.planeOptions(state, airport.iata).map((option) => ({
-    id: `plane:${option.code}`,
+    id: `plane:${option.code}${option.powertrain ? `:${option.powertrain}` : ''}`,
     // The actual airframe on offer (sim/market.ts): its age is what
     // explains its price and how late it'll run.
     label: option.listing
@@ -245,7 +246,7 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
         facts: ['Crews are hired separately: have crews rated on this type at the base before its first flight.'],
         confirmLabel: 'Lease',
         run: () => {
-          const result = ops.leasePlane(state, airport.iata, option.code, seasonalTerm);
+          const result = ops.leasePlane(state, airport.iata, option.code, seasonalTerm, option.powertrain === 'electric' ? 'electric' : undefined);
           notice = result.ok ? result.message : result.reason;
           refresh();
         },
@@ -378,6 +379,37 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
     };
   };
 
+  // A charger (sim/powertrain.ts): electric planes fly only between airports that have one.
+  const chargerChoice = (): RadialAction => {
+    const charger = ops.chargerReadout(state, airport.iata);
+    return {
+      id: 'base:charger',
+      label: charger.built ? `${airport.iata} has a charger` : `Build charger · ${money(CHARGER_FEE)} + ${money(CHARGER_PER_DAY)}/day · electric planes need one at every stop`,
+      icon: textIcon('⚡', 9),
+      large: true,
+      angleDeg: 0,
+      disabledReason: charger.blocked ?? undefined,
+      onSelect: () => {
+        showConfirm({
+          title: `Build charger · ${airport.iata}`,
+          rows: [
+            { label: 'Fee', value: money(CHARGER_FEE) },
+            { label: 'Running cost', value: `${money(CHARGER_PER_DAY)}/day` },
+            ...cashAfterRows(state, CHARGER_FEE),
+          ],
+          facts: ['Electric planes land only where there is a charger, and a charger is needed where one is based.'],
+          confirmLabel: `Build · ${money(CHARGER_FEE)}`,
+          run: () => {
+            const result = ops.buildCharger(state, airport.iata);
+            notice = result.ok ? result.message : result.reason;
+            refresh();
+          },
+        });
+        return false;
+      },
+    };
+  };
+
   // Hub style (sim/hubStyle.ts): each choice planned up front, like the
   // route ring's turn buffer, so one the base can't absorb is greyed out
   // with the reason, and hovering one previews its effect on the pools.
@@ -447,11 +479,11 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
     },
     {
       id: 'base',
-      label: `Create base at ${airport.iata} · crew, line or hangar`,
+      label: `Create base at ${airport.iata} · crew, line, hangar or charger`,
       icon: ICON.base,
       angleDeg: 60,
-      disabledReason: hasCrewBase(state, airport.iata) && mxLevel(state, 'line', airport.iata) > 0 && mxLevel(state, 'heavy', airport.iata) > 0 ? `${airport.iata} has a crew base, a line base and a hangar` : undefined,
-      children: [baseChoice('crew'), baseChoice('line'), baseChoice('heavy')],
+      disabledReason: hasCrewBase(state, airport.iata) && mxLevel(state, 'line', airport.iata) > 0 && mxLevel(state, 'heavy', airport.iata) > 0 && ops.chargerReadout(state, airport.iata).built ? `${airport.iata} has a crew base, a line base, a hangar and a charger` : undefined,
+      children: [baseChoice('crew'), baseChoice('line'), baseChoice('heavy'), chargerChoice()],
     },
     {
       id: 'return',

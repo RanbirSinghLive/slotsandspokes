@@ -35,6 +35,8 @@ export type InboundLease = {
   arrivesDay: number;
   /** A seasonal lease (sim/seasonalLease.ts): how many days it's kept from delivery. */
   seasonalDays?: number;
+  /** A hybrid or electric build (sim/powertrain.ts). */
+  powertrain?: 'hybrid' | 'electric';
 };
 
 /** Days from signing a lease to the plane's delivery: shorter with a fleet programmes COO (sim/executives.ts). */
@@ -48,7 +50,7 @@ export function returnDays(state: SimState): number {
 }
 
 /** Sign a lease on this listing, already taken off the shelf: the plane is delivered later. Returns its delivery day. */
-export function orderLease(state: SimState, listing: MarketListing, base: string, seasonalDays?: number): number {
+export function orderLease(state: SimState, listing: MarketListing, base: string, seasonalDays?: number, powertrain?: 'hybrid' | 'electric'): number {
   const arrivesDay = dayIndex(state) + deliveryDays(state);
   (state.inboundLeases ??= []).push({
     typeCode: listing.typeCode,
@@ -57,6 +59,7 @@ export function orderLease(state: SimState, listing: MarketListing, base: string
     leasePricePerDay: listing.leasePricePerDay,
     arrivesDay,
     ...(seasonalDays !== undefined ? { seasonalDays } : {}),
+    ...(powertrain ? { powertrain } : {}),
   });
   return arrivesDay;
 }
@@ -105,6 +108,7 @@ export function rollDailyFleet(state: SimState): void {
     for (const lease of due) {
       const aircraft = leaseAircraft(state, lease.typeCode, lease.base, lease.ageYears, lease.leasePricePerDay);
       if (lease.seasonalDays !== undefined) aircraft.seasonalUntilDay = today + lease.seasonalDays;
+      if (lease.powertrain) aircraft.powertrain = lease.powertrain;
     }
   }
   const leaving = state.aircraft.filter((aircraft) => aircraft.returningOnDay !== undefined && aircraft.returningOnDay <= today);
