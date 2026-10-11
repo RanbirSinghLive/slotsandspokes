@@ -4,7 +4,8 @@ import { counterRenewal, counterTakeover, faceOf, graduation, makeOffers, renewa
 import { dayIndex } from './clock';
 import { currentPotentialDemand } from './marketDemand';
 import { marketKey } from './schedule';
-import { eligibleRivals, minAskPerDay, placeBid, reservePerDay, TENDER_OPEN_DAYS } from './tenders';
+import { standingOf } from './standing';
+import { bidScore, BUYER_TYPES, buyerKey, buyerTypeOf, eligibleRivals, minAskPerDay, placeBid, reservePerDay, TENDER_OPEN_DAYS } from './tenders';
 import { chooseHome } from './homes';
 import { createNewGameState } from './state';
 
@@ -335,3 +336,50 @@ function circledContract(seed: number) {
   assert.equal(contract.sadDays, 0);
 }
 console.log('takeover: ok');
+
+// --- Buyer types and standing -------------------------------------------
+
+{
+  // A buyer's type is fixed by the community, and the types score bids differently.
+  const { contract } = runningContract(20);
+  assert.equal(buyerTypeOf(contract), buyerTypeOf({ ...contract }));
+  assert.ok(BUYER_TYPES.includes(buyerTypeOf(contract)));
+  assert.ok(bidScore(0.8, 1, 'province') > bidScore(0.8, 1, 'mine'), 'a province prizes the price of a once-daily bid');
+  assert.ok(bidScore(1.3, 2, 'mine') > bidScore(1.3, 2, 'province'), 'a mine prizes twice-daily flying');
+  assert.ok(bidScore(1, 1, 'health', 100) > bidScore(1, 1, 'health', 0), 'standing lifts the airline\'s score');
+}
+
+{
+  // A happy term earns standing with the buyer, which then lifts the renewal ask.
+  const { state, contract } = runningContract(21);
+  const key = buyerKey(contract);
+  assert.equal(standingOf(state, key), 0);
+  contract.satisfaction = 90;
+  contract.endsDay = dayIndex(state);
+  rollDailyContracts(state);
+  assert.ok(standingOf(state, key) >= 11, `a happy term earns standing (${standingOf(state, key)})`);
+  const withStanding = renewalTerms(state, contract).priceMultiplier;
+  state.standing = {};
+  assert.ok(withStanding > renewalTerms(state, contract).priceMultiplier, 'standing raises the renewal ask');
+}
+
+{
+  // A bad term, and losing the contract to a rival, cost standing.
+  const { state, contract } = runningContract(22);
+  const key = buyerKey(contract);
+  state.standing = { [key]: 30 };
+  contract.satisfaction = 30;
+  contract.endsDay = dayIndex(state);
+  rollDailyContracts(state);
+  assert.ok(standingOf(state, key) < 30, 'a sad term costs standing');
+  const second = circledContract(23);
+  const rivalKey = buyerKey(second.contract);
+  second.state.standing = { [rivalKey]: 40 };
+  second.state.simMinute += 1440;
+  rollDailyContracts(second.state);
+  second.state.simMinute += 1440 * 14;
+  rollDailyContracts(second.state);
+  assert.equal(second.contract.status, 'ended');
+  assert.ok(standingOf(second.state, rivalKey) < 40, 'losing it to a rival costs standing');
+}
+console.log('buyers: ok');

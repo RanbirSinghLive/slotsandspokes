@@ -2,6 +2,7 @@ import { dayIndex } from './clock';
 import type { Contract } from './contracts';
 import { nextRandom } from './rng';
 import { legRights, rivalHomeCountry } from './rights';
+import { standingOf } from './standing';
 import type { SimState } from './state';
 
 /**
@@ -18,8 +19,9 @@ import type { SimState } from './state';
  *   NETWORK_END_FROM_DAY, the network end. Each eligible rival then bids
  *   with PARTICIPATION_CHANCE at the deadline. With no eligible rival the
  *   bid is awarded at once; otherwise at the tender's deadline.
- * - **Score.** Price counts most (a lower ask against the reserve), then
- *   capability (twice-daily flying). A tie goes to the airline.
+ * - **Score.** Price and capability (twice-daily flying), weighted by the
+ *   buyer's type, plus the airline's standing with the buyer. A tie goes to
+ *   the airline.
  *
  * Rolls come from the contracts' own stream (sim/contracts.ts) so a game
  * that never bids plays out as before.
@@ -37,8 +39,8 @@ export const RESERVE_RATIO = 1.3;
 export const TENDER_OPEN_DAYS = 20;
 /** Days an awarded airline has to start flying it. */
 export const START_AFTER_AWARD_DAYS = 30;
-const PRICE_WEIGHT = 0.7;
-const CAPABILITY_WEIGHT = 0.3;
+/** What the airline's standing with a buyer adds to its bid score at full standing; rivals have none. */
+const STANDING_BID_BONUS = 0.15;
 const PARTICIPATION_CHANCE = 0.5;
 /** Rival asks, as a share of the reference. */
 const RIVAL_ASK_LOW = 0.8;
@@ -48,6 +50,28 @@ const MIN_ROUTES_AT_NETWORK_END = 6;
 const NETWORK_END_FROM_DAY = 180;
 /** Mixed into the game's seed to start the contracts' own random stream. */
 export const CONTRACT_STREAM_SALT = 0x5eed_c0de;
+
+export type BuyerType = 'province' | 'mine' | 'health';
+export const BUYER_TYPES: BuyerType[] = ['province', 'mine', 'health'];
+
+/**
+ * How a buyer scores bids: a province or ministry cares most about price, a
+ * mine or resource camp about capability (twice-daily flying), a health
+ * authority about both as the baseline but takes a missed day hard
+ * (sim/contracts.ts's updateSatisfaction()).
+ */
+const PRICE_WEIGHT: Record<BuyerType, number> = { province: 0.85, mine: 0.4, health: 0.7 };
+
+/** The buyer is the community at the far end, so a route that goes back to tender keeps its buyer. Its type never changes. */
+export function buyerKey(contract: Contract): string {
+  return `buyer:${contract.b}`;
+}
+
+export function buyerTypeOf(contract: Contract): BuyerType {
+  let sum = 0;
+  for (const char of contract.b) sum += char.charCodeAt(0);
+  return BUYER_TYPES[sum % BUYER_TYPES.length];
+}
 
 type Outcome = { ok: true; message: string } | { ok: false; reason: string };
 
@@ -94,8 +118,9 @@ function priceScore(askRatio: number): number {
   return Math.min(1, Math.max(0, (RESERVE_RATIO - askRatio) / (RESERVE_RATIO - MIN_ASK_RATIO)));
 }
 
-export function bidScore(askRatio: number, frequency: 1 | 2): number {
-  return PRICE_WEIGHT * priceScore(askRatio) + CAPABILITY_WEIGHT * (frequency === 2 ? 1 : 0.5);
+export function bidScore(askRatio: number, frequency: 1 | 2, type: BuyerType = 'health', standing = 0): number {
+  const price = PRICE_WEIGHT[type];
+  return price * priceScore(askRatio) + (1 - price) * (frequency === 2 ? 1 : 0.5) + (STANDING_BID_BONUS * standing) / 100;
 }
 
 function askRatioOf(contract: Contract, bid: Bid): number {
@@ -154,10 +179,10 @@ export function settleTender(state: SimState, contract: Contract, flownBothWays:
     state.contractSeed = s3;
     if (participates >= PARTICIPATION_CHANCE) continue;
     const frequency: 1 | 2 = frequencyRoll < RIVAL_FREQUENCY_2_CHANCE ? 2 : 1;
-    const score = bidScore(RIVAL_ASK_LOW + askRoll * (RIVAL_ASK_HIGH - RIVAL_ASK_LOW), frequency);
+    const score = bidScore(RIVAL_ASK_LOW + askRoll * (RIVAL_ASK_HIGH - RIVAL_ASK_LOW), frequency, buyerTypeOf(contract));
     if (!best || score > best.score) best = { code, score };
   }
-  if (best && best.score > bidScore(askRatioOf(contract, contract.bid), contract.bid.frequency)) {
+  if (best && best.score > bidScore(askRatioOf(contract, contract.bid), contract.bid.frequency, buyerTypeOf(contract), standingOf(state, buyerKey(contract)))) {
     contract.status = 'lapsed';
     contract.lostTo = best.code;
     return;
