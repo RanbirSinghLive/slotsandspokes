@@ -5670,6 +5670,16 @@ button.ops-item:hover {
 .brief-gaps {
   margin-top: 8px;
 }
+#fleet-orders {
+  grid-column: 1 / -1;
+}
+.order-buttons .inspector-plan-hub {
+  margin: 0 4px 0 0;
+  padding: 2px 9px;
+}
+.order-line .inspector-row-detail {
+  margin-top: 2px;
+}
 #brief-settings {
   display: grid;
   grid-template-columns: 1fr auto;

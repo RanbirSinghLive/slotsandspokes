@@ -3639,6 +3639,21 @@ Each cause has a different answer available:
   events; Space resumes). The Messages switch ✋ on the Game screen turns
   the pause off; the ops row's CALL count still lists the planes.
 
+  **Standing orders** (`sim/orders.ts`, `ui/orders.ts`). Each plane has an
+  order, ✋ ask, 🛡 protect or ✂ auto, set on its page (Fleet › plane) or as
+  a fleet default on the Game screen; a plane's own beats the default,
+  which beats ask. Ask is the call above. Protect and auto are never
+  raised as calls (no pause, no CALL count). Auto settles the call without
+  a stop, once a minute (`applyStandingOrders()`, ahead of the departure
+  loop), and only when it clearly pays: for a `curfew` call, a swap to an
+  idle plane that saves a curfew cancel for a fee below the rotation's
+  revenue, else the cancel whose rescued revenue beats what it gives up
+  (flights, when no revenue is known yet); for an `event` call, the cancel
+  of a non-priority rotation that brings the priority flight back inside
+  60 minutes when the penalty it avoids beats the revenue given up. A plane
+  that is only `late` is left alone. What auto did is in `state.orderLog`,
+  shown on the plane's page. A game that never sets auto does no extra work.
+
 A cancellation scores a flat **-80 NPS** rather than extending the delay
 curve, which floors at -50: a cancellation isn't a very late flight, it's
 a different failure. NPS therefore divides by its own denominator

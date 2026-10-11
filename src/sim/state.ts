@@ -1,4 +1,5 @@
 import type { FareClassSettings, FareClassTally } from './fareClasses';
+import type { CallOrder } from './orders';
 import type { GameDifficulty } from './difficulty';
 import type { FareWar, FareWarEvent } from './fareWars';
 import type { DemandEvent } from './demandEvents';
@@ -306,6 +307,13 @@ export type SimState = {
    * Optional: made on first use.
    */
   swappedToday?: { legId: string; fromTail: string }[];
+  /**
+   * Standing orders for late planes (sim/orders.ts): the fleet default and
+   * a plane's own, each 'ask', 'protect' or 'auto'. Absent means ask.
+   */
+  callOrders?: { fleet?: CallOrder; tails?: Record<string, CallOrder> };
+  /** What the 'auto' order did, newest last, capped. */
+  orderLog?: { day: number; tail: string; text: string }[];
   /**
    * Gantt moves held for the midnight rollover (sim/retime.ts): a rotation
    * in the air, or part flown, keeps today's flying and takes its new

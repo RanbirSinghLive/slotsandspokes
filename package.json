@@ -34,6 +34,7 @@
     "rightstest": "tsx src/sim/rightsLicences.test.ts",
     "stationtest": "tsx src/sim/stations.test.ts",
     "extrastest": "tsx src/sim/extras.test.ts",
+    "orderstest": "tsx src/sim/orders.test.ts",
     "sorttest": "tsx src/sim/scheduleSort.test.ts"
   },
   "devDependencies": {
