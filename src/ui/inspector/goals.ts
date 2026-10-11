@@ -1,4 +1,5 @@
 import { airlineCalled, currentTier, gateMilestones, isMilestoneMet, LADDER, tierComplete, tierCounts, tierNeeded, tiersClimbed, type Milestone, type Tier } from '../../sim/ladder';
+import { HOLD_DAYS, LEAD_RATIO, LEAD_ROUTES, nemesisStatus } from '../../sim/nemesis';
 import { info, line, heading } from './dom';
 import type { SimState } from '../../sim/state';
 import { select } from '../selection';
@@ -120,6 +121,29 @@ export function buildGoalsView(state: SimState): HTMLElement {
     }
   } else {
     root.append(line('Top tier reached', 'inspector-line is-good'));
+  }
+
+  // The nemesis: out-fly it and hold the lead.
+  const rivalry = nemesisStatus(state);
+  if (rivalry) {
+    const bar = document.createElement('div');
+    bar.className = 'goal-badge';
+    const name = document.createElement('div');
+    name.className = 'goal-badge-name';
+    name.append(`Out-fly ${rivalry.nemesis.airline} `, info(`The rival that has taken the most from your routes. Fly ${LEAD_ROUTES} or more routes beyond it, and ${LEAD_RATIO} times as many, and hold that lead for ${HOLD_DAYS} days in a row. Beating it retires it as your nemesis; a bigger rival then rises.`));
+    const track = document.createElement('div');
+    track.className = 'goal-badge-bar';
+    const fill = document.createElement('div');
+    fill.style.width = `${Math.min(100, (rivalry.leadDays / HOLD_DAYS) * 100)}%`;
+    track.append(fill);
+    const detail = document.createElement('div');
+    detail.className = 'goal-badge-detail';
+    detail.textContent = `Routes ${rivalry.yourRoutes} v ${rivalry.theirRoutes} · lead held ${rivalry.leadDays}/${HOLD_DAYS}d`;
+    bar.append(name, track, detail);
+    const strip = document.createElement('div');
+    strip.className = 'goal-badges';
+    strip.append(bar);
+    root.append(heading('Nemesis'), strip);
   }
 
   // Every tier, climbed, current and ahead; ★ counts the extras that teach a mechanic.

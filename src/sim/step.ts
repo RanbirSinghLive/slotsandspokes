@@ -4,6 +4,7 @@ import { accrueMaintenance, morningHolds, recordFlown, rollNightlyChecks, wornAg
 import { chargeNightStops } from './nightStops';
 import { applyPendingRetimes } from './retime';
 import { rollDailyFareWars } from './fareWars';
+import { rollDailyRivalry } from './nemesis';
 import { effectiveFareClasses } from './seatSale';
 import { rollDailyBrand } from './brand';
 import { ferryStrandedPlanes } from './ferry';
@@ -405,6 +406,7 @@ export function step(state: SimState): void {
     applyFarePolicy(state);
     rollDailyRivalFares(state);
     rollDailyFareWars(state);
+    rollDailyRivalry(state);
     rollRivalCapacityResponse(state, state.simMinute);
     // The lessor's delivery (sim/market.ts) comes *after* the rivals have
     // grown for the day. Rivals only ever act at rollover, so an airframe
