@@ -129,7 +129,7 @@ const LONG_TABLE = 12;
 function loadGrouping(): Grouping {
   try {
     const saved = localStorage.getItem(GROUPING_KEY);
-    if (saved === 'hub' || saved === 'sector') return saved;
+    if (saved === 'hub' || saved === 'sector' || saved === 'region') return saved;
   } catch {
     // Storage can be blocked; the table still works ungrouped.
   }
@@ -199,7 +199,7 @@ function groupHeader(group: RouteGroup, by: RouteGroupBy, open: boolean, onToggl
   const caret = document.createElement('span');
   caret.className = 'route-group-caret';
   caret.textContent = open ? '▾' : '▸';
-  name.append(caret, by === 'hub' ? glyph('hub') : glyph(group.name === 'domestic' ? 'flag' : 'globe'), `${group.name} · ${group.keys.length}`);
+  name.append(caret, by === 'hub' ? glyph('hub') : by === 'region' ? glyph('mapPin') : glyph(group.name === 'domestic' ? 'flag' : 'globe'), `${group.name} · ${group.keys.length}`);
   const margin = document.createElement('td');
   const trend = group.previousPerDay === null ? '' : trendMark(group.perDay, group.previousPerDay);
   margin.textContent = `${perDayText(group.perDay)}${group.share === null ? '' : ` · ${percentText(group.share)}`} ${trend}`.trim();
@@ -243,7 +243,7 @@ export function buildRoutesView(state: SimState, sort: RouteSort): HTMLElement {
   const intro = document.createElement('div');
   intro.className = 'inspector-line';
   intro.textContent = `Worst ${column.name.toLowerCase()} first`;
-  intro.append(' ', info('Margin is the average a day over the last 7 days, with the last 14 as a line (dashed = $0), the share of revenue in the tip, and an arrow against the week before. Tags: contract and event pay are inside it; a sprout is a route under 2 weeks old. On-time, flown, load and yield (cents per passenger nautical mile) are the last 7 days; flights are per direction; NPS about the last month. Group by hub (the end with more routes) or by sector (domestic = both ends in your home country). Click a heading to sort by it, or a route to open it.'));
+  intro.append(' ', info('Margin is the average a day over the last 7 days, with the last 14 as a line (dashed = $0), the share of revenue in the tip, and an arrow against the week before. Tags: contract and event pay are inside it; a sprout is a route under 2 weeks old. On-time, flown, load and yield (cents per passenger nautical mile) are the last 7 days; flights are per direction; NPS about the last month. Group by hub (the end with more routes), by sector (domestic = both ends in your home country) or by region (where the far end is, by map position, so approximate). Click a heading to sort by it, or a route to open it.'));
   root.append(intro);
 
   const chips = document.createElement('div');
@@ -252,6 +252,7 @@ export function buildRoutesView(state: SimState, sort: RouteSort): HTMLElement {
     ['none', 'All', 'One list'],
     ['hub', 'Hub', 'Grouped by the airport each route hangs off'],
     ['sector', 'Sector', 'Domestic or international'],
+    ['region', 'Region', "Where the far end is, by map position (approximate)"],
   ] as const) {
     const button = document.createElement('button');
     button.type = 'button';
