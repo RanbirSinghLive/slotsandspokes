@@ -2,6 +2,7 @@ import { nightStopCostPerNight, nightStopLegs } from '../../sim/nightStops';
 import { classByCode } from '../../sim/aircraftClasses';
 import { dayIndex } from '../../sim/clock';
 import { line, heading, lineWithInfo } from './dom';
+import { takeCallBlockFlash } from '../callAlert';
 import { gameDate, money } from '../format';
 import { aogFor, daysUntilReturn } from '../../sim/aog';
 import { projectGroundedDay, projectRestOfDay } from '../../sim/cascade';
@@ -307,7 +308,7 @@ function buildDay(state: SimState, tail: string): HTMLElement {
  * rotation it can still cancel. Shown only when there is something to
  * decide; the confirm step states what the choice changes in numbers.
  */
-function buildController(state: SimState, tail: string, changed: () => void): HTMLElement | null {
+export function buildController(state: SimState, tail: string, changed: () => void): HTMLElement | null {
   const projection = projectGroundedDay(state, tail);
   if (!projection.some((p) => p.cancelled || p.lateMinutes > 0)) return null;
   const rotations = cancellableRotations(state, tail);
@@ -315,6 +316,8 @@ function buildController(state: SimState, tail: string, changed: () => void): HT
 
   const block = document.createElement('div');
   block.className = 'inspector-return';
+  // Arriving from the call popup's open button: the block is where the eye should land.
+  if (takeCallBlockFlash(tail)) block.classList.add('call-flash');
   block.append(
     heading(
       'Needs a call',
