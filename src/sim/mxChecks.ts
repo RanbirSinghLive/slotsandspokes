@@ -483,6 +483,15 @@ export function canBookHeavyCheck(state: SimState, aircraft: Aircraft): boolean 
   );
 }
 
+/** Why an open C check can't be booked right now, or null when it can (or isn't open). */
+export function heavyBookBlocker(state: SimState, aircraft: Aircraft): string | null {
+  if (!heavyCheckOpen(aircraft) || aircraft.heavyCheckBooked || aircraft.dCheckBooked || canBookHeavyCheck(state, aircraft)) return null;
+  if (state.aogs.some((event) => event.tail === aircraft.tail)) return 'Grounded already';
+  if (aircraft.rebase) return 'Rebasing';
+  if (aircraft.status !== 'ground') return `In the air · books once parked at ${aircraft.baseAirport}`;
+  return `At ${aircraft.atAirport} · books once parked at ${aircraft.baseAirport}`;
+}
+
 /** A heavy check done: the interval starts again, every deferred item is cleared and the maintenance reserve is paid. */
 export function finishHeavyCheck(state: SimState, aircraft: Aircraft): void {
   settleMaintenance(state, aircraft);

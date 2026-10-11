@@ -1364,11 +1364,29 @@ button,
 
 /* Planning a draft (ui/panels.ts): flights may overlap until the green
    check saves them. The bar holds icons only; their tips name them. */
-#timeline-draft-bar {
+#timeline-tools {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 12px;
   margin-bottom: 6px;
+}
+
+#timeline-sorts {
+  display: flex;
+  gap: 6px;
+}
+
+.draft-button.is-sort svg {
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+}
+
+#timeline-draft-bar {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
 }
 
 #timeline-draft-bar[hidden] {
@@ -5991,4 +6009,39 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
   margin-left: 2px;
   font-size: 10px;
   color: #ffb347;
+}
+
+.mx-bay-book,
+.mx-bay-wait {
+  margin-left: 6px;
+  padding: 0 3px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+.mx-bay-book svg,
+.mx-bay-wait svg {
+  width: 14px;
+  height: 14px;
+}
+
+.mx-bay.is-bookable {
+  border-style: solid;
+  background: rgba(255, 128, 128, 0.1);
+}
+
+.mx-bay.is-bookable .mx-bay-book:hover {
+  color: #e6e9f2;
+}
+
+@media (pointer: coarse) {
+  .mx-bay-book,
+  .mx-bay-wait {
+    padding: 6px 10px;
+    margin: -6px -4px -6px 2px;
+  }
 }
