@@ -3918,6 +3918,18 @@ failure costs.
   weather or a closed airspace, which are waived. A day with no flight on the
   route within 2 hours of the offered time also costs a failure. A term of
   10 to 21 days kept to 95% pays 3 premiums.
+- **Client standing** (`sim/standing.ts`). Each of the nine `STORIES` is a
+  client, with a standing from 0 to 100 kept in `state.standing` under
+  `event:<story>`. A flight kept on time earns 0.5, a term kept to 95% earns
+  8, a failed flight costs 3 and a term that falls short costs 4; it fades
+  0.4% of itself a day. Standing multiplies the premium (and so the penalty
+  and bonus) up to 2x at 100, locked in when the offer is made. A client with
+  15 or more standing, with nothing open, also offers again unprompted: the
+  chance a day is the sum of the loyal clients' standing over 100, divided by
+  12, and the fleet-size thinning does not apply, so a large airline keeps
+  the clients it earned. The offer window shows the pips (one per 20).
+  Standing is generic by key, so tender buyers (`buyer:<id>`) can use the same
+  functions.
 - **Priority.** `rollDailyCrews()` crews a plane flying a priority flight
   first, so a shortage falls on another plane. There is no curfew or
   turn-buffer exemption.

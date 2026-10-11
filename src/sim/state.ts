@@ -587,6 +587,8 @@ export type SimState = {
   /** Storm forecasts for busy airports and how they turned out (sim/crisis.ts). Optional: made on first use. */
   crises?: Crisis[];
   crisisSeed?: number;
+  /** How much each client trusts the airline, 0 to 100, keyed by client (sim/standing.ts). Optional: made on first use. */
+  standing?: Record<string, number>;
   nextCrisisId?: number;
   /** Priority flights offered, accepted or just finished (sim/mandates.ts). */
   mandates?: Mandate[];

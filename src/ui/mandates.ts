@@ -1,6 +1,7 @@
-import { acceptMandate, LATE_MINUTES, mandateIsActive, mandatesOf, MIN_TERM_SUCCESS, STORIES, type Mandate } from '../sim/mandates';
+import { acceptMandate, clientKey, LATE_MINUTES, mandateIsActive, mandatesOf, MIN_TERM_SUCCESS, STORIES, type Mandate } from '../sim/mandates';
 import { dayIndex, minuteOfDayToTimeString } from '../sim/clock';
 import type { SimState } from '../sim/state';
+import { standingOf, standingPips } from '../sim/standing';
 import { showConfirm } from './confirmModal';
 import { money, shortMoney } from './format';
 
@@ -44,13 +45,14 @@ function showOffer(state: SimState, mandate: Mandate, refresh: () => void): void
     tone: 'priority',
     intro: [`Carrying ${story.who}. ${story.headline}.`],
     rows: [
+      { label: 'Client standing', value: `${standingPips(standingOf(state, clientKey(mandate.story)))} ${Math.round(standingOf(state, clientKey(mandate.story)))}` },
       { label: 'First flight', value: `in ${mandate.startDay - today} days` },
       { label: 'Term', value: `${termFlights(mandate)} days, one flight a day` },
       { label: 'On time', value: `+${money(mandate.premium)} a flight` },
       { label: `Cancelled or ${LATE_MINUTES}+ min late`, value: `-${money(mandate.penalty)}` },
       { label: `${Math.round(MIN_TERM_SUCCESS * 100)}% kept`, value: `+${money(mandate.premium * 3)} bonus` },
     ],
-    facts: ['Crews go to this plane first. Weather and closed airspace are never charged. Decline costs nothing; the offer stays in the Schedule until it lapses.'],
+    facts: ['Standing with this client builds with every flight kept and a term kept, drops with every failure, and fades slowly. It raises what they pay and brings them back. Crews go to this plane first. Weather and closed airspace are never charged. Decline costs nothing; the offer stays in the Schedule until it lapses.'],
     confirmLabel: 'Accept',
     cancelLabel: 'Not now',
     run: () => accept(state, mandate, refresh),
