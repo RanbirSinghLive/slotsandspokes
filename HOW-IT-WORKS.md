@@ -3010,6 +3010,17 @@ more people: measured, a Tight-banks Montréal connected the most
 passengers of any style and earned the least.
 
 ---
+### Route flows (`src/sim/routeFlows.ts`)
+
+The route view's Flows section splits a route's daily margin by who rides it:
+local passengers, then each connecting flow from the airports beyond either
+end. The market is summed twice through `summarizeMarket()`, with and without
+the hubs' feed. Without is the local row; the difference is the feed, shared
+between flows by the passengers each offers. Connecting passengers book first
+into the cheapest seats and each leg sells its own ticket (no proration), so a
+flow's money is what its leg earns, and a flow that displaces better-paying
+locals shows negative.
+
 
 ## Air rights (`src/sim/rights.ts`, `data/air-rights.json`)
 

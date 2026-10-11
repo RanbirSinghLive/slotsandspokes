@@ -70,6 +70,8 @@ export function summarizeMarket(
    * they're worked out. Left out, each call works them out afresh.
    */
   connectingByDirection: Map<string, number> = new Map(),
+  /** False sells the market as if no hub fed it (sim/routeFlows.ts's local-only baseline). */
+  withHubFeed = true,
 ): MarketSummary {
   // Sorted by depart time to approximate the same chronological order
   // step.ts's arrivals actually process spill-and-recapture in — a
@@ -98,7 +100,7 @@ export function summarizeMarket(
     let connecting = connectingByDirection.get(direction);
     if (connecting === undefined) {
       // Contract riders (sim/contracts.ts) book like connecting passengers.
-      connecting = connectingDemandOnMarket(state, from, to) + contractRiders(state, from, to);
+      connecting = (withHubFeed ? connectingDemandOnMarket(state, from, to) : 0) + contractRiders(state, from, to);
       connectingByDirection.set(direction, connecting);
     }
     return connecting;

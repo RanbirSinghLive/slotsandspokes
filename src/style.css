@@ -6203,3 +6203,69 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
     height: 24px;
   }
 }
+
+/* Route view Flows section (ui/inspector/route.ts): one row per passenger group. */
+.route-flows {
+  margin-bottom: 8px;
+}
+
+.route-flow-row {
+  display: grid;
+  grid-template-columns: 74px 1fr 34px 54px;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 3px;
+  color: #9aa3b8;
+}
+
+.route-flow-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.route-flow-track {
+  position: relative;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.route-flow-track::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  bottom: -2px;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.route-flow-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.route-flow-bar.is-gain {
+  background: #7ed6a8;
+}
+
+.route-flow-bar.is-loss {
+  background: #ff8080;
+}
+
+.route-flow-pax,
+.route-flow-money {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.route-flow-money.is-loss {
+  color: #ff8080;
+}
+
+.route-flow-total {
+  margin-top: 4px;
+  color: #6b7488;
+  text-align: right;
+}

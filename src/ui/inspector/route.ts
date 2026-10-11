@@ -13,7 +13,7 @@ import {
 import { forecastStance, type StanceForecast } from '../../sim/fareForecast';
 import { inboundAt } from '../../sim/fleetTiming';
 import { cabinShare, crewShare } from '../../sim/crews';
-import { info, line, lineWithInfo } from './dom';
+import { heading, info, line, lineWithInfo } from './dom';
 import { ON_TIME_GRACE_MINUTES } from '../../sim/delays';
 import { money } from '../format';
 import { showConfirm } from '../confirmModal';
@@ -54,6 +54,7 @@ import { CROWDING_WINDOW_MINUTES, crowdingWeight } from '../../sim/timeOfDay';
 import { chartLegend } from '../chartLegend';
 import { buildSeatSplitBar } from '../seatSplitBar';
 import { formatFrequency, formatYield, marketYieldCents } from '../../sim/routeYield';
+import { routeFlows } from '../../sim/routeFlows';
 import { marketCharacterWord, marketMix } from '../../sim/marketCharacter';
 
 /**
@@ -252,6 +253,9 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   if (fees) root.append(fees);
   root.append(...buildFare(state, a, b, changed));
 
+  const flows = buildFlows(state, a, b);
+  if (flows) root.append(flows);
+
   // The planes this route draws on, pooled at its base.
   const base = ops.routeBase(state, a, b);
   const poolsHeading = line(base ? `Planes at ${base}` : '');
@@ -268,6 +272,58 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   root.append(buildRouteOtp(state, a, b));
 
   return { root, redrawPools };
+}
+
+/**
+ * Where the route's passengers come from and what each group adds to its
+ * daily margin (sim/routeFlows.ts): local travellers first, then each
+ * connecting flow from the airports beyond either end. Bars grow from a
+ * centre line, green earning and red costing. Null when the route has no
+ * flights.
+ */
+function buildFlows(state: SimState, a: string, b: string): HTMLElement | null {
+  const result = routeFlows(state, a, b);
+  if (!result) return null;
+  const section = document.createElement('div');
+  section.className = 'route-flows';
+  section.append(
+    heading(
+      'Flows',
+      `Who rides ${a}–${b} a day, and what each group adds to its margin. Local is the city pair itself. Each other row is passengers changing planes at ${a} or ${b}, from the airport shown. Connecting passengers book first into the cheapest seats and each leg sells its own ticket, so a flow's money is what the route gains with it against without it, shared between flows by how many each offers. Red means they take seats from better-paying travellers. To grow a flow, add a connecting frequency or a bigger plane into its hub.`,
+    ),
+  );
+  const rows: Array<{ label: string; hub: string | null; passengers: number; margin: number }> = [
+    { label: `${a}–${b}`, hub: null, passengers: result.local.passengers, margin: result.local.margin },
+    ...result.flows.map((flow) => ({ label: flow.from, hub: flow.hub, passengers: flow.passengers, margin: flow.margin })),
+  ];
+  const biggest = Math.max(1, ...rows.map((row) => Math.abs(row.margin)));
+  for (const row of rows) {
+    const el = document.createElement('div');
+    el.className = 'route-flow-row';
+    el.title = row.hub ? `${row.label} passengers changing planes at ${row.hub}` : 'Local passengers on this city pair';
+    const name = document.createElement('span');
+    name.className = 'route-flow-name';
+    name.textContent = row.hub ? `${row.label} ⇄ ${row.hub}` : 'Local';
+    const track = document.createElement('span');
+    track.className = 'route-flow-track';
+    const bar = document.createElement('span');
+    const width = (Math.abs(row.margin) / biggest) * 50;
+    bar.className = `route-flow-bar ${row.margin < 0 ? 'is-loss' : 'is-gain'}`;
+    bar.style.width = `${width}%`;
+    bar.style.left = row.margin < 0 ? `${50 - width}%` : '50%';
+    track.append(bar);
+    const pax = document.createElement('span');
+    pax.className = 'route-flow-pax';
+    pax.textContent = `${Math.round(row.passengers)}`;
+    const money = document.createElement('span');
+    money.className = `route-flow-money ${row.margin < 0 ? 'is-loss' : ''}`;
+    money.textContent = shortSigned(row.margin);
+    el.append(name, track, pax, money);
+    section.append(el);
+  }
+  const total = line(`Σ ${Math.round(rows.reduce((sum, row) => sum + row.passengers, 0))} pax · ${shortSigned(result.margin)}/day`, 'route-flow-total');
+  section.append(total);
+  return section;
 }
 
 /**
