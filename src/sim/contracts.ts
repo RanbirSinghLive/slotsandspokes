@@ -2,6 +2,7 @@ import airportsData from '../../data/airports.json';
 import { AIRCRAFT_CLASSES } from './aircraftClasses';
 import { dayIndex } from './clock';
 import { marketDistanceNm, potentialDailyDemand } from './demand';
+import { actualDailyDemand, currentPotentialDemand, VIRGIN_MARKET_PDEW } from './marketDemand';
 import { marketNps } from './nps';
 import { bestRangeNm, networkAirports } from './reach';
 import { grantedCountries, homeCountry, legRights } from './rights';
@@ -29,13 +30,16 @@ import { CONTRACT_STREAM_SALT, frequencyOf, settleTender, TENDER_OPEN_DAYS, type
  *   against higher bars than ordinary passengers hold it to
  *   (performanceFactor()), and half the payment is a bonus earned the
  *   same way (paymentShare()): taxpayers' money buys reliability.
- * - **Renewal or the snap-back.** A term kept up to the terms on average
- *   (RENEW_MIN_PERFORMANCE) is renewed smaller (RENEWAL_SIZE), up to
- *   MAX_RENEWALS times: subsidies taper. Otherwise, or finally, the riders
- *   and the payment stop and the market's built-up demand
- *   (sim/marketDemand.ts) drops by SNAP_BACK_SHARE: a subsidised route is
- *   weaker than it looked, so taking one is a bet on building something
- *   that survives it.
+ * - **Renewal, graduation or the snap-back.** In the last
+ *   RENEWAL_WINDOW_DAYS the buyer's terms show (renewalTerms()): the first
+ *   term's pay scaled by the buyer's mood and by graduation(), how much of
+ *   the route's gap to its potential the market has not yet built. Left
+ *   alone it renews on those terms. A market that has grown to stand on its
+ *   own ends with nothing lost; a buyer left too unhappy ends it, the
+ *   market's built-up demand (sim/marketDemand.ts) drops by SNAP_BACK_SHARE
+ *   and the route goes out to tender again. A subsidised route is weaker
+ *   than it looked, so taking one is a bet on building something that
+ *   survives it.
  *
  * Sizes vary by seed and by the home's weakness (homeWeakness()), worked
  * out from the data, not from a measured rating, which contracts
@@ -82,6 +86,11 @@ export type Contract = {
   satisfaction?: number;
   /** Consecutive days the buyer has been sad, for the takeover window. */
   sadDays?: number;
+  /** What the contract paid and sent riders at when it first started, which renewals scale from without compounding. */
+  basePaymentPerDay?: number;
+  baseRidersPerDay?: number;
+  /** The airline's counter on its renewal, set in the renewal window. */
+  renewalAsk?: number;
 };
 
 export type Face = 'happy' | 'neutral' | 'sad';
@@ -108,12 +117,6 @@ export const SNAP_BACK_SHARE = 0.4;
 /** The weakness scale's ends: a median home is 1. */
 const MIN_WEAKNESS = 0.5;
 const MAX_WEAKNESS = 4;
-/** A term's average performance at which the contract is renewed rather than ended. */
-export const RENEW_MIN_PERFORMANCE = 0.5;
-/** Each renewal's payment and riders against the term before: subsidies taper. */
-const RENEWAL_SIZE = 0.75;
-/** After this many renewals it ends whatever the performance. */
-const MAX_RENEWALS = 3;
 /** Finished contracts kept to show in Head office. */
 const HISTORY_KEPT = 8;
 
@@ -229,6 +232,88 @@ export function averagePerformance(contract: Contract): number {
   return contract.performanceDays ? (contract.performanceSum ?? 0) / contract.performanceDays : 1;
 }
 
+/** Days before the term ends in which renewal terms show and can be countered. */
+export const RENEWAL_WINDOW_DAYS = 30;
+/** A happy buyer pays up to this much more on renewal, a sad one up to SAD_MAX_CUT less. */
+const HAPPY_MAX_RAISE = 0.15;
+const SAD_MAX_CUT = 0.25;
+/** A happy buyer lets the airline counter this far above the terms; any buyer lets it go down to MIN_COUNTER_RATIO. */
+const COUNTER_EXTRA = 0.1;
+const MIN_COUNTER_RATIO = 0.7;
+/** Below this mood at the end of a term, the buyer puts the route out to tender again. */
+export const RETENDER_BELOW = 20;
+/** The market has built this share of its gap to potential when the buyer's need is gone. */
+const GRADUATE_AT = 0.7;
+/** At this graduation or below the buyer no longer needs a contract and the term simply ends. */
+const GRADUATED_BELOW = 0.25;
+
+export type RenewalTerms = {
+  /** `graduated`: the market stands on its own, `retender`: the buyer is too unhappy to renew. */
+  outcome: 'renew' | 'graduated' | 'retender';
+  /** 1 while the market still needs the subsidy, falling to 0 as it builds. */
+  graduation: number;
+  priceMultiplier: number;
+  paymentPerDay: number;
+  ridersPerDay: number;
+  /** The range the airline may counter within. */
+  minAsk: number;
+  maxAsk: number;
+};
+
+/**
+ * How much of the buyer's original need is left, 1 to 0: the market's
+ * built-up demand has closed this share of the gap between a market
+ * nobody serves and its potential. A route that has grown to stand on its
+ * own no longer needs a subsidy, so the buyer pays and sends less.
+ */
+export function graduation(state: SimState, contract: Contract): number {
+  const gap = currentPotentialDemand(state, contract.a, contract.b) - VIRGIN_MARKET_PDEW;
+  if (gap <= 0) return 1;
+  const progress = Math.min(1, Math.max(0, (actualDailyDemand(state, contract.a, contract.b) - VIRGIN_MARKET_PDEW) / gap));
+  return Math.max(0, 1 - progress / GRADUATE_AT);
+}
+
+/**
+ * What the buyer would renew on if the term ended today: the first term's
+ * pay (not compounded from earlier renewals) times graduation times a
+ * mood multiplier, from -25% when the buyer is at its saddest to +15% at
+ * its happiest.
+ */
+export function renewalTerms(state: SimState, contract: Contract): RenewalTerms {
+  const base = contract.basePaymentPerDay ?? contract.paymentPerDay;
+  const baseRiders = contract.baseRidersPerDay ?? contract.ridersPerDay;
+  const mood = satisfactionOf(contract);
+  const priceMultiplier =
+    mood >= HAPPY_FROM ? 1 + (HAPPY_MAX_RAISE * (mood - HAPPY_FROM)) / (100 - HAPPY_FROM) : mood >= SAD_BELOW ? 1 : 1 - (SAD_MAX_CUT * (SAD_BELOW - mood)) / SAD_BELOW;
+  const left = graduation(state, contract);
+  const paymentPerDay = Math.round((base * left * priceMultiplier) / 100) * 100;
+  return {
+    outcome: left < GRADUATED_BELOW ? 'graduated' : mood < RETENDER_BELOW ? 'retender' : 'renew',
+    graduation: left,
+    priceMultiplier,
+    paymentPerDay,
+    ridersPerDay: Math.max(1, Math.round(baseRiders * left)),
+    minAsk: Math.ceil((paymentPerDay * MIN_COUNTER_RATIO) / 100) * 100,
+    maxAsk: faceOf(contract) === 'happy' ? Math.round((paymentPerDay * (1 + COUNTER_EXTRA)) / 100) * 100 : paymentPerDay,
+  };
+}
+
+type Outcome = { ok: true; message: string } | { ok: false; reason: string };
+
+/** Counter the renewal terms inside the renewal window; unanswered, the contract renews on the terms. */
+export function counterRenewal(state: SimState, contractId: number, askPerDay: number): Outcome {
+  const contract = contractsOf(state).find((c) => c.id === contractId);
+  if (!contract || contract.status !== 'active') return { ok: false, reason: 'That contract is not running' };
+  if ((contract.endsDay ?? Infinity) - dayIndex(state) > RENEWAL_WINDOW_DAYS) return { ok: false, reason: `Renewal opens ${RENEWAL_WINDOW_DAYS} days before the term ends` };
+  const terms = renewalTerms(state, contract);
+  const ask = Math.round(askPerDay / 100) * 100;
+  if (terms.outcome !== 'renew') return { ok: false, reason: 'The buyer is not renewing' };
+  if (ask > terms.maxAsk) return { ok: false, reason: `Over the most the buyer will pay, $${terms.maxAsk}/day` };
+  if (ask < terms.minAsk) return { ok: false, reason: `Under the lowest ask, $${terms.minAsk}/day` };
+  contract.renewalAsk = ask;
+  return { ok: true, message: `Renewal ask $${ask}/day` };
+}
+
 export function contractsOf(state: SimState): Contract[] {
   return state.contracts ?? [];
 }
@@ -330,6 +415,7 @@ export function makeOffers(state: SimState, atStart: boolean): void {
  */
 export function rollDailyContracts(state: SimState): void {
   const today = dayIndex(state);
+  const retenders: Contract[] = [];
   for (const contract of contractsOf(state)) {
     const key = marketKey(contract.a, contract.b);
     if (contract.status === 'offered') {
@@ -338,6 +424,8 @@ export function rollDailyContracts(state: SimState): void {
       if (contract.status !== 'offered') continue;
       if (contract.awardedDay !== undefined && legs >= 2 * frequencyOf(contract)) {
         contract.status = 'active';
+        contract.basePaymentPerDay = contract.paymentPerDay;
+        contract.baseRidersPerDay = contract.ridersPerDay;
         contract.startedDay = today;
         contract.endsDay = today + contract.termDays;
       } else if (today > contract.offerEndsDay) {
@@ -365,21 +453,45 @@ export function rollDailyContracts(state: SimState): void {
     }
 
     if (today >= (contract.endsDay ?? today)) {
-      // Kept up to the terms, it's renewed smaller, and nothing snaps back
-      // yet; let slip, or tapered out, it ends and the market snaps back.
-      if (averagePerformance(contract) >= RENEW_MIN_PERFORMANCE && (contract.renewals ?? 0) < MAX_RENEWALS) {
+      // Renewed on the buyer's terms unless the airline countered inside the
+      // band; a market that has grown to stand on its own just ends, and a
+      // buyer too unhappy to renew ends it, snaps the market back and puts
+      // the route out to tender again.
+      const terms = renewalTerms(state, contract);
+      if (terms.outcome === 'renew') {
+        const counter = contract.renewalAsk;
         contract.renewals = (contract.renewals ?? 0) + 1;
-        contract.paymentPerDay = Math.round((contract.paymentPerDay * RENEWAL_SIZE) / 100) * 100;
-        contract.ridersPerDay = Math.max(1, Math.round(contract.ridersPerDay * RENEWAL_SIZE));
+        contract.paymentPerDay = counter !== undefined && counter >= terms.minAsk && counter <= terms.maxAsk ? counter : terms.paymentPerDay;
+        contract.ridersPerDay = terms.ridersPerDay;
+        contract.renewalAsk = undefined;
         contract.endsDay = today + contract.termDays;
         contract.performanceSum = 0;
         contract.performanceDays = 0;
       } else {
         contract.status = 'ended';
-        const built = state.marketDemand[key];
-        if (built !== undefined) state.marketDemand[key] = built * (1 - SNAP_BACK_SHARE);
+        if (terms.outcome === 'retender') {
+          const built = state.marketDemand[key];
+          if (built !== undefined) state.marketDemand[key] = built * (1 - SNAP_BACK_SHARE);
+          retenders.push(contract);
+        }
       }
     }
+  }
+  for (const old of retenders) {
+    state.contracts!.push({
+      id: (state.nextContractId ??= 1),
+      a: old.a,
+      b: old.b,
+      paymentPerDay: old.basePaymentPerDay ?? old.paymentPerDay,
+      ridersPerDay: old.baseRidersPerDay ?? old.ridersPerDay,
+      termDays: old.termDays,
+      offeredDay: today,
+      offerEndsDay: today + OFFER_OPEN_DAYS,
+      tenderEndsDay: today + TENDER_OPEN_DAYS,
+      status: 'offered',
+      paidTotal: 0,
+    });
+    state.nextContractId += 1;
   }
 
   // Keep the running and offered ones, and only the last few finished.

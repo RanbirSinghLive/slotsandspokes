@@ -2144,10 +2144,20 @@ balance lever for a weak home.
   the day's performance ×100, or 0 for a day not flown both ways. Face:
   happy from 70, neutral to 40, sad below. Sad days are counted for the
   takeover window (not built yet). No screen shows it yet.
-- **Renewal or the snap-back.** A term averaging 50% performance or more
-  is renewed at 75% of the size, up to three times. Otherwise, or at the
-  end, the payment and riders stop and the market's built-up demand
-  drops 40%.
+- **Renewal, graduation or the snap-back.** In the last 30 days of a
+  term the buyer's terms show (`renewalTerms()`): the first term's pay
+  (not compounded from earlier renewals) × a mood multiplier (−25% at
+  mood 0, 1× from 40 to 70, +15% at 100) × graduation. Graduation is
+  how much of the route's gap between an unserved market and its
+  potential demand is still unbuilt, 1 down to 0 as the market builds
+  (it reaches 0 when 70% of the gap is closed); riders scale with it
+  too. Left alone the contract renews on those terms. A happy buyer lets
+  you counter up to 10% above them, any buyer down to 70% of them
+  (`counterRenewal()`). Graduation under 25% ends the contract with
+  nothing lost: the market stands on its own. A mood under 20 at the end
+  ends it, the market's built-up demand drops 40%, and the route is put
+  out to tender again at the first term's pay, where a rival may win it.
+  There is no renewal cap or fixed taper.
 - **Where it shows:** CONTRACT lines in the ticker, a Contracts section
   in Head office, a line in the route and airport views, the Office dot
   for a new offer, and a dashed gold line and ring under the Demand lens.
