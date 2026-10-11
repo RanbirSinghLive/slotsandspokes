@@ -3390,7 +3390,11 @@ move to other planes. The plane goes in the next morning, grounded the same way
 as a forced check (`bookedHeavyChecks()`, fault "C check booked"), so the
 player picks a quiet week instead of taking the 7-day grace. The booking is
 cancelled with ✕ any time before then; a booked plane away from base waits at
-the booking until it is back. The headless player never books: checks bank
+the booking until it is back. The same booking is a wrench on the plane's
+hangar bay (the dashed red box at the top of Mtc); a plane that can't book yet
+(in the air, or away from base) shows a plane icon there whose tip says what
+it waits for (`heavyBookBlocker()`). "Queued" means the plane isn't asleep at a
+hangar bay tonight, not that the bays are full. The headless player never books: checks bank
 on nights, then force.
 
 An earlier version took every plane out for 1–3 days every 30 days. A
