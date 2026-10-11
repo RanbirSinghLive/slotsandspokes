@@ -3,7 +3,7 @@ import type { SimState } from '../sim/state';
 import { shortMoney } from './format';
 import { buildPnlCharts } from './pnlHistory';
 import { marginChip } from './marginChip';
-import { networkMargin } from '../sim/networkMargin';
+import { networkMargin, smoothedMarginHistory } from '../sim/networkMargin';
 import { select } from './selection';
 
 /**
@@ -38,10 +38,11 @@ export function updateHudPnl(state: SimState): void {
   if (next === shown) return;
   shown = next;
 
-  const days = state.marginHistory.slice(-STRIP_DAYS);
+  const days = smoothedMarginHistory(state).slice(-STRIP_DAYS);
   const biggest = Math.max(1, ...days.map((margin) => Math.abs(margin)));
   const bars = document.createElement('span');
   bars.className = 'hud-pnl-bars';
+  bars.dataset.tip = 'Daily profit with checks and repairs spread over a week; today as it runs';
   for (const margin of days) {
     const bar = document.createElement('span');
     bar.className = margin >= 0 ? 'is-profit' : 'is-loss';

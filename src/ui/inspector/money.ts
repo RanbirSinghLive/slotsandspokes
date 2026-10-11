@@ -100,12 +100,12 @@ function marginChart(history: number[]): SVGSVGElement {
   return svg;
 }
 
-/** Hub and sector tables: each group's week, summed over its routes. */
+/** Hub, sector and region tables: each group's week, summed over its routes. */
 function groupTable(state: SimState, by: RouteGroupBy): HTMLElement {
   const table = document.createElement('table');
   table.className = 'money-group-table';
   const head = document.createElement('tr');
-  for (const text of [by === 'hub' ? 'Hub' : 'Sector', 'Routes', '$/day', 'Margin', '']) {
+  for (const text of [by === 'hub' ? 'Hub' : by === 'region' ? 'Region' : 'Sector', 'Routes', '$/day', 'Margin', '']) {
     const th = document.createElement('th');
     th.textContent = text;
     head.append(th);
@@ -246,7 +246,7 @@ export function buildMoneyView(state: SimState): HTMLElement {
     }
     const trendLine = marginTrend(state);
     if (trendLine.length > 1) root.append(marginChart(trendLine), line(`7-day flying margin · ${trendLine.length}d · dashed 0%`, 'inspector-line goal-ahead'));
-    root.append(heading('By hub'), groupTable(state, 'hub'), heading('By sector'), groupTable(state, 'sector'));
+    root.append(heading('By hub'), groupTable(state, 'hub'), heading('By sector'), groupTable(state, 'sector'), heading('By region'), groupTable(state, 'region'));
     const best = extremes(state);
     if (best) root.append(heading('Best and worst routes · 7d'), best);
   }

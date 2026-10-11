@@ -1,4 +1,5 @@
 import { contractOn } from './contracts';
+import { regionOf } from './regions';
 import { countryOf, homeCountry } from './rights';
 import { marketKey } from './schedule';
 import type { SimState } from './state';
@@ -142,7 +143,7 @@ export function hubOf(state: SimState, a: string, b: string, routeCounts: Map<st
   return a < b ? a : b;
 }
 
-export type RouteGroupBy = 'hub' | 'sector';
+export type RouteGroupBy = 'hub' | 'sector' | 'region';
 
 export type RouteGroup = {
   name: string;
@@ -156,7 +157,7 @@ export type RouteGroup = {
 };
 
 /** Every flown market with its hub and sector. */
-export function flownMarkets(state: SimState): { key: string; a: string; b: string; hub: string; sector: Sector }[] {
+export function flownMarkets(state: SimState): { key: string; a: string; b: string; hub: string; sector: Sector; region: string }[] {
   const markets = new Map<string, { a: string; b: string }>();
   for (const leg of state.schedule) {
     const key = marketKey(leg.origin, leg.dest);
@@ -167,14 +168,18 @@ export function flownMarkets(state: SimState): { key: string; a: string; b: stri
     counts.set(a, (counts.get(a) ?? 0) + 1);
     counts.set(b, (counts.get(b) ?? 0) + 1);
   }
-  return [...markets.entries()].map(([key, { a, b }]) => ({ key, a, b, hub: hubOf(state, a, b, counts), sector: sectorOf(state, a, b) }));
+  return [...markets.entries()].map(([key, { a, b }]) => {
+    const hub = hubOf(state, a, b, counts);
+    // A route's region is where its far end is: the end that is not the hub.
+    return { key, a, b, hub, sector: sectorOf(state, a, b), region: regionOf(hub === a ? b : a) };
+  });
 }
 
 /** Routes grouped by hub or sector with each group's week, best first. */
 export function routeGroups(state: SimState, by: RouteGroupBy): RouteGroup[] {
   const groups = new Map<string, string[]>();
   for (const market of flownMarkets(state)) {
-    const name = by === 'hub' ? market.hub : market.sector;
+    const name = by === 'hub' ? market.hub : by === 'sector' ? market.sector : market.region;
     groups.set(name, [...(groups.get(name) ?? []), market.key]);
   }
   return [...groups.entries()]
@@ -237,4 +242,25 @@ export function costWeek(state: SimState): CostWeek | null {
   const checks = (state.costHistoryByCategory?.maintenance ?? []).slice(-days);
   const average = sum(checks) / days;
   return { days, perDay, checksPerDay: average, spikeDays: average > 0 ? checks.filter((n) => n > 3 * average).length : 0 };
+}
+
+/** Days of checks and repairs spread across each day, ending at it. */
+const CHECK_SPREAD_DAYS = 7;
+
+/**
+ * Each finished day's profit with checks and repairs spread over the week
+ * instead of landing on the day they were paid: the day's other revenue and
+ * costs stay as they were, and its checks are replaced by the average of the
+ * last CHECK_SPREAD_DAYS days'. A check day then reads as part of a steady
+ * cost rather than a collapse. Cash and the books are unchanged; this is for
+ * the daily bars. A save from before costs by kind were kept returns the days as they were.
+ */
+export function smoothedMarginHistory(state: SimState): number[] {
+  const margins = state.marginHistory;
+  const checks = state.costHistoryByCategory?.maintenance;
+  if (!checks || checks.length !== margins.length) return [...margins];
+  return margins.map((margin, i) => {
+    const recent = checks.slice(Math.max(0, i - CHECK_SPREAD_DAYS + 1), i + 1);
+    return margin + checks[i] - sum(recent) / recent.length;
+  });
 }

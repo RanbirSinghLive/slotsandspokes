@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { createPlayer } from '../headless/player';
 import { startHeadlessGame } from '../headless/newGame';
-import { costWeek, flownMarkets, networkMargin, routeGroups, routeMarginShare, routeTags, routeWeek } from './networkMargin';
+import { costWeek, flownMarkets, smoothedMarginHistory, networkMargin, routeGroups, routeMarginShare, routeTags, routeWeek } from './networkMargin';
+import { regionOf } from './regions';
 import { step } from './step';
 
 // Run with `npm run margintest`: the week's margin figures add up to the
@@ -26,7 +27,7 @@ assert.ok(margin.flying <= 1 && margin.allIn <= 1);
 
 // Each route is in exactly one group of either kind, and the groups add up to the routes.
 const markets = flownMarkets(state);
-for (const by of ['hub', 'sector'] as const) {
+for (const by of ['hub', 'sector', 'region'] as const) {
   const groups = routeGroups(state, by);
   const keys = groups.flatMap((group) => group.keys).sort();
   assert.deepEqual(keys, markets.map((m) => m.key).sort(), `${by} groups cover every route once`);
@@ -53,12 +54,26 @@ const weekCost = state.costHistory.slice(-cw.days).reduce((a, b) => a + b, 0) / 
 const kindsTotal = cw.perDay.reduce((a, row) => a + row.amount, 0);
 assert.ok(Math.abs(kindsTotal - weekCost) < 1, `kinds ${kindsTotal} vs days ${weekCost}`);
 
+// Spreading the checks keeps each day's other costs and revenue, and moves only the lump.
+const smooth = smoothedMarginHistory(state);
+assert.equal(smooth.length, state.marginHistory.length);
+const maintenance = state.costHistoryByCategory!.maintenance;
+for (let i = 0; i < smooth.length; i++) {
+  const withoutChecks = state.marginHistory[i] + maintenance[i];
+  const spread = withoutChecks - smooth[i];
+  assert.ok(spread >= -1e-6, 'a day pays at least nothing for checks');
+}
+const rawSwing = Math.max(...state.marginHistory.slice(-14)) - Math.min(...state.marginHistory.slice(-14));
+const smoothSwing = Math.max(...smooth.slice(-14)) - Math.min(...smooth.slice(-14));
+assert.ok(smoothSwing <= rawSwing + 1e-6, 'spreading checks never widens the swing');
+
 // An older save has none of the new fields.
 delete state.routeRevenueHistory;
 delete state.routeMarginHistory;
 delete state.bonusRevenueHistory;
 delete state.bonusHistoryByMarket;
 delete state.costHistoryByCategory;
+assert.deepEqual(smoothedMarginHistory(state), state.marginHistory, 'no category history: days as they were');
 assert.equal(costWeek(state), null);
 assert.equal(networkMargin(state), null);
 assert.equal(routeWeek(state, first.key).paidPerDay, 0);
@@ -66,5 +81,12 @@ assert.equal(routeWeek(state, first.key).paidPerDay, 0);
 // The same game round-trips through a save.
 const copy = JSON.parse(JSON.stringify(state));
 assert.deepEqual(routeWeek(copy, first.key), routeWeek(state, first.key));
+
+// Regions follow the far end of the route from the hub, and the big airports land where expected.
+const expectedRegions: Record<string, string> = { YUL: 'Quebec', YQB: 'Quebec', YYZ: 'Ontario', YOW: 'Ontario', YHZ: 'Atlantic Canada', YFC: 'Atlantic Canada', YVR: 'Western Canada', BOS: 'US Northeast', ATL: 'US Southeast', ORD: 'US Central', LAX: 'US West', MEX: 'MX' };
+for (const [iata, region] of Object.entries(expectedRegions)) assert.equal(regionOf(iata), region, iata);
+for (const market of markets) {
+  assert.equal(market.region, regionOf(market.hub === market.a ? market.b : market.a));
+}
 
 console.log('margintest ok');

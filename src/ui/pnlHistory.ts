@@ -1,5 +1,6 @@
 import { dayIndex } from '../sim/clock';
 import type { SimState } from '../sim/state';
+import { smoothedMarginHistory } from '../sim/networkMargin';
 import { WINDOW_DAYS, buildBipolarBars, buildUnipolarBars, dayLabel, money } from './pnlBars';
 
 /**
@@ -35,15 +36,20 @@ function buildHeader(label: string, yesterday: number | undefined, today: number
   return header;
 }
 
-function buildChart(label: string, history: number[], today: number, bipolar: boolean): HTMLDivElement {
+function buildChart(label: string, history: number[], today: number, bipolar: boolean, raw?: number[]): HTMLDivElement {
   const shown = [...history.slice(-(WINDOW_DAYS - 1)), today];
   const block = document.createElement('div');
   block.className = 'pnl-chart';
   block.append(buildHeader(label, history[history.length - 1], today));
 
   // The last bar is today; the others count back from yesterday.
-  const tooltipFor = (value: number, indexFromEnd: number) =>
-    indexFromEnd === 1 ? `Today so far: ${money(value)} · still running` : `${dayLabel(indexFromEnd - 1)}: ${money(value)}`;
+  const tooltipFor = (value: number, indexFromEnd: number) => {
+    if (indexFromEnd === 1) return `Today so far: ${money(value)} · still running`;
+    const asPaid = raw?.[raw.length - (indexFromEnd - 1)];
+    // A spread day says what it was before the checks were spread, when that differs.
+    const note = asPaid !== undefined && Math.abs(asPaid - value) >= 1 ? ` · ${money(asPaid)} as paid, checks spread over a week` : '';
+    return `${dayLabel(indexFromEnd - 1)}: ${money(value)}${note}`;
+  };
   block.appendChild(bipolar ? buildBipolarBars(shown, tooltipFor, true) : buildUnipolarBars(shown, tooltipFor, true));
   return block;
 }
@@ -64,6 +70,6 @@ export function buildPnlCharts(state: SimState): HTMLElement[] {
   return [
     buildChart('Revenue', state.revenueHistory, state.todayRevenue, false),
     buildChart('Cost', state.costHistory, state.todayCost, false),
-    buildChart('Margin', state.marginHistory, state.todayMargin, true),
+    buildChart('Margin', smoothedMarginHistory(state), state.todayMargin, true, state.marginHistory),
   ];
 }
