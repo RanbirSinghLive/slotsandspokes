@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import airportCountries from '../../data/airport-countries.json';
-import { faceOf, makeOffers, rollDailyContracts } from './contracts';
+import { counterRenewal, faceOf, graduation, makeOffers, renewalTerms, rollDailyContracts } from './contracts';
+import { dayIndex } from './clock';
+import { currentPotentialDemand } from './marketDemand';
 import { marketKey } from './schedule';
 import { eligibleRivals, minAskPerDay, placeBid, reservePerDay, TENDER_OPEN_DAYS } from './tenders';
 import { chooseHome } from './homes';
@@ -178,3 +180,89 @@ console.log('tenders: ok');
   assert.equal(JSON.stringify(JSON.parse(JSON.stringify(tender))), JSON.stringify(tender));
 }
 console.log('satisfaction: ok');
+
+// --- Renewal, graduation, re-tender (sim/contracts.ts) -------------------
+
+function runningContract(seed: number) {
+  const { state, id } = freshTender(seed);
+  const contract = state.contracts!.find((c) => c.id === id)!;
+  // A big pair, so the market has room to build.
+  contract.a = 'YHZ';
+  contract.b = 'YYZ';
+  placeBid(state, id, contract.paymentPerDay, 1);
+  state.schedule = [
+    { legId: 'r-0', tail: 'C-P001', origin: 'YHZ', dest: 'YYZ', departMinute: 360, blockMinutes: 90 },
+    { legId: 'r-1', tail: 'C-P001', origin: 'YYZ', dest: 'YHZ', departMinute: 600, blockMinutes: 90 },
+  ];
+  state.simMinute += 1440;
+  rollDailyContracts(state);
+  assert.equal(contract.status, 'active');
+  return { state, contract };
+}
+
+{
+  const { state, contract } = runningContract(8);
+  const base = contract.basePaymentPerDay!;
+  assert.equal(base, contract.paymentPerDay);
+  contract.satisfaction = 55;
+  assert.equal(renewalTerms(state, contract).paymentPerDay, Math.round(base / 100) * 100, 'a neutral buyer renews at the first term');
+  contract.satisfaction = 100;
+  assert.ok(renewalTerms(state, contract).paymentPerDay > base * 1.1, 'a happy buyer pays more');
+  contract.satisfaction = 25;
+  const sadTerms = renewalTerms(state, contract);
+  assert.ok(sadTerms.paymentPerDay < base, 'a sad buyer pays less');
+  assert.equal(sadTerms.outcome, 'renew');
+
+  // Counter: only in the window, only inside the band.
+  contract.satisfaction = 90;
+  assert.equal(counterRenewal(state, contract.id, base).ok, false, 'no counter before the window opens');
+  contract.endsDay = dayIndex(state) + 10;
+  const happy = renewalTerms(state, contract);
+  assert.equal(counterRenewal(state, contract.id, happy.maxAsk + 1000).ok, false);
+  assert.equal(counterRenewal(state, contract.id, happy.maxAsk).ok, true);
+  // The mood keeps moving until the term ends; a low counter stays inside the band.
+  assert.equal(counterRenewal(state, contract.id, happy.minAsk).ok, true);
+
+  // Term end: renews on the counter, and again next term without compounding.
+  contract.endsDay = dayIndex(state);
+  rollDailyContracts(state);
+  assert.equal(contract.status, 'active');
+  assert.equal(contract.renewals, 1);
+  assert.equal(contract.paymentPerDay, happy.minAsk, 'renewed on the counter');
+  assert.equal(contract.renewalAsk, undefined);
+  contract.endsDay = dayIndex(state);
+  rollDailyContracts(state);
+  assert.ok(contract.paymentPerDay <= Math.round((base * 1.15) / 100) * 100, 'repeat renewals do not compound');
+}
+
+{
+  // Graduation: a market that has built to its potential no longer needs the contract.
+  const { state, contract } = runningContract(9);
+  const key = marketKey(contract.a, contract.b);
+  state.marketDemand[key] = currentPotentialDemand(state, contract.a, contract.b) * 2;
+  assert.ok(graduation(state, contract) < 0.25, 'a built market has graduated');
+  const before = state.marketDemand[key];
+  const count = state.contracts!.length;
+  contract.endsDay = dayIndex(state);
+  rollDailyContracts(state);
+  assert.equal(contract.status, 'ended');
+  assert.equal(state.marketDemand[key], before, 'a graduated market keeps what it built');
+  assert.equal(state.contracts!.filter((c) => c.status === 'offered' && c.b === 'YYZ').length, 0, 'no new tender');
+  void count;
+}
+
+{
+  // An unhappy buyer ends it, the market snaps back, and the route goes out to tender.
+  const { state, contract } = runningContract(10);
+  const key = marketKey(contract.a, contract.b);
+  state.marketDemand[key] = 30;
+  contract.satisfaction = 10;
+  contract.endsDay = dayIndex(state);
+  rollDailyContracts(state);
+  assert.equal(contract.status, 'ended');
+  assert.ok(state.marketDemand[key] < 30, 'the market snaps back');
+  const again = state.contracts!.find((c) => c.status === 'offered' && c.a === 'YHZ' && c.b === 'YYZ');
+  assert.ok(again, 'the route is out to tender again');
+  assert.equal(again!.paymentPerDay, contract.basePaymentPerDay);
+}
+console.log('renewal: ok');

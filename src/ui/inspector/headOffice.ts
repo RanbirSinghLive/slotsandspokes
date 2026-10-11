@@ -10,7 +10,7 @@ import * as ops from '../routeActions';
 import type { ExecutiveOption, InnovationOption } from '../routeActions';
 import { describeEffect, EXECUTIVE_LAPSE_DAYS, type ExecutiveRole } from '../../sim/executives';
 import { formatNps, networkNps } from '../../sim/nps';
-import { averagePerformance, contractsOf, paymentShare, performanceFactor, RENEW_MIN_PERFORMANCE, SNAP_BACK_SHARE, type Contract } from '../../sim/contracts';
+import { averagePerformance, contractsOf, paymentShare, performanceFactor, faceOf, renewalTerms, RENEWAL_WINDOW_DAYS, SNAP_BACK_SHARE, type Contract } from '../../sim/contracts';
 import { select } from '../selection';
 import { portraitElement, ROLE_COLOURS } from '../portraits';
 import { innovationIconElement } from '../innovationIcons';
@@ -506,7 +506,7 @@ function contractsSection(state: SimState): HTMLElement[] {
   const nodes: HTMLElement[] = [
     heading(
       'Contracts',
-      `Route contracts for small, underserved communities, funded to keep them connected. Fly the market at least once a day each way and the contract pays so much a day for the term and sends contract riders. The riders, and half the pay, depend on the route's on-time, completion and NPS against stricter bars than ordinary passengers hold it to; the other half is guaranteed. A term kept up to the terms on average is renewed smaller; otherwise, when it ends, the market's built-up demand drops ${Math.round(SNAP_BACK_SHARE * 100)}%.`,
+      `Route contracts for small, underserved communities, funded to keep them connected. Fly the market at least once a day each way and the contract pays so much a day for the term and sends contract riders. The riders, and half the pay, depend on the route's on-time, completion and NPS against stricter bars than ordinary passengers hold it to; the other half is guaranteed. In the last ${RENEWAL_WINDOW_DAYS} days the renewal terms show: pay moves with the buyer's mood and shrinks as the market builds and no longer needs the subsidy. A buyer left too unhappy ends it, the market's built-up demand drops ${Math.round(SNAP_BACK_SHARE * 100)}% and the route goes out to tender again.`,
     ),
   ];
   if (contracts.length === 0) {
@@ -540,7 +540,8 @@ function contractsSection(state: SimState): HTMLElement[] {
           `Pay ${Math.round(paymentShare(performance) * 100)}% of ${money(contract.paymentPerDay)} · riders ${Math.round(contract.ridersPerDay * performance)}/${contract.ridersPerDay}`,
           performance < 0.5 ? 'inspector-line is-over' : 'inspector-line',
         ),
-        line(`Term average ${Math.round(averagePerformance(contract) * 100)}% · renews at ${Math.round(RENEW_MIN_PERFORMANCE * 100)}% · paid ${money(contract.paidTotal)}`, 'inspector-line office-card-price'),
+        line(`Term average ${Math.round(averagePerformance(contract) * 100)}% · ${{ happy: '😀', neutral: '😐', sad: '☹' }[faceOf(contract)]} · paid ${money(contract.paidTotal)}`, 'inspector-line office-card-price'),
+        ...renewalLines(state, contract, today),
       );
     } else {
       card.append(line(contract.status === 'ended' ? `Ended · paid ${money(contract.paidTotal)}` : 'Lapsed, not taken up', 'inspector-line goal-ahead'));
@@ -548,6 +549,19 @@ function contractsSection(state: SimState): HTMLElement[] {
     nodes.push(card);
   }
   return nodes;
+}
+
+/** Renewal terms once the window opens: the new pay a day, or why it will not renew. */
+function renewalLines(state: SimState, contract: Contract, today: number): HTMLElement[] {
+  if ((contract.endsDay ?? Infinity) - today > RENEWAL_WINDOW_DAYS) return [];
+  const terms = renewalTerms(state, contract);
+  const text =
+    terms.outcome === 'renew'
+      ? `Renews at ${money(contract.renewalAsk ?? terms.paymentPerDay)}/day · ${terms.ridersPerDay} riders/day`
+      : terms.outcome === 'graduated'
+        ? 'Market stands on its own · ends'
+        : 'Buyer unhappy · goes to tender';
+  return [line(text, terms.outcome === 'renew' ? 'inspector-line office-card-price' : 'inspector-line is-over')];
 }
 
 /**
