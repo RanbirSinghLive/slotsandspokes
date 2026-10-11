@@ -3601,29 +3601,53 @@ a different failure. NPS therefore divides by its own denominator
 
 ---
 
-## Innovations (`src/sim/innovations.ts`)
+## Innovations and the R&D shop (`src/sim/innovations.ts`, `src/sim/rd.ts`)
 
-Airline programmes the ladder opens and the player chooses to adopt, at
-Head office (Network › Head office), each for good. Climbing a tier doesn't
-hand them out; it lets the player buy them, and each pays back only on
-an airline big enough to use it.
+Airline programmes the ladder opens and the player researches at Head
+office (Network › Head office), each for good. Climbing a tier doesn't hand
+them out; it puts them on offer. Money then buys them by the day, not at
+once.
 
-Head office shows them as a **tech tree**: the ladder's tiers down a
-spine, a dot lit green once the tier is climbed, each branching to the
-programmes it opens, each a node with its own icon
-(`ui/innovationIcons.ts`): green when running, amber when it can be
-adopted, grey while its tier is ahead. Clicking a node opens its card
-below the tree, with what it does, what it costs and the Adopt button.
+**The shop.** The player sets a daily R&D budget (off, $1k, $3k, $6k or
+$12k) and picks one project. Each rollover (`researchDay()`) spends the
+budget on it, if the cash is there, and turns dollars into points at the
+day's research speed: 1 at 75% on-time, up 0.025 per point of on-time
+share to ×1.5, down to ×0.75 (operating knowledge leads to breakthroughs;
+poor days slow it). A project is done when its points reach its cost, and
+the shop moves to the next step of the chain. A running cost (loyalty,
+codeshare) starts when the project finishes. `adoptedInnovations` still
+lists what is done, so older saves load as they were.
 
-| Innovation | Opens on becoming | Price | Effect |
+Head office shows a **tech tree**: the ladder's tiers down a spine, each
+branching to the projects it opens, each node with its own icon
+(`ui/innovationIcons.ts`): green when done, amber when it can be started
+(pulsing while researched), grey while its tier is ahead or the step before
+it is not done. Clicking a node opens its card with progress, cost and the
+Research button.
+
+| Project | Opens on becoming | Cost (points) | Effect |
 |---|---|---|---|
-| Online booking | Network airline | $400,000 once | every ticket earns 4% more (no agent's cut) |
-| Younger airframes | Network airline | $300,000 once | every plane leased from then on is refurbished 8 years younger (not below 5), at the younger airframe's rate |
-| Crew academy | Regional carrier | $150,000 once | hiring and retraining crews take half the time |
-| Loyalty scheme | International | $500,000 once, then 2% of revenue a day | 60% of turned-away passengers rebook with you, not 40%; rivals see 25% less money on the table on your routes (sim/attractiveness.ts) |
-| Winglet retrofits | International | $800,000 once | 10% less fuel burned (`fuelEfficiencyMultiplier`) |
+| Online booking | Network airline | 400,000 | network overhead −15% |
+| Younger airframes | Network airline | 300,000 | every plane leased from then on is refurbished 8 years younger (not below 5), at the younger airframe's rate |
+| Crew academy | Regional carrier | 150,000 | hiring and retraining crews take half the time |
+| Loyalty scheme | International | 500,000, then 2% of revenue a day | 60% of turned-away passengers rebook with you, not 40%; rivals see 25% less money on the table on your routes (sim/attractiveness.ts) |
+| Winglet retrofits | International | 800,000 | 10% less fuel burned (`fuelEfficiencyMultiplier`) |
 | Codeshare feed | International | $6,000 a day | 30% more connecting passengers at every hub (sim/hubs.ts) |
-| Spoilage management I–V | I–III International, IV–V Global | $3M, $5M, $8M, $12M, $18M once, each needing the one before | each level lets planes sell 1 point more of their seats (75% → up to 80%) |
+| Spoilage management I–V | I–III International, IV–V Global | 3M, 5M, 8M, 12M, 18M, each needing the one before | each level lets planes sell 1 point more of their seats (75% → up to 80%) |
+| Electric path (below) | Regional carrier | 150k, 300k, 400k, 250k, 600k, in order | see below |
+
+**The electric path** (`sim/powertrain.ts`) is five steps, each needing the
+one before. The study, certification and charging-network steps do nothing
+by themselves. *Hybrid propulsion* makes every propeller and regional plane
+leased afterwards a new hybrid build: 25% less fuel, a 15% higher lease
+than the same class new (always a new airframe, never refurbished). *Electric
+25-seater* adds a second 25-seat line to the leasing menu, a 30% higher
+lease and 10% of the fuel; it flies only between airports with a **charger**.
+A charger is built from the airport's Create base menu once *Charging
+network* is done: $250,000 once, $300 a day, charged with the R&D budget
+under the innovations cost. `planRotation()` refuses a route whose stops lack
+one, and the plane can only be leased where one stands. Planes handed back go
+to the lessor as ordinary planes, and planes already flying never change.
 
 Spoilage management is the way to fuller planes (an unsold seat is
 spoiled stock). `loadFactorCap()` adds one point per level and the
@@ -3638,13 +3662,14 @@ money on the table, `connectingFeedMultiplier()` into each hub's flows
 (and its cache key), `leasedAge()` into leasing (the lease fan shows the
 refurbished age and price). Running costs are charged at rollover, under
 the cost category `innovations`; the loyalty scheme's share is of the
-day just ended. Adopting opens a confirm window with the price, running cost and cash after, since it can't be undone.
+day just ended.
 
-The steady headless player adopts one when its one-off price pays back
-from a rough estimate of the gain within 90 days (a running cost must be
-beaten 1.5 times), leaving 60 days of leases in cash. Measured: it
-adopts most of them between days 100 and 200, and its median year-end
-cash rises 5–65% by home (WEEK-TEN.md, thread 2).
+The steady headless player picks the next project by the same payback
+rule on its point cost (a running cost must be beaten 1.5 times), runs the
+$3k budget while its cash covers 60 days of leases, and switches the budget
+off below that. It never researches the electric path. `npm run rdtest`
+checks the shop, the chain and the chargers.
+
 
 ---
 

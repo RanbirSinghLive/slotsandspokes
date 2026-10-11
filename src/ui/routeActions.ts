@@ -12,7 +12,11 @@ import { renderScheduleWarnings, scheduleProblems } from './panels';
  */
 
 export {
-  adoptInnovation,
+  startResearch,
+  setRdBudget,
+  rdReadout,
+  chargerReadout,
+  buildCharger,
   crewReadout,
   crewBaseReadout,
   mxBaseReadout,

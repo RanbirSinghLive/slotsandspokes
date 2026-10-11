@@ -25,6 +25,7 @@ import {
   ancillaryLevel,
 } from '../../sim/ancillaries';
 import { LADDER, tiersClimbed } from '../../sim/ladder';
+import { RD_BUDGETS } from '../../sim/rd';
 import { buyRights, dropRights, EARN_DAYS, LAPSE_DAYS, licencesAllowed, rightsBlocked, rightsCountries, rightsOffer } from '../../sim/rightsLicences';
 
 /**
@@ -35,7 +36,7 @@ import { buyRights, dropRights, EARN_DAYS, LAPSE_DAYS, licencesAllowed, rightsBl
  * innovations the ladder opens (sim/innovations.ts), as a tech tree.
  */
 
-/** One innovation: what it does and costs, and a button to adopt it, or why it can't be yet. */
+/** One project: what it does, how far research has got, and a button to work on it, or why it can't be yet. */
 function innovationCard(state: SimState, option: InnovationOption, changed: () => void): HTMLElement {
   const card = document.createElement('div');
   card.className = 'office-card';
@@ -44,10 +45,8 @@ function innovationCard(state: SimState, option: InnovationOption, changed: () =
   const name = document.createElement('div');
   name.className = 'office-card-name';
   name.append(option.adopted ? `✓ ${option.name} ` : `${option.name} `, info(option.description));
-  const price = [option.oneOffPrice > 0 ? `${money(option.oneOffPrice)} once` : null, option.runningCost ? `${option.runningCost} ongoing` : null]
-    .filter(Boolean)
-    .join(' · ');
-  const status = option.adopted ? (option.runningCost ? `Running · ${option.runningCost}` : 'Adopted') : price;
+  const cost = [`${Math.round(option.progress * 100)}% of ${money(option.oneOffPrice)}`, option.runningCost ? `${option.runningCost} ongoing` : null].filter(Boolean).join(' · ');
+  const status = option.adopted ? (option.runningCost ? `Running · ${option.runningCost}` : 'Done') : cost;
   card.append(name, line(option.summary), line(status, 'inspector-line office-card-price'));
   if (option.adopted) return card;
 
@@ -55,28 +54,47 @@ function innovationCard(state: SimState, option: InnovationOption, changed: () =
     card.append(line(option.blocked, 'inspector-line goal-ahead'));
     return card;
   }
+  if (option.active) {
+    card.append(line('In research', 'inspector-line'));
+    return card;
+  }
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'inspector-plan-hub';
-  button.textContent = 'Adopt';
+  button.textContent = option.progress > 0 ? 'Resume' : 'Research';
   button.addEventListener('click', () => {
-    const rows = [];
-    if (option.oneOffPrice > 0) rows.push({ label: 'Price', value: `${money(option.oneOffPrice)} once` });
-    if (option.runningCost) rows.push({ label: 'Running cost', value: option.runningCost });
-    rows.push(...cashAfterRows(state, option.oneOffPrice));
-    showConfirm({
-      title: `Adopt ${option.name}`,
-      rows,
-      facts: [option.summary, 'Permanent: it cannot be undone' + (option.runningCost ? ', and the running cost runs for good.' : '.')],
-      confirmLabel: 'Adopt',
-      run: () => {
-        ops.adoptInnovation(state, option.id);
-        changed();
-      },
-    });
+    ops.startResearch(state, option.id);
+    changed();
   });
   card.append(button);
   return card;
+}
+
+/** The R&D budget as a row of buttons, the day's speed from on-time performance beside it. */
+function rdBar(state: SimState, changed: () => void): HTMLElement {
+  const readout = ops.rdReadout(state);
+  const bar = document.createElement('div');
+  bar.className = 'rd-bar';
+  const title = document.createElement('div');
+  title.className = 'inspector-line';
+  title.append(`R&D ${readout.perDay > 0 ? `${money(readout.perDay)}/day` : 'off'} · speed ×${readout.speed.toFixed(2)} `,
+    info('Money feeds research: each day the budget is spent on the project you pick and becomes points. Good on-time performance speeds it up (×1.5 at the best, ×0.75 at the worst) because operating knowledge leads to breakthroughs. Some steps do nothing by themselves and only open the next one. Locked projects stay greyed until the ladder opens them.'));
+  const row = document.createElement('div');
+  row.className = 'rd-budgets';
+  RD_BUDGETS.forEach((perDay, level) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'rd-budget';
+    button.classList.toggle('is-on', readout.level === level);
+    button.textContent = perDay === 0 ? 'Off' : money(perDay);
+    button.addEventListener('click', () => {
+      ops.setRdBudget(state, level);
+      changed();
+    });
+    row.append(button);
+  });
+  bar.append(title, row);
+  return bar;
 }
 
 /** A button that opens a confirm window; confirming does it. */
@@ -264,7 +282,8 @@ function techTree(state: SimState, changed: () => void): HTMLElement[] {
       name.textContent = option.name;
       const summary = document.createElement('span');
       summary.className = 'tech-node-summary';
-      summary.textContent = option.adopted ? '✓ running' : option.summary;
+      summary.textContent = option.adopted ? '✓ done' : option.active ? `Researching ${Math.round(option.progress * 100)}%` : option.progress > 0 ? `${Math.round(option.progress * 100)}% · paused` : option.bridge ? 'Opens the next step' : option.summary;
+      node.classList.toggle('is-active', option.active);
       node.append(badge, name, summary);
       node.addEventListener('click', () => {
         selectedInnovation = selectedInnovation === option.id ? null : option.id;
@@ -275,7 +294,7 @@ function techTree(state: SimState, changed: () => void): HTMLElement[] {
     tierEl.append(label, row);
     tree.append(tierEl);
   });
-  const nodes: HTMLElement[] = [tree];
+  const nodes: HTMLElement[] = [rdBar(state, changed), tree];
   const selected = options.find((option) => option.id === selectedInnovation);
   if (selected) nodes.push(innovationCard(state, selected, changed));
   return nodes;
@@ -416,7 +435,7 @@ export function buildHeadOfficeView(state: SimState, changed: () => void): HTMLE
   root.append(...rightsSection(state, changed));
 
   root.append(
-    heading('Innovations', 'Programmes the ladder opens (see Goals): each tier down the tree opens the ones branching from it. Each is yours to adopt, for good, if it pays for your airline. Click one for what it does and costs.'),
+    heading('R&D', 'Projects the ladder opens (see Goals): each tier down the tree opens the ones branching from it. Pick one and the daily budget researches it; each finished project is yours for good. Click one for what it does and costs.'),
     ...techTree(state, changed),
   );
   return root;

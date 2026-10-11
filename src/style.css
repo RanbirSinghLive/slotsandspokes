@@ -3708,6 +3708,42 @@ button.inspector-crumb:hover {
   border-color: #c8d0e0;
 }
 
+.rd-budgets {
+  display: flex;
+  gap: 6px;
+  margin: 4px 0 10px;
+}
+
+.rd-budget {
+  flex: 1;
+  padding: 6px 4px;
+  font: inherit;
+  font-size: 11px;
+  color: #c8d0e0;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.rd-budget.is-on {
+  color: #0a0c12;
+  background: #ffb347;
+  border-color: #ffb347;
+}
+
+.tech-node.is-active .tech-node-badge {
+  color: #ffb347;
+  border-color: #ffb347;
+  animation: rd-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes rd-pulse {
+  50% {
+    box-shadow: 0 0 10px rgba(255, 179, 71, 0.6);
+  }
+}
+
 .office-chair {
   margin: 12px 0 6px;
   font-size: 11px;

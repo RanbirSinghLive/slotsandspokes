@@ -26,6 +26,8 @@ import { connectingDemandOnMarket } from './hubs';
 import { rollTotalDelayMinutes, isOnTimeArrival } from './delays';
 import { rollCompetitorRouteOpenings, rollCompetitorFrequencyGrowth, rollRivalEntry, rollDailyRivalFares } from './competitors';
 import { bookingPerks, runningCostForDay } from './innovations';
+import { researchDay } from './rd';
+import { chargersPerDay, powertrainFuelFactor } from './powertrain';
 import { rollDailyFleet } from './fleetTiming';
 import { rollDailyRebases } from './rebase';
 import { rollDailyRights } from './rightsLicences';
@@ -203,7 +205,7 @@ export function step(state: SimState): void {
 
     // The loyalty scheme costs a share of revenue, so it's worked out from
     // the day that just ended, before the totals reset below.
-    const innovationCost = runningCostForDay(state, state.todayRevenue);
+    const innovationCost = runningCostForDay(state, state.todayRevenue) + researchDay(state) + chargersPerDay(state);
 
     state.completedToday = [];
     state.cancelledToday = [];
@@ -612,7 +614,7 @@ export function step(state: SimState): void {
             type,
             // The locked price under a hedge (sim/fuelPrice.ts).
             airlineFuelPrice(state),
-            state.fuelEfficiencyMultiplier,
+            state.fuelEfficiencyMultiplier * powertrainFuelFactor(aircraft),
             actualDailyDemand(state, flight.origin, flight.dest),
             // Contract riders (sim/contracts.ts) are the airline's own
             // customers too, booked like connecting passengers.

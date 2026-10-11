@@ -24,7 +24,9 @@ import type { SimState } from './state';
  * every place that books a flight or judges a market sees the same thing.
  */
 
-export type InnovationId = 'online-booking' | 'younger-airframes' | 'crew-academy' | 'loyalty-scheme' | 'winglets' | 'codeshare-feed' | SpoilageLevelId;
+export type InnovationId = 'online-booking' | 'younger-airframes' | 'crew-academy' | 'loyalty-scheme' | 'winglets' | 'codeshare-feed' | SpoilageLevelId | ElectricStepId;
+/** The electric path (sim/powertrain.ts): the first, second and fourth steps do nothing by themselves. */
+export type ElectricStepId = 'efficiency-study' | 'hybrid-certification' | 'hybrid-retrofit' | 'charging-tech' | 'electric-25';
 export type SpoilageLevelId = 'spoilage-1' | 'spoilage-2' | 'spoilage-3' | 'spoilage-4' | 'spoilage-5';
 
 export type Innovation = {
@@ -36,14 +38,18 @@ export type Innovation = {
   description: string;
   /** The ladder tier whose climbing opens it (sim/ladder.ts's tier id). */
   openedBy: string;
-  /** Paid once, on adoption. */
+  /** R&D points to finish it (sim/rd.ts): a point is a dollar of budget at 100% on-time. */
   oneOffPrice: number;
+  /** The step before it in its chain: research can't start until that one is done. */
+  needs?: InnovationId;
+  /** A step that does nothing by itself and only opens the next one. */
+  bridge?: boolean;
   /** What it costs to run once adopted, in words ("2% of revenue a day"), or null. */
   runningCost: string | null;
 };
 
-/** Online booking: passengers who book direct pay this much more per ticket, with no agent's cut. */
-export const DIRECT_BOOKING_YIELD = 1.04;
+/** Online booking: selling direct needs fewer agents and desks, so network overhead is multiplied by this. */
+export const ONLINE_BOOKING_OVERHEAD = 0.85;
 /** Younger airframes: years a heavy check takes off each plane leased, down to MIN_REFURBISHED_AGE. */
 export const REFURBISHMENT_YEARS = 8;
 export const MIN_REFURBISHED_AGE = 5;
@@ -82,16 +88,25 @@ function spoilageLevel(level: number): Innovation {
     // The first three open with the international tier, the last two with the flagship tier.
     openedBy: level <= 3 ? 'international' : 'flagship',
     oneOffPrice: SPOILAGE_PRICES[level - 1],
+    needs: level > 1 ? SPOILAGE_LEVELS[level - 2] : undefined,
     runningCost: null,
   };
 }
+
+const ELECTRIC_STEPS: Innovation[] = [
+  { id: 'efficiency-study', name: 'Efficiency study', summary: 'Nothing yet', description: 'Engineers map where the fuel goes. It changes nothing by itself and opens hybrid certification.', openedBy: 'regional', oneOffPrice: 150_000, runningCost: null, bridge: true },
+  { id: 'hybrid-certification', name: 'Hybrid certification', summary: 'Nothing yet', description: 'The regulator signs off a hybrid-electric turboprop. Nothing flies yet; the retrofit programme comes next.', openedBy: 'regional', oneOffPrice: 300_000, runningCost: null, needs: 'efficiency-study', bridge: true },
+  { id: 'hybrid-retrofit', name: 'Hybrid propulsion', summary: 'Prop and regional fuel −25% · new leases dearer', description: 'Every propeller and regional plane you lease from now on is a new hybrid-electric build: 25% less fuel, and a 15% higher lease than the same plane without it. Planes already in the fleet stay as they are.', openedBy: 'regional', oneOffPrice: 400_000, runningCost: null, needs: 'hybrid-certification' },
+  { id: 'charging-tech', name: 'Charging network', summary: 'Chargers at airports', description: 'Fast-charging equipment works at scale. Nothing flies differently yet; you can now build chargers at airports (airport view), and the electric 25-seater needs them at every stop.', openedBy: 'regional', oneOffPrice: 250_000, runningCost: null, needs: 'hybrid-retrofit', bridge: true },
+  { id: 'electric-25', name: 'Electric 25-seater', summary: 'Near-zero fuel · chargers needed', description: 'A fully electric 25-seater joins the lessor: almost no energy cost per flight, and a 30% higher lease than a propeller. It only flies between airports that have a charger, and a charger is needed where it is based.', openedBy: 'regional', oneOffPrice: 600_000, runningCost: null, needs: 'charging-tech' },
+];
 
 export const INNOVATIONS: Innovation[] = [
   {
     id: 'online-booking',
     name: 'Online booking',
-    summary: `Yield +${Math.round((DIRECT_BOOKING_YIELD - 1) * 100)}%`,
-    description: `Sell tickets on your own website: no agent's cut, so every ticket earns ${Math.round((DIRECT_BOOKING_YIELD - 1) * 100)}% more.`,
+    summary: `Overhead −${Math.round((1 - ONLINE_BOOKING_OVERHEAD) * 100)}%`,
+    description: `Sell tickets on your own website: fewer agents and sales desks, so network overhead falls ${Math.round((1 - ONLINE_BOOKING_OVERHEAD) * 100)}%. Yield stays with the revenue officer.`,
     openedBy: 'regional',
     oneOffPrice: 400_000,
     runningCost: null,
@@ -141,6 +156,7 @@ export const INNOVATIONS: Innovation[] = [
     oneOffPrice: 0,
     runningCost: `$${CODESHARE_COST_PER_DAY.toLocaleString()}/day`,
   },
+  ...ELECTRIC_STEPS,
   spoilageLevel(1),
   spoilageLevel(2),
   spoilageLevel(3),
@@ -162,32 +178,25 @@ export function innovationOpen(state: SimState, innovation: Innovation): boolean
   return tierIndex !== -1 && tiersClimbed(state) > tierIndex;
 }
 
-/** Why it can't be adopted right now, or null if it can. */
+/** Why it can't be researched right now, or null if it can: done, behind its ladder tier, or waiting on the step before it. */
 export function adoptBlockedReason(state: SimState, innovation: Innovation): string | null {
   if (isAdopted(state, innovation.id)) return 'Running';
-  const spoilageIndex = SPOILAGE_LEVELS.indexOf(innovation.id as SpoilageLevelId);
-  if (spoilageIndex > 0 && !isAdopted(state, SPOILAGE_LEVELS[spoilageIndex - 1])) return `Needs ${INNOVATIONS.find((i) => i.id === SPOILAGE_LEVELS[spoilageIndex - 1])?.name}`;
+  if (innovation.needs && !isAdopted(state, innovation.needs)) return `Needs ${innovationById(innovation.needs)?.name}`;
   if (!innovationOpen(state, innovation)) {
     const tierIndex = LADDER.findIndex((tier) => tier.id === innovation.openedBy);
     const becomes = LADDER[tierIndex + 1];
     return `Opens as ${becomes ? airlineCalled(becomes) : 'a bigger airline'}`;
   }
-  if (state.cash < innovation.oneOffPrice) return `Needs $${innovation.oneOffPrice.toLocaleString()} cash`;
   return null;
 }
 
-/** Adopt it: pay the one-off price and start the effect. */
-export function adoptInnovation(state: SimState, id: InnovationId): { ok: true; message: string } | { ok: false; reason: string } {
-  const innovation = innovationById(id);
-  if (!innovation) return { ok: false, reason: 'Unknown innovation.' };
-  const blocked = adoptBlockedReason(state, innovation);
-  if (blocked) return { ok: false, reason: blocked };
-  state.cash -= innovation.oneOffPrice;
+/** Research finished (sim/rd.ts): start the effect. Paid for by the R&D budget, not here. */
+export function completeInnovation(state: SimState, id: InnovationId): void {
+  if (isAdopted(state, id)) return;
   state.adoptedInnovations = [...(state.adoptedInnovations ?? []), id];
   // Fuel burn is a number the cost model already reads, so winglets set
   // it once rather than being asked for on every flight.
   if (id === 'winglets') state.fuelEfficiencyMultiplier *= WINGLET_FUEL_FACTOR;
-  return { ok: true, message: `${innovation.name} adopted.` };
 }
 
 /**
@@ -216,8 +225,8 @@ export function bookingPerks(state: SimState, origin: string, dest: string): Boo
   return {
     brandEdge: brandEdge(state, origin, dest),
     positionEdge: positionEdge(state),
-    // Online booking, a revenue-management CCO (sim/executives.ts), and the airline's name (sim/nps.ts).
-    yieldMultiplier: (isAdopted(state, 'online-booking') ? DIRECT_BOOKING_YIELD : 1) * executiveYieldMultiplier(state) * nameYieldMultiplier(state, origin, dest),
+    // A revenue-management CCO (sim/executives.ts), and the airline's name (sim/nps.ts).
+    yieldMultiplier: executiveYieldMultiplier(state) * nameYieldMultiplier(state, origin, dest),
     loadFactor: loadFactorCap(state),
     recaptureRate: isAdopted(state, 'loyalty-scheme') ? LOYALTY_RECAPTURE_RATE : RECAPTURE_RATE,
     ancillaryPerPassenger: ancillaryPerPassenger(state, origin, dest),
@@ -263,4 +272,9 @@ export function runningCostForDay(state: SimState, dayRevenue: number): number {
 /** Hiring and retraining crews take this share of their usual time (sim/crews.ts). */
 export function crewTrainingTimeFactor(state: SimState): number {
   return (isAdopted(state, 'crew-academy') ? CREW_ACADEMY_TIME_FACTOR : 1) * executiveCrewTrainingMultiplier(state);
+}
+
+/** Network overhead is multiplied by this (sim/overhead.ts). */
+export function innovationOverheadMultiplier(state: SimState): number {
+  return isAdopted(state, 'online-booking') ? ONLINE_BOOKING_OVERHEAD : 1;
 }

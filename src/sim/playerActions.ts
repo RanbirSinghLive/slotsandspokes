@@ -85,13 +85,14 @@ import { setAncillaryLevel, setExtra, setRouteFeeLevel, type AncillaryLevel, typ
 import { buyHedge, HEDGE_TERMS, hedgeQuote, type HedgeQuote } from './fuelPrice';
 import {
   adoptBlockedReason,
-  adoptInnovation as adoptInnovationRule,
   INNOVATIONS,
   isAdopted,
   leasedAge,
   type Innovation,
   type InnovationId,
 } from './innovations';
+import { buildCharger as buildChargerRule, chargerBlockedReason, defaultPowertrain, electricAvailable, ELECTRIC_CLASS, hasCharger, powertrainLeasePerDay } from './powertrain';
+import { rdActive, rdBudgetLevel, rdBudgetPerDay, rdProgress, researchSpeed, setRdBudget as setRdBudgetRule, startResearch as startResearchRule } from './rd';
 import { cashNeededToLease, LEASE_RESERVE_DAYS, leaseRateFor, loadLeaseRates } from './leasing';
 import { inboundAt, orderLease } from './fleetTiming';
 import { startSeatSale as startSeatSaleRule } from './seatSale';
@@ -488,6 +489,8 @@ export function removeRoute(state: SimState, a: string, b: string): Outcome<{ me
 export type PlaneOption = {
   code: string;
   name: string;
+  /** Set on a hybrid or electric build (sim/powertrain.ts); the hybrid replaces the usual option of its class, the electric is an extra one. */
+  powertrain?: 'hybrid' | 'electric';
   seats: number;
   /** The airframe a lease would take (sim/market.ts), or null when none of this class is listed. */
   listing: MarketListing | null;
@@ -508,7 +511,9 @@ function days(count: number): string {
  * on the way out at the younger airframe's rate, or an aircraft-finance
  * CFO (sim/executives.ts), who gets the rate down.
  */
-function asLeased(state: SimState, listing: MarketListing): MarketListing {
+function asLeased(state: SimState, listing: MarketListing, powertrain?: 'hybrid' | 'electric'): MarketListing {
+  // A hybrid or electric plane is a new airframe at its own rate (sim/powertrain.ts).
+  if (powertrain) return { ...listing, ageYears: 0, leasePricePerDay: Math.round(powertrainLeasePerDay(listing.typeCode, powertrain) * executiveLeaseMultiplier(state)) };
   const ageYears = leasedAge(state, listing.ageYears);
   const rate = ageYears === listing.ageYears ? listing.leasePricePerDay : leaseRateFor(listing.typeCode, ageYears);
   const leasePricePerDay = Math.round(rate * executiveLeaseMultiplier(state));
@@ -522,49 +527,58 @@ function asLeased(state: SimState, listing: MarketListing): MarketListing {
  * to take.
  */
 export function planeOptions(state: SimState, iata: string): PlaneOption[] {
-  return loadLeaseRates().map((rate) => {
-    const cls = classByCode(rate.typeCode)!;
-    const listings = listingsOf(state, rate.typeCode);
-    const listing = listings[0] ? asLeased(state, listings[0]) : null;
-    let disabledReason: string | undefined;
-    if (!isAircraftTypeAllowedAt(iata, rate.typeCode)) {
-      disabledReason = `Too large to operate at ${iata}.`;
-    } else if (!classOpen(state, rate.typeCode)) {
-      // Earned on the ladder (sim/ladder.ts), not on a date.
-      const opener = tierThatOpens(rate.typeCode);
-      disabledReason = `${pluralClassName(cls.name)} open when you become ${opener ? airlineCalled(opener) : 'a bigger airline'}: see Goals.`;
-    } else if (!listing) {
-      disabledReason = `No ${cls.name} on the market. The next arrives in ${days(daysUntilNextListing(state, rate.typeCode))}, first come first served.`;
-    } else if (!hasCrewBase(state, iata)) {
-      // Planes are based only where crews live (sim/bases.ts).
-      disabledReason = `No crew base at ${iata}: open one on the Crews tab.`;
-    } else if (state.cash < cashNeededToLease(listing.leasePricePerDay)) {
-      disabledReason = `Needs $${cashNeededToLease(listing.leasePricePerDay).toLocaleString()} on hand (${LEASE_RESERVE_DAYS} days of lease) to lease this ${cls.name}.`;
-    }
-    return {
-      code: cls.code,
-      name: cls.name,
-      seats: cls.seats,
-      listing,
-      listed: listings.length,
-      disabledReason,
-      preview: disabledReason ? undefined : { effects: [{ base: iata, classCode: cls.code, minutes: 0, planes: 1 }], routes: [] },
-    };
-  });
+  const options = loadLeaseRates().map((rate) => planeOption(state, iata, rate.typeCode, defaultPowertrain(state, rate.typeCode)));
+  // The electric 25-seater sits beside the propeller once researched, greyed until it can be taken.
+  if (electricAvailable(state)) options.push(planeOption(state, iata, ELECTRIC_CLASS, 'electric'));
+  return options;
+}
+
+function planeOption(state: SimState, iata: string, typeCode: string, powertrain?: 'hybrid' | 'electric'): PlaneOption {
+  const cls = classByCode(typeCode)!;
+  const name = powertrain === 'electric' ? 'Electric 25-seater' : powertrain === 'hybrid' ? `Hybrid ${cls.name}` : cls.name;
+  const listings = listingsOf(state, typeCode);
+  const listing = listings[0] ? asLeased(state, listings[0], powertrain) : null;
+  let disabledReason: string | undefined;
+  if (!isAircraftTypeAllowedAt(iata, typeCode)) {
+    disabledReason = `Too large to operate at ${iata}.`;
+  } else if (!classOpen(state, typeCode)) {
+    // Earned on the ladder (sim/ladder.ts), not on a date.
+    const opener = tierThatOpens(typeCode);
+    disabledReason = `${pluralClassName(cls.name)} open when you become ${opener ? airlineCalled(opener) : 'a bigger airline'}: see Goals.`;
+  } else if (!listing) {
+    disabledReason = `No ${cls.name} on the market. The next arrives in ${days(daysUntilNextListing(state, typeCode))}, first come first served.`;
+  } else if (!hasCrewBase(state, iata)) {
+    // Planes are based only where crews live (sim/bases.ts).
+    disabledReason = `No crew base at ${iata}: open one on the Crews tab.`;
+  } else if (powertrain === 'electric' && !hasCharger(state, iata)) {
+    disabledReason = `No charger at ${iata}: build one in the airport view.`;
+  } else if (state.cash < cashNeededToLease(listing.leasePricePerDay)) {
+    disabledReason = `Needs $${cashNeededToLease(listing.leasePricePerDay).toLocaleString()} on hand (${LEASE_RESERVE_DAYS} days of lease) to lease this ${name}.`;
+  }
+  return {
+    code: cls.code,
+    name,
+    ...(powertrain ? { powertrain } : {}),
+    seats: cls.seats,
+    listing,
+    listed: listings.length,
+    disabledReason,
+    preview: disabledReason ? undefined : { effects: [{ base: iata, classCode: cls.code, minutes: 0, planes: 1 }], routes: [] },
+  };
 }
 
 /** Lease the next listed plane of this class. It arrives immediately, based and parked at `iata`. */
-export function leasePlane(state: SimState, iata: string, typeCode: string, seasonal = false): Outcome<{ message: string }> {
-  const option = planeOptions(state, iata).find((o) => o.code === typeCode);
+export function leasePlane(state: SimState, iata: string, typeCode: string, seasonal = false, powertrain?: 'electric'): Outcome<{ message: string }> {
+  const option = planeOptions(state, iata).find((o) => o.code === typeCode && o.powertrain === (powertrain ?? defaultPowertrain(state, typeCode)));
   if (!option) return { ok: false, reason: 'Unknown aircraft class.' };
   if (option.disabledReason) return { ok: false, reason: option.disabledReason };
   const listing = takeListing(state, typeCode);
   if (!listing) return { ok: false, reason: `No ${option.name} on the market.` };
 
-  const standing = asLeased(state, listing);
+  const standing = asLeased(state, listing, option.powertrain);
   // For the season (sim/seasonalLease.ts): dearer a day, and back by itself.
   const leased = seasonal ? { ...standing, leasePricePerDay: Math.round(standing.leasePricePerDay * SEASONAL_PREMIUM) } : standing;
-  const arrivesDay = orderLease(state, leased, iata, seasonal ? SEASON_DAYS : undefined);
+  const arrivesDay = orderLease(state, leased, iata, seasonal ? SEASON_DAYS : undefined, option.powertrain);
   revealReach(state);
   const crewNote = crewAdvice(state, iata, typeCode);
   const refurbished = leased.ageYears === listing.ageYears ? '' : `, refurbished from ${listing.ageYears}`;
@@ -841,21 +855,46 @@ export function cancelRefit(state: SimState, tail: string): Outcome<{ message: s
 
 export type InnovationOption = Innovation & {
   adopted: boolean;
-  /** Why it can't be adopted now, or null if it can. */
+  /** Why it can't be researched now, or null if it can. */
   blocked: string | null;
+  /** R&D progress, 0 to 1 (sim/rd.ts). */
+  progress: number;
+  /** Whether the shop is working on it today. */
+  active: boolean;
 };
 
-/** Every innovation (sim/innovations.ts), with whether it's running and why it can't be adopted yet. */
+/** Every innovation (sim/innovations.ts), with whether it's done, how far research has got, and why it can't be started yet. */
 export function innovationOptions(state: SimState): InnovationOption[] {
+  const active = rdActive(state);
   return INNOVATIONS.map((innovation) => ({
     ...innovation,
     adopted: isAdopted(state, innovation.id),
     blocked: isAdopted(state, innovation.id) ? null : adoptBlockedReason(state, innovation),
+    progress: rdProgress(state, innovation.id),
+    active: active === innovation.id,
   }));
 }
 
-export function adoptInnovation(state: SimState, id: InnovationId): Outcome<{ message: string }> {
-  return adoptInnovationRule(state, id);
+/** The shop's budget level and dollars a day, and today's speed from on-time performance (sim/rd.ts). */
+export function rdReadout(state: SimState): { level: number; perDay: number; speed: number } {
+  return { level: rdBudgetLevel(state), perDay: rdBudgetPerDay(state), speed: researchSpeed(state) };
+}
+
+export function startResearch(state: SimState, id: InnovationId): Outcome<{ message: string }> {
+  return startResearchRule(state, id);
+}
+
+export function setRdBudget(state: SimState, level: number): Outcome<{ message: string }> {
+  return setRdBudgetRule(state, level);
+}
+
+/** Whether a charger can be built here, and why not (sim/powertrain.ts). */
+export function chargerReadout(state: SimState, iata: string): { built: boolean; blocked: string | null } {
+  return { built: hasCharger(state, iata), blocked: chargerBlockedReason(state, iata) };
+}
+
+export function buildCharger(state: SimState, iata: string): Outcome<{ message: string }> {
+  return buildChargerRule(state, iata);
 }
 
 // --- Fuel hedging --------------------------------------------------------------
