@@ -1364,11 +1364,29 @@ button,
 
 /* Planning a draft (ui/panels.ts): flights may overlap until the green
    check saves them. The bar holds icons only; their tips name them. */
-#timeline-draft-bar {
+#timeline-tools {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 12px;
   margin-bottom: 6px;
+}
+
+#timeline-sorts {
+  display: flex;
+  gap: 6px;
+}
+
+.draft-button.is-sort svg {
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+}
+
+#timeline-draft-bar {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
 }
 
 #timeline-draft-bar[hidden] {

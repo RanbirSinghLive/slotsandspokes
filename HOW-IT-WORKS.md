@@ -1547,7 +1547,9 @@ turns red where it can't go, and the base's hours show across the top
 (amber where full). Letting go commits it (`commitRetime()`); Esc puts
 it back. The rules:
 
-- It must fit the usable day, its new plane's other rotations with a
+- It must fit the usable day (a long-haul round trip, which runs round
+  the clock and is exempt from the 22:00 curfew, may end after 22:00 but
+  still can't start before 06:00), its new plane's other rotations with a
   turn either side, and room in every hour its legs now use at every
   airport (its own old movements count as room, rivals stay where they
   are), with no same-market departure at the same minute.
@@ -1592,6 +1594,21 @@ and replayed when the page reloads, dropped if it no longer fits or is
 another game's. A draft whose flights are all back where the real
 schedule has them closes itself. Inside a draft a night stop can't be
 made or undone.
+
+**One-click sorts** (`sim/scheduleSort.ts`). Three icons beside the draft
+bar re-deal the rotations between planes of the same type at the same
+base, so the same market sits back to back on the same plane. Departure
+times never change, so the curfew, turns, hourly room, slot prices and
+demand timing are all as they were. A night stop's halves, and planes that
+are AOG or leaving the base, stay put. FIFO places rotations in order of
+departure, each on a plane that already flies its market if that one is
+free, else the first free plane in list order (the first planes fill
+first); LIFO takes free planes from the last one back. Optimise starts from
+today's planes and only makes a move or a swap of two rotations that
+leaves a market on fewer planes, so the fewest rotations change plane. The
+result goes into the draft (planned on the draft's copy when one is open)
+and is read on the timeline and saved with the ✓; the whole sort is checked
+first and refused with a reason if it wouldn't hold. `npm run sorttest`.
 
 A dragged rotation **snaps** (`snapStart()`) to within 10 minutes of the
 flight before it (its turn included), the flight after it, or the ends of

@@ -21,6 +21,9 @@ const PATHS = {
   bagOff: '<rect x="5" y="7" width="14" height="14" rx="2"/><path d="M9 7V4h6v3"/>',
   bags: '<rect x="3" y="8" width="11" height="13" rx="2"/><path d="M6 8V5h5v3"/><rect x="15" y="12" width="6" height="9" rx="1.5"/>',
   seat: '<path d="M6 3v9a2 2 0 0 0 2 2h8"/><path d="M16 14v7M8 21h10M6 3h3"/>',
+  sortFifo: '<path d="M4 6h16M4 12h11M4 18h6"/><path d="M19 14v6M16.5 17.5 19 20l2.5-2.5"/>',
+  sortLifo: '<path d="M4 6h6M4 12h11M4 18h16"/><path d="M19 10V4M16.5 6.5 19 4l2.5 2.5"/>',
+  sortBest: '<path d="M10 3l1.8 5.2L17 10l-5.2 1.8L10 17l-1.8-5.2L3 10l5.2-1.8z"/><path d="M19 15v6M16 18h6"/>',
   boarding: '<path d="M4 12h12M11 6l6 6-6 6"/><path d="M20 4v16"/>',
 } as const;
 

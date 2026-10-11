@@ -6,7 +6,7 @@ import { chainProblem, nightStopLegs, planUnwrap, planWrap } from './nightStops'
 import { marketKey, type ScheduleLeg } from './schedule';
 import { nextSlotFees } from './slots';
 import type { SimState } from './state';
-import { scheduledTurnMinutes, USABLE_DAY_END_MINUTE, USABLE_DAY_START_MINUTE } from './utilisation';
+import { isLongHaulRoundTrip, scheduledTurnMinutes, USABLE_DAY_END_MINUTE, USABLE_DAY_START_MINUTE } from './utilisation';
 
 /**
  * Moving a rotation in the day (WEEK-THIRTEEN.md, thread 4): the rules
@@ -142,10 +142,12 @@ export function planRetime(state: SimState, legIds: string[], toTail: string, st
   let kind: RetimePlan['kind'] = 'move';
   let station: string | null = null;
   const offStart = moved[0].departMinute < USABLE_DAY_START_MINUTE;
-  const offEnd = moved[moved.length - 1].departMinute + moved[moved.length - 1].blockMinutes > USABLE_DAY_END_MINUTE;
+  // A long-haul round trip runs round the clock and is exempt from the curfew (sim/curfew.ts), so it may end after 22:00 and never wraps at the evening end.
+  const longHaul = isLongHaulRoundTrip(legs.length, legs.reduce((total, leg) => total + leg.blockMinutes + scheduledTurnMinutes(world, leg.origin, leg.dest), 0));
+  const offEnd = !longHaul && moved[moved.length - 1].departMinute + moved[moved.length - 1].blockMinutes > USABLE_DAY_END_MINUTE;
   // Off either end of the day on its own plane: an out-and-back wraps into a
   // night stop, and a night stop's half pushed past its own end wraps back.
-  if (toTail === fromTail && (offStart || offEnd)) {
+  if (toTail === fromTail && (offStart || offEnd) && !longHaul) {
     const pair = nightStopLegs(world, fromTail);
     const isHalf = pair !== null && legs.length === 1;
     const wrap = isHalf
@@ -175,7 +177,7 @@ export function planRetime(state: SimState, legIds: string[], toTail: string, st
   const end = last.departMinute + last.blockMinutes;
   if (kind === 'move') {
     if (first.departMinute < USABLE_DAY_START_MINUTE) return fail(`Starts ${hhmm(first.departMinute)} · the day opens 06:00`);
-    if (end > USABLE_DAY_END_MINUTE) return fail(`Back at ${hhmm(end)} · past the 22:00 curfew`);
+    if (end > USABLE_DAY_END_MINUTE && !longHaul) return fail(`Back at ${hhmm(end)} · past the 22:00 curfew`);
 
     // Its new plane's other rotations, with a turn either side. (A wrap or
     // an unwrap is planned round them by sim/nightStops.ts.)

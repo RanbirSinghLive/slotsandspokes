@@ -1,7 +1,7 @@
 import { nightStopLegs } from '../sim/nightStops';
 import { hasLineBase, outstationCheck } from '../sim/bases';
 import { deferredItems, MX_HOLD_AT, tonightCheck } from '../sim/mxChecks';
-import { bringNightStopHome, draftProblem, dropRotation, dropRotationInDraft, overlappingLegs, planBringNightStopHome, planDropRotation, removeRotation as removeRotationFromSchedule, saveDraft, snappedStart, type DraftMove, type DropPlan } from '../sim/playerActions';
+import { bringNightStopHome, draftProblem, dropRotation, dropRotationInDraft, overlappingLegs, planBringNightStopHome, planFleetSort, planDropRotation, removeRotation as removeRotationFromSchedule, saveDraft, snappedStart, type DraftMove, type DropPlan, type SortMode } from '../sim/playerActions';
 import type { RetimePlan } from '../sim/retime';
 import { airportHours, FIRST_OPEN_HOUR, freeInHour, OPEN_HOURS } from '../sim/hours';
 import { money, shortMoney } from './format';
@@ -20,6 +20,7 @@ import type { SimState } from '../sim/state';
 import { minuteOfDay, minuteOfDayToTimeString } from '../sim/clock';
 import { info } from './inspector/dom';
 import { linkToMap } from './mapLink';
+import { glyphSvg, type GlyphName } from './glyphs';
 
 // Must match the --panel-width custom property's default value in
 // style.css — see the comment there. Wide enough for the tab bar, the
@@ -272,20 +273,61 @@ type Draft = {
 };
 let draft: Draft | null = null;
 
+// One row over the timeline: the sort icons, and the draft's controls beside them while a draft is open.
+const timelineTools = document.createElement('div');
+timelineTools.id = 'timeline-tools';
 const draftBar = document.createElement('div');
 draftBar.id = 'timeline-draft-bar';
 draftBar.hidden = true;
-rotationsTimelineEl.before(draftBar);
+rotationsTimelineEl.before(timelineTools);
 
+/** An icon button: the words ride in `data-tip`, shown on hover and for a moment after a tap (ui/mapTools.ts). */
 function draftButton(className: string, glyph: string, label: string, onClick: () => void): HTMLButtonElement {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = `draft-button ${className}`;
   button.textContent = glyph;
-  button.title = label;
+  button.dataset.tip = label;
   button.setAttribute('aria-label', label);
   button.addEventListener('click', onClick);
   return button;
+}
+
+/**
+ * One-click re-sorts (sim/scheduleSort.ts): same markets back to back on the
+ * same plane, times untouched. The result lands in the draft, read on the
+ * timeline and confirmed with the ✓.
+ */
+const SORTS: { mode: SortMode; glyph: GlyphName; tip: string }[] = [
+  { mode: 'fifo', glyph: 'sortFifo', tip: 'FIFO · same markets together, filling planes first to last' },
+  { mode: 'lifo', glyph: 'sortLifo', tip: 'LIFO · same markets together, filling planes last to first' },
+  { mode: 'optimise', glyph: 'sortBest', tip: 'Optimise · same markets together, fewest rotations moved' },
+];
+
+const sortGroup = document.createElement('div');
+sortGroup.id = 'timeline-sorts';
+for (const { mode, glyph, tip } of SORTS) {
+  const button = draftButton('is-sort', '', tip, () => sortFleet(mode));
+  button.innerHTML = glyphSvg(glyph);
+  sortGroup.append(button);
+}
+timelineTools.append(sortGroup, draftBar);
+
+function sortFleet(mode: SortMode): void {
+  if (!liveState) return;
+  // Planned on the draft's copy while one is open, so a sort builds on the moves already made.
+  const plan = planFleetSort(draft?.world ?? liveState, mode);
+  if (!plan.ok) {
+    flashTip(`Not sorted · ${plan.reason}`, true);
+    return;
+  }
+  if (plan.moves.length === 0) {
+    flashTip('Already sorted', false);
+    return;
+  }
+  addToDraft(plan.moves);
+  flashTip(`⇄ ${plan.moves.length} rotation${plan.moves.length === 1 ? '' : 's'} moved · ✓ saves`, false);
+  rebuildTimeline();
 }
 
 /** The bar over the timeline while a draft is open: ✎ and a count, then ✓ save, ↶ undo, ✕ discard. Icons only; the tips say which is which. */
@@ -415,7 +457,7 @@ function saveTheDraft(): void {
     return;
   }
   const result = saveDraft(liveState, moves);
-  flashTip(result.ok ? `Saved · ${draft.drops.length} move${draft.drops.length === 1 ? '' : 's'}` : result.reason, !result.ok);
+  flashTip(result.ok ? `Saved · ${moves.length} rotation${moves.length === 1 ? '' : 's'}` : result.reason, !result.ok);
   if (!result.ok) return;
   draft = null;
   storeDraft();
