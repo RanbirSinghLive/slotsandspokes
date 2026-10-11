@@ -167,12 +167,33 @@ export function marketKey(a: string, b: string): string {
  * Pure: the same schedule always gives the same id.
  */
 export function nextLegId(tail: string, legs: ScheduleLeg[]): string {
+  // Every leg that carries this tail's name counts, wherever it flies now: a
+  // rotation moved to another plane keeps its id, and handing its number out
+  // again would give two legs one id.
   const existingNumbers = legs
-    .filter((leg) => leg.tail === tail)
-    .map((leg) => Number(leg.legId.split('-').pop()))
+    .filter((leg) => leg.legId.startsWith(`${tail}-`))
+    .map((leg) => Number(leg.legId.slice(tail.length + 1)))
     .filter((n) => !Number.isNaN(n));
   const nextNumber = (existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0) + 1;
   return `${tail}-${nextNumber}`;
+}
+
+/**
+ * Give a second leg that shares an id its own, so a move or a cancel acts on
+ * one flight. Saves made before nextLegId() counted moved legs can hold such
+ * pairs. The first leg in the schedule keeps the id; returns how many were renamed.
+ */
+export function repairDuplicateLegIds(state: { schedule: ScheduleLeg[] }): number {
+  const seen = new Set<string>();
+  let renamed = 0;
+  for (const leg of state.schedule) {
+    if (seen.has(leg.legId)) {
+      leg.legId = nextLegId(leg.tail, state.schedule);
+      renamed++;
+    }
+    seen.add(leg.legId);
+  }
+  return renamed;
 }
 
 /**

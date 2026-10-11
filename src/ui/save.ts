@@ -1,5 +1,6 @@
 import type { SimState } from '../sim/state';
 import { ensureCrewBases } from '../sim/crews';
+import { repairDuplicateLegIds } from '../sim/schedule';
 import { GAME_VERSION } from './version';
 
 /**
@@ -75,6 +76,8 @@ function renameCodes(state: SimState, renames: Record<string, string>): void {
 function normalise(state: SimState): void {
   // The map reads crews on the very first frame, before any rollover would (sim/crews.ts).
   ensureCrewBases(state);
+  // Two legs once shared an id after a rotation moved planes; a move acts on every leg with the id.
+  repairDuplicateLegIds(state);
 }
 
 export type LoadResult =
