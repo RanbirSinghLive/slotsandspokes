@@ -1,7 +1,7 @@
 import { briefSettings } from '../sim/briefs';
 import { dayIndex } from '../sim/clock';
 import { openCrisis, previewCrisis, setCrisisWaived, type Crisis } from '../sim/crisis';
-import { fleetOrder } from '../sim/orders';
+import { callPolicy } from '../sim/priority';
 import type { SimState } from '../sim/state';
 import { showConfirm } from './confirmModal';
 import { money } from './format';
@@ -10,8 +10,8 @@ import { money } from './format';
  * The crisis forecast (sim/crisis.ts) on the page: a ⛈ chip in the HUD ops
  * row while a forecast is open, and a card with the numbers for both
  * answers. The card pops once when the forecast arrives (pausing the clock
- * if Pause on call is on) when the fleet's order is ask; with protect or
- * auto the chip only says what the order will do.
+ * if Pause on call is on) when the fleet's policy is ask; with priority
+ * the chip only says the controller decides.
  */
 const chipEl = document.querySelector<HTMLButtonElement>('#crisis-chip')!;
 
@@ -19,7 +19,7 @@ const chipEl = document.querySelector<HTMLButtonElement>('#crisis-chip')!;
 const announced = new Set<number>();
 let primed = false;
 
-const ORDER_NOTE = { ask: '', protect: ' · 🛡 flies on', auto: ' · ✂ decides' } as const;
+const POLICY_NOTE = { ask: '', priority: ' · ★ decides' } as const;
 
 function percent(chance: number): string {
   return `${Math.round(chance * 100)}%`;
@@ -57,7 +57,7 @@ function update(state: SimState, choosingHome: boolean): boolean {
   if (!crisis) return false;
   const days = crisis.day - dayIndex(state);
   chipEl.textContent = `⛈ ${crisis.airport} ${percent(crisis.chance)}${crisis.waived ? ' ✂' : ''}`;
-  chipEl.title = `Storm forecast · ${crisis.airport} · ${percent(crisis.chance)} · in ${days}d${crisis.waived ? ' · waived' : ''}${ORDER_NOTE[fleetOrder(state)]}`;
+  chipEl.title = `Storm forecast · ${crisis.airport} · ${percent(crisis.chance)} · in ${days}d${crisis.waived ? ' · waived' : ''}${POLICY_NOTE[callPolicy(state)]}`;
   chipEl.onclick = () => showCard(state, crisis);
   return false;
 }
@@ -74,7 +74,7 @@ export function updateCrisis(state: SimState, choosingHome: boolean): boolean {
   if (!crisis || choosingHome || announced.has(crisis.id)) return false;
   if (document.querySelector('.modal-overlay:not([hidden])')) return false;
   announced.add(crisis.id);
-  if (fleetOrder(state) !== 'ask') return false;
+  if (callPolicy(state) !== 'ask') return false;
   showCard(state, crisis);
   return briefSettings(state).callPause;
 }

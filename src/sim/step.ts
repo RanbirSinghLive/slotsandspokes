@@ -41,7 +41,7 @@ import { cabinCover, FATIGUE_DELAY_MULTIPLIER, legFatigue, rollDailyCrews } from
 import { MAINTENANCE_AGE_FACTOR } from './aog';
 import { isAog, rollDailyAogs } from './aog';
 import { handBackSwaps } from './controller';
-import { applyStandingOrders } from './orders';
+import { applyPriorityPolicy } from './priority';
 import { rollDailyCrisis } from './crisis';
 import {
   executiveSalariesPerDay,
@@ -429,7 +429,7 @@ export function step(state: SimState): void {
   }
 
   // Planes on an 'auto' order get their swap or cancel before the lists below are read.
-  applyStandingOrders(state);
+  applyPriorityPolicy(state);
 
   // Leg ids already flown or cancelled today, and those in the air now, as
   // sets: every due leg is checked against them every minute, and a list

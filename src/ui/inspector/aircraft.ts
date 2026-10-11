@@ -4,7 +4,6 @@ import { classByCode } from '../../sim/aircraftClasses';
 import { dayIndex } from '../../sim/clock';
 import { line, heading, lineWithInfo } from './dom';
 import { takeCallBlockFlash } from '../callAlert';
-import { buildOrdersLine } from '../orders';
 import { gameDate, money } from '../format';
 import { aogFor, daysUntilReturn } from '../../sim/aog';
 import { projectGroundedDay, projectRestOfDay } from '../../sim/cascade';
@@ -211,7 +210,6 @@ export function buildAircraftView(state: SimState, tail: string, changed: () => 
   if (use.share > 1) useLine.classList.add('is-over');
   root.append(useLine);
 
-  root.append(buildOrdersLine(state, tail, changed));
   root.append(heading('Today'), buildDay(state, tail));
   const controllerBlock = buildController(state, tail, changed);
   if (controllerBlock) root.append(controllerBlock);

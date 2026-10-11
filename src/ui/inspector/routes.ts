@@ -6,6 +6,7 @@ import { marketKey } from '../../sim/schedule';
 import type { SimState } from '../../sim/state';
 import * as ops from '../routeActions';
 import { select, type RouteSort } from '../selection';
+import { priorityButton } from '../priority';
 import { info } from './dom';
 import { linkToMap } from '../mapLink';
 
@@ -166,7 +167,8 @@ export function buildRoutesView(state: SimState, sort: RouteSort): HTMLElement {
     tr.className = 'routes-row';
     tr.addEventListener('click', () => select({ kind: 'route', a: row.a, b: row.b }));
     const route = document.createElement('td');
-    route.textContent = `${row.a} – ${row.b}`;
+    route.textContent = `${row.a} – ${row.b} `;
+    route.append(priorityButton(state, row.a, row.b, () => {}));
     const count = document.createElement('td');
     count.textContent = row.frequency;
     tr.append(route, count);

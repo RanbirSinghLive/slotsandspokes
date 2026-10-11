@@ -3713,20 +3713,27 @@ Each cause has a different answer available:
   events; Space resumes). The Messages switch ✋ on the Game screen turns
   the pause off; the ops row's CALL count still lists the planes.
 
-  **Standing orders** (`sim/orders.ts`, `ui/orders.ts`). Each plane has an
-  order, ✋ ask, 🛡 protect or ✂ auto, set on its page (Fleet › plane) or as
-  a fleet default on the Game screen; a plane's own beats the default,
-  which beats ask. Ask is the call above. Protect and auto are never
-  raised as calls (no pause, no CALL count). Auto settles the call without
-  a stop, once a minute (`applyStandingOrders()`, ahead of the departure
-  loop), and only when it clearly pays: for a `curfew` call, a swap to an
-  idle plane that saves a curfew cancel for a fee below the rotation's
-  revenue, else the cancel whose rescued revenue beats what it gives up
-  (flights, when no revenue is known yet); for an `event` call, the cancel
-  of a non-priority rotation that brings the priority flight back inside
-  60 minutes when the penalty it avoids beats the revenue given up. A plane
-  that is only `late` is left alone. What auto did is in `state.orderLog`,
-  shown on the plane's page. A game that never sets auto does no extra work.
+  **Route priority** (`sim/priority.ts`, `ui/priority.ts`). The player
+  ranks a route once, by the icon beside its name (Routes table, route
+  view, and the morning brief): ● normal, ★ keep, ▽ expendable; one tap
+  cycles. The fleet policy on the Game screen is ★ priority (the default,
+  also for old saves) or ✋ ask, which is the call above. Under priority no
+  plane is put to the player (no pause, no CALL count) and the sim settles
+  a breaking day every five minutes (`applyPriorityPolicy()`, ahead of the
+  departure loop). For a `curfew` call it first tries a swap to an idle
+  plane that saves a curfew cancel for a fee below the rotation's revenue;
+  else it cancels the lowest-ranked rotation that recovers the day. A
+  rotation is as protected as its most protected leg. ★ keep is never cut.
+  ▽ expendable goes whenever its loss saves a flight; ● normal only when
+  the rescued revenue beats what it gives up (flights, when no revenue is
+  known yet). For an `event` call it cancels a non-keep, non-priority
+  rotation that brings the priority flight back inside 60 minutes when the
+  penalty it avoids beats the revenue given up. A plane that is only `late`
+  is left alone. An event offered on a ★ route is accepted without a card
+  (other offers wait behind the ★ chip instead of stopping the game). What
+  the policy did is in `state.priorityLog` and the next morning's brief
+  lists it, each with the route's icon to re-rank. Ranks are stored by
+  market in `state.routePriority`; absent means normal.
 
   **Crisis days** (`sim/crisis.ts`, `ui/crisis.ts`). Rarely (a 1-in-100
   chance a day, from day 30, never when events are off) a severe storm is
@@ -3741,9 +3748,10 @@ Each cause has a different answer available:
   care bill) whether the storm comes or not, and the day's revenue is lost
   either way. Waiving costs less on average when the forecast chance is
   above (revenue + waived care) / (revenue + care), shown on the card. The
-  fleet's standing order answers: ✋ ask shows the card when the forecast
-  arrives (and pauses if Pause on call is on), 🛡 always flies on, ✂ waives
-  when the chance is above that break-even. A ⛈ chip in the ops row opens
+  fleet policy answers: ✋ ask shows the card when the forecast
+  arrives (and pauses if Pause on call is on); ★ priority flies on when the
+  airport has a ★ keep route and otherwise waives when the chance is above
+  that break-even. A ⛈ chip in the ops row opens
   the card until the day begins. A network spread over several airports
   loses a smaller share of its day to one closure; that is the preparation.
   The headless player waives whenever the chance is above the break-even.

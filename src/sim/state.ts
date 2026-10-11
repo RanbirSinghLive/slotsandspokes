@@ -1,5 +1,5 @@
 import type { FareClassSettings, FareClassTally } from './fareClasses';
-import type { CallOrder } from './orders';
+import type { CallPolicy, RoutePriority } from './priority';
 import type { Crisis } from './crisis';
 import type { GameDifficulty } from './difficulty';
 import type { FareWar, FareWarEvent } from './fareWars';
@@ -309,12 +309,15 @@ export type SimState = {
    */
   swappedToday?: { legId: string; fromTail: string }[];
   /**
-   * Standing orders for late planes (sim/orders.ts): the fleet default and
-   * a plane's own, each 'ask', 'protect' or 'auto'. Absent means ask.
+   * What the controller does about a plane whose day is breaking
+   * (sim/priority.ts): settle it by route priority, or ask. Absent means
+   * priority.
    */
-  callOrders?: { fleet?: CallOrder; tails?: Record<string, CallOrder> };
-  /** What the 'auto' order did, newest last, capped. */
-  orderLog?: { day: number; tail: string; text: string }[];
+  callPolicy?: CallPolicy;
+  /** Routes marked keep or expendable, by market key; absent means normal. */
+  routePriority?: Record<string, RoutePriority>;
+  /** What the priority policy did, newest last, capped; the daily brief lists yesterday's. */
+  priorityLog?: { day: number; a: string; b: string; text: string }[];
   /**
    * Gantt moves held for the midnight rollover (sim/retime.ts): a rotation
    * in the air, or part flown, keeps today's flying and takes its new

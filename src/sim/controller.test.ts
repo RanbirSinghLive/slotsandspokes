@@ -11,6 +11,7 @@ import { rotationsForTail } from './utilisation';
 // under its own cause, and can't be done twice.
 const player = createPlayer('steady');
 const state = startHeadlessGame('YYZ', 1, player);
+state.callPolicy = 'ask'; // these tests drive the calls by hand
 for (let day = 1; day <= 40; day++) {
   for (let minute = 0; minute < 1440; minute++) step(state);
   player.playDay(state);

@@ -5682,8 +5682,34 @@ button.ops-item:hover {
   margin: 0 4px 0 0;
   padding: 2px 9px;
 }
-.order-line .inspector-row-detail {
-  margin-top: 2px;
+.priority-button {
+  margin-left: 6px;
+  padding: 0 6px;
+  font-size: 0.9em;
+  line-height: 1.4;
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  cursor: pointer;
+  color: inherit;
+}
+.priority-button.is-keep {
+  color: #ffd166;
+}
+.priority-button.is-expendable {
+  color: #8fa3b8;
+}
+.brief-settled {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  white-space: nowrap;
+}
+@media (pointer: coarse) {
+  .priority-button {
+    min-width: 30px;
+    min-height: 30px;
+  }
 }
 #brief-settings {
   display: grid;
