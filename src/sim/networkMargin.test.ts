@@ -68,6 +68,19 @@ const smoothSwing = Math.max(...smooth.slice(-14)) - Math.min(...smooth.slice(-1
 assert.ok(smoothSwing <= rawSwing + 1e-6, 'spreading checks never widens the swing');
 
 // An older save has none of the new fields.
+// The movers add up to the change in profit a day, and say so only with two full weeks on record.
+{
+  const { marginMovers } = await import('./marginMovers');
+  const movers = marginMovers(state);
+  assert.ok(movers, 'movers after two months');
+  const total = movers.movers.reduce((s, m) => s + m.perDay, 0);
+  assert.ok(Math.abs(total - (movers.now - movers.before)) < 1e-6, 'movers add up to the change');
+  const named = movers.movers.filter((m) => m.label === 'other').reduce((s, m) => s + Math.abs(m.perDay), 0);
+  assert.ok(named < Math.abs(movers.now - movers.before) * 0.2 + 1000, 'little is left unexplained ');
+  const young = startHeadlessGame('YYZ', 2, createPlayer('steady'));
+  assert.equal(marginMovers(young), null);
+}
+
 delete state.routeRevenueHistory;
 delete state.routeMarginHistory;
 delete state.bonusRevenueHistory;
