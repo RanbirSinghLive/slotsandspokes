@@ -3,6 +3,7 @@ import { costRows, showConfirm } from '../confirmModal';
 import { money } from '../format';
 import { linkToMap } from '../mapLink';
 import { select } from '../selection';
+import { glyph, pips, type GlyphName } from '../glyphs';
 import { heading, line } from './dom';
 
 /**
@@ -13,6 +14,8 @@ import { heading, line } from './dom';
 export function baseSection(options: {
   title: string;
   info: string;
+  /** The department's glyph: crew room, line station or hangar. */
+  icon: GlyphName;
   kind: string;
   bases: (BaseReadout | LevelledBaseReadout)[];
   candidates: BaseCandidate[];
@@ -38,7 +41,9 @@ export function baseSection(options: {
       },
     });
   };
-  const nodes: HTMLElement[] = [heading(options.title, options.info)];
+  const sectionHead = heading(options.title, options.info);
+  sectionHead.prepend(glyph(options.icon, undefined, 'base-head-glyph'), ' ');
+  const nodes: HTMLElement[] = [sectionHead];
   const list = document.createElement('div');
   list.className = 'inspector-rows';
   for (const base of options.bases) {
@@ -47,16 +52,23 @@ export function baseSection(options: {
     const name = document.createElement('button');
     name.type = 'button';
     name.className = 'inspector-link';
-    name.textContent = `${base.iata} · ${base.name}`;
+    const code = document.createElement('b');
+    code.className = 'iata-plate';
+    code.textContent = base.iata;
+    name.append(code, ` ${base.name}`);
     name.addEventListener('click', () => select({ kind: 'airport', iata: base.iata }));
     const detail = document.createElement('span');
     detail.className = 'inspector-row-detail';
     const levelled = 'level' in base ? base : null;
-    detail.textContent = [
-      ...(levelled ? [`L${levelled.level} · ${levelled.used}/${levelled.level} ${levelled.unit.replace(' a night', '')} tonight${levelled.overflow > 0 ? ` · ${levelled.overflow} over` : ''}`] : []),
-      `${base.planes} plane${base.planes === 1 ? '' : 's'} based`,
-      base.perDay > 0 ? `${money(base.perDay)}/day` : 'free',
-    ].join(' · ');
+    const fleetText = `${base.planes} plane${base.planes === 1 ? '' : 's'} based`;
+    // A levelled base shows its level as slots, filled by tonight's use; a crew base has none.
+    if (levelled) {
+      const unit = levelled.unit.replace(' a night', '');
+      const usage = pips(levelled.used, levelled.level, `L${levelled.level} · ${levelled.used}/${levelled.level} ${unit} tonight${levelled.overflow > 0 ? ` · ${levelled.overflow} over` : ''}`, levelled.overflow > 0 ? 'warn' : options.icon);
+      detail.append(usage, ' ');
+    }
+    const fleet = glyph('plane', fleetText);
+    detail.append(fleet, ` ${base.planes} · ${base.perDay > 0 ? `${money(base.perDay)}/day` : 'free'}`);
     if (levelled && levelled.overflow > 0) detail.classList.add('is-warn');
     row.append(name, detail);
     if (levelled && options.level) {
@@ -113,7 +125,7 @@ export function baseSection(options: {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'inspector-plan-hub';
-  button.textContent = `Open ${options.kind} · ${money(options.fee)} + ${money(options.perDay)}/day`;
+  button.append(glyph('mapPin'), ` Open ${options.kind} · ${money(options.fee)} + ${money(options.perDay)}/day`);
   const refresh = () => {
     const blocked = options.candidates.find((c) => c.iata === select_.value)?.blocked ?? null;
     button.disabled = blocked !== null;

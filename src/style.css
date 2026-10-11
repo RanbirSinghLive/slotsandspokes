@@ -5772,6 +5772,131 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
 .rival-gauge s.mid { left: 50%; background: #556; }
 .rival-ladder { color: #8b94a7; font-size: 12px; }
 
+/* Department glyphs and pips (ui/glyphs.ts) in the inspector's plainer sections. */
+.glyph {
+  display: inline-flex;
+  vertical-align: -2px;
+}
+
+.glyph svg {
+  width: 14px;
+  height: 14px;
+}
+
+.base-head-glyph svg {
+  width: 13px;
+  height: 13px;
+}
+
+.pips {
+  display: inline-flex;
+  gap: 2px;
+  vertical-align: 1px;
+}
+
+.pips i {
+  width: 6px;
+  height: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 1px;
+}
+
+.pips i.is-on {
+  background: #8a93a6;
+  border-color: #8a93a6;
+}
+
+.pips-level i.is-on { background: #8ab4ff; border-color: #8ab4ff; }
+.pips-waiting i.is-on { background: #ffb347; border-color: #ffb347; }
+.pips-wrench i.is-on { background: #5ed6c8; border-color: #5ed6c8; }
+.pips-hangar i.is-on { background: #f2a541; border-color: #f2a541; }
+.pips-engine i.is-on { background: #7fd88f; border-color: #7fd88f; }
+.pips-warn i.is-on { background: #ff8080; border-color: #ff8080; }
+
+/* Plain-looking tables get a department colour: row icons, tinted bars, dimmed zeros. */
+#ontime-causes-table tr.is-zero td,
+#ontime-cancel-table tr.is-zero td {
+  opacity: 0.5;
+}
+
+#ontime-causes-table .glyph svg,
+#ontime-cancel-table .glyph svg,
+#ontime-causes-table .delay-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.load-bar {
+  display: inline-block;
+  width: 28px;
+  height: 6px;
+  margin-left: 4px;
+  vertical-align: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.load-bar i {
+  display: block;
+  height: 100%;
+  background: #5ed6c8;
+}
+
+.load-bar.is-over i {
+  background: #ff5c5c;
+}
+
+.glyph.is-crew { color: #b07ad9; margin-right: 3px; }
+.glyph.is-mtc { color: #5ed6c8; }
+
+.iata-plate {
+  display: inline-block;
+  padding: 0 5px;
+  margin-right: 2px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #0b0e14;
+  background: #ffd166;
+  border-radius: 3px;
+}
+
+.base-row .glyph-plane {
+  color: #8ab4ff;
+}
+
+.base-row .inspector-link {
+  text-align: left;
+}
+
+.mx-rating svg {
+  width: 13px;
+  height: 13px;
+  vertical-align: -2px;
+}
+
+.mx-rating.is-rated {
+  color: var(--puck, #8ab4ff);
+  border-color: var(--puck, #8ab4ff);
+}
+
+.inspector-row-detail.is-contract {
+  color: #5ed6c8;
+}
+
+.inspector-row-detail.is-deferred {
+  color: #ffb347;
+}
+
+.fee-button .fee-glyph {
+  margin-right: 4px;
+  color: #ffd166;
+}
+
+.fee-button.is-current .fee-glyph {
+  color: #7fd88f;
+}
+
 /* The call popup (ui/callPopup.ts). Below the confirm dialogs (45) so ✕ and ⇄
    can ask first, above the phone panel sheet (40) and rail (41). A card, not a
    backdrop: the map stays visible so the breathing ring shows which plane. */

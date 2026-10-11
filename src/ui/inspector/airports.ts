@@ -9,6 +9,7 @@ import { stationReadout, stationTier } from '../../sim/stations';
 import { CAUSE_STYLE, TIER_GLYPH, minutesText } from './station';
 import { select } from '../selection';
 import { linkToMap } from '../mapLink';
+import { glyph, pips } from '../glyphs';
 
 /**
  * The inspector's list of airports (ui/inspector/inspector.ts): every
@@ -109,6 +110,40 @@ function delayCells(state: SimState, iata: string): Pick<Row, 'delay' | 'delayTe
   return { delay: readout.totalPerDeparture, delayText: `${glyph} ${minutesText(readout.totalPerDeparture)}${cause}` };
 }
 
+const LEVEL_PIPS: Record<string, number> = { Outstation: 1, 'Focus city': 2, Base: 3, Hub: 4 };
+
+/** Departures a day, then pips for the field's level: outstation, focus city, base, hub. */
+function departureCell(row: Row): (Node | string)[] {
+  if (row.departures === 0) return ['—'];
+  const level = airportLevel(row.departures);
+  return [`${row.departures} `, pips(LEVEL_PIPS[level] ?? 1, 4, level, 'level')];
+}
+
+/** The peak load as a fill bar that goes red once the field is full. */
+function loadCell(row: Row): (Node | string)[] {
+  const bar = document.createElement('span');
+  bar.className = 'load-bar';
+  bar.classList.toggle('is-over', row.load >= 1);
+  bar.dataset.tip = `${Math.round(row.load * 100)}% of the field's peak room used, every airline counted`;
+  const fill = document.createElement('i');
+  fill.style.width = `${Math.min(100, Math.round(row.load * 100))}%`;
+  bar.append(fill);
+  return [`${Math.round(row.load * 100)}% `, bar];
+}
+
+/** A people glyph for a crew base, a wrench for a maintenance base. */
+function baseCell(row: Row): (Node | string)[] {
+  const marks: Node[] = [];
+  if (row.bases & 1) marks.push(glyph('people', 'Crew base: crews live here and planes can be based here', 'is-crew'));
+  if (row.bases & 2) marks.push(glyph('wrench', 'Maintenance base: a night here is a line check', 'is-mtc'));
+  return marks.length > 0 ? marks : ['—'];
+}
+
+/** Unserved demand as five pips, Tiny to Huge. */
+function waitingCell(row: Row): (Node | string)[] {
+  return [pips(row.waiting + 1, 5, `${SIZE_BY_RANK[row.waiting]} · people here that you are not carrying`, 'waiting')];
+}
+
 function compare(a: Row, b: Row): number {
   const x = a[sortKey];
   const y = b[sortKey];
@@ -203,11 +238,19 @@ export function buildAirportsView(state: SimState, changed: () => void): HTMLEle
         link.className = 'inspector-link';
         link.textContent = row.iata;
         td.append(link);
+      } else if (column.key === 'departures') {
+        td.append(...departureCell(row));
+      } else if (column.key === 'load') {
+        td.append(...loadCell(row));
+      } else if (column.key === 'bases') {
+        td.append(...baseCell(row));
+      } else if (column.key === 'waiting') {
+        td.append(...waitingCell(row));
       } else {
         td.textContent = column.format(row);
       }
       if (column.key === 'load' && row.load >= 1) td.classList.add('is-over');
-      if (column.key === 'delay') td.classList.add('is-nowrap');
+      if (column.key === 'delay' || column.key === 'departures' || column.key === 'load' || column.key === 'bases') td.classList.add('is-nowrap');
       tr.append(td);
     }
     tr.addEventListener('click', () => select({ kind: 'airport', iata: row.iata }));
