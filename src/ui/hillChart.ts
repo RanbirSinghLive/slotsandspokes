@@ -31,6 +31,8 @@ export type HillChartOptions = {
   ariaLabel: string;
   /** What the ball is, in the legend ("your fare"). */
   valueLabel: string;
+  /** Leave the key out where the chart sits in a crowded view. */
+  hideLegend?: boolean;
 };
 
 const WIDTH = 340;
@@ -189,6 +191,7 @@ export function drawHillChart(o: HillChartOptions): { element: HTMLElement; move
 
   const wrap = document.createElement('div');
   wrap.className = 'hill-wrap';
-  wrap.append(root, chartLegend(legend));
+  wrap.append(root);
+  if (!o.hideLegend) wrap.append(chartLegend(legend));
   return { element: wrap, moveBall };
 }
