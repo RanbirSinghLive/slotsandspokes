@@ -81,6 +81,11 @@ export type RouteWeek = {
   revenuePerDay: number;
   /** Contract and event money a day inside that revenue. */
   paidPerDay: number;
+  /** Revenue and cost a day over the week before, or null with under a full week of it. */
+  previousRevenuePerDay: number | null;
+  /** Cost a day over the last week. */
+  costPerDay: number;
+  previousCostPerDay: number | null;
   /** Daily margins, oldest first, for a sparkline. */
   series: number[];
 };
@@ -98,6 +103,9 @@ export function routeWeek(state: SimState, key: string): RouteWeek {
     previousPerDay: earlier.length === MARGIN_WINDOW_DAYS ? sum(earlier) / earlier.length : null,
     revenuePerDay: lastRevenue.length > 0 ? sum(lastRevenue) / lastRevenue.length : 0,
     paidPerDay: last.length > 0 ? sum(paid) / last.length : 0,
+    previousRevenuePerDay: earlier.length === MARGIN_WINDOW_DAYS ? sum(window(revenue, MARGIN_WINDOW_DAYS, MARGIN_WINDOW_DAYS)) / MARGIN_WINDOW_DAYS : null,
+    costPerDay: last.length > 0 ? sum(window(cost, MARGIN_WINDOW_DAYS)) / last.length : 0,
+    previousCostPerDay: earlier.length === MARGIN_WINDOW_DAYS ? sum(window(cost, MARGIN_WINDOW_DAYS, MARGIN_WINDOW_DAYS)) / MARGIN_WINDOW_DAYS : null,
     series: window(margins, MARGIN_WINDOW_DAYS * 2),
   };
 }

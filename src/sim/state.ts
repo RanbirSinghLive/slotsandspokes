@@ -1,3 +1,4 @@
+import type { Nemesis } from './nemesis';
 import type { FareClassSettings, FareClassTally } from './fareClasses';
 import type { CallPolicy, RoutePriority } from './priority';
 import type { Crisis } from './crisis';
@@ -749,6 +750,12 @@ export type SimState = {
   fareWars?: FareWar[];
   /** Fare wars started and ended, the latest few, for the ticker. */
   fareWarLog?: FareWarEvent[];
+  /** Estimated dollars each rival (by code) took from the player's routes, fading 1% a day (sim/nemesis.ts). */
+  rivalGrudge?: Record<string, number>;
+  /** The rival that has taken the most lately, and the lead over it so far. */
+  nemesis?: Nemesis;
+  /** Rival codes the player out-flew for good; they are not named again. */
+  nemesesBeaten?: string[];
   /** The network's fare level against the going rate, remembered over about 60 days (sim/brand.ts); absent means 100%. */
   brandLevel?: number;
   /** Stranded planes ferried home empty before the day starts (sim/ferry.ts), the latest few, for the ticker. */

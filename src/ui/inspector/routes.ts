@@ -160,6 +160,9 @@ function marginCell(row: RouteRow): HTMLTableCellElement {
     week.perDay === null ? 'Under 3 flown days' : `${perDayText(week.perDay)}/day over the last 7 days`,
     share === null ? null : `${percentText(share)} of revenue`,
     week.previousPerDay === null ? null : `week before ${perDayText(week.previousPerDay)}/day`,
+    week.previousRevenuePerDay === null || week.previousCostPerDay === null
+      ? null
+      : `vs week before: revenue ${perDayText(week.revenuePerDay - week.previousRevenuePerDay)} · cost ${perDayText(-(week.costPerDay - week.previousCostPerDay))}`,
     row.margin === null ? null : `yesterday ${perDayText(row.margin)}`,
     week.paidPerDay > 0.5 ? `${shortMoney(week.paidPerDay)}/day of it paid by contracts and events` : null,
   ]

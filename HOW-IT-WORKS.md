@@ -1252,6 +1252,7 @@ One day's profit is noisy: a flight landing after midnight books to the next day
 - **Overview and HUD:** a Margin card and a chip on the P&L strip show the flying margin. **Money** adds the margin line, the 7-day margin chart, tables by hub and by sector, and the three best and three worst routes of the week.
 - **Costs by kind:** `costHistoryByCategory` keeps each finished day's cost by kind, so Money shows the week's average a day by kind beside today's, and a "Checks and repairs" line (the `maintenance` kind: contracted checks, engine shop visits, expedited repairs) with its spike days, those over three times the week's average. Checks are inside all-in margin and the daily bars but outside each route's margin.
 - **Daily bars spread the checks:** the P&L strip's bars and the Overview's Margin chart show each day's profit with checks and repairs replaced by the average of the last 7 days' (`smoothedMarginHistory()`), so a check day reads as part of a steady cost. The tooltip gives the day as paid. Today's running number, cash and every book stay as they were.
+- **Why it moved** (`src/sim/marginMovers.ts`): with two full weeks on record, the margin chip's tip, the Overview card and a Money line split the change in profit a day, last week against the week before, into movers that add up to it. Costs that grow with flying (fuel, block-hour costs, departure fees) are scaled to this week's capacity first, so "flying" is more or fewer seats flown at last week's margins, "fares & loads" is what each seat-mile earned, "fuel rate" and "cost per flight" are what each flight cost beyond that, and leases, slots, idle crews, checks, overhead, R&D upkeep, executives and "paid by buyers" show as they changed. A route's margin tip adds its revenue and cost change against the week before.
 - Test: `npm run margintest`.
 
 ## The ops board (`src/ui/opsBoard.ts`)
@@ -4091,3 +4092,11 @@ under-staffing when last swept (peak at reserve depth 1.05, 77.7%
 completion); and an unattended start loses money from most homes, mainly
 to rival pile-on and curfew cancellations.
 
+
+## The nemesis (`src/sim/nemesis.ts`)
+
+The rival that has taken the most from the player's routes gets a name and a goal. Each day at rollover, every market the player flew counts a share of yesterday's revenue against each rival flying it (the rival's share of the market's flights, 1.5 times that while a fare war with it runs there). The total piles up in `rivalGrudge` and fades 1% a day, so a rival that moves on is forgotten.
+
+- **Naming:** a rival with 3 or more routes and about $150k taken becomes the nemesis; a challenger replaces it only at 1.25 times its grudge. The ticker says so, the Rivals list marks the card ☠, the rival's page has one ops line, and Goals shows a bar.
+- **The goal:** fly 3 or more routes beyond the nemesis and at least 1.5 times as many, for 60 days in a row. Winning retires that rival for good (`nemesesBeaten`) and a bigger one rises. It pays nothing and changes no rival behaviour; it is a target, not an edge.
+- Test: `npm run nemesistest`.

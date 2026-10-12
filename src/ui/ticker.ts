@@ -1,3 +1,4 @@
+import { HOLD_DAYS, LEAD_RATIO, LEAD_ROUTES } from '../sim/nemesis';
 import { airlineCalled, classOpen, LADDER, milestoneById, tiersClimbed } from '../sim/ladder';
 import { rivalTiersClimbed } from '../sim/rivalLadder';
 import { pluralClassName } from '../sim/aircraftClasses';
@@ -575,6 +576,29 @@ function pollFareWarEvents(state: SimState): void {
   }
 }
 
+/** The nemesis being named and beaten (sim/nemesis.ts). */
+let seenNemesis: string | null | undefined;
+let seenBeaten = -1;
+
+function pollNemesis(state: SimState): void {
+  const code = state.nemesis?.code ?? null;
+  const beaten = state.nemesesBeaten?.length ?? 0;
+  if (seenNemesis === undefined) {
+    seenNemesis = code;
+    seenBeaten = beaten;
+    return;
+  }
+  if (beaten > seenBeaten) {
+    const gone = state.nemesesBeaten![beaten - 1];
+    pushEvent(state.simMinute, 'GOAL', `Out-flown ${gone} · ${HOLD_DAYS}d ahead on routes`, { kind: 'rival', code: gone });
+  }
+  if (code !== null && code !== seenNemesis && state.nemesis) {
+    pushEvent(state.simMinute, 'RIVAL', `Nemesis ${state.nemesis.airline} · taking your routes · out-fly it ${LEAD_ROUTES}+ routes and ×${LEAD_RATIO} for ${HOLD_DAYS}d`, { kind: 'rival', code });
+  }
+  seenNemesis = code;
+  seenBeaten = beaten;
+}
+
 /** Stranded planes ferried home empty (sim/ferry.ts): one line each, from the sim's log. */
 let lastFerryMinute: number | null = null;
 
@@ -773,6 +797,7 @@ export function updateTicker(state: SimState): void {
   pollAogEvents(state);
   pollFerryEvents(state);
   pollFareWarEvents(state);
+  pollNemesis(state);
   pollMxHoldEvents(state);
   pollDemandEvents(state);
   pollRivalFareEvents(state);

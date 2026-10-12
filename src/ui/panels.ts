@@ -22,6 +22,7 @@ import { minuteOfDay, minuteOfDayToTimeString } from '../sim/clock';
 import { info } from './inspector/dom';
 import { linkToMap } from './mapLink';
 import { glyphSvg, type GlyphName } from './glyphs';
+import { marginMovers, type MarginMovers } from '../sim/marginMovers';
 import { marginTip, percentText, trendMark } from './marginChip';
 import { networkMargin, type NetworkMargin } from '../sim/networkMargin';
 
@@ -78,7 +79,7 @@ function showTrend(card: HTMLElement, measure: Measure, change: (now: number, be
 }
 
 /** The Margin card: the week's flying margin, coloured by band, with its move against the week before. */
-function showMargin(card: HTMLElement, valueEl: HTMLElement, margin: NetworkMargin | null): void {
+function showMargin(card: HTMLElement, valueEl: HTMLElement, margin: NetworkMargin | null, movers: MarginMovers | null): void {
   const trendEl = card.querySelector<HTMLElement>('.stat-trend')!;
   if (margin === null) {
     valueEl.textContent = '—';
@@ -96,7 +97,7 @@ function showMargin(card: HTMLElement, valueEl: HTMLElement, margin: NetworkMarg
     trendEl.textContent = mark === '' ? '■ holding' : `${mark} ${points(margin.flying, margin.previousFlying)}`;
   }
   trendEl.title = 'Against the week before';
-  card.dataset.tip = marginTip(margin);
+  card.dataset.tip = marginTip(margin, movers);
 }
 
 function points(now: number, before: number): string {
@@ -196,7 +197,7 @@ export function updatePanel(state: SimState): void {
         : percent((state.flightsScheduledTotal - state.flightsCancelledTotal) / state.flightsScheduledTotal);
   showTrend(completionEl.closest<HTMLElement>('.stat-card')!, trends.completion, points);
   // Flying margin (sim/networkMargin.ts): what the routes keep of their revenue, last 7 days.
-  showMargin(marginEl.closest<HTMLElement>('.stat-card')!, marginEl, networkMargin(state));
+  showMargin(marginEl.closest<HTMLElement>('.stat-card')!, marginEl, networkMargin(state), marginMovers(state));
   // Load factor (sim/loadFactor.ts): how full the airline flies, last 7 days.
   loadEl.textContent = formatLoadFactor(networkLoadFactor(state));
   showTrend(loadEl.closest<HTMLElement>('.stat-card')!, trends.loadFactor, points);

@@ -5,7 +5,8 @@ import { chartLegend } from '../chartLegend';
 import { unitEconomicsHistory } from '../../sim/unitEconomics';
 import type { SimState } from '../../sim/state';
 import { costWeek, flownMarkets, marginBand, marginTrend, networkMargin, routeGroups, routeMarginShare, routeWeek, type RouteGroupBy } from '../../sim/networkMargin';
-import { percentText, trendMark } from '../marginChip';
+import { moversLine, percentText, trendMark } from '../marginChip';
+import { marginMovers } from '../../sim/marginMovers';
 import { sparkline } from '../sparkline';
 import { select } from '../selection';
 import { setGrouping } from './routes';
@@ -234,6 +235,16 @@ export function buildMoneyView(state: SimState): HTMLElement {
         'inspector-line goal-ahead',
       ),
     );
+    const movers = marginMovers(state);
+    if (movers && movers.movers.length > 0) {
+      root.append(
+        lineWithInfo(
+          moversLine(movers),
+          'Profit a day over the last 7 days against the 7 before, split into the biggest movers. Flying is more or fewer seats flown at last week\'s margins; fares & loads is what each seat-mile earned; fuel rate and cost per flight are what each flight cost beyond the change in flying. Leases, slots, overhead and checks are shown as they changed. The movers add up to the full change.',
+          'inspector-line goal-ahead',
+        ),
+      );
+    }
     const costs = costWeek(state);
     if (costs) {
       root.append(

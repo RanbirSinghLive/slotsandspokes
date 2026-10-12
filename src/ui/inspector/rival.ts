@@ -1,3 +1,4 @@
+import { HOLD_DAYS, LEAD_RATIO, LEAD_ROUTES, nemesisStatus } from '../../sim/nemesis';
 import { classByCode } from '../../sim/aircraftClasses';
 import { rivalHubs, rivalLadderInWords } from '../../sim/rivalLadder';
 import { info, line, heading, lineWithInfo } from './dom';
@@ -43,6 +44,14 @@ function rivalsOnMap(state: SimState): { code: string; airline: string; routes: 
     byCode.set(route.code, entry);
   }
   return [...byCode.values()];
+}
+
+/** One ops line on the nemesis: since when, routes either side, lead held. */
+function nemesisTip(state: SimState): string {
+  const status = nemesisStatus(state);
+  if (!status) return '';
+  const { theirRoutes, yourRoutes, leadDays, grudge } = status;
+  return `Nemesis · since day ${status.nemesis.sinceDay} · ~${shortMoney(grudge)} taken · routes ${yourRoutes} v ${theirRoutes} · lead ${leadDays}/${HOLD_DAYS}d at +${LEAD_ROUTES} and ×${LEAD_RATIO}`;
 }
 
 /** The rival's name as it appears on the map, or its code if it has left. */
@@ -145,6 +154,7 @@ export function buildRivalsView(state: SimState): HTMLElement {
     sub.append(fleetPips(state.competitorFleets[rival.code] ?? []), routeBlocks(rival.outlooks));
     const hub = hubChip(rival.outlooks.map(({ route }) => route));
     if (hub) sub.append(hub);
+    if (state.nemesis?.code === rival.code) sub.append(chip('☠', 'nemesis', nemesisTip(state), 'is-bad'));
     if (rival.againstYou > 0) sub.append(chip('⚔', String(rival.againstYou), `${rival.againstYou} route${rival.againstYou === 1 ? '' : 's'} on markets you fly`, 'is-warn'));
     if (rival.losing > 0) sub.append(chip('⏱', String(rival.losing), `${rival.losing} route${rival.losing === 1 ? '' : 's'} losing money`, 'is-bad'));
     card.append(rivalLogo(rival.code, 44), name, marginText(rival.margin), sub);
@@ -254,6 +264,7 @@ export function buildRivalView(state: SimState, code: string): HTMLElement {
   margin.classList.add('is-big');
   hero.append(rivalLogo(code, 56), names, margin);
   root.append(hero);
+  if (state.nemesis?.code === code) root.append(line(nemesisTip(state), 'inspector-line is-over'));
 
   // Rivals earn bigger planes on the same ladder (sim/rivalLadder.ts); that and the spare planes are prose, so they sit in an (i).
   const seatsPerFlight = fleet.length > 0 ? Math.round(fleet.reduce((sum, typeCode) => sum + (classByCode(typeCode)?.seats ?? 0), 0) / fleet.length) : 0;

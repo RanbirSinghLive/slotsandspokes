@@ -4,6 +4,7 @@ import { shortMoney } from './format';
 import { buildPnlCharts } from './pnlHistory';
 import { marginChip } from './marginChip';
 import { networkMargin, smoothedMarginHistory } from '../sim/networkMargin';
+import { marginMovers } from '../sim/marginMovers';
 import { select } from './selection';
 
 /**
@@ -56,7 +57,7 @@ export function updateHudPnl(state: SimState): void {
   today.className = 'hud-pnl-today';
   today.textContent = `${state.todayMargin >= 0 ? '+' : ''}${shortMoney(state.todayMargin)} today`;
   // The week's flying margin: the steady figure beside the day's noisy one.
-  const chip = marginChip(networkMargin(state));
+  const chip = marginChip(networkMargin(state), marginMovers(state));
   chip.classList.add('hud-pnl-margin');
   chip.addEventListener('click', () => select({ kind: 'money' }));
   stripEl.replaceChildren(label, bars, today, chip);
