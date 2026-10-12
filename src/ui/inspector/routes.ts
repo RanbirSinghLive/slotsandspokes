@@ -2,14 +2,16 @@ import { marketLoadFactor } from '../../sim/loadFactor';
 import { formatNps, marketNps, RIVAL_NPS } from '../../sim/nps';
 import { OTP_BASELINE, trailingMarketOtp } from '../../sim/routeOtp';
 import { formatFrequency, marketYieldCents, formatYield } from '../../sim/routeYield';
+import { fareClassPolicy, pricingSummary, seatPolicySummary } from '../../sim/pricing';
 import { flownMarkets, marginBand, routeGroups, routeMarginShare, routeTags, routeWeek, type RouteGroup, type RouteGroupBy, type RouteTags, type RouteWeek, type Sector } from '../../sim/networkMargin';
 import type { SimState } from '../../sim/state';
 import * as ops from '../routeActions';
 import { select, type RouteSort } from '../selection';
 import { priorityButton } from '../priority';
-import { info } from './dom';
+import { adopt, info } from './dom';
 import { linkToMap } from '../mapLink';
 import { glyph } from '../glyphs';
+import { onTimeColor } from '../../render/mapmodes';
 import { percentText, trendMark } from '../marginChip';
 import { shortMoney } from '../format';
 import { sparkline } from '../sparkline';
@@ -90,8 +92,25 @@ const COLUMNS: { sort: RouteSort; name: string; value: (row: RouteRow) => number
   },
 ];
 
-/** Margin leads the table: it is the column the page is read for. */
-const ORDERED_COLUMNS = [COLUMNS[COLUMNS.length - 1], ...COLUMNS.slice(0, -1)];
+/**
+ * Two lenses on the same routes. Money reads what the routes earn, with
+ * margin leading since it is the column the page is read for; Reliability
+ * reads how they run. The sort the screen was opened with picks the lens, so
+ * the On-time and Completion cards on the HUD land in Reliability.
+ */
+type Lens = 'money' | 'reliability';
+const LENS_SORTS: Record<Lens, RouteSort[]> = {
+  money: ['margin', 'loadFactor', 'nps', 'yield'],
+  reliability: ['onTime', 'completion'],
+};
+
+function lensOf(sort: RouteSort): Lens {
+  return LENS_SORTS.reliability.includes(sort) ? 'reliability' : 'money';
+}
+
+function columnsOf(lens: Lens) {
+  return LENS_SORTS[lens].map((sort) => COLUMNS.find((c) => c.sort === sort)!);
+}
 
 function percent(share: number | null): string {
   return share === null ? '—' : `${Math.round(share * 100)}%`;
@@ -194,7 +213,7 @@ function tagsFor(row: RouteRow): HTMLElement | null {
   return wrap;
 }
 
-function groupHeader(group: RouteGroup, by: RouteGroupBy, open: boolean, onToggle: () => void): HTMLTableRowElement {
+function groupHeader(group: RouteGroup, by: RouteGroupBy, open: boolean, lens: Lens, columnCount: number, onToggle: () => void): HTMLTableRowElement {
   const tr = document.createElement('tr');
   tr.className = 'route-group-row';
   const name = document.createElement('td');
@@ -203,24 +222,144 @@ function groupHeader(group: RouteGroup, by: RouteGroupBy, open: boolean, onToggl
   caret.className = 'route-group-caret';
   caret.textContent = open ? '▾' : '▸';
   name.append(caret, by === 'hub' ? glyph('hub') : by === 'region' ? glyph('mapPin') : glyph(group.name === 'domestic' ? 'flag' : 'globe'), `${group.name} · ${group.keys.length}`);
-  const margin = document.createElement('td');
-  const trend = group.previousPerDay === null ? '' : trendMark(group.perDay, group.previousPerDay);
-  margin.textContent = `${perDayText(group.perDay)}${group.share === null ? '' : ` · ${percentText(group.share)}`} ${trend}`.trim();
-  if (group.share !== null) margin.classList.add(`is-${marginBand(group.share)}`);
-  margin.dataset.tip = `${group.name}: ${perDayText(group.perDay)}/day over the last 7 days, summed over its routes`;
-  const rest = document.createElement('td');
-  rest.colSpan = ORDERED_COLUMNS.length - 1;
-  tr.append(name, margin, rest);
+  if (lens === 'money') {
+    const margin = document.createElement('td');
+    const trend = group.previousPerDay === null ? '' : trendMark(group.perDay, group.previousPerDay);
+    margin.textContent = `${perDayText(group.perDay)}${group.share === null ? '' : ` · ${percentText(group.share)}`} ${trend}`.trim();
+    if (group.share !== null) margin.classList.add(`is-${marginBand(group.share)}`);
+    margin.dataset.tip = `${group.name}: ${perDayText(group.perDay)}/day over the last 7 days, summed over its routes`;
+    tr.append(name, margin);
+    const rest = document.createElement('td');
+    rest.colSpan = Math.max(1, columnCount - 1);
+    tr.append(rest);
+  } else {
+    const rest = document.createElement('td');
+    rest.colSpan = columnCount;
+    tr.append(name, rest);
+  }
   tr.addEventListener('click', onToggle);
   return tr;
+}
+
+/** Whether the fare strip under the table is open; kept for the session. */
+let pricesOpen = false;
+
+/** The two-button switch between the lenses: icons only, names in tips. */
+function lensSwitch(lens: Lens): HTMLElement {
+  const wrap = document.createElement('span');
+  wrap.className = 'routes-lens';
+  for (const [value, icon, tip, sort] of [
+    ['money', 'coin', 'Money: margin, load, NPS, yield', 'margin'],
+    ['reliability', 'timer', 'Reliability: on-time and flown, with what delays and cancels flights', 'onTime'],
+  ] as const) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.tip = tip;
+    button.setAttribute('aria-label', tip);
+    button.classList.toggle('is-active', lens === value);
+    button.append(glyph(icon));
+    button.addEventListener('click', () => {
+      if (lens !== value) select({ kind: 'routes', sort });
+    });
+    wrap.append(button);
+  }
+  return wrap;
+}
+
+/** Last 7 days across every route: arrivals on time, flights flown, flights cancelled. */
+function reliabilityTiles(state: SimState, rows: RouteRow[]): HTMLElement {
+  let arrived = 0;
+  let onTime = 0;
+  let cancelled = 0;
+  for (const row of rows) {
+    const week = trailingMarketOtp(state, row.a, row.b);
+    arrived += week.arrived;
+    onTime += week.onTime;
+    cancelled += week.cancelled;
+  }
+  const tiles = document.createElement('div');
+  tiles.className = 'reliability-tiles';
+  const tile = (label: string, value: string, colour: string | null, tip: string) => {
+    const el = document.createElement('div');
+    el.className = 'reliability-tile';
+    el.dataset.tip = tip;
+    const name = document.createElement('small');
+    name.textContent = label;
+    const number = document.createElement('strong');
+    number.textContent = value;
+    if (colour) number.style.color = colour;
+    el.append(name, number);
+    return el;
+  };
+  const otp = arrived > 0 ? onTime / arrived : null;
+  const flown = arrived + cancelled > 0 ? arrived / (arrived + cancelled) : null;
+  tiles.append(
+    tile('ON-TIME', percent(otp), otp === null ? null : onTimeColor(otp), 'Arrivals on time, last 7 days, all routes'),
+    tile('FLOWN', percent(flown), null, 'Scheduled flights that operated, last 7 days'),
+    tile('CNX', String(cancelled), cancelled > 0 ? '#ff8080' : null, 'Flights cancelled, last 7 days'),
+  );
+  return tiles;
+}
+
+/**
+ * Fare policy and seat policy, folded under the table to one line: level,
+ * the seat split as a mini bar, and how many routes are off policy. Tapping
+ * it opens the hill and the seat bar in place.
+ */
+function pricesStrip(state: SimState, rebuild: () => void): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'prices-strip';
+  const head = document.createElement('button');
+  head.type = 'button';
+  head.className = 'prices-strip-head';
+  head.dataset.tip = 'Fare policy and seat split for every route not priced by hand';
+  const { stance, hand } = pricingSummary(state);
+  const split = fareClassPolicy(state);
+  const mini = document.createElement('span');
+  mini.className = 'seat-mini';
+  for (const [share, colour] of [
+    [split.saverShare, '#5ed6c8'],
+    [split.flexShare, '#8a93a6'],
+    [Math.max(0, 1 - split.saverShare - split.flexShare), '#ffd166'],
+  ] as const) {
+    const piece = document.createElement('i');
+    piece.style.width = `${Math.round(share * 100)}%`;
+    piece.style.background = colour;
+    mini.append(piece);
+  }
+  const off = stance + hand;
+  head.append(glyph('coin'), ` ${Math.round(state.farePolicyMultiplier * 100)}%`, mini);
+  if (off > 0 || seatPolicySummary(state).byHand > 0) {
+    const note = document.createElement('span');
+    note.className = 'routes-trend';
+    note.textContent = `${off} off policy`;
+    head.append(note);
+  }
+  const caret = document.createElement('span');
+  caret.className = 'caret';
+  caret.textContent = pricesOpen ? '⌃' : '⌄';
+  head.append(caret);
+  head.addEventListener('click', () => {
+    pricesOpen = !pricesOpen;
+    rebuild();
+  });
+  wrap.append(head);
+  if (pricesOpen) {
+    const body = document.createElement('div');
+    body.className = 'prices-strip-body';
+    body.append(adopt('fare-policy-section'));
+    wrap.append(body);
+  }
+  return wrap;
 }
 
 export function buildRoutesView(state: SimState, sort: RouteSort): HTMLElement {
   const root = document.createElement('div');
   root.className = 'inspector-view';
+  const lens = lensOf(sort);
   const title = document.createElement('h3');
-  title.className = 'inspector-title';
-  title.textContent = 'Routes';
+  title.className = 'inspector-title routes-title';
+  title.append('Routes', lensSwitch(lens));
   root.append(title);
 
   const rows = routeRows(state);
@@ -232,7 +371,8 @@ export function buildRoutesView(state: SimState, sort: RouteSort): HTMLElement {
     return root;
   }
 
-  const column = COLUMNS.find((c) => c.sort === sort) ?? COLUMNS[0];
+  const columns = columnsOf(lens);
+  const column = columns.find((c) => c.sort === sort) ?? columns[0];
   // Worst first; routes with nothing to judge yet go last.
   rows.sort((x, y) => {
     const vx = column.value(x);
@@ -243,10 +383,12 @@ export function buildRoutesView(state: SimState, sort: RouteSort): HTMLElement {
     return vx - vy;
   });
 
+  if (lens === 'reliability') root.append(reliabilityTiles(state, rows), adopt('reliability-section'));
+
   const intro = document.createElement('div');
   intro.className = 'inspector-line';
   intro.textContent = `Worst ${column.name.toLowerCase()} first`;
-  intro.append(' ', info('Margin is the average a day over the last 7 days, with the last 14 as a line (dashed = $0), the share of revenue in the tip, and an arrow against the week before. Tags: contract and event pay are inside it; a sprout is a route under 2 weeks old. On-time, flown, load and yield (cents per passenger nautical mile) are the last 7 days; flights are per direction; NPS about the last month. Group by hub (the end with more routes), by sector (domestic = both ends in your home country) or by region (where the far end is, by map position, so approximate). Click a heading to sort by it, or a route to open it.'));
+  intro.append(' ', info('The money lens is first; the stopwatch lens reads reliability. Margin is the average a day over the last 7 days, with the last 14 as a line (dashed = $0), the share of revenue in the tip, and an arrow against the week before. Tags: contract and event pay are inside it; a sprout is a route under 2 weeks old. On-time, flown, load and yield (cents per passenger nautical mile) are the last 7 days; flights are per direction; NPS about the last month. Group by hub (the end with more routes), by sector (domestic = both ends in your home country) or by region (where the far end is, by map position, so approximate). Click a heading to sort by it, or a route to open it. The fare strip under the table opens the fare policy and seat split.'));
   root.append(intro);
 
   const chips = document.createElement('div');
@@ -278,7 +420,7 @@ export function buildRoutesView(state: SimState, sort: RouteSort): HTMLElement {
   const flightsHead = document.createElement('th');
   flightsHead.textContent = '/day';
   head.append(routeHead, flightsHead);
-  for (const c of ORDERED_COLUMNS) {
+  for (const c of columns) {
     const th = document.createElement('th');
     const button = document.createElement('button');
     button.type = 'button';
@@ -305,7 +447,7 @@ export function buildRoutesView(state: SimState, sort: RouteSort): HTMLElement {
     const count = document.createElement('td');
     count.textContent = row.frequency;
     tr.append(route, count);
-    for (const c of ORDERED_COLUMNS) {
+    for (const c of columns) {
       if (c.sort === 'margin') {
         const cell = marginCell(row);
         const rating = c.rate(row);
@@ -314,8 +456,14 @@ export function buildRoutesView(state: SimState, sort: RouteSort): HTMLElement {
         continue;
       }
       const td = document.createElement('td');
-      td.textContent = c.show(row);
       const rating = c.rate(row);
+      if (c.sort === 'onTime' && row.onTime !== null) {
+        const mark = document.createElement('i');
+        mark.className = 'routes-bar';
+        mark.style.width = `${Math.max(2, Math.round(row.onTime * 30))}px`;
+        td.append(mark);
+      }
+      td.append(c.show(row));
       if (rating) td.classList.add(`is-${rating}`);
       tr.append(td);
     }
@@ -330,7 +478,7 @@ export function buildRoutesView(state: SimState, sort: RouteSort): HTMLElement {
       const id = `${grouping}:${group.name}`;
       const open = groupOpen.get(id) ?? rows.length <= LONG_TABLE;
       tbody.append(
-        groupHeader(group, grouping, open, () => {
+        groupHeader(group, grouping, open, lens, columns.length, () => {
           groupOpen.set(id, !open);
           root.replaceWith(buildRoutesView(state, column.sort));
         }),
@@ -353,5 +501,6 @@ export function buildRoutesView(state: SimState, sort: RouteSort): HTMLElement {
   scroller.className = 'routes-scroll';
   scroller.append(table);
   root.append(scroller);
+  if (lens === 'money') root.append(pricesStrip(state, () => root.replaceWith(buildRoutesView(state, column.sort))));
   return root;
 }
