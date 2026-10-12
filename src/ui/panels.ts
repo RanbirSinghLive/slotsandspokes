@@ -352,7 +352,7 @@ function sortFleet(mode: SortMode): void {
     return;
   }
   if (plan.moves.length === 0) {
-    flashTip('Already sorted', false);
+    flashTip(plan.note ? `Already sorted · ${plan.note}` : 'Already sorted', false);
     return;
   }
   addToDraft(plan.moves);
