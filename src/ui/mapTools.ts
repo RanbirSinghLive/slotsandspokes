@@ -4,7 +4,8 @@
  * focus, and on a touch screen, where nothing hovers, for a couple of
  * seconds after a tap, so a phone player can still read what they pressed.
  * The rail's buttons get the same tip, built from their label and title,
- * and so do the icon chips at the top of a long inspector view.
+ * and so do the icon chips at the top of a long inspector view and the
+ * clock bar's speed dots and ops chips.
  * It reuses the ⓘ tooltip box (ui/infoTooltip.ts) and sits beside the
  * strip, on the side with room.
  */
@@ -15,9 +16,10 @@ export function setupMapToolTips(): void {
   const strip = document.querySelector<HTMLElement>('#map-tools');
   const rail = document.querySelector<HTMLElement>('#rail');
   const inspectorBody = document.querySelector<HTMLElement>('#inspector-body');
+  const hud = document.querySelector<HTMLElement>('#hud');
   const tooltip = document.querySelector<HTMLDivElement>('#info-tooltip');
-  if (!strip || !rail || !inspectorBody || !tooltip) return;
-  for (const area of [strip, rail, inspectorBody]) wireTips(area, tooltip);
+  if (!strip || !rail || !inspectorBody || !hud || !tooltip) return;
+  for (const area of [strip, rail, inspectorBody, hud]) wireTips(area, tooltip);
 }
 
 function wireTips(strip: HTMLElement, tooltip: HTMLDivElement): void {
@@ -48,6 +50,10 @@ function wireTips(strip: HTMLElement, tooltip: HTMLDivElement): void {
       tooltip.style.maxWidth = `${stripBox.width}px`;
       left = stripBox.left;
       top = stripBox.top - tooltip.getBoundingClientRect().height - 8;
+    } else if (strip.id === 'hud') {
+      // The clock bar sits in the corner: under the whole bar, so its other rows stay readable.
+      left = rect.left;
+      top = strip.getBoundingClientRect().bottom + 8;
     } else {
       // The strip sits high: beside the button, on the side with room.
       left = rect.left - box.width - 8 >= 8 ? rect.left - box.width - 8 : rect.right + 8;

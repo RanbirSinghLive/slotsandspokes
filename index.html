@@ -44,11 +44,11 @@
         <div id="clock">Jan 1, 2027 · 00:00</div>
         <div id="ops-board"><span id="ops-items"></span><button type="button" id="events-chip" class="ops-item" hidden></button><button type="button" id="crisis-chip" class="ops-item" hidden></button></div>
         <div id="hud-pnl"></div>
-        <div id="speed-controls">
-          <button type="button" data-speed="0">Pause</button>
-          <button type="button" data-speed="1" class="active">1×</button>
-          <button type="button" data-speed="20">20×</button>
-          <button type="button" data-speed="100">100×</button>
+        <div id="speed-controls" role="group" aria-label="Game speed">
+          <button type="button" id="speed-pause" data-tip="Pause · Space" aria-label="Pause"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></button>
+          <button type="button" id="speed-down" data-tip="Slower · −" aria-label="Slower"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="12" x2="18" y2="12"/></svg></button>
+          <span id="speed-dots"></span>
+          <button type="button" id="speed-up" data-tip="Faster · +" aria-label="Faster"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="6" x2="12" y2="18"/><line x1="6" y1="12" x2="18" y2="12"/></svg></button>
         </div>
       </div>
       <div id="alert-strip" hidden>

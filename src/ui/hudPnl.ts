@@ -19,7 +19,7 @@ import { select } from './selection';
 const stripEl = document.querySelector<HTMLDivElement>('#hud-pnl')!;
 
 /** How many finished days the strip shows. */
-const STRIP_DAYS = 10;
+const STRIP_DAYS = 7;
 
 const cardEl = document.createElement('div');
 cardEl.id = 'hud-pnl-card';
@@ -50,17 +50,15 @@ export function updateHudPnl(state: SimState): void {
     bar.style.height = `${Math.max(12, (Math.abs(margin) / biggest) * 100)}%`;
     bars.append(bar);
   }
-  const label = document.createElement('span');
-  label.className = 'ops-code';
-  label.textContent = 'P&L';
   const today = document.createElement('span');
   today.className = 'hud-pnl-today';
-  today.textContent = `${state.todayMargin >= 0 ? '+' : ''}${shortMoney(state.todayMargin)} today`;
+  today.dataset.tip = 'Margin so far today';
+  today.textContent = `${state.todayMargin >= 0 ? '+' : ''}${shortMoney(state.todayMargin)}`;
   // The week's flying margin: the steady figure beside the day's noisy one.
   const chip = marginChip(networkMargin(state), marginMovers(state));
   chip.classList.add('hud-pnl-margin');
   chip.addEventListener('click', () => select({ kind: 'money' }));
-  stripEl.replaceChildren(label, bars, today, chip);
+  stripEl.replaceChildren(bars, today, chip);
   if (!cardEl.hidden) cardEl.replaceChildren(...buildPnlCharts(state));
 }
 
