@@ -320,12 +320,28 @@
     "population": 2975
   },
   {
+    "iata": "YYJ",
+    "name": "Victoria",
+    "lat": 48.6472,
+    "lon": -123.4278,
+    "utcOffsetMinutes": -480,
+    "population": 623964
+  },
+  {
+    "iata": "YCD",
+    "name": "Nanaimo",
+    "lat": 49.055,
+    "lon": -123.8699,
+    "utcOffsetMinutes": -480,
+    "population": 188778
+  },
+  {
     "iata": "YQQ",
     "name": "Comox",
     "lat": 49.7108,
     "lon": -124.887,
     "utcOffsetMinutes": -480,
-    "population": 148934
+    "population": 134298
   },
   {
     "iata": "YXT",
@@ -439,7 +455,7 @@
     "lat": 49.1939,
     "lon": -123.184,
     "utcOffsetMinutes": -480,
-    "population": 2414463
+    "population": 2306471
   },
   {
     "iata": "MEX",
@@ -1258,14 +1274,6 @@
     "population": 676627
   },
   {
-    "iata": "YYJ",
-    "name": "Victoria",
-    "lat": 48.6472,
-    "lon": -123.4278,
-    "utcOffsetMinutes": -480,
-    "population": 671939
-  },
-  {
     "iata": "DSM",
     "name": "Des Moines",
     "lat": 41.534,
@@ -1463,7 +1471,7 @@
     "lat": 40.6518,
     "lon": -75.4428,
     "utcOffsetMinutes": -300,
-    "population": 817600
+    "population": 757173
   },
   {
     "iata": "DAY",
@@ -1712,6 +1720,14 @@
     "lon": -97.5012,
     "utcOffsetMinutes": -360,
     "population": 452292
+  },
+  {
+    "iata": "AVP",
+    "name": "Wilkes-Barre",
+    "lat": 41.3371,
+    "lon": -75.7242,
+    "utcOffsetMinutes": -300,
+    "population": 451116
   },
   {
     "iata": "CUN",
