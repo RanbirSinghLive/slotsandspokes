@@ -320,6 +320,38 @@
     "population": 2975
   },
   {
+    "iata": "YQQ",
+    "name": "Comox",
+    "lat": 49.7108,
+    "lon": -124.887,
+    "utcOffsetMinutes": -480,
+    "population": 148934
+  },
+  {
+    "iata": "YXT",
+    "name": "Terrace",
+    "lat": 54.4685,
+    "lon": -128.576,
+    "utcOffsetMinutes": -480,
+    "population": 28430
+  },
+  {
+    "iata": "YPR",
+    "name": "Prince Rupert",
+    "lat": 54.2861,
+    "lon": -130.445,
+    "utcOffsetMinutes": -480,
+    "population": 14708
+  },
+  {
+    "iata": "YYD",
+    "name": "Smithers",
+    "lat": 54.8247,
+    "lon": -127.183,
+    "utcOffsetMinutes": -480,
+    "population": 9818
+  },
+  {
     "iata": "LGA",
     "name": "LaGuardia",
     "lat": 40.7772,

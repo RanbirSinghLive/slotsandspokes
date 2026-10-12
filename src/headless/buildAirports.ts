@@ -119,13 +119,15 @@ const AIRPORTS: [iata: string, name: string][] = [
   ['YFB', 'Iqaluit'],
   ['YRT', 'Rankin Inlet'],
   // British Columbia coast and northwest: Vancouver Island and the Prince
-  // Rupert / Terrace / Smithers corridor, mostly reached by air or ferry
+  // Rupert / Terrace / Smithers corridor, mostly reached by air or ferry.
+  // Sandspit is left out: GeoNames lists no place of 1,000 people within
+  // 60 km of it, so it would have no population. Nanaimo is left out: its
+  // airport is under 60 km from Victoria's, and the one-airport-per-metro
+  // rule would drop Victoria, the bigger market, to keep it.
   ['YQQ', 'Comox'],
-  ['YCD', 'Nanaimo'],
   ['YXT', 'Terrace'],
   ['YPR', 'Prince Rupert'],
   ['YYD', 'Smithers'],
-  ['YZP', 'Sandspit'],
   ['LGA', 'LaGuardia'],
   ['BOS', 'Boston Logan'],
   // The rest of North America

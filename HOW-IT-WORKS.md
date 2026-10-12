@@ -66,9 +66,9 @@ All from public sources (CLAUDE.md). Some are **generated** by scripts in
 `src/headless/` — change the script and re-run it rather than editing the
 JSON by hand.
 
-- **`airports.json`** — 579 airports, one per metro: a hand-kept list
-  (eastern Canada, 24 northern and regional Canadian airports from Thunder
-  Bay to Iqaluit, the north-east US, about 40 of Europe's main cities,
+- **`airports.json`** — 583 airports, one per metro: a hand-kept list
+  (eastern Canada, 28 northern and regional Canadian airports from Thunder
+  Bay to Iqaluit, including Comox, Terrace, Prince Rupert and Smithers, the north-east US, about 40 of Europe's main cities,
   and world hubs such as DXB and HND), then a fill-out region by region
   (the script's `REGIONS`) from OurAirports' large and medium airports
   with scheduled service:
