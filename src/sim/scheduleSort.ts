@@ -30,7 +30,7 @@ import { rotationsForTail, scheduledTurnMinutes, type Rotation } from './utilisa
 
 export type SortMode = 'fifo' | 'lifo' | 'optimise';
 
-export type SortPlan = { ok: true; moves: DraftMove[] } | { ok: false; reason: string };
+export type SortPlan = { ok: true; moves: DraftMove[]; note?: string } | { ok: false; reason: string };
 
 /** A rotation's place on a plane's day: from take-off until its last turn is done. */
 type Busy = { from: number; to: number; market: string };
@@ -91,10 +91,30 @@ export function planSort(state: SimState, mode: SortMode): SortPlan {
     }
   }
 
-  if (moves.length === 0) return { ok: true, moves };
+  if (moves.length === 0) return { ok: true, moves, note: unsortedNote(state, view) };
   // All or nothing, the same check the ✓ makes: nothing is changed here.
   const check = commitDraft(state, moves, { dryRun: true });
   return check.ok ? { ok: true, moves } : { ok: false, reason: check.reason };
+}
+
+/**
+ * Why "already sorted" can still leave a market on two planes: tomorrow's
+ * schedule (the one a sort works on) may already hold moves waiting for the
+ * rollover, and some flights overlap in time so no one plane can fly them.
+ */
+function unsortedNote(state: SimState, view: SimState): string {
+  const planes = new Map<string, Set<string>>();
+  for (const aircraft of state.aircraft) {
+    for (const rotation of rotationsForTail(view, aircraft.tail)) {
+      const market = marketOf(rotation);
+      planes.set(market, (planes.get(market) ?? new Set()).add(aircraft.tail));
+    }
+  }
+  const split = [...planes].filter(([, tails]) => tails.size > 1).map(([market]) => market.replace('>', '-'));
+  const waiting = (state.pendingRetimes ?? []).length > 0;
+  const parts = [waiting ? 'tomorrow already holds the moves' : 'nothing to move'];
+  if (split.length > 0) parts.push(`${split.join(' ')} still on 2+ planes`);
+  return parts.join(' · ');
 }
 
 /** Which plane flies each rotation (by its first flight's id), or null when the pass runs out of room (a plane's fixed flights can leave no gap). */
