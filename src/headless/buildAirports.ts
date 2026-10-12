@@ -118,6 +118,14 @@ const AIRPORTS: [iata: string, name: string][] = [
   ['YXY', 'Whitehorse'],
   ['YFB', 'Iqaluit'],
   ['YRT', 'Rankin Inlet'],
+  // British Columbia coast and northwest: Vancouver Island and the Prince
+  // Rupert / Terrace / Smithers corridor, mostly reached by air or ferry
+  ['YQQ', 'Comox'],
+  ['YCD', 'Nanaimo'],
+  ['YXT', 'Terrace'],
+  ['YPR', 'Prince Rupert'],
+  ['YYD', 'Smithers'],
+  ['YZP', 'Sandspit'],
   ['LGA', 'LaGuardia'],
   ['BOS', 'Boston Logan'],
   // The rest of North America
