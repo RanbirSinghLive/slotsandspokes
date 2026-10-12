@@ -130,7 +130,6 @@ const canvas = document.querySelector<HTMLCanvasElement>('#map')!;
 setMapElement(canvas);
 const ctx = canvas.getContext('2d')!;
 const clockEl = document.querySelector<HTMLDivElement>('#clock')!;
-const speedButtons = document.querySelectorAll<HTMLButtonElement>('#speed-controls button');
 // The map's lens (index.html's #map-tools): one at a time, its legend
 // and filter directly under the buttons. See setLens() below.
 const lensButtons = document.querySelectorAll<HTMLButtonElement>('#lens-bar button[data-lens]');
@@ -481,8 +480,8 @@ function updateClock(state: SimState): void {
   const localMinute = homeMinuteOfDay(state);
   const hours = Math.floor(localMinute / 60);
   const minutes = localMinute % 60;
-  clockEl.textContent = `${gameDateWithYear(state, dayIndex(state))} · ${pad(hours)}:${pad(minutes)} ${state.homeAirport} time`;
-  clockEl.title = `Local time at your home airport, ${state.homeAirport} (${formatUtcOffset(homeUtcOffsetMinutes(state))}). Every schedule time in the game uses this clock.`;
+  clockEl.textContent = `${gameDateWithYear(state, dayIndex(state))} · ${pad(hours)}:${pad(minutes)}`;
+  clockEl.dataset.tip = `${state.homeAirport} local time (${formatUtcOffset(homeUtcOffsetMinutes(state))}). Every schedule time in the game uses this clock.`;
 }
 
 // A resize keeps the player's pan and zoom; only Home (below) and a new home airport refit.
@@ -618,10 +617,10 @@ function tick(nowMs: number): void {
     if (lastSavedDay < YEAR_ONE_DAY && currentDay >= YEAR_ONE_DAY && !isInsolvent(state)) {
       const speedBefore = speedMultiplier;
       speedMultiplier = 0;
-      speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === 0));
+      syncSpeedUi();
       showYearReport(state, 'Year one', () => {
         speedMultiplier = speedBefore;
-        speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === speedBefore));
+        syncSpeedUi();
       });
     }
     lastSavedDay = currentDay;
@@ -636,7 +635,7 @@ function tick(nowMs: number): void {
   // game-over screen ui/gameOver.ts is about to show.
   if (isInsolvent(state) && speedMultiplier !== 0) {
     speedMultiplier = 0;
-    speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === 0));
+    syncSpeedUi();
   }
 
   // The runway pop-up pauses once so the warning can't scroll past at
@@ -645,7 +644,7 @@ function tick(nowMs: number): void {
   if (runwayPauseRequested) {
     runwayPauseRequested = false;
     speedMultiplier = 0;
-    speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === 0));
+    syncSpeedUi();
   }
 
   latestFractionalMinute = state.simMinute + accumulator / MS_PER_SIM_MINUTE;
@@ -664,7 +663,7 @@ requestAnimationFrame(tick);
 setupTutorial((speed) => {
   speedMultiplier = speed;
   if (speed !== 0) speedBeforePause = speed;
-  speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === speed));
+  syncSpeedUi();
 });
 
 // Anything uncaught pauses the game and says so, with the save to keep
@@ -673,7 +672,7 @@ setupTutorial((speed) => {
 setupCrashCatcher(
   () => {
     speedMultiplier = 0;
-    speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === 0));
+    syncSpeedUi();
   },
   () => saveFileText(state),
   () => feedbackUrl(state),
@@ -701,29 +700,72 @@ setScheduleClock({
 // always snapping back to 1x.
 let speedBeforePause = 1;
 
-speedButtons.forEach((button) => {
-  button.addEventListener('click', () => {
-    speedMultiplier = Number(button.dataset.speed);
-    if (speedMultiplier !== 0) speedBeforePause = speedMultiplier;
-    speedButtons.forEach((b) => b.classList.toggle('active', b === button));
-  });
+// The five speed dots (Paradox style): level 1 to 5, 0 is paused. Dot 5 is 100x,
+// the fastest the map reads well; the dots in between fill the big gaps.
+const SPEED_LEVELS = [1, 5, 20, 50, 100];
+const speedDotsEl = document.querySelector<HTMLSpanElement>('#speed-dots')!;
+const speedPauseEl = document.querySelector<HTMLButtonElement>('#speed-pause')!;
+const speedDownEl = document.querySelector<HTMLButtonElement>('#speed-down')!;
+const speedUpEl = document.querySelector<HTMLButtonElement>('#speed-up')!;
+const speedDotEls = SPEED_LEVELS.map((speed, index) => {
+  const dot = document.createElement('button');
+  dot.type = 'button';
+  dot.className = 'speed-dot';
+  dot.dataset.tip = `${speed}×`;
+  dot.setAttribute('aria-label', `Speed ${index + 1}, ${speed}×`);
+  dot.addEventListener('click', () => setSpeedLevel(index));
+  speedDotsEl.append(dot);
+  return dot;
 });
+
+/** Lights the dots up to the current level (the one before a pause, while paused). */
+function syncSpeedUi(): void {
+  const speed = speedMultiplier === 0 ? speedBeforePause : speedMultiplier;
+  const level = Math.max(0, SPEED_LEVELS.indexOf(speed));
+  speedDotEls.forEach((dot, index) => {
+    dot.classList.toggle('on', index <= level);
+    dot.classList.toggle('current', index === level);
+  });
+  speedPauseEl.classList.toggle('active', speedMultiplier === 0);
+  speedDownEl.disabled = level === 0;
+  speedUpEl.disabled = level === SPEED_LEVELS.length - 1;
+}
+
+function setSpeedLevel(level: number): void {
+  const clamped = Math.max(0, Math.min(SPEED_LEVELS.length - 1, level));
+  speedMultiplier = SPEED_LEVELS[clamped];
+  speedBeforePause = speedMultiplier;
+  syncSpeedUi();
+}
+
+function currentSpeedLevel(): number {
+  return Math.max(0, SPEED_LEVELS.indexOf(speedMultiplier === 0 ? speedBeforePause : speedMultiplier));
+}
+
+speedDownEl.addEventListener('click', () => setSpeedLevel(currentSpeedLevel() - 1));
+speedUpEl.addEventListener('click', () => setSpeedLevel(currentSpeedLevel() + 1));
+speedPauseEl.addEventListener('click', () => togglePause());
+syncSpeedUi();
 
 function togglePause(): void {
   speedMultiplier = speedMultiplier === 0 ? speedBeforePause : 0;
-  speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === speedMultiplier));
+  syncSpeedUi();
 }
 
 // Spacebar pause/resume. Ignored while a real DOM input has focus (schedule
 // filters, fare fields, the New Route form, etc.) so typing a space into
 // one of those doesn't also pause the game out from under the player.
 window.addEventListener('keydown', (event) => {
-  if (event.code !== 'Space' || choosingHome) return;
+  const isSpace = event.code === 'Space';
+  const slower = event.key === '-' || event.code === 'NumpadSubtract';
+  const faster = event.key === '+' || event.key === '=' || event.code === 'NumpadAdd';
+  if (!(isSpace || slower || faster) || choosingHome || event.ctrlKey || event.metaKey) return;
   const target = event.target as HTMLElement | null;
   const tag = target?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return;
   event.preventDefault(); // stop the page itself from scrolling on Space
-  togglePause();
+  if (isSpace) togglePause();
+  else setSpeedLevel(currentSpeedLevel() + (faster ? 1 : -1));
 });
 
 /**
@@ -1135,7 +1177,7 @@ toolsToggle.addEventListener('click', () => {
 // not ask again), refits the map around it and starts the clock.
 if (choosingHome) {
   speedMultiplier = 0;
-  speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === 0));
+  syncSpeedUi();
   showHomePicker(homeOptions(), (iata, season, difficulty, eventsOff) => {
     chooseHome(state, iata, season, difficulty, eventsOff);
     saveState(state);
@@ -1145,7 +1187,7 @@ if (choosingHome) {
     // nothing; 1× or Space starts the clock at 1×.
     speedMultiplier = 0;
     speedBeforePause = 1;
-    speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === 0));
+    syncSpeedUi();
   });
 }
 
@@ -1154,5 +1196,5 @@ if (choosingHome) {
 // it, at 1×.
 if (savedState !== null) {
   speedMultiplier = 0;
-  speedButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === 0));
+  syncSpeedUi();
 }

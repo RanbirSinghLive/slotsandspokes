@@ -77,18 +77,17 @@ button,
 }
 
 /* A small grid sized to its contents: the clock and speeds on one row,
-   the ops board and the P&L strip each on their own below. */
+   the ops board and the P&L strip together on the next. */
 #hud {
   display: grid;
   grid-template-columns: auto auto;
   grid-template-areas:
     'clock speed'
-    'ops ops'
-    'pnl pnl';
+    'ops pnl';
   align-items: center;
   column-gap: 12px;
-  row-gap: 6px;
-  padding: 8px 12px;
+  row-gap: 4px;
+  padding: 6px 10px;
   background: rgba(10, 12, 18, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 6px;
@@ -99,27 +98,44 @@ button,
 
 #clock {
   grid-area: clock;
+  white-space: nowrap;
 }
 
+/* Paradox-style speed: pause, slower, five dots, faster. */
 #speed-controls {
   grid-area: speed;
   display: flex;
-  gap: 4px;
+  align-items: center;
+  gap: 2px;
 }
 
 #speed-controls button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-family: inherit;
-  font-size: inherit;
   color: #cdd3e0;
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid transparent;
   border-radius: 4px;
-  padding: 3px 8px;
+  padding: 0;
+  width: 22px;
+  height: 22px;
   cursor: pointer;
 }
 
-#speed-controls button:hover {
-  border-color: rgba(255, 255, 255, 0.5);
+#speed-controls button svg {
+  width: 14px;
+  height: 14px;
+}
+
+#speed-controls button:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+#speed-controls button:disabled {
+  opacity: 0.3;
+  cursor: default;
 }
 
 #speed-controls button.active {
@@ -128,6 +144,34 @@ button,
   color: #fff;
 }
 
+#speed-dots {
+  display: flex;
+  align-items: center;
+}
+
+#speed-controls button.speed-dot {
+  width: 14px;
+  height: 22px;
+  border: none;
+}
+
+#speed-controls button.speed-dot::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid #6b7694;
+  box-sizing: border-box;
+}
+
+#speed-controls button.speed-dot.on::before {
+  background: #8fb4ff;
+  border-color: #8fb4ff;
+}
+
+#speed-controls button.speed-dot.current::before {
+  box-shadow: 0 0 0 2px rgba(143, 180, 255, 0.35);
+}
 
 /* The Game screen (ui/gameControls.ts): one card per job. Icon tiles carry
    the action, the words ride in data-tip; the card edge colours say which
@@ -4306,11 +4350,12 @@ button.inspector-crumb:hover {
 }
 
 /* The ops board in the HUD (ui/opsBoard.ts): today's operation in one
-   line, a row of its own under the clock and speed controls. */
+   line, under the clock and speed controls. */
 #ops-board {
   grid-area: ops;
   display: flex;
-  gap: 12px;
+  align-items: center;
+  gap: 8px;
   font-family: ui-monospace, Consolas, monospace;
   font-size: 11px;
   color: #cdd3e0;
@@ -4327,6 +4372,29 @@ button.inspector-crumb:hover {
 
 #ops-items {
   display: contents;
+}
+
+/* Today's flights: landed, in the air, still to go. */
+.ops-day {
+  display: flex;
+  width: 64px;
+  height: 8px;
+  gap: 1px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.ops-day-landed {
+  background: #5fc98a;
+}
+
+.ops-day-air {
+  background: #8fb4ff;
+}
+
+.ops-day-togo {
+  background: rgba(255, 255, 255, 0.18);
 }
 
 #crisis-chip {
@@ -5711,10 +5779,20 @@ button.ops-item:hover {
   .inspector-crumb,
   .inspector-back,
   .inspector-chips button.is-icon,
-  #speed-controls button,
   .lever-reset,
   .crew-action {
     position: relative;
+  }
+
+  /* The speed buttons sit tight: a tall invisible hit area, not much wider. */
+  #speed-controls button {
+    position: relative;
+  }
+
+  #speed-controls button::after {
+    content: '';
+    position: absolute;
+    inset: -11px -2px;
   }
 
   .info-mark::after,
@@ -5723,7 +5801,6 @@ button.ops-item:hover {
   .inspector-crumb::after,
   .inspector-back::after,
   .inspector-chips button.is-icon::after,
-  #speed-controls button::after,
   .lever-reset::after,
   .crew-action::after {
     content: '';
@@ -5733,7 +5810,6 @@ button.ops-item:hover {
 
   /* Neighbours that sit close would fight over the overlap: those two get less. */
   .inspector-chips button.is-icon::after,
-  #speed-controls button::after,
   .crew-action::after {
     inset: -10px -3px;
   }
@@ -5749,19 +5825,10 @@ button.ops-item:hover {
   overflow-x: auto;
 }
 
-/* A phone's clock bar: the date on one line, the speeds under it. */
+/* A phone's clock bar: the date and the speeds on one row, the ops and P&L under. */
 @media (max-width: 700px) {
   #hud {
-    grid-template-columns: auto;
-    grid-template-areas:
-      'clock'
-      'speed'
-      'ops'
-      'pnl';
-  }
-
-  #clock {
-    white-space: nowrap;
+    column-gap: 8px;
   }
 }
 

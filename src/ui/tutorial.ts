@@ -68,7 +68,7 @@ const STEPS: Step[] = [
   },
   {
     title: "Today's operation",
-    text: 'DEP · AIR · TO GO · LATE · CNX is how today is going. The bars under it are each day: green made money, red lost it. Hover them for the whole chart. An amber ★ is an event: a priority flight that pays a premium. The game pauses when one arrives.',
+    text: 'The bar under the clock is the day\'s flights: green flown, blue in the air, grey to go. LATE and CNX show up when there are any. The tall bars are each day: green made money, red lost it. Hover them for the whole chart. Dots set the speed. An amber ★ is an event: a priority flight that pays a premium. The game pauses when one arrives.',
     target: '#hud',
   },
   {

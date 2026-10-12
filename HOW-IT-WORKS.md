@@ -52,8 +52,9 @@ Each airport has one fixed `utcOffsetMinutes` (standard time). Daylight
 saving is out of scope.
 
 The browser compresses time: 125 ms of real time = 1 simulated minute at
-1× (`MS_PER_SIM_MINUTE` in `main.ts`). The speed buttons (Pause, 1×, 20×,
-100×) multiply how fast an accumulator fills; `step()` always advances
+1× (`MS_PER_SIM_MINUTE` in `main.ts`). The speed control (a pause button, − and +, and five dots:
+1×, 5×, 20×, 50×, 100×; the keys + and − do the same) multiplies how fast an
+accumulator fills; `step()` always advances
 exactly one minute per call. At most 250 ms of real time is fed in per
 frame (`MAX_FRAME_DELTA_MS`), so returning to a backgrounded tab resumes
 rather than freezing through a huge catch-up. The spacebar toggles pause
@@ -755,7 +756,7 @@ of the base map that frame. `basemap.ts` is the one layer always drawn
 first, every time the map panel is visible.
 
 **The map's three corners** each have one job: top left the clock,
-speeds, ops board and a P&L strip (with the alerts under them, one
+speed dots, an ops bar (today's flights flown · in the air · to go, with LATE, CALL and CNX only while non-zero) and a 7-day P&L strip (with the alerts under them, one
 column, `#now-corner`); top right the **map tools** (`#map-tools`), one
 icon strip in three groups: the lens, the airport filter (All · Yours ·
 Contested · Uncontested, the last being airports no rival flies to, home

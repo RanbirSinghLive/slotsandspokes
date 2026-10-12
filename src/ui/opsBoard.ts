@@ -6,9 +6,9 @@ import { openCallPopup } from './callPopup';
 import { select } from './selection';
 
 /**
- * The ops board: today's operation in one line under the clock, the way
- * an airline's operations centre reads it. DEP departed and landed, AIR
- * in the air now, TO GO still to leave, LATE landed late, CNX cancelled.
+ * The ops board: today's operation in one line under the clock. A bar
+ * shows flights landed, in the air and still to go; LATE (landed late),
+ * CALL and CNX (cancelled) appear only while there is something to see.
  * LATE opens the route with the most late flights today; CNX opens the
  * On-time tab, which breaks cancellations down by cause.
  */
@@ -61,7 +61,7 @@ export function updateOpsBoard(state: SimState, openOnTime: () => void): void {
     const el = document.createElement(onClick ? 'button' : 'span');
     el.className = 'ops-item';
     el.classList.toggle('is-warn', warn);
-    el.title = title;
+    el.dataset.tip = title;
     const label = document.createElement('span');
     label.className = 'ops-code';
     label.textContent = code;
@@ -72,22 +72,34 @@ export function updateOpsBoard(state: SimState, openOnTime: () => void): void {
     }
     return el;
   };
+  // Today's flights as one bar: landed, in the air, still to go. The counts ride in the tip.
+  const total = Math.max(1, now.landed + now.airborne + now.toGo);
+  const bar = document.createElement('span');
+  bar.className = 'ops-day';
+  bar.dataset.tip = `Today · ${now.landed} flown · ${now.airborne} in the air · ${now.toGo} to go`;
+  for (const [kind, count] of [['landed', now.landed], ['air', now.airborne], ['togo', now.toGo]] as const) {
+    if (count === 0) continue;
+    const seg = document.createElement('span');
+    seg.className = `ops-day-${kind}`;
+    seg.style.flexGrow = String(count / total);
+    bar.append(seg);
+  }
   const worst = now.worst;
   const callList = pendingCalls(state);
   boardEl.replaceChildren(
-    item('DEP', now.landed, 'Flights flown and landed today'),
-    item('AIR', now.airborne, 'In the air now'),
-    item('TO GO', now.toGo, 'Still to depart today'),
-    item(
-      'LATE',
-      now.late,
-      `Landed more than ${ON_TIME_GRACE_MINUTES} minutes late today` + (worst ? `. Worst: ${worst.a}–${worst.b}; click to open it.` : ''),
-      worst ? () => select({ kind: 'route', a: worst.a, b: worst.b }) : undefined,
-      now.late > 0,
-    ),
-    ...(callList.length > 0
-      ? [item('CALL', callList.length, `Planes whose day will break: ${callList.map((call) => `${call.tail} (${CALL_TITLES[call.kind]})`).join(', ')}. Click to open the worst.`, () => openCallPopup(state, callList[0].tail, callList[0].kind), true)]
+    bar,
+    ...(now.late > 0
+      ? [item(
+          'LATE',
+          now.late,
+          `Landed more than ${ON_TIME_GRACE_MINUTES} minutes late today` + (worst ? `. Worst: ${worst.a}–${worst.b}; tap to open it.` : ''),
+          worst ? () => select({ kind: 'route', a: worst.a, b: worst.b }) : undefined,
+          true,
+        )]
       : []),
-    item('CNX', now.cancelled, 'Cancelled today; click for causes in the On-time tab', now.cancelled > 0 ? openOnTime : undefined, now.cancelled > 0),
+    ...(callList.length > 0
+      ? [item('CALL', callList.length, `Planes whose day will break: ${callList.map((call) => `${call.tail} (${CALL_TITLES[call.kind]})`).join(', ')}. Tap to open the worst.`, () => openCallPopup(state, callList[0].tail, callList[0].kind), true)]
+      : []),
+    ...(now.cancelled > 0 ? [item('CNX', now.cancelled, 'Cancelled today; tap for causes in the On-time tab', openOnTime, true)] : []),
   );
 }
