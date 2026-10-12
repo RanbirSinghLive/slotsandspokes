@@ -237,18 +237,25 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
       `${marketSize(state, a, b)} market · ${marketCharacterWord(a, b)}${fillWords}` +
         (short ? ' · demand exceeds seats' : '') +
         (fill.thin ? ' · still growing' : '') +
-        fareGrowth,
-      `A market's demand is built by flying it, over weeks, toward the size of the city pair (${readout.seatsPerFlight} seats a flight now). When demand exceeds seats, add a flight or a bigger plane; while it is still growing, extra flights fly emptier. Fares grow it too: everyone's fares here, weighted by seats${level === null ? '' : ` (now ${Math.round(level * 100)}% of the going rate)`}. Cheap fares build it faster and up to 1.3× its usual size; dear ones slow it and settle it smaller. The market is everyone's, so one built cheaply is one a rival can share. The bar is who flies it: business travellers barely mind the fare but want peak departures and frequency; leisure travellers chase the fare; VFR (visiting friends and relatives) sit between. A business trunk rewards frequency and peak slots, a sun route a sharp fare.`,
+        fareGrowth +
+        ` · season ${seasonNow(state, a, b)}`,
+      `${seasonDetail(state, a, b)} A market's demand is built by flying it, over weeks, toward the size of the city pair (${readout.seatsPerFlight} seats a flight now). When demand exceeds seats, add a flight or a bigger plane; while it is still growing, extra flights fly emptier. Fares grow it too: everyone's fares here, weighted by seats${level === null ? '' : ` (now ${Math.round(level * 100)}% of the going rate)`}. Cheap fares build it faster and up to 1.3× its usual size; dear ones slow it and settle it smaller. The market is everyone's, so one built cheaply is one a rival can share. The bar is who flies it: business travellers barely mind the fare but want peak departures and frequency; leisure travellers chase the fare; VFR (visiting friends and relatives) sit between. A business trunk rewards frequency and peak slots, a sun route a sharp fare.`,
     ),
   );
   root.append(...characterBar(a, b));
-  root.append(seasonLine(state, a, b));
   const rivalsView = describeRivalsView(state, a, b);
   if (rivalsView) root.append(rivalsView);
 
 
+  // Reference sections stay folded so the page reads at a glance.
+  const more = document.createElement('details');
+  more.className = 'route-more';
+  const moreSummary = document.createElement('summary');
+  moreSummary.textContent = 'Flows · planes · history';
+  more.append(moreSummary);
+  root.append(more);
   const flows = buildFlows(state, a, b);
-  if (flows) root.append(flows);
+  if (flows) more.append(flows);
 
   // The planes this route draws on, pooled at its base.
   const base = ops.routeBase(state, a, b);
@@ -259,11 +266,11 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
     pools.replaceChildren(...(base ? buildPoolRows(utilisationPools(state, base), getMapPreview()?.effects, base, (code) => crewShare(state, code, base), (code) => inboundAt(state, base, code).length, (code) => cabinShare(state, code, base)) : []));
   };
   redrawPools();
-  if (base) root.append(poolsHeading, pools);
+  if (base) more.append(poolsHeading, pools);
 
   const history = buildRouteHistory(state, a, b);
-  if (history) root.append(history);
-  root.append(buildRouteOtp(state, a, b));
+  if (history) more.append(history);
+  more.append(buildRouteOtp(state, a, b));
 
   return { root, redrawPools };
 }
@@ -405,14 +412,15 @@ function describeEconomics(state: SimState, a: string, b: string): { text: strin
     (entry) => `${entry.className} ${money(entry.perDay)} (${Math.round(entry.share * 100)}% of the class's flying, which uses ${Math.round(entry.poolUse * 100)}% of its day)`,
   );
   return {
-    text: `Today at this fare · ${summary.pax} pax · LF ${Math.round(load * 100)}% · ${signedMoney(summary.margin)}/day`,
+    text: `${summary.pax} pax · LF ${Math.round(load * 100)}% · ${shortSigned(summary.margin)}/day · ${shortSigned(fullMargin)} net`,
     detail:
       `The game's forecast for a day at these settings: revenue ${money(summary.revenue)}, flying costs ${money(summary.cost)}, ` +
       `${Math.round(summary.share * 100)}% of the market's passengers. ` +
       (summary.seatCapped
         ? 'Seat-capped: more want to fly than there are seats, so a higher fare loses passengers nobody could carry.'
-        : 'Demand-capped: there are seats to spare, so a higher fare loses real passengers.'),
-    losing: summary.margin < 0,
+        : 'Demand-capped: there are seats to spare, so a higher fare loses real passengers.') +
+      ' Net is after lease, slots and overhead: ' + `lease ${money(costs.leasePerDay)}, slots ${money(costs.slotsPerDay)}, overhead ${money(costs.overheadPerDay)} a day` + (slotParts.length > 0 ? `; slots ${slotParts.join(', ')}` : '') + (leaseParts.length > 0 ? `; lease ${leaseParts.join('; ')}` : '') + '. Paid airline-wide each midnight; overhead grows with the square of the fleet.',
+    losing: summary.margin < 0 || fullMargin < 0,
     fixed:
       `After lease, slots, overhead · ${signedMoney(fullMargin)}/day`,
     fixedDetail:
@@ -445,19 +453,11 @@ function buildFare(state: SimState, a: string, b: string, changed: () => void): 
   const economicsText = document.createElement('span');
   const economicsInfo = info('');
   economics.append(economicsText, ' ', economicsInfo);
-  // The fully costed line keeps its (i) while the slider redraws its text.
-  const fixedCosts = line('');
-  const fixedText = document.createElement('span');
-  const fixedInfo = info('');
-  fixedCosts.append(fixedText, ' ', fixedInfo);
   const redrawEconomics = () => {
-    const { text, detail, losing, fixed, fixedDetail, fullyLosing } = describeEconomics(state, a, b);
+    const { text, detail, losing } = describeEconomics(state, a, b);
     economicsText.textContent = text;
     economicsInfo.dataset.info = detail;
     economics.classList.toggle('is-over', losing);
-    fixedText.textContent = fixed;
-    fixedInfo.dataset.info = fixedDetail;
-    fixedCosts.classList.toggle('is-over', fullyLosing);
   };
 
   // The hill's range: centred on the policy fare, stretched to include the
@@ -468,7 +468,7 @@ function buildFare(state: SimState, a: string, b: string, changed: () => void): 
   const hill = revenueHill(state, a, b, low, high);
   const pricedBy = () =>
     settings.fareIsOverridden ? 'by hand' : settings.fareStance ? (STANCES.find((s) => s.stance === settings.fareStance)?.name ?? '') : 'policy';
-  const fareValue = line('', 'inspector-line hill-readout');
+  const fareValue = document.createElement('span');
   const redrawFare = () => {
     const range = hill?.peakRange;
     const flown = hill?.observations.length ?? 0;
@@ -488,13 +488,15 @@ function buildFare(state: SimState, a: string, b: string, changed: () => void): 
     redrawEconomics();
   };
   let moveBall: (() => void) | null = null;
-  const nodes: HTMLElement[] = [heading, economics, fixedCosts];
+  const nodes: HTMLElement[] = [heading, economics];
   if (hill) {
     const drawn = drawHill(hill, low, high, () => settings.fare, setFare, changed);
     moveBall = drawn.moveBall;
     nodes.push(drawn.element);
   }
-  nodes.push(fareValue);
+  const fareRow = line('', 'inspector-line hill-readout');
+  fareRow.append(fareValue);
+  nodes.push(fareRow);
   if (settings.fareIsOverridden || settings.fareStance) {
     const reset = document.createElement('button');
     reset.type = 'button';
@@ -504,7 +506,7 @@ function buildFare(state: SimState, a: string, b: string, changed: () => void): 
       setFareStance(state, a, b, null);
       changed();
     });
-    nodes.push(reset);
+    fareRow.append(' ', reset);
   }
 
   redrawFare();
@@ -545,14 +547,17 @@ function dayInWords(day: number): string {
   return `${into < 10 ? 'early' : into < 20 ? 'mid' : 'late'}-${MONTHS[month]}`;
 }
 
-/** Where this market is in its year (sim/seasons.ts): today against an ordinary day, and its busiest and quietest. */
-function seasonLine(state: SimState, a: string, b: string): HTMLElement {
+const seasonPct = (level: number) => `${level >= 1 ? '+' : '−'}${Math.round(Math.abs(level - 1) * 100)}%`;
+
+/** Today's season against an ordinary day, for the market line. */
+function seasonNow(state: SimState, a: string, b: string): string {
+  return seasonPct(marketSeasonOutlook(state, a, b).now);
+}
+
+/** Where this market is in its year (sim/seasons.ts): its busiest and quietest, and why they fall there. */
+function seasonDetail(state: SimState, a: string, b: string): string {
   const year = marketSeasonOutlook(state, a, b);
-  const pct = (level: number) => `${level >= 1 ? '+' : '−'}${Math.round(Math.abs(level - 1) * 100)}%`;
-  return lineWithInfo(
-    `Season ${pct(year.now)} · peak ${pct(year.peak)} ${dayInWords(year.peakDay)} · low ${pct(year.low)} ${dayInWords(year.lowDay)}` + (isSunRoute(a, b) ? ' · ☀' : ''),
-    'How many want to fly this market today against an ordinary day, from the calendar: leisure travellers peak in July and at Christmas, business travellers dip in August and over the holidays, VFR peak at Christmas and in summer. On a sun route (a warm end and a cold one) leisure peaks January to March instead. The busier the season, the fuller the planes at a fare, so the revenue hill and the forecasts move with it: add capacity or raise the fare ahead of a peak, and trim ahead of a low.',
-  );
+  return `Season ${seasonPct(year.now)} today, peak ${seasonPct(year.peak)} ${dayInWords(year.peakDay)}, low ${seasonPct(year.low)} ${dayInWords(year.lowDay)}${isSunRoute(a, b) ? ' (sun route: leisure peaks January to March)' : ''}. Leisure travellers peak in July and at Christmas, business travellers dip in August and over the holidays, VFR peak at Christmas and in summer. The busier the season, the fuller the planes at a fare, so add capacity or raise the fare ahead of a peak.`;
 }
 
 /** The seat bar's colours (style.css's .seat-split-*), for its key. */
@@ -595,6 +600,7 @@ function buildSeatSplit(state: SimState, a: string, b: string, changed: () => vo
   const forecast = line('', 'inspector-line seat-split-forecast');
   const yesterday = state.yesterdayFareClasses?.[key];
   const past = line(yesterday && yesterday.flights > 0 ? `Yesterday · ${describeTally(yesterday)}` : '', 'inspector-line seat-split-yesterday');
+  void past;
 
   const redraw = () => {
     const { saverShare, flexShare } = split();
@@ -609,6 +615,7 @@ function buildSeatSplit(state: SimState, a: string, b: string, changed: () => vo
       ),
     );
     forecast.textContent = `Today · ${describeTally(summarizeMarket(a, b, state, settings).fareClasses, true)}`;
+    forecast.title = past.textContent ?? '';
   };
 
   const { bar } = buildSeatSplitBar({
@@ -633,7 +640,8 @@ function buildSeatSplit(state: SimState, a: string, b: string, changed: () => vo
     });
     policy.append(' ', back);
   }
-  return [heading, bar, policy, legend, forecast, past, buildSale(state, a, b, changed)];
+  if (!settings.fareClassesByHand) policy.remove();
+  return [heading, bar, ...(settings.fareClassesByHand ? [policy] : []), legend, forecast, buildSale(state, a, b, changed)];
 }
 
 /** A seat sale (sim/seatSale.ts): the one running, or a button to start one, or when the next can. */
@@ -699,6 +707,7 @@ function drawHill(
     step: FARE_STEP,
     ariaLabel: 'Fare',
     valueLabel: 'your fare',
+    hideLegend: true,
   });
 }
 

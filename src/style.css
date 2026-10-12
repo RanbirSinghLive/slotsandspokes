@@ -6851,3 +6851,16 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
 .pairing-bar.is-away {
   background: #7d8499;
 }
+
+/* Route view: reference sections folded under one line (ui/inspector/route.ts). */
+.route-more {
+  margin-top: 8px;
+}
+
+.route-more > summary {
+  cursor: pointer;
+  color: #9aa3b8;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
