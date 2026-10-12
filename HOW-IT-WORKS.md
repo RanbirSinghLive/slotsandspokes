@@ -3186,6 +3186,22 @@ its sick chance times the 1.6 days a sickness lasts on average. For six
 Propellers needing six crews: 6 crews, 74% a week; 7, 13%; 8, 1%. The
 headless player staffs for 5% (`crewsForRisk()`).
 
+**Pairings** (`sim/pairings.ts`, shown on the Crews screen) are a read-out
+of the duty the schedule asks of crews: each plane's run of legs from report
+to release, split where the plane waits 2 hours or more at base. Each is a
+day pairing (out of base and back inside 06:00-19:00), late (back after
+19:00), night (before 06:00 or after 22:00) or away (starts or ends off
+base), with a credit ratio of time flying over time on duty. Pairings
+themselves change no rule; the night weighting below is what makes red
+ones cost more.
+
+**Night duty counts 1.5x.** Duty minutes between 22:00 and 06:00
+home-local (`NIGHT_DUTY_EXTRA`, `sim/crews.ts`) weigh half again toward a
+shift. `dutyMinutes()` and `legFatigue()` use that weighted duty, so a plane
+that flies into the night needs more crews at the 8-hour and 13-hour
+marks, its late legs tire the crew sooner, and sickness strain rises with
+the longer shifts. The same trip by day costs less.
+
 ## Cabin crew and training seats (`src/sim/crews.ts`)
 
 **Cabin crew** staff Regional planes and up; a Propeller flies without.

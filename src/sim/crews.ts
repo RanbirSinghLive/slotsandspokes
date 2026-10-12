@@ -35,7 +35,8 @@ import type { SimState } from './state';
  * component). Fresh for the first FRESH_SHIFT_MINUTES of a shift, fully
  * tired FATIGUE_SPAN_MINUTES after that. A turn tighter than
  * TIGHT_TURN_MINUTES tires a crew as much as TIGHT_TURN_TIRING_MINUTES
- * more duty. The levers are ones already on the map: turn buffers, how
+ * more duty. Night minutes (22:00-06:00 home-local) count 1.5x toward a
+ * shift (NIGHT_DUTY_EXTRA), for crew sizing as well as tiredness. The levers are ones already on the map: turn buffers, how
  * full a plane's day is, and how many crews its base has.
  *
  * **Sickness** (WEEK-FOURTEEN.md, stage 4). Each morning every crew not
@@ -68,6 +69,14 @@ export const IDEAL_SHIFT_MINUTES = 8 * 60;
 export const LEGAL_SHIFT_MINUTES = 13 * 60;
 /** Reporting before the first departure, counted in a plane's duty day. */
 export const REPORT_MINUTES = 60;
+/**
+ * Duty between 22:00 and 06:00 home-local counts this much more toward a
+ * shift (an extra half minute for each night minute), so night flying
+ * needs more crews than the same hours by day and tires them sooner.
+ */
+export const NIGHT_DUTY_EXTRA = 0.5;
+export const NIGHT_DUTY_START = 22 * 60;
+export const NIGHT_DUTY_END = 6 * 60;
 /**
  * Fresh for a whole ideal shift: a properly crewed day shouldn't tire
  * anyone; short crews (longer shifts) and tight turns do. Tiring from
@@ -166,28 +175,48 @@ export const CREW_SWAP_GAP_MINUTES = 120;
  * each run of legs from its first departure to its last landing, split at
  * every long wait at base (CREW_SWAP_GAP_MINUTES).
  */
-function dutyStretches(state: SimState, tail: string): { start: number; end: number }[] {
+export function dutyStretches(state: SimState, tail: string): { start: number; end: number; legs: ScheduleLeg[] }[] {
   const legs = legsOf(state, tail);
   const base = state.aircraft.find((aircraft) => aircraft.tail === tail)?.baseAirport;
-  const stretches: { start: number; end: number }[] = [];
+  const stretches: { start: number; end: number; legs: ScheduleLeg[] }[] = [];
   for (let i = 0; i < legs.length; i++) {
     const leg = legs[i];
     const previous = legs[i - 1];
     const waitAtBase = previous && previous.dest === base && leg.departMinute - (previous.departMinute + previous.blockMinutes) >= CREW_SWAP_GAP_MINUTES;
-    if (!previous || waitAtBase) stretches.push({ start: leg.departMinute - REPORT_MINUTES, end: leg.departMinute + leg.blockMinutes });
-    else stretches[stretches.length - 1].end = leg.departMinute + leg.blockMinutes;
+    if (!previous || waitAtBase) stretches.push({ start: leg.departMinute - REPORT_MINUTES, end: leg.departMinute + leg.blockMinutes, legs: [leg] });
+    else {
+      const open = stretches[stretches.length - 1];
+      open.end = leg.departMinute + leg.blockMinutes;
+      open.legs.push(leg);
+    }
   }
   return stretches;
 }
 
-/** A plane's duty in minutes: every stretch its crews are on duty, report time included. 0 for a plane with nothing to fly. */
-export function dutyMinutes(state: SimState, tail: string): number {
-  return dutyStretches(state, tail).reduce((total, stretch) => total + stretch.end - stretch.start, 0);
+/** Minutes of [from, to] that fall in the night window (22:00-06:00), over the days a duty can reach. */
+function nightMinutes(from: number, to: number): number {
+  let total = 0;
+  for (let day = 0; day <= 2; day++) {
+    const windowStart = day * 1440 - (1440 - NIGHT_DUTY_START);
+    const windowEnd = day * 1440 + NIGHT_DUTY_END;
+    total += Math.max(0, Math.min(to, windowEnd) - Math.max(from, windowStart));
+  }
+  return total;
 }
 
-/** Minutes of duty this plane's crews have done by `minute` on the schedule clock, off-duty waits left out. */
+/** Minutes of duty between two schedule-clock minutes as a shift counts them: night minutes weigh more (NIGHT_DUTY_EXTRA). */
+export function shiftMinutes(from: number, to: number): number {
+  return to <= from ? 0 : to - from + NIGHT_DUTY_EXTRA * nightMinutes(from, to);
+}
+
+/** A plane's duty in minutes as shifts count it: every stretch its crews are on duty, report time included, night minutes weighted. 0 for a plane with nothing to fly. */
+export function dutyMinutes(state: SimState, tail: string): number {
+  return dutyStretches(state, tail).reduce((total, stretch) => total + shiftMinutes(stretch.start, stretch.end), 0);
+}
+
+/** Minutes of duty this plane's crews have done by `minute` on the schedule clock, as shifts count them, off-duty waits left out. */
 function onDutyBy(stretches: { start: number; end: number }[], minute: number): number {
-  return stretches.reduce((total, stretch) => total + Math.max(0, Math.min(minute, stretch.end) - stretch.start), 0);
+  return stretches.reduce((total, stretch) => total + shiftMinutes(stretch.start, Math.min(minute, stretch.end)), 0);
 }
 
 function crewsFor(duty: number, shift: number): number {
@@ -684,7 +713,7 @@ export function legFatigue(state: SimState, leg: ScheduleLeg): number {
   // Shifts share out the plane's on-duty time, so a long wait at base
   // (dutyStretches()) neither tires the crew nor counts toward a shift.
   const stretches = dutyStretches(state, leg.tail);
-  const shift = stretches.reduce((total, stretch) => total + stretch.end - stretch.start, 0) / crews;
+  const shift = stretches.reduce((total, stretch) => total + shiftMinutes(stretch.start, stretch.end), 0) / crews;
   const intoDuty = onDutyBy(stretches, leg.departMinute + leg.blockMinutes);
   const shiftIndex = Math.min(crews - 1, Math.floor(onDutyBy(stretches, leg.departMinute) / shift));
   let intoShift = intoDuty - shiftIndex * shift;

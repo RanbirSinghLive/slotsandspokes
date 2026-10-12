@@ -12,6 +12,7 @@ import * as ops from '../routeActions';
 import { select } from '../selection';
 import { baseSection } from './bases';
 import { heading, info, line, lineWithInfo } from './dom';
+import { pairingsSection } from './pairings';
 
 /**
  * The Crews screen as a crew planner's board (sim/crewPlan.ts): what's
@@ -106,6 +107,7 @@ export function buildCrewsView(state: SimState, changed: () => void): HTMLElemen
   root.append(...horizon(plan, today));
   root.append(...toDo(state, plan, today, changed));
   root.append(...roster(state, plan, today, changed));
+  root.append(...pairingsSection(state));
   root.append(...crewBasesSection(state, plan, changed));
   return root;
 }
