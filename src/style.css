@@ -2175,10 +2175,11 @@ button,
    and cancellations, each its own table. */
 #reliability-section {
   overflow-x: auto;
+  margin-bottom: 12px;
 }
 
 #reliability-section h2 {
-  margin: 0 0 12px;
+  margin: 0 0 6px;
   font-size: 11px;
   font-weight: 400;
   text-transform: uppercase;
@@ -2187,41 +2188,130 @@ button,
 }
 
 #reliability-section h2:not(:first-child) {
-  margin-top: 32px;
+  margin-top: 12px;
 }
 
-#ontime-causes-table,
-#ontime-cancel-table {
-  width: 100%;
-  border-collapse: collapse;
+/* One stacked bar per breakdown: segment width is the cause's share, its
+   icon, colour and numbers are in the legend and the tips. */
+.cause-bar {
+  display: flex;
+  height: 14px;
+  gap: 1px;
+  border-radius: 3px;
+  overflow: hidden;
 }
-
-#ontime-causes-table th,
-#ontime-causes-table td,
-#ontime-cancel-table th,
-#ontime-cancel-table td {
-  text-align: left;
-  padding: 8px 10px 8px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+.cause-bar i {
+  display: block;
+  min-width: 2px;
 }
-
-#ontime-causes-table th,
-#ontime-cancel-table th {
+.cause-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #9aa3b8;
+}
+.cause-legend .glyph svg,
+.cause-legend .delay-icon svg {
+  width: 15px;
+  height: 15px;
+}
+.routes-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.routes-lens {
+  margin-left: auto;
+  display: inline-flex;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.routes-lens button {
+  background: none;
+  border: 0;
+  color: #8a93a6;
+  padding: 4px 10px;
+  cursor: pointer;
+  line-height: 0;
+}
+.routes-lens button.is-active {
+  background: #252b3a;
+  color: #fff;
+}
+.routes-lens svg {
+  width: 16px;
+  height: 16px;
+}
+.reliability-tiles {
+  display: flex;
+  gap: 8px;
+  margin: 6px 0 12px;
+}
+.reliability-tile {
+  flex: 1;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+.reliability-tile small {
+  display: block;
   color: #6b7694;
-  font-weight: 400;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: 10px;
+  letter-spacing: 0.1em;
 }
-
-.ontime-causes-share-bar {
-  display: inline-block;
+.reliability-tile strong {
+  font-size: 20px;
+  font-weight: 400;
+  color: #fff;
+}
+.prices-strip {
+  margin-top: 12px;
+}
+.prices-strip-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: none;
+  color: #cdd3e0;
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.prices-strip-head .seat-mini {
+  display: flex;
+  width: 64px;
   height: 8px;
-  background: #6b7694;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.prices-strip-head .seat-mini i {
+  display: block;
+  height: 100%;
+}
+.prices-strip-head .caret {
+  margin-left: auto;
+  color: #8a93a6;
+}
+.prices-strip-body {
+  margin-top: 8px;
+}
+.routes-bar {
+  display: inline-block;
+  height: 6px;
   border-radius: 2px;
   vertical-align: middle;
-  margin-right: 8px;
+  margin-right: 4px;
+  background: currentColor;
 }
+
 
 /* Competition mode's hover tooltip — real DOM (per CLAUDE.md's rule
    against hand-rolled canvas widgets), positioned next to the cursor via
@@ -3236,18 +3326,6 @@ button.ticker-item:hover {
   border-color: rgba(255, 255, 255, 0.5);
 }
 
-#ontime-cancel-table th {
-  color: #6b7694;
-  font-weight: 400;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-#ontime-completion {
-  margin-bottom: 12px;
-  font-size: 13px;
-}
 
 /* The airline's own presence at a hovered airport,
    below the operator legend. The map dots encode the same numbers
@@ -6113,17 +6191,6 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
 .pips-warn i.is-on { background: #ff8080; border-color: #ff8080; }
 
 /* Plain-looking tables get a department colour: row icons, tinted bars, dimmed zeros. */
-#ontime-causes-table tr.is-zero td,
-#ontime-cancel-table tr.is-zero td {
-  opacity: 0.5;
-}
-
-#ontime-causes-table .glyph svg,
-#ontime-cancel-table .glyph svg,
-#ontime-causes-table .delay-icon svg {
-  width: 16px;
-  height: 16px;
-}
 
 .load-bar {
   display: inline-block;

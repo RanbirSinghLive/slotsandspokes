@@ -328,10 +328,14 @@ that reason, both being the sidebar's two lifetime numbers.
 
 ## Reliability (`src/ui/onTime.ts`)
 
-The Routes screen's Reliability section answers *why* flights are late
-or cancelled across the whole airline; which *routes* are unreliable is
-the routes table above it, sorted by on-time. Each route there opens
-that route's view, with its day-by-day reliability and turn buffer.
+The Routes screen has two lenses, switched by a coin and a stopwatch icon
+beside its title (the sort it was opened with picks one; the HUD On-time
+and Completion cards open the stopwatch lens). The Reliability lens
+answers *why* flights are late or cancelled across the whole airline:
+three tiles (on-time, flown, cancelled, last 7 days), then one stacked bar
+each for late minutes by cause and cancellations by cause (icon legend,
+numbers in tips), then the routes table sorted by on-time. Each route
+opens its own view, with its day-by-day reliability and turn buffer.
 
 `SimState.onTimeByMarket: Record<marketKey, { departed, onTime }>`
 mirrors `flightsDepartedTotal`/`flightsOnTimeTotal` exactly, just split
@@ -1315,9 +1319,9 @@ adds a thousand (SS 1214). They show in the day rows and on the plane hover.
 Each screen has one job. Sections that live in index.html and update
 themselves (Fare policy, the Lessor, the rotations timeline, Reliability,
 Game) wait hidden in `#panel-parts` until a screen adopts them
-(`adopt()` in `ui/inspector/dom.ts`): Routes shows Fare policy under its
-title and Reliability (delay codes and cancellations by cause) under
-the table; Fleet shows every plane, then the rotations timeline and the
+(`adopt()` in `ui/inspector/dom.ts`): Routes shows the table first, with the Reliability section (late
+minutes and cancellations by cause) above it in the stopwatch lens and
+Fare policy folded under it to one line in the money lens; Fleet shows every plane, then the rotations timeline and the
 Lessor; **Crews** (`ui/inspector/crews.ts`) shows every base's crews by
 class, one line per class (bar, crews/comfortable, status chip, then + hire, ⇄ retrain and − release as icon buttons whose tips carry the fee), shortest-handed base first.
 
@@ -1721,8 +1725,9 @@ A rollover rebuild that arrives mid-drag waits for the release
 (`refreshInspectorForNewDay()`), so a rebuild never takes a slider out
 from under the pointer.
 
-The airline-wide **fare policy** is at the top of the Routes screen
-(`ui/farePolicy.ts`): the network hill (below, under Fare policy), with
+The airline-wide **fare policy** is on the Routes screen, folded under
+the table to one line (level, seat split mini bar, routes off policy) that
+opens in place (`ui/farePolicy.ts`): the network hill (below, under Fare policy), with
 the level, how many routes follow it, and what the routes priced by hand
 make against it, and a button that puts every route back on the
 policy. It is redrawn only when the day, the routes or the level

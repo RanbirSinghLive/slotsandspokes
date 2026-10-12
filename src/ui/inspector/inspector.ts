@@ -233,12 +233,9 @@ export function renderInspector(state: SimState): void {
   } else if (selection.kind === 'money') {
     bodyEl.replaceChildren(buildMoneyView(state));
   } else if (selection.kind === 'routes') {
-    // The airline-wide fare under the title, every route, then what's
-    // going wrong across them: delay codes and cancellations.
+    // Money or Reliability lens, table first (ui/inspector/routes.ts).
     updateOnTimePanel(state);
-    const view = buildRoutesView(state, selection.sort);
-    view.insertBefore(adopt('fare-policy-section'), view.children[1] ?? null);
-    bodyEl.replaceChildren(view, adopt('reliability-section'));
+    bodyEl.replaceChildren(buildRoutesView(state, selection.sort));
   } else if (selection.kind === 'rival') {
     bodyEl.replaceChildren(buildRivalView(state, selection.code));
   } else if (selection.kind === 'rivals') {

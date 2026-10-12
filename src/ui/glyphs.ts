@@ -30,6 +30,8 @@ const PATHS = {
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
   flag: '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
   hub: '<circle cx="12" cy="12" r="3"/><path d="M12 9V3M12 15v6M9 12H3M15 12h6"/>',
+  coin: '<circle cx="12" cy="12" r="9"/><path d="M14.5 9.2c-.6-.8-1.5-1.2-2.5-1.2-1.4 0-2.5.7-2.5 1.8 0 2.7 5 1.4 5 4.2 0 1.1-1.1 1.8-2.5 1.8-1.1 0-2-.5-2.6-1.3M12 6.5V8M12 16v1.5"/>',
+  timer: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/>',
   boarding: '<path d="M4 12h12M11 6l6 6-6 6"/><path d="M20 4v16"/>',
 } as const;
 

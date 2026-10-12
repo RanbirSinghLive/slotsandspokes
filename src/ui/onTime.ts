@@ -3,14 +3,13 @@ import { delayIcon, type DelayCause } from './delayCodes';
 import { glyph, type GlyphName } from './glyphs';
 
 /**
- * The Routes screen's Reliability section: delay minutes by cause, and
- * cancellations by cause. Which route is late is the routes table's job,
+ * The Routes screen's Reliability lens: delay minutes by cause, and
+ * cancellations by cause, each one stacked bar with an icon legend. Which route is late is the routes table's job,
  * sorted by on-time; this is what's making them late.
  */
 
-const causeRowsBody = document.querySelector<HTMLTableSectionElement>('#ontime-causes-rows')!;
-const cancelRowsBody = document.querySelector<HTMLTableSectionElement>('#ontime-cancel-rows')!;
-const completionEl = document.querySelector<HTMLDivElement>('#ontime-completion')!;
+const causeBarEl = document.querySelector<HTMLDivElement>('#ontime-causes-bar')!;
+const cancelBarEl = document.querySelector<HTMLDivElement>('#ontime-cancel-bar')!;
 
 /**
  * Cancellations, broken out the same way delay minutes are. Each cause
@@ -40,10 +39,6 @@ const DELAY_BAR_COLOURS: Record<string, string> = {
   age: '#8a93a6',
 };
 
-// A simple inline bar for the delay-codes table — 90px is this cause's
-// share of total delay minutes at 100%, not tied to any other unit.
-const MAX_SHARE_BAR_PX = 90;
-
 type DelayCauseRow = { cause: Exclude<DelayCause, 'rotation' | 'executive'>; label: string; minutes: number };
 
 /**
@@ -64,73 +59,58 @@ function delayCauseRows(state: SimState): DelayCauseRow[] {
   ];
 }
 
+type Segment = { icon: HTMLElement; label: string; count: number; unit: string; colour: string };
+
+/** One stacked bar and its legend. Causes with nothing in them are left off; an empty breakdown says so. */
+function drawStack(into: HTMLElement, segments: Segment[]): void {
+  const total = segments.reduce((sum, segment) => sum + segment.count, 0);
+  if (total === 0) {
+    into.textContent = 'None yet';
+    return;
+  }
+  const shown = segments.filter((segment) => segment.count > 0).sort((x, y) => y.count - x.count);
+  const bar = document.createElement('div');
+  bar.className = 'cause-bar';
+  const legend = document.createElement('div');
+  legend.className = 'cause-legend';
+  for (const segment of shown) {
+    const share = Math.round((segment.count / total) * 100);
+    const tip = `${segment.label} · ${segment.count.toLocaleString()} ${segment.unit} · ${share}%`;
+    const piece = document.createElement('i');
+    piece.style.flex = `${segment.count} 0 0`;
+    piece.style.background = segment.colour;
+    piece.dataset.tip = tip;
+    bar.append(piece);
+    const item = document.createElement('span');
+    item.dataset.tip = tip;
+    item.append(segment.icon, ` ${share}%`);
+    legend.append(item);
+  }
+  into.replaceChildren(bar, legend);
+}
+
 /**
- * Rebuild both tables from `state.delayMinutesByCause` and the
- * cancellation counts: called whenever the Routes screen is built, in
- * case either changed since ("refresh on show, not every tick").
+ * Rebuild both bars from `state.delayMinutesByCause` and the cancellation
+ * counts: called whenever the Routes screen is built, in case either
+ * changed since ("refresh on show, not every tick").
  */
 export function updateOnTimePanel(state: SimState): void {
-  causeRowsBody.innerHTML = '';
-
-  const causes = delayCauseRows(state).sort((a, b) => b.minutes - a.minutes);
-  const totalMinutes = causes.reduce((sum, cause) => sum + cause.minutes, 0);
-
-  for (const cause of causes) {
-    const share = totalMinutes > 0 ? cause.minutes / totalMinutes : 0;
-    const row = document.createElement('tr');
-
-    const labelCell = document.createElement('td');
-    labelCell.append(delayIcon(cause.cause), ` ${cause.label}`);
-    row.classList.toggle('is-zero', cause.minutes === 0);
-
-    const minutesCell = document.createElement('td');
-    minutesCell.textContent = `${cause.minutes.toLocaleString()} min`;
-
-    const shareCell = document.createElement('td');
-    const bar = document.createElement('span');
-    bar.className = 'ontime-causes-share-bar';
-    bar.style.width = `${Math.round(share * MAX_SHARE_BAR_PX)}px`;
-    bar.style.background = DELAY_BAR_COLOURS[cause.cause];
-    shareCell.append(bar, document.createTextNode(`${Math.round(share * 100)}%`));
-
-    row.append(labelCell, minutesCell, shareCell);
-    causeRowsBody.appendChild(row);
-  }
-
-  const completion =
-    state.flightsScheduledTotal > 0
-      ? (state.flightsScheduledTotal - state.flightsCancelledTotal) / state.flightsScheduledTotal
-      : 1;
-  completionEl.textContent =
-    state.flightsScheduledTotal === 0
-      ? 'Nothing scheduled yet'
-      : `Completion ${Math.round(completion * 100)}% · CNX ${state.flightsCancelledTotal.toLocaleString()} of ` +
-        `${state.flightsScheduledTotal.toLocaleString()} departures`;
-
-  cancelRowsBody.innerHTML = '';
-  const totalCancelled = state.flightsCancelledTotal;
-  for (const [key, label, icon, colour] of CANCEL_CAUSE_LABELS) {
-    const count = state.cancellationsByCause[key] ?? 0;
-    const share = totalCancelled > 0 ? count / totalCancelled : 0;
-    const row = document.createElement('tr');
-
-    const labelCell = document.createElement('td');
-    const mark = glyph(icon, label);
-    mark.style.color = colour;
-    labelCell.append(mark, ` ${label}`);
-    row.classList.toggle('is-zero', count === 0);
-
-    const countCell = document.createElement('td');
-    countCell.textContent = count.toLocaleString();
-
-    const shareCell = document.createElement('td');
-    const bar = document.createElement('span');
-    bar.className = 'ontime-causes-share-bar';
-    bar.style.width = `${Math.round(share * MAX_SHARE_BAR_PX)}px`;
-    bar.style.background = colour;
-    shareCell.append(bar, document.createTextNode(`${Math.round(share * 100)}%`));
-
-    row.append(labelCell, countCell, shareCell);
-    cancelRowsBody.appendChild(row);
-  }
+  drawStack(
+    causeBarEl,
+    delayCauseRows(state).map((cause) => ({
+      icon: delayIcon(cause.cause),
+      label: cause.label,
+      count: cause.minutes,
+      unit: 'min',
+      colour: DELAY_BAR_COLOURS[cause.cause],
+    })),
+  );
+  drawStack(
+    cancelBarEl,
+    CANCEL_CAUSE_LABELS.map(([key, label, icon, colour]) => {
+      const mark = glyph(icon, label);
+      mark.style.color = colour;
+      return { icon: mark, label, count: state.cancellationsByCause[key] ?? 0, unit: 'flights', colour };
+    }),
+  );
 }

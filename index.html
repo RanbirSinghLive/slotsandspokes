@@ -183,29 +183,10 @@
             <div id="rotations-empty">None yet · tap an airport on the map, then Route</div>
           </section>
         <section id="reliability-section" hidden>
-          <h2>Delay codes</h2>
-          <table id="ontime-causes-table">
-            <thead>
-              <tr>
-                <th>Code</th>
-                <th>Minutes</th>
-                <th>Share</th>
-              </tr>
-            </thead>
-            <tbody id="ontime-causes-rows"></tbody>
-          </table>
-                  <h2>Cancellations <button type="button" class="info-mark" aria-label="What this means" data-info="The other half of reliability. On-time only describes flights that operated — completion factor is how many operated at all.">i</button></h2>
-          <div id="ontime-completion"></div>
-          <table id="ontime-cancel-table">
-            <thead>
-              <tr>
-                <th>Cause</th>
-                <th>Flights</th>
-                <th>Share</th>
-              </tr>
-            </thead>
-            <tbody id="ontime-cancel-rows"></tbody>
-          </table>
+          <h2>Late minutes by cause <button type="button" class="info-mark" aria-label="What this means" data-info="Where the delay minutes of the last day-by-day record come from, by BTS-style delay code. Old planes, rushed turns, weather, congestion and ground handling each have a different fix: younger airframes, turn buffers, nothing, slots, a better station tier.">i</button></h2>
+          <div id="ontime-causes-bar"></div>
+          <h2>Cancelled by cause <button type="button" class="info-mark" aria-label="What this means" data-info="The other half of reliability. On-time only describes flights that operated; Flown is how many operated at all. Each cause has a different answer: crews hired ahead, younger airframes, nothing at all for weather.">i</button></h2>
+          <div id="ontime-cancel-bar"></div>
         </section>
         <div id="game-tab" hidden>
           <section id="save-game-section" class="game-card game-card--save">
