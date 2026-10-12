@@ -79,7 +79,7 @@ export function pairingsSection(state: SimState): HTMLElement[] {
   if (groups.length === 0) return [];
   const title = heading(
     'Pairings',
-    'The duty the current schedule asks of crews: one row per plane across the home-local day (gridlines every 4 hours), one bar per pairing, from an hour before the first departure to the last landing. A wait at base of 2 hours or more lets the crew change, which splits a pairing. Green is out of base and back inside the day, amber is back in the evening (after 19:00), red runs into the night (before 06:00 or after 22:00), grey starts or ends away from base. The percentage is time flying over time on duty: a low one means crews paid to wait. Duty between 22:00 and 06:00 counts 1.5x toward a crew's shift, so red pairings need more crews and tire them sooner. Crews are counted as the planes in the group fly with today.',
+    'The duty the current schedule asks of crews: one row per plane across the home-local day (gridlines every 4 hours), one bar per pairing, from an hour before the first departure to the last landing. A wait at base of 2 hours or more lets the crew change, which splits a pairing. Green is out of base and back inside the day, amber is back in the evening (after 19:00), red runs into the night (before 06:00 or after 22:00), grey starts or ends away from base. The percentage is time flying over time on duty: a low one means crews paid to wait. Duty between 22:00 and 06:00 counts 1.5x toward a shift, so red pairings need more crews and tire them sooner. Crews are counted as the planes in the group fly with today.',
   );
   return [title, ...groups.map(groupBlock)];
 }
