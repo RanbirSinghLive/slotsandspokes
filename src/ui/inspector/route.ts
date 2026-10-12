@@ -122,46 +122,15 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   // its planes flew over the last week, from its own landings.
   const load = marketLoadFactor(state, a, b);
   const presence = lineWithInfo(
-    `${formatFrequency(state, a, b)} · ${summary.byClass.map((c) => `${c.name} ×${c.count}`).join(', ')} · LF ${formatLoadFactor(load)} · yield ${formatYield(marketYieldCents(state, a, b))}`,
+    `${formatFrequency(state, a, b)} · ${summary.byClass.map((c) => `${c.name} ×${c.count}`).join(', ')} · LF ${formatLoadFactor(load)} · yield ${formatYield(marketYieldCents(state, a, b))} · NPS ${formatNps(marketNps(state, a, b))}${brandInWords(state, a, b, state.competitorRoutes) ? ` · ${brandInWords(state, a, b, state.competitorRoutes)}` : ''}`,
     load.factor === null
-      ? 'Load factor (LF): how full the planes fly, from the last 7 days of landings. None landed yet.'
-      : `Load factor (LF): ${load.passengers.toLocaleString()} passengers in ${load.seats.toLocaleString()} seats over the last 7 days. Flights a day are counted each way. Yield: cents of fare per passenger per nautical mile, last 7 days.`,
+      ? 'Load factor (LF): how full the planes fly, from the last 7 days of landings. None landed yet. NPS: how passengers rate you here.'
+      : `Load factor (LF): ${load.passengers.toLocaleString()} passengers in ${load.seats.toLocaleString()} seats over the last 7 days. Flights a day are counted each way. Yield: cents of fare per passenger per nautical mile, last 7 days. NPS (Net Promoter Score): how passengers rate you here over about the last month (airline-wide ${formatNps(networkNps(state))}); late flights, old planes and fares above the rivals' pull it down, and against a rival the better name wins some of the other's passengers.`,
   );
   presence.classList.toggle('is-over', short);
   root.append(presence);
 
-  // NPS (sim/nps.ts): how passengers rate the airline here, about the last
-  // month, and what that does against a rival.
-  const brand = brandInWords(state, a, b, state.competitorRoutes);
-  root.append(
-    lineWithInfo(
-      `NPS ${formatNps(marketNps(state, a, b))}${brand ? ` · ${brand}` : ''}`,
-      `Net Promoter Score: how passengers rate you here over about the last month (airline-wide ${formatNps(networkNps(state))}). Late flights, old planes and fares above the rivals' pull it down. Against a rival, the better name wins some of the other's passengers.`,
-    ),
-  );
 
-  // The market in words (sim/marketSize.ts): how big the city pair is, and
-  // how full a flight is today. A route you have only just opened has
-  // almost no demand, however big the city pair is: demand is built by
-  // flying it, over weeks (sim/marketDemand.ts). Saying so is what stops a
-  // Huge market from reading as "add ten flights".
-  // Once the route has flown, its load factor above says how full it is;
-  // the forecast in words is only for a route with no record yet.
-  const fillWords = load.factor === null ? ` · ${fill.words}` : '';
-  // What the fares flown here do to its growth (sim/fareStimulus.ts).
-  const level = marketFareLevel(state, a, b);
-  const fareGrowth = level === null ? '' : level < 0.9 ? ' · low fares growing it' : level > 1.1 ? ' · fares holding it back' : '';
-  root.append(
-    lineWithInfo(
-      `${marketSize(state, a, b)} market · ${marketCharacterWord(a, b)}${fillWords}` +
-        (short ? ' · demand exceeds seats' : '') +
-        (fill.thin ? ' · still growing' : '') +
-        fareGrowth,
-      `A market's demand is built by flying it, over weeks, toward the size of the city pair (${readout.seatsPerFlight} seats a flight now). When demand exceeds seats, add a flight or a bigger plane; while it is still growing, extra flights fly emptier. Fares grow it too: everyone's fares here, weighted by seats${level === null ? '' : ` (now ${Math.round(level * 100)}% of the going rate)`}. Cheap fares build it faster and up to 1.3× its usual size; dear ones slow it and settle it smaller. The market is everyone's, so one built cheaply is one a rival can share. The bar is who flies it: business travellers barely mind the fare but want peak departures and frequency; leisure travellers chase the fare; VFR (visiting friends and relatives) sit between. A business trunk rewards frequency and peak slots, a sun route a sharp fare.`,
-    ),
-  );
-  root.append(...characterBar(a, b));
-  root.append(seasonLine(state, a, b));
   for (const event of eventsOn(state, a, b)) {
     const running = eventRunning(state, event);
     const today = dayIndex(state);
@@ -246,14 +215,37 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   const shockLine = describeShock(state)?.onRoute(a, b);
   if (shockLine) root.append(line(shockLine, 'inspector-line is-warn'));
 
-  const rivalsView = describeRivalsView(state, a, b);
-  if (rivalsView) root.append(rivalsView);
-
+  root.append(...buildFare(state, a, b, changed));
   const stances = buildStances(state, a, b, changed);
   if (stances) root.append(stances);
   const fees = buildFees(state, a, b, changed);
   if (fees) root.append(fees);
-  root.append(...buildFare(state, a, b, changed));
+
+  // The market in words (sim/marketSize.ts): how big the city pair is, and
+  // how full a flight is today. A route you have only just opened has
+  // almost no demand, however big the city pair is: demand is built by
+  // flying it, over weeks (sim/marketDemand.ts). Saying so is what stops a
+  // Huge market from reading as "add ten flights".
+  // Once the route has flown, its load factor above says how full it is;
+  // the forecast in words is only for a route with no record yet.
+  const fillWords = load.factor === null ? ` · ${fill.words}` : '';
+  // What the fares flown here do to its growth (sim/fareStimulus.ts).
+  const level = marketFareLevel(state, a, b);
+  const fareGrowth = level === null ? '' : level < 0.9 ? ' · low fares growing it' : level > 1.1 ? ' · fares holding it back' : '';
+  root.append(
+    lineWithInfo(
+      `${marketSize(state, a, b)} market · ${marketCharacterWord(a, b)}${fillWords}` +
+        (short ? ' · demand exceeds seats' : '') +
+        (fill.thin ? ' · still growing' : '') +
+        fareGrowth,
+      `A market's demand is built by flying it, over weeks, toward the size of the city pair (${readout.seatsPerFlight} seats a flight now). When demand exceeds seats, add a flight or a bigger plane; while it is still growing, extra flights fly emptier. Fares grow it too: everyone's fares here, weighted by seats${level === null ? '' : ` (now ${Math.round(level * 100)}% of the going rate)`}. Cheap fares build it faster and up to 1.3× its usual size; dear ones slow it and settle it smaller. The market is everyone's, so one built cheaply is one a rival can share. The bar is who flies it: business travellers barely mind the fare but want peak departures and frequency; leisure travellers chase the fare; VFR (visiting friends and relatives) sit between. A business trunk rewards frequency and peak slots, a sun route a sharp fare.`,
+    ),
+  );
+  root.append(...characterBar(a, b));
+  root.append(seasonLine(state, a, b));
+  const rivalsView = describeRivalsView(state, a, b);
+  if (rivalsView) root.append(rivalsView);
+
 
   const flows = buildFlows(state, a, b);
   if (flows) root.append(flows);
@@ -496,7 +488,7 @@ function buildFare(state: SimState, a: string, b: string, changed: () => void): 
     redrawEconomics();
   };
   let moveBall: (() => void) | null = null;
-  const nodes: HTMLElement[] = [heading];
+  const nodes: HTMLElement[] = [heading, economics, fixedCosts];
   if (hill) {
     const drawn = drawHill(hill, low, high, () => settings.fare, setFare, changed);
     moveBall = drawn.moveBall;
@@ -517,7 +509,7 @@ function buildFare(state: SimState, a: string, b: string, changed: () => void): 
 
   redrawFare();
   redrawEconomics();
-  return [...nodes, economics, fixedCosts, ...buildSeatSplit(state, a, b, changed, redrawEconomics)];
+  return [...nodes, ...buildSeatSplit(state, a, b, changed, redrawEconomics)];
 }
 
 /**
@@ -535,9 +527,9 @@ function characterBar(a: string, b: string): HTMLElement[] {
     bar.append(part);
   }
   const key = chartLegend([
-    { mark: 'block', color: '#9d8cf0', label: `business ${Math.round(mix.business * 100)}%` },
-    { mark: 'block', color: '#ffb347', label: `leisure ${Math.round(mix.leisure * 100)}%` },
-    { mark: 'block', color: '#5ed6c8', label: `VFR ${Math.round(mix.vfr * 100)}%` },
+    { mark: 'block', color: '#9d8cf0', label: `Biz ${Math.round(mix.business * 100)}` },
+    { mark: 'block', color: '#ffb347', label: `Leisure ${Math.round(mix.leisure * 100)}` },
+    { mark: 'block', color: '#f08bb5', label: `VFR ${Math.round(mix.vfr * 100)}` },
   ]);
   return [bar, key];
 }
@@ -558,13 +550,13 @@ function seasonLine(state: SimState, a: string, b: string): HTMLElement {
   const year = marketSeasonOutlook(state, a, b);
   const pct = (level: number) => `${level >= 1 ? '+' : '−'}${Math.round(Math.abs(level - 1) * 100)}%`;
   return lineWithInfo(
-    `Season ${pct(year.now)} now · peak ${pct(year.peak)} ${dayInWords(year.peakDay)} · low ${pct(year.low)} ${dayInWords(year.lowDay)}` + (isSunRoute(a, b) ? ' · sun route' : ''),
+    `Season ${pct(year.now)} · peak ${pct(year.peak)} ${dayInWords(year.peakDay)} · low ${pct(year.low)} ${dayInWords(year.lowDay)}` + (isSunRoute(a, b) ? ' · ☀' : ''),
     'How many want to fly this market today against an ordinary day, from the calendar: leisure travellers peak in July and at Christmas, business travellers dip in August and over the holidays, VFR peak at Christmas and in summer. On a sun route (a warm end and a cold one) leisure peaks January to March instead. The busier the season, the fuller the planes at a fare, so the revenue hill and the forecasts move with it: add capacity or raise the fare ahead of a peak, and trim ahead of a low.',
   );
 }
 
 /** The seat bar's colours (style.css's .seat-split-*), for its key. */
-const CLASS_COLORS: Record<string, string> = { saver: '#5ed6c8', flex: '#8a93a6', full: '#ffd166' };
+const CLASS_COLORS: Record<string, string> = { saver: '#a9d2ff', flex: '#5b9bf0', full: '#2d5bb8' };
 
 /** A tally's numbers in a line: what sold in each class and what happened to people. */
 function describeTally(tally: FareClassTally, perFlight = false): string {
@@ -602,7 +594,7 @@ function buildSeatSplit(state: SimState, a: string, b: string, changed: () => vo
   const legend = document.createElement('div');
   const forecast = line('', 'inspector-line seat-split-forecast');
   const yesterday = state.yesterdayFareClasses?.[key];
-  const past = line(yesterday && yesterday.flights > 0 ? `Yesterday · ${describeTally(yesterday)}` : 'Yesterday · not flown', 'inspector-line seat-split-yesterday');
+  const past = line(yesterday && yesterday.flights > 0 ? `Yesterday · ${describeTally(yesterday)}` : '', 'inspector-line seat-split-yesterday');
 
   const redraw = () => {
     const { saverShare, flexShare } = split();
@@ -629,12 +621,12 @@ function buildSeatSplit(state: SimState, a: string, b: string, changed: () => vo
     done: changed,
   });
   redraw();
-  const policy = line(settings.fareClassesByHand ? 'Seats set by hand' : 'Seats on policy', 'inspector-line');
+  const policy = line('', 'inspector-line');
   if (settings.fareClassesByHand) {
     const back = document.createElement('button');
     back.type = 'button';
     back.className = 'lever-reset';
-    back.textContent = 'Put seats back on policy';
+    back.textContent = 'Seats back to policy';
     back.addEventListener('click', () => {
       putSeatsOnPolicy(state, a, b);
       changed();

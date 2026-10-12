@@ -5147,7 +5147,7 @@ button.ops-item:hover {
 }
 
 .mix-bar-vfr {
-  background: #5ed6c8;
+  background: #f08bb5;
 }
 
 /* A route's seats split between fare classes (ui/inspector/route.ts). */
@@ -5168,16 +5168,16 @@ button.ops-item:hover {
 }
 
 .seat-split-saver {
-  background: #5ed6c8;
+  background: #a9d2ff;
   border-radius: 4px 0 0 4px;
 }
 
 .seat-split-flex {
-  background: #8a93a6;
+  background: #5b9bf0;
 }
 
 .seat-split-full {
-  background: #ffd166;
+  background: #2d5bb8;
   border-radius: 0 4px 4px 0;
 }
 
