@@ -166,6 +166,21 @@ export function setGrouping(next: Grouping): void {
   }
 }
 
+/** True once the player flips the active column to best first; kept for the session. */
+let bestFirst = false;
+
+/** Worst first (or best first); routes with nothing to judge yet always go last. */
+function byColumn(column: (typeof COLUMNS)[number]) {
+  return (x: RouteRow, y: RouteRow): number => {
+    const vx = column.value(x);
+    const vy = column.value(y);
+    if (vx === null && vy === null) return 0;
+    if (vx === null) return 1;
+    if (vy === null) return -1;
+    return bestFirst ? vy - vx : vx - vy;
+  };
+}
+
 function perDayText(perDay: number | null): string {
   return perDay === null ? '—' : `${perDay < 0 ? '' : '+'}${shortMoney(perDay)}`;
 }
@@ -239,6 +254,37 @@ function groupHeader(group: RouteGroup, by: RouteGroupBy, open: boolean, lens: L
   }
   tr.addEventListener('click', onToggle);
   return tr;
+}
+
+/** Pinned bottom row: margin and revenue add up over every route; the other columns are plain averages. */
+function totalFoot(rows: RouteRow[], columns: (typeof COLUMNS)[number][]): HTMLTableSectionElement {
+  const foot = document.createElement('tfoot');
+  const tr = document.createElement('tr');
+  tr.className = 'routes-total';
+  const name = document.createElement('td');
+  name.textContent = `Σ ${rows.length}`;
+  name.dataset.tip = `All ${rows.length} routes`;
+  tr.append(name, document.createElement('td'));
+  for (const c of columns) {
+    const td = document.createElement('td');
+    if (c.sort === 'margin') {
+      const known = rows.filter((r) => r.week.perDay !== null);
+      const margin = known.reduce((sum, r) => sum + (r.week.perDay ?? 0), 0);
+      const revenue = rows.reduce((sum, r) => sum + r.week.revenuePerDay, 0);
+      td.textContent = known.length === 0 ? '—' : `${perDayText(margin)}${revenue > 0 ? ` · ${percentText(margin / revenue)}` : ''}`;
+      td.classList.add('routes-margin');
+      td.dataset.tip = `Margin a day over the last 7 days, summed over ${known.length} routes with 3+ flown days · revenue ${shortMoney(revenue)}/day`;
+    } else {
+      const values = rows.map((r) => c.value(r)).filter((v): v is number => v !== null);
+      const mean = values.length === 0 ? null : values.reduce((a, b) => a + b, 0) / values.length;
+      const probe = { ...rows[0], loadFactor: mean, onTime: mean, completion: mean, nps: mean ?? 0, yieldCents: mean };
+      td.textContent = mean === null ? '—' : c.show(probe);
+      td.dataset.tip = 'Average of the routes, not weighted by passengers';
+    }
+    tr.append(td);
+  }
+  foot.append(tr);
+  return foot;
 }
 
 /** Whether the fare strip under the table is open; kept for the session. */
@@ -373,22 +419,14 @@ export function buildRoutesView(state: SimState, sort: RouteSort): HTMLElement {
 
   const columns = columnsOf(lens);
   const column = columns.find((c) => c.sort === sort) ?? columns[0];
-  // Worst first; routes with nothing to judge yet go last.
-  rows.sort((x, y) => {
-    const vx = column.value(x);
-    const vy = column.value(y);
-    if (vx === null && vy === null) return 0;
-    if (vx === null) return 1;
-    if (vy === null) return -1;
-    return vx - vy;
-  });
+  rows.sort(byColumn(column));
 
   if (lens === 'reliability') root.append(reliabilityTiles(state, rows), adopt('reliability-section'));
 
   const intro = document.createElement('div');
   intro.className = 'inspector-line';
-  intro.textContent = `Worst ${column.name.toLowerCase()} first`;
-  intro.append(' ', info('The money lens is first; the stopwatch lens reads reliability. Margin is the average a day over the last 7 days, with the last 14 as a line (dashed = $0), the share of revenue in the tip, and an arrow against the week before. Tags: contract and event pay are inside it; a sprout is a route under 2 weeks old. On-time, flown, load and yield (cents per passenger nautical mile) are the last 7 days; flights are per direction; NPS about the last month. Group by hub (the end with more routes), by sector (domestic = both ends in your home country) or by region (where the far end is, by map position, so approximate). Click a heading to sort by it, or a route to open it. The fare strip under the table opens the fare policy and seat split.'));
+  intro.textContent = `${bestFirst ? 'Best' : 'Worst'} ${column.name.toLowerCase()} first`;
+  intro.append(' ', info('The money lens is first; the stopwatch lens reads reliability. Margin is the average a day over the last 7 days, with the last 14 as a line (dashed = $0), the share of revenue in the tip, and an arrow against the week before. Tags: contract and event pay are inside it; a sprout is a route under 2 weeks old. On-time, flown, load and yield (cents per passenger nautical mile) are the last 7 days; flights are per direction; NPS about the last month. Group by hub (the end with more routes), by sector (domestic = both ends in your home country) or by region (where the far end is, by map position, so approximate). Click a heading to sort by it, again to flip the order, or a route to open it. The bottom row totals the routes: margin and revenue add up, the rest are plain averages of the routes. The fare strip under the table opens the fare policy and seat split.'));
   root.append(intro);
 
   const chips = document.createElement('div');
@@ -426,8 +464,16 @@ export function buildRoutesView(state: SimState, sort: RouteSort): HTMLElement {
     button.type = 'button';
     button.className = 'routes-sort';
     button.classList.toggle('is-active', c.sort === column.sort);
-    button.textContent = c.name;
-    button.addEventListener('click', () => select({ kind: 'routes', sort: c.sort }));
+    button.textContent = c.sort === column.sort ? `${c.name} ${bestFirst ? '▼' : '▲'}` : c.name;
+    button.addEventListener('click', () => {
+      if (c.sort === column.sort) {
+        bestFirst = !bestFirst;
+        root.replaceWith(buildRoutesView(state, column.sort));
+      } else {
+        bestFirst = false;
+        select({ kind: 'routes', sort: c.sort });
+      }
+    });
     th.append(button);
     head.append(th);
   }
@@ -485,18 +531,11 @@ export function buildRoutesView(state: SimState, sort: RouteSort): HTMLElement {
       );
       if (!open) continue;
       const members = group.keys.map((key) => byKey.get(key)).filter((row): row is RouteRow => row !== undefined);
-      members.sort((x, y) => {
-        const vx = column.value(x);
-        const vy = column.value(y);
-        if (vx === null && vy === null) return 0;
-        if (vx === null) return 1;
-        if (vy === null) return -1;
-        return vx - vy;
-      });
+      members.sort(byColumn(column));
       for (const row of members) renderRow(row);
     }
   }
-  table.append(thead, tbody);
+  table.append(thead, tbody, totalFoot(rows, columns));
   const scroller = document.createElement('div');
   scroller.className = 'routes-scroll';
   scroller.append(table);
