@@ -1340,7 +1340,7 @@ the runway, RASM and CASM per finished day, a week's average day, today's costs 
 Completion, Load factor and NPS open **Routes** (`ui/inspector/routes.ts`:
 every route in one table with flights a day, load, on-time, flown, NPS
 and yesterday's margin, sorted by that card's measure, worst first, each
-cell coloured good/fair/poor; a heading re-sorts, a row opens the
+cell coloured good/fair/poor; a heading re-sorts and a second click flips the order (routes with no data stay last), a bottom Σ row totals margin and revenue and averages the other columns, a row opens the
 route); Goals and Head office open theirs. The network's trailing NPS is
 kept for 30 days (`state.npsHistory`) for its trend.
 

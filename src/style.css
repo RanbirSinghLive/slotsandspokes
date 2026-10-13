@@ -6885,3 +6885,11 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
+
+.routes-total td {
+  position: sticky;
+  bottom: 0;
+  background: var(--panel-bg, #11161d);
+  border-top: 1px solid currentColor;
+  font-weight: 600;
+}
