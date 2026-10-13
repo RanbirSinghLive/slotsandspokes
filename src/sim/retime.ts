@@ -347,6 +347,16 @@ export function applyPendingRetimes(state: SimState): void {
   state.pendingRetimes = [];
 }
 
+/** Drop a move held for tomorrow, so the rotation stays where it stands today. */
+export function cancelPendingRetime(state: SimState, legId: string): void {
+  const move = (state.pendingRetimes ?? []).find((p) => p.legs.some((leg) => leg.legId === legId));
+  if (!move) return;
+  state.pendingRetimes = (state.pendingRetimes ?? []).filter((p) => p !== move);
+  // A night stop that was only held never happened: forget where it was wrapped from.
+  const tail = move.legs[0]?.tail;
+  if (tail && state.wrappedFrom?.[tail] && nightStopLegs(state, tail) === null) delete state.wrappedFrom[tail];
+}
+
 /**
  * A night stop brought home from a button, the same unwrap as dragging a
  * half past its end of the day: back to where the out-and-back sat before

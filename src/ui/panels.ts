@@ -3,7 +3,7 @@ import { nightStopLegs } from '../sim/nightStops';
 import { hasLineBase, outstationCheck } from '../sim/bases';
 import { deferredItems, MX_HOLD_AT, tonightCheck } from '../sim/mxChecks';
 import { bringNightStopHome, draftProblem, dropRotation, dropRotationInDraft, overlappingLegs, planBringNightStopHome, planFleetSort, planDropRotation, removeRotation as removeRotationFromSchedule, saveDraft, snappedStart, type DraftMove, type DropPlan, type SortMode } from '../sim/playerActions';
-import type { RetimePlan } from '../sim/retime';
+import { cancelPendingRetime, type RetimePlan } from '../sim/retime';
 import { airportHours, FIRST_OPEN_HOUR, freeInHour, OPEN_HOURS } from '../sim/hours';
 import { money, shortMoney } from './format';
 import { formatNps, networkNps } from '../sim/nps';
@@ -671,19 +671,33 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
           a.addEventListener('click', () => b.classList.add('is-armed'));
         }
       }
-      // Moves held for tomorrow (sim/retime.ts), drawn dashed where they'll sit.
+      // Moves held for tomorrow (sim/retime.ts): one dashed box per flight where it will sit,
+      // so a night stop's two ends don't draw one outline across the whole day.
       for (const move of state.pendingRetimes ?? []) {
         if (move.legs[0]?.tail !== aircraft.tail) continue;
-        const scheduled = move.legs.map((leg) => ({ ...leg, block: state.schedule.find((l) => l.legId === leg.legId)?.blockMinutes ?? 0 }));
-        const departs = Math.min(...scheduled.map((leg) => leg.departMinute));
-        const arrives = Math.max(...scheduled.map((leg) => leg.departMinute + leg.block));
-        const pending = document.createElement('div');
-        pending.className = 'timeline-pending';
-        pending.style.left = at(departs);
-        pending.style.width = width(arrives - departs);
-        pending.textContent = `tomorrow ${minuteOfDayToTimeString(departs)}`;
-        pending.title = `Moves here tomorrow · today's flying stays as it is`;
-        track.append(pending);
+        move.legs.forEach((held, i) => {
+          const block = state.schedule.find((l) => l.legId === held.legId)?.blockMinutes ?? 0;
+          const pending = document.createElement('div');
+          pending.className = 'timeline-pending';
+          pending.style.left = at(held.departMinute);
+          pending.style.width = width(block);
+          pending.title = `Moves here tomorrow ${minuteOfDayToTimeString(held.departMinute)} · today's flying stays as it is`;
+          if (i === 0 && !draft) {
+            const cancel = document.createElement('button');
+            cancel.type = 'button';
+            cancel.className = 'timeline-pending-cancel';
+            cancel.textContent = '✕';
+            cancel.title = 'Cancel this move · it stays where it is today';
+            cancel.setAttribute('aria-label', `Cancel the move held for tomorrow on ${aircraft.tail}`);
+            cancel.addEventListener('click', (event) => {
+              event.stopPropagation();
+              cancelPendingRetime(state, held.legId);
+              rebuildTimeline();
+            });
+            pending.append(cancel);
+          }
+          track.append(pending);
+        });
       }
       // The base in each wait between rotations, where another one could drop in.
       if (aircraft.baseAirport) {
