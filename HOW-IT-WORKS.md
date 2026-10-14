@@ -2936,7 +2936,7 @@ For each pair of spokes at a hub, passengers a day (both directions) =
 | Factor | What it is |
 |---|---|
 | A–B potential demand | the gravity model (`sim/demand.ts`) |
-| × 3% | the share willing to change planes (`CONNECT_SHARE`) |
+| × 8% | the share willing to change planes (`CONNECT_SHARE`) |
 | × establishment | the less built-up spoke route's local traffic ÷ 40 a day, capped at 1, so a new route feeds about a quarter |
 | × frequency chance | `1 − e^(−flights/2)` on the thinner spoke: about 40% at one daily flight, 63% at two, 86% at four |
 | × timing | `0.3 + 0.7 × timed`, where timed is `1 − e^(−connections/0.5)` each way, averaged over the two: every arrival from A counts as much as its best onward departure to B is good |
@@ -2970,7 +2970,8 @@ player bust in 13–15 years of 18. Booking the cheaper classes doesn't
 (WEEK-FOURTEEN.md, stage 2). **They react to price** like local passengers
 (`economy.ts`'s `connectingPriceResponse()`): a route's connecting demand
 is scaled by its booking share at its fare over its share at the going
-rate, capped at 1.5× for pricing under it, so an over-priced hub
+rate, capped at 1.5× for pricing under it and floored at 0.6× for pricing
+over it (one dear leg doesn't empty a hub), so an over-priced hub
 doesn't stay full on connections alone.
 
 **No proration.** A connection is two tickets, one per leg, never one

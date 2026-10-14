@@ -36,7 +36,7 @@ import type { SimState } from './state';
  */
 
 /** Share of an A–B city pair's latent demand that would connect through a hub rather than go another way. */
-const CONNECT_SHARE = 0.03;
+const CONNECT_SHARE = 0.08;
 /** How fast more flights make a connection possible (connectingChance()). */
 const FREQUENCY_SCALE = 2;
 /**
