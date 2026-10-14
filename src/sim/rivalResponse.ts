@@ -76,7 +76,7 @@ export function rollRivalCapacityResponse(state: SimState, dayStartMinute: numbe
     const onMarket = state.competitorRoutes.filter((route) => marketKey(route.origin, route.dest) === key);
     const withRoom = onMarket.filter((route) => route.dailyFrequency < RESPONSE_FREQUENCY_CAP).sort((x, y) => y.dailyFrequency - x.dailyFrequency);
     if (withRoom.length > 0) {
-      addRivalFlight(state, withRoom[0]);
+      addRivalFlight(state, withRoom[0], true);
       continue;
     }
 
@@ -94,7 +94,7 @@ export function rollRivalCapacityResponse(state: SimState, dayStartMinute: numbe
     );
     if (!neighbour) continue;
     const slotFees = rivalSlotQuote(state, a, b);
-    if (slotFees === null || !rivalSecuresCapacity(state, neighbour.code, 1)) continue;
+    if (slotFees === null || !rivalSecuresCapacity(state, neighbour.code, a, b, true)) continue;
     state.competitorRoutes.push({
       airline: neighbour.airline,
       code: neighbour.code,

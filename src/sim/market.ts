@@ -3,6 +3,7 @@ import { biggestOpenRivalClass, rivalClassOpen } from './rivalLadder';
 import { isReturning, startReturn } from './fleetTiming';
 import { nextRandom } from './rng';
 import { leaseRateFor } from './leasing';
+import { computeBlockMinutes, MIN_TURN_MINUTES } from './schedule';
 import type { Aircraft, SimState } from './state';
 
 /**
@@ -60,6 +61,32 @@ const LISTING_AGE_SPREAD = 10;
 export const RETURN_FEE_LEASE_DAYS = 14;
 /** How many daily flights one rival airframe carries. */
 export const FLIGHTS_PER_RIVAL_PLANE = 3;
+/**
+ * Answering a sold-out, overpriced market (sim/rivalResponse.ts), a rival
+ * counts the planes a flight needs by flying time, as the player does
+ * (sim/rotations.ts): block time at one common speed plus the turn, against
+ * the plane-minutes three flights take on an average rival route (135 min
+ * each). A short hop costs less plane than a long one, so a rival can
+ * match the frequency of a dense short pair; ordinary growth stays at the
+ * flat count.
+ */
+const TYPICAL_RIVAL_FLIGHT_MINUTES = 135;
+const RIVAL_PLANE_MINUTES = FLIGHTS_PER_RIVAL_PLANE * TYPICAL_RIVAL_FLIGHT_MINUTES;
+const RIVAL_PLANNING_CRUISE_KTS = 280;
+
+/** Plane time one daily flight on this market takes: block plus the turn after it. */
+export function rivalFlightMinutes(origin: string, dest: string): number {
+  return computeBlockMinutes(origin, dest, RIVAL_PLANNING_CRUISE_KTS) + MIN_TURN_MINUTES;
+}
+
+/** How many planes a rival's flying takes by flying time, counting one more daily flight on `extra`. */
+export function rivalPlanesByFlyingTime(state: SimState, code: string, extra: { origin: string; dest: string }): number {
+  let minutes = rivalFlightMinutes(extra.origin, extra.dest);
+  for (const route of state.competitorRoutes) {
+    if (route.code === code) minutes += route.dailyFrequency * rivalFlightMinutes(route.origin, route.dest);
+  }
+  return Math.ceil(minutes / RIVAL_PLANE_MINUTES);
+}
 /** Rivals move up a class as they grow: at this many daily flights, a Narrowbody; at the next, a Widebody. */
 const RIVAL_NARROWBODY_FLIGHTS = 6;
 const RIVAL_WIDEBODY_FLIGHTS = 14;
@@ -197,17 +224,18 @@ export function ensureRivalFleets(state: SimState): void {
 }
 
 /**
- * Before a rival adds `extraFlights` a day (a new route, a new frequency,
+ * Before a rival adds one daily flight on `origin`-`dest` (a new route, a new frequency,
  * or entering the map at all): whether its fleet can carry them, leasing
  * a plane from the shared market if not. Its preferred class first, then
  * smaller ones; false — and the growth doesn't happen today — when the
  * market has nothing it can use.
  */
-export function rivalSecuresCapacity(state: SimState, code: string, extraFlights: number): boolean {
+export function rivalSecuresCapacity(state: SimState, code: string, origin: string, dest: string, byFlyingTime = false): boolean {
   const fleet = state.competitorFleets[code] ?? [];
-  const needed = Math.ceil((rivalFlights(state, code) + extraFlights) / FLIGHTS_PER_RIVAL_PLANE);
+  const byCount = Math.ceil((rivalFlights(state, code) + 1) / FLIGHTS_PER_RIVAL_PLANE);
+  const needed = byFlyingTime ? Math.min(byCount, rivalPlanesByFlyingTime(state, code, { origin, dest })) : byCount;
   if (fleet.length >= needed) return true;
-  const preferred = preferredRivalClass(rivalFlights(state, code) + extraFlights);
+  const preferred = preferredRivalClass(rivalFlights(state, code) + 1);
   for (const typeCode of RIVAL_CLASS_LADDER.slice(RIVAL_CLASS_LADDER.indexOf(preferred))) {
     if (rivalMayTake(state, code, typeCode) && takeListing(state, typeCode)) {
       // Only recorded once it has a plane: a rival whose entry fails today

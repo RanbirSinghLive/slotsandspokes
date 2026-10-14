@@ -240,7 +240,7 @@ export function rollCompetitorRouteOpenings(state: SimState, dayStartMinute: num
     // market the player uses (sim/market.ts). No slot or no plane, no route today.
     const slotFees = rivalSlotQuote(state, origin, dest);
     if (slotFees === null) continue;
-    if (!rivalSecuresCapacity(state, code, 1)) continue;
+    if (!rivalSecuresCapacity(state, code, origin, dest)) continue;
 
     state.competitorRoutes.push({
       airline,
@@ -336,7 +336,7 @@ export function rollRivalEntry(state: SimState, dayStartMinute: number): void {
   // market, like anyone.
   const slotFees = rivalSlotQuote(state, origin, dest);
   if (slotFees === null) return;
-  if (!rivalSecuresCapacity(state, rival.code, 1)) return;
+  if (!rivalSecuresCapacity(state, rival.code, origin, dest)) return;
   state.competitorRoutes.push({
     airline: rival.airline,
     code: rival.code,
@@ -427,9 +427,9 @@ export function rollCompetitorFrequencyGrowth(state: SimState): void {
  * ends (checked first) and a plane. Its slot fees are added at today's
  * price. Whether it happened.
  */
-export function addRivalFlight(state: SimState, route: CompetitorOffering): boolean {
+export function addRivalFlight(state: SimState, route: CompetitorOffering, byFlyingTime = false): boolean {
   const slotFees = rivalSlotQuote(state, route.origin, route.dest);
-  if (slotFees === null || !rivalSecuresCapacity(state, route.code, 1)) return false;
+  if (slotFees === null || !rivalSecuresCapacity(state, route.code, route.origin, route.dest, byFlyingTime)) return false;
   route.dailyFrequency += 1;
   route.slotFeesPerDay = (route.slotFeesPerDay ?? 0) + slotFees;
   return true;

@@ -1149,7 +1149,12 @@ flying to either end opens the route.
 
 **Every added flight needs a plane.** Rivals lease from the same shared
 market as the player (see The aircraft market), three daily flights per
-airframe. Leasing up the shelf holds them off.
+airframe. Answering a premium (above) counts planes by flying time
+instead (`rivalPlanesByFlyingTime()`): block time at a common 280 kt plus
+the 30 min turn, against 405 plane-minutes an airframe, which is three
+flights on an average rival route. A short hop costs a rival less plane
+than a long one, as it does you, so a dense short pair draws rival
+frequency as fast as the shelf allows. Leasing up the shelf holds them off.
 
 **Rivals close routes that lose money** (`sim/rivalEconomics.ts`).
 Rivals keep no books, so each day `rivalRouteDailyResult()` estimates a
