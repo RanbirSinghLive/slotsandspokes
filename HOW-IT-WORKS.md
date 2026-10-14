@@ -2060,7 +2060,11 @@ ahead of a typical rival's 10 is worth 0.008 of booking utility, taken
 off every rival's option in the choice model (sim/choiceModel.ts). It
 moves passengers between airlines, not how many travel, so a route with
 no rival is unaffected. Thirty points ahead is worth about a 5% fare cut
-to a leisure traveller. A careful airline's network NPS sits at 12–20
+to a leisure traveller. **Reach adds to it** (`reachEdge()`): 0.01 of
+booking utility for each airport you fly to past the fourth, up to 0.12
+(16 airports), the same worth as 15 NPS points. A broad network is known,
+so it holds share against rivals on every market it flies. A careful
+airline's network NPS sits at 12–20
 through its first year, so across the network it's a tie-breaker; on
 one route it's a real lever, since routes range from about −27 (late,
 old planes) to +26, and a bad route loses passengers to its rival.

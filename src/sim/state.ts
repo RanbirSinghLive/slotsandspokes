@@ -447,6 +447,8 @@ export type SimState = {
    * roughly the last month, starting level with a typical rival.
    * Optional: absent in an older save, read as that starting value.
    */
+  /** Airports the schedule touched at the last rollover, for the reach edge (sim/nps.ts). */
+  airportsReached?: number;
   trailingNps?: number;
   /** Each market's trailing NPS, keyed by marketKey(); a market not yet flown reads the network's. */
   trailingNpsByMarket?: Record<string, number>;
