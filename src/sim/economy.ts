@@ -177,6 +177,13 @@ export function legCostBreakdown(
  */
 /** Pricing under the going rate wins connecting passengers too, but at most this many times as many. */
 const MAX_CONNECTING_PRICE_GAIN = 1.5;
+/**
+ * ...and a high fare on one leg costs the connection at most this much of
+ * it. Locals fall away at a premium; a connection also has the other leg
+ * and the whole trip to weigh, so one dear leg alone doesn't empty the
+ * hub (a trunk at 1.6x the going rate fed it 0.3x before).
+ */
+const MIN_CONNECTING_PRICE_RESPONSE = 0.6;
 
 /**
  * How a route's fare scales the connecting passengers it gets
@@ -197,7 +204,7 @@ export function connectingPriceResponse(
 ): number {
   const atFare = bookingShare(fare, legsServingMarket, origin, dest, competitorRoutes, brandEdge);
   const atGoingRate = bookingShare(recommendedFare(origin, dest), legsServingMarket, origin, dest, competitorRoutes, brandEdge);
-  return atGoingRate > 0 ? Math.min(MAX_CONNECTING_PRICE_GAIN, atFare / atGoingRate) : 1;
+  return atGoingRate > 0 ? Math.min(MAX_CONNECTING_PRICE_GAIN, Math.max(MIN_CONNECTING_PRICE_RESPONSE, atFare / atGoingRate)) : 1;
 }
 
 /** A market's mix scaled by today's seasonal factors: no longer summing to 1, since a season brings more or fewer travellers. */
