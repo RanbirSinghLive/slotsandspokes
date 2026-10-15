@@ -177,6 +177,7 @@ export function recordFlightNps(state: SimState, origin: string, dest: string, s
  * totals reset.
  */
 export function rollTrailingNps(state: SimState): void {
+  state.airportsReached = countAirportsServed(state);
   const network = networkNps(state);
   if (state.todayNpsScoredFlights > 0) {
     const dayAverage = state.todayNpsPoints / state.todayNpsScoredFlights;
@@ -201,9 +202,34 @@ export function marketNps(state: SimState, origin: string, dest: string): number
   return state.trailingNpsByMarket?.[marketKey(origin, dest)] ?? networkNps(state);
 }
 
-/** How much the airline's name on this market pulls passengers from a typical rival, in booking utility (sim/choiceModel.ts). */
+/**
+ * A name known in many cities beats one known in three: booking utility
+ * per airport the airline flies to past REACH_FROM_AIRPORTS, up to
+ * MAX_REACH_EDGE (what 15 NPS points are worth). Like NPS it counts against
+ * rivals only, so it is a moat for a broad network and nothing to a lone
+ * trunk, whose rivals can only be out-flown there.
+ */
+const REACH_FROM_AIRPORTS = 4;
+const REACH_EDGE_PER_AIRPORT = 0.01;
+const MAX_REACH_EDGE = 0.12;
+
+/** Airports the airline's schedule touches; counted once a day, since brandEdge() runs for every leg of every summary. */
+function countAirportsServed(state: SimState): number {
+  const served = new Set<string>();
+  for (const leg of state.schedule) {
+    served.add(leg.origin);
+    served.add(leg.dest);
+  }
+  return served.size;
+}
+
+export function reachEdge(state: SimState): number {
+  return clamp(((state.airportsReached ?? 0) - REACH_FROM_AIRPORTS) * REACH_EDGE_PER_AIRPORT, 0, MAX_REACH_EDGE);
+}
+
+/** How much the airline's name on this market pulls passengers from a typical rival, in booking utility (sim/choiceModel.ts): its NPS here, plus how far its network reaches. */
 export function brandEdge(state: SimState, origin: string, dest: string): number {
-  return (marketNps(state, origin, dest) - RIVAL_NPS) * NPS_UTILITY_PER_POINT;
+  return (marketNps(state, origin, dest) - RIVAL_NPS) * NPS_UTILITY_PER_POINT + reachEdge(state);
 }
 
 /** An NPS as players read it: whole points, signed ("+14", "−3", "0"). */
