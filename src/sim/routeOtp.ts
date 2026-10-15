@@ -91,7 +91,7 @@ export function trailingMarketOtp(state: SimState, a: string, b: string, days = 
  *   OTP 100% → 1.5   growth runs half again as fast
  *   OTP  70% → 1.0   normal growth (the neutral line)
  *   OTP  40% → 0     growth stalls
- *   OTP  20% → -1    the market shrinks as fast as if you'd abandoned it
+ *   OTP  20% → -0.25 the market shrinks at a quarter of the abandoned rate (MAX_DECAY)
  *
  * Straight lines between those points. The stall point sits well below
  * the neutral one on purpose: the starting fleet of 20-year-old aircraft
@@ -105,10 +105,20 @@ export function trailingMarketOtp(state: SimState, a: string, b: string, days = 
 const FACTOR_AT_PERFECT = 1.5;
 const STALL_OTP = 0.4;
 const FULL_REVERSE_OTP = 0.2;
+/**
+ * The fastest a market shrinks for unreliability, as a share of the slide
+ * an abandoned market gets. A thin spoke on old planes runs at 10–30%
+ * on-time with no buffer; at the full rate it fell to its floor before the
+ * player could learn why, which made every spoke a trap and the trunks the
+ * only place to build. A quarter keeps it a loud penalty (the market still
+ * shrinks, and growth is lost) that a turn buffer or a newer plane can
+ * still beat.
+ */
+const MAX_DECAY = 0.25;
 
 export function reliabilityDemandFactor(otp: number | null): number {
   if (otp === null) return 1;
   if (otp >= OTP_BASELINE) return 1 + ((otp - OTP_BASELINE) / (1 - OTP_BASELINE)) * (FACTOR_AT_PERFECT - 1);
   if (otp >= STALL_OTP) return (otp - STALL_OTP) / (OTP_BASELINE - STALL_OTP);
-  return Math.max(-1, -(STALL_OTP - otp) / (STALL_OTP - FULL_REVERSE_OTP));
+  return Math.max(-MAX_DECAY, (-(STALL_OTP - otp) / (STALL_OTP - FULL_REVERSE_OTP)) * MAX_DECAY);
 }
