@@ -7053,6 +7053,37 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
   background: #5ed6c8;
 }
 
+/* The − n + count in a hire or convert confirm (ui/confirmModal.ts quantity). */
+.confirm-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.confirm-stepper button {
+  width: 44px;
+  height: 44px;
+  font-size: 22px;
+  background: #3a4258;
+  border: 1px solid #6b7694;
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+}
+
+.confirm-stepper button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.confirm-stepper b {
+  min-width: 2ch;
+  font-size: 22px;
+  text-align: center;
+}
+
 /* The fleet market chip in the HUD row (ui/market.ts): green when cash covers a listed plane, amber when not. */
 #market-chip .plane-icon {
   width: 14px;
