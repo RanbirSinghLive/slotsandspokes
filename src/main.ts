@@ -57,6 +57,7 @@ import { isHubPlannerOpen } from './ui/hubPlanner';
 import { setupFarePolicy, updateFarePolicy } from './ui/farePolicy';
 import { setupInfoTooltips } from './ui/infoTooltip';
 import { setupMapToolTips } from './ui/mapTools';
+import { setupNetworkCardButton } from './ui/networkCardDialog';
 import { updateTicker } from './ui/ticker';
 import { updateStamps } from './ui/stamp';
 import { updateOpsBoard } from './ui/opsBoard';
@@ -120,6 +121,7 @@ setupRouteBuilder(state, () => {
 setupFarePolicy(state);
 setupInfoTooltips();
 setupMapToolTips();
+setupNetworkCardButton(() => state);
 setupGameOver();
 setupGameControls(state);
 setupBriefs(state);

@@ -4149,3 +4149,15 @@ The rival that has taken the most from the player's routes gets a name and a goa
 - **Naming:** a rival with 3 or more routes and about $150k taken becomes the nemesis; a challenger replaces it only at 1.25 times its grudge. The ticker says so, the Rivals list marks the card ☠, the rival's page has one ops line, and Goals shows a bar.
 - **The goal:** fly 3 or more routes beyond the nemesis and at least 1.5 times as many, for 60 days in a row. Winning retires that rival for good (`nemesesBeaten`) and a bigger one rises. It pays nothing and changes no rival behaviour; it is a target, not an edge.
 - Test: `npm run nemesistest`.
+
+## Network card (`src/render/networkCard.ts`, `src/ui/networkCardDialog.ts`)
+
+The share button at the bottom of the map tools opens a 1200×630 picture of the
+network, drawn at 2× to its own canvas. The shared projection is borrowed for the
+draw (`withFittedView`) and put back, so the live map never moves. The map is fitted
+to every airport on the schedule plus points along each arc (a long great circle bows
+away from its ends), kept clear of the title and number strips; a lone home airport
+is padded to a small region. Content: home code, day and date, then icon + count for
+aircraft, routes, airports and daily flights. Line width follows seats a day. The
+dialog offers Share (only where the browser can share a file), Save and Copy (only
+where the clipboard takes images). Nothing is stored in the save.

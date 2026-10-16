@@ -22,6 +22,12 @@ export function setupMapToolTips(): void {
   for (const area of [strip, rail, inspectorBody, hud]) wireTips(area, tooltip);
 }
 
+/** Give a dialog's icon buttons the same tips (hover, focus, or a tap on a touch screen). */
+export function wireDialogTips(area: HTMLElement): void {
+  const tooltip = document.querySelector<HTMLDivElement>('#info-tooltip');
+  if (tooltip) wireTips(area, tooltip);
+}
+
 function wireTips(strip: HTMLElement, tooltip: HTMLDivElement): void {
   // The map tools sit low on a phone, so their tip goes above the whole strip; the rail's goes beside its button.
   const aboveWhenLow = strip.id === 'map-tools';
