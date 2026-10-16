@@ -2821,8 +2821,11 @@ with `refitTo` set: its rotations move to spare planes of its class at
 its base, what doesn't fit is cancelled, and it can't be expedited.
 A refit not yet started can be called off with the money back.
 
-The plane's view shows the cabin and a forecast for the refit
-(`cabinGainPerDay()`): the plane's markets through the game's own
+The plane's view shows the cabin and a forecast for the refit, right under
+its seats and base line. Each Fleet row carries a seat icon (grey economy,
+teal business, amber when the forecast pays); its tip gives the cabin and
+forecast, and tapping it opens the refit confirm.
+The forecast is `cabinGainPerDay()`: the plane's markets through the game's own
 forecast, with the cabin swapped and then put back. The headless player
 reviews its cabins weekly. It refits the one plane whose forecast gain
 pays the refit and its days out back within 45 days, one plane at a

@@ -3,6 +3,7 @@ import { nightStopCostPerNight, nightStopLegs } from '../../sim/nightStops';
 import { classByCode } from '../../sim/aircraftClasses';
 import { dayIndex } from '../../sim/clock';
 import { line, heading, lineWithInfo } from './dom';
+import { glyph } from '../glyphs';
 import { takeCallBlockFlash } from '../callAlert';
 import { gameDate, money } from '../format';
 import { aogFor, daysUntilReturn } from '../../sim/aog';
@@ -81,7 +82,7 @@ export function aircraftLink(tail: string): HTMLButtonElement {
 }
 
 /** Every plane the airline has, each a row opening its view. */
-export function buildFleetView(state: SimState): HTMLElement {
+export function buildFleetView(state: SimState, changed: () => void): HTMLElement {
   const root = document.createElement('div');
   root.className = 'inspector-view';
   root.append(title('Fleet'));
@@ -94,7 +95,7 @@ export function buildFleetView(state: SimState): HTMLElement {
   root.append(
     lineWithInfo(
       `${state.aircraft.length} aircraft · leases ${money(leases)}/day`,
-      'Each row: base · share of the usable day flown (over 100% cannot be flown) · OTP, arrivals on time of flown today · LF, load factor today · J, business cabin. AOG is grounded by a fault.',
+      'Each row: base · share of the usable day flown (over 100% cannot be flown) · OTP, arrivals on time of flown today · LF, load factor today · seat icon, the cabin (teal business, amber when a refit would pay; tap to refit). AOG is grounded by a fault.',
     ),
   );
 
@@ -118,8 +119,10 @@ export function buildFleetView(state: SimState): HTMLElement {
       (flown > 0 ? ` · OTP ${onTime}/${flown}` : '') +
       (loadFactor !== null ? ` · LF ${Math.round(loadFactor * 100)}%` : '') +
       (aogFor(state, aircraft.tail) ? (aogFor(state, aircraft.tail)?.refitTo ? ' · refit' : ' · AOG') : aircraft.refitPending ? ' · refit tomorrow' : '') +
-      (aircraft.cabin ? ' · J' : '');
+      '';
     if (aogFor(state, aircraft.tail) || use.share > 1) detail.classList.add('is-over');
+    const cabinMark = cabinMarkFor(state, aircraft.tail, changed);
+    if (cabinMark) name.append(cabinMark);
     row.append(name, detail);
     row.addEventListener('click', () => select({ kind: 'aircraft', tail: aircraft.tail }));
     list.append(row);
@@ -149,6 +152,10 @@ export function buildAircraftView(state: SimState, tail: string, changed: () => 
       'The share of its flights that leave without a mechanical delay at this airframe\'s age; older planes have more, and longer ones. Knock-on, weather and congestion delays come on top.',
     ),
   );
+
+  // The cabin refit sits right under the plane's facts, where it is seen first.
+  const cabinBlock = buildCabin(state, tail, changed);
+  if (cabinBlock) root.append(cabinBlock);
 
   const now = line(whereNow(state, tail));
   const plane = state.aircraft.find((a) => a.tail === tail);
@@ -238,8 +245,6 @@ export function buildAircraftView(state: SimState, tail: string, changed: () => 
     root.append(list);
   }
 
-  const cabinBlock = buildCabin(state, tail, changed);
-  if (cabinBlock) root.append(cabinBlock);
   const rebaseBlock = buildRebase(state, tail, changed);
   if (rebaseBlock) root.append(rebaseBlock);
   const returnBlock = buildReturn(state, tail, changed);
@@ -429,6 +434,73 @@ function seatsText(seats: number | undefined, cabin: 'economy' | 'business'): st
   return `${layout.business}J + ${layout.economy}Y seats`;
 }
 
+type RefitOption = NonNullable<ReturnType<typeof ops.refitOptionFor>>;
+
+function refitVerb(option: RefitOption): string {
+  return option.to === 'business' ? 'Fit business cabin' : 'Back to all economy';
+}
+
+/** The refit's confirm: cost, days out and forecast; ordering it runs `changed`. */
+function confirmRefit(state: SimState, tail: string, option: RefitOption, changed: () => void): void {
+  const verb = refitVerb(option);
+  showConfirm({
+    title: `${verb} · ${tail}`,
+    rows: [
+      { label: 'Refit cost', value: money(option.cost) },
+      { label: 'Out of service', value: `${option.days} days` },
+      { label: 'Forecast', value: `${option.gainPerDay >= 0 ? '+' : '−'}${money(Math.abs(option.gainPerDay))}/day` },
+      ...cashAfterRows(state, option.cost),
+    ],
+    facts: ['Starts next morning at base; the plane flies nothing while it is out. Calling it off before then refunds the cost.'],
+    confirmLabel: `Order · ${money(option.cost)}`,
+    run: () => {
+      ops.orderRefit(state, tail, option.to);
+      changed();
+    },
+  });
+}
+
+/**
+ * The seat icon on a Fleet row: grey for an all-economy plane, teal for a
+ * business cabin, amber when the refit's forecast pays, with the cabin and
+ * the forecast in the tip. Tapping it opens the refit confirm. A plane that
+ * can't take a business cabin (a Propeller) gets none.
+ */
+function cabinMarkFor(state: SimState, tail: string, changed: () => void): HTMLElement | null {
+  const aircraft = state.aircraft.find((a) => a.tail === tail)!;
+  const option = ops.refitOptionFor(state, tail);
+  if (!option) return null;
+  const business = cabinOf(aircraft) === 'business';
+  const sign = option.gainPerDay >= 0 ? '+' : '−';
+  const forecast = `${sign}${money(Math.abs(option.gainPerDay))}/day`;
+  const pays = option.blocked === null && option.gainPerDay > 0 && !aircraft.refitPending;
+  const tip = aircraft.refitPending
+    ? `Refit to ${aircraft.refitPending} ordered · open the plane to call it off`
+    : `${business ? 'Business cabin' : 'All economy'} · ${verbLower(option)} ${forecast}` + (option.blocked ? ` · ${option.blocked}` : '');
+  const mark = glyph('seat', tip, 'cabin-mark');
+  mark.classList.toggle('is-business', business);
+  mark.classList.toggle('is-pays', pays);
+  mark.classList.toggle('is-pending', aircraft.refitPending !== undefined);
+  mark.setAttribute('role', 'button');
+  mark.tabIndex = 0;
+  const open = (event: Event) => {
+    event.stopPropagation();
+    if (option.blocked === null) confirmRefit(state, tail, option, changed);
+  };
+  mark.addEventListener('click', open);
+  mark.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      open(event);
+    }
+  });
+  return mark;
+}
+
+function verbLower(option: RefitOption): string {
+  return option.to === 'business' ? 'refit to business' : 'refit to economy';
+}
+
 /**
  * The plane's cabin (sim/cabins.ts): what it has, and the refit to the
  * other one with its forecast, cost and days out; or the refit ordered,
@@ -475,26 +547,10 @@ function buildCabin(state: SimState, tail: string, changed: () => void): HTMLEle
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'inspector-plan-hub';
-  const verb = option.to === 'business' ? 'Fit business cabin' : 'Back to all economy';
+  const verb = refitVerb(option);
   button.textContent = `${verb} · ${money(option.cost)} · ${option.days}d out`;
   button.disabled = option.blocked !== null;
-  button.addEventListener('click', () =>
-    showConfirm({
-      title: `${verb} · ${tail}`,
-      rows: [
-        { label: 'Refit cost', value: money(option.cost) },
-        { label: 'Out of service', value: `${option.days} days` },
-        { label: 'Forecast', value: `${option.gainPerDay >= 0 ? '+' : '−'}${money(Math.abs(option.gainPerDay))}/day` },
-        ...cashAfterRows(state, option.cost),
-      ],
-      facts: ['Starts next morning at base; the plane flies nothing while it is out. Calling it off before then refunds the cost.'],
-      confirmLabel: `Order · ${money(option.cost)}`,
-      run: () => {
-        ops.orderRefit(state, tail, option.to);
-        changed();
-      },
-    }),
-  );
+  button.addEventListener('click', () => confirmRefit(state, tail, option, changed));
   const sign = option.gainPerDay >= 0 ? '+' : '−';
   const forecast = line(
     `Forecast ${sign}${money(Math.abs(option.gainPerDay))}/day on its routes` + (option.blocked ? ` · ${option.blocked}` : ''),
