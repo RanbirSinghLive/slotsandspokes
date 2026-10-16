@@ -1999,6 +1999,33 @@ fall back as far as a Propeller, but never take the last one listed: it
 is the class every airline starts and first grows with, and rivals act
 before the player each day.
 
+**Held for you.** A new listing is the player's alone for 3 days
+(`HOLD_DAYS`): rivals skip it until the hold ends, and the HUD chip's
+bar and the Lessor tip count it down. Deliveries land at rollover and one
+game day is a couple of real seconds at 100x, so without a hold a listing
+would be gone before it could be read. After the hold anyone may take it.
+An arrival that finds the shelf full is still lost, so holding banks
+nothing.
+
+**Pick the airframe.** The lease confirm shows one chip per listed
+airframe of the class, youngest first, each with its daily rate and an
+on-time bar; picking one shows its age, the minutes late it adds per
+flight from age alone (`expectedAgeDelayMinutes()`) and its rate. The
+lease takes exactly that listing.
+
+**Standing order.** The bell on a Lessor row places one order per class
+("next one aged 17 / 20 / any or younger"), based at the home airport.
+At rollover, right after the day's delivery, the youngest matching listing
+is leased through the same lease the player presses (class open, crew
+base, cash for 30 days of lease), then the order clears: one order buys one
+plane. A lease that can't go through leaves the order waiting.
+(`sim/standingOrders.ts`.)
+
+**The chip.** A plane icon and a count for every class the player can
+lease that has listings, in the HUD row beside the events chip: teal when
+cash covers one, amber when not, with a bar draining over the hold. Tap
+opens Fleet; the tip lists ages, rates and any order.
+
 **Age is the trade.** Listings are 15–24 years old. The rate card
 (`lease-rates.json`) is a new airframe's price; each year of age takes 2%
 off (`leaseRateFor()`), so a 20-year-old plane leases at 60%. Older

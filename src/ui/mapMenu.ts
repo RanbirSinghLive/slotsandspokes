@@ -24,6 +24,8 @@ import * as ops from './routeActions';
 import { planeIconInner } from './planeIcons';
 import { AIRCRAFT_CLASSES } from '../sim/aircraftClasses';
 import { USEFUL_LIFE_YEARS } from '../sim/leasing';
+import { ageDelayParameters, expectedAgeDelayMinutes } from '../sim/delays';
+import { holdDaysLeft } from '../sim/market';
 import { crewPlan } from '../sim/crewPlan';
 import { trailingDailyMargin } from '../sim/forecast';
 import { dayIndex } from '../sim/clock';
@@ -227,26 +229,46 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
     disabledReason: option.disabledReason,
     preview: option.preview,
     onSelect: () => {
-      const listing = option.listing;
-      if (!listing) return false;
-      const perDay = termPrice(listing.leasePricePerDay);
+      if (!option.listing) return false;
+      // One chip per listed airframe, youngest first: the age is the choice (sim/market.ts).
+      const choices = [...option.choices].sort((a, b) => a.ageYears - b.ageYears || a.id - b.id);
       const overhead = overheadAddedByNextPlane(state);
       const recentMargin = trailingDailyMargin(state);
-      showConfirm({
-        title: `Lease ${option.name} · ${airport.iata}`,
-        rows: [
+      const rowsFor = (index: number) => {
+        const listing = choices[index];
+        const perDay = termPrice(listing.leasePricePerDay);
+        const late = expectedAgeDelayMinutes(listing.ageYears);
+        const held = holdDaysLeft(state, listing);
+        return [
           ...(recentMargin === null ? [] : [{ label: `Margin, last ${Math.min(7, state.marginHistory.length)} day${state.marginHistory.length === 1 ? '' : 's'}`, value: `${money(Math.round(recentMargin))}/day` }]),
           { label: 'Airframe', value: `${option.seats} seats · ${listing.ageYears} yrs (${Math.max(0, USEFUL_LIFE_YEARS - listing.ageYears)} left)` },
+          { label: 'Late from age', value: `~${Math.round(late)} min/flight` },
           { label: 'Lease', value: `${money(perDay)}/day` },
           { label: 'Fleet overhead added', value: `${money(overhead)}/day` },
           { label: 'Running cost added', value: `${money(perDay + overhead)}/day` },
           { label: 'Term', value: seasonalTerm ? `${SEASON_DAYS} days, back by itself` : 'standing' },
           { label: 'Delivery', value: `${deliveryDays(state)} days` },
-        ],
+          ...(held > 0 ? [{ label: 'Held for you', value: `${held}d before rivals can lease it` }] : []),
+        ];
+      };
+      showConfirm({
+        title: `Lease ${option.name} · ${airport.iata}`,
+        rows: [],
+        choices: {
+          selected: 0,
+          rowsFor,
+          chips: choices.map((listing) => ({
+            label: `${listing.ageYears}y`,
+            sub: money(termPrice(listing.leasePricePerDay)),
+            title: `${listing.ageYears} yrs · ${money(termPrice(listing.leasePricePerDay))}/day · ~${Math.round(expectedAgeDelayMinutes(listing.ageYears))} min late per flight from age`,
+            // Taller bar = more on time.
+            meter: ageDelayParameters(listing.ageYears).onTimeProbability,
+          })),
+        },
         facts: ['Crews are hired separately: have crews rated on this type at the base before its first flight.'],
         confirmLabel: 'Lease',
-        run: () => {
-          const result = ops.leasePlane(state, airport.iata, option.code, seasonalTerm, option.powertrain === 'electric' ? 'electric' : undefined);
+        run: (index) => {
+          const result = ops.leasePlane(state, airport.iata, option.code, seasonalTerm, option.powertrain === 'electric' ? 'electric' : undefined, choices[index].id);
           notice = result.ok ? result.message : result.reason;
           refresh();
         },
