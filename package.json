@@ -43,6 +43,7 @@
     "crisistest": "tsx src/sim/crisis.test.ts",
     "standingtest": "tsx src/sim/standing.test.ts",
     "sorttest": "tsx src/sim/scheduleSort.test.ts",
+    "gaugetest": "tsx src/sim/gaugeDrop.test.ts",
     "margintest": "tsx src/sim/networkMargin.test.ts",
     "nemesistest": "tsx src/sim/nemesis.test.ts"
   },

@@ -816,20 +816,21 @@ function onDragMove(event: PointerEvent): void {
     drag.homeTrack.append(dragGhost);
     showBaseHours(lastTimelineState, drag.rotation.airports[0]);
   }
-  // The row the pointer is level with, if it's a plane of the same type;
+  // The row the pointer is level with, of any type (a plane of another type
+  // at the same base takes it re-timed; one elsewhere is refused, red);
   // else its own. Picked by height, not by what's under the pointer (the
   // held block itself is), and shown by sliding the block over that row
   // rather than moving it in the page: moving it would drop the pointer
   // capture and end the drag.
   const homeRect = drag.homeTrack.getBoundingClientRect();
-  const sameType = [...rotationsTimelineEl.querySelectorAll<HTMLElement>(`.timeline-track[data-type="${drag.homeTrack.dataset.type}"]`)];
+  const rows = [...rotationsTimelineEl.querySelectorAll<HTMLElement>('.timeline-track')];
   const track =
-    sameType.find((candidate) => {
+    rows.find((candidate) => {
       const rect = candidate.getBoundingClientRect();
       return event.clientY >= rect.top - 3 && event.clientY <= rect.bottom + 3;
     }) ?? drag.homeTrack;
   drag.span.style.transform = `translateY(${track.getBoundingClientRect().top - homeRect.top}px)`;
-  for (const candidate of sameType) candidate.classList.toggle('is-drop-target', candidate === track && track !== drag.homeTrack);
+  for (const candidate of rows) candidate.classList.toggle('is-drop-target', candidate === track && track !== drag.homeTrack);
   const tail = track.dataset.tail!;
   // In 5-minute steps, pulled to a neighbouring flight or the day's ends when close (sim/scheduleDraft.ts).
   const start = snappedStart(lastTimelineState, drag.rotation.legs.map((leg) => leg.legId), tail, Math.round((drag.rotation.departMinute + dx * drag.minutesPerPx) / 5) * 5);

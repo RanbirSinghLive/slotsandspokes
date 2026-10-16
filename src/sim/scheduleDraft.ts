@@ -7,6 +7,12 @@ import { rotationsForTail, scheduledTurnMinutes, USABLE_DAY_END_MINUTE, USABLE_D
  * Planning the Gantt (the Schedule timeline, ui/panels.ts) without the
  * rules getting in the way mid-gesture. Three things build on sim/retime.ts:
  *
+ * - **Gauge**: a plane of another type at the same base takes the rotation
+ *   too, its flights re-timed for that type's speed. Upgauging a propeller
+ *   round trip onto a regional, or the other way down, is a move or a swap
+ *   like any other, but never onto a leg beyond the receiving type's range or
+ *   an airport too small for it: that drop is refused, red, in both
+ *   directions of a swap.
  * - **Swap**: a rotation dropped onto a plane where other rotations already
  *   sit in that time of day trades places with them: those rotations go to
  *   the dragged one's plane at their own times (or, for a single one, at the
@@ -74,7 +80,7 @@ export function conflictingLegIds(state: SimState): Set<string> {
 function snapshot(state: SimState) {
   return JSON.parse(
     JSON.stringify({
-      legs: state.schedule.map((leg) => [leg.legId, leg.tail, leg.departMinute]),
+      legs: state.schedule.map((leg) => [leg.legId, leg.tail, leg.departMinute, leg.blockMinutes]),
       slotsHeld: state.slotsHeld,
       pendingRetimes: state.pendingRetimes,
       retimedToday: state.retimedToday,
@@ -82,7 +88,7 @@ function snapshot(state: SimState) {
       wrappedFrom: state.wrappedFrom,
     }),
   ) as {
-    legs: [string, string, number][];
+    legs: [string, string, number, number][];
     slotsHeld: SimState['slotsHeld'];
     pendingRetimes: SimState['pendingRetimes'];
     retimedToday: SimState['retimedToday'];
@@ -92,7 +98,7 @@ function snapshot(state: SimState) {
 }
 
 function restore(state: SimState, saved: ReturnType<typeof snapshot>): void {
-  const byId = new Map(saved.legs.map(([legId, tail, departMinute]) => [legId, { tail, departMinute }]));
+  const byId = new Map(saved.legs.map(([legId, tail, departMinute, blockMinutes]) => [legId, { tail, departMinute, blockMinutes }]));
   for (const leg of state.schedule) {
     const was = byId.get(leg.legId);
     if (was) Object.assign(leg, was);
@@ -121,7 +127,7 @@ export function commitDraft(state: SimState, moves: DraftMove[], options: Commit
   };
   const messages: string[] = [];
   for (const move of moves) {
-    const result = commitRetime(state, move.legIds, move.tail, move.start, { allowOverlap: true });
+    const result = commitRetime(state, move.legIds, move.tail, move.start, { allowOverlap: true, allowTypeChange: true });
     if (!result.ok) return fail(result.reason);
     messages.push(result.message);
   }
@@ -152,10 +158,10 @@ export function planDrop(state: SimState, legIds: string[], toTail: string, star
 
 function planDropOn(state: SimState, legIds: string[], toTail: string, start: number): DropPlan {
   const move: DraftMove = { legIds, tail: toTail, start };
-  const plain = planRetime(state, legIds, toTail, start);
+  const plain = planRetime(state, legIds, toTail, start, { allowTypeChange: true });
   if (plain.ok) return { ok: true, kind: 'move', plan: plain, moves: [move], swapWith: [], reason: null };
   // Refused for a reason other than sitting on other flights: nothing to hold.
-  const loose = planRetime(state, legIds, toTail, start, { allowOverlap: true });
+  const loose = planRetime(state, legIds, toTail, start, { allowOverlap: true, allowTypeChange: true });
   if (!loose.ok) return { ok: false, kind: 'move', plan: loose, moves: [move], swapWith: [], reason: loose.reason };
 
   const view = tomorrowView(state);

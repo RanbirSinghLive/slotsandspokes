@@ -1607,6 +1607,14 @@ it back. The rules:
   warns when its new plane's longer day needs more crews than the base
   has.
 
+**Gauge by drag** (`sim/retime.ts`, `legsForType()`). A rotation can be
+dropped on a plane of another type at the same base, up or down a class: its
+legs are re-timed at that type's cruise speed (each keeping its wait), and the
+drop is refused, red, if any leg is beyond that type's range or touches an
+airport too small for it. A swap checks both directions, so a long regional
+rotation is never sent down to a propeller. Held moves keep the new block times
+in `pendingRetimes`.
+
 **Swap, and planning a draft** (`sim/scheduleDraft.ts`). A drop onto a
 plane that has other rotations in that time of day **swaps**: those
 rotations go to the dragged one's plane at their own times (a lone one
