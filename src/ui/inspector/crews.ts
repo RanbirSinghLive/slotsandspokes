@@ -52,9 +52,9 @@ function chipElement(chip: Chip): HTMLElement {
 }
 
 /** A confirm window before an action that spends money or lets crews go; `confirm` null runs it at once. */
-type CrewConfirm = { title: string; rows: { label: string; value: string }[]; facts?: string[]; confirmLabel: string };
+type CrewConfirm = { title: string; rows: { label: string; value: string }[]; facts?: string[]; confirmLabel: string; quantity?: { max: number; rowsFor: (count: number) => { label: string; value: string }[]; confirmLabelFor: (count: number) => string } };
 
-function actionButton(label: string, disabled: boolean, act: () => void, changed: () => void, confirm: CrewConfirm | null = null, tip?: string): HTMLButtonElement {
+function actionButton(label: string, disabled: boolean, act: (count: number) => void, changed: () => void, confirm: CrewConfirm | null = null, tip?: string): HTMLButtonElement {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'inspector-plan-hub crew-action';
@@ -63,11 +63,15 @@ function actionButton(label: string, disabled: boolean, act: () => void, changed
   button.title = tip ?? confirm?.title ?? label;
   button.setAttribute('aria-label', button.title);
   button.disabled = disabled;
-  const run = () => {
-    act();
+  const run = (_choice = 0, count = 1) => {
+    act(count);
     changed();
   };
-  button.addEventListener('click', () => (confirm ? showConfirm({ ...confirm, run }) : run()));
+  button.addEventListener('click', () => {
+    if (!confirm) return run();
+    const { quantity, ...rest } = confirm;
+    showConfirm({ ...rest, run, quantity: quantity && { min: 1, max: Math.max(1, quantity.max), value: 1, rowsFor: quantity.rowsFor, confirmLabelFor: quantity.confirmLabelFor } });
+  });
   return button;
 }
 
@@ -381,27 +385,32 @@ function classRow(state: SimState, iata: string, c: ClassPlan, siblings: ClassPl
   buttons.className = 'crew-buttons';
   const open = ops.crewReadout(state, iata)?.classes.find((r) => r.classCode === c.classCode)?.open ?? false;
   const pilotSeats = ops.crewReadout(state, iata)?.training.pilot.free ?? 0;
-  buttons.append(actionButton('+', !open || pilotSeats === 0 || state.cash < hireFee(c.classCode), () => ops.hireCrewsAt(state, iata, c.classCode, 1), changed, {
-    title: `Hire 1 ${c.name} crew · ${iata}`,
-    rows: [
-      { label: 'Fee now', value: money(hireFee(c.classCode)) },
-      { label: 'Joins', value: `day ${dayIndex(state) + hireLeadDays(state)}` },
-      ...cashAfterRows(state, hireFee(c.classCode)),
-    ],
+  const hireJoins = dayIndex(state) + hireLeadDays(state);
+  const hireRows = (n: number) => [
+    { label: 'Fee now', value: money(hireFee(c.classCode) * n) },
+    { label: 'Joins', value: `day ${hireJoins}` },
+    ...cashAfterRows(state, hireFee(c.classCode) * n),
+  ];
+  buttons.append(actionButton('+', !open || pilotSeats === 0 || state.cash < hireFee(c.classCode), (n) => ops.hireCrewsAt(state, iata, c.classCode, n), changed, {
+    title: `Hire ${c.name} crews · ${iata}`,
+    rows: hireRows(1),
     confirmLabel: `Hire · ${money(hireFee(c.classCode))}`,
-  }, pilotSeats === 0 ? 'No free training seats' : `Hire 1 ${c.name} crew · ${money(hireFee(c.classCode))}`));
+    quantity: { max: Math.min(pilotSeats, Math.floor(state.cash / hireFee(c.classCode))), rowsFor: hireRows, confirmLabelFor: (n) => `Hire ${n} · ${money(hireFee(c.classCode) * n)}` },
+  }, pilotSeats === 0 ? 'No free training seats' : `Hire ${c.name} crews · ${money(hireFee(c.classCode))} each`));
   const donor = siblings.filter((s) => s.classCode !== c.classCode && s.crews - s.ideal > 0).sort((x, y) => y.crews - y.ideal - (x.crews - x.ideal))[0];
   if (donor && open) {
-    buttons.append(actionButton('⇄', pilotSeats === 0 || state.cash < retrainFee(c.classCode), () => ops.retrainCrewsAt(state, iata, donor.classCode, c.classCode, 1), changed, {
-      title: `Convert 1 ${donor.name} → ${c.name} · ${iata}`,
-      rows: [
-        { label: 'Fee now', value: money(retrainFee(c.classCode)) },
-        { label: 'Ready', value: `day ${dayIndex(state) + retrainDays(state)}` },
-        ...cashAfterRows(state, retrainFee(c.classCode)),
-      ],
-      facts: [`A ${donor.name} crew leaves that roster and flies nothing while retraining.`],
+    const convertRows = (n: number) => [
+      { label: 'Fee now', value: money(retrainFee(c.classCode) * n) },
+      { label: 'Ready', value: `day ${dayIndex(state) + retrainDays(state)}` },
+      ...cashAfterRows(state, retrainFee(c.classCode) * n),
+    ];
+    buttons.append(actionButton('⇄', pilotSeats === 0 || state.cash < retrainFee(c.classCode), (n) => ops.retrainCrewsAt(state, iata, donor.classCode, c.classCode, n), changed, {
+      title: `Convert ${donor.name} → ${c.name} crews · ${iata}`,
+      rows: convertRows(1),
+      facts: [`${donor.name} crews leave that roster and fly nothing while retraining.`],
       confirmLabel: `Convert · ${money(retrainFee(c.classCode))}`,
-    }, `Convert 1 ${donor.name} crew → ${c.name} · ${money(retrainFee(c.classCode))}`));
+      quantity: { max: Math.min(donor.crews - donor.ideal, pilotSeats, Math.floor(state.cash / retrainFee(c.classCode))), rowsFor: convertRows, confirmLabelFor: (n) => `Convert ${n} · ${money(retrainFee(c.classCode) * n)}` },
+    }, `Convert ${donor.name} crews → ${c.name} · ${money(retrainFee(c.classCode))} each`));
   }
   if (c.crews > c.ideal) buttons.append(
       actionButton('−1', false, () => ops.releaseCrewsAt(state, iata, c.classCode, 1), changed, {
@@ -443,15 +452,18 @@ function cabinRow(state: SimState, iata: string, c: ClassPlan, cabin: NonNullabl
   const seats = readout?.training.cabin.free ?? 0;
   const buttons = document.createElement('div');
   buttons.className = 'crew-buttons';
-  buttons.append(actionButton('+', seats === 0 || state.cash < cabin.hireFee, () => ops.hireCabinAt(state, iata, c.classCode, 1), changed, {
-    title: `Hire 1 ${c.name} cabin team · ${iata}`,
-    rows: [
-      { label: 'Fee now', value: money(cabin.hireFee) },
-      { label: 'Joins', value: `day ${dayIndex(state) + (readout?.cabinLeadDays ?? 0)}` },
-      ...cashAfterRows(state, cabin.hireFee),
-    ],
+  const cabinJoins = dayIndex(state) + (readout?.cabinLeadDays ?? 0);
+  const cabinRows = (n: number) => [
+    { label: 'Fee now', value: money(cabin.hireFee * n) },
+    { label: 'Joins', value: `day ${cabinJoins}` },
+    ...cashAfterRows(state, cabin.hireFee * n),
+  ];
+  buttons.append(actionButton('+', seats === 0 || state.cash < cabin.hireFee, (n) => ops.hireCabinAt(state, iata, c.classCode, n), changed, {
+    title: `Hire ${c.name} cabin teams · ${iata}`,
+    rows: cabinRows(1),
     confirmLabel: `Hire · ${money(cabin.hireFee)}`,
-  }, seats === 0 ? 'No free cabin seats' : `Hire 1 ${c.name} cabin team · ${money(cabin.hireFee)}`));
+    quantity: { max: Math.min(seats, Math.floor(state.cash / cabin.hireFee)), rowsFor: cabinRows, confirmLabelFor: (n) => `Hire ${n} · ${money(cabin.hireFee * n)}` },
+  }, seats === 0 ? 'No free cabin seats' : `Hire ${c.name} cabin teams · ${money(cabin.hireFee)} each`));
   if (cabin.teams > cabin.ideal) {
     buttons.append(actionButton('−1', false, () => ops.releaseCabinAt(state, iata, c.classCode, 1), changed, {
       title: `Release 1 ${c.name} cabin team · ${iata}`,
