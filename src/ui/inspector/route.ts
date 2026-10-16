@@ -861,6 +861,11 @@ function buildRouteHistory(state: SimState, a: string, b: string): HTMLElement |
  * time. Bars are each finished day's on-time share, coloured on the same
  * scale as the On-Time map mode, so a red bar here is a red route there.
  */
+/** A route whose reliability factor is under this is barely growing, if at all. */
+const STALLING_FACTOR = 0.25;
+/** The buffer the hint suggests: the middle of ops' choices. */
+const SUGGESTED_TURN_BUFFER_MINUTES = 30;
+
 function buildRouteOtp(state: SimState, a: string, b: string): HTMLElement {
   const history = state.onTimeHistoryByMarket[marketKey(a, b)];
   const arrived = history?.arrived.slice(-WINDOW_DAYS) ?? [];
@@ -927,6 +932,12 @@ function buildRouteOtp(state: SimState, a: string, b: string): HTMLElement {
     chart.append(line(`Demand growth ${Math.round(factor * 100)}% of normal · delays`, 'route-otp-line is-warning'));
   } else {
     chart.append(line('Demand shrinking · delays', 'route-otp-line is-problem'));
+  }
+  // Stalled or shrinking with little buffer: the cheapest fix is one the player can make right here.
+  if (trailing.otp !== null && factor < STALLING_FACTOR && buffer < SUGGESTED_TURN_BUFFER_MINUTES) {
+    const hint = line(`Try turn buffer +${SUGGESTED_TURN_BUFFER_MINUTES} min`, 'route-otp-line is-warning');
+    hint.append(' ', info('Below 40% on-time a route stops growing, and below that it slowly shrinks. Ground time after each flight stops one late arrival making the next flight late, and costs some of the plane\'s day.'));
+    chart.append(hint);
   }
   return chart;
 }
