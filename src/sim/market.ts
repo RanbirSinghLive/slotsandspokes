@@ -54,8 +54,8 @@ type ClassRhythm = { initial: number; intervalDays: number; cap: number };
 /** Each class's shelf: how many are listed on day 0, how often another arrives, and the most listed at once. */
 export const MARKET_RHYTHM: Record<string, ClassRhythm> = {
   PROP: { initial: 3, intervalDays: 4, cap: 3 },
-  REGIONAL: { initial: 1, intervalDays: 10, cap: 2 },
-  NARROWBODY: { initial: 1, intervalDays: 20, cap: 2 },
+  REGIONAL: { initial: 1, intervalDays: 7, cap: 3 },
+  NARROWBODY: { initial: 1, intervalDays: 14, cap: 3 },
   WIDEBODY: { initial: 1, intervalDays: 35, cap: 1 },
 };
 

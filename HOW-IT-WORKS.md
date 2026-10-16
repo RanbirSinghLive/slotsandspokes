@@ -1976,8 +1976,8 @@ carrier, Widebodies on finishing Network airline.
 | Class | Stocked at day 0 | Then one every | Max listed |
 |---|---|---|---|
 | Propeller | 3 | 4 days | 3 |
-| Regional | 1 | 10 days | 2 |
-| Narrowbody | 1 | 20 days | 2 |
+| Regional | 1 | 7 days | 3 |
+| Narrowbody | 1 | 14 days | 3 |
 | Widebody | 1 | 35 days | 1 |
 
 A player who climbs before the rivals near it gets a bigger class and a
