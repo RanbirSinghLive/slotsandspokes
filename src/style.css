@@ -4926,19 +4926,6 @@ button.ops-item:hover {
   font-size: 9px;
 }
 
-.crew-row--cabin::before {
-  content: '';
-  flex: 1 1 60px;
-  min-width: 40px;
-  order: 2;
-  height: 0;
-}
-
-.crew-row--cabin .crew-row-count { order: 3; }
-.crew-row--cabin .crew-chip { order: 4; }
-.crew-row--cabin .info-mark { order: 5; }
-.crew-row--cabin .crew-buttons { order: 6; }
-
 .crew-risk-dot {
   flex: none;
   width: 7px;

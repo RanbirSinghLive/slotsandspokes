@@ -434,7 +434,31 @@ function cabinRow(state: SimState, iata: string, c: ClassPlan, cabin: NonNullabl
   count.textContent = `${cabin.teams}/${cabin.ideal}`;
   count.title = `${cabin.teams} teams${cabin.arriving > 0 ? ` +${cabin.arriving} joining` : ''} · need ${cabin.ideal} (min ${cabin.minimum}) · standby ${money(cabin.standbyPerDay)}/day`;
   const chip = chipElement(short ? { text: 'SHORT', tone: 'bad' } : cabin.teams < cabin.minimum ? { text: `JOINING +${cabin.arriving}`, tone: 'info' } : cabin.teams < cabin.ideal ? { text: 'TIGHT', tone: 'warn' } : cabin.teams > cabin.ideal ? { text: `RESERVE +${cabin.teams - cabin.ideal}`, tone: 'info' } : { text: 'OK', tone: 'good' });
-  row.append(label, count, chip);
+  // Same bar as the pilots': teams on hand and joining against the legal minimum and the comfortable number.
+  const scale = Math.max(1, cabin.teams + cabin.arriving, cabin.ideal, cabin.minimum);
+  const pct = (n: number) => `${(n / scale) * 100}%`;
+  const bar = document.createElement('div');
+  bar.className = 'crew-bar';
+  const onHand = document.createElement('span');
+  onHand.className = 'crew-bar-onhand';
+  onHand.style.width = pct(cabin.teams);
+  const joining = document.createElement('span');
+  joining.className = 'crew-bar-joining';
+  joining.style.left = pct(cabin.teams);
+  joining.style.width = pct(cabin.arriving);
+  bar.append(onHand, joining);
+  for (const [n, className, text] of [
+    [cabin.minimum, 'is-minimum', `Legal minimum ${cabin.minimum}`],
+    [cabin.ideal, 'is-ideal', `Comfortable ${cabin.ideal}`],
+  ] as const) {
+    if (n <= 0) continue;
+    const markEl = document.createElement('span');
+    markEl.className = `crew-bar-mark ${className}`;
+    markEl.style.left = pct(n);
+    markEl.title = text;
+    bar.append(markEl);
+  }
+  row.append(label, bar, count, chip);
   row.append(
     info(
       `Cabin teams staff every Regional plane and up: ${CABIN_TEAMS_PER_SHIFT[c.classCode]} per shift its pilots fly. A short cabin never grounds a plane, but each of its flights loses up to ${CABIN_SHORT_NPS_PENALTY} NPS points in proportion to the teams missing. They train in ${ops.crewReadout(state, iata)?.cabinLeadDays ?? 0} days in a cabin training seat, and can't be converted between classes.`,
