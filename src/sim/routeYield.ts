@@ -4,13 +4,17 @@ import { marketKey } from './schedule';
 import type { SimState } from './state';
 
 /**
- * A route's frequency and yield, as the map and the route views quote them.
+ * A route's frequency and PRASM, as the map and the route views quote them.
  *
  * Frequency is per direction: a plane flying A-B-A once a day is "1/day",
- * not two legs. Yield is what each passenger pays per nautical mile flown,
- * in cents, over the last LOAD_WINDOW_DAYS finished days, so a long route
- * and a short one can be compared on fare alone.
+ * not two legs. PRASM is profit per available seat-mile, in cents, over the
+ * last LOAD_WINDOW_DAYS finished days. Fare per mile is no use for comparing
+ * routes (the fare has a fixed part, so short routes always read high);
+ * profit over seats flown pays for the plane's size and the route's length
+ * at once.
  */
+
+const STATUTE_MILES_PER_NM = 1.15078;
 
 /** Daily flights each way on a market: [a to b, b to a]. */
 export function flightsEachWay(state: SimState, a: string, b: string): [number, number] {
@@ -30,18 +34,20 @@ export function formatFrequency(state: SimState, a: string, b: string): string {
 }
 
 /**
- * Revenue per passenger per nautical mile over the last week, in cents, or
- * null when the route has carried nobody in the window.
+ * Profit (revenue less cost) per available seat-mile over the last week, in
+ * cents, or null when no seats flew in the window.
  */
-export function marketYieldCents(state: SimState, a: string, b: string, days = LOAD_WINDOW_DAYS): number | null {
+export function marketPrasmCents(state: SimState, a: string, b: string, days = LOAD_WINDOW_DAYS): number | null {
   const key = marketKey(a, b);
-  const revenue = (state.revenueHistoryByMarket[key] ?? []).slice(-days).reduce((sum, n) => sum + n, 0);
-  const passengers = (state.loadHistoryByMarket?.[key]?.passengers ?? []).slice(-days).reduce((sum, n) => sum + n, 0);
-  if (passengers <= 0) return null;
-  return (revenue / (passengers * marketDistanceNm(a, b))) * 100;
+  const revenue = (state.revenueHistoryByMarket[key] ?? []).slice(-days);
+  const cost = (state.costHistoryByMarket[key] ?? []).slice(-days);
+  const seats = (state.loadHistoryByMarket?.[key]?.seats ?? []).slice(-days).reduce((sum, n) => sum + n, 0);
+  if (seats <= 0) return null;
+  const profit = revenue.reduce((sum, r, i) => sum + r - (cost[i] ?? 0), 0);
+  return (profit / (seats * marketDistanceNm(a, b) * STATUTE_MILES_PER_NM)) * 100;
 }
 
-/** Yield as shown: "14.2¢", or a dash before the route has carried anyone. */
-export function formatYield(cents: number | null): string {
-  return cents === null ? '—' : `${cents.toFixed(1)}¢`;
+/** PRASM as shown: "1.8¢", "−0.4¢", or a dash before the route has flown. */
+export function formatPrasm(cents: number | null): string {
+  return cents === null ? '—' : `${cents < 0 ? '−' : ''}${Math.abs(cents).toFixed(1)}¢`;
 }
