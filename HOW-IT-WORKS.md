@@ -338,6 +338,13 @@ each for late minutes by cause and cancellations by cause (icon legend,
 numbers in tips), then the routes table sorted by on-time. Each route
 opens its own view, with its day-by-day reliability and turn buffer.
 
+**Reliability moves demand** (`reliabilityDemandFactor()`, over the last 7
+days): 100% on-time grows a market 1.5× as fast, 70% normal, 40% stalls
+it. Below 40% it shrinks toward its floor, more the worse the day-by-day
+reliability, but at no more than a quarter (`MAX_DECAY`) of the slide an
+abandoned market gets, reached at 20%. A spoke on old planes can stall or
+shrink slowly; a turn buffer or a newer plane brings it back.
+
 `SimState.onTimeByMarket: Record<marketKey, { departed, onTime }>`
 mirrors `flightsDepartedTotal`/`flightsOnTimeTotal` exactly, just split
 per market — lazily created the first time a market's first leg ever
