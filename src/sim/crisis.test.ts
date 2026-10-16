@@ -33,6 +33,11 @@ function forecast(chance: number, waived = false): Crisis {
   return crisis;
 }
 
+/** Every cancellation so far, whatever the cause. */
+function cancelledTotal(): number {
+  return Object.values(state.cancellationsByCause).reduce((sum, n) => sum + (n ?? 0), 0);
+}
+
 /** Plays to the next rollover, where the forecast is settled. */
 function throughRollover(): void {
   const day = dayIndex(state);
@@ -50,10 +55,13 @@ restore();
 let crisis = forecast(1);
 let cash = state.cash;
 let weatherBefore = state.cancellationsByCause.weather;
+const cancelledBefore = cancelledTotal();
 throughRollover();
 assert.equal(crisis.status, 'hit');
 assert.ok(crisis.paid > 0 && crisis.flights >= 4, 'a hit should cost a care bill');
-assert.ok(state.cancellationsByCause.weather - weatherBefore >= crisis.flights - 1, 'the closed airport should cancel its flights');
+assert.ok(state.cancellationsByCause.weather > weatherBefore, 'the storm should cancel flights as weather');
+// A flight whose plane is already grounded for crew or an AOG, or held by a maintenance check, counts under that cause first, so all causes are summed.
+assert.ok(cancelledTotal() - cancelledBefore >= crisis.flights - 1, 'the closed airport should cancel its flights');
 assert.ok(state.cash < cash, 'cash should fall');
 console.log(`fly on, hit: ok · ${crisis.flights} flights · care $${crisis.paid}`);
 const careHit = crisis.paid;
