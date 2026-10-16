@@ -14,7 +14,13 @@ export type ConfirmOptions = {
   rows: ConfirmRow[];
   facts?: string[];
   confirmLabel: string;
-  run: (choice: number) => void;
+  run: (choice: number, count: number) => void;
+  /**
+   * A − n + stepper above the rows, for a hire or conversion of several at
+   * once. `rowsFor` and `confirmLabelFor` rebuild the fee rows and the button
+   * for each count; `run` receives the count. Words ride in `title`.
+   */
+  quantity?: { min: number; max: number; value: number; rowsFor: (count: number) => ConfirmRow[]; confirmLabelFor: (count: number) => string };
   /**
    * A row of chips to pick from above the rows, such as which airframe age
    * to lease. `rows` is replaced with `rowsFor(choice)` each time one is
@@ -98,7 +104,7 @@ export function showConfirm(options: ConfirmOptions): void {
     bar.append(...buttons);
     box.append(bar);
     fillRows(rowsFor(picked));
-  } else {
+  } else if (!options.quantity) {
     fillRows(options.rows);
   }
   box.append(table);
@@ -108,15 +114,49 @@ export function showConfirm(options: ConfirmOptions): void {
     p.textContent = fact;
     box.append(p);
   }
+  let count = options.quantity?.value ?? 1;
+  const confirm = document.createElement('button');
+  confirm.type = 'button';
+  confirm.className = 'confirm-go';
+  confirm.textContent = options.confirmLabel;
+  if (options.quantity) {
+    const { min, max, rowsFor, confirmLabelFor } = options.quantity;
+    const stepper = document.createElement('div');
+    stepper.className = 'confirm-stepper';
+    const minus = document.createElement('button');
+    minus.type = 'button';
+    minus.textContent = '−';
+    minus.setAttribute('aria-label', 'One fewer');
+    const value = document.createElement('b');
+    value.setAttribute('aria-live', 'polite');
+    const plus = document.createElement('button');
+    plus.type = 'button';
+    plus.textContent = '+';
+    plus.setAttribute('aria-label', 'One more');
+    const show = () => {
+      value.textContent = String(count);
+      minus.disabled = count <= min;
+      plus.disabled = count >= max;
+      fillRows(rowsFor(count));
+      confirm.textContent = confirmLabelFor(count);
+    };
+    minus.addEventListener('click', () => {
+      count = Math.max(min, count - 1);
+      show();
+    });
+    plus.addEventListener('click', () => {
+      count = Math.min(max, count + 1);
+      show();
+    });
+    stepper.append(minus, value, plus);
+    box.insertBefore(stepper, table);
+    show();
+  }
   const actions = document.createElement('div');
   actions.className = 'modal-actions';
   const cancel = document.createElement('button');
   cancel.type = 'button';
   cancel.textContent = options.cancelLabel ?? 'Cancel';
-  const confirm = document.createElement('button');
-  confirm.type = 'button';
-  confirm.className = 'confirm-go';
-  confirm.textContent = options.confirmLabel;
   actions.append(cancel, confirm);
   box.append(actions);
   overlay.append(box);
@@ -137,7 +177,7 @@ export function showConfirm(options: ConfirmOptions): void {
   });
   confirm.addEventListener('click', () => {
     close();
-    options.run(picked);
+    options.run(picked, count);
   });
   confirm.focus();
 }
