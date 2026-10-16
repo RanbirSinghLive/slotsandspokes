@@ -98,7 +98,7 @@ import { inboundAt, orderLease } from './fleetTiming';
 import { startSeatSale as startSeatSaleRule } from './seatSale';
 import { SEASON_DAYS, SEASONAL_PREMIUM } from './seasonalLease';
 import { changeSpareEngines as changeSpareEnginesRule, holdPerDay, shopVisitCost, sparesHeld, sparesReady } from './enginePool';
-import { aBankedMinutes, aCheckOpen, aCheckProgress, aCheckWorkMinutes, cyclesSinceHeavy, deferredItems, flightHoursSinceHeavy, heavyBankedMinutes, maintenanceReserve, heavyBayTails, heavyCheckDueIn, canBookHeavyCheck, heavyBookBlocker, applyHeavyTolerance, heavyToleranceBlocker, heavyToleranceCost, heavyShiftOf, TOLERANCE_STEPS, canBookDCheck, dCheckDueIn, dCheckOpen, flightHoursSinceD, heavyCheckOpen, heavyCheckWorkMinutes, sleepersNow, tonightCheck } from './mxChecks';
+import { aBankedMinutes, aCheckOpen, aCheckProgress, aCheckWorkMinutes, cyclesSinceHeavy, deferredItems, flightHoursSinceHeavy, heavyBankedMinutes, maintenanceReserve, heavyBayTails, heavyCheckDueIn, canBookHeavyCheck, heavyBookBlocker, applyHeavyTolerance, heavyToleranceBlocker, heavyToleranceCost, heavyShiftOf, toleranceCapDays, toleranceWearYears, TOLERANCE_STEPS, canBookDCheck, dCheckDueIn, dCheckOpen, flightHoursSinceD, heavyCheckOpen, heavyCheckWorkMinutes, sleepersNow, tonightCheck } from './mxChecks';
 import { rebaseOptions, rebasePlane, type RebaseOption } from './rebase';
 import { cabinGainPerDay, cabinOf, cancelRefit as cancelRefitRule, orderRefit as orderRefitRule, refitBlockedReason, refitCost, refitDays, type Cabin } from './cabins';
 import { commitBringHome, commitRetime, planBringHome, planRetime, type RetimePlan } from './retime';
@@ -724,6 +724,10 @@ export type HeavyCheckReadout = {
   /** The C-check tolerance steps: days, fee and why not (null: allowed). */
   tolerance: { days: number; cost: number; blocker: string | null }[];
   shiftDays: number;
+  /** Extra age the pushed plane wears while its check is past its unpushed due date, in years. */
+  toleranceWear: number;
+  /** The most its check can be pushed in all. */
+  toleranceCap: number;
   /** Grounded for it, booked or having gone too far overdue. */
   inCheck: boolean;
   /** Holding a hangar bay, so its nights bank hours. */
@@ -763,6 +767,8 @@ export function heavyCheckReadouts(state: SimState): HeavyCheckReadout[] {
       bookBlocker: heavyBookBlocker(state, aircraft),
       tolerance: TOLERANCE_STEPS.map((days) => ({ days, cost: heavyToleranceCost(state, aircraft, days), blocker: heavyToleranceBlocker(state, aircraft, days) })),
       shiftDays: heavyShiftOf(aircraft),
+      toleranceWear: toleranceWearYears(aircraft),
+      toleranceCap: toleranceCapDays(state, aircraft),
       inCheck: state.aogs.some((event) => event.tail === aircraft.tail && event.check),
       inBay: bays.has(aircraft.tail),
       lastNight: state.lastNightChecks?.[aircraft.tail] ?? null,

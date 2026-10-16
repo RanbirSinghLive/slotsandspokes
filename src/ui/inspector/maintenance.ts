@@ -180,7 +180,7 @@ let openPuck: string | null = null;
  */
 function puckMenu(state: SimState, plane: HeavyCheckReadout, changed: () => void): HTMLElement {
   const menu = box('mx-puck-menu');
-  menu.append(box('mx-puck-who', `${plane.tail} · ${plane.dueIn > 0 ? `due ${plane.dueIn}d` : `${-plane.dueIn}d over`}${plane.shiftDays > 0 ? ` · +${plane.shiftDays}d` : ''}`));
+  menu.append(box('mx-puck-who', `${plane.tail} · ${plane.dueIn > 0 ? `due ${plane.dueIn}d` : `${-plane.dueIn}d over`}${plane.shiftDays > 0 ? ` · +${plane.shiftDays}/${plane.toleranceCap}d` : ''}${plane.toleranceWear > 0 ? ` · wear +${plane.toleranceWear.toFixed(1)}y` : ''}`));
   const action = (label: string | HTMLElement, tip: string | null, run: () => void, ready: boolean): HTMLButtonElement => {
     const button = document.createElement('button');
     button.type = 'button';
@@ -238,7 +238,7 @@ function buildDueTimeline(state: SimState, changed: () => void): HTMLElement[] {
     laneEnds[lane] = at;
     const marker = document.createElement('button');
     marker.type = 'button';
-    marker.className = `mx-marker${plane.dueIn <= 0 ? ' is-late' : plane.open ? ' is-open' : ''}${plane.tail === openPuck ? ' is-picked' : ''}`;
+    marker.className = `mx-marker${plane.dueIn <= 0 ? ' is-late' : plane.open ? ' is-open' : ''}${plane.toleranceWear > 0 ? ' is-worn' : ''}${plane.tail === openPuck ? ' is-picked' : ''}`;
     marker.textContent = plane.tail.slice(-4);
     marker.addEventListener('click', () => {
       openPuck = openPuck === plane.tail ? null : plane.tail;
@@ -246,7 +246,7 @@ function buildDueTimeline(state: SimState, changed: () => void): HTMLElement[] {
     });
     marker.style.left = `${at}%`;
     marker.style.top = `${lane * 18 + 2}px`;
-    marker.dataset.tip = `${plane.tail} · ${plane.dueIn > 0 ? `due ${plane.dueIn}d` : `${-plane.dueIn}d overdue`}${plane.shiftDays > 0 ? ` · pushed ${plane.shiftDays}d` : ''} · tap for options`;
+    marker.dataset.tip = `${plane.tail} · ${plane.dueIn > 0 ? `due ${plane.dueIn}d` : `${-plane.dueIn}d overdue`}${plane.shiftDays > 0 ? ` · pushed ${plane.shiftDays}/${plane.toleranceCap}d` : ''}${plane.toleranceWear > 0 ? ` · wearing +${plane.toleranceWear.toFixed(1)}y` : ''} · tap for options`;
     axis.append(marker);
   }
   axis.style.height = `${laneEnds.length * 18 + 6}px`;

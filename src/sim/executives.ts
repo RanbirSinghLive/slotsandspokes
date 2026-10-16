@@ -64,7 +64,7 @@ export type ExecutiveEffect =
   /** Multiplies how long hiring and retraining crews take (sim/innovations.ts's crewTrainingTimeFactor()). */
   | { kind: 'crew-programmes'; trainingTimeMultiplier: number }
   /** Multiplies what every maintenance base costs a day (sim/bases.ts's mxCostPerDay()), and what pushing a C check later costs (sim/mxChecks.ts). */
-  | { kind: 'maintenance-bases'; costMultiplier: number; toleranceCostMultiplier?: number }
+  | { kind: 'maintenance-bases'; costMultiplier: number; toleranceCostMultiplier?: number; toleranceExtraDays?: number }
   /** Multiplies freight revenue (sim/cargo.ts). */
   | { kind: 'cargo'; revenueMultiplier: number }
   /** Multiplies the premium an event pays and the penalty for failing one (sim/mandates.ts). */
@@ -274,6 +274,11 @@ export function executiveToleranceMultiplier(state: SimState): number {
   return effectOf(state, 'maintenance-bases')?.toleranceCostMultiplier ?? 1;
 }
 
+/** Days the Director of Maintenance adds to how far a C check can be pushed. */
+export function executiveToleranceExtraDays(state: SimState): number {
+  return effectOf(state, 'maintenance-bases')?.toleranceExtraDays ?? 0;
+}
+
 export function executiveCargoMultiplier(state: SimState): number {
   return effectOf(state, 'cargo')?.revenueMultiplier ?? 1;
 }
@@ -311,7 +316,7 @@ export function describeEffect(effect: ExecutiveEffect): string {
     case 'crew-programmes':
       return `Retraining −${percent(effect.trainingTimeMultiplier)} time`;
     case 'maintenance-bases':
-      return `Base running costs −${percent(effect.costMultiplier)}` + (effect.toleranceCostMultiplier ? ` · C-check tolerance −${percent(effect.toleranceCostMultiplier)}` : '');
+      return `Base running costs −${percent(effect.costMultiplier)}` + (effect.toleranceCostMultiplier ? ` · C-check tolerance −${percent(effect.toleranceCostMultiplier)}` : '') + (effect.toleranceExtraDays ? ` · push +${effect.toleranceExtraDays}d` : '');
     case 'cargo':
       return `Freight revenue +${percent(effect.revenueMultiplier)}`;
     case 'events':
