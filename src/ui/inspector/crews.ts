@@ -422,7 +422,8 @@ function classRow(state: SimState, iata: string, c: ClassPlan, siblings: ClassPl
 function cabinRow(state: SimState, iata: string, c: ClassPlan, cabin: NonNullable<ReturnType<typeof ops.crewReadout>>['classes'][number]['cabin'] & {}, changed: () => void): HTMLElement {
   const row = document.createElement('div');
   row.className = 'crew-row';
-  const short = cabin.teams < cabin.minimum;
+  // Teams already in training count: a base with its seats full of hires isn't short, it is waiting.
+  const short = cabin.teams + cabin.arriving < cabin.minimum;
   row.classList.add('crew-row--line', 'crew-row--cabin');
   const label = document.createElement('span');
   label.className = 'crew-row-name';
@@ -432,7 +433,7 @@ function cabinRow(state: SimState, iata: string, c: ClassPlan, cabin: NonNullabl
   count.className = 'crew-row-count';
   count.textContent = `${cabin.teams}/${cabin.ideal}`;
   count.title = `${cabin.teams} teams${cabin.arriving > 0 ? ` +${cabin.arriving} joining` : ''} · need ${cabin.ideal} (min ${cabin.minimum}) · standby ${money(cabin.standbyPerDay)}/day`;
-  const chip = chipElement(short ? { text: 'SHORT', tone: 'bad' } : cabin.teams < cabin.ideal ? { text: 'TIGHT', tone: 'warn' } : cabin.teams > cabin.ideal ? { text: `RESERVE +${cabin.teams - cabin.ideal}`, tone: 'info' } : { text: 'OK', tone: 'good' });
+  const chip = chipElement(short ? { text: 'SHORT', tone: 'bad' } : cabin.teams < cabin.minimum ? { text: `JOINING +${cabin.arriving}`, tone: 'info' } : cabin.teams < cabin.ideal ? { text: 'TIGHT', tone: 'warn' } : cabin.teams > cabin.ideal ? { text: `RESERVE +${cabin.teams - cabin.ideal}`, tone: 'info' } : { text: 'OK', tone: 'good' });
   row.append(label, count, chip);
   row.append(
     info(
@@ -451,7 +452,7 @@ function cabinRow(state: SimState, iata: string, c: ClassPlan, cabin: NonNullabl
       ...cashAfterRows(state, cabin.hireFee),
     ],
     confirmLabel: `Hire · ${money(cabin.hireFee)}`,
-  }, seats === 0 ? 'No free cabin seats' : `Hire 1 ${c.name} cabin team · ${money(cabin.hireFee)}`));
+  }, seats === 0 ? `No free cabin seats · ${readout?.training.cabin.used ?? 0} in training` : `Hire 1 ${c.name} cabin team · ${money(cabin.hireFee)}`));
   if (cabin.teams > cabin.ideal) {
     buttons.append(actionButton('−1', false, () => ops.releaseCabinAt(state, iata, c.classCode, 1), changed, {
       title: `Release 1 ${c.name} cabin team · ${iata}`,
