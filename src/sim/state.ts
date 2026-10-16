@@ -324,7 +324,7 @@ export type SimState = {
    * in the air, or part flown, keeps today's flying and takes its new
    * times and plane tomorrow. Optional: made on first use.
    */
-  pendingRetimes?: { legs: { legId: string; tail: string; departMinute: number }[]; repriced: { iata: string; oldFee: number; newFee: number }[] }[];
+  pendingRetimes?: { legs: { legId: string; tail: string; departMinute: number; blockMinutes?: number }[]; repriced: { iata: string; oldFee: number; newFee: number }[] }[];
   /**
    * Where each night stop's out-and-back sat before it was wrapped, by
    * tail, so bringing it home puts it back (sim/retime.ts). Optional.

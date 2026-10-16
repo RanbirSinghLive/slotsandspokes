@@ -3,7 +3,8 @@ import { crewBases, crewNeed, crewsOf } from './crews';
 import { hourlyRoomProblem, hourOf, airportHours, hourPriceMultiplier } from './hours';
 import { summarizeMarket } from './marketSummary';
 import { chainProblem, nightStopLegs, planUnwrap, planWrap } from './nightStops';
-import { marketKey, type ScheduleLeg } from './schedule';
+import aircraftTypesData from '../../data/aircraft-types.json';
+import { computeBlockMinutes, isAircraftTypeAllowedAt, legDistanceNm, marketKey, type ScheduleLeg } from './schedule';
 import { nextSlotFees } from './slots';
 import type { SimState } from './state';
 import { isLongHaulRoundTrip, scheduledTurnMinutes, USABLE_DAY_END_MINUTE, USABLE_DAY_START_MINUTE } from './utilisation';
@@ -78,6 +79,8 @@ export type RetimePlan = {
 };
 
 export type RetimeOptions = {
+  /** Let the rotation move to a plane of another type at the same base: its legs are re-timed for that type's speed, and refused beyond its range or an airport it is too big for. */
+  allowTypeChange?: boolean;
   /** Plan it as a move that starts tomorrow, whatever today looks like. */
   forceDeferred?: boolean;
   /** For an unwrap: where to put the out-and-back if it fits. */
@@ -104,6 +107,38 @@ function hhmm(minute: number): string {
   return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 }
 
+const typeSpecs = new Map((aircraftTypesData as { code: string; name: string; rangeNm: number; cruiseKts: number }[]).map((type) => [type.code, type]));
+
+/**
+ * The legs as another type would fly them: each block time from that type's
+ * cruise speed, every leg keeping the wait it had after the one before. A
+ * leg beyond the type's range, or into an airport too small for it, is why
+ * not.
+ */
+function legsForType(world: SimState, legs: ScheduleLeg[], typeCode: string): ScheduleLeg[] | string {
+  const type = typeSpecs.get(typeCode);
+  if (!type) return 'No such type.';
+  const restyled: ScheduleLeg[] = [];
+  let shift = 0;
+  for (let i = 0; i < legs.length; i++) {
+    const leg = legs[i];
+    const distanceNm = Math.round(legDistanceNm(leg.origin, leg.dest));
+    if (distanceNm > type.rangeNm) return `${leg.origin}→${leg.dest} ${distanceNm} nm · beyond the ${type.name}'s ${type.rangeNm} nm range`;
+    for (const iata of [leg.origin, leg.dest]) {
+      if (!isAircraftTypeAllowedAt(iata, typeCode)) return `${iata} is too small for the ${type.name}`;
+    }
+    const blockMinutes = computeBlockMinutes(leg.origin, leg.dest, type.cruiseKts);
+    restyled.push({ ...leg, departMinute: leg.departMinute + shift, blockMinutes });
+    const next = legs[i + 1];
+    if (next) {
+      const turn = scheduledTurnMinutes(world, leg.origin, leg.dest);
+      const wait = next.departMinute - (leg.departMinute + leg.blockMinutes + turn);
+      shift = restyled[i].departMinute + blockMinutes + turn + wait - next.departMinute;
+    }
+  }
+  return restyled;
+}
+
 /** Plan moving the rotation made of these legs to start at `startMinute` on `toTail`. */
 export function planRetime(state: SimState, legIds: string[], toTail: string, startMinute: number, options: RetimeOptions = {}): RetimePlan {
   // A rotation's legs as they'll stand tomorrow: a move waiting for the rollover counts.
@@ -118,7 +153,7 @@ export function planRetime(state: SimState, legIds: string[], toTail: string, st
   // Planned in tomorrow's world: a fresh day, nothing flown or in the air.
   const world: SimState = deferred ? { ...view, completedToday: [], cancelledToday: [], activeFlights: [], retimedToday: [] } : view;
 
-  const legs = world.schedule.filter((leg) => legIds.includes(leg.legId)).sort((a, b) => a.departMinute - b.departMinute);
+  let legs = world.schedule.filter((leg) => legIds.includes(leg.legId)).sort((a, b) => a.departMinute - b.departMinute);
   const blank: RetimePlan = { ok: false, reason: null, legs, marginChangePerDay: 0, slotFeeChangePerDay: 0, repriced: [], crewWarning: null, startsTomorrow: false, kind: 'move', station: null, tomorrowLegIds: [], againTodayLegIds: [], deferred, fromStart: legs[0]?.departMinute ?? 0 };
   const fail = (reason: string): RetimePlan => ({ ...blank, reason });
   if (legs.length === 0) return fail('That rotation is gone.');
@@ -126,7 +161,14 @@ export function planRetime(state: SimState, legIds: string[], toTail: string, st
   const from = state.aircraft.find((a) => a.tail === fromTail);
   const to = state.aircraft.find((a) => a.tail === toTail);
   if (!from || !to) return fail('No such plane.');
-  if (to.typeCode !== from.typeCode) return fail(`${toTail} is a different type`);
+  if (to.typeCode !== from.typeCode) {
+    if (!options.allowTypeChange) return fail(`${toTail} is a different type`);
+    // A night stop's halves stay on their plane, so only whole out-and-backs change type.
+    const restyled = legsForType(world, legs, to.typeCode);
+    if (typeof restyled === 'string') return fail(restyled);
+    legs = restyled;
+    blank.legs = legs;
+  }
   if (to.baseAirport !== from.baseAirport) return fail(`${toTail} is based at ${to.baseAirport ?? 'no base'}`);
   if (to.returningOnDay !== undefined || to.rebase) return fail(`${toTail} is leaving the base`);
   if (toTail !== fromTail && state.aogs.some((event) => event.tail === toTail)) return fail(`${toTail} AOG`);
@@ -284,9 +326,9 @@ export function commitRetime(state: SimState, legIds: string[], toTail: string, 
     // Dragged back to where it stands now: nothing left to hold.
     const unchanged = plan.legs.every((leg) => {
       const now = state.schedule.find((l) => l.legId === leg.legId);
-      return now && now.tail === leg.tail && now.departMinute === leg.departMinute;
+      return now && now.tail === leg.tail && now.departMinute === leg.departMinute && now.blockMinutes === leg.blockMinutes;
     });
-    if (!unchanged) pending.push({ legs: plan.legs.map((leg) => ({ legId: leg.legId, tail: leg.tail, departMinute: leg.departMinute })), repriced: plan.repriced });
+    if (!unchanged) pending.push({ legs: plan.legs.map((leg) => ({ legId: leg.legId, tail: leg.tail, departMinute: leg.departMinute, blockMinutes: leg.blockMinutes })), repriced: plan.repriced });
     state.pendingRetimes = pending;
     const when = unchanged ? 'stays as it is' : 'from tomorrow';
     if (plan.kind === 'wrap') return { ok: true, message: `${toTail} night stop ${plan.station} · out ${hhmm(plan.legs[1].departMinute)} · back ${hhmm(first.departMinute)} · ${when}` };
@@ -317,13 +359,14 @@ export function commitRetime(state: SimState, legIds: string[], toTail: string, 
 }
 
 /** Write retimed legs into the schedule, and re-price the slots they hold at their new hours. */
-function applyLegs(state: SimState, legs: { legId: string; tail: string; departMinute: number }[], repriced: RetimePlan['repriced']): void {
+function applyLegs(state: SimState, legs: { legId: string; tail: string; departMinute: number; blockMinutes?: number }[], repriced: RetimePlan['repriced']): void {
   const byId = new Map(legs.map((leg) => [leg.legId, leg]));
   for (const leg of state.schedule) {
     const moved = byId.get(leg.legId);
     if (!moved) continue;
     leg.tail = moved.tail;
     leg.departMinute = moved.departMinute;
+    if (moved.blockMinutes !== undefined) leg.blockMinutes = moved.blockMinutes;
   }
   // For each departure that changed hour, the held pair nearest its
   // old-hour price takes the new-hour price.
