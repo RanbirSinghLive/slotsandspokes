@@ -1632,8 +1632,10 @@ made or undone.
 bar re-deal the rotations between planes of the same type at the same
 base, so the same market sits back to back on the same plane. Departure
 times never change, so the curfew, turns, hourly room, slot prices and
-demand timing are all as they were. A night stop's halves, and planes that
-are AOG or leaving the base, stay put. FIFO places rotations in order of
+demand timing are all as they were. A night stop's halves, planes that
+are AOG or leaving the base, and any rotation that starts away from the base
+stay put, and the time a plane spends away from its base because of those
+counts as busy (no round trip is placed there). FIFO places rotations in order of
 departure, each on a plane that already flies its market if that one is
 free, else the first free plane in list order (the first planes fill
 first); LIFO takes free planes from the last one back. Optimise starts from

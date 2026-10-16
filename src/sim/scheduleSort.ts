@@ -1,6 +1,6 @@
 import { tomorrowView } from './retime';
 import { commitDraft, type DraftMove } from './scheduleDraft';
-import { marketKey } from './schedule';
+import { marketKey, type ScheduleLeg } from './schedule';
 import type { SimState } from './state';
 import { nightStopLegs } from './nightStops';
 import { rotationsForTail, scheduledTurnMinutes, type Rotation } from './utilisation';
@@ -49,6 +49,23 @@ function busyOf(view: SimState, rotation: Rotation): Busy {
 
 const clashes = (a: Busy, b: Busy): boolean => a.from < b.to && b.from < a.to;
 
+/**
+ * The stretches when a plane is away from its base because of flights the
+ * sort leaves where they are (a night stop's evening half lands at the
+ * outstation, a one-way flight leaves the plane there). A round trip from
+ * the base can't fly then, whatever the clock says, so the sort counts those
+ * stretches as busy.
+ */
+function awayFromBase(fixedLegs: ScheduleLeg[], base: string): Busy[] {
+  const away: Busy[] = [];
+  const legs = [...fixedLegs].sort((a, b) => a.departMinute - b.departMinute);
+  if (legs.length > 0 && legs[0].origin !== base) away.push({ from: 0, to: legs[0].departMinute, market: '' });
+  legs.forEach((leg, i) => {
+    if (leg.dest !== base) away.push({ from: leg.departMinute + leg.blockMinutes, to: legs[i + 1]?.departMinute ?? Infinity, market: '' });
+  });
+  return away;
+}
+
 /** Plan the sort of tomorrow's schedule; an empty list of moves means it is already sorted. */
 export function planSort(state: SimState, mode: SortMode): SortPlan {
   const view = tomorrowView(state);
@@ -74,12 +91,18 @@ export function planSort(state: SimState, mode: SortMode): SortPlan {
     const movable: Movable[] = [];
     for (const tail of tails) {
       const half = nightStopLegs(view, tail);
+      const base = state.aircraft.find((a) => a.tail === tail)!.baseAirport!;
+      const fixedLegs: ScheduleLeg[] = [];
       for (const rotation of rotationsForTail(view, tail)) {
         const busy = busyOf(view, rotation);
         const isHalf = half !== null && (rotation.legs[0] === half.morning || rotation.legs[0] === half.evening);
-        if (rotation.closed && !isHalf && available.includes(tail)) movable.push({ rotation, market: busy.market, busy });
-        else fixed.get(tail)?.push(busy);
+        if (rotation.closed && rotation.legs[0].origin === base && !isHalf && available.includes(tail)) movable.push({ rotation, market: busy.market, busy });
+        else {
+          fixed.get(tail)?.push(busy);
+          fixedLegs.push(...rotation.legs);
+        }
       }
+      fixed.get(tail)?.push(...awayFromBase(fixedLegs, base));
     }
     if (movable.length < 2) continue;
 
