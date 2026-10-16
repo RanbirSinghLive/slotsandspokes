@@ -495,6 +495,8 @@ export type PlaneOption = {
   seats: number;
   /** The airframe a lease would take (sim/market.ts), or null when none of this class is listed. */
   listing: MarketListing | null;
+  /** Every listed airframe of this class as the airline would get it, so the lease can pick an age. One entry for a powertrain build. */
+  choices: MarketListing[];
   /** How many of this class are listed in all. */
   listed: number;
   disabledReason?: string;
@@ -539,6 +541,8 @@ function planeOption(state: SimState, iata: string, typeCode: string, powertrain
   const name = powertrain === 'electric' ? 'Electric 25-seater' : powertrain === 'hybrid' ? `Hybrid ${cls.name}` : cls.name;
   const listings = listingsOf(state, typeCode);
   const listing = listings[0] ? asLeased(state, listings[0], powertrain) : null;
+  // A powertrain build is a new airframe, so there is no age to choose.
+  const choices = powertrain ? (listing ? [listing] : []) : listings.map((l) => ({ ...asLeased(state, l), id: l.id }));
   let disabledReason: string | undefined;
   if (!isAircraftTypeAllowedAt(iata, typeCode)) {
     disabledReason = `Too large to operate at ${iata}.`;
@@ -553,8 +557,9 @@ function planeOption(state: SimState, iata: string, typeCode: string, powertrain
     disabledReason = `No crew base at ${iata}: open one on the Crews tab.`;
   } else if (powertrain === 'electric' && !hasCharger(state, iata)) {
     disabledReason = `No charger at ${iata}: build one in the airport view.`;
-  } else if (state.cash < cashNeededToLease(listing.leasePricePerDay)) {
-    disabledReason = `Needs $${cashNeededToLease(listing.leasePricePerDay).toLocaleString()} on hand (${LEASE_RESERVE_DAYS} days of lease) to lease this ${name}.`;
+  } else if (state.cash < cashNeededToLease(Math.min(...choices.map((c) => c.leasePricePerDay)))) {
+    // The cheapest airframe on the shelf sets the gate; a dearer one is refused when picked.
+    disabledReason = `Needs $${cashNeededToLease(Math.min(...choices.map((c) => c.leasePricePerDay))).toLocaleString()} on hand (${LEASE_RESERVE_DAYS} days of lease) to lease this ${name}.`;
   }
   return {
     code: cls.code,
@@ -562,6 +567,7 @@ function planeOption(state: SimState, iata: string, typeCode: string, powertrain
     ...(powertrain ? { powertrain } : {}),
     seats: cls.seats,
     listing,
+    choices,
     listed: listings.length,
     disabledReason,
     preview: disabledReason ? undefined : { effects: [{ base: iata, classCode: cls.code, minutes: 0, planes: 1 }], routes: [] },
@@ -569,11 +575,17 @@ function planeOption(state: SimState, iata: string, typeCode: string, powertrain
 }
 
 /** Lease the next listed plane of this class. It arrives immediately, based and parked at `iata`. */
-export function leasePlane(state: SimState, iata: string, typeCode: string, seasonal = false, powertrain?: 'electric'): Outcome<{ message: string }> {
+export function leasePlane(state: SimState, iata: string, typeCode: string, seasonal = false, powertrain?: 'electric', listingId?: number): Outcome<{ message: string }> {
   const option = planeOptions(state, iata).find((o) => o.code === typeCode && o.powertrain === (powertrain ?? defaultPowertrain(state, typeCode)));
   if (!option) return { ok: false, reason: 'Unknown aircraft class.' };
   if (option.disabledReason) return { ok: false, reason: option.disabledReason };
-  const listing = takeListing(state, typeCode);
+  // The chosen airframe's own price gates the lease, not the first one's.
+  const wanted = listingId === undefined ? undefined : option.choices.find((c) => c.id === listingId);
+  if (listingId !== undefined && !wanted) return { ok: false, reason: `That ${option.name} is no longer listed.` };
+  if (wanted && state.cash < cashNeededToLease(wanted.leasePricePerDay)) {
+    return { ok: false, reason: `Needs $${cashNeededToLease(wanted.leasePricePerDay).toLocaleString()} on hand (${LEASE_RESERVE_DAYS} days of lease) to lease this ${option.name}.` };
+  }
+  const listing = takeListing(state, typeCode, listingId);
   if (!listing) return { ok: false, reason: `No ${option.name} on the market.` };
 
   const standing = asLeased(state, listing, option.powertrain);

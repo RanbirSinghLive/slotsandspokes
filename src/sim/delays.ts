@@ -78,6 +78,16 @@ export function ageDelayParameters(ageYears: number): { onTimeProbability: numbe
 }
 
 /**
+ * Minutes late per departure an aircraft of this age adds on average, from
+ * age alone: the chance it is late times the mean of a squared severity roll
+ * (1 + (max - 1) / 3). The lease choice shows it beside the rate.
+ */
+export function expectedAgeDelayMinutes(ageYears: number): number {
+  const { onTimeProbability, maxDelayMinutes } = ageDelayParameters(ageYears);
+  return (1 - onTimeProbability) * (1 + (maxDelayMinutes - 1) / 3);
+}
+
+/**
  * Cause 1: age. Reliability degrades linearly with age from the model's
  * original 65%-on-time/45-minute-max baseline (age 0 reproduces it
  * almost exactly), floored so a genuinely ancient airframe still isn't a

@@ -1,6 +1,11 @@
 import { AIRCRAFT_CLASSES, pluralClassName } from '../sim/aircraftClasses';
 import { airlineCalled, classOpen, tierThatOpens } from '../sim/ladder';
-import { daysUntilNextListing, listingsOf } from '../sim/market';
+import { cashNeededToLease } from '../sim/leasing';
+import { daysUntilNextListing, holdDaysLeft, HOLD_DAYS, listingsOf } from '../sim/market';
+import { clearStandingOrder, setStandingOrder, standingOrderOf } from '../sim/standingOrders';
+import { select } from './selection';
+import { showConfirm } from './confirmModal';
+import { money } from './format';
 import type { SimState } from '../sim/state';
 import { info } from './inspector/dom';
 import { planeIconElement } from './planeIcons';
@@ -28,7 +33,95 @@ debutClose.addEventListener('click', () => {
   debutModal.hidden = true;
 });
 
+const chipEl = document.querySelector<HTMLButtonElement>('#market-chip')!;
+chipEl.addEventListener('click', () => select({ kind: 'fleet' }));
+
 let stripSignature = '';
+let chipSignature = '';
+let currentState: SimState | null = null;
+
+/** Standing order choices: how old an airframe the order may take. */
+const ORDER_AGES = [
+  { label: '≤17y', maxAgeYears: 17 },
+  { label: '≤20y', maxAgeYears: 20 },
+  { label: 'any', maxAgeYears: 24 },
+];
+
+function openOrderDialog(state: SimState, code: string, name: string): void {
+  const existing = standingOrderOf(state, code);
+  if (existing) {
+    showConfirm({
+      title: `Standing order · ${name}`,
+      rows: [{ label: 'Takes', value: `next ${name} ≤ ${existing.maxAgeYears} yrs, based ${state.homeAirport}` }],
+      facts: ['Leases it the moment it is listed, then clears itself.'],
+      confirmLabel: 'Remove order',
+      run: () => {
+        clearStandingOrder(state, code);
+        stripSignature = '';
+        chipSignature = '';
+      },
+    });
+    return;
+  }
+  const rowsFor = (index: number) => [
+    { label: 'Takes', value: `next ${name} ≤ ${ORDER_AGES[index].maxAgeYears} yrs` },
+    { label: 'Based at', value: state.homeAirport },
+  ];
+  showConfirm({
+    title: `Standing order · ${name}`,
+    rows: [],
+    choices: { chips: ORDER_AGES.map((a) => ({ label: a.label, title: `Lease the youngest ${name} aged ${a.maxAgeYears} or less` })), selected: 1, rowsFor },
+    facts: [`Leases the youngest match the moment one is listed, if cash covers ${30} days of lease. One plane, then the order clears.`],
+    confirmLabel: 'Place order',
+    run: (index) => {
+      setStandingOrder(state, code, { maxAgeYears: ORDER_AGES[index].maxAgeYears });
+      stripSignature = '';
+      chipSignature = '';
+    },
+  });
+}
+
+/** The HUD chip: a plane and a count for every class listed that the player can lease; green when cash covers one, amber when not. */
+function renderChip(state: SimState): void {
+  const open = AIRCRAFT_CLASSES.filter((cls) => classOpen(state, cls.code)).map((cls) => ({ cls, listings: listingsOf(state, cls.code) })).filter((c) => c.listings.length > 0);
+  const signature = open
+    .map(({ cls, listings }) => `${cls.code}:${listings.map((l) => `${l.id}.${holdDaysLeft(state, l)}`).join(',')}:${standingOrderOf(state, cls.code)?.maxAgeYears ?? 0}:${Math.floor(state.cash / 10000)}`)
+    .join('|');
+  if (signature === chipSignature) return;
+  chipSignature = signature;
+  chipEl.hidden = open.length === 0;
+  if (open.length === 0) return;
+  const parts: Node[] = [];
+  const lines: string[] = [];
+  let anyAffordable = false;
+  for (const { cls, listings } of open) {
+    const cheapest = Math.min(...listings.map((l) => l.leasePricePerDay));
+    const affordable = state.cash >= cashNeededToLease(cheapest);
+    anyAffordable ||= affordable;
+    const hold = Math.min(...listings.map((l) => holdDaysLeft(state, l)));
+    const span = document.createElement('span');
+    span.className = affordable ? 'market-chip-class is-affordable' : 'market-chip-class is-short';
+    span.append(planeIconElement(cls.code), ` ${listings.length}`);
+    // The ring: how much of the player-first hold is left before rivals may lease it.
+    if (hold > 0) {
+      const ring = document.createElement('i');
+      ring.className = 'market-chip-ring';
+      ring.style.setProperty('--left', `${Math.round((hold / HOLD_DAYS) * 100)}%`);
+      span.append(ring);
+    }
+    parts.push(span);
+    const order = standingOrderOf(state, cls.code);
+    lines.push(
+      `${cls.name} · ${listings.map((l) => `${l.ageYears}y ${money(l.leasePricePerDay)}/day`).join(' · ')}` +
+        (hold > 0 ? ` · yours ${hold}d more` : ' · rivals may lease') +
+        (affordable ? '' : ` · needs ${money(cashNeededToLease(cheapest))}`) +
+        (order ? ` · order ≤${order.maxAgeYears}y` : ''),
+    );
+  }
+  chipEl.classList.toggle('is-short', !anyAffordable);
+  chipEl.replaceChildren(...parts);
+  chipEl.title = lines.join('\n');
+}
 
 function renderStrip(state: SimState): void {
   const rows = AIRCRAFT_CLASSES.map((cls) => {
@@ -43,11 +136,13 @@ function renderStrip(state: SimState): void {
       listed: String(listings.length),
       ages: listings.length > 0 ? listings.map((l) => l.ageYears).join(' ') : '—',
       next: `${next}d`,
+      holds: listings.map((l) => holdDaysLeft(state, l)),
+      order: standingOrderOf(state, cls.code)?.maxAgeYears ?? 0,
       why: locked ? `Opens as ${opener ? airlineCalled(opener) : 'a bigger airline'}. See Goals.` : null,
       empty: locked || listings.length === 0,
     };
   });
-  const signature = rows.map((row) => `${row.name}:${row.listed}:${row.ages}:${row.next}:${row.why}`).join('|');
+  const signature = rows.map((row) => `${row.name}:${row.listed}:${row.ages}:${row.next}:${row.why}:${row.holds.join('.')}:${row.order}`).join('|');
   if (signature === stripSignature) return;
   stripSignature = signature;
 
@@ -70,7 +165,18 @@ function renderStrip(state: SimState): void {
       locked.append(info(row.why));
       cells.push(locked);
     } else {
-      cells.push(cell(row.listed, `market-num${row.empty ? ' is-empty' : ''}`), cell(row.ages, 'market-num is-empty'), cell(row.next, 'market-num'));
+      const ages = cell(row.ages, 'market-num is-empty');
+      if (row.holds.some((h) => h > 0)) ages.title = `Yours ${Math.max(...row.holds)}d more: rivals cannot lease these yet`;
+      // The bell places or removes a standing order for this class.
+      const bell = document.createElement('button');
+      bell.type = 'button';
+      bell.className = `market-bell${row.order ? ' is-set' : ''}`;
+      bell.textContent = '🔔';
+      bell.title = row.order ? `Standing order ≤${row.order}y · tap to remove` : 'Standing order: lease the next one for you';
+      bell.addEventListener('click', () => currentState && openOrderDialog(currentState, row.code, row.name));
+      const count = cell(row.listed, `market-num${row.empty ? ' is-empty' : ''}`);
+      count.append(' ', bell);
+      cells.push(count, ages, cell(row.next, 'market-num'));
     }
   }
   stripEl.replaceChildren(...cells);
@@ -102,6 +208,8 @@ function pollUnlocks(state: SimState): void {
 }
 
 export function updateMarket(state: SimState): void {
+  currentState = state;
   renderStrip(state);
+  renderChip(state);
   pollUnlocks(state);
 }

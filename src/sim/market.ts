@@ -37,8 +37,13 @@ export type MarketListing = {
   listedDay: number;
 };
 
+/** A one-shot instruction to lease the next matching listing of a class the moment it is listed (sim/standingOrders.ts). */
+export type StandingOrder = { maxAgeYears: number; maxRatePerDay?: number };
+
 export type MarketState = {
   listings: MarketListing[];
+  /** At most one per class, keyed by class code; cleared once it leases. */
+  orders?: Record<string, StandingOrder>;
   /** Day each class's next airframe arrives, keyed by class code. */
   nextArrivalDay: Record<string, number>;
   nextListingId: number;
@@ -53,6 +58,14 @@ export const MARKET_RHYTHM: Record<string, ClassRhythm> = {
   NARROWBODY: { initial: 1, intervalDays: 20, cap: 2 },
   WIDEBODY: { initial: 1, intervalDays: 35, cap: 1 },
 };
+
+/**
+ * A new listing is the player's alone for this many days; rivals skip it
+ * until the hold ends. Lessor deliveries land at rollover, and at fast
+ * speed one game day is a couple of real seconds, so without a hold a
+ * listing would be gone before anyone could look at it.
+ */
+export const HOLD_DAYS = 3;
 
 /** Listed airframes are this many years old, give or take: 15 to 24. */
 const MIN_LISTING_AGE = 15;
@@ -148,9 +161,19 @@ export function daysUntilNextListing(state: SimState, typeCode: string): number 
   return Math.max(1, state.market.nextArrivalDay[typeCode] - today);
 }
 
-/** Take the first listing of this class off the market, or null when there isn't one. */
-export function takeListing(state: SimState, typeCode: string): MarketListing | null {
-  const listing = listingsOf(state, typeCode)[0];
+/** Days left in this listing's player-first hold: 0 once rivals may take it. */
+export function holdDaysLeft(state: SimState, listing: MarketListing): number {
+  return Math.max(0, listing.listedDay + HOLD_DAYS - dayIndex(state));
+}
+
+/**
+ * Take a listing of this class off the market, or null when there isn't one:
+ * the one named by `listingId`, else the first. A rival (`byRival`) can't
+ * take one still in its hold.
+ */
+export function takeListing(state: SimState, typeCode: string, listingId?: number, byRival = false): MarketListing | null {
+  const candidates = listingsOf(state, typeCode).filter((l) => !byRival || holdDaysLeft(state, l) === 0);
+  const listing = listingId === undefined ? candidates[0] : candidates.find((l) => l.id === listingId);
   if (!listing) return null;
   state.market.listings = state.market.listings.filter((l) => l !== listing);
   return listing;
@@ -237,7 +260,7 @@ export function rivalSecuresCapacity(state: SimState, code: string, origin: stri
   if (fleet.length >= needed) return true;
   const preferred = preferredRivalClass(rivalFlights(state, code) + 1);
   for (const typeCode of RIVAL_CLASS_LADDER.slice(RIVAL_CLASS_LADDER.indexOf(preferred))) {
-    if (rivalMayTake(state, code, typeCode) && takeListing(state, typeCode)) {
+    if (rivalMayTake(state, code, typeCode) && takeListing(state, typeCode, undefined, true)) {
       // Only recorded once it has a plane: a rival whose entry fails today
       // shouldn't leave an empty fleet behind.
       state.competitorFleets[code] = [...fleet, typeCode];

@@ -14,7 +14,13 @@ export type ConfirmOptions = {
   rows: ConfirmRow[];
   facts?: string[];
   confirmLabel: string;
-  run: () => void;
+  run: (choice: number) => void;
+  /**
+   * A row of chips to pick from above the rows, such as which airframe age
+   * to lease. `rows` is replaced with `rowsFor(choice)` each time one is
+   * picked, and `run` receives the picked index. Words ride in `title`.
+   */
+  choices?: { chips: { label: string; sub?: string; title?: string; meter?: number }[]; selected: number; rowsFor: (choice: number) => ConfirmRow[] };
   /** Paragraphs under the title, before the rows: flavour or a lead-in. */
   intro?: string[];
   /** Replaces "Cancel" on the dismissing button. */
@@ -44,15 +50,56 @@ export function showConfirm(options: ConfirmOptions): void {
   }
   const table = document.createElement('div');
   table.className = 'confirm-rows';
-  for (const row of options.rows) {
-    const line = document.createElement('div');
-    line.className = 'confirm-row';
-    const label = document.createElement('span');
-    label.textContent = row.label;
-    const value = document.createElement('span');
-    value.textContent = row.value;
-    line.append(label, value);
-    table.append(line);
+  const fillRows = (rows: ConfirmRow[]) => {
+    table.replaceChildren();
+    for (const row of rows) {
+      const line = document.createElement('div');
+      line.className = 'confirm-row';
+      const label = document.createElement('span');
+      label.textContent = row.label;
+      const value = document.createElement('span');
+      value.textContent = row.value;
+      line.append(label, value);
+      table.append(line);
+    }
+  };
+  let picked = options.choices?.selected ?? 0;
+  if (options.choices) {
+    const { chips, rowsFor } = options.choices;
+    const bar = document.createElement('div');
+    bar.className = 'confirm-chips';
+    const buttons = chips.map((chip, index) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'confirm-chip';
+      if (chip.title) button.title = chip.title;
+      const main = document.createElement('b');
+      main.textContent = chip.label;
+      button.append(main);
+      if (chip.sub) {
+        const sub = document.createElement('span');
+        sub.textContent = chip.sub;
+        button.append(sub);
+      }
+      if (chip.meter !== undefined) {
+        const meter = document.createElement('i');
+        meter.className = 'confirm-chip-meter';
+        meter.style.setProperty('--fill', `${Math.round(Math.max(0, Math.min(1, chip.meter)) * 100)}%`);
+        button.append(meter);
+      }
+      button.addEventListener('click', () => {
+        picked = index;
+        buttons.forEach((b, i) => b.classList.toggle('is-picked', i === picked));
+        fillRows(rowsFor(picked));
+      });
+      return button;
+    });
+    buttons.forEach((b, i) => b.classList.toggle('is-picked', i === picked));
+    bar.append(...buttons);
+    box.append(bar);
+    fillRows(rowsFor(picked));
+  } else {
+    fillRows(options.rows);
   }
   box.append(table);
   for (const fact of options.facts ?? []) {
@@ -90,7 +137,7 @@ export function showConfirm(options: ConfirmOptions): void {
   });
   confirm.addEventListener('click', () => {
     close();
-    options.run();
+    options.run(picked);
   });
   confirm.focus();
 }

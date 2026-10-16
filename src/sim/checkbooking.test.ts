@@ -9,7 +9,7 @@ import { step } from './step';
 // before its window opens, grounds the plane for the check the next
 // morning, and a cancelled booking leaves it flying.
 const player = createPlayer('steady');
-const state = startHeadlessGame('YYZ', 1, player);
+const state = startHeadlessGame('YYZ', 2, player);
 for (let day = 1; day <= 12; day++) {
   for (let minute = 0; minute < 1440; minute++) step(state);
   player.playDay(state);

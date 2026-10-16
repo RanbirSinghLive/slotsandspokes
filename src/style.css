@@ -6983,3 +6983,99 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
   color: #7fd88f;
   border-color: #7fd88f;
 }
+
+/* The lease age chips (ui/confirmModal.ts choices): one per listed airframe, with an on-time meter. */
+.confirm-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.confirm-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 56px;
+  min-height: 44px;
+  padding: 4px 8px;
+  background: #3a4258;
+  border: 1px solid #6b7694;
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+}
+
+.confirm-chip span {
+  font-size: 11px;
+  color: #cdd3e0;
+}
+
+.confirm-chip.is-picked {
+  border-color: #5ed6c8;
+  background: rgba(94, 214, 200, 0.16);
+}
+
+.confirm-chip-meter {
+  display: block;
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.confirm-chip-meter::after {
+  content: '';
+  display: block;
+  width: var(--fill);
+  height: 100%;
+  background: #5ed6c8;
+}
+
+/* The fleet market chip in the HUD row (ui/market.ts): green when cash covers a listed plane, amber when not. */
+#market-chip .plane-icon {
+  width: 14px;
+  height: 14px;
+  vertical-align: -2px;
+}
+
+#market-chip .market-chip-class {
+  margin-right: 6px;
+  position: relative;
+  color: #5ed6c8;
+}
+
+#market-chip .market-chip-class.is-short {
+  color: #ffb454;
+}
+
+#market-chip .market-chip-ring {
+  display: inline-block;
+  width: 24px;
+  height: 3px;
+  margin-left: 3px;
+  vertical-align: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, currentColor var(--left), rgba(255, 255, 255, 0.15) var(--left));
+}
+
+.market-bell {
+  padding: 0 2px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0.45;
+}
+
+.market-bell.is-set {
+  opacity: 1;
+}
+
+@media (pointer: coarse) {
+  .market-bell {
+    min-width: 32px;
+    min-height: 32px;
+  }
+}
