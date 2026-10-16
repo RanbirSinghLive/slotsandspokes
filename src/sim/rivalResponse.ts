@@ -2,6 +2,7 @@ import { recommendedFare, marketKey } from './schedule';
 import { summarizeMarket } from './marketSummary';
 import { addRivalFlight } from './competitors';
 import { rivalSecuresCapacity } from './market';
+import { legRights, rivalHomeCountry } from './rights';
 import { inRespite, pressureFactor, recentlyClosedByRival, rivalNetworkRoom } from './pressure';
 import { nextRandom } from './rng';
 import { rivalSlotQuote } from './slots';
@@ -88,6 +89,8 @@ export function rollRivalCapacityResponse(state: SimState, dayStartMinute: numbe
     const neighbour = state.competitorRoutes.find(
       (route) =>
         !alreadyThere.has(route.code) &&
+        // Air rights (sim/rights.ts): the responder's home country must be allowed to fly the market.
+        legRights(rivalHomeCountry(state.competitorRoutes, route.code), a, b).ok &&
         !recentlyClosedByRival(state, route.code, a, b) &&
         rivalNetworkRoom(state, route.code) > 0 &&
         [route.origin, route.dest].some((iata) => iata === a || iata === b),
@@ -95,6 +98,7 @@ export function rollRivalCapacityResponse(state: SimState, dayStartMinute: numbe
     if (!neighbour) continue;
     const slotFees = rivalSlotQuote(state, a, b);
     if (slotFees === null || !rivalSecuresCapacity(state, neighbour.code, a, b, true)) continue;
+    const homeCountry = rivalHomeCountry(state.competitorRoutes, neighbour.code);
     state.competitorRoutes.push({
       airline: neighbour.airline,
       code: neighbour.code,
@@ -105,6 +109,7 @@ export function rollRivalCapacityResponse(state: SimState, dayStartMinute: numbe
       baseFare: recommendedFare(a, b),
       openedAtMinute: dayStartMinute,
       slotFeesPerDay: slotFees,
+      homeCountry,
     });
   }
 }
