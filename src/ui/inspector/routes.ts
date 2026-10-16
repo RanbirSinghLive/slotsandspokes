@@ -1,7 +1,7 @@
 import { marketLoadFactor } from '../../sim/loadFactor';
 import { formatNps, marketNps, RIVAL_NPS } from '../../sim/nps';
 import { OTP_BASELINE, trailingMarketOtp } from '../../sim/routeOtp';
-import { formatFrequency, marketYieldCents, formatYield } from '../../sim/routeYield';
+import { formatFrequency, marketPrasmCents, formatPrasm } from '../../sim/routeYield';
 import { fareClassPolicy, pricingSummary, seatPolicySummary } from '../../sim/pricing';
 import { flownMarkets, marginBand, routeGroups, routeMarginShare, routeTags, routeWeek, type RouteGroup, type RouteGroupBy, type RouteTags, type RouteWeek, type Sector } from '../../sim/networkMargin';
 import type { SimState } from '../../sim/state';
@@ -34,7 +34,7 @@ type RouteRow = {
   week: RouteWeek;
   tags: RouteTags;
   frequency: string;
-  yieldCents: number | null;
+  prasmCents: number | null;
   loadFactor: number | null;
   onTime: number | null;
   completion: number | null;
@@ -74,10 +74,10 @@ const COLUMNS: { sort: RouteSort; name: string; value: (row: RouteRow) => number
     rate: (row) => (row.nps >= RIVAL_NPS + 5 ? 'good' : row.nps >= RIVAL_NPS - 5 ? 'fair' : 'poor'),
   },
   {
-    sort: 'yield',
-    name: 'Yield',
-    value: (row) => row.yieldCents,
-    show: (row) => formatYield(row.yieldCents),
+    sort: 'prasm',
+    name: 'PRASM',
+    value: (row) => row.prasmCents,
+    show: (row) => formatPrasm(row.prasmCents),
     rate: () => null,
   },
   {
@@ -100,7 +100,7 @@ const COLUMNS: { sort: RouteSort; name: string; value: (row: RouteRow) => number
  */
 type Lens = 'money' | 'reliability';
 const LENS_SORTS: Record<Lens, RouteSort[]> = {
-  money: ['margin', 'loadFactor', 'nps', 'yield'],
+  money: ['margin', 'loadFactor', 'nps', 'prasm'],
   reliability: ['onTime', 'completion'],
 };
 
@@ -129,7 +129,7 @@ function routeRows(state: SimState): RouteRow[] {
       week: routeWeek(state, key),
       tags: routeTags(state, a, b),
       frequency: formatFrequency(state, a, b),
-      yieldCents: marketYieldCents(state, a, b),
+      prasmCents: marketPrasmCents(state, a, b),
       loadFactor: marketLoadFactor(state, a, b).factor,
       onTime: reliability.otp,
       completion: operated > 0 ? reliability.arrived / operated : null,
@@ -277,7 +277,7 @@ function totalFoot(rows: RouteRow[], columns: (typeof COLUMNS)[number][]): HTMLT
     } else {
       const values = rows.map((r) => c.value(r)).filter((v): v is number => v !== null);
       const mean = values.length === 0 ? null : values.reduce((a, b) => a + b, 0) / values.length;
-      const probe = { ...rows[0], loadFactor: mean, onTime: mean, completion: mean, nps: mean ?? 0, yieldCents: mean };
+      const probe = { ...rows[0], loadFactor: mean, onTime: mean, completion: mean, nps: mean ?? 0, prasmCents: mean };
       td.textContent = mean === null ? '—' : c.show(probe);
       td.dataset.tip = 'Average of the routes, not weighted by passengers';
     }
@@ -426,7 +426,7 @@ export function buildRoutesView(state: SimState, sort: RouteSort): HTMLElement {
   const intro = document.createElement('div');
   intro.className = 'inspector-line';
   intro.textContent = `${bestFirst ? 'Best' : 'Worst'} ${column.name.toLowerCase()} first`;
-  intro.append(' ', info('The money lens is first; the stopwatch lens reads reliability. Margin is the average a day over the last 7 days, with the last 14 as a line (dashed = $0), the share of revenue in the tip, and an arrow against the week before. Tags: contract and event pay are inside it; a sprout is a route under 2 weeks old. On-time, flown, load and yield (cents per passenger nautical mile) are the last 7 days; flights are per direction; NPS about the last month. Group by hub (the end with more routes), by sector (domestic = both ends in your home country) or by region (where the far end is, by map position, so approximate). Click a heading to sort by it, again to flip the order, or a route to open it. The bottom row totals the routes: margin and revenue add up, the rest are plain averages of the routes. The fare strip under the table opens the fare policy and seat split.'));
+  intro.append(' ', info('The money lens is first; the stopwatch lens reads reliability. Margin is the average a day over the last 7 days, with the last 14 as a line (dashed = $0), the share of revenue in the tip, and an arrow against the week before. Tags: contract and event pay are inside it; a sprout is a route under 2 weeks old. On-time, flown, load and PRASM (profit per available seat-mile, in cents) are the last 7 days; flights are per direction; NPS about the last month. Group by hub (the end with more routes), by sector (domestic = both ends in your home country) or by region (where the far end is, by map position, so approximate). Click a heading to sort by it, again to flip the order, or a route to open it. The bottom row totals the routes: margin and revenue add up, the rest are plain averages of the routes. The fare strip under the table opens the fare policy and seat split.'));
   root.append(intro);
 
   const chips = document.createElement('div');

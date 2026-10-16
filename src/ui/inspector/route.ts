@@ -55,7 +55,7 @@ import { marketFareLevel } from '../../sim/fareStimulus';
 import { CROWDING_WINDOW_MINUTES, crowdingWeight } from '../../sim/timeOfDay';
 import { chartLegend } from '../chartLegend';
 import { buildSeatSplitBar } from '../seatSplitBar';
-import { formatFrequency, formatYield, marketYieldCents } from '../../sim/routeYield';
+import { formatFrequency, formatPrasm, marketPrasmCents } from '../../sim/routeYield';
 import { routeFlows } from '../../sim/routeFlows';
 import { marketCharacterWord, marketMix } from '../../sim/marketCharacter';
 
@@ -123,10 +123,10 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   // its planes flew over the last week, from its own landings.
   const load = marketLoadFactor(state, a, b);
   const presence = lineWithInfo(
-    `${formatFrequency(state, a, b)} · ${summary.byClass.map((c) => `${c.name} ×${c.count}`).join(', ')} · LF ${formatLoadFactor(load)} · yield ${formatYield(marketYieldCents(state, a, b))} · NPS ${formatNps(marketNps(state, a, b))}${brandInWords(state, a, b, state.competitorRoutes) ? ` · ${brandInWords(state, a, b, state.competitorRoutes)}` : ''}`,
+    `${formatFrequency(state, a, b)} · ${summary.byClass.map((c) => `${c.name} ×${c.count}`).join(', ')} · LF ${formatLoadFactor(load)} · PRASM ${formatPrasm(marketPrasmCents(state, a, b))} · NPS ${formatNps(marketNps(state, a, b))}${brandInWords(state, a, b, state.competitorRoutes) ? ` · ${brandInWords(state, a, b, state.competitorRoutes)}` : ''}`,
     load.factor === null
       ? 'Load factor (LF): how full the planes fly, from the last 7 days of landings. None landed yet. NPS: how passengers rate you here.'
-      : `Load factor (LF): ${load.passengers.toLocaleString()} passengers in ${load.seats.toLocaleString()} seats over the last 7 days. Flights a day are counted each way. Yield: cents of fare per passenger per nautical mile, last 7 days. NPS (Net Promoter Score): how passengers rate you here over about the last month (airline-wide ${formatNps(networkNps(state))}); late flights, old planes and fares above the rivals' pull it down, and against a rival the better name wins some of the other's passengers.`,
+      : `Load factor (LF): ${load.passengers.toLocaleString()} passengers in ${load.seats.toLocaleString()} seats over the last 7 days. Flights a day are counted each way. PRASM: profit per available seat-mile in cents, last 7 days. NPS (Net Promoter Score): how passengers rate you here over about the last month (airline-wide ${formatNps(networkNps(state))}); late flights, old planes and fares above the rivals' pull it down, and against a rival the better name wins some of the other's passengers.`,
   );
   presence.classList.toggle('is-over', short);
   root.append(presence);
