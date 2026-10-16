@@ -2532,21 +2532,25 @@ and Halifax went bust 16/18.
 
 ## Market character (`src/sim/marketCharacter.ts`)
 
-Who flies a city pair. Each airport is scored 0–2 for how strongly it
+Who flies a city pair. Each airport is scored 0–3 for how strongly it
 draws business, leisure and VFR (visiting friends and relatives) travel
 (`data/airport-character.json`, hand-authored from public knowledge:
-Toronto business 2 and VFR 2, Orlando leisure 2, St. John's VFR 2). A
-pair's mix starts from a base (business 19%, leisure 46%, VFR 35%) and
-each segment's points multiply its weight by 1.45, then the three are
+Toronto business 2 and VFR 2, Orlando leisure 3, St. John's VFR 2; a 3 marks an extreme market, such as
+a financial centre or a pure resort). A
+pair's mix starts from a base (business 20%, leisure 43%, VFR 37%) and
+each segment's points (capped at 5) multiply its weight by 1.7, then the three are
 scaled back to a whole. The points follow how each trip works: business
 needs business at both ends (the smaller end's score twice, the gap
 half), leisure needs one end worth going to (the sunnier end's score
 twice), VFR a community at either end (the stronger end's). So
-Toronto–Chicago is a business trunk (41% business), Toronto–Orlando a
-sun route (67% leisure), Toronto–St. John's friends and family (50%
-VFR). The base is set so the network's mix, weighted by potential
-demand, matches the one mix it replaced (it's 21/50/29 against
-20/50/30), so the balance moves by where the mix lands.
+Toronto–Chicago is a business trunk (50% business), Toronto–Orlando a
+sun route (83% leisure), Toronto–St. John's friends and family (58%
+VFR). Airports nobody scored count as ordinary on all three, so the
+biggest cities and the busiest regional airports are scored by hand.
+The base is set so the network's mix, weighted by potential demand,
+matches the one mix it replaced (it's 20/50/30 against 20/50/30), so
+the balance moves by where the mix lands; the spread between markets
+(business share's standard deviation) is about 0.12, up from 0.07.
 
 The mix feeds the choice model in place of one mix for every market
 (each segment's booking share weighted by the pair's own mix,
