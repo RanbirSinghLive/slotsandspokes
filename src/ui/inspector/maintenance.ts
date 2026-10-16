@@ -214,11 +214,12 @@ const TIMELINE_DAYS = HEAVY_INTERVAL_DAYS;
  * Every plane's heavy-check due date on one axis, today at the left: a
  * marker each, overdue ones stacked at the edge, so a fleet bunching up for
  * the hangar shows as a cluster. Markers that would overlap take a lane
- * of their own.
+ * of their own. A plane's D check shares the axis once it is due inside it:
+ * read-only, since the D check is booked from its card.
  */
 function buildDueTimeline(state: SimState, changed: () => void): HTMLElement[] {
   const nodes: HTMLElement[] = [
-    heading('C checks due', `Each plane's C check on a ${TIMELINE_DAYS}-day axis (due by days, hours or cycles, whichever is first), today at the left. The amber band is the window where nights at a maintenance base bank hours; a cluster of markers is planes that will want the hangar together. Overdue planes sit at the left edge.`),
+    heading('C checks due', `Each plane's C check on a ${TIMELINE_DAYS}-day axis (due by days, hours or cycles, whichever is first), today at the left. The amber band is the window where nights at a maintenance base bank hours; a cluster of markers is planes that will want the hangar together. Overdue planes sit at the left edge. A violet D marker is a plane whose D check (the overhaul) falls due inside the axis.`),
   ];
   const readouts = ops.heavyCheckReadouts(state).filter((p) => !p.inCheck);
   if (readouts.length === 0) return [...nodes, line('No planes outside the hangar')];
@@ -231,21 +232,35 @@ function buildDueTimeline(state: SimState, changed: () => void): HTMLElement[] {
   // Lanes: a marker takes the first lane whose last marker is far enough left.
   const laneEnds: number[] = [];
   const MARKER_SPAN_PCT = 11;
-  for (const plane of readouts) {
-    const at = (Math.min(TIMELINE_DAYS, Math.max(0, plane.dueIn)) / TIMELINE_DAYS) * 100;
-    let lane = laneEnds.findIndex((end) => at - end >= MARKER_SPAN_PCT);
+  const D_MARKER_SPAN_PCT = 15;
+  // C markers, then a D marker for each plane whose D check is due within the axis.
+  const markers = [
+    ...readouts.map((plane) => ({ plane, kind: 'C' as const, dueIn: plane.dueIn })),
+    ...readouts.filter((plane) => !plane.dInCheck && plane.dDueIn <= TIMELINE_DAYS).map((plane) => ({ plane, kind: 'D' as const, dueIn: plane.dDueIn })),
+  ].sort((a, b) => a.dueIn - b.dueIn);
+  for (const { plane, kind, dueIn } of markers) {
+    const at = (Math.min(TIMELINE_DAYS, Math.max(0, dueIn)) / TIMELINE_DAYS) * 100;
+    const span = kind === 'D' ? D_MARKER_SPAN_PCT : MARKER_SPAN_PCT;
+    let lane = laneEnds.findIndex((end) => at - end >= span);
     if (lane === -1) lane = laneEnds.length;
     laneEnds[lane] = at;
     const marker = document.createElement('button');
     marker.type = 'button';
-    marker.className = `mx-marker${plane.dueIn <= 0 ? ' is-late' : plane.open ? ' is-open' : ''}${plane.toleranceWear > 0 ? ' is-worn' : ''}${plane.tail === openPuck ? ' is-picked' : ''}`;
+    marker.style.left = `${at}%`;
+    marker.style.top = `${lane * 18 + 2}px`;
+    if (kind === 'D') {
+      marker.className = `mx-marker is-d${dueIn <= 0 ? ' is-late is-edge' : ''}`;
+      marker.textContent = `D ${plane.tail.slice(-4)}`;
+      marker.dataset.tip = `${plane.tail} · D check ${dueIn > 0 ? `due ${dueIn}d` : `${-dueIn}d overdue`}${plane.dCanBook ? ' · book it from its card' : ' · booking opens 60d before due'}`;
+      axis.append(marker);
+      continue;
+    }
+    marker.className = `mx-marker${dueIn <= 0 ? ' is-late' : plane.open ? ' is-open' : ''}${plane.toleranceWear > 0 ? ' is-worn' : ''}${plane.tail === openPuck ? ' is-picked' : ''}`;
     marker.textContent = plane.tail.slice(-4);
     marker.addEventListener('click', () => {
       openPuck = openPuck === plane.tail ? null : plane.tail;
       changed();
     });
-    marker.style.left = `${at}%`;
-    marker.style.top = `${lane * 18 + 2}px`;
     marker.dataset.tip = `${plane.tail} · ${plane.dueIn > 0 ? `due ${plane.dueIn}d` : `${-plane.dueIn}d overdue`}${plane.shiftDays > 0 ? ` · pushed ${plane.shiftDays}/${plane.toleranceCap}d` : ''}${plane.toleranceWear > 0 ? ` · wearing +${plane.toleranceWear.toFixed(1)}y` : ''} · tap for options`;
     axis.append(marker);
   }

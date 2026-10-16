@@ -3677,7 +3677,8 @@ only when the money leaves moves. The Mtc card shows what is due.
   for each plane in its heavy check (days until it's out) and a dashed bay
   for each whose check window is open or overdue (filled edge in a bay, dimmed queued), and **Heavy checks due**
   puts every plane's due date on one 30-day axis so a bunching fleet
-  shows as a cluster.
+  shows as a cluster. A plane whose D check falls due inside that
+  axis gets a violet D marker too (overdue ones at the left edge); it is read-only, since the D check is booked from the card.
 - **The Gantt:** a key above the rows explains the night cell, and each
   plane's label carries tonight's check as the day is going ("☾✓", "☾c" contracted,
   "☾−40m" short, "☾✗" away). The plane's own view says the same in words
