@@ -431,7 +431,8 @@ function classRow(state: SimState, iata: string, c: ClassPlan, siblings: ClassPl
 function cabinRow(state: SimState, iata: string, c: ClassPlan, cabin: NonNullable<ReturnType<typeof ops.crewReadout>>['classes'][number]['cabin'] & {}, changed: () => void): HTMLElement {
   const row = document.createElement('div');
   row.className = 'crew-row';
-  const short = cabin.teams < cabin.minimum;
+  // Teams already in training count: a base with its seats full of hires isn't short, it is waiting.
+  const short = cabin.teams + cabin.arriving < cabin.minimum;
   row.classList.add('crew-row--line', 'crew-row--cabin');
   const label = document.createElement('span');
   label.className = 'crew-row-name';
@@ -441,8 +442,32 @@ function cabinRow(state: SimState, iata: string, c: ClassPlan, cabin: NonNullabl
   count.className = 'crew-row-count';
   count.textContent = `${cabin.teams}/${cabin.ideal}`;
   count.title = `${cabin.teams} teams${cabin.arriving > 0 ? ` +${cabin.arriving} joining` : ''} · need ${cabin.ideal} (min ${cabin.minimum}) · standby ${money(cabin.standbyPerDay)}/day`;
-  const chip = chipElement(short ? { text: 'SHORT', tone: 'bad' } : cabin.teams < cabin.ideal ? { text: 'TIGHT', tone: 'warn' } : cabin.teams > cabin.ideal ? { text: `RESERVE +${cabin.teams - cabin.ideal}`, tone: 'info' } : { text: 'OK', tone: 'good' });
-  row.append(label, count, chip);
+  const chip = chipElement(short ? { text: 'SHORT', tone: 'bad' } : cabin.teams < cabin.minimum ? { text: `JOINING +${cabin.arriving}`, tone: 'info' } : cabin.teams < cabin.ideal ? { text: 'TIGHT', tone: 'warn' } : cabin.teams > cabin.ideal ? { text: `RESERVE +${cabin.teams - cabin.ideal}`, tone: 'info' } : { text: 'OK', tone: 'good' });
+  // Same bar as the pilots': teams on hand and joining against the legal minimum and the comfortable number.
+  const scale = Math.max(1, cabin.teams + cabin.arriving, cabin.ideal, cabin.minimum);
+  const pct = (n: number) => `${(n / scale) * 100}%`;
+  const bar = document.createElement('div');
+  bar.className = 'crew-bar';
+  const onHand = document.createElement('span');
+  onHand.className = 'crew-bar-onhand';
+  onHand.style.width = pct(cabin.teams);
+  const joining = document.createElement('span');
+  joining.className = 'crew-bar-joining';
+  joining.style.left = pct(cabin.teams);
+  joining.style.width = pct(cabin.arriving);
+  bar.append(onHand, joining);
+  for (const [n, className, text] of [
+    [cabin.minimum, 'is-minimum', `Legal minimum ${cabin.minimum}`],
+    [cabin.ideal, 'is-ideal', `Comfortable ${cabin.ideal}`],
+  ] as const) {
+    if (n <= 0) continue;
+    const markEl = document.createElement('span');
+    markEl.className = `crew-bar-mark ${className}`;
+    markEl.style.left = pct(n);
+    markEl.title = text;
+    bar.append(markEl);
+  }
+  row.append(label, bar, count, chip);
   row.append(
     info(
       `Cabin teams staff every Regional plane and up: ${CABIN_TEAMS_PER_SHIFT[c.classCode]} per shift its pilots fly. A short cabin never grounds a plane, but each of its flights loses up to ${CABIN_SHORT_NPS_PENALTY} NPS points in proportion to the teams missing. They train in ${ops.crewReadout(state, iata)?.cabinLeadDays ?? 0} days in a cabin training seat, and can't be converted between classes.`,
@@ -463,7 +488,7 @@ function cabinRow(state: SimState, iata: string, c: ClassPlan, cabin: NonNullabl
     rows: cabinRows(1),
     confirmLabel: `Hire · ${money(cabin.hireFee)}`,
     quantity: { max: Math.min(seats, Math.floor(state.cash / cabin.hireFee)), rowsFor: cabinRows, confirmLabelFor: (n) => `Hire ${n} · ${money(cabin.hireFee * n)}` },
-  }, seats === 0 ? 'No free cabin seats' : `Hire ${c.name} cabin teams · ${money(cabin.hireFee)} each`));
+  }, seats === 0 ? `No free cabin seats · ${readout?.training.cabin.used ?? 0} in training` : `Hire ${c.name} cabin teams · ${money(cabin.hireFee)} each`));
   if (cabin.teams > cabin.ideal) {
     buttons.append(actionButton('−1', false, () => ops.releaseCabinAt(state, iata, c.classCode, 1), changed, {
       title: `Release 1 ${c.name} cabin team · ${iata}`,
