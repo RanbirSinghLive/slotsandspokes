@@ -3139,6 +3139,8 @@ country is unknown the rule allows it, so a missing row never stops a route.
 | Connection A–hub–B, A and B in one other country | **barred**, whatever the hub: a Canadian carrier can't sell Boston to New York through Toronto |
 | Connection with A and B in different countries | allowed when both legs are |
 
+Rivals follow the same table on every path that opens a route (expansion, a newcomer, following the player into a market). A rival route its home country's carriers may not fly closes at the daily rollover.
+
 **Buying domestic rights abroad** (`src/sim/rightsLicences.ts`). Once widebodies are open (the Network
 tier is climbed), the airline can buy domestic rights in one foreign
 country, so it may fly and sell inside it like a bloc member.

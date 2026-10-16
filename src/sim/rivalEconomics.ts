@@ -1,13 +1,14 @@
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { rivalBookingShare } from './choiceModel';
 import { brandEdge } from './nps';
-import type { CompetitorOffering } from './competitors';
+import { PRE_EXISTING_OPENED_AT_MINUTE, type CompetitorOffering } from './competitors';
 import { LOAD_FACTOR, legCost, type EconomyAircraftType } from './economy';
 import { leaseRateFor } from './leasing';
 import { preferredRivalClass, rivalFlights } from './market';
 import { actualDailyDemand } from './marketDemand';
 import { RIVAL_CLOSE_AFTER_LOSING_DAYS, RIVAL_CLOSE_GRACE_DAYS, RIVAL_REOPEN_COOLDOWN_DAYS } from './pressure';
 import { computeBlockMinutes, legsServingMarket, marketKey } from './schedule';
+import { legRights } from './rights';
 import type { SimState } from './state';
 
 /**
@@ -106,6 +107,9 @@ export function closeLosingRivalRoutes(state: SimState): void {
     route.loadFactor = result.seats > 0 ? (result.passengers * LOAD_FACTOR) / result.seats : 0;
     const pastGrace = state.simMinute - route.openedAtMinute >= graceMinutes;
     if (pastGrace && route.losingDays >= RIVAL_CLOSE_AFTER_LOSING_DAYS) closing.add(route);
+    // Air rights (sim/rights.ts): a route its home country's carriers may not fly closes at once. Only a rival with a stamped nationality is judged; a route it started with (seed data) is its starting position, so only routes it opened itself are judged.
+    const stamped = state.competitorRoutes.find((other) => other.code === route.code && other.homeCountry)?.homeCountry;
+    if (stamped && route.openedAtMinute !== PRE_EXISTING_OPENED_AT_MINUTE && !legRights(stamped, route.origin, route.dest).ok) closing.add(route);
   }
   // Remember closures for the reopening cooldown, dropping ones past it.
   const since = state.simMinute - RIVAL_REOPEN_COOLDOWN_DAYS * MINUTES_PER_DAY;
