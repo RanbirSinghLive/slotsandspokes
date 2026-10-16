@@ -954,11 +954,15 @@ window.addEventListener('keydown', (event) => {
 }, true);
 
 /** The result of a move, shown where the tip was for a moment. */
+let flashTimer: ReturnType<typeof setTimeout> | undefined;
+
 function flashTip(text: string, bad: boolean): void {
   dragTip.textContent = text;
   dragTip.classList.toggle('is-bad', bad);
   dragTip.hidden = false;
-  setTimeout(() => {
+  // A newer flash restarts the clock, so an older one's timer can't hide it early.
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => {
     if (!drag) dragTip.hidden = true;
   }, 2500);
 }
