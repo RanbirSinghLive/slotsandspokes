@@ -39,7 +39,7 @@ export type Selection =
   | { kind: 'rival'; code: string };
 
 /** What the Routes view sorts by. */
-export type RouteSort = 'loadFactor' | 'onTime' | 'completion' | 'nps' | 'prasm' | 'margin';
+export type RouteSort = 'loadFactor' | 'onTime' | 'completion' | 'nps' | 'margin';
 
 export const NETWORK: Selection = { kind: 'network' };
 

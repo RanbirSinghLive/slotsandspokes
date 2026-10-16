@@ -2447,16 +2447,16 @@ fold, the route view draws the whole 30-day history as one line on a
 fixed 0-100% scale, with the seat-sale cap (`loadFactorCap`) as a dashed
 line and a tap or hover tip per day; a day nothing flew breaks the line.
 
-**Frequency and PRASM on routes** (`src/sim/routeYield.ts`). A route's
+**Frequency on routes** (`src/sim/routeYield.ts`). A route's
 frequency counts one direction: a plane flying A-B-A once a day is
 "1/day", not two legs, and a route flown more one way than the other
-reads "2/1/day". PRASM is profit (revenue less cost) over seats flown times
-great-circle statute miles, over the last 7 finished days, in cents per
-available seat-mile; negative when the route loses money. Fare per mile
-is not shown: the fare has a fixed part, so short routes always read high.
-Both sit on each route line on the Demand lens only (the plain network
+reads "2/1/day". There is no per-passenger or per-seat-mile route
+figure: fare per mile only ranks routes by length (the fare has a fixed
+part), and profit per seat-mile ranks them differently from the Margin
+column, which is the one the page is read for.
+Frequency sits on each route line on the Demand lens only (the plain network
 map leaves them off, as they clog a hub), in the route's view, and in
-the Routes table (where PRASM also sorts). On the Demand lens, labels
+the Routes table. On the Demand lens, labels
 are placed busiest route first; a label that would cover one
 already placed slides along its line (middle, then 40/60%, 30/70%) and
 is left off if no spot is clear, so a hub's fan of routes stays
