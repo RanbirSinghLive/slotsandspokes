@@ -250,6 +250,9 @@ let selectedInnovation: string | null = null;
  * green when running, amber when it can be adopted, grey while its tier
  * is still ahead. Click one for what it does and costs, and to adopt it.
  */
+/** Set by a tap on a project, so the next draw scrolls its card into view. */
+let showCardAfterRender = false;
+
 function techTree(state: SimState, changed: () => void): HTMLElement[] {
   const options = ops.innovationOptions(state);
   const climbed = tiersClimbed(state);
@@ -286,6 +289,7 @@ function techTree(state: SimState, changed: () => void): HTMLElement[] {
       node.append(badge, name, summary);
       node.addEventListener('click', () => {
         selectedInnovation = selectedInnovation === option.id ? null : option.id;
+        showCardAfterRender = selectedInnovation !== null;
         changed();
       });
       row.append(node);
@@ -295,7 +299,13 @@ function techTree(state: SimState, changed: () => void): HTMLElement[] {
   });
   const nodes: HTMLElement[] = [rdBar(state, changed), tree];
   const selected = options.find((option) => option.id === selectedInnovation);
-  if (selected) nodes.push(innovationCard(state, selected, changed));
+  if (selected) {
+    const card = innovationCard(state, selected, changed);
+    nodes.push(card);
+    // The card sits under the whole tree, so on a phone a tap high in the tree would show nothing without this.
+    if (showCardAfterRender) requestAnimationFrame(() => card.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+    showCardAfterRender = false;
+  }
   return nodes;
 }
 

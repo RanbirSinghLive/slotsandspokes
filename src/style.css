@@ -1523,7 +1523,7 @@ button,
   font-family: ui-monospace, Consolas, monospace;
   font-size: 11px;
   color: #e6e9f0;
-  white-space: nowrap;
+  max-width: calc(100vw - 16px);
   background: #11151f;
   border: 1px solid #2a3142;
   border-radius: 4px;
@@ -4007,11 +4007,12 @@ button.inspector-crumb:hover {
 }
 
 .tech-node-name {
+  display: -webkit-box;
   overflow: hidden;
   font-size: 11px;
   font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .tech-node-summary {
