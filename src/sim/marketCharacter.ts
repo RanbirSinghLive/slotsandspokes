@@ -3,7 +3,7 @@ import type { SegmentName } from './timeOfDay';
 
 /**
  * Market character (WEEK-FOURTEEN.md, slice 1): who flies a city pair.
- * Each airport is scored 0–2 for how strongly it draws business, leisure
+ * Each airport is scored 0–3 for how strongly it draws business, leisure
  * and VFR (visiting friends and relatives) travel
  * (data/airport-character.json, hand-authored). A pair's mix starts from
  * BASE_MIX, and each segment's points multiply its weight by
@@ -20,6 +20,10 @@ import type { SegmentName } from './timeOfDay';
  * (sim/choiceModel.ts) and time-of-day demand (sim/timeOfDay.ts) read
  * the pair's own mix in place of one mix for every market.
  *
+ * A 3 marks an extreme market (a financial centre, a pure resort, a
+ * diaspora capital). Points are capped at MAX_POINTS so two 3s don't
+ * push a pair's mix past what a real route could be.
+ *
  * BASE_MIX is set so the network's mix, weighted by potential demand,
  * stays close to the one mix it replaced (business 20%, leisure 50%,
  * VFR 30%): the balance moves by where the mix lands, not by how much of
@@ -31,9 +35,11 @@ type Character = Partial<Record<SegmentName, number>>;
 const CHARACTER = characterData as unknown as Record<string, Character>;
 
 /** The mix of a pair of ordinary airports. */
-const BASE_MIX: Record<SegmentName, number> = { business: 0.19, leisure: 0.46, vfr: 0.35 };
+const BASE_MIX: Record<SegmentName, number> = { business: 0.20, leisure: 0.43, vfr: 0.37 };
 /** How much each point of character at either end multiplies its segment's weight. */
-const CHARACTER_PULL = 1.45;
+const CHARACTER_PULL = 1.7;
+/** The most points one segment can earn, so a pair of 3s stays a believable mix. */
+const MAX_POINTS = 5;
 
 const SEGMENT_NAMES: SegmentName[] = ['business', 'leisure', 'vfr'];
 
@@ -49,9 +55,9 @@ export function marketMix(a: string, b: string): Record<SegmentName, number> {
   const [l1, l2] = score('leisure');
   const [v1, v2] = score('vfr');
   const points: Record<SegmentName, number> = {
-    business: 2 * Math.min(b1, b2) + 0.5 * Math.abs(b1 - b2),
-    leisure: 2 * Math.max(l1, l2),
-    vfr: Math.max(v1, v2),
+    business: Math.min(MAX_POINTS, 2 * Math.min(b1, b2) + 0.5 * Math.abs(b1 - b2)),
+    leisure: Math.min(MAX_POINTS, 2 * Math.max(l1, l2)),
+    vfr: Math.min(MAX_POINTS, Math.max(v1, v2)),
   };
   const weights = SEGMENT_NAMES.map((segment) => BASE_MIX[segment] * Math.pow(CHARACTER_PULL, points[segment]));
   const total = weights.reduce((sum, weight) => sum + weight, 0);
