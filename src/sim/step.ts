@@ -1,3 +1,4 @@
+import { rollStandingOrders } from './standingOrders';
 import { endSeasonalLeases } from './seasonalLease';
 import { demandFactors, rollDailyDemandEvents } from './demandEvents';
 import { accrueMaintenance, morningHolds, recordFlown, rollNightlyChecks, wornAge } from './mxChecks';
@@ -414,6 +415,7 @@ export function step(state: SimState): void {
     // see it; delivered after, it sits on the shelf all day and the player
     // gets the first chance. First come, first served, fairly.
     rollDailyMarket(state, dayIndex(state));
+    rollStandingOrders(state);
 
     // Market stimulation (sim/marketDemand.ts): markets grow
     // toward their potential where they're actually flown and decay back
