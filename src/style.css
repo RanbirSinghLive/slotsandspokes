@@ -5728,6 +5728,9 @@ button.ops-item:hover {
 .mx-marker.is-picked { outline: 2px solid #e6e9f2; }
 .mx-marker.is-open { background: #ffb347; }
 .mx-marker.is-late { background: #ff8080; }
+.mx-marker.is-worn {
+  background-image: repeating-linear-gradient(135deg, rgba(14, 16, 22, 0.35) 0 2px, transparent 2px 5px);
+}
 
 .mx-axis-ticks {
   position: relative;

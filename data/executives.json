@@ -243,7 +243,8 @@
     "effect": {
       "kind": "maintenance-bases",
       "costMultiplier": 0.95,
-      "toleranceCostMultiplier": 0.8
+      "toleranceCostMultiplier": 0.8,
+      "toleranceExtraDays": 3
     }
   },
   {
@@ -259,7 +260,8 @@
     "effect": {
       "kind": "maintenance-bases",
       "costMultiplier": 0.7,
-      "toleranceCostMultiplier": 0.5
+      "toleranceCostMultiplier": 0.5,
+      "toleranceExtraDays": 5
     }
   },
   {

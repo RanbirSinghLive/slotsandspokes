@@ -3592,11 +3592,18 @@ the cancellations cost Toronto most of its year on 18 seeds.
 **Tolerance.** Inside its window, tap a plane's puck on the "C checks due"
 axis to induct it (the booking above) or push the check later by 1, 5 or 15
 days (`applyHeavyTolerance()`, `heavyShiftDays`), so checks that fall together
-can be spread over the hangar. Each push costs a multiple of the check's
-contract price (0.5, 2 and 5 times), at most 15 days in all per check, and the
-grace still runs from the pushed date. The Director of Maintenance cuts the
-fee (Aaltonen −20%, Bakare −50%). The push is cleared when the check is done.
-The headless player never pushes.
+can be spread over the hangar. It is a soft gate. A push costs 0.5, 2 or 5
+times the check's contract price, and each earlier push on the same check
+makes the next 50% dearer (`heavyPushes`). The most a check can be pushed in
+all is 10 days, plus the Director of Maintenance's days (Aaltonen +3, Bakare
++5) and 2 for each hangar bay at the plane's base, up to 20
+(`toleranceCapDays()`). Every day the check runs past the date it would have
+fallen due without the push, the plane wears like 0.1 years of extra age
+(`toleranceWearYears()`, in `wornAge()`), so it breaks and delays more until
+it goes in; the marker is hatched while it wears. The Director also cuts the
+fee (Aaltonen −20%, Bakare −50%). The grace still runs from the pushed date,
+and the push and its wear clear when the check is done. The headless player
+never pushes.
 
 **The D check** is the overhaul above the C check, due after 360 flying days
 or 3,600 flight hours, whichever comes first (`dCheckDueIn()`). It is

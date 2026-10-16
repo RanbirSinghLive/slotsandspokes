@@ -101,6 +101,8 @@ export type Aircraft = {
   heavyCheckBooked?: boolean;
   /** Days its C check was pushed later by paid tolerance (sim/mxChecks.ts). Absent: none. */
   heavyShiftDays?: number;
+  /** How many pushes made that shift, each dearer than the last (sim/mxChecks.ts). Absent: none. */
+  heavyPushes?: number;
   flightMinutesSinceHeavy?: number;
   /** Takeoff-and-landing cycles since the last heavy check (sim/mxChecks.ts). Absent: none counted yet. */
   cyclesSinceHeavy?: number;
