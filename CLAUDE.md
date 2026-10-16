@@ -188,7 +188,11 @@ database, server or API.
 - **When something breaks, revert rather than patching over it.** `git
   checkout` the last good state and try a different approach.
 - **One vertical slice per session, always ending in something runnable.**
-  `npm run build` and `npm run headless` both pass before a commit.
+  `npm run check` passes before a commit: build, every sim test (`npm test`),
+  a 30-day headless run, same-seed and save-reload determinism, and the
+  Cloudflare config. `npm run check -- --ui` adds `npm run uicheck`, which
+  opens a 75-day save in Chromium at desktop and phone-touch size and fails
+  on console errors or sideways overflow. New controls still get clicked by hand.
 - **Parallel sessions work in their own git worktree**, never in the same
   working tree at once.
 - **Explain as you go, in the chat.** The owner is learning to program through

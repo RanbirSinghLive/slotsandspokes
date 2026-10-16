@@ -38,3 +38,4 @@ data/.cache/
 
 # Wrangler local state (wrangler dev)
 .wrangler/
+ui-check-output/
