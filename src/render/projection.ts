@@ -120,6 +120,45 @@ export function fitWorld(width: number, height: number, inset: { top: number; ri
 }
 
 /**
+ * Run `paint` with the shared projection fitted so `points` ([longitude,
+ * latitude] pairs) fill a `width` x `height` box, kept `inset` pixels in from
+ * each edge, then put the map's own view back exactly as it was. This is how
+ * an image of the network is drawn (render/networkCard.ts) without touching
+ * what the player is looking at. `paint` must be synchronous: the live view
+ * is only borrowed until it returns.
+ */
+export function withFittedView(
+  width: number,
+  height: number,
+  inset: { top: number; right: number; bottom: number; left: number },
+  points: [number, number][],
+  paint: () => void,
+): void {
+  const before = snapshotView();
+  const clipBefore = projection.clipExtent();
+  const marginBefore = mapGesture.margin;
+  try {
+    mapGesture.margin = 0;
+    projection.clipExtent(null);
+    projection.fitExtent(
+      [
+        [inset.left, inset.top],
+        [width - inset.right, height - inset.bottom],
+      ],
+      { type: 'MultiPoint', coordinates: points },
+    );
+    projection.clipExtent([
+      [0, 0],
+      [width, height],
+    ]);
+    paint();
+  } finally {
+    mapGesture.margin = marginBefore;
+    projection.scale(before.scale).translate(before.translate).clipExtent(clipBefore);
+  }
+}
+
+/**
  * `active` is true while a finger is dragging or pinching the map (main.ts);
  * `margin` is how much extra, as a fraction of the map's width and height on
  * every side, the cached sheets (basemap.ts, fog.ts) paint beyond the screen.
