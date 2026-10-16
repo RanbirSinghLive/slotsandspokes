@@ -263,16 +263,16 @@ and ground handling, `sim/stations.ts`), not one distribution —
   (new: copied from `FleetListing.ageYears` at acquisition,
   `ui/fleetMarket.ts` — that field already existed for Fleet Market
   pricing flavor, now doing double duty) drives an on-time probability
-  that degrades linearly from 65% at age 0 down to a 35% floor, and a
-  worst-case severity that grows from 45 minutes upward with age. Age 0
-  reproduces this model's *original* 65%/45 numbers almost exactly — a
-  deliberate choice, so age is a genuine widening of the old model
-  rather than a silent re-tune of the game's whole balance in the same
-  pass. Checked with a throwaway 200k-sample script (`nextRandom()`,
-  same disposable-script pattern the demand-model retune used, deleted
-  after, never committed): age 0 → 65.1% on-time; age 24 (the oldest
-  Fleet Market listing, an A330-300) → 41.0% on-time, 18.7 min average
-  delay, 93 min worst case.
+  that degrades linearly from 75% at age 0 by 0.8 points a year (35% floor),
+  and a worst-case severity that grows from 45 minutes by 2 a year. Age is
+  the one cause every departure rolls, so it is also the lease choice:
+  by `expectedAgeDelayMinutes()` a 15-year-old adds about 9.5 minutes late
+  per flight, a 20-year-old about 12 and a 24-year-old about 14.5, against
+  about 3.9 for a new airframe. (It was 65% and a point a year, 13 to 19
+  minutes; the 90-day headless read before and after is in PR notes: on-time
+  up about 8 points, minutes late per arrival about 3.5 down, age's share
+  of delay minutes still 47-62%.) Weather and congestion keep their own
+  odds below.
 - **Weather** (`rollWeatherDelay()`) — unchanged in mechanism from
   before this rework, just pulled out into its own named function: an
   airport with active weather (`sim/weather.ts`) rolls against far
@@ -1789,7 +1789,7 @@ cancellations. Weather at an airport is one of the three causes
 `rollTotalDelayMinutes()` sums (see "The tick," above, for the other
 two — age and knock-on): a leg departing from there rolls against
 much worse odds (`WEATHER_ON_TIME_PROBABILITY` 0.2, `WEATHER_MAX_DELAY_MINUTES`
-90, vs. a fresh age-0 aircraft's baseline 65%/45) via the exact same
+90, vs. a fresh age-0 aircraft's baseline 75%/45) via the exact same
 bernoulli-then-severity shape the age cause uses, just with harsher
 parameters — no new aircraft state needed.
 

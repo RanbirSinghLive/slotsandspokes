@@ -9,7 +9,7 @@ import { WEATHER_ON_TIME_PROBABILITY, WEATHER_MAX_DELAY_MINUTES } from './weathe
  *
  *   1. Age (rollAgeDelay) — this aircraft's own baseline mechanical/
  *      operational unreliability, worse the older the airframe: a
- *      brand-new (age 0) aircraft is about 65% on time, with delays of
+ *      brand-new (age 0) aircraft is about 75% on time, with delays of
  *      up to 45 minutes.
  *   2. Weather (rollWeatherDelay) — an airport with active weather
  *      (sim/weather.ts) rolls against far worse odds.
@@ -33,8 +33,8 @@ import { WEATHER_ON_TIME_PROBABILITY, WEATHER_MAX_DELAY_MINUTES } from './weathe
  * distribution, so another cause (crew, ATC) can join this same list
  * later without reshaping the others.
  */
-const AGE_ON_TIME_PROBABILITY_BASE = 0.65;
-const AGE_ON_TIME_PROBABILITY_PER_YEAR = 0.01;
+const AGE_ON_TIME_PROBABILITY_BASE = 0.75;
+const AGE_ON_TIME_PROBABILITY_PER_YEAR = 0.008;
 const AGE_ON_TIME_PROBABILITY_FLOOR = 0.35;
 const AGE_MAX_DELAY_MINUTES_BASE = 45;
 const AGE_MAX_DELAY_MINUTES_PER_YEAR = 2;
@@ -88,10 +88,11 @@ export function expectedAgeDelayMinutes(ageYears: number): number {
 }
 
 /**
- * Cause 1: age. Reliability degrades linearly with age from the model's
- * original 65%-on-time/45-minute-max baseline (age 0 reproduces it
- * almost exactly), floored so a genuinely ancient airframe still isn't a
- * coin flip on every single departure.
+ * Cause 1: age. Reliability degrades linearly with age from 75% on time and
+ * a 45-minute worst case at age 0, floored so a genuinely ancient airframe
+ * still isn't a coin flip on every single departure. Every departure rolls
+ * it, so the slope is kept gentle: the weather and congestion causes should
+ * still be able to decide a day.
  */
 function rollAgeDelay(
   seed: number,
