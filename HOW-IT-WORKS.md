@@ -2407,7 +2407,10 @@ seats, last 7 days)"), an airport's market list, a plane's rotations
 (its route's) and its day (each flight's own), the Fleet list (today's),
 the On-time table, and the flight hover (the route's, since a flight's
 passengers are settled when it lands). Once a route has a load factor,
-its view drops the forecast "about half full for now" words.
+its view drops the forecast "about half full for now" words. Below the
+fold, the route view draws the whole 30-day history as one line on a
+fixed 0-100% scale, with the seat-sale cap (`loadFactorCap`) as a dashed
+line and a tap or hover tip per day; a day nothing flew breaks the line.
 
 **Frequency and yield on routes** (`src/sim/routeYield.ts`). A route's
 frequency counts one direction: a plane flying A-B-A once a day is

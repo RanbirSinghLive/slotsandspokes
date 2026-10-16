@@ -26,6 +26,7 @@ import { CLASS_NAMES, CLASS_ORDER, CLASS_PRICE, DEFAULT_FARE_CLASSES, type FareC
 import { demandAgainstSeats, marketSize } from '../../sim/marketSize';
 import { summarizeMarket } from '../../sim/marketSummary';
 import { formatLoadFactor, marketLoadFactor } from '../../sim/loadFactor';
+import { loadFactorCap } from '../../sim/innovations';
 import { moneyOnTable } from '../../sim/attractiveness';
 import { describeShock } from '../../sim/shocks';
 import { rivalResponseChance } from '../../sim/rivalResponse';
@@ -271,6 +272,8 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   const history = buildRouteHistory(state, a, b);
   if (history) more.append(history);
   more.append(buildRouteOtp(state, a, b));
+  const loadChart = buildRouteLoadHistory(state, a, b);
+  if (loadChart) more.append(loadChart);
 
   return { root, redrawPools };
 }
@@ -852,6 +855,85 @@ function buildRouteHistory(state: SimState, a: string, b: string): HTMLElement |
     return `${dayLabel(indexFromEnd)}: ${pnlMoney(shownRevenue[i])} revenue, ${pnlMoney(shownCost[i])} cost, ${pnlMoney(value)} margin`;
   });
   chart.append(header, bars);
+  return chart;
+}
+
+/** Fewer finished days than this and a line says nothing yet. */
+const LOAD_CHART_MIN_DAYS = 2;
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/**
+ * This route's load factor over its recorded history (up to
+ * PNL_HISTORY_MAX_DAYS days, sim/loadFactor.ts): one line on a fixed
+ * 0–100% scale so a climb reads as a climb, the airline's seat-sale cap
+ * as a dashed reference line, and a tap or hover tip per day. Null until
+ * the route has a couple of finished days.
+ */
+function buildRouteLoadHistory(state: SimState, a: string, b: string): HTMLElement | null {
+  const history = state.loadHistoryByMarket?.[marketKey(a, b)];
+  const passengers = history?.passengers ?? [];
+  const seats = history?.seats ?? [];
+  if (seats.length < LOAD_CHART_MIN_DAYS) return null;
+  const days = seats.length;
+  const cap = loadFactorCap(state);
+  const factors = seats.map((seatCount, i) => (seatCount > 0 ? passengers[i] / seatCount : null));
+
+  const chart = document.createElement('div');
+  chart.className = 'inspector-chart';
+  const header = document.createElement('div');
+  header.className = 'pnl-chart-header';
+  const labelEl = document.createElement('span');
+  labelEl.textContent = `LF · ${days}d`;
+  labelEl.append(' ', info(`Each point is a finished day: passengers over seats flown on this route. The dashed line is your seat-sale cap (${Math.round(cap * 100)}%), the most a flight can sell. A line pinned to it means the route wants bigger planes or more flights; a low or falling line means too much capacity or a fare that is too high.`));
+  const statEl = document.createElement('span');
+  statEl.className = 'pnl-chart-stat';
+  const latest = factors.findLast((factor) => factor !== null) ?? null;
+  statEl.textContent = latest === null ? '—' : `${Math.round(latest * 100)}%`;
+  header.append(labelEl, statEl);
+
+  const plot = document.createElement('div');
+  plot.className = 'load-chart';
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 100 40');
+  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.setAttribute('aria-hidden', 'true');
+  const x = (i: number) => (days === 1 ? 50 : (i / (days - 1)) * 100);
+  const y = (factor: number) => 40 - Math.min(1, factor) * 40;
+  const capLine = document.createElementNS(SVG_NS, 'line');
+  capLine.setAttribute('x1', '0');
+  capLine.setAttribute('x2', '100');
+  capLine.setAttribute('y1', String(y(cap)));
+  capLine.setAttribute('y2', String(y(cap)));
+  capLine.setAttribute('class', 'load-chart-cap');
+  svg.append(capLine);
+  // A day nothing flew breaks the line rather than dropping it to zero.
+  let path = '';
+  factors.forEach((factor, i) => {
+    if (factor === null) {
+      path += ' ';
+      return;
+    }
+    const pen = i > 0 && factors[i - 1] !== null ? 'L' : 'M';
+    path += `${pen}${x(i).toFixed(2)},${y(factor).toFixed(2)}`;
+  });
+  const lineEl = document.createElementNS(SVG_NS, 'path');
+  lineEl.setAttribute('d', path.trim());
+  lineEl.setAttribute('class', 'load-chart-line');
+  svg.append(lineEl);
+  plot.append(svg);
+
+  const hits = document.createElement('div');
+  hits.className = 'load-chart-hits';
+  factors.forEach((factor, i) => {
+    const hit = document.createElement('i');
+    hit.tabIndex = 0;
+    hit.title = factor === null
+      ? `${dayLabel(days - i)}: no flights`
+      : `${dayLabel(days - i)}: ${Math.round(factor * 100)}% · ${passengers[i]} of ${seats[i]} seats`;
+    hits.append(hit);
+  });
+  plot.append(hits);
+  chart.append(header, plot);
   return chart;
 }
 
