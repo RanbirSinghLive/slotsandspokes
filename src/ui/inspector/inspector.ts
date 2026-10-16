@@ -216,7 +216,7 @@ export function renderInspector(state: SimState): void {
     bodyEl.replaceChildren(buildAircraftView(state, selection.tail, rebuild));
   } else if (selection.kind === 'fleet') {
     // Every plane, then their days and the lessor's shelf.
-    bodyEl.replaceChildren(buildFleetView(state), adopt('rotations-section'), adopt('market-section'));
+    bodyEl.replaceChildren(buildFleetView(state, rebuild), adopt('rotations-section'), adopt('market-section'));
   } else if (selection.kind === 'crews') {
     bodyEl.replaceChildren(buildCrewsView(state, rebuild));
   } else if (selection.kind === 'maintenance') {

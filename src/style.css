@@ -4362,6 +4362,22 @@ button.inspector-crumb:hover {
   margin-top: 12px;
 }
 
+/* The cabin refit icon on a Fleet row (ui/inspector/aircraft.ts). */
+.inspector-row .cabin-mark {
+  margin-left: 4px;
+  padding: 3px;
+  color: #6c7691;
+  cursor: pointer;
+  vertical-align: middle;
+}
+.inspector-row .cabin-mark.is-business { color: #5ed6c8; }
+.inspector-row .cabin-mark.is-pays { color: #ffb347; }
+.inspector-row .cabin-mark.is-pending { color: #ffb347; opacity: 0.6; }
+.inspector-row .cabin-mark:hover { background: rgba(255, 255, 255, 0.08); border-radius: 4px; }
+@media (pointer: coarse) {
+  .inspector-row .cabin-mark { padding: 10px; margin: -8px -4px -8px 2px; }
+}
+
 .inspector-plan-hub:disabled {
   opacity: 0.5;
   cursor: not-allowed;
