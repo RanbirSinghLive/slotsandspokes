@@ -171,7 +171,28 @@ function confirmHeavyBooking(state: SimState, plane: HeavyCheckReadout, changed:
   });
 }
 
-/** The plane whose puck on the due axis is open, kept across redraws. */
+/** The D-check booking dialog, from the card or the plane's marker on the due axis. */
+function confirmDBooking(state: SimState, plane: HeavyCheckReadout, changed: () => void): void {
+  const preview = ops.previewDCheckBooking(state, plane.tail);
+  if (!preview) return;
+  showConfirm({
+    title: `Book D check · ${plane.tail}`,
+    rows: [
+      { label: 'Grounded', value: `${preview.days}d from tomorrow` },
+      { label: 'Check cost', value: preview.cost > 0 ? money(preview.cost) : 'in house' },
+      { label: 'Rotations', value: `${preview.rotations} · other planes cover them where pools allow` },
+      ...(preview.cost > 0 ? cashAfterRows(state, preview.cost) : []),
+    ],
+    facts: ['A full overhaul: it also clears the C and A checks. Rotations nobody can cover are cancelled. Cancel the booking any time before it goes in.'],
+    confirmLabel: 'Book check',
+    run: () => {
+      ops.bookDCheck(state, plane.tail);
+      changed();
+    },
+  });
+}
+
+/** The puck on the due axis that is open, as `C:tail` or `D:tail`, kept across redraws. */
 let openPuck: string | null = null;
 
 /**
@@ -207,6 +228,30 @@ function puckMenu(state: SimState, plane: HeavyCheckReadout, changed: () => void
   return menu;
 }
 
+/** What a D marker offers: book the overhaul now (it also does the C check), or take the booking back. */
+function dPuckMenu(state: SimState, plane: HeavyCheckReadout, changed: () => void): HTMLElement {
+  const menu = box('mx-puck-menu');
+  menu.append(box('mx-puck-who', `${plane.tail} · D check ${plane.dDueIn > 0 ? `due ${plane.dDueIn}d` : `${-plane.dDueIn}d over`}`));
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'mx-puck-action';
+  if (plane.dBooked) {
+    button.append('D booked · tomorrow ✕');
+    button.dataset.tip = 'Cancel the booking';
+    button.addEventListener('click', () => {
+      ops.cancelBookedDCheck(state, plane.tail);
+      changed();
+    });
+  } else {
+    button.append(glyph('wrench'), ' book D');
+    button.disabled = !plane.dCanBook;
+    button.dataset.tip = plane.dCanBook ? 'Book the D check · also does the C check' : (plane.dBookBlocker ?? 'Opens 60d before due');
+    button.addEventListener('click', () => confirmDBooking(state, plane, changed));
+  }
+  menu.append(button);
+  return menu;
+}
+
 /** The timeline's reach: the longest wait to a heavy check is its whole interval. */
 const TIMELINE_DAYS = HEAVY_INTERVAL_DAYS;
 
@@ -214,11 +259,12 @@ const TIMELINE_DAYS = HEAVY_INTERVAL_DAYS;
  * Every plane's heavy-check due date on one axis, today at the left: a
  * marker each, overdue ones stacked at the edge, so a fleet bunching up for
  * the hangar shows as a cluster. Markers that would overlap take a lane
- * of their own.
+ * of their own. A plane's D check shares the axis once it is due inside it:
+ * read-only, since the D check is booked from its card.
  */
 function buildDueTimeline(state: SimState, changed: () => void): HTMLElement[] {
   const nodes: HTMLElement[] = [
-    heading('C checks due', `Each plane's C check on a ${TIMELINE_DAYS}-day axis (due by days, hours or cycles, whichever is first), today at the left. The amber band is the window where nights at a maintenance base bank hours; a cluster of markers is planes that will want the hangar together. Overdue planes sit at the left edge.`),
+    heading('C checks due', `Each plane's C check on a ${TIMELINE_DAYS}-day axis (due by days, hours or cycles, whichever is first), today at the left. The amber band is the window where nights at a maintenance base bank hours; a cluster of markers is planes that will want the hangar together. Overdue planes sit at the left edge. A violet D marker is a plane whose D check (the overhaul) falls due inside the axis; tap it to book. The D check also does the C check, so that plane's C marker dims when its D falls due first and goes once the D is booked.`),
   ];
   const readouts = ops.heavyCheckReadouts(state).filter((p) => !p.inCheck);
   if (readouts.length === 0) return [...nodes, line('No planes outside the hangar')];
@@ -230,23 +276,42 @@ function buildDueTimeline(state: SimState, changed: () => void): HTMLElement[] {
   axis.append(windowBand);
   // Lanes: a marker takes the first lane whose last marker is far enough left.
   const laneEnds: number[] = [];
-  const MARKER_SPAN_PCT = 11;
-  for (const plane of readouts) {
-    const at = (Math.min(TIMELINE_DAYS, Math.max(0, plane.dueIn)) / TIMELINE_DAYS) * 100;
+  const MARKER_SPAN_PCT = 15;
+  // C markers, then a D marker for each plane whose D check is due within the axis.
+  const markers = [
+    // A booked D check does the C check, so that plane's C marker is gone.
+    ...readouts.filter((plane) => !plane.dBooked).map((plane) => ({ plane, kind: 'C' as const, dueIn: plane.dueIn })),
+    ...readouts.filter((plane) => !plane.dInCheck && plane.dDueIn <= TIMELINE_DAYS).map((plane) => ({ plane, kind: 'D' as const, dueIn: plane.dDueIn })),
+  ].sort((a, b) => a.dueIn - b.dueIn);
+  for (const { plane, kind, dueIn } of markers) {
+    const at = (Math.min(TIMELINE_DAYS, Math.max(0, dueIn)) / TIMELINE_DAYS) * 100;
     let lane = laneEnds.findIndex((end) => at - end >= MARKER_SPAN_PCT);
     if (lane === -1) lane = laneEnds.length;
     laneEnds[lane] = at;
     const marker = document.createElement('button');
     marker.type = 'button';
-    marker.className = `mx-marker${plane.dueIn <= 0 ? ' is-late' : plane.open ? ' is-open' : ''}${plane.toleranceWear > 0 ? ' is-worn' : ''}${plane.tail === openPuck ? ' is-picked' : ''}`;
-    marker.textContent = plane.tail.slice(-4);
-    marker.addEventListener('click', () => {
-      openPuck = openPuck === plane.tail ? null : plane.tail;
-      changed();
-    });
     marker.style.left = `${at}%`;
     marker.style.top = `${lane * 18 + 2}px`;
-    marker.dataset.tip = `${plane.tail} · ${plane.dueIn > 0 ? `due ${plane.dueIn}d` : `${-plane.dueIn}d overdue`}${plane.shiftDays > 0 ? ` · pushed ${plane.shiftDays}/${plane.toleranceCap}d` : ''}${plane.toleranceWear > 0 ? ` · wearing +${plane.toleranceWear.toFixed(1)}y` : ''} · tap for options`;
+    if (kind === 'D') {
+      marker.className = `mx-marker is-d${dueIn <= 0 ? ' is-late is-edge' : ''}${plane.dBooked ? ' is-booked' : ''}${openPuck === `D:${plane.tail}` ? ' is-picked' : ''}`;
+      marker.textContent = `D ${plane.tail.slice(-4)}`;
+      marker.addEventListener('click', () => {
+        openPuck = openPuck === `D:${plane.tail}` ? null : `D:${plane.tail}`;
+        changed();
+      });
+      marker.dataset.tip = `${plane.tail} · D check ${plane.dBooked ? 'booked · tomorrow' : dueIn > 0 ? `due ${dueIn}d` : `${-dueIn}d overdue`} · tap for options`;
+      axis.append(marker);
+      continue;
+    }
+    // A D check restarts the C clock, so a C check that falls due after the same plane's D check is moot if the D goes in first.
+    const coveredByD = !plane.dInCheck && plane.dDueIn <= dueIn;
+    marker.className = `mx-marker${dueIn <= 0 ? ' is-late' : plane.open ? ' is-open' : ''}${plane.toleranceWear > 0 ? ' is-worn' : ''}${coveredByD ? ' is-covered' : ''}${openPuck === `C:${plane.tail}` ? ' is-picked' : ''}`;
+    marker.textContent = `C ${plane.tail.slice(-4)}`;
+    marker.addEventListener('click', () => {
+      openPuck = openPuck === `C:${plane.tail}` ? null : `C:${plane.tail}`;
+      changed();
+    });
+    marker.dataset.tip = `${plane.tail} · ${plane.dueIn > 0 ? `due ${plane.dueIn}d` : `${-plane.dueIn}d overdue`}${plane.shiftDays > 0 ? ` · pushed ${plane.shiftDays}/${plane.toleranceCap}d` : ''}${plane.toleranceWear > 0 ? ` · wearing +${plane.toleranceWear.toFixed(1)}y` : ''} · tap for options${coveredByD ? ` · D check due ${plane.dDueIn > 0 ? `in ${plane.dDueIn}d` : `${-plane.dDueIn}d ago`}: it also does the C check, so booking D first clears this one` : ''}`;
     axis.append(marker);
   }
   axis.style.height = `${laneEnds.length * 18 + 6}px`;
@@ -257,8 +322,8 @@ function buildDueTimeline(state: SimState, changed: () => void): HTMLElement[] {
     ticks.append(tick);
   }
   nodes.push(axis, ticks);
-  const picked = readouts.find((plane) => plane.tail === openPuck);
-  if (picked) nodes.push(puckMenu(state, picked, changed));
+  const picked = readouts.find((plane) => openPuck === `C:${plane.tail}` || openPuck === `D:${plane.tail}`);
+  if (picked) nodes.push(openPuck === `D:${picked.tail}` ? dPuckMenu(state, picked, changed) : puckMenu(state, picked, changed));
   return nodes;
 }
 
@@ -441,23 +506,7 @@ function buildFleetBoard(state: SimState, changed: () => void): HTMLElement[] {
         book.type = 'button';
         book.textContent = `Book D check · ${preview.days}d${preview.cost > 0 ? ` · ${money(preview.cost)}` : ''}`;
         book.className = 'mx-card-action';
-        book.addEventListener('click', () =>
-          showConfirm({
-            title: `Book D check · ${plane.tail}`,
-            rows: [
-              { label: 'Grounded', value: `${preview.days}d from tomorrow` },
-              { label: 'Check cost', value: preview.cost > 0 ? money(preview.cost) : 'in house' },
-              { label: 'Rotations', value: `${preview.rotations} · other planes cover them where pools allow` },
-              ...(preview.cost > 0 ? cashAfterRows(state, preview.cost) : []),
-            ],
-            facts: ['A full overhaul: it also clears the C and A checks. Rotations nobody can cover are cancelled. Cancel the booking any time before it goes in.'],
-            confirmLabel: 'Book check',
-            run: () => {
-              ops.bookDCheck(state, plane.tail);
-              changed();
-            },
-          }),
-        );
+        book.addEventListener('click', () => confirmDBooking(state, plane, changed));
         wrap.append(book);
       }
     }
