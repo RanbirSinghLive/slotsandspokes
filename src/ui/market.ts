@@ -3,6 +3,7 @@ import { airlineCalled, classOpen, tierThatOpens } from '../sim/ladder';
 import { cashNeededToLease } from '../sim/leasing';
 import { daysUntilNextListing, holdDaysLeft, HOLD_DAYS, listingsOf, priceIndexOf } from '../sim/market';
 import { clearStandingOrder, setStandingOrder, standingOrderOf } from '../sim/standingOrders';
+import { deliveryDays } from '../sim/fleetTiming';
 import { select } from './selection';
 import { showConfirm } from './confirmModal';
 import { money } from './format';
@@ -52,7 +53,7 @@ function openOrderDialog(state: SimState, code: string, name: string): void {
   if (existing) {
     showConfirm({
       title: `Standing order · ${name}`,
-      rows: [{ label: 'Takes', value: `next ${name} ≤ ${existing.maxAgeYears} yrs, based ${state.homeAirport}` }],
+      rows: [{ label: 'Takes', value: `next ${name} ≤ ${existing.maxAgeYears} yrs, based ${state.homeAirport}` }, { label: 'Arrives', value: `${deliveryDays(state)}d after leasing` }],
       facts: ['Leases it the moment it is listed, then clears itself.'],
       confirmLabel: 'Remove order',
       run: () => {
@@ -65,7 +66,7 @@ function openOrderDialog(state: SimState, code: string, name: string): void {
   }
   const rowsFor = (index: number) => [
     { label: 'Takes', value: `next ${name} ≤ ${ORDER_AGES[index].maxAgeYears} yrs` },
-    { label: 'Based at', value: state.homeAirport },
+    { label: 'Based at', value: `${state.homeAirport} (home) · +${deliveryDays(state)}d` },
   ];
   showConfirm({
     title: `Standing order · ${name}`,

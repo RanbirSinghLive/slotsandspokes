@@ -35,6 +35,8 @@ export type RivalClosure = { code: string; market: string; closedAtMinute: numbe
 
 export type Aircraft = {
   tail: string;
+  /** The day a lease was delivered; absent for the starting plane and older saves. The Fleet page marks a delivery that has no flights yet. */
+  deliveredDay?: number;
   typeCode: string;
   /** A hybrid or electric build (sim/powertrain.ts); absent for the usual turbine or piston plane. */
   powertrain?: 'hybrid' | 'electric';
