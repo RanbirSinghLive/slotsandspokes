@@ -1,7 +1,7 @@
 import { AIRCRAFT_CLASSES, pluralClassName } from '../sim/aircraftClasses';
 import { airlineCalled, classOpen, tierThatOpens } from '../sim/ladder';
 import { cashNeededToLease } from '../sim/leasing';
-import { daysUntilNextListing, holdDaysLeft, HOLD_DAYS, listingsOf } from '../sim/market';
+import { daysUntilNextListing, holdDaysLeft, HOLD_DAYS, listingsOf, priceIndexOf } from '../sim/market';
 import { clearStandingOrder, setStandingOrder, standingOrderOf } from '../sim/standingOrders';
 import { select } from './selection';
 import { showConfirm } from './confirmModal';
@@ -140,9 +140,10 @@ function renderStrip(state: SimState): void {
       order: standingOrderOf(state, cls.code)?.maxAgeYears ?? 0,
       why: locked ? `Opens as ${opener ? airlineCalled(opener) : 'a bigger airline'}. See Goals.` : null,
       empty: locked || listings.length === 0,
+      price: locked ? 1 : priceIndexOf(state.market, cls.code),
     };
   });
-  const signature = rows.map((row) => `${row.name}:${row.listed}:${row.ages}:${row.next}:${row.why}:${row.holds.join('.')}:${row.order}`).join('|');
+  const signature = rows.map((row) => `${row.name}:${row.listed}:${row.ages}:${row.next}:${row.why}:${row.holds.join('.')}:${row.order}:${row.price}`).join('|');
   if (signature === stripSignature) return;
   stripSignature = signature;
 
@@ -159,6 +160,15 @@ function renderStrip(state: SimState): void {
   for (const row of rows) {
     const name = cell('', row.empty ? 'is-empty' : '');
     name.append(planeIconElement(row.code), ` ${row.name}`);
+    // The lessor's price level: an arrow once it is 5% or more off the rate card.
+    if (!row.why && Math.abs(row.price - 1) >= 0.05) {
+      const trend = document.createElement('span');
+      const pct = Math.round(Math.abs(row.price - 1) * 100);
+      trend.className = row.price > 1 ? 'market-trend is-up' : 'market-trend is-down';
+      trend.textContent = row.price > 1 ? ' ▲' : ' ▼';
+      trend.title = `Lessor rates ${row.price > 1 ? `+${pct}% · shelf running short` : `−${pct}% · listings sitting`}. A lease keeps the rate it was signed at.`;
+      name.append(trend);
+    }
     cells.push(name);
     if (row.why) {
       const locked = cell('🔒 Locked ', 'market-locked is-empty');

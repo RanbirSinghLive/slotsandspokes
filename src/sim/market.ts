@@ -1,4 +1,5 @@
 import { dayIndex } from './clock';
+import { classOpen } from './ladder';
 import { biggestOpenRivalClass, rivalClassOpen } from './rivalLadder';
 import { isReturning, startReturn } from './fleetTiming';
 import { nextRandom } from './rng';
@@ -47,6 +48,8 @@ export type MarketState = {
   /** Day each class's next airframe arrives, keyed by class code. */
   nextArrivalDay: Record<string, number>;
   nextListingId: number;
+  /** The lessor's price level per class, 1 = the rate card (see PRICE_MIN). Absent means 1 everywhere. */
+  priceIndex?: Record<string, number>;
 };
 
 type ClassRhythm = { initial: number; intervalDays: number; cap: number };
@@ -66,6 +69,23 @@ export const MARKET_RHYTHM: Record<string, ClassRhythm> = {
  * listing would be gone before anyone could look at it.
  */
 export const HOLD_DAYS = 3;
+
+/**
+ * Scarcity pricing: the lessor charges more for a class the airlines keep
+ * emptying and less for one that sits. A class's price level (1 = the rate
+ * card) climbs each day its shelf is empty and eases each day a listing
+ * sits past its hold; deliveries come sooner while it is high. The rate is
+ * locked when a lease is signed, so a squeeze only hits new leases. Moves
+ * only for classes the player may lease, so a locked class never drifts
+ * cheap before anyone can use it. It falls more slowly than it rises: a
+ * sitting shelf is a small discount, never a standing one.
+ */
+export const PRICE_MIN = 0.9;
+export const PRICE_MAX = 1.4;
+const PRICE_RISE_PER_DAY = 0.015;
+const PRICE_FALL_PER_DAY = 0.005;
+/** A squeezed class refills at most this much faster than its base interval. */
+const FASTEST_INTERVAL_SHARE = 0.6;
 
 /** Listed airframes are this many years old, give or take: 15 to 24. */
 const MIN_LISTING_AGE = 15;
@@ -118,10 +138,20 @@ function rivalMayTake(state: SimState, code: string, typeCode: string): boolean 
   return typeCode !== 'PROP' || listingsOf(state, typeCode).length > 1;
 }
 
+/** This class's price level at the lessor: 1 is the rate card. */
+export function priceIndexOf(market: MarketState, typeCode: string): number {
+  return market.priceIndex?.[typeCode] ?? 1;
+}
+
+/** What the lessor asks per day for a plane of this class and age right now. */
+export function marketRate(market: MarketState, typeCode: string, ageYears: number): number {
+  return Math.round((leaseRateFor(typeCode, ageYears) * priceIndexOf(market, typeCode)) / 10) * 10;
+}
+
 function addListing(market: MarketState, typeCode: string, day: number, seed: number): number {
   const [roll, next] = nextRandom(seed);
   const ageYears = MIN_LISTING_AGE + Math.floor(roll * LISTING_AGE_SPREAD);
-  market.listings.push({ id: market.nextListingId++, typeCode, ageYears, leasePricePerDay: leaseRateFor(typeCode, ageYears), listedDay: day });
+  market.listings.push({ id: market.nextListingId++, typeCode, ageYears, leasePricePerDay: marketRate(market, typeCode, ageYears), listedDay: day });
   return next;
 }
 
@@ -144,10 +174,25 @@ export function createMarket(seed: number): [MarketState, number] {
 export function rollDailyMarket(state: SimState, day: number): void {
   const market = state.market;
   for (const [code, rhythm] of Object.entries(MARKET_RHYTHM)) {
+    movePriceIndex(state, code);
     if (day < market.nextArrivalDay[code]) continue;
     if (listingsOf(state, code).length < rhythm.cap) state.rngSeed = addListing(market, code, day, state.rngSeed);
-    market.nextArrivalDay[code] = day + rhythm.intervalDays;
+    const sooner = Math.max(Math.round(rhythm.intervalDays * FASTEST_INTERVAL_SHARE), Math.round(rhythm.intervalDays / priceIndexOf(market, code)));
+    market.nextArrivalDay[code] = day + sooner;
   }
+}
+
+/** One day's move of a class's price level, and the shelf re-priced to it. */
+function movePriceIndex(state: SimState, code: string): void {
+  if (!classOpen(state, code)) return;
+  const market = state.market;
+  const listed = listingsOf(state, code);
+  const sitting = listed.some((listing) => holdDaysLeft(state, listing) === 0);
+  const move = listed.length === 0 ? PRICE_RISE_PER_DAY : sitting ? -PRICE_FALL_PER_DAY : 0;
+  if (move === 0) return;
+  const next = Math.min(PRICE_MAX, Math.max(PRICE_MIN, priceIndexOf(market, code) + move));
+  market.priceIndex = { ...(market.priceIndex ?? {}), [code]: Math.round(next * 1000) / 1000 };
+  for (const listing of listed) listing.leasePricePerDay = marketRate(market, code, listing.ageYears);
 }
 
 /** This class's listings, the one a lease would take first. */

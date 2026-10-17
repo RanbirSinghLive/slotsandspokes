@@ -12,7 +12,7 @@ import { allRotations } from './utilisation';
 // a rotation, never its time; it leaves the schedule legal, never splits a
 // market over more planes than before, and a second FIFO or LIFO changes nothing.
 const player = createPlayer('bold');
-const state = startHeadlessGame('YYZ', 3, player);
+const state = startHeadlessGame('YYZ', 1, player);
 for (let day = 1; day <= 100; day++) {
   for (let minute = 0; minute < 1440; minute++) step(state);
   player.playDay(state);
