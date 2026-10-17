@@ -33,6 +33,7 @@ import { greatCircleDistanceNm } from '../sim/geo';
 import { networkOverheadPerDay } from '../sim/overhead';
 import { cashNeededToLease } from '../sim/leasing';
 import { overheadAddedByNextPlane, overheadSavedByOneFewer } from '../sim/overhead';
+import { freeHeavyBays } from '../sim/mxChecks';
 import * as actions from '../sim/playerActions';
 import { forecastStance } from '../sim/fareForecast';
 import { setFareClasses, setFareStance } from '../sim/pricing';
@@ -1380,6 +1381,26 @@ function keepMaintenance(state: SimState): string[] {
       if (!added.ok) break;
       log.push(added.message);
     }
+  }
+  log.push(...keepHeavyChecks(state));
+  return log;
+}
+
+/**
+ * Book each plane's C check once its window is open and the plane is parked
+ * at base, when a hangar bay is free for it (counting the planes already
+ * booked there), so checks go in house one stretch at a time instead of
+ * waiting out the overdue grace and being contracted out.
+ */
+function keepHeavyChecks(state: SimState): string[] {
+  const log: string[] = [];
+  for (const readout of actions.heavyCheckReadouts(state)) {
+    if (!readout.canBook) continue;
+    const base = state.aircraft.find((aircraft) => aircraft.tail === readout.tail)?.baseAirport ?? '';
+    const alreadyBooked = state.aircraft.filter((aircraft) => aircraft.heavyCheckBooked && aircraft.baseAirport === base).length;
+    if (readout.dueIn > 0 && freeHeavyBays(state, base) <= alreadyBooked) continue;
+    const booked = actions.bookHeavyCheck(state, readout.tail);
+    if (booked.ok) log.push(booked.message);
   }
   return log;
 }

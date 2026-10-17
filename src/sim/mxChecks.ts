@@ -27,16 +27,12 @@ import type { Aircraft, SimState } from './state';
  * from a maintenance base.
  *
  * **The heavy check** is HEAVY_WORK_MINUTES of hangar work every
- * HEAVY_INTERVAL_DAYS days the plane flies, done at night: from
- * HEAVY_WINDOW_DAYS before it's due, whatever each night at a maintenance
- * base has left after the line check goes toward it. Done, it clears every
- * deferred item. A plane with long nights finishes it in two or three
- * without missing a flight; one flown hard from first light to curfew
- * makes slow progress; nights elsewhere make none. Only a plane
- * OVERDUE_GRACE_DAYS past due is grounded for it, as an AOG (sim/aog.ts),
- * at its base, until the work left is done, by contract if its base has
- * no maintenance. So the lever is the shape of the plane's day and where
- * it sleeps, not a date.
+ * HEAVY_INTERVAL_DAYS days the plane flies, done as one stretch with the
+ * plane out of service, in a hangar bay or contracted out: booked by the
+ * player once HEAVY_WINDOW_DAYS before it's due, or forced when the plane
+ * is OVERDUE_GRACE_DAYS past due, as an AOG (sim/aog.ts), at its base,
+ * until the work is done. Done, it clears every deferred item. So the lever
+ * is picking the quiet week, not the shape of the plane's night.
  */
 
 /** Hangar minutes a night, by class: a base, and more per cycle flown. */
@@ -374,7 +370,6 @@ export function rollNightlyChecks(state: SimState, dayStartMinute: number): void
   }
   const sleepers = checked.flatMap((entry) => (entry.station ? [{ aircraft: entry.aircraft, station: entry.station }] : []));
   const inHouse = lineCheckedTails(state, sleepers);
-  const bays = heavyBayTails(state, sleepers);
 
   for (const { aircraft, station } of checked) {
     const legs = state.schedule.filter((leg) => leg.tail === aircraft.tail);
@@ -391,18 +386,13 @@ export function rollNightlyChecks(state: SimState, dayStartMinute: number): void
     } else {
       result = night < work ? 'short' : night >= work + CLEAR_SPARE_MINUTES && deferredItems(aircraft) > 0 ? 'cleared' : 'checked';
     }
-    // What the night has left after the line check goes to the A check first, once it's open (contracted where there's no line base), then toward the heavy check in a hangar bay.
-    let spare = night > work ? Math.round(night - work) : 0;
+    // What the night has left after the line check goes to the A check once it's open (contracted where there's no line base). The C check never banks nights: it is one stretch out of service.
+    const spare = night > work ? Math.round(night - work) : 0;
     if (station && result !== 'away' && spare > 0 && aCheckOpen(aircraft)) {
       const used = Math.min(spare, aCheckWorkMinutes(aircraft.typeCode) - aBankedMinutes(aircraft));
       if (!inHouse.has(aircraft.tail)) chargeMaintenance(state, contractCost(used));
       aircraft.aBankedMinutes = aBankedMinutes(aircraft) + used;
-      spare -= used;
       if (aBankedMinutes(aircraft) >= aCheckWorkMinutes(aircraft.typeCode)) finishACheck(state, aircraft);
-    }
-    if (station && result !== 'away' && bays.has(aircraft.tail) && spare > 0) {
-      aircraft.heavyBankedMinutes = heavyBankedMinutes(aircraft) + spare;
-      if (heavyBankedMinutes(aircraft) >= heavyCheckWorkMinutes(aircraft.typeCode)) finishHeavyCheck(state, aircraft);
     }
     // A night away or too short, or an A check long overdue, leaves an item for tomorrow.
     if (result === 'away' || result === 'short' || aCheckOverdue(aircraft)) aircraft.deferredItems = deferredItems(aircraft) + 1;
@@ -433,31 +423,6 @@ export function lineCheckedTails(state: SimState, sleepers: { aircraft: Aircraft
     for (const plane of planes.slice(0, lineCapacity(state, station))) done.add(plane.tail);
   }
   return done;
-}
-
-/**
- * The planes holding a hangar bay: at a hangar rated for their class, with
- * the heavy check open, the closest to due first, up to the bays left
- * after planes in a forced check there.
- */
-export function heavyBayTails(state: SimState, sleepers: { aircraft: Aircraft; station: string }[]): Set<string> {
-  const held = new Set<string>();
-  const byStation = new Map<string, Aircraft[]>();
-  for (const { aircraft, station } of sleepers) {
-    if (!heavyRated(state, station, aircraft.typeCode) || !heavyCheckOpen(aircraft)) continue;
-    byStation.set(station, [...(byStation.get(station) ?? []), aircraft]);
-  }
-  for (const [station, planes] of byStation) {
-    const inForcedCheck = state.aogs.filter((event) => event.check && event.base === station).length;
-    planes.sort((a, b) => heavyCheckDueIn(a) - heavyCheckDueIn(b) || a.tail.localeCompare(b.tail));
-    for (const plane of planes.slice(0, Math.max(0, heavyBays(state, station) - inForcedCheck))) held.add(plane.tail);
-  }
-  return held;
-}
-
-/** The planes asleep at each station tonight, as they stand now: grounded planes where they are. */
-export function sleepersNow(state: SimState): { aircraft: Aircraft; station: string }[] {
-  return state.aircraft.flatMap((aircraft) => (aircraft.status === 'ground' && aircraft.atAirport ? [{ aircraft, station: aircraft.atAirport }] : []));
 }
 
 /** Maintenance spending outside the flights: contracted checks. */
@@ -602,7 +567,7 @@ export function finishHeavyCheck(state: SimState, aircraft: Aircraft): void {
 export function tonightCheck(
   state: SimState,
   tail: string,
-): { night: number; work: number; station: string; inHouse: boolean; away: boolean; contracted: boolean; short: boolean; banking: 'A' | 'C' | 'A+C' | null } | null {
+): { night: number; work: number; station: string; inHouse: boolean; away: boolean; contracted: boolean; short: boolean; banking: 'A' | null } | null {
   const aircraft = state.aircraft.find((a) => a.tail === tail);
   const legs = state.schedule.filter((leg) => leg.tail === tail).sort((a, b) => a.departMinute - b.departMinute);
   if (!aircraft || legs.length === 0) return null;
@@ -622,12 +587,9 @@ export function tonightCheck(
   const contracted = !inHouse && outstationCheck(state, station) === 'contract';
   const away = !inHouse && !contracted;
   const short = !away && night < work;
-  // Whether the night's spare hours go to an A check, then a C check in a bay, as rollNightlyChecks() will do.
-  let spare = !away && night > work ? night - work : 0;
-  const bankingA = spare > 0 && aCheckOpen(aircraft);
-  if (bankingA) spare -= Math.min(spare, aCheckWorkMinutes(aircraft.typeCode) - aBankedMinutes(aircraft));
-  const bankingC = !away && spare > 0 && heavyBayTails(state, sleepers).has(tail);
-  return { night, work, station, inHouse, away, contracted, short, banking: bankingA && bankingC ? 'A+C' : bankingA ? 'A' : bankingC ? 'C' : null };
+  // Whether the night's spare hours go to an A check, as rollNightlyChecks() will do.
+  const banking = !away && night > work && aCheckOpen(aircraft) ? ('A' as const) : null;
+  return { night, work, station, inHouse, away, contracted, short, banking };
 }
 
 /** Bookable: parked at its base, D check inside its window, and no other check booked, running or rebasing. */
