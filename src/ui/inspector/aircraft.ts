@@ -105,8 +105,10 @@ export function buildFleetView(state: SimState, changed: () => void): HTMLElemen
   // Leases signed and not yet delivered, soonest first, above the fleet.
   const today = dayIndex(state);
   for (const lease of [...(state.inboundLeases ?? [])].sort((a, b) => a.arrivesDay - b.arrivesDay)) {
-    const row = document.createElement('div');
+    const row = linkToMap(document.createElement('button'), { kind: 'airport', iata: lease.base });
+    row.type = 'button';
     row.className = 'inspector-row is-inbound';
+    row.addEventListener('click', () => select({ kind: 'airport', iata: lease.base }));
     const name = document.createElement('span');
     name.append(planeIconElement(lease.typeCode), ` ${classByCode(lease.typeCode)?.name ?? lease.typeCode}`);
     const detail = document.createElement('span');

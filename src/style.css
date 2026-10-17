@@ -4226,7 +4226,6 @@ button.inspector-crumb:hover {
 .inspector-row.is-inbound {
   border-bottom: 1px dashed rgba(255, 255, 255, 0.3);
   opacity: 0.75;
-  cursor: default;
 }
 .inspector-row.is-new {
   box-shadow: inset 3px 0 0 #2fb8a6;

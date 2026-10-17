@@ -247,7 +247,7 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
           { label: 'Fleet overhead added', value: `${money(overhead)}/day` },
           { label: 'Running cost added', value: `${money(perDay + overhead)}/day` },
           { label: 'Term', value: seasonalTerm ? `${SEASON_DAYS} days, back by itself` : 'standing' },
-          { label: 'Delivery', value: `${deliveryDays(state)} days` },
+          { label: 'Based at', value: `${airport.iata} · arrives day ${dayIndex(state) + deliveryDays(state)} (${deliveryDays(state)}d)` },
           ...(held > 0 ? [{ label: 'Held for you', value: `${held}d before rivals can lease it` }] : []),
         ];
       };
