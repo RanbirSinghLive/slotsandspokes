@@ -219,7 +219,7 @@ const TIMELINE_DAYS = HEAVY_INTERVAL_DAYS;
  */
 function buildDueTimeline(state: SimState, changed: () => void): HTMLElement[] {
   const nodes: HTMLElement[] = [
-    heading('C checks due', `Each plane's C check on a ${TIMELINE_DAYS}-day axis (due by days, hours or cycles, whichever is first), today at the left. The amber band is the window where nights at a maintenance base bank hours; a cluster of markers is planes that will want the hangar together. Overdue planes sit at the left edge. A violet D marker is a plane whose D check (the overhaul) falls due inside the axis.`),
+    heading('C checks due', `Each plane's C check on a ${TIMELINE_DAYS}-day axis (due by days, hours or cycles, whichever is first), today at the left. The amber band is the window where nights at a maintenance base bank hours; a cluster of markers is planes that will want the hangar together. Overdue planes sit at the left edge. A violet D marker is a plane whose D check (the overhaul) falls due inside the axis; the D check also does the C check, so that plane's C marker dims when its D falls due first.`),
   ];
   const readouts = ops.heavyCheckReadouts(state).filter((p) => !p.inCheck);
   if (readouts.length === 0) return [...nodes, line('No planes outside the hangar')];
@@ -231,8 +231,7 @@ function buildDueTimeline(state: SimState, changed: () => void): HTMLElement[] {
   axis.append(windowBand);
   // Lanes: a marker takes the first lane whose last marker is far enough left.
   const laneEnds: number[] = [];
-  const MARKER_SPAN_PCT = 11;
-  const D_MARKER_SPAN_PCT = 15;
+  const MARKER_SPAN_PCT = 15;
   // C markers, then a D marker for each plane whose D check is due within the axis.
   const markers = [
     ...readouts.map((plane) => ({ plane, kind: 'C' as const, dueIn: plane.dueIn })),
@@ -240,8 +239,7 @@ function buildDueTimeline(state: SimState, changed: () => void): HTMLElement[] {
   ].sort((a, b) => a.dueIn - b.dueIn);
   for (const { plane, kind, dueIn } of markers) {
     const at = (Math.min(TIMELINE_DAYS, Math.max(0, dueIn)) / TIMELINE_DAYS) * 100;
-    const span = kind === 'D' ? D_MARKER_SPAN_PCT : MARKER_SPAN_PCT;
-    let lane = laneEnds.findIndex((end) => at - end >= span);
+    let lane = laneEnds.findIndex((end) => at - end >= MARKER_SPAN_PCT);
     if (lane === -1) lane = laneEnds.length;
     laneEnds[lane] = at;
     const marker = document.createElement('button');
@@ -255,13 +253,15 @@ function buildDueTimeline(state: SimState, changed: () => void): HTMLElement[] {
       axis.append(marker);
       continue;
     }
-    marker.className = `mx-marker${dueIn <= 0 ? ' is-late' : plane.open ? ' is-open' : ''}${plane.toleranceWear > 0 ? ' is-worn' : ''}${plane.tail === openPuck ? ' is-picked' : ''}`;
-    marker.textContent = plane.tail.slice(-4);
+    // A D check restarts the C clock, so a C check that falls due after the same plane's D check is moot if the D goes in first.
+    const coveredByD = !plane.dInCheck && plane.dDueIn <= dueIn;
+    marker.className = `mx-marker${dueIn <= 0 ? ' is-late' : plane.open ? ' is-open' : ''}${plane.toleranceWear > 0 ? ' is-worn' : ''}${coveredByD ? ' is-covered' : ''}${plane.tail === openPuck ? ' is-picked' : ''}`;
+    marker.textContent = `C ${plane.tail.slice(-4)}`;
     marker.addEventListener('click', () => {
       openPuck = openPuck === plane.tail ? null : plane.tail;
       changed();
     });
-    marker.dataset.tip = `${plane.tail} · ${plane.dueIn > 0 ? `due ${plane.dueIn}d` : `${-plane.dueIn}d overdue`}${plane.shiftDays > 0 ? ` · pushed ${plane.shiftDays}/${plane.toleranceCap}d` : ''}${plane.toleranceWear > 0 ? ` · wearing +${plane.toleranceWear.toFixed(1)}y` : ''} · tap for options`;
+    marker.dataset.tip = `${plane.tail} · ${plane.dueIn > 0 ? `due ${plane.dueIn}d` : `${-plane.dueIn}d overdue`}${plane.shiftDays > 0 ? ` · pushed ${plane.shiftDays}/${plane.toleranceCap}d` : ''}${plane.toleranceWear > 0 ? ` · wearing +${plane.toleranceWear.toFixed(1)}y` : ''} · tap for options${coveredByD ? ` · D check due ${plane.dDueIn > 0 ? `in ${plane.dDueIn}d` : `${-plane.dDueIn}d ago`}: it also does the C check, so booking D first clears this one` : ''}`;
     axis.append(marker);
   }
   axis.style.height = `${laneEnds.length * 18 + 6}px`;
