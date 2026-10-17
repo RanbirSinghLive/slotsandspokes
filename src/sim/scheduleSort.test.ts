@@ -17,6 +17,12 @@ for (let day = 1; day <= 100; day++) {
   for (let minute = 0; minute < 1440; minute++) step(state);
   player.playDay(state);
 }
+// Sorting is judged from a legal schedule: a plane that just came out of a check can leave overlapping legs for a day or two, so run on until none do.
+for (let extra = 0; extra < 30 && scheduleConflicts(state).length > 0; extra++) {
+  for (let minute = 0; minute < 1440; minute++) step(state);
+  player.playDay(state);
+}
+assert.deepEqual(scheduleConflicts(state), [], 'the game never reached a legal schedule to sort');
 
 const planesPerMarket = (s: typeof state): number => {
   const planes = new Map<string, Set<string>>();

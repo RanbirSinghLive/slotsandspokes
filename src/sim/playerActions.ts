@@ -98,7 +98,7 @@ import { inboundAt, orderLease } from './fleetTiming';
 import { startSeatSale as startSeatSaleRule } from './seatSale';
 import { SEASON_DAYS, SEASONAL_PREMIUM } from './seasonalLease';
 import { changeSpareEngines as changeSpareEnginesRule, holdPerDay, shopVisitCost, sparesHeld, sparesReady } from './enginePool';
-import { aBankedMinutes, aCheckOpen, aCheckProgress, aCheckWorkMinutes, cyclesSinceHeavy, deferredItems, flightHoursSinceHeavy, heavyBankedMinutes, maintenanceReserve, heavyBayTails, heavyCheckDueIn, canBookHeavyCheck, heavyBookBlocker, applyHeavyTolerance, heavyToleranceBlocker, heavyToleranceCost, heavyShiftOf, toleranceCapDays, toleranceWearYears, TOLERANCE_STEPS, canBookDCheck, dBookBlocker, dCheckDueIn, dCheckOpen, flightHoursSinceD, heavyCheckOpen, heavyCheckWorkMinutes, sleepersNow, tonightCheck } from './mxChecks';
+import { aBankedMinutes, aCheckOpen, aCheckProgress, aCheckWorkMinutes, cyclesSinceHeavy, deferredItems, flightHoursSinceHeavy, heavyBankedMinutes, maintenanceReserve, heavyCheckDueIn, canBookHeavyCheck, heavyBookBlocker, applyHeavyTolerance, heavyToleranceBlocker, heavyToleranceCost, heavyShiftOf, toleranceCapDays, toleranceWearYears, TOLERANCE_STEPS, canBookDCheck, dBookBlocker, dCheckDueIn, dCheckOpen, flightHoursSinceD, heavyCheckOpen, heavyCheckWorkMinutes, tonightCheck } from './mxChecks';
 import { rebaseOptions, rebasePlane, type RebaseOption } from './rebase';
 import { cabinGainPerDay, cabinOf, cancelRefit as cancelRefitRule, orderRefit as orderRefitRule, refitBlockedReason, refitCost, refitDays, type Cabin } from './cabins';
 import { commitBringHome, commitRetime, planBringHome, planRetime, type RetimePlan } from './retime';
@@ -742,8 +742,6 @@ export type HeavyCheckReadout = {
   toleranceCap: number;
   /** Grounded for it, booked or having gone too far overdue. */
   inCheck: boolean;
-  /** Holding a hangar bay, so its nights bank hours. */
-  inBay: boolean;
   lastNight: 'checked' | 'cleared' | 'short' | 'contracted' | 'away' | null;
   /** The D check: days to due (negative: overdue), whether booking is open, airborne hours since, booked, bookable now, and whether it is the check in the hangar. */
   dDueIn: number;
@@ -757,7 +755,6 @@ export type HeavyCheckReadout = {
 
 /** Every plane's checks (sim/mxChecks.ts), for the Mtc screen, soonest due first. */
 export function heavyCheckReadouts(state: SimState): HeavyCheckReadout[] {
-  const bays = heavyBayTails(state, sleepersNow(state));
   return state.aircraft
     .map((aircraft) => ({
       tail: aircraft.tail,
@@ -783,7 +780,6 @@ export function heavyCheckReadouts(state: SimState): HeavyCheckReadout[] {
       toleranceWear: toleranceWearYears(aircraft),
       toleranceCap: toleranceCapDays(state, aircraft),
       inCheck: state.aogs.some((event) => event.tail === aircraft.tail && event.check),
-      inBay: bays.has(aircraft.tail),
       lastNight: state.lastNightChecks?.[aircraft.tail] ?? null,
       dDueIn: dCheckDueIn(aircraft),
       dOpen: dCheckOpen(aircraft),
@@ -1174,9 +1170,7 @@ export function mxBaseReadout(
       tonight.set(check.station, entry);
     }
   }
-  const sleepers = sleepersNow(state);
-  const bays = heavyBayTails(state, sleepers);
-  const inBays = (iata: string) => sleepers.filter((entry) => entry.station === iata && bays.has(entry.aircraft.tail)).length + state.aogs.filter((event) => event.check && event.base === iata).length;
+  const inBays = (iata: string) => state.aogs.filter((event) => event.check && event.base === iata).length;
   const stations = mxStationList(state).filter((iata) => mxLevel(state, kind, iata) > 0);
   const bases = stations.map((iata) => ({
     iata,
