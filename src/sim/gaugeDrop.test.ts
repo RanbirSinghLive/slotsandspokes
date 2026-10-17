@@ -10,7 +10,7 @@ import { allRotations } from './utilisation';
 // at the same base is re-timed for that type, and refused when any leg is
 // beyond the receiving type's range, whichever way it is dragged.
 const player = createPlayer('bold');
-const state = startHeadlessGame('YYZ', 3, player);
+const state = startHeadlessGame('YYZ', 4, player);
 for (let day = 1; day <= 75; day++) {
   for (let minute = 0; minute < 1440; minute++) step(state);
   player.playDay(state);

@@ -3319,6 +3319,14 @@ button.ticker-item:hover {
   color: #6b7694;
 }
 
+#market-strip .market-trend.is-up {
+  color: #f0a64a;
+}
+
+#market-strip .market-trend.is-down {
+  color: #5ed6c8;
+}
+
 /* A locked class spans the three number columns. */
 #market-strip .market-locked {
   grid-column: span 3;

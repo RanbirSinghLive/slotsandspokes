@@ -93,7 +93,7 @@ import {
 } from './innovations';
 import { buildCharger as buildChargerRule, chargerBlockedReason, defaultPowertrain, electricAvailable, ELECTRIC_CLASS, hasCharger, powertrainLeasePerDay } from './powertrain';
 import { rdActive, rdBudgetLevel, rdBudgetPerDay, rdProgress, researchSpeed, setRdBudget as setRdBudgetRule, startResearch as startResearchRule } from './rd';
-import { cashNeededToLease, LEASE_RESERVE_DAYS, leaseRateFor, loadLeaseRates } from './leasing';
+import { cashNeededToLease, LEASE_RESERVE_DAYS, loadLeaseRates } from './leasing';
 import { inboundAt, orderLease } from './fleetTiming';
 import { startSeatSale as startSeatSaleRule } from './seatSale';
 import { SEASON_DAYS, SEASONAL_PREMIUM } from './seasonalLease';
@@ -104,7 +104,7 @@ import { cabinGainPerDay, cabinOf, cancelRefit as cancelRefitRule, orderRefit as
 import { commitBringHome, commitRetime, planBringHome, planRetime, type RetimePlan } from './retime';
 import { commitDraft, conflictingLegIds, planDrop, snapStart, type DraftMove, type DropPlan } from './scheduleDraft';
 import { planSort, type SortMode, type SortPlan } from './scheduleSort';
-import { daysUntilNextListing, listingsOf, returnBlockedReason, returnFee, returnLease, takeListing, type MarketListing } from './market';
+import { daysUntilNextListing, listingsOf, marketRate, returnBlockedReason, returnFee, returnLease, takeListing, type MarketListing } from './market';
 import { airlineCalled, classOpen, tierThatOpens } from './ladder';
 import { actualDailyDemand, currentPotentialDemand } from './marketDemand';
 import { revealReach } from './reach';
@@ -518,7 +518,7 @@ function asLeased(state: SimState, listing: MarketListing, powertrain?: 'hybrid'
   // A hybrid or electric plane is a new airframe at its own rate (sim/powertrain.ts).
   if (powertrain) return { ...listing, ageYears: 0, leasePricePerDay: Math.round(powertrainLeasePerDay(listing.typeCode, powertrain) * executiveLeaseMultiplier(state)) };
   const ageYears = leasedAge(state, listing.ageYears);
-  const rate = ageYears === listing.ageYears ? listing.leasePricePerDay : leaseRateFor(listing.typeCode, ageYears);
+  const rate = ageYears === listing.ageYears ? listing.leasePricePerDay : marketRate(state.market, listing.typeCode, ageYears);
   const leasePricePerDay = Math.round(rate * executiveLeaseMultiplier(state));
   if (ageYears === listing.ageYears && leasePricePerDay === listing.leasePricePerDay) return listing;
   return { ...listing, ageYears, leasePricePerDay };

@@ -2034,6 +2034,21 @@ airframes are late more often (`sim/delays.ts`), break down more
 don't age during a game; remaining life (to 25 years) is shown, not
 enforced.
 
+**Scarcity pricing.** The lessor's rate for a class moves with the shelf
+(`state.market.priceIndex`, 1 = the rate card; `movePriceIndex()` in
+`sim/market.ts`, once a day at rollover). A shelf with nothing on it
+raises the class's price level by 1.5 points; a listing still unleased
+after its hold lowers it by 0.5. Held-only shelves leave it alone. The
+level stays between 0.9 and 1.4, and a class the player cannot lease yet
+never moves. It also paces deliveries: the next airframe comes after the
+base interval divided by the level, never under 60% of it (Regional 7 days
+falls to 4 at the top). Every listing is re-priced to the level each day,
+so the lease confirm, the HUD chip and standing orders all quote it. **A
+lease keeps the rate it was signed at**: a later squeeze changes nothing
+for a plane already leased. The Lessor strip shows a ▲ (amber) or ▼
+(teal) beside a class once its level is 5% or more off the card, with the
+percentage in its tip.
+
 **Cash gate.** Leasing needs 30 days of the lease in cash
 (`LEASE_RESERVE_DAYS`), which is what unlocks the bigger classes as the
 airline earns: at 20-year prices about $79k for a Propeller, $306k for a
