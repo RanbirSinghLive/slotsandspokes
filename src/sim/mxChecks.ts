@@ -643,6 +643,16 @@ export function canBookDCheck(state: SimState, aircraft: Aircraft): boolean {
   );
 }
 
+/** Why an open D check can't be booked right now, or null when it can (or is booked already or not open). */
+export function dBookBlocker(state: SimState, aircraft: Aircraft): string | null {
+  if (!dCheckOpen(aircraft) || aircraft.dCheckBooked || canBookDCheck(state, aircraft)) return null;
+  if (aircraft.heavyCheckBooked) return 'C check booked · cancel it first';
+  if (state.aogs.some((event) => event.tail === aircraft.tail)) return 'Grounded already';
+  if (aircraft.rebase) return 'Rebasing';
+  if (aircraft.status !== 'ground') return `In the air · books once parked at ${aircraft.baseAirport}`;
+  return `At ${aircraft.atAirport} · books once parked at ${aircraft.baseAirport}`;
+}
+
 /** What booking a plane's D check now would do: days grounded, contract cost (0 in house) and rotations it takes off the plane. Null when it can't be booked. */
 export function previewDCheckBooking(state: SimState, tail: string): { days: number; cost: number; rotations: number } | null {
   const aircraft = state.aircraft.find((a) => a.tail === tail);

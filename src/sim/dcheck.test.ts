@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { createPlayer } from '../headless/player';
 import { startHeadlessGame } from '../headless/newGame';
-import { bookDCheck, cancelBookedDCheck } from './playerActions';
-import { D_WEAR_YEARS, dCheckDueIn, previewDCheckBooking, wornAge } from './mxChecks';
+import { bookDCheck, bookHeavyCheck, cancelBookedDCheck } from './playerActions';
+import { D_WEAR_YEARS, dBookBlocker, dCheckDueIn, previewDCheckBooking, wornAge } from './mxChecks';
 import { step } from './step';
 
 // Run with `npm run dchecktest`: a D check can't be booked before its window,
@@ -26,7 +26,14 @@ const age = wornAge(aircraft);
 aircraft.daysSinceD = 365;
 assert.equal(wornAge(aircraft), age + D_WEAR_YEARS, 'overdue plane did not wear');
 aircraft.daysSinceD = 320;
+assert.equal(dBookBlocker(state, aircraft), null, 'a bookable D check had a blocker');
+// A booked C check blocks the D booking, and says so.
+aircraft.daysSinceHeavyCheck = 25;
+assert.equal(bookHeavyCheck(state, aircraft.tail).ok, true);
+assert.equal(dBookBlocker(state, aircraft), 'C check booked · cancel it first');
+delete aircraft.heavyCheckBooked;
 assert.equal(bookDCheck(state, aircraft.tail).ok, true);
+assert.equal(dBookBlocker(state, aircraft), null, 'a booked D check had a blocker');
 assert.equal(bookDCheck(state, aircraft.tail).ok, false, 'booked twice');
 cancelBookedDCheck(state, aircraft.tail);
 assert.equal(aircraft.dCheckBooked, undefined);

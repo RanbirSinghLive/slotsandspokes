@@ -5736,6 +5736,8 @@ button.ops-item:hover {
   border-radius: 3px;
   cursor: default;
 }
+.mx-marker.is-d { cursor: pointer; }
+.mx-marker.is-d.is-booked { outline: 1px dashed #e6e9f2; }
 .mx-marker.is-covered { opacity: 0.55; }
 .mx-marker.is-edge { transform: none; }
 .mx-marker.is-d.is-late { background: #ff8080; outline: 1px solid #b9a7ff; }

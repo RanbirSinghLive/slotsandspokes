@@ -98,7 +98,7 @@ import { inboundAt, orderLease } from './fleetTiming';
 import { startSeatSale as startSeatSaleRule } from './seatSale';
 import { SEASON_DAYS, SEASONAL_PREMIUM } from './seasonalLease';
 import { changeSpareEngines as changeSpareEnginesRule, holdPerDay, shopVisitCost, sparesHeld, sparesReady } from './enginePool';
-import { aBankedMinutes, aCheckOpen, aCheckProgress, aCheckWorkMinutes, cyclesSinceHeavy, deferredItems, flightHoursSinceHeavy, heavyBankedMinutes, maintenanceReserve, heavyBayTails, heavyCheckDueIn, canBookHeavyCheck, heavyBookBlocker, applyHeavyTolerance, heavyToleranceBlocker, heavyToleranceCost, heavyShiftOf, toleranceCapDays, toleranceWearYears, TOLERANCE_STEPS, canBookDCheck, dCheckDueIn, dCheckOpen, flightHoursSinceD, heavyCheckOpen, heavyCheckWorkMinutes, sleepersNow, tonightCheck } from './mxChecks';
+import { aBankedMinutes, aCheckOpen, aCheckProgress, aCheckWorkMinutes, cyclesSinceHeavy, deferredItems, flightHoursSinceHeavy, heavyBankedMinutes, maintenanceReserve, heavyBayTails, heavyCheckDueIn, canBookHeavyCheck, heavyBookBlocker, applyHeavyTolerance, heavyToleranceBlocker, heavyToleranceCost, heavyShiftOf, toleranceCapDays, toleranceWearYears, TOLERANCE_STEPS, canBookDCheck, dBookBlocker, dCheckDueIn, dCheckOpen, flightHoursSinceD, heavyCheckOpen, heavyCheckWorkMinutes, sleepersNow, tonightCheck } from './mxChecks';
 import { rebaseOptions, rebasePlane, type RebaseOption } from './rebase';
 import { cabinGainPerDay, cabinOf, cancelRefit as cancelRefitRule, orderRefit as orderRefitRule, refitBlockedReason, refitCost, refitDays, type Cabin } from './cabins';
 import { commitBringHome, commitRetime, planBringHome, planRetime, type RetimePlan } from './retime';
@@ -751,6 +751,7 @@ export type HeavyCheckReadout = {
   dFlightHours: number;
   dBooked: boolean;
   dCanBook: boolean;
+  dBookBlocker: string | null;
   dInCheck: boolean;
 };
 
@@ -789,6 +790,7 @@ export function heavyCheckReadouts(state: SimState): HeavyCheckReadout[] {
       dFlightHours: Math.round(flightHoursSinceD(aircraft)),
       dBooked: aircraft.dCheckBooked === true,
       dCanBook: canBookDCheck(state, aircraft),
+      dBookBlocker: dBookBlocker(state, aircraft),
       dInCheck: state.aogs.some((event) => event.tail === aircraft.tail && event.checkKind === 'D'),
     }))
     .sort((a, b) => a.dueIn - b.dueIn);
