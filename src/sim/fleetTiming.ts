@@ -84,6 +84,15 @@ export function inboundAt(state: SimState, base?: string, typeCode?: string): In
   );
 }
 
+/** How long the Fleet page keeps flagging a delivery that has no flights yet. */
+export const NEW_DELIVERY_DAYS = 14;
+
+/** A lease delivered lately that nothing has been scheduled on yet: it earns nothing but is charged. */
+export function isNewDelivery(state: SimState, aircraft: Aircraft): boolean {
+  if (aircraft.deliveredDay === undefined || dayIndex(state) - aircraft.deliveredDay > NEW_DELIVERY_DAYS) return false;
+  return !state.schedule.some((leg) => leg.tail === aircraft.tail);
+}
+
 /** Whether this plane is on its way back to the lessor. */
 export function isReturning(aircraft: Aircraft): boolean {
   return aircraft.returningOnDay !== undefined;
@@ -107,6 +116,7 @@ export function rollDailyFleet(state: SimState): void {
     state.inboundLeases = (state.inboundLeases ?? []).filter((lease) => lease.arrivesDay > today);
     for (const lease of due) {
       const aircraft = leaseAircraft(state, lease.typeCode, lease.base, lease.ageYears, lease.leasePricePerDay);
+      aircraft.deliveredDay = today;
       if (lease.seasonalDays !== undefined) aircraft.seasonalUntilDay = today + lease.seasonalDays;
       if (lease.powertrain) aircraft.powertrain = lease.powertrain;
     }

@@ -25,6 +25,7 @@ import { DEFERRED_AGE_YEARS, deferredItems, HEAVY_INTERVAL_DAYS, heavyBankedMinu
 import { delayIconsFor } from '../delayCodes';
 import { flightNumber } from '../../sim/flightNumbers';
 import { CREWS_PER_NEW_PLANE } from '../../sim/crews';
+import { isNewDelivery } from '../../sim/fleetTiming';
 
 /**
  * The inspector's views of the player's own aircraft
@@ -95,13 +96,30 @@ export function buildFleetView(state: SimState, changed: () => void): HTMLElemen
   root.append(
     lineWithInfo(
       `${state.aircraft.length} aircraft · leases ${money(leases)}/day`,
-      'Each row: base · share of the usable day flown (over 100% cannot be flown) · OTP, arrivals on time of flown today · LF, load factor today · seat icon, the cabin (teal business, amber when a refit would pay; tap to refit). AOG is grounded by a fault.',
+      'Each row: base · share of the usable day flown (over 100% cannot be flown) · OTP, arrivals on time of flown today · LF, load factor today · seat icon, the cabin (teal business, amber when a refit would pay; tap to refit). AOG is grounded by a fault. A dashed row is a lease on order, with its delivery day; ✦ is a delivery with no flights yet.',
     ),
   );
 
   const list = document.createElement('div');
   list.className = 'inspector-rows';
-  for (const aircraft of state.aircraft) {
+  // Leases signed and not yet delivered, soonest first, above the fleet.
+  const today = dayIndex(state);
+  for (const lease of [...(state.inboundLeases ?? [])].sort((a, b) => a.arrivesDay - b.arrivesDay)) {
+    const row = document.createElement('div');
+    row.className = 'inspector-row is-inbound';
+    const name = document.createElement('span');
+    name.append(planeIconElement(lease.typeCode), ` ${classByCode(lease.typeCode)?.name ?? lease.typeCode}`);
+    const detail = document.createElement('span');
+    detail.className = 'inspector-row-detail';
+    detail.textContent = `→ ${lease.base} · day ${lease.arrivesDay} · ${Math.max(0, lease.arrivesDay - today)}d`;
+    row.title = `On order: delivered at ${lease.base} on day ${lease.arrivesDay}; leased at ${money(lease.leasePricePerDay)}/day from then.`;
+    row.append(name, detail);
+    list.append(row);
+  }
+  // New deliveries with no flights yet come first, marked.
+  const newTails = new Set(state.aircraft.filter((a) => isNewDelivery(state, a)).map((a) => a.tail));
+  const ordered = [...state.aircraft.filter((a) => newTails.has(a.tail)), ...state.aircraft.filter((a) => !newTails.has(a.tail))];
+  for (const aircraft of ordered) {
     const use = aircraftUtilisation(state, aircraft.tail);
     const { flown, onTime, loadFactor } = todayOnTime(state, aircraft.tail);
     const row = linkToMap(document.createElement('button'), { kind: 'aircraft', tail: aircraft.tail });
@@ -123,6 +141,14 @@ export function buildFleetView(state: SimState, changed: () => void): HTMLElemen
     if (aogFor(state, aircraft.tail) || use.share > 1) detail.classList.add('is-over');
     const cabinMark = cabinMarkFor(state, aircraft.tail, changed);
     if (cabinMark) name.append(cabinMark);
+    if (newTails.has(aircraft.tail)) {
+      const fresh = document.createElement('span');
+      fresh.className = 'fleet-new-mark';
+      fresh.textContent = '✦';
+      fresh.title = `Delivered day ${aircraft.deliveredDay} · no flights yet · lease charged. Draw a route from ${aircraft.baseAirport ?? 'its base'} to put it to work.`;
+      name.append(' ', fresh);
+      row.classList.add('is-new');
+    }
     row.append(name, detail);
     row.addEventListener('click', () => select({ kind: 'aircraft', tail: aircraft.tail }));
     list.append(row);

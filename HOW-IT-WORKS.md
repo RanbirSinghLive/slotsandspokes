@@ -3763,7 +3763,11 @@ joining, planes going), each with the days until the first of them
 happens. Glyphs are drawn shapes, not emoji, so they look the same in
 every browser. It
 counts as an obstacle for the labels. The ticker says when a plane is
-delivered, when one has gone back, and when crews join.
+delivered, when one has gone back, and when crews join. The Fleet screen
+lists each lease on order as a dashed row above the fleet (class, base,
+delivery day, days left). A delivered plane with no flights yet, within 14
+days of delivery, goes to the top of the list with a teal bar and a ✦ until
+something is scheduled on it.
 
 The headless player never rebases. It leases a class only with none of it already on its
 way (pools don't count a plane until it's delivered), hires its crews

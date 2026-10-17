@@ -4223,6 +4223,17 @@ button.inspector-crumb:hover {
   white-space: nowrap;
 }
 
+.inspector-row.is-inbound {
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.3);
+  opacity: 0.75;
+  cursor: default;
+}
+.inspector-row.is-new {
+  box-shadow: inset 3px 0 0 #2fb8a6;
+}
+.fleet-new-mark {
+  color: #2fb8a6;
+}
 .inspector-row-detail {
   color: #9aa3b8;
 }
