@@ -3381,8 +3381,8 @@ base and a hangar from the start, inside the starting cost.
 
 | | Crew base | Line base | Hangar (heavy base) |
 |---|---|---|---|
-| What it is | Where crews live; the only places planes can be leased or based | Where a night is a line check | Where heavy-check hours are banked |
-| Level | none | planes checked a night | bays: planes banking at once |
+| What it is | Where crews live; the only places planes can be leased or based | Where a night is a line check | Where C and D checks are done |
+| Level | none | planes checked a night | bays: planes in a C or D check at once |
 | Opened on | the Crews screen, or the map ring's Create base | the Mtc screen, or the map ring's Create base | the Mtc screen, or the map ring's Create base |
 | Open | $100,000, then $500/day | $150,000, then $100/day a level | $400,000, then $300/day a level |
 | Each level above 1 | n/a | $25,000 | $100,000 |
@@ -3395,11 +3395,11 @@ nothing.
 
 **Capacity.** A line base checks as many planes a night as its level, the
 ones with the most deferred items first (`lineCheckedTails()`); a plane
-past that is treated like one at an outstation. A hangar's bays go to the
-planes with an open heavy check nearest to due, less any plane in a forced
-check there (`heavyBayTails()`); only those bank hours on their nights,
-the rest queue. A station with no hangar banks nothing, so a line-only
-station is cheap and never does a heavy check.
+past that is treated like one at an outstation. A hangar's bays are held by
+the planes in a C or D check there; a check that starts with no bay free is
+contracted out (`freeHeavyBays()`). A station with no hangar does no checks
+in house, so a line-only station is cheap and a plane's C check there is
+contracted.
 
 **Ratings.** A station's mechanics are rated by aircraft class, like crews.
 A plane of an unrated class is treated like one at an outstation, at a line
@@ -3422,8 +3422,7 @@ on the map) stays one click each.
 class, a plane stranded away), the night is a **contracted check**, $300 an
 hour of the night's work (a Propeller on 4 flights a day: $840), or **no
 check and a deferred item**, by the station's setting on the Mtc screen's
-Stations list (contracted unless changed). A contracted night still banks
-hours toward the heavy check if the plane holds a bay at a hangar there. So
+Stations list (contracted unless changed). So
 a crew base alone is cheap to open and dearer to run, and a line base pays
 for itself at about one plane sleeping there.
 
@@ -3573,16 +3572,15 @@ one flown lightly. The 10-day window and 7-day grace below are the same
 fraction of that interval whichever clock is furthest along. It is hangar work
 every 30 days the plane flies:
 8 hours for a Propeller, 10 for a Regional, 12 for a Narrowbody, 16 for
-a Widebody. It's done at night. From 10 days before it's due, whatever
-each night in a hangar bay has left after the line check goes toward it
-(`heavyBankedMinutes`). When the work is done, the interval starts
-again and every deferred item is cleared. A plane with long nights
-finishes in two or three without missing a flight; one flown from first
-light to the curfew makes slow progress; nights without a hangar bay make none. Only a
-plane 7 days past due is grounded for it, as an AOG with its flying
-moved to spare planes, until the work left is done, by contract at a
-base without maintenance. A plane from an
-older save starts part-way through its interval, staggered by tail.
+a Widebody. It is one stretch with the plane out of service, never done in
+slices on nights: the plane is grounded as an AOG with its flying moved to
+spare planes, for the work in whole days, in a hangar bay or contracted out.
+It goes in when the player books it (from 10 days before it's due) or, 7
+days past due, whenever it is at base or its night stop. When the work is
+done, the interval starts again and every deferred item is cleared. A plane
+from an older save starts part-way through its interval, staggered by tail,
+and any hours it had banked on nights count toward the work left
+(`heavyBankedMinutes`); nothing banks any more.
 
 **Booking the C check.** Once the window is open, a plane parked at its base
 shows "Book C check" on its Mtc card (`bookHeavyCheck()`). The confirm shows
@@ -3594,9 +3592,10 @@ cancelled with ✕ any time before then; a booked plane away from base waits at
 the booking until it is back. The same booking is a wrench on the plane's
 hangar bay (the dashed red box at the top of Mtc); a plane that can't book yet
 (in the air, or away from base) shows a plane icon there whose tip says what
-it waits for (`heavyBookBlocker()`). "Queued" means the plane isn't asleep at a
-hangar bay tonight, not that the bays are full. The headless player never books: checks bank
-on nights, then force.
+it waits for (`heavyBookBlocker()`). The headless player books each plane once
+its window is open and it is parked at base, when a hangar bay is free there
+(counting planes it has already booked), and takes the forced, contracted
+check when it is overdue (`keepHeavyChecks()`).
 
 **Bays are shared by every check that grounds a plane.** A forced or booked C
 check, and a booked D check, go in house only if the base's hangar is rated for
@@ -3606,9 +3605,9 @@ paid by the hour, the same as at a base with no hangar, and the booking confirm
 quotes that cost (`freeHeavyBays()`). So planes that come due together at one
 hangar cost real money; spreading them, adding a bay or rebasing a plane saves it.
 
-An earlier version took every plane out for 1–3 days every 30 days. A
-fleet flown near capacity had no spare planes to take its flying, so
-the cancellations cost Toronto most of its year on 18 seeds.
+A C check costs a flying day for the plane. A fleet flown near capacity has no
+spare planes to take its flying, so its rotations are cancelled for the day:
+book checks into the quiet days, one plane at a time.
 
 **Tolerance.** Inside its window, tap a plane's puck on the "C checks due"
 axis to induct it (the booking above) or push the check later by 1, 5 or 15
@@ -3660,9 +3659,8 @@ staggered by tail, so a fleet doesn't come due together.
 or 80 cycles, whichever comes first, so a plane on short hops is due as soon as
 one on long ones. Its work is 4 hours for a Propeller, 5 for a Regional, 6 for
 a Narrowbody and 8 for a Widebody. From 80% of the interval, whatever a night
-has left after the line check goes to the A check first (at a line base, or
-contracted at a station that has none, paid by the hour), and what is left
-after that goes toward the heavy check as before. A done A check restarts its
+has left after the line check goes to the A check (at a line base, or
+contracted at a station that has none, paid by the hour). A done A check restarts its
 interval and pays the plane's maintenance reserve. A plane 25% past due adds a
 deferred item every night it flies (not on top of a night already adding one),
 so one that never gets its A check ends up held. A night away or at a station
@@ -3681,16 +3679,16 @@ only when the money leaves moves. The Mtc card shows what is due.
 - **The Mtc screen's Fleet board:** a strip of how many planes are
   serviceable, on watch, due for action (held, or a heavy check overdue),
   in the hangar or on the ground, then a card per plane, worst first. Each
-  card has the heavy-check clock (days since the last check, the window
-  where nights bank hours, the due mark, the overdue grace) with a thinner
+  card has the heavy-check clock (days since the last check, the booking
+  window, the due mark, the overdue grace) with a thinner
   A-check lane under it (percent of its interval, same marks), its deferred
-  items as slots filling toward the hold, the hours banked, last night's
+  items as slots filling toward the hold, last night's
   check, and its age, life, tech and AOG figures. Display only: the
   standing is worked out in `ui/inspector/maintenance.ts` from the same
   readouts. Planes are grouped by type, each group folding shut with its
   planes' lamps still showing. Above the board, a **Hangar** row has each hangar's bays in use, a bay
   for each plane in its heavy check (days until it's out) and a dashed bay
-  for each whose check window is open or overdue (filled edge in a bay, dimmed queued), and **Heavy checks due**
+  for each whose check window is open or overdue (the wrench books it), and **Heavy checks due**
   puts every plane's due date on one 30-day axis so a bunching fleet
   shows as a cluster. A plane whose D check falls due inside that
   axis gets a violet D marker too (overdue ones at the left edge); Markers read "C P001" / "D P001". A D check also does the C check, so a plane's C marker dims when its D falls due first and goes once the D is booked. Tap a D marker to book the D check (or cancel the booking); `dBookBlocker()` says why it can't yet.
@@ -3699,9 +3697,8 @@ only when the money leaves moves. The Mtc card shows what is due.
   "☾−40m" short, "☾✗" away). The plane's own view says the same in words
   ("Tonight ☾✓ · 9h 24m at base for 4h 24m of work · C due 11d"). It works from the projected
   rest of the day, so a late afternoon shows tonight getting shorter. When
-  the night's spare hours will go to a check, the cell is hatched amber and
-  ends in "A", "C" or "AC" (`tonightCheck().banking`): the A check first, then
-  the C check if the plane holds a hangar bay.
+  the night's spare hours will go to the A check, the cell is hatched amber and
+  ends in "A" (`tonightCheck().banking`).
 
 ---
 
