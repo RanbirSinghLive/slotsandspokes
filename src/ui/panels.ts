@@ -16,7 +16,6 @@ import { planeIconElement, TYPE_COLOURS } from './planeIcons';
 import { updatePnlHistoryPanel } from './pnlHistory';
 import { formatLoadFactor, networkLoadFactor } from '../sim/loadFactor';
 import { goalsSummary } from './inspector/goals';
-import { headOfficeSummary } from './inspector/headOffice';
 import type { SimState } from '../sim/state';
 import { minuteOfDay, minuteOfDayToTimeString } from '../sim/clock';
 import { info } from './inspector/dom';
@@ -38,13 +37,12 @@ const completionEl = document.querySelector<HTMLSpanElement>('#panel-completion'
 const loadEl = document.querySelector<HTMLSpanElement>('#panel-load')!;
 const npsEl = document.querySelector<HTMLElement>('#panel-nps')!;
 const goalsEl = document.querySelector<HTMLButtonElement>('#panel-goals')!;
-const headOfficeEl = document.querySelector<HTMLButtonElement>('#panel-head-office')!;
 
 /**
  * The Network panel's cards: each headline number opens the view that
  * explains it. Cash and Runway open Money; the four route measures open
- * Routes sorted by that measure, worst first; Goals and Head office open
- * their own views.
+ * Routes sorted by that measure, worst first; Goals and Fleet open
+ * their own views, and Attention (ui/rail.ts) opens the first thing wrong.
  */
 const cardTargets: [string, Selection][] = [
   ['#card-cash', { kind: 'money' }],
@@ -55,7 +53,7 @@ const cardTargets: [string, Selection][] = [
   ['#card-load', { kind: 'routes', sort: 'loadFactor' }],
   ['#card-nps', { kind: 'routes', sort: 'nps' }],
   ['#panel-goals', { kind: 'goals' }],
-  ['#panel-head-office', { kind: 'headOffice' }],
+  ['#card-fleet', { kind: 'fleet' }],
 ];
 for (const [selector, target] of cardTargets) {
   document.querySelector<HTMLButtonElement>(selector)!.addEventListener('click', () => select(target));
@@ -206,8 +204,6 @@ export function updatePanel(state: SimState): void {
   showTrend(npsEl.closest<HTMLElement>('.stat-card')!, trends.nps, (now, before) => `${now >= before ? '+' : '−'}${Math.abs(Math.round(now - before))}`);
   // Where the airline stands on the ladder (sim/ladder.ts), and head office.
   linkCard(goalsEl, 'Goals', goalsSummary(state));
-  // The last 30 days of fuel, the price Head office is mostly about.
-  linkCard(headOfficeEl, 'Head office', headOfficeSummary(state), (state.fuelPriceHistory ?? []).slice(-30));
   updatePnlHistoryPanel(state);
 
   renderRotations(state);

@@ -42,7 +42,9 @@ function wireTips(strip: HTMLElement, tooltip: HTMLDivElement): void {
     const text = button.dataset.tip;
     if (!text) return;
     window.clearTimeout(hideTimer);
-    tooltip.textContent = text;
+    // Tapping a rail icon on a phone only needs its name: the full line would cover the panel beside it.
+    const railOnTouch = strip.id === 'rail' && window.matchMedia('(pointer: coarse)').matches;
+    tooltip.textContent = railOnTouch ? text.split(' · ')[0] : text;
     tooltip.hidden = false;
     tooltip.style.left = '0px'; // measure at full width, not squeezed by the edge
     tooltip.style.maxWidth = '';

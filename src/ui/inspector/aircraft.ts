@@ -121,6 +121,8 @@ export function buildFleetView(state: SimState, changed: () => void): HTMLElemen
   // New deliveries with no flights yet come first, marked.
   const newTails = new Set(state.aircraft.filter((a) => isNewDelivery(state, a)).map((a) => a.tail));
   const ordered = [...state.aircraft.filter((a) => newTails.has(a.tail)), ...state.aircraft.filter((a) => !newTails.has(a.tail))];
+  // A phone's row has no room for the OTP count too: it wrapped, so rows changed height. The plane's own view has it.
+  const narrowScreen = window.matchMedia('(pointer: coarse)').matches;
   for (const aircraft of ordered) {
     const use = aircraftUtilisation(state, aircraft.tail);
     const { flown, onTime, loadFactor } = todayOnTime(state, aircraft.tail);
@@ -136,7 +138,7 @@ export function buildFleetView(state: SimState, changed: () => void): HTMLElemen
     detail.textContent =
       (aircraft.rebase ? `${aircraft.rebase.from}→${aircraft.rebase.to} day ${aircraft.rebase.arrivesDay}` : (aircraft.baseAirport ?? 'no base')) +
       ` · ${Math.round(use.share * 100)}%` +
-      (flown > 0 ? ` · OTP ${onTime}/${flown}` : '') +
+      (flown > 0 && !narrowScreen ? ` · OTP ${onTime}/${flown}` : '') +
       (loadFactor !== null ? ` · LF ${Math.round(loadFactor * 100)}%` : '') +
       (aogFor(state, aircraft.tail) ? (aogFor(state, aircraft.tail)?.refitTo ? ' · refit' : ' · AOG') : aircraft.refitPending ? ' · refit tomorrow' : '') +
       '';
