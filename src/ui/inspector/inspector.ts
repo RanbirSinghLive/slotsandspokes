@@ -261,13 +261,17 @@ function addJumpChips(): void {
   const chips = document.createElement('nav');
   chips.className = 'inspector-chips';
   chips.setAttribute('aria-label', 'Sections');
+  // A glyph only stands in for a heading the first time: a second section the same glyph matches keeps its words, so no two chips look alike.
+  const iconsUsed = new Set<string>();
   for (const h of headings) {
     const chip = document.createElement('button');
     chip.type = 'button';
     // The heading's own words, without its (i): the chip's text, or its tip when an icon stands in.
-    const words = (h.firstChild?.textContent ?? h.textContent ?? '').trim();
+    const ownWords = (h.firstChild?.textContent ?? '').trim();
+    const words = ownWords || (h.textContent ?? '').replace(/\s*i$/, '').trim();
     const icon = chipIconFor(words);
-    if (icon) {
+    if (icon && !iconsUsed.has(icon)) {
+      iconsUsed.add(icon);
       chip.innerHTML = icon;
       chip.classList.add('is-icon');
       chip.dataset.tip = words;

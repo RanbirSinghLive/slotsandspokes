@@ -4482,6 +4482,13 @@ button.inspector-crumb:hover {
   display: contents;
 }
 
+/* A phone's clock bar is narrow: a chip stays on one line (label, then number) rather than wrapping its number under it. */
+#ops-board,
+.ops-item,
+#hud-pnl {
+  white-space: nowrap;
+}
+
 /* Today's flights: landed, in the air, still to go. */
 .ops-day {
   display: flex;
@@ -5932,6 +5939,16 @@ button.ops-item:hover {
 @media (max-width: 700px) {
   #hud {
     column-gap: 8px;
+    max-width: calc(100vw - 64px);
+    grid-template-areas:
+      'clock speed'
+      'ops ops'
+      'pnl pnl';
+  }
+
+  #ops-board {
+    flex-wrap: wrap;
+    row-gap: 2px;
   }
 }
 

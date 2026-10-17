@@ -93,7 +93,7 @@ function newsIds(state: SimState): Partial<Record<Screen, string[]>> {
   };
 }
 
-function conditions(state: SimState): Partial<Record<Screen, Dot>> {
+export function conditions(state: SimState): Partial<Record<Screen, Dot>> {
   const fleetBad = state.groundedTails.length > 0 || scheduleProblems(state).length > 0;
   let crews: Dot = null;
   for (const iata of Object.keys(crewBases(state))) {
@@ -120,6 +120,39 @@ function conditions(state: SimState): Partial<Record<Screen, Dot>> {
   };
 }
 
+/** What each condition dot is called on the Overview's Attention card, worst first, with the screen that fixes it. */
+const ATTENTION: { screen: Screen; short: (state: SimState) => string }[] = [
+  { screen: 'maintenance', short: (state) => `${state.aogs.length} AOG` },
+  { screen: 'fleet', short: () => 'fleet' },
+  { screen: 'crews', short: () => 'crews' },
+  { screen: 'contracts', short: () => 'contracts' },
+  { screen: 'money', short: () => 'cash' },
+  { screen: 'routes', short: () => 'losing routes' },
+];
+
+const attentionCardEl = document.querySelector<HTMLElement>('#card-attention')!;
+const attentionValueEl = document.querySelector<HTMLElement>('#panel-attention')!;
+const attentionLineEl = attentionCardEl.querySelector<HTMLElement>('.stat-trend')!;
+const fleetValueEl = document.querySelector<HTMLElement>('#panel-fleet')!;
+const fleetCardEl = document.querySelector<HTMLElement>('#card-fleet')!;
+const fleetLineEl = fleetCardEl.querySelector<HTMLElement>('.stat-trend')!;
+let attentionTarget: Selection = { kind: 'fleet' };
+attentionCardEl.addEventListener('click', () => select(attentionTarget));
+
+/** The Overview's Attention and Fleet cards: the rail's condition dots as words, so the cause of a falling card is on the same page. */
+function updateOverviewCards(state: SimState, dots: Partial<Record<Screen, Dot>>): void {
+  const problems = ATTENTION.filter((entry) => dots[entry.screen] === 'bad' || dots[entry.screen] === 'warn');
+  attentionCardEl.dataset.trend = problems.length === 0 ? 'better' : problems.some((entry) => dots[entry.screen] === 'bad') ? 'worse' : 'steady';
+  attentionValueEl.textContent = problems.length === 0 ? 'All clear' : `${problems.length} to fix`;
+  attentionLineEl.textContent = problems.map((entry) => entry.short(state)).join(' · ');
+  attentionCardEl.dataset.tip = problems.length === 0 ? 'Nothing needs you: no plane out, crews covered, no route losing money, cash safe' : 'Open the first one: planes out, crews short, contracts, cash, losing routes';
+  attentionTarget = problems.length === 0 ? { kind: 'network' } : targetOf(problems[0].screen);
+
+  const flying = state.aircraft.filter((aircraft) => aircraft.status === 'airborne').length;
+  fleetValueEl.textContent = `${state.aircraft.length} aircraft`;
+  fleetLineEl.textContent = `${flying} flying · ${state.aogs.length} AOG`;
+}
+
 const NEWS_DOT: Partial<Record<Screen, Dot>> = { goals: 'good', rivals: 'warn', headOffice: 'good', contracts: 'good' };
 /** How often the dots are worked out: they read a lot of state, and nothing they show moves faster than this. */
 const DOT_INTERVAL_MS = 500;
@@ -130,6 +163,7 @@ function updateDots(state: SimState, open: Screen | null, now: number): void {
   if (now - lastDotsAt < DOT_INTERVAL_MS) return;
   lastDotsAt = now;
   const dots = conditions(state);
+  updateOverviewCards(state, dots);
   for (const [screen, ids] of Object.entries(newsIds(state)) as [Screen, string[]][]) {
     // The screen open now has been read; so has everything on a first look.
     if (!seen[screen] || screen === open) seen[screen] = new Set(ids);

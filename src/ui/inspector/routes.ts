@@ -455,6 +455,7 @@ export function buildRoutesView(state: SimState, sort: RouteSort): HTMLElement {
   const head = document.createElement('tr');
   const routeHead = document.createElement('th');
   routeHead.textContent = 'Route';
+  routeHead.dataset.tip = '● route priority: tap the dot to cycle ● normal, ★ keep, ▽ expendable';
   const flightsHead = document.createElement('th');
   flightsHead.textContent = '/day';
   head.append(routeHead, flightsHead);
