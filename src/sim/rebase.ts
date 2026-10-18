@@ -7,6 +7,7 @@ import { airlineFuelPrice } from './fuelPrice';
 import { marketDistanceNm } from './demand';
 import { computeBlockMinutes, isAircraftTypeAllowedAt } from './schedule';
 import type { Aircraft, SimState } from './state';
+import { rangeNmFor } from './range';
 
 /**
  * Moving a plane from one crew base to another: a ferry flight with no
@@ -52,7 +53,7 @@ function ferryCost(state: SimState, aircraft: Aircraft, to: string): { cost: num
   const type = typesByCode.get(aircraft.typeCode);
   const from = aircraft.baseAirport;
   if (!type || !from) return { cost: 0, hops: 1 };
-  const hops = Math.max(1, Math.ceil(marketDistanceNm(from, to) / type.rangeNm));
+  const hops = Math.max(1, Math.ceil(marketDistanceNm(from, to) / rangeNmFor(state, aircraft.typeCode)));
   const block = computeBlockMinutes(from, to, type.cruiseKts);
   const cost = legCost(block, type, airlineFuelPrice(state), state.fuelEfficiencyMultiplier) + (hops - 1) * type.costPerDeparture;
   return { cost: Math.round(cost), hops };

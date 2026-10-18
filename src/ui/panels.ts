@@ -633,6 +633,7 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
         span.title =
           `${rotation.airports.join(' → ')} · ${minuteOfDayToTimeString(rotation.departMinute)}–${minuteOfDayToTimeString(rotation.arriveMinute)}` +
           ` · ${Math.round(rotation.share * 100)}% of a plane` +
+          (rotation.legs[0].dayParity !== undefined ? ` · ${rotation.legs[0].dayParity === 0 ? 'even' : 'odd'} days only · a second plane on the other days makes it daily` : '') +
           (half
             ? ` · night stop ${nightStop!.morning.origin} · ⌂ or push it past ${rotation.legs[0] === nightStop!.morning ? 'the start' : 'the end'} of the day to bring it home`
             : rotation.closed

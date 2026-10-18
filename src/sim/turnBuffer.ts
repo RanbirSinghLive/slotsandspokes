@@ -4,6 +4,7 @@ import { nextBankMinute } from './hubStyle';
 import { hourlyRoomProblem, hourOf } from './hours';
 import {
   aircraftUtilisation,
+  flownEveryOtherDay,
   isLongHaulRoundTrip,
   rotationsForTail,
   scheduledTurnMinutes,
@@ -135,7 +136,7 @@ function tailFits(work: SimState, tail: string): boolean {
   // A long-haul round trip is allowed to run round the clock (see
   // isLongHaulRoundTrip()); its utilisation already counts as one full day.
   const clockMinutes = legs.reduce((total, leg) => total + leg.blockMinutes + scheduledTurnMinutes(work, leg.origin, leg.dest), 0);
-  if (isLongHaulRoundTrip(legs.length, clockMinutes)) return true;
+  if (isLongHaulRoundTrip(legs.length, clockMinutes, flownEveryOtherDay(legs))) return true;
   const lastArrival = Math.max(...legs.map((leg) => leg.departMinute + leg.blockMinutes));
   // Both the clock and the budget: the day's last flight has to land by
   // 22:00, and the plane can't be booked past 100% of its usable day

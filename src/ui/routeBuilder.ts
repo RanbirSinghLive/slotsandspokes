@@ -17,6 +17,7 @@ import { applyRotation, autoPickTail, planRotation, type RotationPlan } from '..
 import { minuteOfDayToTimeString, renderScheduleWarnings, scheduleProblems } from './panels';
 import { hideCompetitionTooltip } from './competitionTooltip';
 import type { SimState } from '../sim/state';
+import { rangeNmFor } from '../sim/range';
 
 const RING_RADIUS = 8;
 const PREVIEW_STROKE = '#ffd166';
@@ -76,7 +77,8 @@ function showRouteHoverTooltip(
     const existingFrequency = legsServingMarket(origin.iata, candidate.iata, state.schedule);
     const newFrequency = existingFrequency + 2;
     const distanceNm = greatCircleDistanceNm(origin, candidate);
-    const outOfRange = distanceNm > type.rangeNm;
+    const rangeNm = rangeNmFor(state, type.code);
+    const outOfRange = distanceNm > rangeNm;
 
     // The market in words (sim/marketSize.ts): how big the city pair is,
     // and whether this plane would fill today. The numbers stay hidden;
@@ -97,7 +99,7 @@ function showRouteHoverTooltip(
     // as though it were: another stop on the way back closes the loop,
     // which is exactly what "Add stop" is for.
     const homeNm = greatCircleDistanceNm(candidate, base);
-    const cannotGetHome = !outOfRange && candidate.iata !== base.iata && homeNm > type.rangeNm;
+    const cannotGetHome = !outOfRange && candidate.iata !== base.iata && homeNm > rangeNm;
 
     routeHoverTooltipBody.textContent = outOfRange
       ? `${pdewText} · out of range (${Math.round(distanceNm)} nm)`
@@ -352,7 +354,7 @@ export function drawRoutePreview(ctx: CanvasRenderingContext2D, state: SimState)
   const type = aircraft ? aircraftTypesByCode.get(aircraft.typeCode) : undefined;
   const path = geoPath(projection, ctx);
   if (type) {
-    const circle = geoCircle().center([origin.lon, origin.lat]).radius(type.rangeNm / 60)();
+    const circle = geoCircle().center([origin.lon, origin.lat]).radius(rangeNmFor(state, type.code) / 60)();
     ctx.save();
     ctx.setLineDash([2, 3]);
     ctx.strokeStyle = RANGE_RING_STROKE;
@@ -657,7 +659,8 @@ function updateFormValidation(chain: Airport[], dest: Airport, state: SimState):
   const firstLeg = plan.legs[0];
   formBlock.textContent = firstLeg
     ? `${plan.legs.length} leg${plan.legs.length === 1 ? '' : 's'} · ${formatDuration(plan.clockMinutes)} · ` +
-      `${minuteOfDayToTimeString(firstLeg.departMinute)}–${minuteOfDayToTimeString(plan.arriveBackMinute)}`
+      `${minuteOfDayToTimeString(firstLeg.departMinute)}–${minuteOfDayToTimeString(plan.arriveBackMinute)}` +
+      (plan.dayParity !== undefined ? ` · every other day · ${plan.dayParity === 0 ? 'even' : 'odd'} days` : '')
     : '';
 
   // The market read for the leg being added (sim/marketSize.ts): its

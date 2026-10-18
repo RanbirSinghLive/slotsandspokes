@@ -7,7 +7,8 @@ import aircraftTypesData from '../../data/aircraft-types.json';
 import { computeBlockMinutes, isAircraftTypeAllowedAt, legDistanceNm, marketKey, type ScheduleLeg } from './schedule';
 import { nextSlotFees } from './slots';
 import type { SimState } from './state';
-import { isLongHaulRoundTrip, scheduledTurnMinutes, USABLE_DAY_END_MINUTE, USABLE_DAY_START_MINUTE, wrappedLongHaul } from './utilisation';
+import { isLongHaulRoundTrip, scheduledTurnMinutes, USABLE_DAY_END_MINUTE, USABLE_DAY_START_MINUTE, flownEveryOtherDay, wrappedLongHaul } from './utilisation';
+import { rangeNmFor } from './range';
 
 /**
  * Moving a rotation in the day (WEEK-THIRTEEN.md, thread 4): the rules
@@ -123,7 +124,8 @@ function legsForType(world: SimState, legs: ScheduleLeg[], typeCode: string): Sc
   for (let i = 0; i < legs.length; i++) {
     const leg = legs[i];
     const distanceNm = Math.round(legDistanceNm(leg.origin, leg.dest));
-    if (distanceNm > type.rangeNm) return `${leg.origin}→${leg.dest} ${distanceNm} nm · beyond the ${type.name}'s ${type.rangeNm} nm range`;
+    const rangeNm = rangeNmFor(world, typeCode);
+    if (distanceNm > rangeNm) return `${leg.origin}→${leg.dest} ${distanceNm} nm · beyond the ${type.name}'s ${rangeNm} nm range`;
     for (const iata of [leg.origin, leg.dest]) {
       if (!isAircraftTypeAllowedAt(iata, typeCode)) return `${iata} is too small for the ${type.name}`;
     }
@@ -188,7 +190,7 @@ export function planRetime(state: SimState, legIds: string[], toTail: string, st
   let station: string | null = null;
   const offStart = moved[0].departMinute < USABLE_DAY_START_MINUTE;
   // A long-haul round trip runs round the clock and is exempt from the curfew (sim/curfew.ts), so it may end after 22:00 and never wraps at the evening end.
-  const longHaul = isLongHaulRoundTrip(legs.length, legs.reduce((total, leg) => total + leg.blockMinutes + scheduledTurnMinutes(world, leg.origin, leg.dest), 0));
+  const longHaul = isLongHaulRoundTrip(legs.length, legs.reduce((total, leg) => total + leg.blockMinutes + scheduledTurnMinutes(world, leg.origin, leg.dest), 0), flownEveryOtherDay(legs));
   const offEnd = !longHaul && moved[moved.length - 1].departMinute + moved[moved.length - 1].blockMinutes > USABLE_DAY_END_MINUTE;
   // Off either end of the day on its own plane: an out-and-back wraps into a
   // night stop, and a night stop's half pushed past its own end wraps back.
@@ -221,7 +223,7 @@ export function planRetime(state: SimState, legIds: string[], toTail: string, st
   const last = moved[moved.length - 1];
   const end = last.departMinute + last.blockMinutes;
   // A long-haul round trip leaving in the evening has its flight back after midnight: stored a day earlier, as a night stop's is (dispatch is on each day's own clock, step.ts).
-  const crossesMidnight = kind === 'move' && longHaul && last.departMinute >= 24 * 60;
+  const crossesMidnight = kind === 'move' && longHaul && last.departMinute >= 24 * 60 && !flownEveryOtherDay(legs);
   if (kind === 'move') {
     if (longHaul ? first.departMinute < 0 || first.departMinute >= 24 * 60 : first.departMinute < USABLE_DAY_START_MINUTE) {
       return fail(longHaul ? `Starts ${hhmm(first.departMinute)} next day · must leave today` : `Starts ${hhmm(first.departMinute)} · the day opens 06:00`);

@@ -53,6 +53,7 @@ import { crewReadiness } from '../sim/crews';
 import { HANDLING, STATION_FEE, STATION_PER_DAY, stationTier, stationUpgradeBlocked, upgradeStation, type HandlingTier } from '../sim/stations';
 import { dailyDeparturesAt } from '../sim/airports';
 import { openCrisis, setCrisisWaived, shouldWaive } from '../sim/crisis';
+import { rangeNmFor } from '../sim/range';
 
 /**
  * The headless "players" that balance runs are played by (WEEK-EIGHT.md,
@@ -1058,14 +1059,13 @@ function pickStances(state: SimState, memory: Memory): string[] {
  * way fillPlane() scores. Null when there's nothing.
  */
 function bestMarketFor(state: SimState, home: string, typeCode: string, memory: Memory): { dest: string; score: number } | null {
-  const spec = classByCode(typeCode)!;
   const from = airportByIata.get(home)!;
   let best: { dest: string; score: number } | null = null;
   for (const dest of airports) {
     if (dest.iata === home || !state.knownAirports.includes(dest.iata)) continue;
     if (!legRights(homeCountry(state), home, dest.iata, grantedCountries(state)).ok) continue;
     if (!isAircraftTypeAllowedAt(dest.iata, typeCode)) continue;
-    if (greatCircleDistanceNm(from, dest) > spec.rangeNm) continue;
+    if (greatCircleDistanceNm(from, dest) > rangeNmFor(state, typeCode)) continue;
     if (coolingDown(state, memory, marketKey(home, dest.iata))) continue;
     const score = marketScore(state, home, dest.iata) / (1 + legsServingMarket(home, dest.iata, state.schedule));
     if (!best || score > best.score) best = { dest: dest.iata, score };
