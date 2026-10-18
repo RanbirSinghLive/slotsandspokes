@@ -20,7 +20,29 @@ export type ScheduleLeg = {
   dest: string;
   departMinute: number;
   blockMinutes: number;
+  /**
+   * Set on both legs of an ultra-long-haul round trip that outruns a day:
+   * the plane flies it only on days whose index has this parity, one round
+   * trip every other day. Two planes on opposite parities make a daily
+   * service. Absent on every ordinary leg.
+   */
+  dayParity?: 0 | 1;
 };
+
+/** Whether the leg is due on this day of the game (sim/clock.ts's dayIndex): an alternate-day leg only on its own parity. */
+export function legFliesOnDay(leg: ScheduleLeg, day: number): boolean {
+  return leg.dayParity === undefined || day % 2 === leg.dayParity;
+}
+
+/** Whether these legs are an alternate-day round trip: all carry a day parity (ScheduleLeg.dayParity). */
+export function flownEveryOtherDay(legs: ScheduleLeg[]): boolean {
+  return legs.length > 0 && legs.every((leg) => leg.dayParity !== undefined);
+}
+
+/** How much of a daily flight the leg is: half for an alternate-day leg, whole otherwise. */
+export function legDailyWeight(leg: ScheduleLeg): number {
+  return leg.dayParity === undefined ? 1 : 0.5;
+}
 
 const TAXI_ALLOWANCE_MINUTES = 20;
 
@@ -208,9 +230,9 @@ export function repairDuplicateLegIds(state: { schedule: ScheduleLeg[] }): numbe
  * three now splits it three ways instead.
  */
 export function legsServingMarket(origin: string, dest: string, legs: ScheduleLeg[]): number {
-  return legs.filter(
-    (leg) => (leg.origin === origin && leg.dest === dest) || (leg.origin === dest && leg.dest === origin),
-  ).length;
+  return legs
+    .filter((leg) => (leg.origin === origin && leg.dest === dest) || (leg.origin === dest && leg.dest === origin))
+    .reduce((total, leg) => total + legDailyWeight(leg), 0);
 }
 
 /** When each of the player's legs on this market departs (schedule minutes), both directions: what time-of-day demand reads (sim/timeOfDay.ts). */

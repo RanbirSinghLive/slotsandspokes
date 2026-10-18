@@ -5,6 +5,7 @@ import { airlineCalled, LADDER, tiersClimbed } from './ladder';
 import { brandEdge, nameYieldMultiplier } from './nps';
 import { positionEdge } from './brand';
 import type { SegmentName } from './timeOfDay';
+import { ULTRA_LONG_RANGE_BONUS_NM } from './range';
 import type { SimState } from './state';
 
 /**
@@ -24,7 +25,7 @@ import type { SimState } from './state';
  * every place that books a flight or judges a market sees the same thing.
  */
 
-export type InnovationId = 'online-booking' | 'younger-airframes' | 'crew-academy' | 'loyalty-scheme' | 'winglets' | 'codeshare-feed' | SpoilageLevelId | ElectricStepId;
+export type InnovationId = 'online-booking' | 'younger-airframes' | 'crew-academy' | 'loyalty-scheme' | 'winglets' | 'codeshare-feed' | 'ultra-long-range' | SpoilageLevelId | ElectricStepId;
 /** The electric path (sim/powertrain.ts): the first, second and fourth steps do nothing by themselves. */
 export type ElectricStepId = 'efficiency-study' | 'hybrid-certification' | 'hybrid-retrofit' | 'charging-tech' | 'electric-25';
 export type SpoilageLevelId = 'spoilage-1' | 'spoilage-2' | 'spoilage-3' | 'spoilage-4' | 'spoilage-5';
@@ -155,6 +156,15 @@ export const INNOVATIONS: Innovation[] = [
     openedBy: 'international',
     oneOffPrice: 0,
     runningCost: `$${CODESHARE_COST_PER_DAY.toLocaleString()}/day`,
+  },
+  {
+    id: 'ultra-long-range',
+    name: 'Ultra-long-range kit',
+    summary: `Widebody range +${ULTRA_LONG_RANGE_BONUS_NM.toLocaleString()} nm`,
+    description: `Extra fuel capacity and a certified long-range mission: the widebody flies ${ULTRA_LONG_RANGE_BONUS_NM.toLocaleString()} nm further, for good. Those sectors run longer than a day there and back, so each is flown by two planes on alternate days.`,
+    openedBy: 'international',
+    oneOffPrice: 2_500_000,
+    runningCost: null,
   },
   ...ELECTRIC_STEPS,
   spoilageLevel(1),

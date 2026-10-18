@@ -5,7 +5,7 @@ import { dailyMovementsAt } from './airports';
 import { airportHours, hourlyRoomProblem, hourOf, hoursWithRoom, type AirportHours } from './hours';
 import { nextBankMinute } from './hubStyle';
 import { nightStopLegs } from './nightStops';
-import { minuteOfDayToTimeString } from './clock';
+import { dayIndex, minuteOfDayToTimeString } from './clock';
 import { greatCircleDistanceNm } from './geo';
 import { fareClassPolicy, policyFare } from './pricing';
 import { revealReach } from './reach';
@@ -21,6 +21,7 @@ import {
 } from './schedule';
 import { acquireNeededSlots, quoteSlots, takeQuotedSlots, type SlotQuote } from './slots';
 import type { SimState } from './state';
+import { rangeNmFor } from './range';
 import {
   aircraftUtilisation,
   extraTurnMinutes,
@@ -247,9 +248,21 @@ export type RotationPlan = {
   slotQuotes: SlotQuote[];
   /** Set when a full hour pushed the rotation later than its plane was free: where, and when it would have left. */
   heldBack: { iata: string; hour: number; fromMinute: number } | null;
+  /** Set when the plane flies this round trip only on days of this parity (ScheduleLeg.dayParity). */
+  dayParity?: 0 | 1;
   error: string | null;
   blocksAddStop: boolean;
 };
+
+/** The parity a new alternate-day plane takes on a market: the one fewer planes fly, so a second plane covers the other days. A tie starts tomorrow. */
+function alternateDayParity(state: SimState, a: string, b: string): 0 | 1 {
+  const flown: [number, number] = [0, 0];
+  for (const leg of state.schedule) {
+    if (leg.dayParity !== undefined && marketKey(leg.origin, leg.dest) === marketKey(a, b)) flown[leg.dayParity]++;
+  }
+  if (flown[0] === flown[1]) return ((dayIndex(state) + 1) % 2) as 0 | 1;
+  return flown[0] < flown[1] ? 0 : 1;
+}
 
 export function planRotation(chain: RotationStop[], dest: RotationStop, tail: string, state: SimState): RotationPlan {
   const base = chain[0];
@@ -270,7 +283,14 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
   // usable day (sim/utilisation.ts's isLongHaulRoundTrip()): it is then
   // "one full aircraft" and the end-of-day rule below does not apply.
   const tailIsEmpty = !state.schedule.some((leg) => leg.tail === tail);
-  const longHaul = tailIsEmpty && rotationAirports.length === 2 && isLongHaulRoundTrip(legs.length, clockMinutes);
+  // Ultra-long-haul: a round trip that outruns a whole day is flown by this plane every other day, so two planes make a daily service.
+  const alternateDays = tailIsEmpty && rotationAirports.length === 2 && clockMinutes > 24 * 60 && isLongHaulRoundTrip(legs.length, clockMinutes, true);
+  if (alternateDays && legs[1] && legs[1].departMinute >= 24 * 60) {
+    // Its flight back must leave before midnight (step.ts dispatches on each day's own clock), so the pair starts as early as it takes.
+    const start = Math.floor((24 * 60 - 5 - (legs[1].departMinute - legs[0].departMinute)) / 5) * 5;
+    if (start >= 0) legs = packRotationAvoidingCollisions(rotationAirports, type?.cruiseKts, start, state);
+  }
+  const longHaul = tailIsEmpty && rotationAirports.length === 2 && isLongHaulRoundTrip(legs.length, clockMinutes, alternateDays);
   const rotationMinutes = longHaul ? USABLE_DAY_MINUTES : clockMinutes;
 
   // Room by the hour (sim/hours.ts): when an hour this rotation would use
@@ -317,6 +337,7 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
     arriveBackMinute,
     slotQuotes: [],
     heldBack,
+    dayParity: alternateDays ? alternateDayParity(state, rotationAirports[0].iata, rotationAirports[1].iata) : undefined,
     error: null,
     blocksAddStop: true,
   };
@@ -383,7 +404,8 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
         airportByIata(leg.origin, rotationAirports),
         airportByIata(leg.dest, rotationAirports),
       );
-      if (distanceNm <= type.rangeNm) continue;
+      const rangeNm = rangeNmFor(state, type.code);
+      if (distanceNm <= rangeNm) continue;
       const isClosingLeg = leg === lastLeg && leg.dest === base.iata;
       // Both messages name the leg as `origin → dest`, the direction it is
       // actually flown: naming the base first for a leg flying toward it
@@ -391,8 +413,8 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
       // checked on its own.
       return fail(
         isClosingLeg
-          ? `This rotation can't close: ${leg.origin} → ${base.iata} is ${Math.round(distanceNm)} nm, beyond the ${type.name}'s ${type.rangeNm} nm range. Add a stop on the way back to ${base.iata}.`
-          : `${leg.origin} → ${leg.dest} is ${Math.round(distanceNm)} nm — beyond the ${type.name}'s ${type.rangeNm} nm range with a full load.`,
+          ? `This rotation can't close: ${leg.origin} → ${base.iata} is ${Math.round(distanceNm)} nm, beyond the ${type.name}'s ${rangeNm} nm range. Add a stop on the way back to ${base.iata}.`
+          : `${leg.origin} → ${leg.dest} is ${Math.round(distanceNm)} nm — beyond the ${type.name}'s ${rangeNm} nm range with a full load.`,
         !isClosingLeg,
       );
     }
@@ -575,6 +597,7 @@ export function applyRotation(
       dest: packed.dest,
       departMinute: packed.departMinute,
       blockMinutes: packed.blockMinutes,
+      ...(plan.dayParity !== undefined ? { dayParity: plan.dayParity } : {}),
     };
     state.schedule.push(leg);
     createdLegIds.push(leg.legId);

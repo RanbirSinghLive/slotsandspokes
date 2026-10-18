@@ -46,6 +46,7 @@
     "gaugetest": "tsx src/sim/gaugeDrop.test.ts",
     "overnighttest": "tsx src/sim/overnight.test.ts",
     "seatplantest": "tsx src/sim/seatplan.test.ts",
+    "ultrahaultest": "tsx src/sim/ultrahaul.test.ts",
     "margintest": "tsx src/sim/networkMargin.test.ts",
     "nemesistest": "tsx src/sim/nemesis.test.ts"
   },

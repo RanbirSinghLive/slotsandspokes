@@ -1,5 +1,5 @@
 import { MIN_TURN_MINUTES } from './schedule';
-import { isLongHaulRoundTrip, rotationsForTail, scheduledTurnMinutes, USABLE_DAY_END_MINUTE, type Rotation } from './utilisation';
+import { flownEveryOtherDay, isLongHaulRoundTrip, rotationsForTail, scheduledTurnMinutes, USABLE_DAY_END_MINUTE, type Rotation } from './utilisation';
 import type { ScheduleLeg } from './schedule';
 import type { SimState } from './state';
 
@@ -48,7 +48,7 @@ export function breaksCurfew(state: SimState, rotation: Rotation, departMinute: 
     (total, leg) => total + leg.blockMinutes + scheduledTurnMinutes(state, leg.origin, leg.dest),
     0,
   );
-  if (isLongHaulRoundTrip(rotation.legs.length, clockMinutes)) return false;
+  if (isLongHaulRoundTrip(rotation.legs.length, clockMinutes, flownEveryOtherDay(rotation.legs))) return false;
   return projectedReturnMinute(rotation, departMinute, dayStart) > dayStart + USABLE_DAY_END_MINUTE;
 }
 

@@ -6,6 +6,7 @@ import { difficultySettings } from './difficulty';
 import { greatCircleDistanceNm } from './geo';
 import { nextRandom } from './rng';
 import type { SimState } from './state';
+import { rangeNmFor } from './range';
 
 /**
  * Airspace closures: a circle of sky that is shut for days or months, from
@@ -253,7 +254,7 @@ export function legAirspace(state: SimState, origin: string, dest: string, typeC
   const type = aircraftTypes.get(typeCode);
   if (!type) return { kind: 'clear' };
   const flownNm = greatCircleDistanceNm(from, to) + worst.detour.extraNm;
-  if (flownNm > type.rangeNm) return { kind: 'blocked', reason: `${worst.closure.name} detour beyond range` };
+  if (flownNm > rangeNmFor(state, typeCode)) return { kind: 'blocked', reason: `${worst.closure.name} detour beyond range` };
   return {
     kind: 'detour',
     via: worst.detour.via,

@@ -1,7 +1,8 @@
 import airportsData from '../../data/airports.json';
-import { classByCode, AIRCRAFT_CLASSES } from './aircraftClasses';
+import { AIRCRAFT_CLASSES } from './aircraftClasses';
 import { marketDistanceNm } from './demand';
 import type { SimState } from './state';
+import { rangeNmFor } from './range';
 
 /**
  * Fog by reach. The world is 185 airports but a new game shows only the
@@ -60,7 +61,7 @@ export function rivalsInSight(state: SimState): Set<string> {
 
 /** Range of the biggest class currently leased; a propeller's if there are no planes. */
 export function bestRangeNm(state: SimState): number {
-  const ranges = state.aircraft.map((aircraft) => classByCode(aircraft.typeCode)?.rangeNm ?? 0);
+  const ranges = state.aircraft.map((aircraft) => rangeNmFor(state, aircraft.typeCode));
   return Math.max(AIRCRAFT_CLASSES[0].rangeNm, ...ranges);
 }
 

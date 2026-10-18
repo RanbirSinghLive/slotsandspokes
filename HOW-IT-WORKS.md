@@ -1465,6 +1465,19 @@ dispatches it on its own day's clock, and `wrappedLongHaul()` reads the
 pair back as one rotation, flight out first. It is no night stop: no hotel,
 and the plane is in the air at midnight.
 
+**Ultra-long-haul.** A round trip that outruns a whole day (a widebody
+YVR–SYD is about 30 hours there and back) is flown by its plane every
+other day: both its legs carry `dayParity` (0 or 1) and step.ts leaves them
+alone on the other days. Its flight back leaves before midnight, so the
+pair starts as early as it takes. Such a plane flies nothing else and
+counts as one full plane; its crews are needed half as much. A second
+plane planned on the same market takes the other parity, and together
+they make one departure a day each way: `legsServingMarket()` counts an
+alternate-day leg as half a daily flight. The widebody only reaches these
+sectors with the Ultra-long-range kit (R&D shop, +3,000 nm: 5,500 nm to
+8,500 nm), read everywhere through `rangeNmFor()` in `sim/range.ts`.
+A flight delayed past midnight onto the off day waits for its next day.
+
 **Pools.** Utilisation is reported per aircraft, and pooled per base and
 per class (`utilisationPools()`), because "do I need another Regional at
 YUL?" is the decision the player actually makes. A plane grounded by an
