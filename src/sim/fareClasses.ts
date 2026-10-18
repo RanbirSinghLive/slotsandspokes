@@ -1,4 +1,4 @@
-import { CABIN_PRICE, CABIN_VALUE } from './cabins';
+import { CABIN_PRICE, CABIN_VALUE, PREMIUM_PRICE, PREMIUM_VALUE } from './cabins';
 import type { SegmentName } from './timeOfDay';
 
 /**
@@ -63,6 +63,8 @@ export type FareClassTally = {
   businessTurnedAway: number;
   /** Seats sold in the business cabin (sim/cabins.ts). */
   cabinSold?: number;
+  /** Seats sold in premium economy (sim/cabins.ts). */
+  premiumSold?: number;
 };
 
 export function emptyTally(): FareClassTally {
@@ -77,6 +79,7 @@ export function addTally(into: FareClassTally, from: FareClassTally): void {
   into.diluted += from.diluted;
   into.businessTurnedAway += from.businessTurnedAway;
   if (from.cabinSold) into.cabinSold = (into.cabinSold ?? 0) + from.cabinSold;
+  if (from.premiumSold) into.premiumSold = (into.premiumSold ?? 0) + from.premiumSold;
 }
 
 export type SeatSale = {
@@ -96,6 +99,8 @@ export type SeatSaleInput = {
   seats: number;
   /** Business cabin seats that can be sold (sim/cabins.ts); none without a cabin. */
   businessSeats?: number;
+  /** Premium economy seats that can be sold (sim/cabins.ts); none without them. */
+  premiumSeats?: number;
   baseFare: number;
   /** This flight's share of the market's demand (sim/timeOfDay.ts's split by hour). */
   demand: number;
@@ -120,6 +125,7 @@ export function sellSeats(input: SeatSaleInput): SeatSale {
   const tally = emptyTally();
   tally.flights = 1;
   let cabinLeft = Math.max(0, input.businessSeats ?? 0);
+  let premiumLeft = Math.max(0, input.premiumSeats ?? 0);
   let fares = 0;
   let passengers = 0;
 
@@ -153,6 +159,15 @@ export function sellSeats(input: SeatSaleInput): SeatSale {
       booked += take;
       fares += take * input.baseFare * CABIN_PRICE;
       tally.cabinSold = take;
+    }
+    // Then premium economy, for whoever finds it worth its price: each segment values it its own way.
+    if (premiumLeft > 1e-9) {
+      const willing = pool * input.shareAt(segment, (input.baseFare * PREMIUM_PRICE) / PREMIUM_VALUE[segment]);
+      const take = Math.min(premiumLeft, Math.max(0, willing - booked));
+      premiumLeft -= take;
+      booked += take;
+      fares += take * input.baseFare * PREMIUM_PRICE;
+      if (take > 0) tally.premiumSold = (tally.premiumSold ?? 0) + take;
     }
     for (const fareClass of CLASS_ORDER) {
       if (left[fareClass] <= 1e-9) continue;

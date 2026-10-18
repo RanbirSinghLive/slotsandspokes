@@ -1,7 +1,7 @@
 import { demandFactors } from './demandEvents';
 import { effectiveFareClasses } from './seatSale';
 import { crowdingWeight } from './timeOfDay';
-import { cabinLayout, cabinOf } from './cabins';
+import { layoutOf } from './cabins';
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { flightResult, type EconomyAircraftType } from './economy';
 import { trafficShare } from './choiceModel';
@@ -113,8 +113,7 @@ export function summarizeMarket(
   for (const leg of legs) {
     const type = aircraftTypeForLeg(leg, state);
     const aircraft = state.aircraft.find((a) => a.tail === leg.tail);
-    const cabin = aircraft ? cabinOf(aircraft) : 'economy';
-    const layout = cabinLayout(type.seats, cabin);
+    const layout = aircraft ? layoutOf(aircraft, type.seats) : { economy: type.seats, premium: 0, business: 0 };
     const result = flightResult(
       { origin: leg.origin, dest: leg.dest, blockMinutes: leg.blockMinutes },
       type,
@@ -129,7 +128,7 @@ export function summarizeMarket(
       perks,
       { departMinute: leg.departMinute, marketDepartMinutes: departures, crowding: crowdingWeight(leg, legs), season },
       effectiveFareClasses(state, marketKey(origin, dest), routeSettings.fareClasses ?? DEFAULT_FARE_CLASSES),
-      cabin,
+      layout,
     );
     addTally(fareClasses, result.fareClasses);
     previewSpillover += result.spilloverDelta;
@@ -137,8 +136,8 @@ export function summarizeMarket(
     revenue += result.revenue;
     cost += result.cost;
     margin += result.margin;
-    totalSeats += layout.economy + layout.business;
-    totalSeatCeiling += Math.round(layout.economy * perks.loadFactor) + Math.round(layout.business * perks.loadFactor);
+    totalSeats += layout.economy + layout.premium + layout.business;
+    totalSeatCeiling += Math.round(layout.economy * perks.loadFactor) + Math.round(layout.premium * perks.loadFactor) + Math.round(layout.business * perks.loadFactor);
   }
 
   // A market is "seat-capped" when every one of its flights is pinned at

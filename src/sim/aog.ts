@@ -7,10 +7,11 @@ import { summarizeMarket } from './marketSummary';
 import { marketKey } from './schedule';
 import { aircraftUtilisation, rotationsForTail, type Rotation } from './utilisation';
 import { coverRotations } from './turnBuffer';
-import { refitDays } from './cabins';
-import { type BayClaims, bookedDChecks, bookedHeavyChecks, finishDCheck, finishHeavyCheck, forcedHeavyChecks, wornAge } from './mxChecks';
+import { applyRefit, refitDays, refitWorkMinutes, type RefitTarget } from './cabins';
+import { type BayClaims, bookedDChecks, chargeMaintenance, freeHeavyBays, bookedHeavyChecks, finishDCheck, finishHeavyCheck, forcedHeavyChecks, wornAge } from './mxChecks';
 import { nightStopStation } from './nightStops';
 import { engineFault, returnEngines } from './enginePool';
+import { contractCost, heavyRated } from './bases';
 import type { Aircraft, SimState } from './state';
 
 /**
@@ -75,7 +76,9 @@ export type AogEvent = {
   /** The ids those moved legs now have, so the flying can be handed back when it's repaired. */
   movedLegIds: string[];
   /** A planned refit (sim/cabins.ts) rather than a breakdown: the cabin it has when it's back. It can't be expedited. */
-  refitTo?: 'economy' | 'business';
+  refitTo?: RefitTarget;
+  /** A refit done in a hangar bay at its base, which is held until it's back; absent, contracted out. */
+  inBay?: boolean;
   /** A heavy check (sim/mxChecks.ts) rather than a breakdown. It can't be expedited. */
   check?: boolean;
   /** Which check it is, when `check` is set: absent is the C check. */
@@ -165,15 +168,13 @@ export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
   state.aogs = state.aogs.filter((event) => event.returnsAtMinute > dayStartMinute);
   for (const event of repaired) {
     const aircraft = state.aircraft.find((a) => a.tail === event.tail);
-    if (aircraft && event.refitTo === 'business') aircraft.cabin = 'business';
-    if (aircraft && event.refitTo === 'economy') delete aircraft.cabin;
+    if (aircraft && event.refitTo) applyRefit(aircraft, event.refitTo);
     if (aircraft && event.check) {
       if (event.checkKind === 'D') finishDCheck(state, aircraft);
       else finishHeavyCheck(state, aircraft);
     }
     handBackFlying(state, event);
   }
-  startRefits(state, dayStartMinute);
   // Heavy checks overdue past the grace (sim/mxChecks.ts): grounded, the same way, for the work left.
   const bayClaims: BayClaims = new Map();
   const forced = forcedHeavyChecks(state, bayClaims);
@@ -196,6 +197,9 @@ export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
       ...(checkKind ? { checkKind } : {}),
     });
   }
+
+  // After the checks have taken their bays: a refit takes what's left, and a plane starting a check waits.
+  startRefits(state, dayStartMinute);
 
   for (const aircraft of state.aircraft) {
     // Always draw, whatever the outcome below, so how many random numbers a
@@ -245,6 +249,9 @@ function startRefits(state: SimState, dayStartMinute: number): void {
 function startRefitIfAtBase(state: SimState, aircraft: Aircraft, dayStartMinute: number): void {
   if (!aircraft.refitPending || isAog(state, aircraft.tail) || aircraft.rebase) return;
   if (aircraft.status !== 'ground' || !aircraft.baseAirport || aircraft.atAirport !== aircraft.baseAirport) return;
+  // In a bay when its base has a hangar rated for the class with one free; otherwise contracted out by the hour.
+  const inBay = heavyRated(state, aircraft.baseAirport, aircraft.typeCode) && freeHeavyBays(state, aircraft.baseAirport) > 0;
+  if (!inBay) chargeMaintenance(state, contractCost(refitWorkMinutes(aircraft.typeCode)));
   state.aogs.push({
     tail: aircraft.tail,
     base: aircraft.baseAirport,
@@ -254,6 +261,7 @@ function startRefitIfAtBase(state: SimState, aircraft: Aircraft, dayStartMinute:
     coveredRotations: 0,
     movedLegIds: [],
     refitTo: aircraft.refitPending,
+    ...(inBay ? { inBay: true } : {}),
   });
   delete aircraft.refitPending;
 }

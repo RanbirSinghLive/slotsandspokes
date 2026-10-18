@@ -11,7 +11,7 @@ import { rollDailyBrand } from './brand';
 import { ferryStrandedPlanes } from './ferry';
 import { USABLE_DAY_START_MINUTE } from './utilisation';
 import { crowdingWeight } from './timeOfDay';
-import { cabinLayout, cabinOf } from './cabins';
+import { layoutOf } from './cabins';
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { ancillaryNpsPenalty, rollAncillaries } from './ancillaries';
 import { flightResult, type EconomyAircraftType } from './economy';
@@ -647,13 +647,13 @@ export function step(state: SimState): void {
               };
             })(),
             effectiveFareClasses(state, key),
-            cabinOf(aircraft),
+            layoutOf(aircraft, type.seats),
           );
           addTally(((state.todayFareClasses ??= {})[key] ??= emptyTally()), result.fareClasses);
           state.spilloverByMarket[key] = spilloverAvailable + result.spilloverDelta;
           flightPassengers = result.pax;
-          const layout = cabinLayout(type.seats, cabinOf(aircraft));
-          flightSeats = layout.economy + layout.business;
+          const layout = layoutOf(aircraft, type.seats);
+          flightSeats = layout.economy + layout.premium + layout.business;
           flightMargin = result.margin;
           recordFlightLoad(state, key, result.pax, flightSeats);
           recordFlightSeatNm(state, flight.origin, flight.dest, flightSeats);
