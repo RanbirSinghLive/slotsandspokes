@@ -87,6 +87,7 @@ export let baselineScale = 1;
  * don't change the canvas's own pixel bounds.
  */
 export function fitProjection(width: number, height: number, home: { lon: number; lat: number }): void {
+  projection.rotate([-home.lon, 0]);
   projection.fitSize([width, height], homeViewBounds(home.lon, home.lat));
   baselineScale = projection.scale();
   projection.clipExtent([
@@ -105,6 +106,7 @@ export function fitWorld(width: number, height: number, inset: { top: number; ri
   // Two corners, not a ring: a ring 350° wide is ambiguous on a sphere, but
   // two points' projected bounds are just the box between them. Antarctica
   // and the far Arctic are left off; no airport is there.
+  projection.rotate([0, 0]);
   projection.fitExtent(
     [
       [inset.left, inset.top],
@@ -140,6 +142,7 @@ export function withFittedView(
   try {
     mapGesture.margin = 0;
     projection.clipExtent(null);
+    projection.rotate([-circularMeanLongitude(points), 0]);
     projection.fitExtent(
       [
         [inset.left, inset.top],
@@ -154,7 +157,7 @@ export function withFittedView(
     paint();
   } finally {
     mapGesture.margin = marginBefore;
-    projection.scale(before.scale).translate(before.translate).clipExtent(clipBefore);
+    projection.rotate(before.rotation).scale(before.scale).translate(before.translate).clipExtent(clipBefore);
   }
 }
 
@@ -170,10 +173,49 @@ export function withFittedView(
 export const mapGesture = { active: false, margin: 0 };
 
 /** The view a cached sheet was painted for, to carry its picture to a later view. */
-export type ViewSnapshot = { scale: number; translate: [number, number] };
+export type ViewSnapshot = { scale: number; translate: [number, number]; rotation: [number, number, number] };
 
 export function snapshotView(): ViewSnapshot {
-  return { scale: projection.scale(), translate: projection.translate() };
+  return { scale: projection.scale(), translate: projection.translate(), rotation: projection.rotate() };
+}
+
+/**
+ * The longitude the points cluster around, taken on the circle so that
+ * Vancouver (-123) and Tokyo (140) average to the Pacific, not the Atlantic.
+ */
+function circularMeanLongitude(points: [number, number][]): number {
+  let east = 0;
+  let north = 0;
+  for (const [lon] of points) {
+    east += Math.cos((lon * Math.PI) / 180);
+    north += Math.sin((lon * Math.PI) / 180);
+  }
+  return east === 0 && north === 0 ? 0 : (Math.atan2(north, east) * 180) / Math.PI;
+}
+
+/**
+ * Keep the map's seam, the line where the world is cut open, off the screen.
+ *
+ * A Mercator map is a strip 360 degrees wide, so a route from Vancouver to
+ * Tokyo has to run off one edge of the strip and come back on the other.
+ * Rotating the projection moves where the strip is cut. When the cut would
+ * land on screen, rotate it round to the far side of the globe from the
+ * middle of the view, so the player can pan across the Pacific (or any
+ * ocean) without ever meeting an edge. Rotating about the vertical axis only
+ * shifts every point sideways, so nothing else about the view changes.
+ */
+export function keepSeamOffScreen(width: number, height: number): void {
+  if (width <= 0) return;
+  const [translateX] = projection.translate();
+  const halfStrip = Math.PI * projection.scale();
+  const seamLeft = translateX - halfStrip;
+  const seamRight = translateX + halfStrip;
+  if (!(seamLeft > 0 && seamLeft < width) && !(seamRight > 0 && seamRight < width)) return;
+  const centre = projection.invert?.([width / 2, height / 2]);
+  if (!centre) return;
+  const [, translateY] = projection.translate();
+  projection.rotate([-centre[0], 0]);
+  projection.translate([width / 2, translateY]);
 }
 
 /** Where a sheet painted for `painted` lands under the current view: its scale and where its origin goes. */
@@ -189,6 +231,7 @@ function sheetPlacement(painted: ViewSnapshot): { ratio: number; originX: number
  * pinch is in progress and a blurry, slightly scaled copy will do.
  */
 export function sheetStillFits(painted: ViewSnapshot, margin: number, cssWidth: number, cssHeight: number): boolean {
+  if (painted.rotation[0] !== projection.rotate()[0]) return false;
   const { ratio, originX, originY } = sheetPlacement(painted);
   const marginX = margin * cssWidth;
   const marginY = margin * cssHeight;

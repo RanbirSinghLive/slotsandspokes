@@ -795,7 +795,9 @@ any lens.
    built to answer "where do I fly next?". A circle per airport sized by
    the people there not on your planes (`sim/unmetDemand.ts`'s latent
    demand), in the five steps the panel names in words (Tiny to Huge,
-   `airportDemandSize()`), so map and airport view agree. Teal where the
+   `airportDemandSize()`), so map and airport view agree. Zoomed out the
+   circles shrink with the zoom (to 30% of their size), and a smaller airport
+   that falls inside a bigger one's circle is skipped until the player zooms in. Teal where the
    airport is underserved by every airline (`sim/serviceLevel.ts`),
    brighter when starved; grey where it's well served; an amber rim where
    you're turning passengers away today. No lines until asked: the
@@ -912,8 +914,14 @@ in week four (39°N–54°N, 81°W–51°W, up from 42°N–50°N/80°W–51°W)
 of the nine new airports fell outside the old eastern-Canada-only box —
 Goose Bay (53.3°N) north of the old top edge, LaGuardia (40.8°N) south of
 the old bottom one. Pan drags `projection.translate()`; scroll zooms
-`projection.scale()` toward the cursor, clamped to 0.5×–20× of the fitted
-scale.
+`projection.scale()` toward the cursor, clamped to 0.15×–20× of the fitted
+scale. The world is cut open along one seam (the antimeridian of the
+projection's rotation). The fit rotates the projection to the home city, and
+`keepSeamOffScreen()` (`render/projection.ts`) rotates it again whenever a pan
+or zoom would bring the seam on screen, so the player can pan across the
+Pacific to Tokyo without meeting an edge. A cached sheet painted under another
+rotation is repainted, not slid. While a route is being drawn, a drag on open
+map pans and keeps the route; a click without a drag cancels it.
 
 The accumulator loop (`main.ts`) turns real frame time into whole simulated
 minutes (`step()` calls) plus a continuous fractional minute for rendering,
@@ -1582,7 +1590,11 @@ it back. The rules:
 
 - It must fit the usable day (a long-haul round trip, which runs round
   the clock and is exempt from the 22:00 curfew, may end after 22:00 but
-  still can't start before 06:00), its new plane's other rotations with a
+  still can't start before 06:00, and every flight in it must leave before
+  midnight: step.ts dispatches a flight on its own day's clock, so a
+  return leg scheduled past 24:00 would never go. A 9-hour sector like
+  Vancouver–London can therefore start by about 14:25, not in the evening),
+  its new plane's other rotations with a
   turn either side, and room in every hour its legs now use at every
   airport (its own old movements count as room, rivals stay where they
   are), with no same-market departure at the same minute.

@@ -259,9 +259,9 @@ export function armRouteBuilderAt(airport: Airport, typeCode?: string): void {
  * starting a pan in that case. Returns false to mean "not mine, go ahead
  * and pan as usual."
  */
-export function handleRouteBuilderMouseDown(event: ClientPoint, state: SimState): boolean {
+export function handleRouteBuilderMouseDown(event: ClientPoint, state: SimState): 'idle' | 'consumed' | 'pan-or-cancel' {
   // Nothing armed means this click isn't ours; the map menu or a pan gets it.
-  if (builderState.mode === 'idle') return false;
+  if (builderState.mode === 'idle') return 'idle';
 
   const clicked = findNearestAirport(...mapPoint(event.clientX, event.clientY));
 
@@ -269,23 +269,26 @@ export function handleRouteBuilderMouseDown(event: ClientPoint, state: SimState)
     const origin = chainOrigin(builderState.chain);
     if (clicked && clicked.iata === origin.iata) {
       reset(); // re-clicking the airport the next leg departs from cancels
-      return true;
+      return 'consumed';
     }
     if (clicked) {
       const chain = builderState.chain;
       builderState = { mode: 'confirming', chain, dest: clicked };
       showForm(chain, clicked, state);
       showConfirmRing(chain, clicked, state, confirmRoute);
-      return true;
+      return 'consumed';
     }
-    reset(); // clicked open water while armed: cancel
-    return true;
+    // Open water while armed: a drag pans the map and keeps the route, a plain click cancels.
+    return 'pan-or-cancel';
   }
 
-  // Confirming: a click on the map away from the ring cancels, as a click
-  // on open water does while choosing.
+  // Confirming: same, for a press on the map away from the ring.
+  return 'pan-or-cancel';
+}
+
+/** A plain click on open map while a route is being drawn: drop the route. */
+export function cancelRouteBuilder(): void {
   reset();
-  return true;
 }
 
 /**

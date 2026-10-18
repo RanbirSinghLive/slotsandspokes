@@ -1,8 +1,8 @@
 import './style.css';
 import { dayIndex, homeUtcOffsetMinutes, minuteOfDay as homeMinuteOfDay } from './sim/clock';
-import { projection, fitProjection, mapGesture, setMapElement, mapPoint, mapSize, mapSizeChanged, type ClientPoint } from './render/projection';
+import { fitProjection, mapGesture, setMapElement, mapPoint, mapSize, mapSizeChanged, type ClientPoint } from './render/projection';
 import { setupMapInput } from './ui/mapInput';
-import { zoomAt as cameraZoomAt, panFrom, panBy, currentView, restoreView } from './render/camera';
+import { zoomAt as cameraZoomAt, panBy, currentView, restoreView } from './render/camera';
 import { drawBasemap } from './render/basemap';
 import { drawRightsView } from './render/rightsView';
 import { drawTerminator } from './render/terminator';
@@ -44,6 +44,7 @@ import { updatePanel, renderScheduleWarnings, scheduleProblems, PANEL_WIDTH_PX, 
 import {
   setupRouteBuilder,
   handleRouteBuilderMouseDown,
+  cancelRouteBuilder,
   handleRouteBuilderMouseMove,
   handleRouteBuilderKeyDown,
   drawRoutePreview,
@@ -875,16 +876,15 @@ window.addEventListener('keydown', (event) => {
 
 // --- Pan (click and drag) ---
 //
-// `projection.translate()` is the [x, y] pixel position that the
-// projection's reference point (roughly, the map's own "origin") lands on.
-// Dragging the mouse by (dx, dy) pixels should slide the whole map by that
-// same (dx, dy), so panning is just: remember where the translate was when
-// the drag started, then add the mouse's total movement to it on every
-// subsequent move.
+// Dragging the mouse by (dx, dy) pixels slides the whole map by that same
+// (dx, dy): each move adds the mouse's movement since the previous event.
 let isDragging = false;
 let dragStartX = 0;
 let dragStartY = 0;
-let translateAtDragStart: [number, number] = [0, 0];
+let lastDragX = 0;
+let lastDragY = 0;
+// A press on open map while drawing a route: dragging pans, releasing in place cancels the route.
+let cancelRouteOnClick = false;
 
 // Whether the radial ring was open when this click started: a click on
 // empty map closes the ring first, and only a click with no ring open
@@ -912,8 +912,18 @@ function pressMap(event: ClientPoint): void {
   // The route-creation gesture (ui/routeBuilder.ts) gets first refusal
   // on any click on the map. Only once it says "not mine" does an
   // ordinary click-and-drag start panning.
-  if (handleRouteBuilderMouseDown(event, state)) {
+  const builderResult = handleRouteBuilderMouseDown(event, state);
+  if (builderResult === 'consumed') {
     render();
+    return;
+  }
+  if (builderResult === 'pan-or-cancel') {
+    cancelRouteOnClick = true;
+    isDragging = true;
+    dragStartX = event.clientX;
+    dragStartY = event.clientY;
+    lastDragX = event.clientX;
+    lastDragY = event.clientY;
     return;
   }
 
@@ -945,7 +955,8 @@ function pressMap(event: ClientPoint): void {
   isDragging = true;
   dragStartX = event.clientX;
   dragStartY = event.clientY;
-  translateAtDragStart = projection.translate();
+  lastDragX = event.clientX;
+  lastDragY = event.clientY;
 }
 
 canvas.addEventListener('mousedown', pressMap);
@@ -1011,9 +1022,10 @@ canvas.addEventListener('mouseleave', () => {
 
 window.addEventListener('mousemove', (event) => {
   if (!isDragging) return;
-  const dx = event.clientX - dragStartX;
-  const dy = event.clientY - dragStartY;
-  panFrom(translateAtDragStart, dx, dy);
+  // Slide by how far the mouse moved since the last event: the view can be recentred mid-drag (camera.ts), so a total from the press would be measured against a stale origin.
+  panBy(event.clientX - lastDragX, event.clientY - lastDragY);
+  lastDragX = event.clientX;
+  lastDragY = event.clientY;
   render();
 });
 
@@ -1023,7 +1035,11 @@ function releaseMap(event: ClientPoint): void {
   // under it, so it started a pan that never moved) returns the panel to
   // Network.
   const moved = Math.hypot(event.clientX - dragStartX, event.clientY - dragStartY);
-  if (isDragging && moved < CLICK_SLOP_PX && !ringOpenAtMouseDown) select(NETWORK);
+  if (cancelRouteOnClick && isDragging && moved < CLICK_SLOP_PX) {
+    cancelRouteBuilder();
+    render();
+  } else if (isDragging && !cancelRouteOnClick && moved < CLICK_SLOP_PX && !ringOpenAtMouseDown) select(NETWORK);
+  cancelRouteOnClick = false;
   isDragging = false;
 }
 
