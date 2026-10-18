@@ -10,6 +10,7 @@ import * as ops from '../routeActions';
 import { showFleetSeatMap, showSeatMap } from '../seatMap';
 import { select } from '../selection';
 import { heading, info, line } from './dom';
+import { feesSection } from './fees';
 
 /**
  * Product: the airline's cabins by type (sim/fleetCabins.ts). Each type
@@ -248,6 +249,8 @@ export function buildProductView(state: SimState, changed: () => void): HTMLElem
   const inRefit = products.reduce((sum, product) => sum + product.planes.filter((plane) => plane.standing === 'refit').length, 0);
   const templateCount = products.reduce((sum, product) => sum + product.templates.length, 0);
   root.append(line(`${standards} standard${standards === 1 ? '' : 's'} · ${inRefit} in refit · ${templateCount} template${templateCount === 1 ? '' : 's'}`));
+  // Fees sit beside cabins: both are what a ticket buys, set airline-wide.
+  root.append(...feesSection(state, changed));
   // Types the fleet flies first, then the rest greyed, so what's coming shows without crowding what's here.
   const ordered = [...products.filter((p) => p.fits && p.planes.length > 0), ...products.filter((p) => p.fits && p.planes.length === 0), ...products.filter((p) => !p.fits)];
   for (const product of ordered) root.append(...typeSection(state, product, changed));

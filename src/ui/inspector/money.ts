@@ -304,7 +304,7 @@ export function buildMoneyView(state: SimState): HTMLElement {
     root.append(
       lineWithInfo(
         `Fees ${money(state.yesterdayAncillaryRevenue ?? 0)}/day · total ${shortMoney(state.ancillaryRevenueTotal ?? 0)}`,
-        'Bag and seat fees, already inside revenue above. Set the level at Head office; they cost NPS, and rivals copy a fee over time.',
+        'Bag and seat fees, already inside revenue above. Set the level on Product; they cost NPS, and rivals copy a fee over time.',
       ),
     );
   }
