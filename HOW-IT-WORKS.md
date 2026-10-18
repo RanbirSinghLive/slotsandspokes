@@ -2854,7 +2854,8 @@ have sold, and it can lose money.
 
 **A refit** changes the cabin either way. It is paid when ordered:
 10 days of the plane's lease. It starts the next morning the plane is
-on the ground at its base, and takes it out of service for 3 days
+on the ground at its base, or the moment it lands there when it is in the
+air at every midnight (a long-haul pair landing after midnight), and takes it out of service for 3 days
 (Regional), 4 (Narrowbody) or 6 (Widebody). Out of service it is an AOG
 with `refitTo` set: its rotations move to spare planes of its class at
 its base, what doesn't fit is cancelled, and it can't be expedited.

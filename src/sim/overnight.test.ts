@@ -63,3 +63,16 @@ for (let minute = 0; minute < 1440 * days; minute++) {
 }
 assert.ok(eveningDepartures >= 18, `an evening round trip flew only ${eveningDepartures} legs in ${days} days`);
 console.log(`ok: evening start ${eveningDepartures} legs in ${days} days`);
+
+// A refit ordered on a plane that is in the air at every midnight used to wait forever ("refit tomorrow"); it starts when the plane lands at base.
+const refitGame = startHeadlessGame('YYZ', 4, createPlayer('bold'));
+const refitPlane = refitGame.aircraft[0];
+refitGame.schedule = [
+  { legId: 'R-1', tail: refitPlane.tail, origin: base, dest: other, departMinute: 360, blockMinutes: 540 },
+  { legId: 'R-2', tail: refitPlane.tail, origin: other, dest: base, departMinute: 930, blockMinutes: 540 },
+] as typeof refitGame.schedule;
+refitPlane.refitPending = 'business';
+for (let minute = 0; minute < 1440 * 4 && refitPlane.refitPending; minute++) step(refitGame);
+assert.equal(refitPlane.refitPending, undefined, 'refit never started on a plane that lands after midnight');
+assert.ok(refitGame.aogs.some((event) => event.tail === refitPlane.tail && event.refitTo === 'business'));
+console.log('ok: refit starts on landing at base');

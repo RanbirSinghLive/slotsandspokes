@@ -1,6 +1,6 @@
 import { powertrainMark } from '../powertrainMark';
 import { nightStopCostPerNight, nightStopLegs } from '../../sim/nightStops';
-import { classByCode } from '../../sim/aircraftClasses';
+import { AIRCRAFT_CLASSES, classByCode, pluralClassName } from '../../sim/aircraftClasses';
 import { dayIndex } from '../../sim/clock';
 import { line, heading, lineWithInfo } from './dom';
 import { glyph } from '../glyphs';
@@ -83,6 +83,9 @@ export function aircraftLink(tail: string): HTMLButtonElement {
 }
 
 /** Every plane the airline has, each a row opening its view. */
+/** Types whose rows are folded away in the Fleet list, by type code: remembered for the session. */
+const collapsedFleetTypes = new Set<string>();
+
 export function buildFleetView(state: SimState, changed: () => void): HTMLElement {
   const root = document.createElement('div');
   root.className = 'inspector-view';
@@ -123,39 +126,64 @@ export function buildFleetView(state: SimState, changed: () => void): HTMLElemen
   const ordered = [...state.aircraft.filter((a) => newTails.has(a.tail)), ...state.aircraft.filter((a) => !newTails.has(a.tail))];
   // A phone's row has no room for the OTP count too: it wrapped, so rows changed height. The plane's own view has it.
   const narrowScreen = window.matchMedia('(pointer: coarse)').matches;
-  for (const aircraft of ordered) {
-    const use = aircraftUtilisation(state, aircraft.tail);
-    const { flown, onTime, loadFactor } = todayOnTime(state, aircraft.tail);
-    const row = linkToMap(document.createElement('button'), { kind: 'aircraft', tail: aircraft.tail });
-    row.type = 'button';
-    row.className = 'inspector-row';
-    const name = document.createElement('span');
-    name.append(planeIconElement(aircraft.typeCode), ` ${aircraft.tail}`);
-    const mark = powertrainMark(aircraft);
-    if (mark) name.append(' ', mark);
-    const detail = document.createElement('span');
-    detail.className = 'inspector-row-detail';
-    detail.textContent =
-      (aircraft.rebase ? `${aircraft.rebase.from}→${aircraft.rebase.to} day ${aircraft.rebase.arrivesDay}` : (aircraft.baseAirport ?? 'no base')) +
-      ` · ${Math.round(use.share * 100)}%` +
-      (flown > 0 && !narrowScreen ? ` · OTP ${onTime}/${flown}` : '') +
-      (loadFactor !== null ? ` · LF ${Math.round(loadFactor * 100)}%` : '') +
-      (aogFor(state, aircraft.tail) ? (aogFor(state, aircraft.tail)?.refitTo ? ' · refit' : ' · AOG') : aircraft.refitPending ? ' · refit tomorrow' : '') +
-      '';
-    if (aogFor(state, aircraft.tail) || use.share > 1) detail.classList.add('is-over');
-    const cabinMark = cabinMarkFor(state, aircraft.tail, changed);
-    if (cabinMark) name.append(cabinMark);
-    if (newTails.has(aircraft.tail)) {
-      const fresh = document.createElement('span');
-      fresh.className = 'fleet-new-mark';
-      fresh.textContent = '✦';
-      fresh.title = `Delivered day ${aircraft.deliveredDay} · no flights yet · lease charged. Draw a route from ${aircraft.baseAirport ?? 'its base'} to put it to work.`;
-      name.append(' ', fresh);
-      row.classList.add('is-new');
+  for (const cls of AIRCRAFT_CLASSES) {
+    const planes = ordered.filter((a) => a.typeCode === cls.code);
+    if (planes.length === 0) continue;
+    const collapsed = collapsedFleetTypes.has(cls.code);
+    const header = document.createElement('button');
+    header.type = 'button';
+    header.className = 'fleet-group';
+    header.setAttribute('aria-expanded', String(!collapsed));
+    header.append(`${collapsed ? '▸' : '▾'} `, planeIconElement(cls.code), ` ${pluralClassName(cls.name)} ×${planes.length}`);
+    // A folded group still shows trouble inside it.
+    const down = planes.filter((a) => aogFor(state, a.tail)).length;
+    if (down > 0) {
+      const downEl = document.createElement('span');
+      downEl.className = 'inspector-row-detail is-over';
+      downEl.textContent = `AOG ${down}`;
+      header.append(downEl);
     }
-    row.append(name, detail);
-    row.addEventListener('click', () => select({ kind: 'aircraft', tail: aircraft.tail }));
-    list.append(row);
+    header.addEventListener('click', () => {
+      if (collapsedFleetTypes.has(cls.code)) collapsedFleetTypes.delete(cls.code);
+      else collapsedFleetTypes.add(cls.code);
+      changed();
+    });
+    list.append(header);
+    if (collapsed) continue;
+      for (const aircraft of planes) {
+      const use = aircraftUtilisation(state, aircraft.tail);
+      const { flown, onTime, loadFactor } = todayOnTime(state, aircraft.tail);
+      const row = linkToMap(document.createElement('button'), { kind: 'aircraft', tail: aircraft.tail });
+      row.type = 'button';
+      row.className = 'inspector-row';
+      const name = document.createElement('span');
+      name.append(planeIconElement(aircraft.typeCode), ` ${aircraft.tail}`);
+      const mark = powertrainMark(aircraft);
+      if (mark) name.append(' ', mark);
+      const detail = document.createElement('span');
+      detail.className = 'inspector-row-detail';
+      detail.textContent =
+        (aircraft.rebase ? `${aircraft.rebase.from}→${aircraft.rebase.to} day ${aircraft.rebase.arrivesDay}` : (aircraft.baseAirport ?? 'no base')) +
+        ` · ${Math.round(use.share * 100)}%` +
+        (flown > 0 && !narrowScreen ? ` · OTP ${onTime}/${flown}` : '') +
+        (loadFactor !== null ? ` · LF ${Math.round(loadFactor * 100)}%` : '') +
+        (aogFor(state, aircraft.tail) ? (aogFor(state, aircraft.tail)?.refitTo ? ' · refit' : ' · AOG') : aircraft.refitPending ? ' · refit tomorrow' : '') +
+        '';
+      if (aogFor(state, aircraft.tail) || use.share > 1) detail.classList.add('is-over');
+      const cabinMark = cabinMarkFor(state, aircraft.tail, changed);
+      if (cabinMark) name.append(cabinMark);
+      if (newTails.has(aircraft.tail)) {
+        const fresh = document.createElement('span');
+        fresh.className = 'fleet-new-mark';
+        fresh.textContent = '✦';
+        fresh.title = `Delivered day ${aircraft.deliveredDay} · no flights yet · lease charged. Draw a route from ${aircraft.baseAirport ?? 'its base'} to put it to work.`;
+        name.append(' ', fresh);
+        row.classList.add('is-new');
+      }
+      row.append(name, detail);
+      row.addEventListener('click', () => select({ kind: 'aircraft', tail: aircraft.tail }));
+      list.append(row);
+    }
   }
   root.append(list);
   return root;

@@ -1,5 +1,5 @@
 import { nextRandom } from './rng';
-import { dayIndex } from './clock';
+import { dayIndex, dayStartMinute } from './clock';
 import { executiveMaintenanceMultiplier } from './executives';
 import { airportLoadAt } from './airports';
 import { hourOf } from './hours';
@@ -239,21 +239,34 @@ export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
 
 /** Refits ordered (sim/cabins.ts) start on a plane on the ground at its base, flying nothing else meanwhile. */
 function startRefits(state: SimState, dayStartMinute: number): void {
-  for (const aircraft of state.aircraft) {
-    if (!aircraft.refitPending || isAog(state, aircraft.tail) || aircraft.rebase) continue;
-    if (aircraft.status !== 'ground' || !aircraft.baseAirport || aircraft.atAirport !== aircraft.baseAirport) continue;
-    state.aogs.push({
-      tail: aircraft.tail,
-      base: aircraft.baseAirport,
-      fault: 'cabin refit',
-      returnsAtMinute: dayStartMinute + refitDays(aircraft.typeCode) * MINUTES_PER_DAY,
-      uncoveredRoutes: [],
-      coveredRotations: 0,
-      movedLegIds: [],
-      refitTo: aircraft.refitPending,
-    });
-    delete aircraft.refitPending;
-  }
+  for (const aircraft of state.aircraft) startRefitIfAtBase(state, aircraft, dayStartMinute);
+}
+
+function startRefitIfAtBase(state: SimState, aircraft: Aircraft, dayStartMinute: number): void {
+  if (!aircraft.refitPending || isAog(state, aircraft.tail) || aircraft.rebase) return;
+  if (aircraft.status !== 'ground' || !aircraft.baseAirport || aircraft.atAirport !== aircraft.baseAirport) return;
+  state.aogs.push({
+    tail: aircraft.tail,
+    base: aircraft.baseAirport,
+    fault: 'cabin refit',
+    returnsAtMinute: dayStartMinute + refitDays(aircraft.typeCode) * MINUTES_PER_DAY,
+    uncoveredRoutes: [],
+    coveredRotations: 0,
+    movedLegIds: [],
+    refitTo: aircraft.refitPending,
+  });
+  delete aircraft.refitPending;
+}
+
+/**
+ * A long-haul pair that lands after midnight is in the air at every morning
+ * pass, so its refit would never find it at base. It starts when the plane
+ * touches down there instead.
+ */
+export function startRefitOnLanding(state: SimState, aircraft: Aircraft): void {
+  if (!aircraft.refitPending) return;
+  startRefitIfAtBase(state, aircraft, dayStartMinute(state));
+  if (!aircraft.refitPending) coverGroundedPlanes(state);
 }
 
 /**

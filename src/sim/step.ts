@@ -41,7 +41,7 @@ import { rollDailyMarketDemand, actualDailyDemand } from './marketDemand';
 import { revealReach } from './reach';
 import { cabinCover, FATIGUE_DELAY_MULTIPLIER, legFatigue, rollDailyCrews } from './crews';
 import { MAINTENANCE_AGE_FACTOR } from './aog';
-import { isAog, rollDailyAogs } from './aog';
+import { isAog, rollDailyAogs, startRefitOnLanding } from './aog';
 import { handBackSwaps } from './controller';
 import { applyPriorityPolicy } from './priority';
 import { rollDailyCrisis } from './crisis';
@@ -606,6 +606,7 @@ export function step(state: SimState): void {
       aircraft.atAirport = flight.dest;
       aircraft.activeLegId = null;
       aircraft.groundSinceMinute = state.simMinute;
+      startRefitOnLanding(state, aircraft);
       // Ground delay is part of the arrival time but is not time in the air.
       recordFlown(aircraft, flight.arriveMinute - flight.departMinute - flight.delayMinutes);
 

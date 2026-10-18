@@ -1406,6 +1406,31 @@ button,
   color: var(--puck);
 }
 
+.fleet-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 4px 0 0;
+  font: inherit;
+  font-size: 11px;
+  color: #c8d0e0;
+  text-align: left;
+  background: none;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+
+.fleet-group .inspector-row-detail {
+  margin-left: auto;
+}
+
+.fleet-group svg {
+  width: 14px;
+  height: 14px;
+}
+
 .timeline-rotation {
   position: absolute;
   top: 0;
