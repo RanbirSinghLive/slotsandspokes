@@ -4423,6 +4423,127 @@ button.inspector-crumb:hover {
 
 .mx-bay.is-refit .mx-bay-state { color: #9d8cf0; }
 
+/* Product: cabins by type (ui/inspector/product.ts). */
+.product-view h2 svg { width: 16px; height: 16px; vertical-align: -3px; }
+.product-view h2.is-locked { opacity: 0.45; }
+.inspector-line.is-muted { opacity: 0.5; }
+.cabin-bar {
+  display: inline-flex;
+  width: 44px;
+  height: 6px;
+  overflow: hidden;
+  vertical-align: middle;
+  border-radius: 3px;
+  background: #3a4258;
+}
+.cabin-bar-business { background: #9d8cf0; }
+.cabin-bar-premium { background: #5ed6c8; }
+.cabin-bar-economy { background: #6c7691; }
+.product-standard,
+.product-template {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+.product-standard.is-none .product-standard-text { opacity: 0.6; flex: 1; }
+.product-standard-open {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.product-standard-open .cabin-bar { width: 72px; height: 8px; }
+.product-progress { font-variant-numeric: tabular-nums; color: #ffb347; }
+.product-progress.is-done { color: #5ed6c8; }
+.product-tool,
+.product-template-add {
+  min-width: 28px;
+  min-height: 28px;
+  background: #3a4258;
+  border: 1px solid #6b7694;
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+}
+.product-templates { margin: 4px 0 8px; padding-left: 8px; border-left: 2px solid rgba(255, 255, 255, 0.1); }
+.product-template.is-standard .product-template-name { color: #5ed6c8; }
+.product-template-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: text;
+}
+.product-template-input { flex: 1; min-width: 0; font: inherit; }
+.product-template-seats { color: #8892ac; font-size: 12px; font-variant-numeric: tabular-nums; }
+.product-template-mark { min-width: 28px; text-align: center; color: #5ed6c8; }
+.product-template-add { margin-top: 4px; }
+.product-planes { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px; }
+.product-plane {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #6b7694;
+  border-radius: 12px;
+  font-size: 12px;
+}
+.product-plane-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.product-plane .cabin-bar { width: 24px; height: 5px; }
+.product-plane.is-standard { border-color: #5ed6c8; }
+.product-plane.is-refit { border-color: #ffb347; }
+.product-plane.is-waiting { border-style: dashed; opacity: 0.75; }
+.product-plane.is-own { border-color: #9d8cf0; }
+.product-follow { min-width: 22px; min-height: 22px; margin-right: 2px; padding: 0; border-radius: 10px; font-size: 11px; }
+@media (pointer: coarse) {
+  .product-tool,
+  .product-template-add { min-width: 44px; min-height: 44px; }
+  .product-plane-open { padding: 8px 10px; }
+  .product-follow { min-width: 36px; min-height: 36px; }
+}
+
+/* Saved templates on the seat map (ui/seatMap.ts). */
+.seatmap-templates { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.seatmap-template {
+  padding: 3px 9px;
+  background: #3a4258;
+  border: 1px solid #6b7694;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+.seatmap-template.is-on { border-color: #5ed6c8; color: #5ed6c8; }
+.seatmap-template:disabled { opacity: 0.4; cursor: default; }
+.confirm-row .is-warn { color: #ffb347; }
+@media (pointer: coarse) {
+  .seatmap-template { min-height: 36px; padding: 6px 12px; }
+}
+
 /* The seat map dialog (ui/seatMap.ts). */
 .modal-box--seatmap { max-width: 420px; }
 .seatmap-split { margin-bottom: 10px; }

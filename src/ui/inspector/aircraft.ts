@@ -590,7 +590,12 @@ function buildCabin(state: SimState, tail: string, changed: () => void): HTMLEle
     `${option.to === 'business' ? 'Business cabin' : 'All economy'} would be ${sign}${money(Math.abs(option.gainPerDay))}/day` + (option.blocked ? ` · ${option.blocked}` : ''),
     option.gainPerDay < 0 ? 'inspector-line is-warn' : 'inspector-line',
   );
-  block.append(button, forecast);
+  const product = document.createElement('button');
+  product.type = 'button';
+  product.className = 'inspector-link';
+  product.textContent = aircraft.ownCabin ? 'Own cabin · off its type standard · Product ›' : 'Fleet cabins · Product ›';
+  product.addEventListener('click', () => select({ kind: 'product' }));
+  block.append(button, forecast, product);
   return block;
 }
 

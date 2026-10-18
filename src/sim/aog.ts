@@ -10,6 +10,7 @@ import { coverRotations } from './turnBuffer';
 import { applyRefit, refitDays, refitWorkMinutes, type RefitTarget } from './cabins';
 import { type BayClaims, bookedDChecks, chargeMaintenance, freeHeavyBays, bookedHeavyChecks, finishDCheck, finishHeavyCheck, forcedHeavyChecks, wornAge } from './mxChecks';
 import { nightStopStation } from './nightStops';
+import { rollFleetCabins } from './fleetCabins';
 import { engineFault, returnEngines } from './enginePool';
 import { contractCost, heavyRated } from './bases';
 import type { Aircraft, SimState } from './state';
@@ -199,6 +200,8 @@ export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
   }
 
   // After the checks have taken their bays: a refit takes what's left, and a plane starting a check waits.
+  // Planes behind their type's standard cabin are ordered theirs first, one per base (sim/fleetCabins.ts).
+  rollFleetCabins(state);
   startRefits(state, dayStartMinute);
 
   for (const aircraft of state.aircraft) {

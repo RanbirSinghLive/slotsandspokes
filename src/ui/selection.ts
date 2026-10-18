@@ -21,6 +21,8 @@ export type Selection =
   | { kind: 'fleet' }
   /** Every crew base's crews by class (ui/inspector/crews.ts). */
   | { kind: 'crews' }
+  /** Cabins by type: standards, templates, every plane's seats (ui/inspector/product.ts). */
+  | { kind: 'product' }
   /** AOGs and fleet health (ui/inspector/maintenance.ts). */
   | { kind: 'maintenance' }
   /** Save, load and new game. */

@@ -29,6 +29,7 @@ const SCREENS: [string, Selection][] = [
   ['Fleet', { kind: 'fleet' }],
   ['Crews', { kind: 'crews' }],
   ['Maintenance', { kind: 'maintenance' }],
+  ['Product', { kind: 'product' }],
   ['Rivals', { kind: 'rivals' }],
   ['Money', { kind: 'money' }],
   ['Goals', { kind: 'goals' }],

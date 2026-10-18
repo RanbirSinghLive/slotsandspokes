@@ -101,7 +101,8 @@ import { SEASON_DAYS, SEASONAL_PREMIUM } from './seasonalLease';
 import { changeSpareEngines as changeSpareEnginesRule, holdPerDay, shopVisitCost, sparesHeld, sparesReady } from './enginePool';
 import { aBankedMinutes, aCheckOpen, aCheckProgress, aCheckWorkMinutes, cyclesSinceHeavy, deferredItems, flightHoursSinceHeavy, heavyBankedMinutes, maintenanceReserve, heavyCheckDueIn, canBookHeavyCheck, heavyBookBlocker, applyHeavyTolerance, heavyToleranceBlocker, heavyToleranceCost, heavyShiftOf, toleranceCapDays, toleranceWearYears, TOLERANCE_STEPS, canBookDCheck, dBookBlocker, dCheckDueIn, dCheckOpen, flightHoursSinceD, heavyCheckOpen, heavyCheckWorkMinutes, holdsBay, freeHeavyBays, tonightCheck } from './mxChecks';
 import { rebaseOptions, rebasePlane, type RebaseOption } from './rebase';
-import { bestSeatPlan, cabinGainPerDay, cabinOf, cancelRefit as cancelRefitRule, layoutFor, maxBusinessSeats, maxPremiumSeats, orderRefit as orderRefitRule, refitBlockedReason, refitCost, refitDays, refitWorkMinutes, seatPlanOf, seatsOfType, typeSegmentSplit, type Cabin, type RefitTarget, type SeatPlan } from './cabins';
+import { bestTypeSeatPlan, deleteCabinTemplate as deleteCabinTemplateRule, fleetCabinOf, fleetCabinStatus, followFleetCabin as followFleetCabinRule, renameCabinTemplate as renameCabinTemplateRule, saveCabinTemplate as saveCabinTemplateRule, setFleetCabin as setFleetCabinRule, templatesFor, typeCabinGainPerDay, type FleetCabinStatus } from './fleetCabins';
+import { bestSeatPlan, cabinGainPerDay, canHaveBusinessCabin, layoutOf, refitCostForLease, sameSeatPlan, cabinOf, cancelRefit as cancelRefitRule, layoutFor, maxBusinessSeats, maxPremiumSeats, orderRefit as orderRefitRule, refitBlockedReason, refitCost, refitDays, refitWorkMinutes, seatPlanOf, seatsOfType, typeSegmentSplit, type Cabin, type RefitTarget, type SeatPlan } from './cabins';
 import { commitBringHome, commitRetime, planBringHome, planRetime, type RetimePlan } from './retime';
 import { commitDraft, conflictingLegIds, planDrop, snapStart, type DraftMove, type DropPlan } from './scheduleDraft';
 import { planSort, type SortMode, type SortPlan } from './scheduleSort';
@@ -111,7 +112,7 @@ import { actualDailyDemand, currentPotentialDemand } from './marketDemand';
 import { revealReach } from './reach';
 import { applyRotation, candidateTailsAt, planRotation, type RotationPlan, type RotationStop } from './rotations';
 import { isAircraftTypeAllowedAt, legsServingMarket, marketKey } from './schedule';
-import type { SimState } from './state';
+import type { CabinTemplate, SimState } from './state';
 import { applyTurnBufferChange, planTurnBufferChange } from './turnBuffer';
 import { allRotations, type PoolEffect, type Rotation } from './utilisation';
 
@@ -938,6 +939,89 @@ export { maxBusinessSeats, maxPremiumSeats };
 
 export function cancelRefit(state: SimState, tail: string): Outcome<{ message: string }> {
   return cancelRefitRule(state, tail);
+}
+
+// --- Product: fleet cabins -------------------------------------------------------
+
+/** One plane on the Product screen: its seats now, and where it stands against its type's standard (sim/fleetCabins.ts). */
+export type ProductPlane = {
+  tail: string;
+  layout: ReturnType<typeof layoutFor>;
+  /** standard: on it; refit: in or ordered a refit; waiting: its turn is coming; own: kept off it; none: the type has no standard. */
+  standing: 'standard' | 'refit' | 'waiting' | 'own' | 'none';
+};
+
+export type ProductType = {
+  typeCode: string;
+  /** Seats of the type with every seat economy. */
+  seats: number;
+  /** False for a type no cabin fits (a Propeller). */
+  fits: boolean;
+  planes: ProductPlane[];
+  templates: CabinTemplate[];
+  status: FleetCabinStatus;
+  split: ReturnType<typeof typeSegmentSplit>;
+  /** One refit's price for a plane of the type, at the fleet's average lease. */
+  refitCost: number;
+  refitDays: number;
+};
+
+/** Everything the Product screen draws, one entry per type in class order. */
+export function productReadout(state: SimState): ProductType[] {
+  return AIRCRAFT_CLASSES.map((cls) => {
+    const typeCode = cls.code;
+    const seats = seatsOfType(typeCode);
+    const standard = fleetCabinOf(state, typeCode);
+    const ofType = state.aircraft.filter((a) => a.typeCode === typeCode);
+    const planes = ofType.map((aircraft): ProductPlane => {
+      const inRefit = aircraft.refitPending !== undefined || state.aogs.some((event) => event.tail === aircraft.tail && event.refitTo !== undefined);
+      const on = standard !== null && sameSeatPlan(seatPlanOf(aircraft), standard);
+      const standing = aircraft.ownCabin ? 'own' : inRefit ? 'refit' : standard === null ? 'none' : on ? 'standard' : 'waiting';
+      return { tail: aircraft.tail, layout: layoutOf(aircraft, seats), standing };
+    });
+    const leases = ofType.map((a) => a.leaseCostPerDay);
+    const averageRefit = leases.length > 0 ? refitCostForLease(leases.reduce((sum, n) => sum + n, 0) / leases.length) : 0;
+    return {
+      typeCode,
+      seats,
+      fits: canHaveBusinessCabin(typeCode),
+      planes,
+      templates: templatesFor(state, typeCode),
+      status: fleetCabinStatus(state, typeCode),
+      split: typeSegmentSplit(state, typeCode),
+      refitCost: Math.round(averageRefit),
+      refitDays: refitDays(typeCode),
+    };
+  });
+}
+
+/** What the type's planes that follow the standard would make a day with `plan`, against now. */
+export function forecastTypeCabin(state: SimState, typeCode: string, plan: SeatPlan): { gainPerDay: number; layout: ReturnType<typeof layoutFor> } {
+  return { gainPerDay: typeCabinGainPerDay(state, typeCode, plan), layout: layoutFor(seatsOfType(typeCode), plan) };
+}
+
+export function bestTypeCabin(state: SimState, typeCode: string): { plan: SeatPlan; gainPerDay: number } | null {
+  return bestTypeSeatPlan(state, typeCode);
+}
+
+export function saveCabinTemplate(state: SimState, typeCode: string, plan: SeatPlan, name?: string): Outcome<{ message: string }> {
+  return saveCabinTemplateRule(state, typeCode, plan, name);
+}
+
+export function deleteCabinTemplate(state: SimState, id: number): Outcome<{ message: string }> {
+  return deleteCabinTemplateRule(state, id);
+}
+
+export function renameCabinTemplate(state: SimState, id: number, name: string): Outcome<{ message: string }> {
+  return renameCabinTemplateRule(state, id, name);
+}
+
+export function setFleetCabin(state: SimState, typeCode: string, plan: SeatPlan | null): Outcome<{ message: string }> {
+  return setFleetCabinRule(state, typeCode, plan);
+}
+
+export function followFleetCabin(state: SimState, tail: string): Outcome<{ message: string }> {
+  return followFleetCabinRule(state, tail);
 }
 
 // --- Innovations --------------------------------------------------------------

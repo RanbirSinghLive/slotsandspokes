@@ -1,6 +1,7 @@
 import { dayIndex } from './clock';
 import { executiveDeliveryMultiplier, executiveReturnMultiplier } from './executives';
 import { leaseAircraft } from './leasing';
+import { fitStandardOnDelivery } from './fleetCabins';
 import { settleMaintenance } from './mxChecks';
 import type { MarketListing } from './market';
 import type { Aircraft, SimState } from './state';
@@ -119,6 +120,7 @@ export function rollDailyFleet(state: SimState): void {
       aircraft.deliveredDay = today;
       if (lease.seasonalDays !== undefined) aircraft.seasonalUntilDay = today + lease.seasonalDays;
       if (lease.powertrain) aircraft.powertrain = lease.powertrain;
+      fitStandardOnDelivery(state, aircraft);
     }
   }
   const leaving = state.aircraft.filter((aircraft) => aircraft.returningOnDay !== undefined && aircraft.returningOnDay <= today);
