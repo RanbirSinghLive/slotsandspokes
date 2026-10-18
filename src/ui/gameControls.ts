@@ -2,7 +2,7 @@ import { saveState, clearSavedState, hasSavedState, downloadText, importSaveText
 import { dayIndex } from '../sim/clock';
 import type { SimState } from '../sim/state';
 import { GAME_VERSION } from './version';
-import { cloudLinkInfo } from './cloudSave';
+import { backupBeforeNewGame, cloudLinkInfo } from './cloudSave';
 import { syncBriefSettings } from './briefWindow';
 
 /**
@@ -98,15 +98,17 @@ export function setupGameControls(state: SimState): void {
   aboutVersion.textContent = `Slots & Spokes ${GAME_VERSION} · alpha · save format ${SAVE_FORMAT}`;
 
   newGameButton.addEventListener('click', () => {
-    const cloudNote = cloudLinkInfo() ? ' The cloud save is replaced too.' : '';
+    const cloudNote = cloudLinkInfo() ? ' The cloud save is replaced; a backup is kept.' : '';
     newGameConfirmText.textContent = `Erase current game?${cloudNote}`;
     newGameButton.hidden = true;
     newGameConfirmEl.hidden = false;
   });
 
   newGameConfirmYes.addEventListener('click', () => {
-    clearSavedState();
-    window.location.reload();
+    void backupBeforeNewGame().finally(() => {
+      clearSavedState();
+      window.location.reload();
+    });
   });
 
   newGameConfirmCancel.addEventListener('click', () => {
