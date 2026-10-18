@@ -1,4 +1,5 @@
-import { acceptMandate, clientKey, LATE_MINUTES, mandateIsActive, mandatesOf, MIN_TERM_SUCCESS, STORIES, type Mandate } from '../sim/mandates';
+import { acceptMandate, clientKey, LATE_MINUTES, mandatedLeg, mandateIsActive, mandatesOf, MIN_TERM_SUCCESS, STORIES, type Mandate } from '../sim/mandates';
+import { select } from './selection';
 import { dayIndex, minuteOfDayToTimeString } from '../sim/clock';
 import type { SimState } from '../sim/state';
 import { callPolicy } from '../sim/priority';
@@ -20,6 +21,9 @@ const chipEl = document.querySelector<HTMLButtonElement>('#events-chip')!;
 const announced = new Set<number>();
 let primed = false;
 let signature: string | null = null;
+
+/** Days a lapsed offer stays in the list. */
+const LAPSED_SHOWN_DAYS = 2;
 
 function label(mandate: Mandate): string {
   return `${mandate.origin}→${mandate.dest} ${minuteOfDayToTimeString(mandate.departMinute)}`;
@@ -65,7 +69,12 @@ function row(state: SimState, mandate: Mandate, refresh: () => void): HTMLElemen
   const el = document.createElement('div');
   el.className = 'mandate-row';
   const text = document.createElement('span');
-  if (mandate.status === 'offered') {
+  if (mandate.status === 'lapsed') {
+    el.classList.add('is-lapsed');
+    text.textContent = `EVENT ${label(mandate)} · ✕ expired`;
+    el.title = 'Offer expired: it was not accepted before its first flight';
+    el.append(text);
+  } else if (mandate.status === 'offered') {
     text.textContent = `EVENT ${label(mandate)} · +${shortMoney(mandate.premium)}/flt · -${shortMoney(mandate.penalty)} fail · starts ${mandate.startDay - today}d · ${termFlights(mandate)}d term`;
     el.append(text);
     const button = document.createElement('button');
@@ -78,6 +87,18 @@ function row(state: SimState, mandate: Mandate, refresh: () => void): HTMLElemen
     const when = mandateIsActive(state, mandate) ? `${mandate.endDay - today}d left` : `starts ${mandate.startDay - today}d`;
     text.textContent = `EVENT ${label(mandate)} · ${mandate.flown} flown · ${mandate.failed} failed · ${net} · ${when}`;
     el.append(text);
+    // Opens the plane flying it, or the route when no flight matches any more.
+    const open = () => {
+      const tail = mandatedLeg(state, mandate)?.tail;
+      select(tail ? { kind: 'aircraft', tail } : { kind: 'route', a: mandate.origin, b: mandate.dest });
+    };
+    el.classList.add('is-link');
+    el.tabIndex = 0;
+    el.title = 'Open the plane flying it';
+    el.addEventListener('click', open);
+    el.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') open();
+    });
   }
   return el;
 }
@@ -98,20 +119,23 @@ function chipTip(state: SimState, shown: Mandate[]): string {
 export function updateMandates(state: SimState, choosingHome: boolean, openSchedule: () => void): boolean {
   const shown = mandatesOf(state).filter((m) => m.status === 'offered' || m.status === 'accepted');
   const today = dayIndex(state);
-  const next = shown.map((m) => `${m.id}:${m.status}:${m.flown}:${m.failed}:${m.netTotal}:${m.startDay - today}`).join('|');
+  // An offer that lapsed stays listed, greyed, for a couple of days so a miss is visible.
+  const lapsed = mandatesOf(state).filter((m) => m.status === 'lapsed' && today - m.startDay <= LAPSED_SHOWN_DAYS);
+  const listed = [...shown, ...lapsed];
+  const next = listed.map((m) => `${m.id}:${m.status}:${m.flown}:${m.failed}:${m.netTotal}:${m.startDay - today}`).join('|');
   const refresh = () => {
     signature = null;
     updateMandates(state, choosingHome, openSchedule);
   };
   if (next !== signature) {
     signature = next;
-    listEl.replaceChildren(...shown.map((m) => row(state, m, refresh)));
+    listEl.replaceChildren(...listed.map((m) => row(state, m, refresh)));
     chipEl.textContent = `★ ${shown.length}`;
     chipEl.title = chipTip(state, shown);
     chipEl.hidden = shown.length === 0;
   }
   chipEl.onclick = openSchedule;
-  listEl.hidden = shown.length === 0;
+  listEl.hidden = listed.length === 0;
 
   if (!primed) {
     for (const m of mandatesOf(state)) announced.add(m.id);

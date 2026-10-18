@@ -5878,6 +5878,32 @@ button.ops-item:hover {
   margin-left: auto;
 }
 
+.mandate-row.is-link {
+  cursor: pointer;
+}
+
+.mandate-row.is-link:hover {
+  background: rgba(255, 180, 84, 0.16);
+}
+
+.mandate-row.is-lapsed {
+  opacity: 0.5;
+  border-left-color: #6b7694;
+  text-decoration: line-through;
+}
+
+.timeline-event-star {
+  position: absolute;
+  top: -2px;
+  left: 2px;
+  z-index: 2;
+  color: #ffb454;
+  font-size: 11px;
+  line-height: 1;
+  pointer-events: none;
+  text-shadow: 0 0 3px rgba(10, 12, 18, 0.9);
+}
+
 
 /* Touch: a thumb needs 44px, so the small controls keep their look and grow an
    invisible hit area (the ::after), or grow for real where there is room. */

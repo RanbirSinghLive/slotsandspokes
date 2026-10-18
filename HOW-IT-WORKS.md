@@ -188,6 +188,11 @@ Next to the tiers, a ★ button turns events (priority flights, below) off for t
 game: `state.eventsOff` is set at the start and `rollDailyMandates()` then offers
 none (absent in older saves, which have events). It is not a difficulty tier.
 
+Events show above the Fleet Schedule: an open offer has Details, an accepted
+one is a row that opens the plane flying it (the route if no flight matches),
+and an offer that lapsed stays greyed and struck through for two days. The
+Gantt stars the rotation that flies an accepted event.
+
 Medium is the game `balance-reference.json` measures. The headless
 runner takes `--difficulty easy|medium|hard` (`npm run headless`). Home
 cities carry no rating: the picker lists them by catchment and leaves

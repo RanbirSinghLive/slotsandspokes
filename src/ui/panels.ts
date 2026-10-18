@@ -1,3 +1,4 @@
+import { mandatedLeg, mandatesOf } from '../sim/mandates';
 import { powertrainMark } from './powertrainMark';
 import { nightStopLegs } from '../sim/nightStops';
 import { hasLineBase, outstationCheck } from '../sim/bases';
@@ -511,6 +512,8 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
   const end = Math.max(USABLE_DAY_END_MINUTE, ...rotations.map((r) => r.arriveMinute));
   timelineWindow = { start, end };
   // In a draft: which flights have been moved in it, and which now sit on others.
+  // Legs flying an accepted event, starred on their rotation.
+  const eventLegs = new Set(mandatesOf(state).filter((m) => m.status === 'accepted').flatMap((m) => mandatedLeg(state, m)?.legId ?? []));
   const drafted = new Set(draft?.drops.flat().flatMap((move) => move.legIds));
   const conflicted = draft ? overlappingLegs(state) : null;
   const at = (minute: number) => `${((minute - start) / (end - start)) * 100}%`;
@@ -647,6 +650,13 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
             span.append(groundLabel(before.dest, within((before.departMinute + before.blockMinutes + leg.departMinute) / 2)));
           }
         });
+        if (rotation.legs.some((leg) => eventLegs.has(leg.legId))) {
+          const star = document.createElement('span');
+          star.className = 'timeline-event-star';
+          star.textContent = '★';
+          span.append(star);
+          span.title += ' · ★ event flight';
+        }
         // Not in a draft: ⌂ and × act on the real schedule.
         if (draft) {
           track.append(span);
