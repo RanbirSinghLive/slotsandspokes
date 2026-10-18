@@ -1377,7 +1377,10 @@ pure read of `state`, like the canvas layers.
 
 **The inspector** (`src/ui/inspector/`, `src/ui/selection.ts`). The panel
 shows whatever is selected. At **Network** it is the Overview above.
-The rail's screens are selections too; the detail views sit under
+The rail's screens are selections too, in two groups split by a rule:
+the screens you act on first (Routes, Fleet, Crews, Mtc, Product,
+Contracts, Office), then the read-outs (Overview, Money, Airports,
+Rivals, Goals), with Game at the foot. The detail views sit under
 **Airports**, **Fleet** or **Rivals**:
 
 | Selection | How you get there | What it shows |
@@ -1906,7 +1909,7 @@ home picker), your airline (the map), fly your first route (with the
 type choice), the clock, today's operation (ops board and P&L strip, and the amber ★ event chip),
 the lenses, the rail, the Schedule (the step opens Fleet on it), hours
 filling (peaks, the planner's next free hour, peak against off-peak),
-crews and maintenance (Mtc), Head office (fuel, contracts, fees, air rights, the seven chairs,
+crews and maintenance (Mtc), Head office (fuel, contracts, air rights, the seven chairs,
 the tree), Goals, and a last word on edges fading, size drawing rivals,
 cash, and the year one report. A step pointing inside a screen opens it
 first (`open`). The two hands-on steps, choosing a
@@ -2917,7 +2920,8 @@ above it who flies the markets the plane's type flies now
 flights). Best fit (`bestSeatPlan()`) tries a grid of J and W seats through
 the forecast.
 **Product: fleet cabins (`src/sim/fleetCabins.ts`).** The Product screen
-(rail, after Mtc; `ui/inspector/product.ts`) holds cabins by type. A
+(rail, after Mtc; `ui/inspector/product.ts`) holds the ancillary fees
+(see Ancillary fees) and cabins by type: both are what a ticket buys. A
 **template** is a seat plan saved under a name for one type (at most 6 a
 type, in `state.cabinTemplates`); every seat map shows the type's templates
 as chips to load, and ＋ saves the plan on it. A type's **standard cabin**
@@ -4247,7 +4251,7 @@ Two read-only briefs. They change no economy; `sim/briefs.ts` decides when each 
 
 ## Ancillary fees (`src/sim/ancillaries.ts`)
 
-An airline-wide dial at Head office › Fees: bags included (level 0, the
+An airline-wide dial at Product › Fees: bags included (level 0, the
 default and the old game), checked bag fee ($10), all bags and seat fee
 ($20). It moves once a month (`ANCILLARY_LOCK_DAYS`).
 
@@ -4279,7 +4283,7 @@ default and the old game), checked bag fee ($10), all bags and seat fee
 
 - **Extras.** Priority boarding ($8, paid mostly by business travellers)
   and paid seats ($8, mostly leisure and VFR) are switched on for the whole
-  airline at Head office › Fees, once online booking is adopted, and move
+  airline at Product › Fees, once online booking is adopted, and move
   once every 30 days each. Each adds revenue, price drag and NPS cost beside
   the dial, with its own rival copy (`state.rivalExtras`, same 1/120 a day,
   half the NPS cost permanent). Paid seats earn nothing on a market at

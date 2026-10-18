@@ -23,18 +23,18 @@ const MAX_RESULTS = 8;
 const namesByIata = new Map(airports.map((airport) => [airport.iata, airport.name]));
 
 const SCREENS: [string, Selection][] = [
-  ['Overview', { kind: 'network' }],
   ['Routes', { kind: 'routes', sort: 'margin' }],
-  ['Airports', { kind: 'airports' }],
   ['Fleet', { kind: 'fleet' }],
   ['Crews', { kind: 'crews' }],
   ['Maintenance', { kind: 'maintenance' }],
   ['Product', { kind: 'product' }],
-  ['Rivals', { kind: 'rivals' }],
-  ['Money', { kind: 'money' }],
-  ['Goals', { kind: 'goals' }],
   ['Contracts', { kind: 'contracts' }],
   ['Head office', { kind: 'headOffice' }],
+  ['Overview', { kind: 'network' }],
+  ['Money', { kind: 'money' }],
+  ['Airports', { kind: 'airports' }],
+  ['Rivals', { kind: 'rivals' }],
+  ['Goals', { kind: 'goals' }],
   ['Game', { kind: 'game' }],
 ];
 

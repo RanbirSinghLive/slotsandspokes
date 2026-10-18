@@ -797,7 +797,7 @@ function buildFees(state: SimState, a: string, b: string, changed: () => void): 
   heading.append(
     ' ',
     info(
-      `Bag and seat fees on this route alone; by default it follows the airline's dial at Head office. A fee adds ${money(ancillaryPerPassenger(state, a, b))} a passenger here at the current level, adds to the price travellers compare, and costs NPS: more where a rival flies this market (${isContested(state, a, b) ? 'one does' : 'none does'}), less where you are alone. A route's level moves once every ${ROUTE_FEE_LOCK_DAYS} days.`,
+      `Bag and seat fees on this route alone; by default it follows the airline's dial on Product. A fee adds ${money(ancillaryPerPassenger(state, a, b))} a passenger here at the current level, adds to the price travellers compare, and costs NPS: more where a rival flies this market (${isContested(state, a, b) ? 'one does' : 'none does'}), less where you are alone. A route's level moves once every ${ROUTE_FEE_LOCK_DAYS} days.`,
     ),
   );
   block.append(heading);
