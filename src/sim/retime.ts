@@ -7,7 +7,7 @@ import aircraftTypesData from '../../data/aircraft-types.json';
 import { computeBlockMinutes, isAircraftTypeAllowedAt, legDistanceNm, marketKey, type ScheduleLeg } from './schedule';
 import { nextSlotFees } from './slots';
 import type { SimState } from './state';
-import { isLongHaulRoundTrip, scheduledTurnMinutes, USABLE_DAY_END_MINUTE, USABLE_DAY_START_MINUTE } from './utilisation';
+import { isLongHaulRoundTrip, scheduledTurnMinutes, USABLE_DAY_END_MINUTE, USABLE_DAY_START_MINUTE, wrappedLongHaul } from './utilisation';
 
 /**
  * Moving a rotation in the day (WEEK-THIRTEEN.md, thread 4): the rules
@@ -154,6 +154,9 @@ export function planRetime(state: SimState, legIds: string[], toTail: string, st
   const world: SimState = deferred ? { ...view, completedToday: [], cancelledToday: [], activeFlights: [], retimedToday: [] } : view;
 
   let legs = world.schedule.filter((leg) => legIds.includes(leg.legId)).sort((a, b) => a.departMinute - b.departMinute);
+  // A long-haul pair across midnight is planned unwrapped: flight out first, flight back after midnight.
+  const wrappedPair = legs[0] ? wrappedLongHaul(world, legs[0].tail) : null;
+  if (wrappedPair) legs = [wrappedPair.out, { ...wrappedPair.back, departMinute: wrappedPair.back.departMinute + 24 * 60 }];
   const blank: RetimePlan = { ok: false, reason: null, legs, marginChangePerDay: 0, slotFeeChangePerDay: 0, repriced: [], crewWarning: null, startsTomorrow: false, kind: 'move', station: null, tomorrowLegIds: [], againTodayLegIds: [], deferred, fromStart: legs[0]?.departMinute ?? 0 };
   const fail = (reason: string): RetimePlan => ({ ...blank, reason });
   if (legs.length === 0) return fail('That rotation is gone.');
@@ -217,11 +220,16 @@ export function planRetime(state: SimState, legIds: string[], toTail: string, st
   const first = moved[0];
   const last = moved[moved.length - 1];
   const end = last.departMinute + last.blockMinutes;
+  // A long-haul round trip leaving in the evening has its flight back after midnight: stored a day earlier, as a night stop's is (dispatch is on each day's own clock, step.ts).
+  const crossesMidnight = kind === 'move' && longHaul && last.departMinute >= 24 * 60;
   if (kind === 'move') {
-    if (first.departMinute < USABLE_DAY_START_MINUTE) return fail(`Starts ${hhmm(first.departMinute)} · the day opens 06:00`);
+    if (longHaul ? first.departMinute < 0 || first.departMinute >= 24 * 60 : first.departMinute < USABLE_DAY_START_MINUTE) {
+      return fail(longHaul ? `Starts ${hhmm(first.departMinute)} next day · must leave today` : `Starts ${hhmm(first.departMinute)} · the day opens 06:00`);
+    }
     if (end > USABLE_DAY_END_MINUTE && !longHaul) return fail(`Back at ${hhmm(end)} · past the 22:00 curfew`);
     // A flight is dispatched on its own day's clock (step.ts), so one that would leave after midnight never goes and strands the plane.
-    if (last.departMinute >= 24 * 60) return fail(`${last.origin}→${last.dest} would leave ${hhmm(last.departMinute)} next day · must leave before midnight`);
+    if (last.departMinute >= 24 * 60 && !crossesMidnight) return fail(`${last.origin}→${last.dest} would leave ${hhmm(last.departMinute)} next day · must leave before midnight`);
+    if (crossesMidnight && world.schedule.some((leg) => leg.tail === toTail && !legIds.includes(leg.legId))) return fail(`${toTail} flies other routes · an overnight round trip needs the plane to itself`);
 
     // Its new plane's other rotations, with a turn either side. (A wrap or
     // an unwrap is planned round them by sim/nightStops.ts.)
@@ -237,6 +245,7 @@ export function planRetime(state: SimState, legIds: string[], toTail: string, st
     // The plane's day still has to join up (a night stop's half dragged into the middle of it wouldn't).
     const chain = options.allowOverlap ? null : chainProblem([...others, ...moved]);
     if (chain) return fail(chain);
+    if (crossesMidnight) moved = [moved[0], { ...moved[1], departMinute: moved[1].departMinute - 24 * 60 }];
   }
 
   // Room by the hour: its own old movements count as room, rivals stay put.

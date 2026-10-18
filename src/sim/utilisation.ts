@@ -98,6 +98,26 @@ export function effectiveTailMinutes(legCount: number, rawMinutes: number): numb
   return isLongHaulRoundTrip(legCount, rawMinutes) ? USABLE_DAY_MINUTES : rawMinutes;
 }
 
+/**
+ * A long-haul round trip that crosses midnight, stored the way a night
+ * stop is: the flight out in the evening, the flight back in the small
+ * hours of the next day with its departMinute reduced by a day, so every
+ * leg still departs inside 0-1439 and step.ts dispatches it on that clock.
+ * Null unless the tail's only two legs are such a pair.
+ */
+export function wrappedLongHaul(state: SimState, tail: string): { out: ScheduleLeg; back: ScheduleLeg } | null {
+  const legs = state.schedule.filter((leg) => leg.tail === tail).sort((a, b) => a.departMinute - b.departMinute);
+  if (legs.length !== 2) return null;
+  const [back, out] = legs;
+  if (out.dest !== back.origin || back.dest !== out.origin) return null;
+  const aircraft = state.aircraft.find((a) => a.tail === tail);
+  if (aircraft?.baseAirport !== out.origin) return null;
+  const rawMinutes = legs.reduce((total, leg) => total + scheduledLegMinutes(state, leg), 0);
+  if (!isLongHaulRoundTrip(2, rawMinutes)) return null;
+  // The flight back must be due after the flight out has landed and turned: that is what makes it the next day's.
+  return back.departMinute + MINUTES_PER_DAY >= out.departMinute + out.blockMinutes + scheduledTurnMinutes(state, out.origin, out.dest) ? { out, back } : null;
+}
+
 export type AircraftUtilisation = {
   tail: string;
   typeCode: string;
@@ -269,6 +289,16 @@ function buildRotation(state: SimState, tail: string, legs: ScheduleLeg[], base:
 export function rotationsForTail(state: SimState, tail: string): Rotation[] {
   const legs = state.schedule.filter((leg) => leg.tail === tail).sort((a, b) => a.departMinute - b.departMinute);
   if (legs.length === 0) return [];
+
+  // A long-haul pair across midnight is one rotation, flight out first.
+  const wrapped = wrappedLongHaul(state, tail);
+  if (wrapped) {
+    const back = { ...wrapped.back, departMinute: wrapped.back.departMinute + MINUTES_PER_DAY };
+    const rotation = buildRotation(state, tail, [wrapped.out, back], wrapped.out.origin);
+    // The legs stay the schedule's own objects: callers match them by identity.
+    rotation.legs = [wrapped.out, wrapped.back];
+    return [rotation];
+  }
 
   const aircraft = state.aircraft.find((a) => a.tail === tail);
   // Falling back to the first leg's origin keeps an unbased tail's legs

@@ -8,8 +8,8 @@ import { cancelPendingRetime, type RetimePlan } from '../sim/retime';
 import { airportHours, FIRST_OPEN_HOUR, freeInHour, OPEN_HOURS } from '../sim/hours';
 import { money, shortMoney } from './format';
 import { formatNps, networkNps } from '../sim/nps';
-import { validateSchedule } from '../sim/schedule';
-import { allRotations, USABLE_DAY_END_MINUTE, USABLE_DAY_START_MINUTE, utilisationProblems, type Rotation } from '../sim/utilisation';
+import { validateSchedule, type ScheduleLeg } from '../sim/schedule';
+import { allRotations, USABLE_DAY_END_MINUTE, USABLE_DAY_START_MINUTE, utilisationProblems, wrappedLongHaul, type Rotation } from '../sim/utilisation';
 import { select, selectRoute, type Selection } from './selection';
 import { networkTrends, type Measure } from '../sim/trends';
 import { AIRCRAFT_CLASSES, pluralClassName } from '../sim/aircraftClasses';
@@ -431,9 +431,12 @@ function draftChangesNothing(live: SimState, world: SimState): boolean {
 function draftRotations(live: SimState, world: SimState): Rotation[] {
   const byId = new Map(world.schedule.map((leg) => [leg.legId, leg]));
   return allRotations(live).map((rotation) => {
-    const legs = rotation.legs.map((leg) => byId.get(leg.legId) ?? leg).sort((a, b) => a.departMinute - b.departMinute);
+    const moved = rotation.legs.map((leg) => byId.get(leg.legId) ?? leg);
+    // A long-haul pair over midnight keeps its flight out first; its flight back is stored a day early.
+    const overMidnight = wrappedLongHaul(world, moved[0].tail) !== null;
+    const legs = overMidnight ? moved : moved.sort((a, b) => a.departMinute - b.departMinute);
     const last = legs[legs.length - 1];
-    return { ...rotation, tail: legs[0].tail, legs, airports: [legs[0].origin, ...legs.map((leg) => leg.dest)], departMinute: legs[0].departMinute, arriveMinute: last.departMinute + last.blockMinutes };
+    return { ...rotation, tail: legs[0].tail, legs, airports: [legs[0].origin, ...legs.map((leg) => leg.dest)], departMinute: legs[0].departMinute, arriveMinute: last.departMinute + (overMidnight ? 24 * 60 : 0) + last.blockMinutes };
   });
 }
 
@@ -509,7 +512,11 @@ function saveTheDraft(): void {
  */
 function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
   const start = Math.min(USABLE_DAY_START_MINUTE, ...rotations.map((r) => r.departMinute));
-  const end = Math.max(USABLE_DAY_END_MINUTE, ...rotations.map((r) => r.arriveMinute));
+  // A move held for tomorrow is drawn too, so the axis reaches its end (a long-haul flight back after midnight sits a day on).
+  const heldEnds = (state.pendingRetimes ?? []).flatMap((move) =>
+    move.legs.map((held) => (held.departMinute < move.legs[0].departMinute ? held.departMinute + 24 * 60 : held.departMinute) + (held.blockMinutes ?? 0)),
+  );
+  const end = Math.max(USABLE_DAY_END_MINUTE, ...rotations.map((r) => r.arriveMinute), ...heldEnds);
   timelineWindow = { start, end };
   // In a draft: which flights have been moved in it, and which now sit on others.
   // Legs flying an accepted event, starred on their rotation.
@@ -638,16 +645,18 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
           selectRoute(state, rotation.airports[0], rotation.airports[1]);
         });
         const within = (minute: number) => `${((minute - rotation.departMinute) / (rotation.arriveMinute - rotation.departMinute)) * 100}%`;
+        // A long-haul pair over midnight stores its flight back a day early (sim/utilisation.ts wrappedLongHaul): drawn after the flight out.
+        const departOf = (leg: ScheduleLeg) => (leg.departMinute < rotation.departMinute ? leg.departMinute + 24 * 60 : leg.departMinute);
         rotation.legs.forEach((leg, i) => {
           const block = document.createElement('div');
           block.className = 'timeline-leg';
-          block.style.left = within(leg.departMinute);
+          block.style.left = within(departOf(leg));
           block.style.width = `${(leg.blockMinutes / (rotation.arriveMinute - rotation.departMinute)) * 100}%`;
           span.append(block);
           // Where the plane waits between this flight and the one before: the chain reads ALB ▬ LGA ▬ ALB.
           if (i > 0) {
             const before = rotation.legs[i - 1];
-            span.append(groundLabel(before.dest, within((before.departMinute + before.blockMinutes + leg.departMinute) / 2)));
+            span.append(groundLabel(before.dest, within((departOf(before) + before.blockMinutes + departOf(leg)) / 2)));
           }
         });
         if (rotation.legs.some((leg) => eventLegs.has(leg.legId))) {
@@ -685,7 +694,9 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
           const block = state.schedule.find((l) => l.legId === held.legId)?.blockMinutes ?? 0;
           const pending = document.createElement('div');
           pending.className = 'timeline-pending';
-          pending.style.left = at(held.departMinute);
+          // A long-haul pair over midnight holds its flight back a day early: drawn after the flight out.
+          const heldStart = held.departMinute < move.legs[0].departMinute ? held.departMinute + 24 * 60 : held.departMinute;
+          pending.style.left = at(heldStart);
           pending.style.width = width(block);
           pending.title = `Moves here tomorrow ${minuteOfDayToTimeString(held.departMinute)} · today's flying stays as it is`;
           if (i === 0 && !draft) {
