@@ -2,7 +2,7 @@ import { contractCost, lineRated, outstationCheck } from './bases';
 import { lineCheckMinutes } from './mxChecks';
 import type { ScheduleLeg } from './schedule';
 import type { Aircraft, SimState } from './state';
-import { scheduledTurnMinutes, USABLE_DAY_END_MINUTE, USABLE_DAY_START_MINUTE } from './utilisation';
+import { scheduledTurnMinutes, USABLE_DAY_END_MINUTE, USABLE_DAY_START_MINUTE, wrappedLongHaul } from './utilisation';
 
 /**
  * Night stops (WEEK-SIXTEEN.md, stage 2): a plane that sleeps at the far
@@ -44,6 +44,8 @@ export function nightStopStation(state: SimState, tail: string): string | null {
   const aircraft = state.aircraft.find((a) => a.tail === tail);
   const legs = legsOf(state, tail);
   if (!aircraft?.baseAirport || legs.length < 2) return null;
+  // A long-haul pair across midnight sleeps in the air, not at a station.
+  if (wrappedLongHaul(state, tail)) return null;
   const first = legs[0];
   const last = legs[legs.length - 1];
   return first.origin !== aircraft.baseAirport && last.dest === first.origin ? first.origin : null;

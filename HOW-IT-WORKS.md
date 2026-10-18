@@ -1457,7 +1457,13 @@ rotation's cost is just the sum of its legs.
 **Long haul.** A plane flying exactly one round trip that outruns 16
 hours but fits in 24 (Toronto–London, 6.9 hours each way) counts as
 exactly one full day rather than 140%. It may leave at 06:00 and return
-overnight (`isLongHaulRoundTrip()`).
+overnight (`isLongHaulRoundTrip()`). It may also leave at any time of
+day, evening included: a plane whose only two legs are such a round trip
+may have its flight back after midnight. That flight is stored a day
+early (the night-stop shape, `departMinute − 1440`) so step.ts still
+dispatches it on its own day's clock, and `wrappedLongHaul()` reads the
+pair back as one rotation, flight out first. It is no night stop: no hotel,
+and the plane is in the air at midnight.
 
 **Pools.** Utilisation is reported per aircraft, and pooled per base and
 per class (`utilisationPools()`), because "do I need another Regional at
@@ -1594,11 +1600,12 @@ turns red where it can't go, and the base's hours show across the top
 it back. The rules:
 
 - It must fit the usable day (a long-haul round trip, which runs round
-  the clock and is exempt from the 22:00 curfew, may end after 22:00 but
-  still can't start before 06:00, and every flight in it must leave before
-  midnight: step.ts dispatches a flight on its own day's clock, so a
-  return leg scheduled past 24:00 would never go. A 9-hour sector like
-  Vancouver–London can therefore start by about 14:25, not in the evening),
+  the clock and is exempt from the 22:00 curfew, may end after 22:00 and
+  may start at any time of day, but its flight out must leave before
+  midnight. A flight back after midnight is stored a day early and needs
+  the plane to itself; any other flight leaving past 24:00 is refused,
+  since step.ts dispatches a flight on its own day's clock and it would
+  never go),
   its new plane's other rotations with a
   turn either side, and room in every hour its legs now use at every
   airport (its own old movements count as room, rivals stay where they

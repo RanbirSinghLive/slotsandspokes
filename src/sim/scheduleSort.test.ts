@@ -89,7 +89,8 @@ out.departMinute = 360;
 home.departMinute = 360 + 520 + 60;
 const longIds = [out.legId, home.legId];
 assert.ok(planDrop(longHaul, longIds, rotation.tail, 365).ok, 'a long-haul round trip should move along its own plane');
-assert.equal(planDrop(longHaul, longIds, rotation.tail, 355).ok, false, 'but not before the day opens');
+assert.ok(planDrop(longHaul, longIds, rotation.tail, 355).ok, 'a long-haul round trip may leave before 06:00');
+assert.equal(planDrop(longHaul, longIds, rotation.tail, -5).ok, false, 'but not the day before');
 console.log('long-haul move: ok');
 console.log('schedule sort: ok');
 
