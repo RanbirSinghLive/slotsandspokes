@@ -729,7 +729,8 @@ export function step(state: SimState): void {
       margin: flightMargin,
     };
 
-    state.completedToday.push(flight.legId);
+    // A flight that left yesterday and lands after midnight must not mark today's own departure of the same leg as flown: that skipped every second day of a long-haul round trip.
+    if (flight.scheduledDepartMinute >= dayStart) state.completedToday.push(flight.legId);
     settleMandateArrival(state, flight);
     state.activeFlights.splice(i, 1);
   }

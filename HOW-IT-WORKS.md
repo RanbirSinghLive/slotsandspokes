@@ -153,7 +153,7 @@ aircraft[]       — { tail, typeCode, status: 'ground'|'airborne', atAirport,
 activeFlights[]  — { legId, tail, origin, dest, departMinute, arriveMinute,
                       scheduledArriveMinute }
 schedule[]       — the airline's daily-repeating legs; empty in a new game
-completedToday[] — legIds finished since the last day rollover
+completedToday[] — legIds finished since the last day rollover, for flights that left today (a flight that left yesterday and lands after midnight does not count: today's own departure of that leg is still to fly)
 todayRevenue/Cost/Margin — reset to 0 at day rollover; cash is not reset
 rngSeed          — seeded RNG state (see Randomness) — used by M9's delay rolls
 ```
