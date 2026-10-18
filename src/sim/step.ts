@@ -11,7 +11,7 @@ import { rollDailyBrand } from './brand';
 import { ferryStrandedPlanes } from './ferry';
 import { USABLE_DAY_START_MINUTE } from './utilisation';
 import { crowdingWeight } from './timeOfDay';
-import { cabinLayout, cabinOf } from './cabins';
+import { layoutOf } from './cabins';
 import aircraftTypesData from '../../data/aircraft-types.json';
 import { ancillaryNpsPenalty, rollAncillaries } from './ancillaries';
 import { flightResult, type EconomyAircraftType } from './economy';
@@ -41,7 +41,7 @@ import { rollDailyMarketDemand, actualDailyDemand } from './marketDemand';
 import { revealReach } from './reach';
 import { cabinCover, FATIGUE_DELAY_MULTIPLIER, legFatigue, rollDailyCrews } from './crews';
 import { MAINTENANCE_AGE_FACTOR } from './aog';
-import { isAog, rollDailyAogs } from './aog';
+import { isAog, rollDailyAogs, startRefitOnLanding } from './aog';
 import { handBackSwaps } from './controller';
 import { applyPriorityPolicy } from './priority';
 import { rollDailyCrisis } from './crisis';
@@ -609,6 +609,7 @@ export function step(state: SimState): void {
       aircraft.atAirport = flight.dest;
       aircraft.activeLegId = null;
       aircraft.groundSinceMinute = state.simMinute;
+      startRefitOnLanding(state, aircraft);
       // Ground delay is part of the arrival time but is not time in the air.
       recordFlown(aircraft, flight.arriveMinute - flight.departMinute - flight.delayMinutes);
 
@@ -649,13 +650,13 @@ export function step(state: SimState): void {
               };
             })(),
             effectiveFareClasses(state, key),
-            cabinOf(aircraft),
+            layoutOf(aircraft, type.seats),
           );
           addTally(((state.todayFareClasses ??= {})[key] ??= emptyTally()), result.fareClasses);
           state.spilloverByMarket[key] = spilloverAvailable + result.spilloverDelta;
           flightPassengers = result.pax;
-          const layout = cabinLayout(type.seats, cabinOf(aircraft));
-          flightSeats = layout.economy + layout.business;
+          const layout = layoutOf(aircraft, type.seats);
+          flightSeats = layout.economy + layout.premium + layout.business;
           flightMargin = result.margin;
           recordFlightLoad(state, key, result.pax, flightSeats);
           recordFlightSeatNm(state, flight.origin, flight.dest, flightSeats);

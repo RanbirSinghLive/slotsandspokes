@@ -46,6 +46,11 @@ export {
   previewTurnBuffer,
   returnOptions,
   refitOptionFor,
+  seatMapFor,
+  forecastSeatPlan,
+  bestSeatPlanFor,
+  maxBusinessSeats,
+  maxPremiumSeats,
   heavyCheckReadouts,
   bookHeavyCheck,
   toleranceHeavyCheck,
@@ -109,8 +114,8 @@ export function startSeatSale(state: SimState, a: string, b: string) {
   return afterChange(state, actions.startSeatSale(state, a, b));
 }
 
-export function orderRefit(state: SimState, tail: string, cabin: 'economy' | 'business') {
-  return afterChange(state, actions.orderRefit(state, tail, cabin));
+export function orderRefit(state: SimState, tail: string, target: Parameters<typeof actions.orderRefit>[2]) {
+  return afterChange(state, actions.orderRefit(state, tail, target));
 }
 
 export function cancelRefit(state: SimState, tail: string) {

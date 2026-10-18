@@ -1,6 +1,6 @@
 import type { SegmentName } from './timeOfDay';
 import { bookingShare, segmentShareAt } from './choiceModel';
-import { cabinLayout, type Cabin } from './cabins';
+import { cabinLayout, type CabinLayout } from './cabins';
 import { DEFAULT_FARE_CLASSES, sellSeats, type FareClassSettings, type FareClassTally } from './fareClasses';
 import { marketMix } from './marketCharacter';
 import { flightDemandShare } from './timeOfDay';
@@ -248,19 +248,19 @@ export function flightResult(
   timing?: { departMinute: number; marketDepartMinutes: number[]; crowding?: number; season?: Record<SegmentName, number> },
   /** The route's seat split between fare classes (sim/fareClasses.ts); the default when it hasn't been set. */
   fareClasses?: FareClassSettings,
-  /** The plane's cabin (sim/cabins.ts): a business cabin trades economy seats for business ones. */
-  cabin: Cabin = 'economy',
+  /** The plane's seats by cabin (sim/cabins.ts): J and W seats take the room of economy ones. */
+  layout: CabinLayout = cabinLayout(type.seats, 'economy'),
 ): FlightResult {
   const demandPerFlight = timing
     ? marketDailyDemand * flightDemandShare(timing.departMinute, timing.marketDepartMinutes, marketMix(leg.origin, leg.dest), timing.crowding)
     : marketDailyDemand / legsServingMarket;
   const connecting = connectingDailyDemand * connectingPriceResponse(fare, legsServingMarket, leg.origin, leg.dest, competitorRoutes, perks.brandEdge);
-  const layout = cabinLayout(type.seats, cabin);
   const seatCeiling = Math.round(layout.economy * perks.loadFactor);
   // The seats sold class by class, in booking order (sim/fareClasses.ts).
   const sale = sellSeats({
     seats: seatCeiling,
     businessSeats: Math.round(layout.business * perks.loadFactor),
+    premiumSeats: Math.round(layout.premium * perks.loadFactor),
     baseFare: fare,
     demand: demandPerFlight,
     // The season scales how many of each segment want to fly today (sim/seasons.ts).

@@ -117,7 +117,7 @@ function buildHangar(state: SimState, changed: () => void): HTMLElement[] {
   const nodes: HTMLElement[] = [
     heading(
       'Hangar',
-      `C checks in work and coming. A filled bay is a plane in its C check, grounded until it's done. A dashed bay is a plane whose check is within ${HEAVY_WINDOW_DAYS} days or overdue: book it from the wrench when it is parked at base, or if it runs ${OVERDUE_GRACE_DAYS} days overdue it goes in whenever it is. Planes that go in together fill the bays and the rest are contracted out.`,
+      `C checks in work and coming. A filled bay is a plane in its C check or a cabin refit, grounded until it's done. A dashed bay is a plane whose check is within ${HEAVY_WINDOW_DAYS} days or overdue: book it from the wrench when it is parked at base, or if it runs ${OVERDUE_GRACE_DAYS} days overdue it goes in whenever it is. Planes that go in together fill the bays and the rest are contracted out.`,
     ),
   ];
   const bays = box('mx-bays');
@@ -144,9 +144,17 @@ function buildHangar(state: SimState, changed: () => void): HTMLElement[] {
     }
     bays.append(bay);
   }
+  // A cabin refit done in house holds a bay too (sim/cabins.ts): a filled bay marked with the seat icon.
+  for (const event of state.aogs) {
+    if (!event.refitTo || !event.inBay) continue;
+    const bay = box('mx-bay is-working is-refit');
+    bay.append(box('mx-bay-tail', event.tail), box('mx-bay-state', `refit · out in ${daysUntilReturn(state, event)}d`));
+    bay.dataset.tip = `${event.tail} · cabin refit in a bay at ${event.base} · back in ${daysUntilReturn(state, event)}d`;
+    bays.append(bay);
+  }
   const capacity = ops.mxBaseReadout(state, 'heavy').bases.map((base) => `${base.iata} ${base.used}/${base.level} bays`).join(' · ');
   nodes.push(line(capacity || 'No hangar'));
-  nodes.push(bays.childElementCount > 0 ? bays : noneLine('Hangar clear · no C check in work or within its window'));
+  nodes.push(bays.childElementCount > 0 ? bays : noneLine('Hangar clear · no check or refit in work or within its window'));
   return nodes;
 }
 

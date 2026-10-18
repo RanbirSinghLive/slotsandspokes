@@ -16,6 +16,7 @@ import {
   MX_PER_LEVEL_PER_DAY,
   MX_RATING_FEE,
   MX_RATING_PER_DAY,
+  heavyRated,
   mxBaseBlocked,
   mxBaseCloseBlocked,
   mxLevel,
@@ -98,9 +99,9 @@ import { inboundAt, orderLease } from './fleetTiming';
 import { startSeatSale as startSeatSaleRule } from './seatSale';
 import { SEASON_DAYS, SEASONAL_PREMIUM } from './seasonalLease';
 import { changeSpareEngines as changeSpareEnginesRule, holdPerDay, shopVisitCost, sparesHeld, sparesReady } from './enginePool';
-import { aBankedMinutes, aCheckOpen, aCheckProgress, aCheckWorkMinutes, cyclesSinceHeavy, deferredItems, flightHoursSinceHeavy, heavyBankedMinutes, maintenanceReserve, heavyCheckDueIn, canBookHeavyCheck, heavyBookBlocker, applyHeavyTolerance, heavyToleranceBlocker, heavyToleranceCost, heavyShiftOf, toleranceCapDays, toleranceWearYears, TOLERANCE_STEPS, canBookDCheck, dBookBlocker, dCheckDueIn, dCheckOpen, flightHoursSinceD, heavyCheckOpen, heavyCheckWorkMinutes, tonightCheck } from './mxChecks';
+import { aBankedMinutes, aCheckOpen, aCheckProgress, aCheckWorkMinutes, cyclesSinceHeavy, deferredItems, flightHoursSinceHeavy, heavyBankedMinutes, maintenanceReserve, heavyCheckDueIn, canBookHeavyCheck, heavyBookBlocker, applyHeavyTolerance, heavyToleranceBlocker, heavyToleranceCost, heavyShiftOf, toleranceCapDays, toleranceWearYears, TOLERANCE_STEPS, canBookDCheck, dBookBlocker, dCheckDueIn, dCheckOpen, flightHoursSinceD, heavyCheckOpen, heavyCheckWorkMinutes, holdsBay, freeHeavyBays, tonightCheck } from './mxChecks';
 import { rebaseOptions, rebasePlane, type RebaseOption } from './rebase';
-import { cabinGainPerDay, cabinOf, cancelRefit as cancelRefitRule, orderRefit as orderRefitRule, refitBlockedReason, refitCost, refitDays, type Cabin } from './cabins';
+import { bestSeatPlan, cabinGainPerDay, cabinOf, cancelRefit as cancelRefitRule, layoutFor, maxBusinessSeats, maxPremiumSeats, orderRefit as orderRefitRule, refitBlockedReason, refitCost, refitDays, refitWorkMinutes, seatPlanOf, seatsOfType, typeSegmentSplit, type Cabin, type RefitTarget, type SeatPlan } from './cabins';
 import { commitBringHome, commitRetime, planBringHome, planRetime, type RetimePlan } from './retime';
 import { commitDraft, conflictingLegIds, planDrop, snapStart, type DraftMove, type DropPlan } from './scheduleDraft';
 import { planSort, type SortMode, type SortPlan } from './scheduleSort';
@@ -882,9 +883,58 @@ export function refitOptionFor(state: SimState, tail: string): RefitOption | nul
   };
 }
 
-export function orderRefit(state: SimState, tail: string, cabin: Cabin): Outcome<{ message: string }> {
-  return orderRefitRule(state, tail, cabin);
+export function orderRefit(state: SimState, tail: string, target: RefitTarget): Outcome<{ message: string }> {
+  return orderRefitRule(state, tail, target);
 }
+
+/** Everything the seat-map dialog draws for a plane (sim/cabins.ts); null for one that can't be refitted. */
+export type SeatMap = {
+  typeCode: string;
+  /** Seats of the type with every seat economy. */
+  seats: number;
+  current: SeatPlan;
+  cost: number;
+  days: number;
+  /** Who flies the markets this type flies now (leisure, VFR, business shares); null when none flies. */
+  split: ReturnType<typeof typeSegmentSplit>;
+  /** Whether the refit would be done in a hangar bay at the plane's base now, and the contracted price if not. */
+  bay: boolean;
+  contractCost: number;
+  /** Why no refit can be ordered now, or null. */
+  blocked: string | null;
+};
+
+export function seatMapFor(state: SimState, tail: string): SeatMap | null {
+  const aircraft = state.aircraft.find((a) => a.tail === tail);
+  if (!aircraft || refitDays(aircraft.typeCode) === 0) return null;
+  const base = aircraft.baseAirport;
+  const bay = base !== null && heavyRated(state, base, aircraft.typeCode) && freeHeavyBays(state, base) > 0;
+  return {
+    typeCode: aircraft.typeCode,
+    seats: seatsOfType(aircraft.typeCode),
+    current: seatPlanOf(aircraft),
+    cost: refitCost(aircraft),
+    days: refitDays(aircraft.typeCode),
+    split: typeSegmentSplit(state, aircraft.typeCode),
+    bay,
+    contractCost: contractCost(refitWorkMinutes(aircraft.typeCode)),
+    // The seat plan itself is checked per plan; this is what stops any refit.
+    blocked: refitBlockedReason(state, aircraft, seatPlanOf(aircraft)) === 'It already has this cabin.' ? null : refitBlockedReason(state, aircraft, seatPlanOf(aircraft)),
+  };
+}
+
+/** What the plane's markets would make a day with `plan` fitted, against now, and why it can't be ordered. */
+export function forecastSeatPlan(state: SimState, tail: string, plan: SeatPlan): { gainPerDay: number; layout: ReturnType<typeof layoutFor>; blocked: string | null } | null {
+  const aircraft = state.aircraft.find((a) => a.tail === tail);
+  if (!aircraft || refitDays(aircraft.typeCode) === 0) return null;
+  return { gainPerDay: cabinGainPerDay(state, tail, plan), layout: layoutFor(seatsOfType(aircraft.typeCode), plan), blocked: refitBlockedReason(state, aircraft, plan) };
+}
+
+export function bestSeatPlanFor(state: SimState, tail: string): { plan: SeatPlan; gainPerDay: number } | null {
+  return bestSeatPlan(state, tail);
+}
+
+export { maxBusinessSeats, maxPremiumSeats };
 
 export function cancelRefit(state: SimState, tail: string): Outcome<{ message: string }> {
   return cancelRefitRule(state, tail);
@@ -1170,7 +1220,7 @@ export function mxBaseReadout(
       tonight.set(check.station, entry);
     }
   }
-  const inBays = (iata: string) => state.aogs.filter((event) => event.check && event.base === iata).length;
+  const inBays = (iata: string) => state.aogs.filter((event) => holdsBay(event) && event.base === iata).length;
   const stations = mxStationList(state).filter((iata) => mxLevel(state, kind, iata) > 0);
   const bases = stations.map((iata) => ({
     iata,

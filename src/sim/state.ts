@@ -86,10 +86,12 @@ export type Aircraft = {
   returningOnDay?: number;
   /** Set while it ferries to another crew base (sim/rebase.ts). It flies nothing meanwhile, and joins `to` on `arrivesDay`. */
   rebase?: { from: string; to: string; arrivesDay: number };
-  /** A business cabin up front (sim/cabins.ts); absent, all economy. */
+  /** A business cabin up front, the one older saves have (sim/cabins.ts); a refit replaces it with `seatPlan`. */
   cabin?: 'business';
-  /** A refit ordered and paid for, starting the next morning it is at base (sim/cabins.ts). */
-  refitPending?: 'economy' | 'business';
+  /** The J and W seats it has, the rest economy (sim/cabins.ts); absent, all economy unless `cabin` says otherwise. */
+  seatPlan?: { business: number; premium: number };
+  /** A refit ordered and paid for, starting the next morning it is at base (sim/cabins.ts). Older saves hold 'economy' or 'business'. */
+  refitPending?: 'economy' | 'business' | { business: number; premium: number };
   /** A seasonal lease (sim/seasonalLease.ts): the day its season ends and it goes back. */
   seasonalUntilDay?: number;
   /** Line checks missed or cut short and not yet made up (sim/mxChecks.ts). Absent: none. */

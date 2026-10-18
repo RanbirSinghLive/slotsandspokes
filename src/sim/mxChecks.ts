@@ -426,7 +426,7 @@ export function lineCheckedTails(state: SimState, sleepers: { aircraft: Aircraft
 }
 
 /** Maintenance spending outside the flights: contracted checks. */
-function chargeMaintenance(state: SimState, cost: number): void {
+export function chargeMaintenance(state: SimState, cost: number): void {
   state.cash -= cost;
   state.todayCost += cost;
   state.todayCostByCategory.maintenance += cost;
@@ -467,9 +467,14 @@ export function forcedHeavyChecks(state: SimState, claimed: BayClaims = new Map(
 /** Bays taken so far this morning by checks starting, by station. */
 export type BayClaims = Map<string, number>;
 
-/** Bays at a hangar not held by a plane in a C or D check. */
+/** A C or D check, or a refit done in house, holds a bay until the plane is back. */
+export function holdsBay(event: { check?: boolean; inBay?: boolean }): boolean {
+  return event.check === true || event.inBay === true;
+}
+
+/** Bays at a hangar not held by a plane in a C or D check or a refit. */
 export function freeHeavyBays(state: SimState, station: string, claimed: BayClaims = new Map()): number {
-  const inCheck = state.aogs.filter((event) => event.check && event.base === station).length;
+  const inCheck = state.aogs.filter((event) => holdsBay(event) && event.base === station).length;
   return Math.max(0, heavyBays(state, station) - inCheck - (claimed.get(station) ?? 0));
 }
 

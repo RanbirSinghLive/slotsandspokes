@@ -2865,21 +2865,48 @@ many and the plane has room, it turns those who'd have paid Saver or
 Flex into 2.2× fares. On a full plane, the economy seats it took would
 have sold, and it can lose money.
 
-**A refit** changes the cabin either way. It is paid when ordered:
+**Seat plans.** A plane's cabin is a seat plan: how many business (J) and
+premium economy (W) seats it has, the rest economy (Y). A J seat takes the
+room of 2.5 Y seats and a W seat 1.5; J and W together may take 65% of the
+room (`seatPlanProblem()`). The older all-or-nothing business cabin in
+`Aircraft.cabin` reads as the plan it always was (8% of seats as J).
+Premium economy sells after the business cabin and before the economy
+classes, at 1.45× the base fare (`PREMIUM_PRICE`), to whichever segment
+finds it worth that: business travellers value a W seat at 1.3× an economy
+one, leisure 1.15×, VFR 1.1× (`PREMIUM_VALUE`).
+
+**A refit** sets a new seat plan. It is paid when ordered:
 10 days of the plane's lease. It starts the next morning the plane is
-on the ground at its base, and takes it out of service for 3 days
+on the ground at its base, or the moment it lands there when it is in the
+air at every midnight (a long-haul pair landing after midnight), and takes it out of service for 3 days
 (Regional), 4 (Narrowbody) or 6 (Widebody). Out of service it is an AOG
 with `refitTo` set: its rotations move to spare planes of its class at
 its base, what doesn't fit is cancelled, and it can't be expedited.
 A refit not yet started can be called off with the money back.
 
-The plane's view shows the cabin and a forecast for the refit, right under
-its seats and base line. Each Fleet row carries a seat icon (grey economy,
-teal business, amber when the forecast pays); its tip gives the cabin and
-forecast, and tapping it opens the refit confirm.
+**Refits and the hangar.** A refit holds a hangar bay at the plane's base
+for its days (`AogEvent.inBay`) when the base has a hangar rated for the
+class with a bay free, the same bays C and D checks use
+(`freeHeavyBays()`). Otherwise it is contracted out and paid by the hour
+(`REFIT_WORK_HOURS` through `contractCost()`, on top of the refit cost).
+Refits start after the morning's checks have taken their bays, so a plane
+whose C check starts that morning goes in for the check and its refit
+waits. Mtc's Hangar shows a refit as a hatched bay.
+
+The plane's view shows its seats and a Seat map button under the seats and
+base line. Each Fleet row carries a seat icon (grey economy, teal with J or
+W seats, amber when the forecast pays); its tip gives the seats and the
+forecast, and tapping it opens the seat map (`ui/seatMap.ts`): the cabin
+drawn seat by seat, J and W steppers (or a tap on a seat to move it up a
+class), the forecast, cost, days out and bay or contract for the plan, and
+above it who flies the markets the plane's type flies now
+(`typeSegmentSplit()`: each segment's share of demand over the type's
+flights). Best fit (`bestSeatPlan()`) tries a grid of J and W seats through
+the forecast.
 The forecast is `cabinGainPerDay()`: the plane's markets through the game's own
-forecast, with the cabin swapped and then put back. The headless player
-reviews its cabins weekly. It refits the one plane whose forecast gain
+forecast, with the seats swapped and then put back. The headless player
+reviews its cabins weekly and only ever flips between all economy and the
+old business cabin: it refits the one plane whose forecast gain
 pays the refit and its days out back within 45 days, one plane at a
 time.
 
