@@ -9,9 +9,17 @@ import { readSyncCode, syncCodeKey } from './syncCode';
  *   GET  /api/cloud            → { configured }
  *   GET  /api/save/meta        → { rev, savedAt, day, device } or 404
  *   GET  /api/save             → the save text, rev in the `x-save-rev` header, or 404
+ *   GET  /api/save?slot=NAME   → a backup's text (rev header is the live save's, so a restore pushes cleanly)
  *   PUT  /api/save?base=REV&day=N&device=ID
  *                              → writes if REV is the stored rev (0 when none yet),
  *                                else 409 with the stored meta (a newer save on another device)
+ *   GET  /api/save/backups     → [{ slot, meta }] for the backups that exist
+ *   POST /api/save/backup?slot=newgame|conflict
+ *                              → copies the live save into that slot before the player replaces it
+ *
+ * Backups: a push also rolls the live save into `prev1` (and `prev1` into
+ * `prev2`) when the live save is at least an hour old, so a bad stretch of
+ * play can be undone. A backup is one KV key holding { meta, text }.
  *
  * Every call but the first carries the sync code as `Authorization: Bearer CODE`.
  */
@@ -23,6 +31,11 @@ export type KeyValueStore = {
 export type SaveMeta = { rev: number; savedAt: string; day: number; device: string };
 
 const MAX_SAVE_BYTES = 5_000_000;
+const ROLL_BACKUP_AFTER_MS = 60 * 60 * 1000;
+const ROLLING_SLOTS = ['prev1', 'prev2'] as const;
+const PLAYER_SLOTS = ['newgame', 'conflict'] as const;
+const ALL_SLOTS = [...ROLLING_SLOTS, ...PLAYER_SLOTS];
+type Backup = { meta: SaveMeta; text: string };
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
@@ -38,6 +51,12 @@ export async function handleApi(request: Request, store: KeyValueStore | undefin
   const key = await syncCodeKey(code);
   const metaKey = `meta:${key}`;
   const saveKey = `save:${key}`;
+  const backupKey = (slot: string) => `bak:${key}:${slot}`;
+  const readBackup = async (slot: string): Promise<Backup | null> => {
+    const raw = await store.get(backupKey(slot));
+    return raw === null ? null : (JSON.parse(raw) as Backup);
+  };
+  const writeBackup = (slot: string, backup: Backup) => store.put(backupKey(slot), JSON.stringify(backup));
   const readMeta = async (): Promise<SaveMeta | null> => {
     const raw = await store.get(metaKey);
     return raw === null ? null : (JSON.parse(raw) as SaveMeta);
@@ -46,6 +65,27 @@ export async function handleApi(request: Request, store: KeyValueStore | undefin
   if (url.pathname === '/api/save/meta' && request.method === 'GET') {
     const meta = await readMeta();
     return meta === null ? json({ error: 'No save yet.' }, 404) : json(meta);
+  }
+
+  if (url.pathname === '/api/save/backups' && request.method === 'GET') {
+    const found = await Promise.all(ALL_SLOTS.map(async (slot) => ({ slot, backup: await readBackup(slot) })));
+    return json(found.filter((entry) => entry.backup !== null).map((entry) => ({ slot: entry.slot, meta: entry.backup!.meta })));
+  }
+
+  if (url.pathname === '/api/save/backup' && request.method === 'POST') {
+    const slot = url.searchParams.get('slot') ?? '';
+    if (!(PLAYER_SLOTS as readonly string[]).includes(slot)) return json({ error: 'Unknown backup slot.' }, 400);
+    const [meta, text] = await Promise.all([readMeta(), store.get(saveKey)]);
+    if (meta === null || text === null) return json({ error: 'No save yet.' }, 404);
+    await writeBackup(slot, { meta, text });
+    return json(meta);
+  }
+
+  if (url.pathname === '/api/save' && request.method === 'GET' && url.searchParams.has('slot')) {
+    const slot = url.searchParams.get('slot') ?? '';
+    const [backup, live] = await Promise.all([(ALL_SLOTS as readonly string[]).includes(slot) ? readBackup(slot) : null, readMeta()]);
+    if (backup === null || live === null) return json({ error: 'No such backup.' }, 404);
+    return new Response(backup.text, { headers: { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-save-rev': String(live.rev) } });
   }
 
   if (url.pathname === '/api/save' && request.method === 'GET') {
@@ -72,6 +112,13 @@ export async function handleApi(request: Request, store: KeyValueStore | undefin
       day: Number(url.searchParams.get('day') ?? 0) || 0,
       device: (url.searchParams.get('device') ?? '').slice(0, 40),
     };
+    // Roll the outgoing save into the backups when it has stood for an hour, so a push every
+    // five minutes doesn't push the older backups out within the hour.
+    if (current !== null && Date.now() - Date.parse(current.savedAt) >= ROLL_BACKUP_AFTER_MS) {
+      const [outgoing, older] = await Promise.all([store.get(saveKey), readBackup('prev1')]);
+      if (older !== null) await writeBackup('prev2', older);
+      if (outgoing !== null) await writeBackup('prev1', { meta: current, text: outgoing });
+    }
     // The save first, then the number that announces it: a reader never sees a new rev without its save.
     await store.put(saveKey, text);
     await store.put(metaKey, JSON.stringify(meta));

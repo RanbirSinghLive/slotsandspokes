@@ -1974,7 +1974,20 @@ fallback; the cloud is a copy of it.
   another device** dialog offers Keep this device or Load cloud save.
   Last write wins; the loser is replaced only when the player says so.
 - Turning cloud save on uploads the save already in this browser, so
-  existing games carry over. New Game replaces the cloud copy too.
+  existing games carry over, and shows the code once in a dialog with Copy
+  code and Copy link. A player with no cloud save is asked once, from game
+  day 7, whether to turn it on.
+- A push whose save is unchanged (same text but for its timestamp) is
+  skipped.
+- **Backups** (Game screen, Backups tile): the Worker keeps `prev1` and
+  `prev2` (the live save rolls in when it has stood an hour), `newgame`
+  (copied just before New Game or the game-over New Game replaces the cloud
+  copy; the client waits at most 3 seconds) and `conflict` (copied when
+  the player keeps this device over a newer cloud save). Loading one makes
+  it this device's game and the next push the cloud's. Each is one KV key,
+  `bak:HASH:SLOT`.
+- Known gap: KV has no compare-and-set, so two devices pushing within a
+  few seconds can both pass the `rev` check.
 - Offline or failing pushes stay `dirty` and retry at the next save.
 - Storage is the KV namespace bound as `SAVES` in `wrangler.jsonc`.
   `npm run cloudtest` checks the API in Node.

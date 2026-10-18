@@ -27,4 +27,20 @@ assert.equal(read.headers.get('x-save-rev'), '2');
 assert.equal(await read.text(), save);
 const other = newSyncCode();
 assert.equal((await call('GET', '/api/save', undefined, other)).status, 404);
+
+// Backups: the player slots copy the live save; rolling slots wait for an hour-old save.
+assert.equal((await call('POST', '/api/save/backup?slot=bogus')).status, 400);
+assert.equal((await call('POST', '/api/save/backup?slot=newgame', undefined, other)).status, 404);
+assert.equal((await call('POST', '/api/save/backup?slot=newgame')).status, 200);
+const afterBackup = JSON.stringify({ format: 2, gameVersion: 't', state: { simMinute: 99 } });
+assert.equal((await call('PUT', '/api/save?base=2&day=10&device=a', afterBackup)).status, 200);
+assert.deepEqual((await (await call('GET', '/api/save/backups')).json()).map((b: { slot: string }) => b.slot), ['newgame']);
+const restored = await call('GET', '/api/save?slot=newgame');
+assert.equal(await restored.text(), save);
+assert.equal(restored.headers.get('x-save-rev'), '3');
+const metaKey = [...data.keys()].find((k) => k.startsWith('meta:'))!;
+data.set(metaKey, JSON.stringify({ ...JSON.parse(data.get(metaKey)!), savedAt: new Date(Date.now() - 2 * 3600_000).toISOString() }));
+assert.equal((await call('PUT', '/api/save?base=3&day=11&device=a', save)).status, 200);
+assert.deepEqual((await (await call('GET', '/api/save/backups')).json()).map((b: { slot: string }) => b.slot), ['prev1', 'newgame']);
+assert.equal(await (await call('GET', '/api/save?slot=prev1')).text(), afterBackup);
 console.log('cloud save API: ok');

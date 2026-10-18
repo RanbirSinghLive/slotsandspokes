@@ -23,6 +23,10 @@ import { hasSavedState, importSaveText, onSaveWritten, saveFileText } from './sa
  * link, every path ends quietly and the local save carries on.
  */
 const LINK_KEY = 'slotsandspokes-cloud';
+const ASKED_KEY = 'slotsandspokes-cloud-asked';
+
+/** The game day at which a player with no cloud save is asked once whether to turn it on: past the first few sectors, with something worth keeping. */
+const ASK_FROM_DAY = 7;
 
 /**
  * Each push costs two Workers KV writes, and the free tier allows 1,000
@@ -43,6 +47,8 @@ let pushing = false;
 let pushAgain = false;
 let conflictOpen = false;
 let lastPushAt = 0;
+/** The last text pushed, without its timestamp, so a save that hasn't changed isn't sent again. */
+let lastPushedBody = '';
 let pushTimer: ReturnType<typeof setTimeout> | null = null;
 const listeners: Array<() => void> = [];
 
@@ -132,13 +138,20 @@ async function push(): Promise<void> {
   pushing = true;
   lastPushAt = Date.now();
   try {
+    const body = saveFileText(state);
+    const comparable = body.replace(/"savedAt":"[^"]*"/, '');
+    if (comparable === lastPushedBody) {
+      writeLink({ ...link, dirty: false });
+      return;
+    }
     const params = new URLSearchParams({ base: String(link.rev), day: String(dayIndex(state)), device: link.device });
-    const response = await api(`/api/save?${params}`, link.code, { method: 'PUT', body: saveFileText(state) });
+    const response = await api(`/api/save?${params}`, link.code, { method: 'PUT', body });
     if (response.status === 409) {
       const { meta } = (await response.json()) as { meta: SaveMeta | null };
       if (meta) askWhichSave(meta);
     } else if (response.ok) {
       const meta = (await response.json()) as SaveMeta;
+      lastPushedBody = comparable;
       writeLink({ ...link, rev: meta.rev, dirty: false });
       setStatus(`Synced · day ${meta.day} · ${clockTime(meta.savedAt)}`);
     } else {
@@ -156,7 +169,7 @@ async function push(): Promise<void> {
 }
 
 /** A small dialog over the page, built on the shared modal classes. */
-function showDialog(title: string, lines: string[], buttons: Array<{ label: string; run: () => void }>, input?: HTMLInputElement): () => void {
+function showDialog(title: string, lines: string[], buttons: Array<{ label: string; run: () => void; keepOpen?: boolean }>, input?: HTMLInputElement): () => void {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.classList.add('cloud-dialog');
@@ -176,12 +189,12 @@ function showDialog(title: string, lines: string[], buttons: Array<{ label: stri
   const actions = document.createElement('div');
   actions.className = 'modal-actions';
   const close = () => overlay.remove();
-  for (const { label, run } of buttons) {
+  for (const { label, run, keepOpen } of buttons) {
     const button = document.createElement('button');
     button.type = 'button';
     button.textContent = label;
     button.addEventListener('click', () => {
-      close();
+      if (!keepOpen) close();
       run();
     });
     actions.append(button);
@@ -206,8 +219,11 @@ function askWhichSave(remote: SaveMeta): void {
         label: 'Keep this device',
         run: () => {
           conflictOpen = false;
-          if (link) writeLink({ ...link, rev: remote.rev, dirty: true });
-          void push();
+          // The cloud game is about to be overwritten: keep a copy to restore from.
+          void backupToSlot('conflict').finally(() => {
+            if (link) writeLink({ ...link, rev: remote.rev, dirty: true });
+            void push();
+          });
         },
       },
       { label: 'Load cloud save', run: () => void pullAndReload(code) },
@@ -243,6 +259,107 @@ export function enableCloudSave(): void {
   writeLink({ code: newSyncCode(), rev: 0, device: newDevice(), dirty: true });
   setStatus('Turning on…');
   void push().then(() => listeners.forEach((listener) => listener()));
+  showCodeOnce();
+}
+
+/** The code is the only way back to the save from a new phone or a wiped browser, so it is shown once, big, with copy buttons. */
+function showCodeOnce(): void {
+  const info = cloudLinkInfo();
+  if (info === null) return;
+  const copyText = (text: string) => void navigator.clipboard?.writeText(text).catch(() => undefined);
+  showDialog(
+    'Cloud save on',
+    [info.code, 'Copy or write this code down. It is the only way to get this game back on a new phone or after the browser clears its data. Anyone with the code can play your game.'],
+    [
+      { label: 'Copy code', run: () => copyText(info.code), keepOpen: true },
+      { label: 'Copy link', run: () => copyText(info.shareLink), keepOpen: true },
+      { label: 'Done', run: () => undefined },
+    ],
+  );
+}
+
+/** Copy the live cloud save into a backup slot; resolves either way, so a failure never blocks the player. */
+async function backupToSlot(slot: 'newgame' | 'conflict'): Promise<void> {
+  if (link === null) return;
+  try {
+    await api(`/api/save/backup?slot=${slot}`, link.code, { method: 'POST' });
+  } catch {
+    // Offline: the player's own action goes ahead without a backup.
+  }
+}
+
+/** Before New Game replaces the cloud save: keep it as the "new game" backup, waiting at most three seconds. */
+export async function backupBeforeNewGame(): Promise<void> {
+  if (link === null) return;
+  await Promise.race([backupToSlot('newgame'), new Promise((resolve) => setTimeout(resolve, 3000))]);
+}
+
+const SLOT_NAMES: Record<string, string> = { prev1: 'Earlier save', prev2: 'Earlier still', newgame: 'Before New Game', conflict: 'Replaced by this device' };
+
+/** List the cloud's backups and load one: it becomes this device's game, and the next push makes it the cloud's. */
+export async function showBackups(): Promise<void> {
+  if (link === null) return;
+  const code = link.code;
+  let slots: Array<{ slot: string; meta: SaveMeta }> = [];
+  try {
+    const response = await api('/api/save/backups', code);
+    if (!response.ok) throw new Error(`backups ${response.status}`);
+    slots = (await response.json()) as Array<{ slot: string; meta: SaveMeta }>;
+  } catch {
+    showDialog('Cloud backups', ['Couldn\'t reach the cloud.'], [{ label: 'OK', run: () => undefined }]);
+    return;
+  }
+  if (slots.length === 0) {
+    showDialog('Cloud backups', ['No backups yet. One is kept when you start a new game, and earlier saves roll in hourly.'], [{ label: 'OK', run: () => undefined }]);
+    return;
+  }
+  showDialog(
+    'Cloud backups',
+    ['Loading one replaces the game on this device and, at the next sync, the cloud save.'],
+    [
+      { label: 'Cancel', run: () => undefined },
+      ...slots.map(({ slot, meta }) => ({
+        label: `${SLOT_NAMES[slot] ?? slot} · day ${meta.day} · ${clockTime(meta.savedAt)}`,
+        run: () => void restoreBackup(code, slot),
+      })),
+    ],
+  );
+}
+
+async function restoreBackup(code: string, slot: string): Promise<void> {
+  try {
+    const response = await api(`/api/save?slot=${slot}`, code);
+    if (!response.ok) throw new Error(`backup ${response.status}`);
+    const rev = Number(response.headers.get('x-save-rev') ?? 0);
+    const imported = importSaveText(await response.text());
+    if (!imported.ok) {
+      setStatus(`Backup not loaded · ${imported.reason}`);
+      return;
+    }
+    writeLink({ code, rev, device: link?.device ?? newDevice(), dirty: true });
+    window.location.reload();
+  } catch {
+    setStatus('Backup not loaded · offline');
+  }
+}
+
+/** Once, at the first day worth keeping, offer cloud saves to a player who hasn't turned them on. */
+function askToTurnOn(): void {
+  if (!available || link !== null || state === null || conflictOpen || dayIndex(state) < ASK_FROM_DAY) return;
+  try {
+    if (localStorage.getItem(ASKED_KEY) !== null) return;
+    localStorage.setItem(ASKED_KEY, '1');
+  } catch {
+    return;
+  }
+  showDialog(
+    'Keep this game safe?',
+    ['Browsers can wipe saved games, and iPhone Safari does after a week unused. Cloud save keeps a copy and lets you play on another device.'],
+    [
+      { label: 'Not now', run: () => undefined },
+      { label: 'Turn on', run: enableCloudSave },
+    ],
+  );
 }
 
 export function disableCloudSave(): void {
@@ -325,7 +442,10 @@ export function onCloudChange(listener: () => void): void {
 export async function startCloudSave(gameState: SimState): Promise<void> {
   state = gameState;
   onSaveWritten(() => {
-    if (link === null) return;
+    if (link === null) {
+      askToTurnOn();
+      return;
+    }
     writeLink({ ...link, dirty: true });
     schedulePush();
   });

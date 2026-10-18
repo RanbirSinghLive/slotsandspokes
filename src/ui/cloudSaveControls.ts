@@ -1,4 +1,4 @@
-import { askForCode, cloudLinkInfo, disableCloudSave, enableCloudSave, isCloudAvailable, onCloudChange } from './cloudSave';
+import { askForCode, cloudLinkInfo, disableCloudSave, enableCloudSave, isCloudAvailable, onCloudChange, showBackups } from './cloudSave';
 
 /**
  * The Game screen's Cloud save section, and the home picker's "use your
@@ -43,5 +43,6 @@ export function setupCloudSaveControls(): void {
   });
   document.querySelector('#cloud-save-copy-code')!.addEventListener('click', () => copy(cloudLinkInfo()?.code ?? '', 'Code copied.'));
   document.querySelector('#cloud-save-copy-link')!.addEventListener('click', () => copy(cloudLinkInfo()?.shareLink ?? '', 'Link copied · open it on your other device.'));
+  document.querySelector('#cloud-save-backups')!.addEventListener('click', () => void showBackups());
   pickerLink.addEventListener('click', askForCode);
 }

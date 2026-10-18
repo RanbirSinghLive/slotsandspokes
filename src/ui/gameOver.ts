@@ -1,5 +1,6 @@
 import { isInsolvent } from '../sim/insolvency';
 import { money } from './format';
+import { backupBeforeNewGame } from './cloudSave';
 import { clearSavedState } from './save';
 import { buildReportBody, feedbackLink } from './yearReport';
 import type { SimState } from '../sim/state';
@@ -22,8 +23,10 @@ let reported = false;
 export function setupGameOver(): void {
   // No separate confirmation: reaching this screen means the game is over.
   gameOverNewGameButton.addEventListener('click', () => {
-    clearSavedState();
-    window.location.reload();
+    void backupBeforeNewGame().finally(() => {
+      clearSavedState();
+      window.location.reload();
+    });
   });
 }
 
