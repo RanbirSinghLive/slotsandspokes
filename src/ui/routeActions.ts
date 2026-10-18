@@ -49,6 +49,9 @@ export {
   seatMapFor,
   forecastSeatPlan,
   bestSeatPlanFor,
+  productReadout,
+  forecastTypeCabin,
+  bestTypeCabin,
   maxBusinessSeats,
   maxPremiumSeats,
   heavyCheckReadouts,
@@ -116,6 +119,26 @@ export function startSeatSale(state: SimState, a: string, b: string) {
 
 export function orderRefit(state: SimState, tail: string, target: Parameters<typeof actions.orderRefit>[2]) {
   return afterChange(state, actions.orderRefit(state, tail, target));
+}
+
+export function saveCabinTemplate(state: SimState, typeCode: string, plan: Parameters<typeof actions.saveCabinTemplate>[2], name?: string) {
+  return afterChange(state, actions.saveCabinTemplate(state, typeCode, plan, name));
+}
+
+export function deleteCabinTemplate(state: SimState, id: number) {
+  return afterChange(state, actions.deleteCabinTemplate(state, id));
+}
+
+export function renameCabinTemplate(state: SimState, id: number, name: string) {
+  return afterChange(state, actions.renameCabinTemplate(state, id, name));
+}
+
+export function setFleetCabin(state: SimState, typeCode: string, plan: Parameters<typeof actions.setFleetCabin>[2]) {
+  return afterChange(state, actions.setFleetCabin(state, typeCode, plan));
+}
+
+export function followFleetCabin(state: SimState, tail: string) {
+  return afterChange(state, actions.followFleetCabin(state, tail));
 }
 
 export function cancelRefit(state: SimState, tail: string) {

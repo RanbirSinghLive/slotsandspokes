@@ -4,6 +4,7 @@ import { info } from './inspector/dom';
 import * as ops from './routeActions';
 import { describeLayout, ECONOMY_SEATS_PER_BUSINESS, layoutFor, PREMIUM_SEAT_ROOM, sameSeatPlan, type SeatPlan } from '../sim/cabins';
 import { classByCode } from '../sim/aircraftClasses';
+import { MAX_TEMPLATES_PER_TYPE } from '../sim/fleetCabins';
 import type { SimState } from '../sim/state';
 
 /**
@@ -93,13 +94,131 @@ function splitBar(split: NonNullable<ReturnType<typeof ops.seatMapFor>>['split']
   return [wrap];
 }
 
+/**
+ * What a seat map edits: one plane, or every plane of a type (the Product
+ * screen). The dialog is the same; where the forecast, best fit and the
+ * button's action come from differ.
+ */
+type SeatMapSource = {
+  title: string;
+  explanation: string;
+  typeCode: string;
+  seats: number;
+  /** The plan it opens on, and ↺ goes back to. */
+  start: SeatPlan;
+  /** The plan it has now, for "as now" and "was". */
+  current: SeatPlan;
+  split: NonNullable<ReturnType<typeof ops.seatMapFor>>['split'];
+  forecast: (plan: SeatPlan) => { gainPerDay: number; blocked: string | null };
+  best: () => SeatPlan | null;
+  bestTip: string;
+  rows: (plan: SeatPlan) => [string, string, string?][];
+  goLabel: (plan: SeatPlan) => string;
+  go: (plan: SeatPlan) => void;
+};
+
 /** Opens the seat map for a plane; ordering a refit runs `changed`. */
-export function showSeatMap(state: SimState, tail: string, changed: () => void): void {
+export function showSeatMap(state: SimState, tail: string, changed: () => void, startPlan?: SeatPlan): void {
   const aircraft = state.aircraft.find((a) => a.tail === tail);
   const map = ops.seatMapFor(state, tail);
   if (!aircraft || !map) return;
+  const standard = state.fleetCabins?.[map.typeCode];
+  openSeatMap(
+    state,
+    {
+      title: `Cabin · ${tail}`,
+      explanation: `Set how many business (J), premium economy (W) and economy (Y) seats ${tail} has. A J seat takes the room of ${ECONOMY_SEATS_PER_BUSINESS} Y seats and a W seat ${PREMIUM_SEAT_ROOM}; J and W together may take 65% of the room. J sells to business travellers at 2.2× the fare, W at 1.45× to whoever values it, Y as before. Tap a seat to move it up a class, or a saved template to load it. The bar is who flies the markets this type flies now: lean to business where it is large. Forecast is the game's own on the plane's routes as they are now; Best fit tries a grid of cabins through it. A refit starts the next morning the plane is at base, takes it out of service, and holds a hangar bay at its base when one rated for the class is free; otherwise it is contracted out by the hour. Its flying moves to spare planes of its class. Refitted off its type's standard cabin, it keeps its own until told to follow the standard again (Product).`,
+      typeCode: map.typeCode,
+      seats: map.seats,
+      start: startPlan ?? map.current,
+      current: map.current,
+      split: map.split,
+      forecast: (plan) => {
+        const forecast = ops.forecastSeatPlan(state, tail, plan) ?? { gainPerDay: 0, blocked: 'Cannot be refitted' };
+        return { gainPerDay: forecast.gainPerDay, blocked: sameSeatPlan(plan, map.current) ? 'Same cabin as now' : forecast.blocked };
+      },
+      best: () => ops.bestSeatPlanFor(state, tail)?.plan ?? null,
+      bestTip: 'Best fit · the cabin the forecast likes most',
+      rows: (plan) => {
+        const offStandard = standard !== undefined && !sameSeatPlan(plan, standard);
+        return [
+          ['Refit cost', money(map.cost)],
+          ['Out of service', map.bay ? `${map.days} days · hangar bay` : `${map.days} days · contracted ${money(map.contractCost)}`],
+          ['Cash after', money(state.cash - map.cost - (map.bay ? 0 : map.contractCost))],
+          ...(offStandard ? [['Standard', `${describeLayout(layoutFor(map.seats, standard))} · off it, keeps its own`, 'is-warn'] as [string, string, string]] : []),
+        ];
+      },
+      goLabel: () => `Order · ${money(map.cost)}`,
+      go: (plan) => {
+        ops.orderRefit(state, tail, plan);
+        changed();
+      },
+    },
+    changed,
+  );
+}
+
+/**
+ * Opens the seat map for every plane of a type (the Product screen): its
+ * forecast is the whole fleet's, and the button makes the plan the type's
+ * standard cabin, rolled out one refit per base at a time.
+ */
+export function showFleetSeatMap(state: SimState, typeCode: string, changed: () => void, startPlan?: SeatPlan): void {
+  const product = ops.productReadout(state).find((entry) => entry.typeCode === typeCode);
+  if (!product || !product.fits) return;
+  const typeName = classByCode(typeCode)?.name ?? typeCode;
+  const standard = product.status.standard;
+  const current = standard ?? mostCommonPlan(state, typeCode);
+  openSeatMap(
+    state,
+    {
+      title: `Cabin · ${typeName} fleet`,
+      explanation: `The cabin for every ${typeName}. Set as standard, it is what each one should have: every morning, at each base, one plane of the type not on it is ordered a refit to it (${money(product.refitCost)} each, ${product.refitDays} days out), so a base never has more than one out for it at once; the one flying least goes first. Planes delivered later arrive with it fitted. A plane refitted to something else keeps its own until told to follow again. Save a template to keep the plan under a name. Forecast is every ${typeName} that follows the standard swapped at once, through the game's own forecast on the routes they fly now.`,
+      typeCode,
+      seats: product.seats,
+      start: startPlan ?? current,
+      current,
+      split: product.split,
+      forecast: (plan) => ({ gainPerDay: ops.forecastTypeCabin(state, typeCode, plan).gainPerDay, blocked: standard && sameSeatPlan(plan, standard) ? 'The standard now' : null }),
+      best: () => ops.bestTypeCabin(state, typeCode)?.plan ?? null,
+      bestTip: `Best fit · the cabin the forecast likes most across the ${typeName} fleet`,
+      rows: (plan) => {
+        const toRefit = product.planes.filter((plane) => plane.standing !== 'own' && !sameSeatPlan(planOfLayout(plane.layout), plan)).length;
+        return [
+          ['Refits', toRefit === 0 ? '—' : `${toRefit} × ${money(product.refitCost)} · ${product.refitDays}d out each`],
+          ['Deliveries', 'arrive fitted'],
+        ];
+      },
+      goLabel: () => 'Set as standard',
+      go: (plan) => {
+        ops.setFleetCabin(state, typeCode, plan);
+        changed();
+      },
+    },
+    changed,
+  );
+}
+
+function planOfLayout(layout: { business: number; premium: number }): SeatPlan {
+  return { business: layout.business, premium: layout.premium };
+}
+
+/** The seat plan most of a type's planes have, for a fleet seat map with no standard yet. */
+function mostCommonPlan(state: SimState, typeCode: string): SeatPlan {
+  const product = ops.productReadout(state).find((entry) => entry.typeCode === typeCode);
+  const counts = new Map<string, { plan: SeatPlan; n: number }>();
+  for (const plane of product?.planes ?? []) {
+    const plan = planOfLayout(plane.layout);
+    const key = `${plan.business}/${plan.premium}`;
+    counts.set(key, { plan, n: (counts.get(key)?.n ?? 0) + 1 });
+  }
+  return [...counts.values()].sort((a, b) => b.n - a.n)[0]?.plan ?? { business: 0, premium: 0 };
+}
+
+function openSeatMap(state: SimState, source: SeatMapSource, changed: () => void): void {
+  const map = source;
   const typeName = classByCode(map.typeCode)?.name ?? map.typeCode;
-  let plan: SeatPlan = { ...map.current };
+  let plan: SeatPlan = { ...map.start };
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay modal-overlay--confirm';
@@ -107,14 +226,14 @@ export function showSeatMap(state: SimState, tail: string, changed: () => void):
   box.className = 'modal-box modal-box--confirm modal-box--seatmap';
   box.setAttribute('role', 'dialog');
   const title = document.createElement('h2');
-  title.append(`Cabin · ${tail} `);
-  title.append(
-    info(
-      `Set how many business (J), premium economy (W) and economy (Y) seats ${tail} has. A J seat takes the room of ${ECONOMY_SEATS_PER_BUSINESS} Y seats and a W seat ${PREMIUM_SEAT_ROOM}; J and W together may take 65% of the room. J sells to business travellers at 2.2× the fare, W at 1.45× to whoever values it, Y as before. Tap a seat to move it up a class. The bar is who flies the markets this type flies now: lean to business where it is large. Forecast is the game's own on the plane's routes as they are now; Best fit tries a grid of cabins through it. A refit starts the next morning the plane is at base, takes it out of service, and holds a hangar bay at its base when one rated for the class is free; otherwise it is contracted out by the hour. Its flying moves to spare planes of its class.`,
-    ),
-  );
+  title.append(`${map.title} `);
+  title.append(info(map.explanation));
   box.append(title);
   box.append(...splitBar(map.split, typeName));
+
+  const templatesHost = document.createElement('div');
+  templatesHost.className = 'seatmap-templates';
+  box.append(templatesHost);
 
   const mapHost = document.createElement('div');
   mapHost.className = 'seatmap-host';
@@ -184,12 +303,42 @@ export function showSeatMap(state: SimState, tail: string, changed: () => void):
     return { ...plan, business: plan.business - 1 };
   };
 
+  function drawTemplates(): void {
+    const saved = (state.cabinTemplates ?? []).filter((template) => template.typeCode === map.typeCode);
+    const chips = saved.map((template) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'seatmap-template';
+      const templatePlan = { business: template.business, premium: template.premium };
+      chip.classList.toggle('is-on', sameSeatPlan(templatePlan, plan));
+      const layout = describeLayout(layoutFor(map.seats, templatePlan));
+      chip.textContent = template.name;
+      chip.dataset.tip = `${layout} · tap to load`;
+      chip.addEventListener('click', () => set(templatePlan));
+      return chip;
+    });
+    const add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'seatmap-template is-add';
+    add.textContent = '＋';
+    const already = saved.find((template) => sameSeatPlan({ business: template.business, premium: template.premium }, plan));
+    add.disabled = already !== undefined || saved.length >= MAX_TEMPLATES_PER_TYPE;
+    add.dataset.tip = already ? `Saved as ${already.name}` : saved.length >= MAX_TEMPLATES_PER_TYPE ? `${MAX_TEMPLATES_PER_TYPE} templates is the most a type keeps` : 'Save this cabin as a template';
+    add.setAttribute('aria-label', 'Save as template');
+    add.addEventListener('click', () => {
+      ops.saveCabinTemplate(state, map.typeCode, plan);
+      changed();
+      draw();
+    });
+    templatesHost.replaceChildren(...chips, add);
+  }
+
   function draw(): void {
-    const forecast = ops.forecastSeatPlan(state, tail, plan);
-    if (!forecast) return;
-    const layout = forecast.layout;
+    const forecast = map.forecast(plan);
+    const layout = layoutFor(map.seats, plan);
+    drawTemplates();
     mapHost.replaceChildren(
-      drawCabin(map!.typeCode, layout, (cabin) => {
+      drawCabin(map.typeCode, layout, (cabin) => {
         const next = nextClassUp(cabin);
         const clamped = clampPlan(next);
         // A tap that finds no room goes round to economy instead of doing nothing.
@@ -211,11 +360,11 @@ export function showSeatMap(state: SimState, tail: string, changed: () => void):
     best.type = 'button';
     best.className = 'seatmap-tool';
     best.textContent = '★';
-    best.dataset.tip = 'Best fit · the cabin the forecast likes most';
+    best.dataset.tip = map.bestTip;
     best.setAttribute('aria-label', 'Best fit');
     best.addEventListener('click', () => {
-      const found = ops.bestSeatPlanFor(state, tail);
-      if (found) set(found.plan);
+      const found = map.best();
+      if (found) set(found);
     });
     const reset = document.createElement('button');
     reset.type = 'button';
@@ -223,17 +372,15 @@ export function showSeatMap(state: SimState, tail: string, changed: () => void):
     reset.textContent = '↺';
     reset.dataset.tip = 'Back to the cabin it has now';
     reset.setAttribute('aria-label', 'Reset');
-    reset.addEventListener('click', () => set({ ...map!.current }));
+    reset.addEventListener('click', () => set({ ...map.current }));
     controls.append(economy, best, reset);
 
-    const same = sameSeatPlan(plan, map!.current);
+    const same = sameSeatPlan(plan, map.current);
     const sign = forecast.gainPerDay >= 0 ? '+' : '−';
     const lines: [string, string, string?][] = [
-      ['Seats', same ? `${describeLayout(layout)} · as now` : `${describeLayout(layout)} · was ${describeLayout(layoutFor(map!.seats, map!.current))}`],
+      ['Seats', same ? `${describeLayout(layout)} · as now` : `${describeLayout(layout)} · was ${describeLayout(layoutFor(map.seats, map.current))}`],
       ['Forecast', same ? '—' : `${sign}${money(Math.abs(forecast.gainPerDay))}/day`, forecast.gainPerDay > 0 ? 'is-gain' : forecast.gainPerDay < 0 ? 'is-loss' : undefined],
-      ['Refit cost', money(map!.cost)],
-      ['Out of service', map!.bay ? `${map!.days} days · hangar bay` : `${map!.days} days · contracted ${money(map!.contractCost)}`],
-      ['Cash after', money(state.cash - map!.cost - (map!.bay ? 0 : map!.contractCost))],
+      ...map.rows(plan),
     ];
     rows.replaceChildren();
     for (const [label, text, tone] of lines) {
@@ -247,9 +394,8 @@ export function showSeatMap(state: SimState, tail: string, changed: () => void):
       row.append(left, right);
       rows.append(row);
     }
-    const blocked = same ? 'Same cabin as now' : forecast.blocked;
-    order.disabled = blocked !== null;
-    order.textContent = blocked ?? `Order · ${money(map!.cost)}`;
+    order.disabled = forecast.blocked !== null;
+    order.textContent = forecast.blocked ?? map.goLabel(plan);
   }
 
   const close = () => {
@@ -266,8 +412,7 @@ export function showSeatMap(state: SimState, tail: string, changed: () => void):
   });
   order.addEventListener('click', () => {
     close();
-    ops.orderRefit(state, tail, plan);
-    changed();
+    map.go(plan);
   });
   document.body.append(overlay);
   draw();

@@ -25,6 +25,9 @@ import type { FuelHedge } from './fuelPrice';
 import { STARTING_NPS } from './nps';
 import type { CrewBase, CrewDay } from './crews';
 import type { InboundLease } from './fleetTiming';
+
+/** A seat plan saved under a name, for one type (sim/fleetCabins.ts). */
+export type CabinTemplate = { id: number; name: string; typeCode: string; business: number; premium: number };
 import { createExecutiveSlots, type ExecutiveSlots } from './executives';
 import type { Contract } from './contracts';
 
@@ -92,6 +95,8 @@ export type Aircraft = {
   seatPlan?: { business: number; premium: number };
   /** A refit ordered and paid for, starting the next morning it is at base (sim/cabins.ts). Older saves hold 'economy' or 'business'. */
   refitPending?: 'economy' | 'business' | { business: number; premium: number };
+  /** Kept off its type's standard cabin (sim/fleetCabins.ts): the player refitted it to something else. */
+  ownCabin?: true;
   /** A seasonal lease (sim/seasonalLease.ts): the day its season ends and it goes back. */
   seasonalUntilDay?: number;
   /** Line checks missed or cut short and not yet made up (sim/mxChecks.ts). Absent: none. */
@@ -696,6 +701,11 @@ export type SimState = {
   rivalMilestones?: Record<string, Record<string, number>>;
   /** Leases signed and not yet delivered (sim/fleetTiming.ts). Optional: absent in an older save. */
   inboundLeases?: InboundLease[];
+  /** Saved seat plans, per type, to apply to planes (sim/fleetCabins.ts). Absent: none. */
+  cabinTemplates?: CabinTemplate[];
+  nextCabinTemplateId?: number;
+  /** The standard cabin for every plane of a type, by type code (sim/fleetCabins.ts). Absent: each plane its own. */
+  fleetCabins?: Record<string, { business: number; premium: number }>;
   /** Crew bases and their crews, by IATA (sim/crews.ts). Optional: an older save gets bases made at its first rollover. */
   crewBases?: Record<string, CrewBase>;
   /** Old maintenance bases, by IATA: read only by a save from before levels (sim/bases.ts's mxLevels()), and dropped at its first change. */

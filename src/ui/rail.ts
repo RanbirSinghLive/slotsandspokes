@@ -34,7 +34,7 @@ const railEl = document.querySelector<HTMLElement>('#rail')!;
 const items = [...railEl.querySelectorAll<HTMLButtonElement>('.rail-item[data-go]')];
 const hideButton = railEl.querySelector<HTMLButtonElement>('#rail-hide')!;
 
-type Screen = 'network' | 'routes' | 'airports' | 'fleet' | 'crews' | 'maintenance' | 'rivals' | 'money' | 'goals' | 'contracts' | 'headOffice' | 'game';
+type Screen = 'network' | 'routes' | 'airports' | 'fleet' | 'product' | 'crews' | 'maintenance' | 'rivals' | 'money' | 'goals' | 'contracts' | 'headOffice' | 'game';
 
 /** Where each rail item goes. Routes opens worst margin first. */
 function targetOf(screen: Screen): Selection {

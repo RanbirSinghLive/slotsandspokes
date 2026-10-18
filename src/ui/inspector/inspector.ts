@@ -14,6 +14,7 @@ import { buildRivalView, buildRivalsView, rivalName } from './rival';
 import { buildRouteView } from './route';
 import { buildCrewsView } from './crews';
 import { buildMaintenanceView } from './maintenance';
+import { buildProductView } from './product';
 import { adopt } from './dom';
 import { updateOnTimePanel } from '../onTime';
 import { updateGameControls } from '../gameControls';
@@ -102,6 +103,10 @@ function trail(state: SimState, selection: Selection): { label: string; target: 
   }
   if (selection.kind === 'crews') {
     steps.push({ label: 'Crews', target: selection });
+    return steps;
+  }
+  if (selection.kind === 'product') {
+    steps.push({ label: 'Product', target: selection });
     return steps;
   }
   if (selection.kind === 'maintenance') {
@@ -219,6 +224,8 @@ export function renderInspector(state: SimState): void {
     bodyEl.replaceChildren(buildFleetView(state, rebuild), adopt('rotations-section'), adopt('market-section'));
   } else if (selection.kind === 'crews') {
     bodyEl.replaceChildren(buildCrewsView(state, rebuild));
+  } else if (selection.kind === 'product') {
+    bodyEl.replaceChildren(buildProductView(state, rebuild));
   } else if (selection.kind === 'maintenance') {
     bodyEl.replaceChildren(buildMaintenanceView(state, rebuild));
   } else if (selection.kind === 'game') {

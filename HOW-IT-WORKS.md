@@ -2916,6 +2916,26 @@ above it who flies the markets the plane's type flies now
 (`typeSegmentSplit()`: each segment's share of demand over the type's
 flights). Best fit (`bestSeatPlan()`) tries a grid of J and W seats through
 the forecast.
+**Product: fleet cabins (`src/sim/fleetCabins.ts`).** The Product screen
+(rail, after Mtc; `ui/inspector/product.ts`) holds cabins by type. A
+**template** is a seat plan saved under a name for one type (at most 6 a
+type, in `state.cabinTemplates`); every seat map shows the type's templates
+as chips to load, and ＋ saves the plan on it. A type's **standard cabin**
+(`state.fleetCabins`) is the one every plane of that type should have.
+Setting it charges nothing at once: each morning, before refits start
+(`rollFleetCabins()` in the morning pass of `sim/aog.ts`), at each base one
+plane of the type not on it is ordered a refit to it at the usual price,
+unless one there is already in or booked for a refit, so a base never has
+more than one plane of a type out for it. The plane flying fewest legs goes
+first; one that can't be refitted that morning (out of service, ferrying,
+short of cash) waits. A plane refitted by hand to anything else is kept on
+its own cabin (`Aircraft.ownCabin`), as is one whose refit to the standard
+is called off, until ↺ puts it back; setting a standard puts every plane of
+the type back on it. Planes delivered while a standard is set arrive with
+it fitted, free (`fitStandardOnDelivery()`). The fleet seat map's forecast
+(`typeCabinGainPerDay()`) swaps every plane of the type that follows the
+standard at once. The headless player sets no standards.
+
 The forecast is `cabinGainPerDay()`: the plane's markets through the game's own
 forecast, with the seats swapped and then put back. The headless player
 reviews its cabins weekly and only ever flips between all economy and the

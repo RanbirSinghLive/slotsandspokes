@@ -2,6 +2,7 @@ import aircraftTypesData from '../../data/aircraft-types.json';
 import { marketMix } from './marketCharacter';
 import { summarizeMarket } from './marketSummary';
 import { marketKey } from './schedule';
+import { noteRefitTarget } from './fleetCabins';
 import type { Aircraft, SimState } from './state';
 import type { SegmentName } from './timeOfDay';
 
@@ -135,7 +136,11 @@ export function refitDays(typeCode: string): number {
 }
 
 export function refitCost(aircraft: Aircraft): number {
-  return REFIT_LEASE_DAYS * aircraft.leaseCostPerDay;
+  return refitCostForLease(aircraft.leaseCostPerDay);
+}
+
+export function refitCostForLease(leaseCostPerDay: number): number {
+  return REFIT_LEASE_DAYS * leaseCostPerDay;
 }
 
 /** Why this plane can't be refitted to `target` now, or null if it can. */
@@ -168,6 +173,7 @@ export function orderRefit(state: SimState, tail: string, target: RefitTarget): 
   state.todayCostByCategory.maintenance += cost;
   state.todayMargin -= cost;
   aircraft.refitPending = { ...plan };
+  noteRefitTarget(state, aircraft, plan);
   return { ok: true, message: `${tail} refit to ${describeLayout(layoutFor(seats, plan))} · ${refitDays(aircraft.typeCode)}d from tomorrow · $${cost.toLocaleString()}` };
 }
 
@@ -189,6 +195,8 @@ export function cancelRefit(state: SimState, tail: string): { ok: true; message:
   state.todayCostByCategory.maintenance -= cost;
   state.todayMargin += cost;
   delete aircraft.refitPending;
+  // Called off on its way to the standard, it keeps the cabin it has rather than be ordered again tomorrow.
+  noteRefitTarget(state, aircraft, seatPlanOf(aircraft));
   return { ok: true, message: `${tail} refit called off · $${cost.toLocaleString()} back` };
 }
 
