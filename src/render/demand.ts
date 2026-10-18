@@ -1,6 +1,6 @@
 import { geoPath } from 'd3-geo';
 import type { LineString } from 'geojson';
-import { projection } from './projection';
+import { baselineScale, projection } from './projection';
 import { airports, isAirportKnown } from './airports';
 import { currentPotentialDemand } from '../sim/marketDemand';
 import { airportDemandSize, sizeRank } from '../sim/marketSize';
@@ -35,6 +35,9 @@ import { contractsOf } from '../sim/contracts';
 
 /** A circle's radius for each size, Tiny to Huge. */
 const SIZE_RADIUS_PX = [3, 5, 8, 12, 16];
+/** Circles shrink with the zoom, down to this share of their size, so a whole continent stays readable. */
+const MIN_RADIUS_SHARE = 0.3;
+const MIN_RADIUS_PX = 1.5;
 const TEAL = '94, 214, 196';
 const GREY = '154, 163, 184';
 const SPILL_RIM = '#ffb347';
@@ -73,13 +76,22 @@ export function drawDemandLayer(ctx: CanvasRenderingContext2D, state: SimState, 
   if (focus) drawFocusMarkets(ctx, state, focus);
   drawContractOffers(ctx, state);
 
-  for (const airport of airports) {
-    if (!isAirportKnown(airport.iata)) continue;
-    const waiting = unmet.get(airport.iata);
-    if (!waiting || waiting.latent < 1) continue;
+  // Zoomed out, the same pixel sizes pile into one blot. Circles shrink with the zoom, and
+  // a smaller airport that would sit inside a bigger one's circle is left out until the player zooms in.
+  const radiusShare = Math.min(1, Math.max(MIN_RADIUS_SHARE, Math.pow(projection.scale() / baselineScale, 0.6)));
+  const crowded = radiusShare < 1;
+  const waitingAirports = airports
+    .filter((airport) => isAirportKnown(airport.iata) && (unmet.get(airport.iata)?.latent ?? 0) >= 1)
+    .sort((a, b) => unmet.get(b.iata)!.latent - unmet.get(a.iata)!.latent);
+  const drawn: { x: number; y: number; radius: number }[] = [];
+
+  for (const airport of waitingAirports) {
+    const waiting = unmet.get(airport.iata)!;
     const point = projection([airport.lon, airport.lat]);
     if (!point) continue;
-    const radius = SIZE_RADIUS_PX[sizeRank(airportDemandSize(waiting.latent))];
+    const radius = Math.max(MIN_RADIUS_PX, SIZE_RADIUS_PX[sizeRank(airportDemandSize(waiting.latent))] * radiusShare);
+    if (crowded && drawn.some((other) => Math.hypot(other.x - point[0], other.y - point[1]) < other.radius)) continue;
+    drawn.push({ x: point[0], y: point[1], radius });
     const hungry = hunger.get(airport.iata) ?? 0;
     const rgb = hungry >= HUNGER_MIN ? TEAL : GREY;
     const alpha = hungry >= HUNGER_MIN ? 0.18 + 0.3 * hungry : 0.14;

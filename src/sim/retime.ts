@@ -220,6 +220,8 @@ export function planRetime(state: SimState, legIds: string[], toTail: string, st
   if (kind === 'move') {
     if (first.departMinute < USABLE_DAY_START_MINUTE) return fail(`Starts ${hhmm(first.departMinute)} · the day opens 06:00`);
     if (end > USABLE_DAY_END_MINUTE && !longHaul) return fail(`Back at ${hhmm(end)} · past the 22:00 curfew`);
+    // A flight is dispatched on its own day's clock (step.ts), so one that would leave after midnight never goes and strands the plane.
+    if (last.departMinute >= 24 * 60) return fail(`${last.origin}→${last.dest} would leave ${hhmm(last.departMinute)} next day · must leave before midnight`);
 
     // Its new plane's other rotations, with a turn either side. (A wrap or
     // an unwrap is planned round them by sim/nightStops.ts.)

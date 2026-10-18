@@ -421,6 +421,11 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
     );
   }
 
+  // A flight is dispatched on its own day's clock (step.ts): one scheduled past midnight would never leave and would strand the plane.
+  if (lastLeg && lastLeg.departMinute >= 24 * 60) {
+    return fail(`${lastLeg.origin} → ${lastLeg.dest} would leave ${minuteOfDayToTimeString(lastLeg.departMinute % (24 * 60))} the next day · a rotation's flights all leave before midnight. Use another plane or an earlier start.`);
+  }
+
   // On a night stop, it has to be home and turned before the evening flight out.
   const evening = nightStopLegs(state, tail)?.evening;
   if (evening && lastLeg && arriveBackMinute + scheduledTurnMinutes(state, lastLeg.origin, lastLeg.dest) > evening.departMinute) {

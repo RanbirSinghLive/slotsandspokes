@@ -1,4 +1,4 @@
-import { baselineScale, mapSize, projection } from './projection';
+import { baselineScale, keepSeamOffScreen, mapSize, projection } from './projection';
 
 /**
  * The map's camera: where the shared projection is looking and how far in.
@@ -30,17 +30,20 @@ export function zoomAt(x: number, y: number, factor: number): void {
   const [driftedX, driftedY] = projection(geoUnderPoint)!;
   const [tx, ty] = projection.translate();
   projection.translate([tx + (x - driftedX), ty + (y - driftedY)]);
+  keepSeamInView();
 }
 
-/** Slide the map by (dx, dy) pixels from where its translate was when a drag began. */
-export function panFrom(start: [number, number], dx: number, dy: number): void {
-  projection.translate([start[0] + dx, start[1] + dy]);
+/** Called after every move of the view; see projection.ts's keepSeamOffScreen. */
+function keepSeamInView(): void {
+  const { width, height } = mapSize();
+  keepSeamOffScreen(width, height);
 }
 
 /** Slide the map by (dx, dy) pixels from where it is now. */
 export function panBy(dx: number, dy: number): void {
   const [tx, ty] = projection.translate();
   projection.translate([tx + dx, ty + dy]);
+  keepSeamInView();
 }
 
 /** What the player is looking at, so a resize that only changes the box can keep it. */
