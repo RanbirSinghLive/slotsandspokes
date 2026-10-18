@@ -50,19 +50,23 @@ const CLEAR_SPARE_MINUTES = 120;
 export const DEFERRED_AGE_YEARS = 3;
 /** Deferred items at which the plane is held at base for a morning. */
 export const MX_HOLD_AT = 3;
-export const HEAVY_INTERVAL_DAYS = 30;
+export const HEAVY_INTERVAL_DAYS = 90;
 /**
  * The heavy check is the C check. It is due after HEAVY_INTERVAL_DAYS flying
  * days, C_INTERVAL_HOURS airborne or C_INTERVAL_CYCLES landed, whichever
  * comes first, so a plane flown hard comes due sooner than one flown lightly.
  */
-export const C_INTERVAL_HOURS = 300;
-export const C_INTERVAL_CYCLES = 250;
+export const C_INTERVAL_HOURS = 900;
+export const C_INTERVAL_CYCLES = 750;
 /** The heavy check's work starts being done this many days before it's due. */
-export const HEAVY_WINDOW_DAYS = 10;
+export const HEAVY_WINDOW_DAYS = 15;
 export const OVERDUE_GRACE_DAYS = 7;
-/** Hangar minutes a heavy check takes, by class. */
-const HEAVY_WORK_MINUTES: Record<string, number> = { PROP: 480, REGIONAL: 600, NARROWBODY: 720, WIDEBODY: 960 };
+/**
+ * Hangar minutes a heavy check takes, by class: whole days, so the plane is
+ * out of service 2, 2, 3 or 4 days. Rare and heavy rather than frequent and
+ * light, so a fast-forwarded game isn't a constant queue for the hangar.
+ */
+const HEAVY_WORK_MINUTES: Record<string, number> = { PROP: 2880, REGIONAL: 2880, NARROWBODY: 4320, WIDEBODY: 5760 };
 
 /**
  * The share of a flight's non-fuel block-hour cost that is maintenance.
@@ -94,8 +98,8 @@ const A_WORK_MINUTES: Record<string, number> = { PROP: 240, REGIONAL: 300, NARRO
  * service for days, so it is only ever booked by the player, never forced; a
  * plane past due wears like D_WEAR_YEARS more years of age until it goes in.
  */
-export const D_INTERVAL_DAYS = 360;
-export const D_INTERVAL_HOURS = 3600;
+export const D_INTERVAL_DAYS = 720;
+export const D_INTERVAL_HOURS = 7200;
 /** Booking opens this many days before it's due. */
 export const D_WINDOW_DAYS = 60;
 export const D_WEAR_YEARS = 2;
@@ -262,8 +266,8 @@ export function daysSinceHeavyCheck(aircraft: Aircraft): number {
   if (aircraft.daysSinceHeavyCheck !== undefined) return aircraft.daysSinceHeavyCheck;
   let hash = 0;
   for (let i = 0; i < aircraft.tail.length; i++) hash = (hash * 31 + aircraft.tail.charCodeAt(i)) % 997;
-  // Times 11, so neighbouring tails (C-P001, C-P002) land 11 days apart rather than one.
-  return (hash * 11) % HEAVY_INTERVAL_DAYS;
+  // Times 11, so neighbouring tails (C-P001, C-P002) land 11 days apart rather than one. Never inside two windows of due, so no new game opens on one.
+  return (hash * 11) % (HEAVY_INTERVAL_DAYS - 2 * HEAVY_WINDOW_DAYS);
 }
 
 /**
@@ -348,6 +352,22 @@ export function applyHeavyTolerance(state: SimState, aircraft: Aircraft, days: n
 }
 
 /** The night just ended, judged at midnight: whether the plane got its check. */
+/**
+ * A plane's first flying night: its hour and cycle clocks start as far
+ * through their intervals as its staggered day clocks. Without this every
+ * plane leased together runs on hours from zero, and the hours clock, not
+ * the stagger, decides when the fleet comes due: all at once.
+ */
+function staggerUsageClocks(aircraft: Aircraft): void {
+  const cShare = daysSinceHeavyCheck(aircraft) / HEAVY_INTERVAL_DAYS;
+  aircraft.flightMinutesSinceHeavy = (aircraft.flightMinutesSinceHeavy ?? 0) + Math.round(cShare * C_INTERVAL_HOURS * 60);
+  aircraft.cyclesSinceHeavy = (aircraft.cyclesSinceHeavy ?? 0) + Math.round(cShare * C_INTERVAL_CYCLES);
+  if (aircraft.daysSinceD === undefined) {
+    const dShare = daysSinceD(aircraft) / D_INTERVAL_DAYS;
+    aircraft.flightMinutesSinceD = (aircraft.flightMinutesSinceD ?? 0) + Math.round(dShare * D_INTERVAL_HOURS * 60);
+  }
+}
+
 export type NightResult = 'checked' | 'cleared' | 'short' | 'contracted' | 'away';
 
 /**
@@ -364,6 +384,7 @@ export function rollNightlyChecks(state: SimState, dayStartMinute: number): void
     const legs = state.schedule.filter((leg) => leg.tail === aircraft.tail);
     if (legs.length === 0 || aircraft.rebase) continue;
     if (state.aogs.some((event) => event.tail === aircraft.tail)) continue;
+    if (aircraft.daysSinceHeavyCheck === undefined) staggerUsageClocks(aircraft);
     aircraft.daysSinceHeavyCheck = daysSinceHeavyCheck(aircraft) + 1;
     aircraft.daysSinceD = daysSinceD(aircraft) + 1;
     checked.push({ aircraft, station: aircraft.status === 'ground' ? aircraft.atAirport : null });
