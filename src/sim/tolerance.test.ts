@@ -18,7 +18,7 @@ state.cash = 1_000_000;
 aircraft.daysSinceHeavyCheck = 0;
 assert.equal(toleranceHeavyCheck(state, aircraft.tail, 5).ok, false, 'pushed before the window opened');
 
-aircraft.daysSinceHeavyCheck = 26;
+aircraft.daysSinceHeavyCheck = 86;
 const before = heavyCheckDueIn(aircraft);
 const cash = state.cash;
 const fee = heavyToleranceCost(state, aircraft, 5);
@@ -32,14 +32,14 @@ assert.ok(toleranceCapDays(state, aircraft) >= TOLERANCE_BASE_CAP_DAYS);
 assert.equal(toleranceWearYears(aircraft), 0, 'wore before the unpushed due date');
 assert.equal(toleranceHeavyCheck(state, aircraft.tail, 7).ok, false, 'took an unlisted step');
 
-aircraft.daysSinceHeavyCheck = 32;
+aircraft.daysSinceHeavyCheck = 92;
 const wear = toleranceWearYears(aircraft);
 assert.ok(wear > 0, 'a pushed check past its unpushed due date did not wear');
 const worn = wornAge(aircraft);
 aircraft.heavyShiftDays = 0;
 assert.equal(wornAge(aircraft), worn - wear, 'wear stayed after the push ended');
 aircraft.heavyShiftDays = 5;
-aircraft.daysSinceHeavyCheck = 26;
+aircraft.daysSinceHeavyCheck = 86;
 const baseCap = toleranceCapDays(state, aircraft);
 state.executives.dom = { candidateId: 'dom-bakare', hiredAtMinute: 0 };
 assert.ok(heavyToleranceCost(state, aircraft, 5) < fee, 'the Director of Maintenance did not cut the fee');

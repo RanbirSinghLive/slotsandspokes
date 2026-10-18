@@ -20,15 +20,15 @@ assert.ok(aircraft, 'no parked plane to test with');
 aircraft.daysSinceD = 0;
 assert.equal(bookDCheck(state, aircraft.tail).ok, false, 'booked before the window opened');
 
-aircraft.daysSinceD = 320;
+aircraft.daysSinceD = 680;
 assert.ok(previewDCheckBooking(state, aircraft.tail), 'no preview inside the window');
 const age = wornAge(aircraft);
-aircraft.daysSinceD = 365;
+aircraft.daysSinceD = 725;
 assert.equal(wornAge(aircraft), age + D_WEAR_YEARS, 'overdue plane did not wear');
-aircraft.daysSinceD = 320;
+aircraft.daysSinceD = 680;
 assert.equal(dBookBlocker(state, aircraft), null, 'a bookable D check had a blocker');
 // A booked C check blocks the D booking, and says so.
-aircraft.daysSinceHeavyCheck = 25;
+aircraft.daysSinceHeavyCheck = 85;
 assert.equal(bookHeavyCheck(state, aircraft.tail).ok, true);
 assert.equal(dBookBlocker(state, aircraft), 'C check booked · cancel it first');
 delete aircraft.heavyCheckBooked;

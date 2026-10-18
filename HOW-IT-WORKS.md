@@ -3643,20 +3643,22 @@ by contract (a line check's price for each) away from a maintenance
 base.
 
 **The heavy check is the C check** (the screens call it C; the code says heavy).
-It is due after 30 flying days, 300 flight hours or 250 cycles, whichever comes
+It is due after 90 flying days, 900 flight hours or 750 cycles, whichever comes
 first (`heavyCheckProgressDays()`), so a plane flown hard comes due sooner than
-one flown lightly. The 10-day window and 7-day grace below are the same
-fraction of that interval whichever clock is furthest along. It is hangar work
-every 30 days the plane flies:
-8 hours for a Propeller, 10 for a Regional, 12 for a Narrowbody, 16 for
-a Widebody. It is one stretch with the plane out of service, never done in
+one flown lightly. The 15-day window and 7-day grace below are counted in days
+on whichever clock is furthest along. It is rare and heavy rather than frequent
+and light: 2 days out of service for a Propeller or a Regional, 3 for a
+Narrowbody, 4 for a Widebody, so a fast-forwarded game isn't a constant queue
+for the hangar. It is one stretch with the plane out of service, never done in
 slices on nights: the plane is grounded as an AOG with its flying moved to
 spare planes, for the work in whole days, in a hangar bay or contracted out.
-It goes in when the player books it (from 10 days before it's due) or, 7
+It goes in when the player books it (from 15 days before it's due) or, 7
 days past due, whenever it is at base or its night stop. When the work is
 done, the interval starts again and every deferred item is cleared. A plane
-from an older save starts part-way through its interval, staggered by tail,
-and any hours it had banked on nights count toward the work left
+just leased starts part-way through its interval, staggered by tail and never
+within 30 days of due, with its hour and cycle clocks started as far along as
+its day clock (`staggerUsageClocks()`), so planes leased together don't come
+due together. A plane from an older save keeps its clocks, and any hours it had banked on nights count toward the work left
 (`heavyBankedMinutes`); nothing banks any more.
 
 **Booking the C check.** Once the window is open, a plane parked at its base
@@ -3682,7 +3684,7 @@ paid by the hour, the same as at a base with no hangar, and the booking confirm
 quotes that cost (`freeHeavyBays()`). So planes that come due together at one
 hangar cost real money; spreading them, adding a bay or rebasing a plane saves it.
 
-A C check costs a flying day for the plane. A fleet flown near capacity has no
+A C check costs the plane its flying days. A fleet flown near capacity has no
 spare planes to take its flying, so its rotations are cancelled for the day:
 book checks into the quiet days, one plane at a time.
 
@@ -3702,8 +3704,8 @@ fee (Aaltonen −20%, Bakare −50%). The grace still runs from the pushed date,
 and the push and its wear clear when the check is done. The headless player
 never pushes.
 
-**The D check** is the overhaul above the C check, due after 360 flying days
-or 3,600 flight hours, whichever comes first (`dCheckDueIn()`). It is
+**The D check** is the overhaul above the C check, due after 720 flying days
+or 7,200 flight hours, whichever comes first (`dCheckDueIn()`). It is
 **booked, never forced**: from 60 days before due, a plane parked at its base
 shows "Book D check" on its Mtc card (`bookDCheck()`). It goes in the next
 morning, grounded as an AOG with its flying moved to spare planes, for 10 days
@@ -3712,8 +3714,8 @@ C check is. Away from a heavy-rated hangar the work is contracted and paid
 when it goes in. It also does the C and A checks, so those clocks restart with
 it. A plane past due wears like 2 more years of age (`D_WEAR_YEARS`, in
 `wornAge()`) until it goes in. A plane from an older save, or just leased,
-starts staggered by tail, at least 120 days from due. The headless player
-never books, so its planes wear past day 360.
+starts staggered by tail, at least 120 days from due, its hours clock with it.
+The headless player never books, so its planes wear past due.
 
 **Spare engines** (`src/sim/enginePool.ts`, the Engines section of the Mtc
 screen). An AOG whose fault is an engine leaves the plane waiting 4 days more

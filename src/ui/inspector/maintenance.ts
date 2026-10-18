@@ -2,7 +2,7 @@ import { AIRCRAFT_CLASSES, pluralClassName } from '../../sim/aircraftClasses';
 import { aogChance, aogFor, daysUntilReturn, expediteCost, expediteRepair } from '../../sim/aog';
 import { ageDelayParameters } from '../../sim/delays';
 import { USEFUL_LIFE_YEARS } from '../../sim/leasing';
-import { A_OVERDUE, A_WINDOW, C_INTERVAL_CYCLES, C_INTERVAL_HOURS, D_INTERVAL_DAYS, D_WEAR_YEARS, D_WINDOW_DAYS, DEFERRED_AGE_YEARS, HEAVY_INTERVAL_DAYS, HEAVY_WINDOW_DAYS, MX_HOLD_AT, OVERDUE_GRACE_DAYS, wornAge } from '../../sim/mxChecks';
+import { A_OVERDUE, A_WINDOW, C_INTERVAL_CYCLES, C_INTERVAL_HOURS, D_INTERVAL_DAYS, D_INTERVAL_HOURS, D_WEAR_YEARS, D_WINDOW_DAYS, DEFERRED_AGE_YEARS, HEAVY_INTERVAL_DAYS, HEAVY_WINDOW_DAYS, MX_HOLD_AT, OVERDUE_GRACE_DAYS, wornAge } from '../../sim/mxChecks';
 import * as ops from '../routeActions';
 import type { HeavyCheckReadout } from '../../sim/playerActions';
 import type { SimState } from '../../sim/state';
@@ -260,8 +260,8 @@ function dPuckMenu(state: SimState, plane: HeavyCheckReadout, changed: () => voi
   return menu;
 }
 
-/** The timeline's reach: the longest wait to a heavy check is its whole interval. */
-const TIMELINE_DAYS = HEAVY_INTERVAL_DAYS;
+/** The timeline's reach: the next month, which holds every booking window and leaves later checks off the axis. */
+const TIMELINE_DAYS = 30;
 
 /**
  * Every plane's heavy-check due date on one axis, today at the left: a
@@ -288,9 +288,10 @@ function buildDueTimeline(state: SimState, changed: () => void): HTMLElement[] {
   // C markers, then a D marker for each plane whose D check is due within the axis.
   const markers = [
     // A booked D check does the C check, so that plane's C marker is gone.
-    ...readouts.filter((plane) => !plane.dBooked).map((plane) => ({ plane, kind: 'C' as const, dueIn: plane.dueIn })),
+    ...readouts.filter((plane) => !plane.dBooked && plane.dueIn <= TIMELINE_DAYS).map((plane) => ({ plane, kind: 'C' as const, dueIn: plane.dueIn })),
     ...readouts.filter((plane) => !plane.dInCheck && plane.dDueIn <= TIMELINE_DAYS).map((plane) => ({ plane, kind: 'D' as const, dueIn: plane.dDueIn })),
   ].sort((a, b) => a.dueIn - b.dueIn);
+  if (markers.length === 0) return [...nodes, line(`None due in ${TIMELINE_DAYS}d`)];
   for (const { plane, kind, dueIn } of markers) {
     const at = (Math.min(TIMELINE_DAYS, Math.max(0, dueIn)) / TIMELINE_DAYS) * 100;
     let lane = laneEnds.findIndex((end) => at - end >= MARKER_SPAN_PCT);
@@ -348,7 +349,7 @@ function buildFleetBoard(state: SimState, changed: () => void): HTMLElement[] {
   const nodes: HTMLElement[] = [
     heading(
       'Fleet',
-      `Release to service, plane by plane. Serviceable: nothing open. Watch: a deferred item, a C check in its window or under 2 years of life. Action: held at ${MX_HOLD_AT} deferred items or a C check overdue. C-check clock: every ${HEAVY_INTERVAL_DAYS} flying days, ${C_INTERVAL_HOURS} flight hours or ${C_INTERVAL_CYCLES} cycles, 8–16 hours of hangar work done as one stretch with the plane grounded. Book it from ${HEAVY_WINDOW_DAYS} days before it's due; ${OVERDUE_GRACE_DAYS} days overdue it is grounded whenever it is at base. Items: each deferred item (no line check, or a night too short) wears the plane like ${DEFERRED_AGE_YEARS} more years; at ${MX_HOLD_AT} it is held for a morning and its first rotation cancelled. Tech: the share of flights that leave without a mechanical delay. AOG: today's chance of a fault grounding it. Life: years left before the airframe reaches its useful life.`,
+      `Release to service, plane by plane. Serviceable: nothing open. Watch: a deferred item, a C check in its window or under 2 years of life. Action: held at ${MX_HOLD_AT} deferred items or a C check overdue. C-check clock: every ${HEAVY_INTERVAL_DAYS} flying days, ${C_INTERVAL_HOURS} flight hours or ${C_INTERVAL_CYCLES} cycles, 2–4 days in the hangar with the plane grounded. Book it from ${HEAVY_WINDOW_DAYS} days before it's due; ${OVERDUE_GRACE_DAYS} days overdue it is grounded whenever it is at base. Items: each deferred item (no line check, or a night too short) wears the plane like ${DEFERRED_AGE_YEARS} more years; at ${MX_HOLD_AT} it is held for a morning and its first rotation cancelled. Tech: the share of flights that leave without a mechanical delay. AOG: today's chance of a fault grounding it. Life: years left before the airframe reaches its useful life.`,
     ),
   ];
   const readouts = ops.heavyCheckReadouts(state);
@@ -449,7 +450,7 @@ function buildFleetBoard(state: SimState, changed: () => void): HTMLElement[] {
       `mx-clock-text${plane.dDueIn < 0 ? ' mx-text-due' : ''}`,
       plane.dInCheck ? 'D check · in the hangar' : `D ${plane.dDueIn >= 0 ? `due ${plane.dDueIn}d` : `${-plane.dDueIn}d overdue · +${D_WEAR_YEARS} yrs wear`} · ${plane.dFlightHours}h`,
     );
-    dLine.title = 'D check: overhaul every 360 flying days or 3,600 flight hours. Booked, never forced; past due the plane wears like 2 more years until it goes in.';
+    dLine.title = `D check: overhaul every ${D_INTERVAL_DAYS} flying days or ${D_INTERVAL_HOURS.toLocaleString('en-US')} flight hours. Booked, never forced; past due the plane wears like ${D_WEAR_YEARS} more years until it goes in.`;
 
     // Deferred items as slots filling toward the hold.
     const slots = box('mx-slots');

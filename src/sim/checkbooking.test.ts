@@ -20,7 +20,7 @@ assert.ok(aircraft, 'no parked plane to test with');
 aircraft.daysSinceHeavyCheck = 0;
 assert.equal(bookHeavyCheck(state, aircraft.tail).ok, false, 'booked before the window opened');
 
-aircraft.daysSinceHeavyCheck = 24;
+aircraft.daysSinceHeavyCheck = 84;
 assert.ok(previewHeavyCheckBooking(state, aircraft.tail), 'no preview inside the window');
 assert.equal(bookHeavyCheck(state, aircraft.tail).ok, true);
 assert.equal(bookHeavyCheck(state, aircraft.tail).ok, false, 'booked twice');
@@ -38,7 +38,7 @@ assert.equal(aircraft.heavyCheckBooked, undefined);
 // next booking is contracted out and priced, not done free in house.
 const other = state.aircraft.find((a) => a !== aircraft && a.status === 'ground' && a.atAirport === a.baseAirport && a.baseAirport === event.base && !state.aogs.some((e) => e.tail === a.tail));
 if (other) {
-  other.daysSinceHeavyCheck = 24;
+  other.daysSinceHeavyCheck = 84;
   const bays = freeHeavyBays(state, event.base);
   for (let i = 0; i < bays; i++) state.aogs.push({ ...event, tail: `FILL-${i}` });
   assert.equal(freeHeavyBays(state, event.base), 0);
