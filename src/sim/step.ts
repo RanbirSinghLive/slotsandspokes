@@ -16,7 +16,7 @@ import aircraftTypesData from '../../data/aircraft-types.json';
 import { ancillaryNpsPenalty, rollAncillaries } from './ancillaries';
 import { flightResult, type EconomyAircraftType } from './economy';
 import { carryCargo, rollDailyCargo } from './cargo';
-import { MIN_TURN_MINUTES, legsServingMarket, marketDepartMinutes, marketKey, type ScheduleLeg } from './schedule';
+import { MIN_TURN_MINUTES, legFliesOnDay, legsServingMarket, marketDepartMinutes, marketKey, type ScheduleLeg } from './schedule';
 import { breaksCurfew, rotationStartingWith } from './curfew';
 import { rollDailyWeather, isAirportClosed } from './weather';
 import { legAirspace, rollDailyAirspace } from './airspace';
@@ -145,8 +145,9 @@ export function recordCancellation(state: SimState, leg: ScheduleLeg, cause: key
 
 /** Whether an earlier leg of this plane's day hasn't flown or been cancelled yet. `doneToday` holds the ids that have. */
 function hasEarlierLegPending(state: SimState, leg: ScheduleLeg, doneToday: Set<string>): boolean {
+  const day = dayIndex(state);
   return state.schedule.some(
-    (other) => other.tail === leg.tail && other.departMinute < leg.departMinute && !doneToday.has(other.legId),
+    (other) => other.tail === leg.tail && other.departMinute < leg.departMinute && !doneToday.has(other.legId) && legFliesOnDay(other, day),
   );
 }
 
@@ -446,8 +447,10 @@ export function step(state: SimState): void {
   const doneToday = retimed.length > 0 ? new Set([...doneTodaySet(state), ...retimed]) : doneTodaySet(state);
   const airborne = new Set(state.activeFlights.map((flight) => flight.legId));
 
+  const today = dayIndex(state);
   for (const leg of state.schedule) {
     if (minuteOfDay < leg.departMinute) continue; // not due yet today
+    if (!legFliesOnDay(leg, today)) continue; // an alternate-day leg on its off day
 
     if (doneToday.has(leg.legId) || airborne.has(leg.legId)) continue; // already handled today
 

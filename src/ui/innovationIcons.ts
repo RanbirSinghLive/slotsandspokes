@@ -12,6 +12,8 @@ const ICONS: Record<string, string> = {
   'younger-airframes': '<path d="M14.5 6.5a4 4 0 0 1-5.3 5.3L4 17l3 3 5.2-5.2a4 4 0 0 1 5.3-5.3l-2.4 2.4-2.4-.6-.6-2.4Z"/><path d="M19 2v3M17.5 3.5h3"/>',
   // A card with a star: members who come back.
   'loyalty-scheme': '<rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="m12 8.5 1.2 2.4 2.6.4-1.9 1.8.5 2.6-2.4-1.3-2.4 1.3.5-2.6-1.9-1.8 2.6-.4Z"/>',
+  // A plane crossing a long arc: more range.
+  'ultra-long-range': '<path d="M3 19c4-9 14-9 18 0" stroke-dasharray="2 3"/><path d="M12 4v6M9 7l3-3 3 3"/>',
   // A wing whose tip turns up: less fuel.
   winglets: '<path d="M3 16 16 11c2-.7 3-2 3.5-5l.5-2 1 1-.5 3c-.5 3-2 5-5 6L4 19Z"/><path d="M8 17.5 7 21"/>',
   // Two linked rings: a partner selling your connections.

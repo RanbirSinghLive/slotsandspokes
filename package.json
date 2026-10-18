@@ -45,6 +45,7 @@
     "sorttest": "tsx src/sim/scheduleSort.test.ts",
     "gaugetest": "tsx src/sim/gaugeDrop.test.ts",
     "overnighttest": "tsx src/sim/overnight.test.ts",
+    "ultrahaultest": "tsx src/sim/ultrahaul.test.ts",
     "margintest": "tsx src/sim/networkMargin.test.ts",
     "nemesistest": "tsx src/sim/nemesis.test.ts"
   },

@@ -1,4 +1,6 @@
-import { MIN_TURN_MINUTES, marketKey, type ScheduleLeg } from './schedule';
+import { MIN_TURN_MINUTES, flownEveryOtherDay, marketKey, type ScheduleLeg } from './schedule';
+
+export { flownEveryOtherDay };
 import { hubWaitMinutes } from './hubStyle';
 import type { SimState } from './state';
 import { AIRCRAFT_CLASSES } from './aircraftClasses';
@@ -89,13 +91,13 @@ const MINUTES_PER_DAY = 1440;
  * than the 140% its clock time would suggest (which would raise a false
  * over-booked alarm on a plane doing precisely what it should).
  */
-export function isLongHaulRoundTrip(legCount: number, rawMinutes: number): boolean {
-  return legCount === 2 && rawMinutes > USABLE_DAY_MINUTES && rawMinutes <= MINUTES_PER_DAY;
+export function isLongHaulRoundTrip(legCount: number, rawMinutes: number, alternateDays = false): boolean {
+  return legCount === 2 && rawMinutes > USABLE_DAY_MINUTES && rawMinutes <= (alternateDays ? 2 * MINUTES_PER_DAY : MINUTES_PER_DAY);
 }
 
 /** Minutes a tail's legs cost it, with a long-haul round trip counted as one full day. */
-export function effectiveTailMinutes(legCount: number, rawMinutes: number): number {
-  return isLongHaulRoundTrip(legCount, rawMinutes) ? USABLE_DAY_MINUTES : rawMinutes;
+export function effectiveTailMinutes(legCount: number, rawMinutes: number, alternateDays = false): number {
+  return isLongHaulRoundTrip(legCount, rawMinutes, alternateDays) ? USABLE_DAY_MINUTES : rawMinutes;
 }
 
 /**
@@ -107,7 +109,7 @@ export function effectiveTailMinutes(legCount: number, rawMinutes: number): numb
  */
 export function wrappedLongHaul(state: SimState, tail: string): { out: ScheduleLeg; back: ScheduleLeg } | null {
   const legs = state.schedule.filter((leg) => leg.tail === tail).sort((a, b) => a.departMinute - b.departMinute);
-  if (legs.length !== 2) return null;
+  if (legs.length !== 2 || flownEveryOtherDay(legs)) return null;
   const [back, out] = legs;
   if (out.dest !== back.origin || back.dest !== out.origin) return null;
   const aircraft = state.aircraft.find((a) => a.tail === tail);
@@ -133,7 +135,7 @@ export function aircraftUtilisation(state: SimState, tail: string): AircraftUtil
   const aircraft = state.aircraft.find((a) => a.tail === tail);
   const legs = state.schedule.filter((leg) => leg.tail === tail);
   const rawMinutes = legs.reduce((total, leg) => total + scheduledLegMinutes(state, leg), 0);
-  const minutes = effectiveTailMinutes(legs.length, rawMinutes);
+  const minutes = effectiveTailMinutes(legs.length, rawMinutes, flownEveryOtherDay(legs));
   return {
     tail,
     typeCode: aircraft?.typeCode ?? '',
@@ -267,7 +269,7 @@ export type Rotation = {
 
 function buildRotation(state: SimState, tail: string, legs: ScheduleLeg[], base: string): Rotation {
   const last = legs[legs.length - 1];
-  const minutes = effectiveTailMinutes(legs.length, legs.reduce((total, leg) => total + scheduledLegMinutes(state, leg), 0));
+  const minutes = effectiveTailMinutes(legs.length, legs.reduce((total, leg) => total + scheduledLegMinutes(state, leg), 0), flownEveryOtherDay(legs));
   return {
     tail,
     legs,

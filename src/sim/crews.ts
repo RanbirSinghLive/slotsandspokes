@@ -3,7 +3,7 @@ import { crewHireTimeFactor, crewRetrainTimeFactor } from './innovations';
 import { dayIndex } from './clock';
 import { mandatedTails } from './mandates';
 import { nextRandom } from './rng';
-import type { ScheduleLeg } from './schedule';
+import { flownEveryOtherDay, type ScheduleLeg } from './schedule';
 import type { SimState } from './state';
 
 /**
@@ -211,7 +211,9 @@ export function shiftMinutes(from: number, to: number): number {
 
 /** A plane's duty in minutes as shifts count it: every stretch its crews are on duty, report time included, night minutes weighted. 0 for a plane with nothing to fly. */
 export function dutyMinutes(state: SimState, tail: string): number {
-  return dutyStretches(state, tail).reduce((total, stretch) => total + shiftMinutes(stretch.start, stretch.end), 0);
+  const total = dutyStretches(state, tail).reduce((sum, stretch) => sum + shiftMinutes(stretch.start, stretch.end), 0);
+  // A plane flying alternate days (ScheduleLeg.dayParity) is on duty half the days, so its crews are needed half as much.
+  return flownEveryOtherDay(state.schedule.filter((leg) => leg.tail === tail)) ? Math.ceil(total / 2) : total;
 }
 
 /** Minutes of duty this plane's crews have done by `minute` on the schedule clock, as shifts count them, off-duty waits left out. */
