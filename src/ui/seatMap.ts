@@ -2,7 +2,8 @@ import { chartLegend } from './chartLegend';
 import { money } from './format';
 import { info } from './inspector/dom';
 import * as ops from './routeActions';
-import { describeLayout, ECONOMY_SEATS_PER_BUSINESS, layoutFor, PREMIUM_SEAT_ROOM, sameSeatPlan, type SeatPlan } from '../sim/cabins';
+import { attendantsForLayout } from '../sim/crews';
+import { describeLayout, ECONOMY_SEATS_PER_BUSINESS, layoutFor, PREMIUM_SEAT_ROOM, sameSeatPlan, type CabinLayout, type SeatPlan } from '../sim/cabins';
 import { classByCode } from '../sim/aircraftClasses';
 import { MAX_TEMPLATES_PER_TYPE } from '../sim/fleetCabins';
 import type { SimState } from '../sim/state';
@@ -380,6 +381,7 @@ function openSeatMap(state: SimState, source: SeatMapSource, changed: () => void
     const lines: [string, string, string?][] = [
       ['Seats', same ? `${describeLayout(layout)} · as now` : `${describeLayout(layout)} · was ${describeLayout(layoutFor(map.seats, map.current))}`],
       ['Forecast', same ? '—' : `${sign}${money(Math.abs(forecast.gainPerDay))}/day`, forecast.gainPerDay > 0 ? 'is-gain' : forecast.gainPerDay < 0 ? 'is-loss' : undefined],
+      cabinCrewLine(layout, layoutFor(map.seats, map.current)),
       ...map.rows(plan),
     ];
     rows.replaceChildren();
@@ -416,4 +418,14 @@ function openSeatMap(state: SimState, source: SeatMapSource, changed: () => void
   });
   document.body.append(overlay);
   draw();
+}
+
+/** The seat map's attendants line: attendants a shift with this cabin, legal and full service, against now; more at full service reads as a loss, since each is paid by the day. */
+function cabinCrewLine(layout: CabinLayout, now: CabinLayout): [string, string, string?] {
+  const next = attendantsForLayout(layout);
+  const was = attendantsForLayout(now);
+  const text = `${next.floor} legal · ${next.full} full`;
+  if (next.floor === was.floor && next.full === was.full) return ['Cabin crew', text];
+  const cheaper = next.full !== was.full ? next.full < was.full : next.floor < was.floor;
+  return ['Cabin crew', `${text} · was ${was.floor} · ${was.full}`, cheaper ? 'is-gain' : 'is-loss'];
 }

@@ -85,7 +85,7 @@ export function flightSatisfactionScore(
   ageYears: number,
   /** 0-1: how fresh the crew is (1 − its fatigue, sim/crews.ts). */
   crewFreshness = 1,
-  /** 0-1: the share of the cabin teams its plane needs that it has (sim/crews.ts's cabinCover()). */
+  /** 0-1: the share of full service its cabin has, never under the legal floor's share since a plane short of that doesn't fly (sim/crews.ts's cabinCover()). */
   cabinCover = 1,
 ): number {
   const delayComponent = clamp(

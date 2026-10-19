@@ -2,7 +2,7 @@ import { dayIndex } from '../../sim/clock';
 import { crewPlan, type ClassPlan, type PlaneEntry } from '../../sim/crewPlan';
 import { AIRCRAFT_CLASSES, classByCode } from '../../sim/aircraftClasses';
 import { classOpen, tierThatOpens } from '../../sim/ladder';
-import { cabinHireFee, needsCabinCrew, CABIN_SHORT_NPS_PENALTY, CABIN_TEAMS_PER_SHIFT, CREWS_PER_NEW_PLANE, crewReadiness, hireFee, hireLeadDays, retrainDays, retrainFee, SICK_BASE_CHANCE, SICK_STRAIN_CHANCE, standbyCost } from '../../sim/crews';
+import { cabinHireFee, needsCabinCrew, CABIN_SHORT_NPS_PENALTY, SEATS_PER_ATTENDANT, SERVICE_SEATS_PER_ATTENDANT, typeAttendants, CREWS_PER_NEW_PLANE, crewReadiness, hireFee, hireLeadDays, retrainDays, retrainFee, SICK_BASE_CHANCE, SICK_STRAIN_CHANCE, standbyCost } from '../../sim/crews';
 import type { SimState } from '../../sim/state';
 import { money } from '../format';
 import { linkToMap } from '../mapLink';
@@ -274,7 +274,7 @@ function entryRow(state: SimState, iata: string, c: ClassPlan, entry: PlaneEntry
 
 /** Each base's roster, type by type. */
 function roster(state: SimState, plan: ReturnType<typeof crewPlan>, today: number, changed: () => void): HTMLElement[] {
-  const nodes: HTMLElement[] = [heading('Roster', 'Crews by type rating at each base. The bar is crews on hand (solid) and joining (hatched); the marks are the legal minimum (red), the comfortable number for 8-hour shifts (white), and what the planes on their way will need (amber). Short grounds planes; tight flies late legs tired; reserve crews stand by at a daily cost. Regional and bigger types have a cabin row under their pilots: cabin teams staff the plane, and short ones cost NPS.')];
+  const nodes: HTMLElement[] = [heading('Roster', 'Crews by type rating at each base. The bar is crews on hand (solid) and joining (hatched); the marks are the legal minimum (red), the comfortable number for 8-hour shifts (white), and what the planes on their way will need (amber). Short grounds planes; tight flies late legs tired; reserve crews stand by at a daily cost. Regional and bigger types have a cabin row under their pilots: attendants by the seat plan, where under the legal floor grounds a plane and under full service costs NPS.')];
   for (const base of plan) {
     const card = document.createElement('div');
     card.className = 'crew-base';
@@ -289,7 +289,7 @@ function roster(state: SimState, plan: ReturnType<typeof crewPlan>, today: numbe
       card.append(
         lineWithInfo(
           `Training seats · pilots ${training.pilot.used}/${training.pilot.seats} · cabin ${training.cabin.used}/${training.cabin.seats}`,
-          'Crews hired or retraining take a training seat until they join. A base has 2 seats for each workforce plus 1 for every 2 crews it already has, so a small base can only grow so fast: ask for more crews than seats and the rest wait. A crew academy shortens hiring courses and a chief pilot retraining ones, which frees seats sooner.',
+          'Crews hired or retraining take a training seat until they join. A base has 2 pilot seats and 6 cabin seats plus 1 for every 2 crews or attendants it already has, so a small base can only grow so fast: ask for more crews than seats and the rest wait. A crew academy shortens hiring courses and a chief pilot retraining ones, which frees seats sooner.',
           training.pilot.free === 0 || training.cabin.free === 0 ? 'inspector-line is-warn' : 'inspector-line',
         ),
       );
@@ -302,8 +302,8 @@ function roster(state: SimState, plan: ReturnType<typeof crewPlan>, today: numbe
     // Types the airline can't fly yet still show their cabin row, greyed out: a hint of what comes later.
     for (const cls of AIRCRAFT_CLASSES) {
       if (classOpen(state, cls.code)) continue;
-      card.append(lockedRow(cls.code, 'pilot'));
-      if (needsCabinCrew(cls.code)) card.append(lockedRow(cls.code, 'cabin'));
+      card.append(lockedRow(state, cls.code, 'pilot'));
+      if (needsCabinCrew(cls.code)) card.append(lockedRow(state, cls.code, 'cabin'));
     }
     nodes.push(card);
   }
@@ -427,38 +427,51 @@ function classRow(state: SimState, iata: string, c: ClassPlan, siblings: ClassPl
   return row;
 }
 
-/** A class's cabin teams at a base: on hand against need, with hire and release. A short cabin flies, but every flight scores lower. */
+/** A class's attendants at a base: on hand against the legal floor and full service, with hire and release. Under the floor a plane stays on the ground; under full service its flights score lower. */
 function cabinRow(state: SimState, iata: string, c: ClassPlan, cabin: NonNullable<ReturnType<typeof ops.crewReadout>>['classes'][number]['cabin'] & {}, changed: () => void): HTMLElement {
   const row = document.createElement('div');
   row.className = 'crew-row';
-  // Teams already in training count: a base with its seats full of hires isn't short, it is waiting.
-  const short = cabin.teams + cabin.arriving < cabin.minimum;
+  // Attendants already in training count: a base with its seats full of hires isn't short, it is waiting.
+  const short = cabin.attendants + cabin.arriving < cabin.minimum;
   row.classList.add('crew-row--line', 'crew-row--cabin');
   const label = document.createElement('span');
   label.className = 'crew-row-name';
-  label.title = `${c.name} cabin`;
+  label.title = `${c.name} cabin · ${cabin.perNewShift.floor} attendant${cabin.perNewShift.floor === 1 ? '' : 's'} a shift by law, ${cabin.perNewShift.full} for full service in the standard cabin`;
   label.append(planeIconElement(c.classCode), ' ☺');
   const count = document.createElement('span');
   count.className = 'crew-row-count';
-  count.textContent = `${cabin.teams}/${cabin.ideal}`;
-  count.title = `${cabin.teams} teams${cabin.arriving > 0 ? ` +${cabin.arriving} joining` : ''} · need ${cabin.ideal} (min ${cabin.minimum}) · standby ${money(cabin.standbyPerDay)}/day`;
-  const chip = chipElement(short ? { text: 'SHORT', tone: 'bad' } : cabin.teams < cabin.minimum ? { text: `JOINING +${cabin.arriving}`, tone: 'info' } : cabin.teams < cabin.ideal ? { text: 'TIGHT', tone: 'warn' } : cabin.teams > cabin.ideal ? { text: `RESERVE +${cabin.teams - cabin.ideal}`, tone: 'info' } : { text: 'OK', tone: 'good' });
-  // Same bar as the pilots': teams on hand and joining against the legal minimum and the comfortable number.
-  const scale = Math.max(1, cabin.teams + cabin.arriving, cabin.ideal, cabin.minimum);
+  count.textContent = `${cabin.attendants}/${cabin.full}`;
+  count.title = `${cabin.attendants} attendants${cabin.arriving > 0 ? ` +${cabin.arriving} joining` : ''} · full service ${cabin.full} · legal ${cabin.minimum} · ${money(cabin.wagePerDay)}/day each`;
+  const reserve = cabin.attendants - cabin.full;
+  const chip = chipElement(
+    short
+      ? { text: 'SHORT', tone: 'bad' }
+      : cabin.attendants < cabin.minimum
+        ? { text: `JOINING +${cabin.arriving}`, tone: 'info' }
+        : cabin.attendants < cabin.full
+          ? { text: 'THIN', tone: 'warn' }
+          : reserve > 0
+            ? { text: `RESERVE +${reserve}`, tone: 'info' }
+            : { text: 'OK', tone: 'good' },
+  );
+  const riskPercent = Math.round(cabin.weeklyRisk * 100);
+  if (cabin.minimum > 0) chip.title = `Sick ${cabin.sick} · over legal ${Math.max(0, cabin.attendants - cabin.minimum)} · grounding risk ${cabin.weeklyRisk < 0.01 ? '<1' : riskPercent}%/wk`;
+  // Same bar as the pilots': attendants on hand and joining against the legal floor and full service.
+  const scale = Math.max(1, cabin.attendants + cabin.arriving, cabin.full, cabin.minimum);
   const pct = (n: number) => `${(n / scale) * 100}%`;
   const bar = document.createElement('div');
   bar.className = 'crew-bar';
   const onHand = document.createElement('span');
   onHand.className = 'crew-bar-onhand';
-  onHand.style.width = pct(cabin.teams);
+  onHand.style.width = pct(cabin.attendants);
   const joining = document.createElement('span');
   joining.className = 'crew-bar-joining';
-  joining.style.left = pct(cabin.teams);
+  joining.style.left = pct(cabin.attendants);
   joining.style.width = pct(cabin.arriving);
   bar.append(onHand, joining);
   for (const [n, className, text] of [
     [cabin.minimum, 'is-minimum', `Legal minimum ${cabin.minimum}`],
-    [cabin.ideal, 'is-ideal', `Comfortable ${cabin.ideal}`],
+    [cabin.full, 'is-ideal', `Full service ${cabin.full}`],
   ] as const) {
     if (n <= 0) continue;
     const markEl = document.createElement('span');
@@ -468,9 +481,15 @@ function cabinRow(state: SimState, iata: string, c: ClassPlan, cabin: NonNullabl
     bar.append(markEl);
   }
   row.append(label, bar, count, chip);
+  if (cabin.minimum > 0 && riskPercent >= 10) {
+    const dot = document.createElement('span');
+    dot.className = `crew-risk-dot ${riskPercent >= 25 ? 'is-over' : 'is-warn'}`;
+    dot.title = chip.title;
+    row.append(dot);
+  }
   row.append(
     info(
-      `Cabin teams staff every Regional plane and up: ${CABIN_TEAMS_PER_SHIFT[c.classCode]} per shift its pilots fly. A short cabin never grounds a plane, but each of its flights loses up to ${CABIN_SHORT_NPS_PENALTY} NPS points in proportion to the teams missing. They train in ${ops.crewReadout(state, iata)?.cabinLeadDays ?? 0} days in a cabin training seat, and can't be converted between classes.`,
+      `Attendants by the seat plan, on every shift a plane's pilots fly. By law 1 for every ${SEATS_PER_ATTENDANT} seats or part of them: under that a plane stays on the ground, so a cabin of 50 seats needs one fewer than 51. Full service needs 1 for every ${SERVICE_SEATS_PER_ATTENDANT.economy} Y, ${SERVICE_SEATS_PER_ATTENDANT.premium} W or ${SERVICE_SEATS_PER_ATTENDANT.business} J seats; between the two a plane flies with a thin cabin and its flights lose up to ${CABIN_SHORT_NPS_PENALTY} NPS points. Each is paid ${money(cabin.wagePerDay)} a day, flying or not, and they fall sick like pilots. They train in ${ops.crewReadout(state, iata)?.cabinLeadDays ?? 0} days in a cabin training seat, and can't be converted between types.`,
     ),
   );
   const readout = ops.crewReadout(state, iata);
@@ -480,29 +499,30 @@ function cabinRow(state: SimState, iata: string, c: ClassPlan, cabin: NonNullabl
   const cabinJoins = dayIndex(state) + (readout?.cabinLeadDays ?? 0);
   const cabinRows = (n: number) => [
     { label: 'Fee now', value: money(cabin.hireFee * n) },
+    { label: 'Pay', value: `${money(cabin.wagePerDay * n)}/day` },
     { label: 'Joins', value: `day ${cabinJoins}` },
     ...cashAfterRows(state, cabin.hireFee * n),
   ];
   buttons.append(actionButton('+', seats === 0 || state.cash < cabin.hireFee, (n) => ops.hireCabinAt(state, iata, c.classCode, n), changed, {
-    title: `Hire ${c.name} cabin teams · ${iata}`,
+    title: `Hire ${c.name} attendants · ${iata}`,
     rows: cabinRows(1),
     confirmLabel: `Hire · ${money(cabin.hireFee)}`,
     quantity: { max: Math.min(seats, Math.floor(state.cash / cabin.hireFee)), rowsFor: cabinRows, confirmLabelFor: (n) => `Hire ${n} · ${money(cabin.hireFee * n)}` },
-  }, seats === 0 ? `No free cabin seats · ${readout?.training.cabin.used ?? 0} in training` : `Hire ${c.name} cabin teams · ${money(cabin.hireFee)} each`));
-  if (cabin.teams > cabin.ideal) {
+  }, seats === 0 ? `No free cabin seats · ${readout?.training.cabin.used ?? 0} in training` : `Hire ${c.name} attendants · ${money(cabin.hireFee)} each`));
+  if (cabin.attendants > cabin.minimum) {
     buttons.append(actionButton('−1', false, () => ops.releaseCabinAt(state, iata, c.classCode, 1), changed, {
-      title: `Release 1 ${c.name} cabin team · ${iata}`,
-      rows: [{ label: 'Teams after', value: `${cabin.teams - 1} (need ${cabin.ideal}, min ${cabin.minimum})` }, { label: 'Standby saved', value: `${money(cabin.standbyPerDay)}/day` }],
+      title: `Release 1 ${c.name} attendant · ${iata}`,
+      rows: [{ label: 'After', value: `${cabin.attendants - 1} (full ${cabin.full}, legal ${cabin.minimum})` }, { label: 'Pay saved', value: `${money(cabin.wagePerDay)}/day` }],
       facts: ['Rehiring costs the fee again and takes days to join.'],
       confirmLabel: 'Release',
-    }, `Release 1 ${c.name} cabin team · saves ${money(cabin.standbyPerDay)}/day`));
+    }, `Release 1 ${c.name} attendant · saves ${money(cabin.wagePerDay)}/day`));
   }
   row.append(buttons);
   return row;
 }
 
 /** A pilot or cabin row for a type the airline can't fly yet: greyed out, with what opens it. */
-function lockedRow(classCode: string, role: 'pilot' | 'cabin'): HTMLElement {
+function lockedRow(state: SimState, classCode: string, role: 'pilot' | 'cabin'): HTMLElement {
   const name = classByCode(classCode)?.name ?? classCode;
   const opener = tierThatOpens(classCode);
   const row = document.createElement('div');
@@ -512,13 +532,13 @@ function lockedRow(classCode: string, role: 'pilot' | 'cabin'): HTMLElement {
   label.className = 'crew-row-name';
   label.title = role === 'cabin' ? `${name} cabin` : name;
   label.append(planeIconElement(classCode), role === 'cabin' ? ' ☺' : '');
-  const teams = CABIN_TEAMS_PER_SHIFT[classCode] ?? 0;
+  const attendants = typeAttendants(state, classCode).floor;
   const fee = role === 'cabin' ? cabinHireFee(classCode) : hireFee(classCode);
   const detail = document.createElement('span');
   detail.className = 'crew-row-count';
   detail.textContent = money(fee);
   detail.title = role === 'cabin'
-    ? `${teams} cabin team${teams === 1 ? '' : 's'} a shift · ${money(fee)} a team · opens as ${opener?.name ?? 'you grow'}`
+    ? `${attendants} attendant${attendants === 1 ? '' : 's'} a shift by law · ${money(fee)} each · opens as ${opener?.name ?? 'you grow'}`
     : `${money(fee)} a crew · opens as ${opener?.name ?? 'you grow'}`;
   row.append(label, detail, chipElement({ text: 'LOCKED', tone: 'idle' }));
   const buttons = document.createElement('div');

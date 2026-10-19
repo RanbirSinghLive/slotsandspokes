@@ -1,10 +1,12 @@
 import { AIRCRAFT_CLASSES, classByCode } from './aircraftClasses';
+import { layoutFor, layoutOf, seatsOfType, type CabinLayout } from './cabins';
+import { fleetCabinOf } from './fleetCabins';
 import { crewHireTimeFactor, crewRetrainTimeFactor } from './innovations';
 import { dayIndex } from './clock';
 import { mandatedTails } from './mandates';
 import { nextRandom } from './rng';
 import { flownEveryOtherDay, type ScheduleLeg } from './schedule';
-import type { SimState } from './state';
+import type { Aircraft, SimState } from './state';
 
 /**
  * Crews (WEEK-TEN.md, thread 9): something to optimise on the map, not in
@@ -48,12 +50,17 @@ import type { SimState } from './state';
  * them at standby cost. Overworking a small roster makes it sicker as
  * well as tired: the cheap roster is the fragile one.
  *
- * **Cabin crew.** Regional planes and up also need cabin crews, rated for
- * a class like pilots (CABIN_TEAMS_PER_SHIFT teams for each shift a plane's
- * pilots fly). A short cabin never grounds a plane: it flies with a thin
- * cabin and every flight loses service points in its NPS score
- * (cabinCover(), sim/nps.ts). They hire and release like pilots, with no
- * retraining.
+ * **Cabin crew.** Regional planes and up also carry flight attendants,
+ * rated for a class like pilots, and how many follows the plane's seat
+ * plan (sim/cabins.ts), not its pilots. The law asks one attendant for
+ * every SEATS_PER_ATTENDANT seats or part of them on each shift its pilots
+ * fly; a plane that can't get them is grounded like one short of pilots.
+ * Full service asks more where the seats are premium
+ * (SERVICE_SEATS_PER_ATTENDANT): a plane flying above the floor but under
+ * full service flies with a thin cabin and loses service points in its NPS
+ * score (cabinCover(), sim/nps.ts). Attendants are paid by the day, flying
+ * or standing by, so every seat plan carries its crew cost. They fall sick
+ * like pilots, and hire and release like them, with no retraining.
  *
  * **Training capacity.** Each base has a limited number of training seats
  * per workforce (pilots, cabin): crews hired or retraining occupy one until
@@ -118,16 +125,28 @@ export const CREWS_PER_NEW_PLANE = 2;
 /** The starting plane's class, which the home base's first crews are rated for. */
 export const STARTING_CREW_CLASS = 'PROP';
 
-/** Cabin teams a plane carries for each shift its pilots fly: none on a Propeller. */
-export const CABIN_TEAMS_PER_SHIFT: Record<string, number> = { PROP: 0, REGIONAL: 1, NARROWBODY: 1, WIDEBODY: 2 };
-/** A cabin team's hiring fee and standby cost, as a share of a pilot crew's in the same class. */
-export const CABIN_COST_SHARE = 0.5;
-/** Days until a cabin team hired today flies: shorter than a pilot's course. */
+/** Classes that carry flight attendants: a Propeller's few seats fly without. */
+const CABIN_CREW_CLASSES = ['REGIONAL', 'NARROWBODY', 'WIDEBODY'];
+/**
+ * The legal floor: one attendant for every this many seats or part of
+ * them, as the FAA and Transport Canada rule it. It's why 50-seat
+ * regional jets exist: seat 51 costs a second attendant.
+ */
+export const SEATS_PER_ATTENDANT = 50;
+/** Seats one attendant serves at full service, by cabin: premium seats need more hands. */
+export const SERVICE_SEATS_PER_ATTENDANT: Record<keyof CabinLayout, number> = { economy: 50, premium: 25, business: 12 };
+/** An attendant's hiring fee as a share of a pilot crew's in the same class. */
+export const CABIN_COST_SHARE = 0.2;
+/** What an attendant is paid a day, flying or not, as a share of a pilot crew's standby in the same class. */
+export const CABIN_WAGE_SHARE = 0.6;
+/** Days until an attendant hired today flies: shorter than a pilot's course. */
 export const CABIN_HIRE_LEAD_DAYS = 4;
-/** Service points a flight loses with no cabin team at all (sim/nps.ts), scaled down as cover improves. */
+/** Service points a flight loses with a cabin at the legal floor and none of its service crew (sim/nps.ts), scaled down as cover improves. */
 export const CABIN_SHORT_NPS_PENALTY = 25;
-/** Training seats a base has before any crews: crews in training at once, per workforce. */
-export const TRAINING_SEATS_BASE = 2;
+/** Training seats a base has before any crews, per workforce: a plane's attendants train in one course. */
+export const TRAINING_SEATS_BASE: Record<CrewRole, number> = { pilot: 2, cabin: 6 };
+/** Attendants that stood for one cabin team of a class, for a save from when cabin crew counted in teams. */
+const ATTENDANTS_PER_OLD_TEAM: Record<string, number> = { REGIONAL: 2, NARROWBODY: 3, WIDEBODY: 3 };
 /** Each crew on a base's roster adds this many training seats, rounded down. */
 export const TRAINING_SEATS_PER_CREW = 0.5;
 
@@ -142,10 +161,14 @@ export type CrewBase = {
   hiring: { classCode: string; count: number; readyDay: number }[];
   /** Crews away retraining for another class (already out of `from`), and the day they're back. */
   retraining: { from: string; classCode: string; count: number; readyDay: number }[];
-  /** Cabin teams rated for each class, by class code. Absent in an older save: ensureCrewBases() crews its planes. */
+  /** Flight attendants rated for each class, by class code. Absent in an older save: ensureCrewBases() crews its planes. */
   cabinByClass?: Record<string, number>;
-  /** Cabin teams being trained, and the day each batch starts. */
+  /** Attendants being trained, and the day each batch starts. */
   cabinHiring?: { classCode: string; count: number; readyDay: number }[];
+  /** Attendants off sick, counted in cabinByClass, and the day each is back. */
+  cabinSick?: { classCode: string; count: number; backDay: number }[];
+  /** 'attendant' once cabinByClass counts attendants; absent in a save from when it counted teams, which ensureCrewBases() converts. */
+  cabinUnit?: 'attendant';
 };
 
 export type CrewDay = {
@@ -153,8 +176,10 @@ export type CrewDay = {
   crewsByTail: Record<string, number>;
   /** When each flying plane's duty day starts, home-local minute of day, by tail. */
   dutyStartByTail: Record<string, number>;
-  /** Share of the cabin teams each flying plane needs that it has today, 0 to 1, by tail. Absent for a plane that needs none, or in a save from before cabin crews. */
+  /** Share of full service each flying plane's cabin has today, from its legal floor up to 1, by tail. Absent for a plane that needs none, or in a save from before cabin crews. */
   cabinCoverByTail?: Record<string, number>;
+  /** Planes grounded today for want of attendants rather than pilots. */
+  cabinShortTails?: string[];
 };
 
 function legsOf(state: SimState, tail: string): ScheduleLeg[] {
@@ -252,39 +277,95 @@ export function retrainDays(state: SimState): number {
 
 /** Whether planes of this class carry cabin crew at all. */
 export function needsCabinCrew(classCode: string): boolean {
-  return (CABIN_TEAMS_PER_SHIFT[classCode] ?? 0) > 0;
+  return CABIN_CREW_CLASSES.includes(classCode);
 }
 
-/** A cabin team's hiring fee in this class. */
+/** An attendant's hiring fee in this class. */
 export function cabinHireFee(classCode: string): number {
   return Math.round(hireFee(classCode) * CABIN_COST_SHARE);
 }
 
-/** What a cabin team of this class costs a day standing by. */
-export function cabinStandbyCost(classCode: string): number {
-  return Math.round(standbyCost(classCode) * CABIN_COST_SHARE);
+/** What an attendant of this class is paid a day, flying or standing by. */
+export function cabinWage(classCode: string): number {
+  return Math.round(standbyCost(classCode) * CABIN_WAGE_SHARE);
 }
 
-/** Days until a cabin team hired today flies: shorter with a crew academy. */
+/** Days until an attendant hired today flies: shorter with a crew academy. */
 export function cabinLeadDays(state: SimState): number {
   return Math.max(1, Math.round(CABIN_HIRE_LEAD_DAYS * crewHireTimeFactor(state)));
 }
 
-/** Cabin teams of this class a base has now. */
+/** Attendants of this class a base has now, sick ones included. */
 export function cabinTeamsOf(base: CrewBase | undefined, classCode: string): number {
   return base?.cabinByClass?.[classCode] ?? 0;
 }
 
-/** Cabin teams of this class in training for a base. */
+/** Attendants of this class in training for a base. */
 export function cabinArriving(base: CrewBase | undefined, classCode: string): number {
   return (base?.cabinHiring ?? []).filter((batch) => batch.classCode === classCode).reduce((sum, batch) => sum + batch.count, 0);
 }
 
-/** Cabin teams a base's planes of a class need at ideal shifts and at the legal minimum. */
-export function cabinNeed(state: SimState, iata: string, classCode: string): { ideal: number; minimum: number } {
-  const need = crewNeed(state, iata, classCode);
-  const teams = CABIN_TEAMS_PER_SHIFT[classCode] ?? 0;
-  return { ideal: need.ideal * teams, minimum: need.minimum * teams };
+/** Attendants of this class off sick at a base today. */
+export function cabinSickOf(base: CrewBase | undefined, classCode: string, today: number): number {
+  const sick = (base?.cabinSick ?? []).filter((batch) => batch.classCode === classCode && batch.backDay > today).reduce((sum, batch) => sum + batch.count, 0);
+  return Math.min(sick, cabinTeamsOf(base, classCode));
+}
+
+/**
+ * Attendants one shift of a cabin laid out this way needs: `floor`, the
+ * legal minimum to fly (one per SEATS_PER_ATTENDANT seats or part of
+ * them), and `full`, enough for full service, where premium seats need
+ * more hands (SERVICE_SEATS_PER_ATTENDANT). Full is never under the floor.
+ */
+export function attendantsForLayout(layout: CabinLayout): { floor: number; full: number } {
+  const seats = layout.economy + layout.premium + layout.business;
+  const floor = Math.ceil(seats / SEATS_PER_ATTENDANT);
+  const service =
+    layout.economy / SERVICE_SEATS_PER_ATTENDANT.economy + layout.premium / SERVICE_SEATS_PER_ATTENDANT.premium + layout.business / SERVICE_SEATS_PER_ATTENDANT.business;
+  // The small allowance keeps an exact fit (100 Y seats is 2) from rounding up on floating-point noise.
+  return { floor, full: Math.max(floor, Math.ceil(service - 1e-9)) };
+}
+
+/** Attendants a shift on this plane needs, from its seat plan; none for a class that flies without. */
+export function planeAttendants(aircraft: Pick<Aircraft, 'cabin' | 'seatPlan' | 'typeCode'>): { floor: number; full: number } {
+  if (!needsCabinCrew(aircraft.typeCode)) return { floor: 0, full: 0 };
+  return attendantsForLayout(layoutOf(aircraft, seatsOfType(aircraft.typeCode)));
+}
+
+/** Attendants a shift needs on a new plane of this class: deliveries come fitted with the type's standard cabin (sim/fleetCabins.ts), else all economy. */
+export function typeAttendants(state: SimState, classCode: string): { floor: number; full: number } {
+  if (!needsCabinCrew(classCode)) return { floor: 0, full: 0 };
+  return attendantsForLayout(layoutFor(seatsOfType(classCode), fleetCabinOf(state, classCode) ?? { business: 0, premium: 0 }));
+}
+
+/** Attendants this plane needs for its day, at the legal floor and at full service: each shift its pilots fly carries a cabin. */
+export function planeCabinNeed(state: SimState, tail: string): { floor: number; full: number } {
+  const aircraft = state.aircraft.find((a) => a.tail === tail);
+  if (!aircraft) return { floor: 0, full: 0 };
+  const shifts = crewsFor(dutyMinutes(state, tail), LEGAL_SHIFT_MINUTES);
+  const perShift = planeAttendants(aircraft);
+  return { floor: shifts * perShift.floor, full: shifts * perShift.full };
+}
+
+/** What this plane's attendants cost a day when its cabin is staffed for full service: the crew cost a seat plan carries. */
+export function cabinCostPerDay(state: SimState, tail: string): number {
+  const aircraft = state.aircraft.find((a) => a.tail === tail);
+  if (!aircraft) return 0;
+  return planeCabinNeed(state, tail).full * cabinWage(aircraft.typeCode);
+}
+
+/** Attendants a base's planes of a class need: `full` for full service on every plane, `minimum` the legal floor that keeps them all flying. */
+export function cabinNeed(state: SimState, iata: string, classCode: string): { full: number; minimum: number } {
+  let full = 0;
+  let minimum = 0;
+  if (!needsCabinCrew(classCode)) return { full, minimum };
+  for (const aircraft of state.aircraft) {
+    if (aircraft.baseAirport !== iata || aircraft.typeCode !== classCode) continue;
+    const need = planeCabinNeed(state, aircraft.tail);
+    full += need.full;
+    minimum += need.floor;
+  }
+  return { full, minimum };
 }
 
 /** How many crews of this workforce a base has on its books, flying or in training. */
@@ -302,7 +383,7 @@ export function inTraining(base: CrewBase | undefined, role: CrewRole): number {
 
 /** Crews of this workforce a base can have in training at once: a few to start, more as its roster grows. */
 export function trainingSeats(base: CrewBase | undefined, role: CrewRole): number {
-  return TRAINING_SEATS_BASE + Math.floor(rosterSize(base, role) * TRAINING_SEATS_PER_CREW);
+  return TRAINING_SEATS_BASE[role] + Math.floor(rosterSize(base, role) * TRAINING_SEATS_PER_CREW);
 }
 
 /** Training seats a base has free now. */
@@ -310,7 +391,7 @@ export function trainingSeatsFree(base: CrewBase | undefined, role: CrewRole): n
   return Math.max(0, trainingSeats(base, role) - inTraining(base, role));
 }
 
-/** The cover a flight's cabin has, 1 when its plane needs none or the day's crewing predates cabin crews. */
+/** The share of full service a flight's cabin has, 1 when its plane needs no attendants or the day's crewing predates cabin crews. */
 export function cabinCover(state: SimState, tail: string): number {
   return state.crewDay?.cabinCoverByTail?.[tail] ?? 1;
 }
@@ -385,9 +466,23 @@ export function crewReadiness(state: SimState, iata: string, classCode: string, 
   const have = crews ?? crewsOf(base, classCode);
   const minimum = crewNeed(state, iata, classCode).minimum;
   const chance = sickChance(state, iata, classCode);
+  return { sick: sickOf(base, classCode, dayIndex(state)), reserve: have - minimum, chance, weeklyRisk: weeklyRisk(have, minimum, chance) };
+}
+
+/** The same readiness for a class's attendants, against the legal floor its planes need. */
+export function cabinReadiness(state: SimState, iata: string, classCode: string, attendants?: number): { sick: number; reserve: number; chance: number; weeklyRisk: number } {
+  const base = crewBases(state)[iata];
+  const have = attendants ?? cabinTeamsOf(base, classCode);
+  const minimum = cabinNeed(state, iata, classCode).minimum;
+  const chance = sickChance(state, iata, classCode);
+  return { sick: cabinSickOf(base, classCode, dayIndex(state)), reserve: have - minimum, chance, weeklyRisk: weeklyRisk(have, minimum, chance) };
+}
+
+/** The chance of at least one day in seven with more than the reserve off, each off with the sick chance times how long a sickness lasts. */
+function weeklyRisk(have: number, minimum: number, chance: number): number {
   const offOnADay = Math.min(0.5, chance * MEAN_SICK_DAYS);
   const daily = minimum === 0 ? 0 : shortChance(have, have - minimum, offOnADay);
-  return { sick: sickOf(base, classCode, dayIndex(state)), reserve: have - minimum, chance, weeklyRisk: 1 - (1 - daily) ** 7 };
+  return 1 - (1 - daily) ** 7;
 }
 
 /** The fewest crews of a class that keep the weekly grounding risk at or under `risk`, no fewer than `floor`. */
@@ -395,6 +490,13 @@ export function crewsForRisk(state: SimState, iata: string, classCode: string, r
   let crews = Math.max(floor, crewNeed(state, iata, classCode).minimum);
   while (crews < floor + 20 && crewReadiness(state, iata, classCode, crews).weeklyRisk > risk) crews += 1;
   return crews;
+}
+
+/** The fewest attendants of a class that keep the weekly grounding risk at or under `risk`, no fewer than `floor`. */
+export function attendantsForRisk(state: SimState, iata: string, classCode: string, risk: number, floor: number): number {
+  let attendants = Math.max(floor, cabinNeed(state, iata, classCode).minimum);
+  while (attendants < floor + 30 && cabinReadiness(state, iata, classCode, attendants).weeklyRisk > risk) attendants += 1;
+  return attendants;
 }
 
 /** Crews of this class on their way to a base: hired, or retraining for it. */
@@ -447,31 +549,30 @@ export function crewShare(state: SimState, classCode: string, iata?: string): { 
 }
 
 /**
- * One class's cabin team hours, as crewShare() is for pilots: duty booked
- * (per team a shift carries) against what its teams work at ideal shifts,
- * at one base or across every base. Null for a class that flies without
- * cabin crew, or with no teams or duty. `short` when teams are below the
- * legal minimum somewhere, so flights lose NPS.
+ * One class's attendants, for the thin bar under the pilots': full
+ * service on every plane against the attendants on hand, at one base or
+ * across every base. Null for a class that flies without cabin crew, or
+ * with no attendants and no need. `short` when attendants are below the
+ * legal floor somewhere, so planes are grounded.
  */
 export function cabinShare(state: SimState, classCode: string, iata?: string): { share: number; short: boolean } | null {
-  const perShift = CABIN_TEAMS_PER_SHIFT[classCode] ?? 0;
-  if (perShift === 0) return null;
-  let booked = 0;
-  let available = 0;
+  if (!needsCabinCrew(classCode)) return null;
+  let needed = 0;
+  let onHand = 0;
   let short = false;
   let any = false;
   for (const [base, crewBase] of Object.entries(crewBases(state))) {
     if (iata !== undefined && base !== iata) continue;
-    const need = crewNeed(state, base, classCode);
-    const teams = cabinTeamsOf(crewBase, classCode);
-    if (need.dutyHours === 0 && teams === 0) continue;
+    const need = cabinNeed(state, base, classCode);
+    const attendants = cabinTeamsOf(crewBase, classCode);
+    if (need.full === 0 && attendants === 0) continue;
     any = true;
-    booked += need.dutyHours * perShift;
-    available += (teams * IDEAL_SHIFT_MINUTES) / 60;
-    if (teams < need.minimum * perShift) short = true;
+    needed += need.full;
+    onHand += attendants;
+    if (attendants < need.minimum) short = true;
   }
   if (!any) return null;
-  return { share: available > 0 ? booked / available : booked > 0 ? 2 : 0, short };
+  return { share: onHand > 0 ? needed / onHand : needed > 0 ? 2 : 0, short };
 }
 
 /**
@@ -510,22 +611,29 @@ export function ensureCrewBases(state: SimState): void {
     }
     bases[iata] = { crewsByClass, hiring: [], retraining: [] };
   }
-  // A base from before cabin crews gets the cabin teams its planes need, so loading a save doesn't thin its cabins.
+  // A base from before cabin crews gets the attendants its planes need for
+  // full service, and one from when they counted in teams has each team
+  // turned into the attendants it stood for, never below the legal floor,
+  // so loading a save grounds nothing.
   for (const [iata, base] of Object.entries(bases)) {
-    if (base.cabinByClass !== undefined) continue;
+    if (base.cabinUnit === 'attendant') continue;
+    const teams = base.cabinByClass;
     base.cabinByClass = {};
     for (const cls of AIRCRAFT_CLASSES) {
-      const ideal = cabinNeed(state, iata, cls.code).ideal;
-      if (ideal > 0) base.cabinByClass[cls.code] = ideal;
+      if (!needsCabinCrew(cls.code)) continue;
+      const need = cabinNeed(state, iata, cls.code);
+      const attendants = teams === undefined ? need.full : Math.max((teams[cls.code] ?? 0) * (ATTENDANTS_PER_OLD_TEAM[cls.code] ?? 1), need.minimum);
+      if (attendants > 0) base.cabinByClass[cls.code] = attendants;
     }
-    base.cabinHiring ??= [];
+    base.cabinHiring = (base.cabinHiring ?? []).map((batch) => ({ ...batch, count: batch.count * (ATTENDANTS_PER_OLD_TEAM[batch.classCode] ?? 1) }));
+    base.cabinUnit = 'attendant';
   }
 }
 
 /** Open a crew base with no crews (a lease at a new airport does this). */
 export function openCrewBase(state: SimState, iata: string): void {
   const bases = (state.crewBases ??= {});
-  if (!bases[iata]) bases[iata] = { crewsByClass: {}, hiring: [], retraining: [], cabinByClass: {}, cabinHiring: [] };
+  if (!bases[iata]) bases[iata] = { crewsByClass: {}, hiring: [], retraining: [], cabinByClass: {}, cabinHiring: [], cabinUnit: 'attendant' };
 }
 
 type Outcome = { ok: true; message: string } | { ok: false; reason: string };
@@ -581,12 +689,12 @@ export function releaseCrews(state: SimState, iata: string, classCode: string, c
   return { ok: true, message: `${crewsWord(count, classCode)} released · ${iata}` };
 }
 
-/** Recruit cabin teams for a class at a base: paid now, flying after the cabin lead time, in a training seat meanwhile. */
+/** Recruit attendants for a class at a base: paid now, flying after the cabin lead time, in a training seat meanwhile. */
 export function hireCabin(state: SimState, iata: string, classCode: string, count: number): Outcome {
   const base = crewBases(state)[iata];
   if (!base) return { ok: false, reason: `No crew base at ${iata}.` };
   if (!needsCabinCrew(classCode)) return { ok: false, reason: 'That class flies without cabin crew.' };
-  if (count < 1) return { ok: false, reason: 'Hire at least one cabin team.' };
+  if (count < 1) return { ok: false, reason: 'Hire at least one attendant.' };
   const free = trainingSeatsFree(base, 'cabin');
   if (count > free) return { ok: false, reason: seatsReason(free, 'cabin', iata) };
   const fee = count * cabinHireFee(classCode);
@@ -595,25 +703,27 @@ export function hireCabin(state: SimState, iata: string, classCode: string, coun
   const readyDay = dayIndex(state) + cabinLeadDays(state);
   (base.cabinHiring ??= []).push({ classCode, count, readyDay });
   const name = classByCode(classCode)?.name ?? classCode;
-  return { ok: true, message: `${count} ${name} cabin team${count === 1 ? '' : 's'} hired · ${iata} · $${fee.toLocaleString()} · ready day ${readyDay}` };
+  return { ok: true, message: `${count} ${name} attendant${count === 1 ? '' : 's'} hired · ${iata} · $${fee.toLocaleString()} · ready day ${readyDay}` };
 }
 
-/** Let cabin teams of a class go at a base. */
+/** Let attendants of a class go at a base. */
 export function releaseCabin(state: SimState, iata: string, classCode: string, count: number): Outcome {
   const base = crewBases(state)[iata];
-  if (!base || cabinTeamsOf(base, classCode) < count || count < 1) return { ok: false, reason: 'Not that many cabin teams there.' };
+  if (!base || cabinTeamsOf(base, classCode) < count || count < 1) return { ok: false, reason: 'Not that many attendants there.' };
   base.cabinByClass![classCode] -= count;
   const name = classByCode(classCode)?.name ?? classCode;
-  return { ok: true, message: `${count} ${name} cabin team${count === 1 ? '' : 's'} released · ${iata}` };
+  return { ok: true, message: `${count} ${name} attendant${count === 1 ? '' : 's'} released · ${iata}` };
 }
 
 /**
  * The day's crewing, at rollover: hires and retraining that have come due
  * join their class, then each base shares each class's crews among that
  * class's planes (the minimum to every plane first, then spares to the
- * longest shifts), planes that can't be crewed are grounded, and crews
- * left over are charged standby at their class's rate. Returns the
- * standby cost.
+ * longest shifts), planes that can't get their pilots or their cabin's
+ * legal floor are grounded, and crews left over are charged standby at
+ * their class's rate. Attendants above the floor go one at a time to the
+ * thinnest cabin, toward full service, and every attendant is paid the
+ * day's wage. Returns the standby and wage cost.
  */
 export function rollDailyCrews(state: SimState): number {
   ensureCrewBases(state);
@@ -633,20 +743,13 @@ export function rollDailyCrews(state: SimState): number {
     for (const batch of (base.cabinHiring ?? []).filter((b) => b.readyDay <= today)) cabin[batch.classCode] = (cabin[batch.classCode] ?? 0) + batch.count;
     base.cabinHiring = (base.cabinHiring ?? []).filter((b) => b.readyDay > today);
 
-    // Sickness: who's back today, then who calls in, on yesterday's roster.
+    // Sickness: who's back today, then who calls in, on yesterday's roster; attendants too.
     base.sick = (base.sick ?? []).filter((batch) => batch.backDay > today);
+    base.cabinSick = (base.cabinSick ?? []).filter((batch) => batch.backDay > today);
     for (const cls of AIRCRAFT_CLASSES) {
-      const fit = crewsOf(base, cls.code) - sickOf(base, cls.code, today);
-      if (fit <= 0) continue;
       const chance = sickChance(state, iata, cls.code);
-      for (let i = 0; i < fit; i++) {
-        const [roll, afterRoll] = nextRandom(state.rngSeed);
-        const [length, afterLength] = nextRandom(afterRoll);
-        state.rngSeed = afterLength;
-        if (roll >= chance) continue;
-        const days = 1 + Math.floor(length * length * MAX_SICK_DAYS);
-        base.sick.push({ classCode: cls.code, count: 1, backDay: today + days });
-      }
+      rollSickness(state, base.sick, cls.code, crewsOf(base, cls.code) - sickOf(base, cls.code, today), chance, today);
+      rollSickness(state, base.cabinSick, cls.code, cabinTeamsOf(base, cls.code) - cabinSickOf(base, cls.code, today), chance, today);
     }
 
     for (const cls of AIRCRAFT_CLASSES) {
@@ -658,15 +761,22 @@ export function rollDailyCrews(state: SimState): number {
         .sort((a, b) => Number(mandated.has(b.tail)) - Number(mandated.has(a.tail)));
       // Sick crews fly nothing.
       let left = crewsOf(base, cls.code) - sickOf(base, cls.code, today);
-      // The minimum first, in fleet order, so which plane waits is stable.
+      let cabinLeft = cabinTeamsOf(base, cls.code) - cabinSickOf(base, cls.code, today);
+      const cabinGiven: Record<string, { given: number; full: number }> = {};
+      // The minimum first, in fleet order, so which plane waits is stable:
+      // its pilots and its cabin's legal floor, or it stays on the ground.
       for (const plane of planes) {
         const minimum = crewsFor(plane.duty, LEGAL_SHIFT_MINUTES);
-        if (left >= minimum) {
+        const cabin = planeCabinNeed(state, plane.tail);
+        if (left >= minimum && cabinLeft >= cabin.floor) {
           day.crewsByTail[plane.tail] = minimum;
           left -= minimum;
+          cabinLeft -= cabin.floor;
+          if (cabin.full > 0) cabinGiven[plane.tail] = { given: cabin.floor, full: cabin.full };
         } else {
           day.crewsByTail[plane.tail] = 0;
           grounded.push(plane.tail);
+          if (left >= minimum) (day.cabinShortTails ??= []).push(plane.tail);
         }
       }
       // Then one spare at a time to whichever flying plane has the longest shift.
@@ -678,18 +788,17 @@ export function rollDailyCrews(state: SimState): number {
         left -= 1;
       }
       standby += left * standbyCost(cls.code);
-      // Cabin teams: each flying plane's teams for the shifts its pilots fly, in fleet order; a short cabin still flies.
-      let cabinLeft = cabinTeamsOf(base, cls.code);
-      const teams = CABIN_TEAMS_PER_SHIFT[cls.code] ?? 0;
-      for (const plane of planes) {
-        const pilots = day.crewsByTail[plane.tail];
-        if (teams === 0 || pilots <= 0) continue;
-        const needed = crewsFor(plane.duty, LEGAL_SHIFT_MINUTES) * teams;
-        const given = Math.min(needed, cabinLeft);
-        cabinLeft -= given;
-        (day.cabinCoverByTail ??= {})[plane.tail] = given / needed;
+      // Attendants over the floors, one at a time to the thinnest cabin, toward full service.
+      while (cabinLeft > 0) {
+        const thin = Object.entries(cabinGiven).filter(([, cabin]) => cabin.given < cabin.full);
+        if (thin.length === 0) break;
+        const [, thinnest] = thin.reduce((a, b) => (b[1].given / b[1].full < a[1].given / a[1].full ? b : a));
+        thinnest.given += 1;
+        cabinLeft -= 1;
       }
-      standby += cabinLeft * cabinStandbyCost(cls.code);
+      for (const [tail, cabin] of Object.entries(cabinGiven)) (day.cabinCoverByTail ??= {})[tail] = cabin.given / cabin.full;
+      // Attendants are paid by the day, flying or not; sick ones too.
+      standby += cabinTeamsOf(base, cls.code) * cabinWage(cls.code);
       for (const plane of planes) {
         const first = legsOf(state, plane.tail)[0];
         day.dutyStartByTail[plane.tail] = first.departMinute - REPORT_MINUTES;
@@ -700,6 +809,18 @@ export function rollDailyCrews(state: SimState): number {
   state.crewDay = day;
   state.groundedTails = grounded;
   return standby;
+}
+
+/** Roll who among `fit` crews of a class calls in sick today, adding them to `sick`. */
+function rollSickness(state: SimState, sick: { classCode: string; count: number; backDay: number }[], classCode: string, fit: number, chance: number, today: number): void {
+  for (let i = 0; i < fit; i++) {
+    const [roll, afterRoll] = nextRandom(state.rngSeed);
+    const [length, afterLength] = nextRandom(afterRoll);
+    state.rngSeed = afterLength;
+    if (roll >= chance) continue;
+    const days = 1 + Math.floor(length * length * MAX_SICK_DAYS);
+    sick.push({ classCode, count: 1, backDay: today + days });
+  }
 }
 
 /**

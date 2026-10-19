@@ -186,7 +186,7 @@ function cargoLanesFilled(state: SimState): number {
   return Object.entries(state.cargoSatisfaction ?? {}).filter(([, filled]) => filled >= 0.5).length;
 }
 
-function cabinTeamsOnRegionals(state: SimState): number {
+function attendantsOnRegionals(state: SimState): number {
   return Object.values(crewBases(state)).reduce((sum, base) => sum + (base.cabinByClass?.REGIONAL ?? 0), 0);
 }
 
@@ -346,9 +346,9 @@ export const LADDER: Tier[] = [
       {
         id: 'cabin-crew',
         name: 'Cabin crew aboard',
-        description: 'Have cabin teams trained for a Regional: regional aircraft and up carry them, and a shortage hurts NPS.',
+        description: 'Have attendants trained for a Regional: regional aircraft and up carry them by seat count, and a plane short of its legal cabin stays on the ground.',
         extra: true,
-        met: (state) => cabinTeamsOnRegionals(state) > 0,
+        met: (state) => attendantsOnRegionals(state) > 0,
         progress: noProgress,
       },
       {
