@@ -344,6 +344,10 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
 
   const fail = (error: string, blocksAddStop = true): RotationPlan => ({ ...plan, error, blocksAddStop });
 
+  // A plane going back to the lessor leaves with no flights (sim/fleetTiming.ts), so it takes no new ones.
+  if (!aircraft) return fail(`No plane ${tail}.`, false);
+  if (aircraft.returningOnDay !== undefined) return fail(`${tail} returning to the lessor · gone day ${aircraft.returningOnDay}`, false);
+
   // An electric plane flies only between airports with a charger (sim/powertrain.ts).
   const unchargedStops = aircraft ? missingChargers(state, aircraft, rotationAirports.map((stop) => stop.iata)) : [];
   if (unchargedStops.length > 0) return fail(`${tail} is electric: no charger at ${unchargedStops.join(', ')}. Build one in the airport view.`, false);
