@@ -66,15 +66,19 @@ function collectAlerts(state: SimState, choosingHome: boolean): Alert[] {
     });
   }
 
-  // Planes grounded for want of crews (sim/crews.ts), one row per tail,
-  // named, opening its base: the airport view's crew bar and Hire buttons.
+  // Planes grounded for want of pilots or of their cabin's legal floor of
+  // attendants (sim/crews.ts), one row per tail, named, opening its base:
+  // the airport view's crew bars and Hire buttons.
+  const cabinShort = new Set(state.crewDay?.cabinShortTails ?? []);
   for (const tail of state.groundedTails) {
     const plane = state.aircraft.find((aircraft) => aircraft.tail === tail);
     const base = plane?.baseAirport;
     const className = classByCode(plane?.typeCode ?? '')?.name ?? '';
     alerts.push({
       key: `grounded:${tail}`,
-      message: `CREW · ${tail} grounded · short of ${className} crews at ${base ?? 'its base'}`,
+      message: cabinShort.has(tail)
+        ? `CABIN · ${tail} grounded · short of ${className} attendants at ${base ?? 'its base'}`
+        : `CREW · ${tail} grounded · short of ${className} crews at ${base ?? 'its base'}`,
       tab: 'fleet',
       view: base ? { kind: 'airport', iata: base } : undefined,
     });

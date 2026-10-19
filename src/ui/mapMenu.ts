@@ -329,19 +329,19 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
       };
     });
 
-  // Cabin teams for the classes that carry them (Regional and up), after the pilot crews.
+  // Attendants for the classes that carry them (Regional and up), after the pilot crews.
   const cabinCrewChoices: RadialAction[] = (crews?.classes ?? [])
     .filter((c) => c.open && c.cabin)
     .map((c) => {
       const cabin = c.cabin!;
       return {
         id: `cabin:${c.classCode}`,
-        label: `Hire 1 ${c.name} cabin team · ${money(cabin.hireFee)} · joins day ${dayIndex(state) + (crews?.cabinLeadDays ?? 0)} · ${cabin.teams} teams${cabin.arriving > 0 ? ` +${cabin.arriving} joining` : ''} · need ${cabin.ideal} (min ${cabin.minimum}) · hold for more`,
+        label: `Hire 1 ${c.name} attendant · ${money(cabin.hireFee)} · joins day ${dayIndex(state) + (crews?.cabinLeadDays ?? 0)} · ${cabin.attendants} on hand${cabin.arriving > 0 ? ` +${cabin.arriving} joining` : ''} · full ${cabin.full} (legal ${cabin.minimum}) · hold for more`,
         icon: planeIconInner(c.classCode),
         large: true,
         angleDeg: 0,
         repeatable: true,
-        disabledReason: crews && crews.training.cabin.free === 0 ? `No free cabin training seats at ${airport.iata}.` : state.cash < cabin.hireFee ? `Needs ${money(cabin.hireFee)} on hand to hire a ${c.name} cabin team.` : undefined,
+        disabledReason: crews && crews.training.cabin.free === 0 ? `No free cabin training seats at ${airport.iata}.` : state.cash < cabin.hireFee ? `Needs ${money(cabin.hireFee)} on hand to hire a ${c.name} attendant.` : undefined,
         onSelect: () => {
           const result = ops.hireCabinAt(state, airport.iata, c.classCode, 1);
           notice = result.ok ? result.message : result.reason;
@@ -364,7 +364,7 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
     });
     return [
       locked(`crew:${cls.code}`, `${cls.name} crews · ${money(hireFee(cls.code))} a crew · opens as ${opens}`),
-      ...(needsCabinCrew(cls.code) ? [locked(`cabin:${cls.code}`, `${cls.name} cabin teams · ${money(cabinHireFee(cls.code))} a team · opens as ${opens}`)] : []),
+      ...(needsCabinCrew(cls.code) ? [locked(`cabin:${cls.code}`, `${cls.name} attendants · ${money(cabinHireFee(cls.code))} each · opens as ${opens}`)] : []),
     ];
   });
   crewChoices.push(...cabinCrewChoices, ...lockedChoices);

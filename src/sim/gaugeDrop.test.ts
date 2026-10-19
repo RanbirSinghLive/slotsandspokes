@@ -5,6 +5,7 @@ import { commitDraft, planDrop, scheduleConflicts } from './scheduleDraft';
 import { computeBlockMinutes, legDistanceNm } from './schedule';
 import { step } from './step';
 import { allRotations } from './utilisation';
+import { rangeNmFor } from './range';
 
 // Run with `npm run gaugetest`: a rotation dropped on a plane of another type
 // at the same base is re-timed for that type, and refused when any leg is
@@ -22,14 +23,17 @@ const rotations = allRotations(state).filter((r) => r.closed && r.airports.lengt
 const props = rotations.filter((r) => typeOf(r.tail) === 'PROP');
 const regionals = state.aircraft.filter((a) => a.typeCode === 'REGIONAL');
 assert.ok(props.length > 0 && regionals.length > 0, 'the game needs props and a regional');
+// A regional with its day cleared, so a prop round trip has free time to land on whatever the game booked.
+const roomy = structuredClone(state);
+roomy.schedule = roomy.schedule.filter((leg) => leg.tail !== regionals[0].tail);
 // Night stops read as breaks in the chain here, so compare against how many there were.
-const startingConflicts = scheduleConflicts(state).length;
+const startingConflicts = scheduleConflicts(roomy).length;
 
 // Upgauge: a prop round trip dropped on a regional's free time goes there, block times from the regional's speed.
 let upgauged = 0;
 for (const rotation of props) {
   for (const plane of regionals) {
-    const copy = structuredClone(state);
+    const copy = structuredClone(roomy);
     const ids = rotation.legs.map((leg) => leg.legId);
     for (let start = 360; start <= 1200; start += 30) {
       const drop = planDrop(copy, ids, plane.tail, start);
@@ -49,7 +53,8 @@ for (const rotation of props) {
 assert.ok(upgauged > 0, 'no prop round trip could be upgauged onto a regional');
 
 // Range: a rotation with a leg beyond the prop's range is refused on every prop, in both a plain move and as the far side of a swap.
-const tooFar = rotations.filter((r) => typeOf(r.tail) !== 'PROP' && longest(r.legs) > 380);
+// Clear of the prop's range by a mile: the planner rounds distances, so a leg a fraction over still fits.
+const tooFar = rotations.filter((r) => typeOf(r.tail) !== 'PROP' && longest(r.legs) > rangeNmFor(state, 'PROP') + 1);
 assert.ok(tooFar.length > 0, 'the game needs a regional rotation beyond a prop');
 for (const rotation of tooFar) {
   const ids = rotation.legs.map((leg) => leg.legId);
