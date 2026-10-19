@@ -208,7 +208,6 @@ const AIRPORTS: [iata: string, name: string][] = [
   ['LST', 'Launceston'],
   ['MQL', 'Mildura'],
   ['NSN', 'Nelson'],
-  ['ROT', 'Rotorua'],
   ['IVC', 'Invercargill'],
 ];
 
