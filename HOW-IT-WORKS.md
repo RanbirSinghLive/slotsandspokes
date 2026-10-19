@@ -67,10 +67,10 @@ All from public sources (CLAUDE.md). Some are **generated** by scripts in
 `src/headless/` — change the script and re-run it rather than editing the
 JSON by hand.
 
-- **`airports.json`** — 585 airports, one per metro: a hand-kept list
+- **`airports.json`** — 626 airports, one per metro: a hand-kept list
   (eastern Canada, 29 northern and regional Canadian airports from Thunder
   Bay to Iqaluit, including Comox, Nanaimo, Terrace, Prince Rupert and Smithers, the north-east US, about 40 of Europe's main cities,
-  and world hubs such as DXB and HND), then a fill-out region by region
+  and world hubs such as DXB and HND, and 13 regional Australian and New Zealand towns from Wagga Wagga to Invercargill), then a fill-out region by region
   (the script's `REGIONS`) from OurAirports' large and medium airports
   with scheduled service:
 
@@ -83,12 +83,13 @@ JSON by hand.
   | Middle East | 20 |
   | Asia | 100 |
   | Africa | 25 |
-  | Oceania | 20 |
+  | Oceania | up to 50 |
 
   North America comes first and is unchanged from when it was the only
   fill-out. Each region takes its hand-named hubs first, then all its
   large airports and then the medium ones, each time the one that would
-  serve the most people not already nearer an airport on the map. A
+  serve the most people not already nearer an airport on the map, never
+  one with nobody in its own country within 60 km. A
   metro's second airport that would take the first's people (Istanbul
   Sabiha Gökçen) is left out (`SECOND_AIRPORTS`), and Ukraine is left out
   while its airspace is closed. Then a **home-reach top-up**
