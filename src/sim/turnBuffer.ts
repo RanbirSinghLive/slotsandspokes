@@ -174,12 +174,15 @@ function rehome(work: SimState, state: SimState, rotation: Rotation, fromTail: s
   if (rotation.legs[0].origin !== from.baseAirport || rotation.legs[rotation.legs.length - 1].dest !== from.baseAirport) return null;
 
   const candidates = state.aircraft
-    // A plane grounded by an AOG (sim/aog.ts) can't take anyone's flying.
+    // A plane grounded by an AOG (sim/aog.ts) can't take anyone's flying,
+    // nor can one going back to the lessor or moving to another base.
     .filter(
       (a) =>
         a.tail !== fromTail &&
         a.typeCode === from.typeCode &&
         a.baseAirport === from.baseAirport &&
+        a.returningOnDay === undefined &&
+        a.rebase === undefined &&
         !state.aogs.some((event) => event.tail === a.tail) &&
         nightStopStation(state, a.tail) === null,
     )

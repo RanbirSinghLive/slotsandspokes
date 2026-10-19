@@ -1,6 +1,7 @@
 import type { SimState } from '../sim/state';
 import { ensureCrewBases } from '../sim/crews';
 import { repairDuplicateLegIds } from '../sim/schedule';
+import { removeOrphanFlights } from '../sim/fleetTiming';
 import { GAME_VERSION } from './version';
 
 /**
@@ -78,6 +79,8 @@ function normalise(state: SimState): void {
   ensureCrewBases(state);
   // Two legs once shared an id after a rotation moved planes; a move acts on every leg with the id.
   repairDuplicateLegIds(state);
+  // A plane once left the fleet with flights still on it (AOG cover handed it some on its way back to the lessor).
+  removeOrphanFlights(state);
 }
 
 export type LoadResult =

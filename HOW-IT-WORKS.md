@@ -2123,7 +2123,12 @@ lose: long-haul is a bet on filling 300 seats.
 **Returning a lease** (`returnLease()`) costs 14 days of it
 (`RETURN_FEE_LEASE_DAYS`) and puts the airframe back on the market for
 anyone. It is refused while the plane still has flights, is grounded by
-an AOG, or is in the air.
+an AOG, or is in the air. While it goes back it takes no new flights:
+the route planner refuses it and AOG cover passes it over (as it does a
+plane ferrying to another base). Anything still on it when it leaves the
+fleet comes off with it (`removeFlightsOf()` in `sim/fleetTiming.ts`),
+and a save holding flights on a plane no longer in the fleet loses them
+on load.
 
 ## Brand position (`src/sim/brand.ts`)
 

@@ -1,6 +1,5 @@
 import { dayIndex } from './clock';
-import { startReturn } from './fleetTiming';
-import { legsServingMarket, marketKey } from './schedule';
+import { removeFlightsOf, startReturn } from './fleetTiming';
 import type { SimState } from './state';
 
 /**
@@ -29,11 +28,7 @@ export function endSeasonalLeases(state: SimState): string[] {
   for (const aircraft of state.aircraft) {
     if (aircraft.seasonalUntilDay === undefined || aircraft.seasonalUntilDay > today || aircraft.returningOnDay !== undefined) continue;
     if (aircraft.status !== 'ground' || state.aogs.some((event) => event.tail === aircraft.tail)) continue;
-    const legs = state.schedule.filter((leg) => leg.tail === aircraft.tail);
-    state.schedule = state.schedule.filter((leg) => leg.tail !== aircraft.tail);
-    for (const leg of legs) {
-      if (legsServingMarket(leg.origin, leg.dest, state.schedule) === 0) delete state.routeSettings[marketKey(leg.origin, leg.dest)];
-    }
+    removeFlightsOf(state, aircraft.tail);
     startReturn(state, aircraft);
     ended.push(aircraft.tail);
   }
