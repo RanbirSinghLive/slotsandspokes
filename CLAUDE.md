@@ -81,7 +81,7 @@ and so does a save reloaded mid-game.
 
 ## The headless runner
 
-`npm run headless`, `sweep`, `balance` and `quick` start a game **the same way the
+`npm run headless`, `sweep`, `balance`, `quick` and `global` start a game **the same way the
 browser does**: `startHeadlessGame()` in `src/headless/newGame.ts` calls
 `createNewGameState()` and then `chooseHome()`. Then a headless player
 (`src/headless/player.ts`) plays it, once a day, only through the route

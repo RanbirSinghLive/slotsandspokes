@@ -647,6 +647,8 @@ minute but before the next rollover resets the day's totals.
 
 **`npm run quick`** (`src/headless/quickBalance.ts`, about 4 to 5 minutes) plays the steady player for 365 days from four homes (YUL, YYZ, PHL, YHZ), 10 seeds each, and compares the result with `balance-reference.json`. `--winter` starts in winter; `--save-last` saves the last read as the new reference and is used only when the owner accepts a read.
 
+**`npm run global`** (`src/headless/globalBalance.ts`, about half an hour on four cores) plays the steady player on Medium for 365 days from 24 homes, a strong pair (big cities, many first routes) and a weak pair (small or isolated) on each continent, 3 seeds each. It has no reference: it shows whether the game works everywhere, per home as median cash, range, busts with their days, and the planes, markets and ladder tiers of the airlines still flying. `--only EU` plays one continent; `--winter` starts in winter. Games go to `balance-global-last.json` (not committed).
+
 **It plays the real game.** `startHeadlessGame()` in
 `src/headless/newGame.ts` makes the same two calls the browser does —
 `createNewGameState()`, then `chooseHome()` — with a fixed seed so runs

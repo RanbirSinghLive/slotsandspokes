@@ -17,6 +17,7 @@
     "rivers": "tsx src/headless/buildRivers.ts",
     "land50": "tsx src/headless/buildLand50.ts",
     "quick": "tsx src/headless/quickBalance.ts",
+    "global": "tsx src/headless/globalBalance.ts",
     "test": "tsx src/headless/runTests.ts",
     "determinism": "tsx src/headless/determinism.ts",
     "check": "tsx src/headless/check.ts",
