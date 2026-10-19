@@ -186,7 +186,7 @@ export function rollDailyMarketDemand(state: SimState): void {
         reliability *
         // A route to places nobody serves builds faster (sim/serviceLevel.ts).
         hungerBoost(hunger, origin, dest) *
-        // A market-building CCO speeds every market up (sim/executives.ts).
+        // A market builder in a seat speeds every market up (sim/executives.ts).
         marketBuilding *
         // Low fares build it faster, dear ones slower (sim/fareStimulus.ts),
         // and a seat sale brings new travellers to try it (sim/seatSale.ts).

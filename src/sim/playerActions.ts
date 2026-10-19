@@ -69,16 +69,22 @@ import {
 import airportsData from '../../data/airports.json';
 import {
   appointBlockedReason,
-  chairOpensAt,
   appointedCandidate,
   appointExecutive,
   candidatesForRole,
+  classStrength,
   dismissExecutive,
-  EXECUTIVE_ROLES,
+  EXECUTIVE_SEATS,
   executiveLeaseMultiplier,
+  executiveSalary,
+  executiveWorthPerDay,
+  loadExecutives,
   ROLE_LABELS,
+  seatAdvice,
+  seatOf,
+  seatOpensAt,
   type ExecutiveCandidate,
-  type ExecutiveRole,
+  type ExecutiveSeat,
 } from './executives';
 import { AIRCRAFT_CLASSES, classByCode, classRank, pluralClassName } from './aircraftClasses';
 import { applyHubStyleChange, planHubStyleChange } from './hubs';
@@ -520,10 +526,10 @@ function days(count: number): string {
  */
 function asLeased(state: SimState, listing: MarketListing, powertrain?: 'hybrid' | 'electric'): MarketListing {
   // A hybrid or electric plane is a new airframe at its own rate (sim/powertrain.ts).
-  if (powertrain) return { ...listing, ageYears: 0, leasePricePerDay: Math.round(powertrainLeasePerDay(listing.typeCode, powertrain) * executiveLeaseMultiplier(state)) };
+  if (powertrain) return { ...listing, ageYears: 0, leasePricePerDay: Math.round(powertrainLeasePerDay(listing.typeCode, powertrain) * executiveLeaseMultiplier(state, listing.typeCode)) };
   const ageYears = leasedAge(state, listing.ageYears);
   const rate = ageYears === listing.ageYears ? listing.leasePricePerDay : marketRate(state.market, listing.typeCode, ageYears);
-  const leasePricePerDay = Math.round(rate * executiveLeaseMultiplier(state));
+  const leasePricePerDay = Math.round(rate * executiveLeaseMultiplier(state, listing.typeCode));
   if (ageYears === listing.ageYears && leasePricePerDay === listing.leasePricePerDay) return listing;
   return { ...listing, ageYears, leasePricePerDay };
 }
@@ -1099,37 +1105,70 @@ export function setRouteFees(state: SimState, origin: string, dest: string, leve
 // --- Executives ------------------------------------------------------------------
 
 export type ExecutiveOption = ExecutiveCandidate & {
-  appointed: boolean;
-  /** Why they can't be appointed now, or null if they can. */
+  /** The seat they hold now, if any. */
+  seat: ExecutiveSeat | null;
+  /** Why they can't be appointed to this seat now, or null if they can. */
   blocked: string | null;
+  /** Their estimated worth to the airline a day, and their salary at today's fleet (sim/executives.ts). */
+  worthPerDay: number;
+  salaryNow: number;
+  /** How strongly they work on each aircraft class, smallest first, for the class pips. */
+  classStrengths: number[];
 };
 
-/** Each chair (sim/executives.ts): who holds it, and every candidate with why they can't be hired yet. */
-export function executiveOptions(state: SimState): { role: ExecutiveRole; label: string; holder: ExecutiveCandidate | null; hiredDay: number | null; opensAt: string | null; candidates: ExecutiveOption[] }[] {
-  return EXECUTIVE_ROLES.map((role) => {
-    const holder = appointedCandidate(state, role) ?? null;
-    const appointment = state.executives[role];
+export type ExecutiveSeatOption = {
+  seat: ExecutiveSeat;
+  label: string;
+  holder: ExecutiveOption | null;
+  hiredDay: number | null;
+  daysBelowLine: number;
+  opensAt: string | null;
+  /** Whether the seat wants a look, and who would fit better (sim/executives.ts's seatAdvice()). */
+  advice: ReturnType<typeof seatAdvice>;
+  /** Everyone who could sit here but doesn't, best fit first. */
+  candidates: ExecutiveOption[];
+};
+
+function executiveOption(state: SimState, candidate: ExecutiveCandidate, seat: ExecutiveSeat): ExecutiveOption {
+  const held = seatOf(state, candidate.id);
+  return {
+    ...candidate,
+    seat: held,
+    blocked: held === seat ? null : appointBlockedReason(state, candidate, seat),
+    worthPerDay: executiveWorthPerDay(state, candidate),
+    salaryNow: executiveSalary(state, candidate),
+    classStrengths: AIRCRAFT_CLASSES.map((aircraftClass) => classStrength(candidate, aircraftClass.code)),
+  };
+}
+
+/** Each seat (sim/executives.ts): who holds it, whether it wants a look, and every candidate with what they'd net and why they can't be hired yet. */
+export function executiveOptions(state: SimState): ExecutiveSeatOption[] {
+  return EXECUTIVE_SEATS.map((seat) => {
+    const holder = appointedCandidate(state, seat);
+    const appointment = state.executives[seat];
+    const pool = seat === 'board' ? loadExecutives() : candidatesForRole(seat);
     return {
-      role,
-      label: ROLE_LABELS[role],
-      holder,
+      seat,
+      label: ROLE_LABELS[seat],
+      holder: holder ? executiveOption(state, holder, seat) : null,
       hiredDay: appointment ? dayIndex(state, appointment.hiredAtMinute) : null,
-      opensAt: chairOpensAt(state, role),
-      candidates: candidatesForRole(role).map((candidate) => ({
-        ...candidate,
-        appointed: holder?.id === candidate.id,
-        blocked: holder?.id === candidate.id ? null : appointBlockedReason(state, candidate),
-      })),
+      daysBelowLine: appointment?.daysBelowLine ?? 0,
+      opensAt: seatOpensAt(state, seat),
+      advice: seatAdvice(state, seat),
+      candidates: pool
+        .filter((candidate) => candidate.id !== holder?.id && seatOf(state, candidate.id) === null)
+        .map((candidate) => executiveOption(state, candidate, seat))
+        .sort((a, b) => b.worthPerDay - b.salaryNow - (a.worthPerDay - a.salaryNow)),
     };
   });
 }
 
-export function appointExecutiveById(state: SimState, candidateId: string): Outcome<{ message: string }> {
-  return appointExecutive(state, candidateId);
+export function appointExecutiveById(state: SimState, candidateId: string, seat?: ExecutiveSeat): Outcome<{ message: string }> {
+  return appointExecutive(state, candidateId, seat);
 }
 
-export function letExecutiveGo(state: SimState, role: ExecutiveRole): Outcome<{ message: string }> {
-  return dismissExecutive(state, role);
+export function letExecutiveGo(state: SimState, seat: ExecutiveSeat): Outcome<{ message: string }> {
+  return dismissExecutive(state, seat);
 }
 
 // --- Crews -----------------------------------------------------------------------

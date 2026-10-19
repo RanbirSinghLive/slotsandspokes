@@ -3,29 +3,16 @@
     "id": "coo-maintenance",
     "role": "coo",
     "name": "Errol Vance",
-    "background": "Maintenance and engineering",
+    "background": "Line maintenance",
     "flavor": "A licensed engineer who still reads the defect log himself. Reckons a well-kept airframe owes you nothing and a neglected one takes it out of your schedule.",
     "npsNeeded": null,
     "signingFee": 150000,
-    "salaryPerDay": 1500,
+    "salaryPerDay": 1000,
+    "salaryPerPlane": 80,
+    "classWeights": [1, 0.8, 0.4, 0.2],
     "effect": {
       "kind": "maintenance",
-      "ageFactorMultiplier": 0.85
-    }
-  },
-  {
-    "id": "coo-fleet",
-    "role": "coo",
-    "name": "Lena Fischer",
-    "background": "Fleet programmes",
-    "flavor": "Ran fleet planning for a charter group that changed its aircraft every season. Knows every lessor's delivery desk and gets planes in, and out, in half the time.",
-    "npsNeeded": 10,
-    "signingFee": 250000,
-    "salaryPerDay": 2500,
-    "effect": {
-      "kind": "fleet-programmes",
-      "deliveryMultiplier": 0.5,
-      "returnMultiplier": 0.5
+      "ageFactorMultiplier": 0.7
     }
   },
   {
@@ -34,69 +21,48 @@
     "name": "Marcus Oyelaran",
     "background": "Flight operations",
     "flavor": "Twenty years running control centres. Believes most delays are decisions, not weather, and reschedules a rotation faster than anyone can explain why it was late.",
-    "npsNeeded": 15,
-    "signingFee": 300000,
-    "salaryPerDay": 3000,
+    "npsNeeded": 10,
+    "signingFee": 250000,
+    "salaryPerDay": 2500,
+    "salaryPerPlane": 150,
+    "classWeights": [0.8, 0.9, 1, 1],
     "effect": {
       "kind": "flight-ops",
       "delayMultiplier": 0.85
     }
   },
   {
-    "id": "coo-inflight",
+    "id": "dom-bakare",
     "role": "coo",
-    "name": "Priya Raghunathan",
-    "background": "Inflight service",
-    "flavor": "Came up through the cabin and never stopped thinking like it. Rewrote a legacy carrier's onboard standards and made the crew like the new ones better.",
-    "npsNeeded": 20,
-    "signingFee": 400000,
-    "salaryPerDay": 4000,
-    "effect": {
-      "kind": "inflight",
-      "npsBonus": 8
-    }
-  },
-  {
-    "id": "cfo-mercer",
-    "role": "cfo",
-    "name": "Dale Mercer",
-    "background": "Cost control",
-    "flavor": "Spent a career in the back offices of charter airlines, where a head-office cost nobody can name is a cost that gets cut. Brings a red pen and uses it.",
-    "npsNeeded": null,
-    "signingFee": 150000,
-    "salaryPerDay": 1500,
-    "effect": {
-      "kind": "overhead",
-      "overheadMultiplier": 0.85
-    }
-  },
-  {
-    "id": "cfo-okafor",
-    "role": "cfo",
-    "name": "Hana Okafor",
-    "background": "Treasury",
-    "flavor": "Ran fuel purchasing for a flag carrier through two price spikes. Knows the banks by first name and pays half what anyone else does to lock a price.",
+    "name": "Tunde Bakare",
+    "background": "Hangar and heavy checks",
+    "flavor": "Planned the bays of a three-hangar overhaul base. Fills a hangar the way a chess player fills a board.",
     "npsNeeded": 15,
-    "signingFee": 250000,
-    "salaryPerDay": 2500,
+    "signingFee": 300000,
+    "salaryPerDay": 3000,
+    "salaryPerPlane": 150,
+    "classWeights": [0, 0.5, 1, 1],
     "effect": {
-      "kind": "treasury",
-      "hedgePremiumMultiplier": 0.5,
-      "overheadMultiplier": 0.95
+      "kind": "maintenance-bases",
+      "costMultiplier": 0.75,
+      "toleranceCostMultiplier": 0.5,
+      "toleranceExtraDays": 5
     }
   },
   {
-    "id": "cfo-adeyemi",
-    "role": "cfo",
-    "name": "Simone Adeyemi",
-    "background": "Aircraft finance",
-    "flavor": "Structured aircraft debt for a decade before deciding she would rather spend it than arrange it. Lessors return her calls first, and quote her lower.",
-    "npsNeeded": 20,
-    "signingFee": 350000,
-    "salaryPerDay": 3500,
+    "id": "cpo-solheim",
+    "role": "coo",
+    "name": "Ingrid Solheim",
+    "background": "Chief pilot · training",
+    "flavor": "A line captain who moved into the simulator building. Her crews come out of training a week sooner and complain less.",
+    "npsNeeded": null,
+    "signingFee": 200000,
+    "salaryPerDay": 2000,
+    "salaryPerPlane": 100,
+    "classWeights": [0.3, 0.7, 1, 1],
     "effect": {
-      "kind": "leasing",
-      "leaseMultiplier": 0.88
+      "kind": "crew-programmes",
+      "trainingTimeMultiplier": 0.5
     }
   },
   {
@@ -107,24 +73,28 @@
     "flavor": "Built a low-cost carrier's network one town at a time: the travel agents, the local papers, the chamber of commerce. New routes fill faster when he's been there first.",
     "npsNeeded": null,
     "signingFee": 150000,
-    "salaryPerDay": 1500,
+    "salaryPerDay": 1000,
+    "salaryPerPlane": 80,
+    "classWeights": [1, 0.8, 0.5, 0.3],
     "effect": {
       "kind": "market-building",
-      "growthMultiplier": 1.25
+      "growthMultiplier": 1.3
     }
   },
   {
-    "id": "cco-carvalho",
+    "id": "coo-inflight",
     "role": "cco",
-    "name": "Inês Carvalho",
-    "background": "Network and alliances",
-    "flavor": "Planned a hub carrier's banks for years and can tell you which two cities a connection is really for. Sells the itinerary, not the flight.",
-    "npsNeeded": 15,
+    "name": "Priya Raghunathan",
+    "background": "Inflight service",
+    "flavor": "Came up through the cabin and never stopped thinking like it. Rewrote a legacy carrier's onboard standards and made the crew like the new ones better.",
+    "npsNeeded": 10,
     "signingFee": 250000,
     "salaryPerDay": 2500,
+    "salaryPerPlane": 150,
+    "classWeights": [0, 0.4, 0.7, 1],
     "effect": {
-      "kind": "connections",
-      "connectingMultiplier": 1.15
+      "kind": "inflight",
+      "npsBonus": 10
     }
   },
   {
@@ -136,194 +106,97 @@
     "npsNeeded": 20,
     "signingFee": 350000,
     "salaryPerDay": 3500,
+    "salaryPerPlane": 200,
+    "classWeights": [0.25, 0.5, 0.8, 1],
     "effect": {
       "kind": "revenue",
-      "yieldMultiplier": 1.03
+      "yieldMultiplier": 1.04
     }
   },
   {
-    "id": "cco-sato",
+    "id": "cco-carvalho",
     "role": "cco",
-    "name": "Akira Sato",
-    "background": "Inventory control",
-    "flavor": "Ran overbooking models at a flag carrier where an empty seat was an offence. Believes every seat was sold to somebody, just at the wrong price.",
-    "npsNeeded": 25,
-    "signingFee": 500000,
-    "salaryPerDay": 5000,
-    "effect": {
-      "kind": "revenue",
-      "yieldMultiplier": 1.05
-    }
-  },
-  {
-    "id": "coo-director-ops",
-    "role": "coo",
-    "name": "Kenji Watanabe",
-    "background": "Network operations control",
-    "flavor": "Ran a twenty-aircraft operations centre through three winters. Believes a delay is a decision somebody postponed.",
-    "npsNeeded": 25,
-    "requiresTier": "operator",
-    "signingFee": 800000,
-    "salaryPerDay": 8000,
-    "effect": {
-      "kind": "flight-ops",
-      "delayMultiplier": 0.75
-    }
-  },
-  {
-    "id": "cfo-treasurer",
-    "role": "cfo",
-    "name": "Marguerite Dufresne",
-    "background": "Fleet and balance sheet",
-    "flavor": "Has financed more aircraft than she has flown on. Lessors return her calls on the first ring.",
-    "npsNeeded": 25,
-    "requiresTier": "operator",
-    "signingFee": 700000,
-    "salaryPerDay": 7000,
-    "effect": {
-      "kind": "leasing",
-      "leaseMultiplier": 0.8
-    }
-  },
-  {
-    "id": "cco-alliances",
-    "role": "cco",
-    "name": "Rafael Ortega",
-    "background": "Alliances and joint ventures",
-    "flavor": "Built two codeshare partnerships from a napkin. Thinks of a hub as a promise to the airlines on both sides of it.",
-    "npsNeeded": 25,
-    "requiresTier": "operator",
-    "signingFee": 750000,
-    "salaryPerDay": 7500,
-    "effect": {
-      "kind": "connections",
-      "connectingMultiplier": 1.3
-    }
-  },
-  {
-    "id": "cpo-solheim",
-    "role": "cpo",
-    "name": "Ingrid Solheim",
-    "background": "Training standards",
-    "flavor": "A line captain who moved into the simulator building. Her crews come out of training a week sooner and complain less.",
-    "npsNeeded": null,
-    "requiresTier": "network",
-    "signingFee": 400000,
-    "salaryPerDay": 4000,
-    "effect": {
-      "kind": "crew-programmes",
-      "trainingTimeMultiplier": 0.8
-    }
-  },
-  {
-    "id": "cpo-malhotra",
-    "role": "cpo",
-    "name": "Dev Malhotra",
-    "background": "Fleet transition",
-    "flavor": "Has converted whole pilot groups between types without a cancelled flight. Keeps a spreadsheet of who flies what and why.",
+    "name": "Inês Carvalho",
+    "background": "Network, alliances and freight",
+    "flavor": "Planned a hub carrier's banks for years and can tell you which two cities a connection is really for. Sells the itinerary, and the belly space under it.",
     "npsNeeded": 15,
-    "requiresTier": "operator",
-    "signingFee": 700000,
-    "salaryPerDay": 7000,
-    "effect": {
-      "kind": "crew-programmes",
-      "trainingTimeMultiplier": 0.6
-    }
-  },
-  {
-    "id": "dom-aaltonen",
-    "role": "dom",
-    "name": "Birgit Aaltonen",
-    "background": "Line maintenance",
-    "flavor": "Started on the night shift at an outstation. Runs every base like she is the one waiting for the part.",
-    "npsNeeded": null,
-    "requiresTier": "international",
-    "signingFee": 500000,
-    "salaryPerDay": 5000,
-    "effect": {
-      "kind": "maintenance-bases",
-      "costMultiplier": 0.95,
-      "toleranceCostMultiplier": 0.8,
-      "toleranceExtraDays": 3
-    }
-  },
-  {
-    "id": "dom-bakare",
-    "role": "dom",
-    "name": "Tunde Bakare",
-    "background": "Hangar and heavy checks",
-    "flavor": "Planned the bays of a three-hangar overhaul base. Fills a hangar the way a chess player fills a board.",
-    "npsNeeded": 15,
-    "requiresTier": "operator",
-    "signingFee": 700000,
-    "salaryPerDay": 7000,
-    "effect": {
-      "kind": "maintenance-bases",
-      "costMultiplier": 0.7,
-      "toleranceCostMultiplier": 0.5,
-      "toleranceExtraDays": 5
-    }
-  },
-  {
-    "id": "hoc-karimova",
-    "role": "hoc",
-    "name": "Nadia Karimova",
-    "background": "Perishables and cold chain",
-    "flavor": "Knows which shipper will pay double for a Tuesday morning and which will not call back.",
-    "npsNeeded": null,
-    "requiresTier": "international",
     "signingFee": 300000,
     "salaryPerDay": 3000,
+    "salaryPerPlane": 150,
+    "classWeights": [0.2, 0.5, 0.8, 1],
     "effect": {
-      "kind": "cargo",
-      "revenueMultiplier": 1.1
+      "kind": "connections",
+      "connectingMultiplier": 1.2,
+      "cargoMultiplier": 1.2
     }
   },
   {
-    "id": "hoc-lindahl",
-    "role": "hoc",
-    "name": "Sven Lindahl",
-    "background": "Freight sales",
-    "flavor": "Sold belly space across four continents before anyone called it a product. Every lane has a customer in his notebook.",
-    "npsNeeded": 15,
-    "requiresTier": "established",
-    "signingFee": 500000,
-    "salaryPerDay": 5000,
+    "id": "cfo-mercer",
+    "role": "cfo",
+    "name": "Dale Mercer",
+    "background": "Cost control",
+    "flavor": "Spent a career in the back offices of charter airlines, where a head-office cost nobody can name is a cost that gets cut. Brings a red pen and uses it.",
+    "npsNeeded": null,
+    "signingFee": 150000,
+    "salaryPerDay": 1000,
+    "salaryPerPlane": 80,
+    "classWeights": [1, 0.8, 0.5, 0.3],
     "effect": {
-      "kind": "cargo",
-      "revenueMultiplier": 1.25
+      "kind": "overhead",
+      "overheadMultiplier": 0.75,
+      "slotFeeMultiplier": 0.9
+    }
+  },
+  {
+    "id": "cfo-okafor",
+    "role": "cfo",
+    "name": "Hana Okafor",
+    "background": "Treasury",
+    "flavor": "Ran fuel purchasing for a flag carrier through two price spikes. Knows the banks by first name and pays half what anyone else does to lock a price.",
+    "npsNeeded": 15,
+    "signingFee": 250000,
+    "salaryPerDay": 2500,
+    "salaryPerPlane": 150,
+    "classWeights": [0.3, 0.5, 0.8, 1],
+    "effect": {
+      "kind": "treasury",
+      "hedgePremiumMultiplier": 0.5,
+      "overheadMultiplier": 0.95
+    }
+  },
+  {
+    "id": "cfo-adeyemi",
+    "role": "cfo",
+    "name": "Simone Adeyemi",
+    "background": "Aircraft finance",
+    "flavor": "Structured aircraft debt for a decade before deciding she would rather spend it than arrange it. Lessors return her calls first, quote her lower, and deliver sooner.",
+    "npsNeeded": 10,
+    "signingFee": 250000,
+    "salaryPerDay": 2500,
+    "salaryPerPlane": 150,
+    "classWeights": [0.8, 0.9, 1, 1],
+    "effect": {
+      "kind": "leasing",
+      "leaseMultiplier": 0.85,
+      "deliveryMultiplier": 0.5,
+      "returnMultiplier": 0.5
     }
   },
   {
     "id": "hga-fontaine",
-    "role": "hga",
+    "role": "cfo",
     "name": "Lucía Fontaine",
     "background": "Government affairs",
     "flavor": "A former diplomat who treats a landing permit as the start of a conversation. Ministers take her calls, and tell their staff to.",
-    "npsNeeded": null,
-    "requiresTier": "international",
-    "signingFee": 300000,
-    "salaryPerDay": 3000,
+    "npsNeeded": 20,
+    "signingFee": 200000,
+    "salaryPerDay": 2000,
+    "salaryPerPlane": 100,
+    "classWeights": [0.5, 0.7, 1, 1],
     "effect": {
       "kind": "events",
-      "premiumMultiplier": 1.25,
-      "penaltyMultiplier": 0.8
-    }
-  },
-  {
-    "id": "hga-eze",
-    "role": "hga",
-    "name": "Obinna Eze",
-    "background": "Aviation policy",
-    "flavor": "Wrote part of a bilateral agreement and still knows which clause nobody read. Priority flights come with better terms when he is in the room.",
-    "npsNeeded": 15,
-    "requiresTier": "established",
-    "signingFee": 500000,
-    "salaryPerDay": 5000,
-    "effect": {
-      "kind": "events",
-      "premiumMultiplier": 1.5,
-      "penaltyMultiplier": 0.6
+      "premiumMultiplier": 1.3,
+      "penaltyMultiplier": 0.7
     }
   }
 ]

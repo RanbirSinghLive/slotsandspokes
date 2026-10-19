@@ -707,8 +707,8 @@ planner the route builder uses, and the ring's actions in
   9. **Head office.** It adopts innovations on a 90-day payback, sets a
      standing fuel policy on day one (50% cover, 90 days, dips only, no
      surcharge; `AIRGAME_FUEL_POLICY` tries another), and hires executives
-     when last week's margin covers ten times the salary (see those
-     sections).
+     by net worth a day when last week's margin covers three times the
+     salary (see those sections).
 
   It skips a rotation whose new slot fees are more than a quarter of
   what a full plane would take in fares on it. It never adds flights at
@@ -1313,8 +1313,8 @@ or a schedule problem, Mtc red for a plane AOG, Crews red for a class short and 
 stretched, Routes amber for a route that lost money yesterday, Money red
 under a month of cash), or for something new since that screen was last
 open, like unread mail (Goals green for a milestone, Rivals amber for a
-rival on one of your markets, Office green for an executive or
-innovation newly on offer).
+rival on one of your markets, Office green for an executive seat
+newly wanting a look or an innovation newly on offer).
 
 **The jump box** (`ui/jumpBox.ts`): `/`, ⌘K or Ctrl+K, or Jump at the
 top of the rail, opens a search at the top of the map over every
@@ -1735,7 +1735,7 @@ A route's own lever lives in its route view, under **Fare**:
     hill's height at a fare never flown, narrowing with each day flown
     within 6% of the going rate of it (as 1/√(1 + days)); older days
     drop out, so when the market moves the band widens again. A
-    revenue-management CCO halves it (`executiveFareEstimateMultiplier()`);
+    revenue manager narrows it by up to half (`executiveFareEstimateMultiplier()`);
   - **the estimate** in the band is the game's forecast
     (`summarizeMarket()` at 25 fares, smoothed) plus an error as big as
     the uncertainty there, a smooth wave fixed per market: right where
@@ -1913,7 +1913,7 @@ home picker), your airline (the map), fly your first route (with the
 type choice), the clock, today's operation (ops board and P&L strip, and the amber ★ event chip),
 the lenses, the rail, the Schedule (the step opens Fleet on it), hours
 filling (peaks, the planner's next free hour, peak against off-peak),
-crews and maintenance (Mtc), Fuel (the standing policy), Head office (contracts, air rights, the seven chairs,
+crews and maintenance (Mtc), Fuel (the standing policy), Head office (contracts, air rights, the three chairs and board seat,
 the tree), Goals, and a last word on edges fading, size drawing rivals,
 cash, and the year one report. A step pointing inside a screen opens it
 first (`open`). The two hands-on steps, choosing a
@@ -3798,8 +3798,8 @@ days (`applyHeavyTolerance()`, `heavyShiftDays`), so checks that fall together
 can be spread over the hangar. It is a soft gate. A push costs 0.5, 2 or 5
 times the check's contract price, and each earlier push on the same check
 makes the next 50% dearer (`heavyPushes`). The most a check can be pushed in
-all is 10 days, plus the Director of Maintenance's days (Aaltonen +3, Bakare
-+5) and 2 for each hangar bay at the plane's base, up to 20
+all is 10 days, plus the heavy maintenance director's days (Bakare +5 on a
+narrowbody or widebody, +2 on a regional, none on a propeller) and 2 for each hangar bay at the plane's base, up to 20
 (`toleranceCapDays()`). Every day the check runs past the date it would have
 fallen due without the push, the plane wears like 0.1 years of extra age
 (`toleranceWearYears()`, in `wornAge()`), so it breaks and delays more until
@@ -3828,7 +3828,7 @@ the plane is back the next morning, and the pulled engine goes to the shop for
 20 days, paid then (40 days of the spare's holding cost), before it rejoins the
 pool. Each spare costs its holding cost a day, on the shelf or in the shop
 (Propeller $60, Regional $150, Narrowbody $350, Widebody $750), under
-maintenance (scaled by the Director of Maintenance), up to 3 a class and only for a class in the fleet. Spares are
+maintenance (scaled by the heavy maintenance director), up to 3 a class and only for a class in the fleet. Spares are
 given back only when on the shelf. The headless player holds one per 6 planes
 of a class.
 
@@ -3933,7 +3933,7 @@ ahead rather than reacted with:
   wherever pays today still costs something.
 - **Crews** join 7 days after hiring, 10 after retraining (above).
 
-A fleet programmes COO (Lena Fischer) halves delivery and return times,
+The fleet finance executive (Simone Adeyemi) halves delivery and return times,
 a crew academy hiring times.
 
 **On the map**, an airport with anything under way shows one amber line
@@ -4149,74 +4149,82 @@ checks the shop, the chain and the chargers.
 
 ## Executives (`src/sim/executives.ts`)
 
-The player is the chief executive; seven chairs are theirs to fill, at
-Head office (Network › Head office): **COO**, **CFO** and **CCO** from
-the start, and four more that open as the airline climbs the ladder:
-Chief Pilot (Network airline), Director of Maintenance
-(International), Head of Cargo and Head of Government Affairs (International).
-A chair none of whose candidates the airline has reached yet shows greyed
-with a lock and the tier that opens it. Each
+The player is the chief executive. Three chairs are theirs to fill at
+Head office from the start: **Operations**, **Commercial** and
+**Finance**, four candidates each. A fourth **board seat** opens at
+Network airline (greyed with a lock until then) and takes any candidate
+not already seated, so a big airline can double down on one area. Each
 candidate (`data/executives.json`) is a named person with a background,
 hired for a **signing fee** (not refunded) and a **daily salary**
-(charged at rollover, cost category `executives`), for one lasting
-effect on a system already in the game. "Let go" stops the salary.
-Replacing a holder costs the new candidate's full fee.
+(charged at rollover, cost category `executives`): a base plus a share
+for every plane in the fleet, so a chair is never free value to a big
+airline. "Let go" stops the salary; replacing a holder costs the new
+candidate's full fee.
 
-Head office shows the chairs as **tiles**, each with its holder's
-portrait (or an empty chair), name and background, or how many
-candidates are available. Clicking a chair opens it below: the holder,
-then each candidate with a portrait, what they'd do and cost, and
-Appoint or why not yet. Portraits are flat cartoon faces drawn as SVG
-(`ui/portraits.ts`), one set of traits per candidate, the jacket in the
-chair's colour (COO teal, CFO amber, CCO violet, Chief Pilot blue, Maintenance coral, Cargo green, Government pink).
+**Who fits changes with the fleet.** Every candidate has `classWeights`,
+one per aircraft class smallest first: how strongly their effect lands
+on that class. Effects felt per flight (delays, tech delays and AOG,
+NPS, lease rates, C-check pushes) use that flight's or plane's class;
+the rest use the fleet's average (`fleetStrength()`). The inflight
+director does nothing on a propeller (no cabin crew) and the most on a
+widebody; the line maintenance chief and the cost controller are the
+reverse. Three chairs for twelve people means there is always someone
+you go without.
 
-**The pool widens as NPS rises**: each chair has a journeyman open to
-anyone, a hire who needs a trailing network NPS of 15, and a star who
-needs 20 (judged at hiring). A hire with a line must keep it: network NPS under it for 30 days in a row and they leave (`rollExecutiveStanding()`), the fee gone; the chair's view counts the days down.
+| Chair | Anyone | NPS 10 | NPS 15 | NPS 20 |
+|---|---|---|---|---|
+| Operations | Errol Vance, line maintenance: tech delays and AOG −30% (props full, widebodies 20%); Ingrid Solheim, chief pilot: retraining −50% (props 30%, narrowbody+ full) | Marcus Oyelaran, ops control: delays −15% (80% to full) | Tunde Bakare, heavy maintenance: base running costs −25%, C-check pushes −50%, push +5d (none on props) | |
+| Commercial | Tomas Lindqvist: markets grow 30% faster (props full, widebodies 30%) | Priya Raghunathan, inflight: +10 NPS a flight (props 0, regional 40%, narrowbody 70%, widebody full) | Inês Carvalho, network: connecting passengers +20%, freight +20% (20% to full) | Kofi Mensah, revenue: yield +4%, sharper fare reads (25% to full) |
+| Finance | Dale Mercer, cost control: overhead −25%, slot fees −10% (props full, widebodies 30%) | Simone Adeyemi, fleet finance: new leases −15%, deliveries and returns in half the time (80% to full) | Hana Okafor, treasury: hedge premiums halved, 180-day hedges, overhead −5% (30% to full) | Lucía Fontaine, government affairs: event premiums +30%, penalties −30% (50% to full) |
 
-| Chair | Anyone | NPS 15 | NPS 20 |
-|---|---|---|---|
-| COO | Errol Vance: breakdowns as if 15% younger; Lena Fischer (NPS 10): deliveries and returns in half the time | Marcus Oyelaran: delays 15% shorter | Priya Raghunathan: +8 NPS a flight |
-| CFO | Dale Mercer: overhead −15% | Hana Okafor: hedge premiums halved, 180-day hedges, overhead −5% | Simone Adeyemi: new leases −12% |
-| CCO | Tomas Lindqvist: markets grow 25% faster | Inês Carvalho: +15% connecting passengers | Kofi Mensah: +3% yield |
+Fees run $150,000 to $350,000; base salaries $1,000 (the three
+journeymen) to $3,500 a day plus $80 to $200 a plane.
 
-A fourth CCO, Akira Sato (NPS 25, $500,000, $5,000 a day), lifts yield 5% (and sharpens fare estimates like Mensah). Seats sold belong to Spoilage management alone (see Innovations).
+**Worth and advice.** `executiveWorthPerDay()` estimates what a
+candidate would add to the airline's day as it flies now: last week's
+revenue or cost in the line their effect touches, times the share their
+effect plausibly moves, at today's fleet strength. It is an estimate for
+comparing people, set so a hire who suits the fleet earns a few times
+their salary. `seatAdvice()` reads it per seat: `underwater` when the
+holder costs more than they earn, `better` naming someone open to the
+airline (NPS aside from cash) who would net 1.5 times the holder (and at
+least $500 a day more), `empty` when an empty seat has such a hire.
 
-**Second tiers.** Each chair also has candidates that need a ladder tier
-as well as NPS (`requiresTier` in the data; a candidate's card says "Needs
-<tier>" until then). A senior hire replaces the junior in the same chair
-and costs a full new fee: COO Kenji Watanabe (Operator, NPS 25): delays
-25% shorter; CFO Marguerite Dufresne (Operator, NPS 25): new leases −20%;
-CCO Rafael Ortega (Operator, NPS 25): +30% connecting passengers. They
-cost $700,000 to $800,000 and $7,000 to $8,000 a day.
+**Head office** shows the seats as tiles: the holder's portrait (jacket
+in their chair's colour: Operations teal, Commercial violet, Finance
+amber), name and net a day; amber when the advice says look, a green
+dot on an empty seat a hire would pay in. Opening a seat lists its
+holder and every candidate best fit first, each with a fit bar (worth a
+day, a tick at the salary, green past it), net a day, four class pips,
+and Appoint or why not yet; the candidate the advice names is outlined.
 
-| New chair | Opens | First hire | Second hire |
-|---|---|---|---|
-| Chief Pilot | Network airline | Ingrid Solheim: retraining 20% faster ($400,000, $4,000 a day) | Dev Malhotra (Operator, NPS 15): 40% faster ($700,000, $7,000) |
-| Director of Maintenance | International | Birgit Aaltonen: base running costs −5% ($500,000, $5,000) | Tunde Bakare (Operator, NPS 15): −30% ($700,000, $7,000) |
-| Head of Cargo | International | Nadia Karimova: freight revenue +10% ($300,000, $3,000) | Sven Lindahl (Established carrier, NPS 15): +25% ($500,000, $5,000) |
-| Head of Government Affairs | International | Lucía Fontaine: event premiums +25%, penalties −20% ($300,000, $3,000) | Obinna Eze (Established carrier, NPS 15): +50%, −40% ($500,000, $5,000) |
+**Nudges**, none of them windows: the Office rail dot lights when a
+seat newly wants a look; the daily brief carries a 👔 chip naming the
+seat and who would fit (each seat at most once a week, `lastExecNudge`);
+and a small greyed portrait sits beside the Mtc, Crews and Fleet titles
+when the line maintenance chief or heavy maintenance director, the chief
+pilot, or the inflight director or fleet finance would clearly fit
+(`seatToFit()`, `ui/execNudge.ts`); a tap opens their seat.
 
-The crew effect is the only lever on retraining time (`crewRetrainTimeFactor()`); hiring time is the crew academy's (`crewHireTimeFactor()`),
-the base effect scales `mxCostPerDay()` and the spare engine pool's holding cost, the freight effect scales each
-load's revenue in `carryCargo()`, and the event effect scales a new
-offer's premium and its penalty (sim/mandates.ts). A save from before the
-new chairs has no slots for them and fills them as it hires.
+**The pool widens as NPS rises**: candidates with a line only talk to an
+airline at that trailing network NPS (judged at hiring), and a hire with
+a line must keep it: network NPS under it for 30 days in a row and they
+leave (`rollExecutiveStanding()`), the fee gone; the seat's view counts
+the days down.
 
-Fees run $150,000 (journeymen) to $800,000, salaries $1,500 to $8,000 a
-day. The effects are read where they apply: delays (sim/cascade.ts,
-step.ts), NPS, AOG age (sim/aog.ts), overhead (sim/overhead.ts), hedge
-premiums and the 180-day term (sim/fuelPrice.ts), lease rates (`asLeased()` in
-sim/playerActions.ts), market growth, hub flows (sim/hubs.ts, in the
-cache key) and yield (`bookingPerks()`).
+Saves from before format 3 had seven chairs; `migrateExecutives()` (run
+by the format 3 migration in `ui/save.ts`) maps each retired candidate
+to whoever does their job now, keeps anyone already in their own chair,
+then places the rest earliest hire first in their chair or, once the
+airline has opened it, the board seat, and lets go whoever finds no seat.
 
-The steady headless player hires when last week's margin covers ten
-times the salary and the fee leaves its cash reserve, filling empty
-chairs and upgrading to stronger candidates. Measured: journeymen around
-days 80–170, the NPS 15 hires from day 109, the stars rarely (once in
-five sample games, day 314). It fills the new chairs the same way as they
-open, which moves `npm run quick` (see the headless runner). The reference
-(`balance-reference.json`) was not re-saved with the chairs.
+The steady headless player fills each seat with the candidate who would
+net most, and switches when another nets enough more to earn back the
+signing fee within 120 days (`EXECUTIVE_PAYBACK_DAYS`) once the holder
+has sat 90 days (`EXECUTIVE_MIN_TENURE_DAYS`), when last week's
+margin covers three times the salary and the fee leaves its cash
+reserve. `npm run executivetest` checks the seats, the class scaling,
+the worth shift from propellers to widebodies, and the migration.
 
 ---
 

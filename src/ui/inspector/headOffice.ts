@@ -3,8 +3,9 @@ import { money } from '../format';
 import { cashAfterRows, showConfirm } from '../confirmModal';
 import type { SimState } from '../../sim/state';
 import * as ops from '../routeActions';
-import type { ExecutiveOption, InnovationOption } from '../routeActions';
-import { describeEffect, EXECUTIVE_LAPSE_DAYS, type ExecutiveRole } from '../../sim/executives';
+import type { ExecutiveOption, ExecutiveSeatOption, InnovationOption } from '../routeActions';
+import { describeEffect, EXECUTIVE_LAPSE_DAYS, type ExecutiveSeat } from '../../sim/executives';
+import { AIRCRAFT_CLASSES } from '../../sim/aircraftClasses';
 import { formatNps, networkNps } from '../../sim/nps';
 import { portraitElement, ROLE_COLOURS } from '../portraits';
 import { innovationIconElement } from '../innovationIcons';
@@ -90,20 +91,66 @@ function confirmButton(label: string, confirm: Omit<Parameters<typeof showConfir
   return button;
 }
 
-/** One candidate: who they are, what they'd do and cost, and a button to hire them, or why not yet. */
-function candidateCard(state: SimState, candidate: ExecutiveOption, role: string, holder: string | null, changed: () => void): HTMLElement {
+/** Each aircraft class's short name, smallest first, for the class pips. */
+const CLASS_SHORT = AIRCRAFT_CLASSES.map((aircraftClass) => aircraftClass.name);
+
+/** Four pips, one per aircraft class, filled as strongly as the person works on it. */
+function classPips(person: ExecutiveOption): HTMLElement {
+  const pips = document.createElement('span');
+  pips.className = 'exec-pips';
+  pips.title = person.classStrengths.map((strength, index) => `${CLASS_SHORT[index]} ${Math.round(strength * 100)}%`).join(' · ');
+  for (const strength of person.classStrengths) {
+    const pip = document.createElement('span');
+    pip.className = 'exec-pip';
+    pip.style.setProperty('--fill', String(strength));
+    pips.append(pip);
+  }
+  return pips;
+}
+
+/**
+ * Worth against salary at today's fleet: a bar filled to the estimated
+ * worth, with a tick at the salary, green past it and grey short of it.
+ */
+function fitBar(person: ExecutiveOption): HTMLElement {
+  const net = person.worthPerDay - person.salaryNow;
+  const scale = Math.max(person.worthPerDay, person.salaryNow * 2, 1);
+  const bar = document.createElement('span');
+  bar.className = 'exec-fit';
+  bar.classList.toggle('is-paying', net > 0);
+  bar.title = `est. ${money(person.worthPerDay)}/day vs salary ${money(person.salaryNow)}/day at today's fleet`;
+  const fill = document.createElement('span');
+  fill.className = 'exec-fit-fill';
+  fill.style.width = `${Math.round((person.worthPerDay / scale) * 100)}%`;
+  const tick = document.createElement('span');
+  tick.className = 'exec-fit-salary';
+  tick.style.left = `${Math.round((person.salaryNow / scale) * 100)}%`;
+  bar.append(fill, tick);
+  const label = document.createElement('span');
+  label.className = 'exec-fit-net';
+  label.textContent = `${net >= 0 ? '+' : '−'}${money(Math.abs(net))}/d`;
+  const wrap = document.createElement('span');
+  wrap.className = 'exec-fit-row';
+  wrap.append(bar, label, classPips(person));
+  return wrap;
+}
+
+/** One candidate: who they are, what they'd do, net and cost, and a button to hire them into `seat`, or why not yet. */
+function candidateCard(state: SimState, candidate: ExecutiveOption, seat: ExecutiveSeatOption, better: boolean, changed: () => void): HTMLElement {
+  const holder = seat.holder?.name ?? null;
   const card = document.createElement('div');
   card.className = 'office-card office-person';
   card.classList.toggle('is-locked', candidate.blocked !== null);
+  card.classList.toggle('is-better', better);
   const body = document.createElement('div');
   const name = document.createElement('div');
   name.className = 'office-card-name';
-  name.textContent = `${candidate.name} · ${candidate.background}`;
+  name.append(`${candidate.name} · ${candidate.background} `, info(candidate.flavor));
   body.append(
     name,
-    line(candidate.flavor, 'inspector-line office-card-flavor'),
     line(describeEffect(candidate.effect)),
-    line(`Sign ${money(candidate.signingFee)} · ${money(candidate.salaryPerDay)}/day`, 'inspector-line office-card-price'),
+    fitBar(candidate),
+    line(`Sign ${money(candidate.signingFee)} · ${money(candidate.salaryNow)}/day${candidate.npsNeeded !== null ? ` · NPS ${candidate.npsNeeded}+` : ''}`, 'inspector-line office-card-price'),
   );
   if (candidate.blocked) {
     body.append(line(candidate.blocked, 'inspector-line goal-ahead'));
@@ -112,117 +159,144 @@ function candidateCard(state: SimState, candidate: ExecutiveOption, role: string
       confirmButton(
         holder ? `Replace ${holder}` : 'Appoint',
         {
-          title: `${holder ? 'Replace' : 'Appoint'} ${role.toUpperCase()}: ${candidate.name}`,
+          title: `${holder ? 'Replace' : 'Appoint'} · ${seat.label}: ${candidate.name}`,
           rows: [
             { label: 'Signing fee', value: money(candidate.signingFee) },
-            { label: 'Salary', value: `${money(candidate.salaryPerDay)}/day` },
+            { label: 'Salary', value: `${money(candidate.salaryNow)}/day` },
+            { label: 'Est. worth', value: `${money(candidate.worthPerDay)}/day` },
             ...cashAfterRows(state, candidate.signingFee),
           ],
           facts: [describeEffect(candidate.effect), ...(holder ? [`${holder} leaves, with no refund of their fee.`] : [])],
           confirmLabel: holder ? `Replace ${holder}` : 'Appoint',
         },
         () => {
-          ops.appointExecutiveById(state, candidate.id);
+          ops.appointExecutiveById(state, candidate.id, seat.seat);
           changed();
         },
       ),
     );
   }
-  card.append(portraitElement(candidate.id, role, 44), body);
+  card.append(portraitElement(candidate.id, candidate.role, 44), body);
   return card;
 }
 
-/** The chair opened to show its holder and candidates, if any: one at a time, kept while the view rebuilds. */
-let openChair: string | null = null;
+/** The seat opened to show its holder and candidates, if any: one at a time, kept while the view rebuilds. */
+let openSeat: ExecutiveSeat | null = null;
+
+/** Open a seat the next time the Office draws, for a nudge that leads there (ui/execNudge.ts). */
+export function openExecutiveSeat(seat: ExecutiveSeat): void {
+  openSeat = seat;
+}
+
+/** Whether a seat wants a look: amber when its holder costs more than they earn or someone fits clearly better. */
+function seatWantsLook(seat: ExecutiveSeatOption): boolean {
+  return seat.advice.underwater || (seat.holder !== null && seat.advice.better !== null);
+}
 
 /**
- * The chairs as tiles, each with who holds it (their portrait, or an
- * empty chair) and, at a glance, what they do or how many candidates are
- * talking to you. Click one to open it: its holder, then each candidate
- * with what they'd do, cost and whether they'll come yet.
+ * The seats as tiles, each with who holds it (their portrait, or an
+ * empty chair) and their net a day as a fit bar. A tile turns amber when
+ * its holder is costing money or someone else would fit clearly better,
+ * and an empty one gets a dot when a hire would pay. Click one to open
+ * it: its holder, then every candidate, best fit first.
  */
 function executivesSection(state: SimState, changed: () => void): HTMLElement[] {
-  const chairs = ops.executiveOptions(state);
+  const seats = ops.executiveOptions(state);
   const nodes: HTMLElement[] = [
-    heading('Executives', 'You are the chief executive; these chairs are yours to fill, and more open as the airline climbs the ladder. The strongest candidates only talk to an airline passengers rate well. A hire with an NPS line leaves if the airline stays under it for 30 days in a row. Click a chair to see who it could be.'),
+    heading('Executives', `You are the chief executive; three chairs are yours to fill, and a board seat that takes anyone opens at Network airline. Each person works harder on some aircraft classes than others (the four pips, smallest class first), so who fits changes as you fly bigger planes. The bar is their estimated worth a day at today's fleet; the tick is their salary, a base plus a share per plane. The strongest candidates only talk to an airline passengers rate well, and a hire with an NPS line leaves if the airline stays under it for ${EXECUTIVE_LAPSE_DAYS} days in a row.`),
     line(`Airline NPS ${formatNps(networkNps(state))}`),
   ];
   const row = document.createElement('div');
   row.className = 'office-chairs';
-  for (const chair of chairs) {
+  for (const seat of seats) {
     const tile = document.createElement('button');
     tile.type = 'button';
     tile.className = 'office-chair-tile';
-    tile.classList.toggle('is-open', openChair === chair.role);
-    tile.classList.toggle('is-filled', chair.holder !== null);
-    tile.classList.toggle('is-locked', chair.opensAt !== null);
-    tile.style.setProperty('--role', ROLE_COLOURS[chair.role] ?? '#8a93a6');
-    tile.title = chair.opensAt ? `${chair.label} · opens at ${chair.opensAt}` : chair.label;
-    const available = chair.candidates.filter((c) => !c.appointed && !c.blocked).length;
+    tile.classList.toggle('is-open', openSeat === seat.seat);
+    tile.classList.toggle('is-filled', seat.holder !== null);
+    tile.classList.toggle('is-locked', seat.opensAt !== null);
+    tile.classList.toggle('wants-look', seatWantsLook(seat));
+    tile.classList.toggle('has-hire', seat.advice.empty);
+    const colourRole = seat.holder?.role ?? seat.seat;
+    tile.style.setProperty('--role', ROLE_COLOURS[colourRole] ?? '#8a93a6');
+    tile.title = seat.opensAt
+      ? `${seat.label} · opens at ${seat.opensAt}`
+      : seat.advice.better
+        ? `${seat.label} · ${seat.advice.better.name} would fit better`
+        : seat.advice.underwater
+          ? `${seat.label} · costs more than they earn`
+          : seat.label;
     const role = document.createElement('span');
     role.className = 'office-chair-role';
-    role.textContent = chair.role.toUpperCase();
+    role.textContent = seat.label;
     const who = document.createElement('span');
     who.className = 'office-chair-who';
-    who.textContent = chair.holder ? chair.holder.name : 'Vacant';
-    const note = document.createElement('span');
-    note.className = 'office-chair-note';
-    note.textContent = chair.holder ? chair.holder.background : chair.opensAt ? `🔒 ${chair.opensAt}` : `${available} available`;
-    tile.append(portraitElement(chair.holder?.id ?? null, chair.role, 56), role, who, note);
+    who.textContent = seat.holder ? seat.holder.name : seat.opensAt ? '🔒' : 'Vacant';
+    tile.append(portraitElement(seat.holder?.id ?? null, colourRole, 56), role, who);
+    if (seat.holder) {
+      const net = seat.holder.worthPerDay - seat.holder.salaryNow;
+      const note = document.createElement('span');
+      note.className = 'office-chair-note';
+      note.classList.toggle('is-paying', net > 0);
+      note.textContent = `${net >= 0 ? '+' : '−'}${money(Math.abs(net))}/d`;
+      tile.append(note);
+    }
     tile.addEventListener('click', () => {
-      openChair = openChair === chair.role ? null : chair.role;
+      openSeat = openSeat === seat.seat ? null : seat.seat;
       changed();
     });
     row.append(tile);
   }
   nodes.push(row);
 
-  const chair = chairs.find((c) => c.role === openChair);
-  if (chair) {
+  const seat = seats.find((s) => s.seat === openSeat);
+  if (seat) {
     const title = document.createElement('h4');
     title.className = 'office-chair';
-    title.textContent = chair.label;
+    title.textContent = seat.opensAt ? `${seat.label} · opens at ${seat.opensAt}` : seat.label;
     nodes.push(title);
-    if (chair.holder) {
+    const holder = seat.holder;
+    if (holder) {
       const card = document.createElement('div');
       card.className = 'office-card office-person is-adopted';
+      card.classList.toggle('wants-look', seatWantsLook(seat));
       const body = document.createElement('div');
       const name = document.createElement('div');
       name.className = 'office-card-name';
-      name.textContent = `✓ ${chair.holder.name} · ${chair.holder.background}`;
+      name.textContent = `✓ ${holder.name} · ${holder.background}`;
       body.append(
         name,
-        line(describeEffect(chair.holder.effect)),
-        line(`Since day ${chair.hiredDay} · ${money(chair.holder.salaryPerDay)}/day`, 'inspector-line office-card-price'),
-        ...lapseLine(state, chair.role as ExecutiveRole, chair.holder.npsNeeded),
+        line(describeEffect(holder.effect)),
+        fitBar(holder),
+        line(`Since day ${seat.hiredDay} · ${money(holder.salaryNow)}/day`, 'inspector-line office-card-price'),
+        ...lapseLine(seat.daysBelowLine, holder.npsNeeded),
         confirmButton('Let go', {
-          title: `Let ${chair.holder.name} go`,
+          title: `Let ${holder.name} go`,
           rows: [
-            { label: 'Chair', value: chair.label },
-            { label: 'Salary saved', value: `${money(chair.holder.salaryPerDay)}/day` },
+            { label: 'Seat', value: seat.label },
+            { label: 'Salary saved', value: `${money(holder.salaryNow)}/day` },
           ],
-          facts: [`You lose: ${describeEffect(chair.holder.effect)}`, 'Their signing fee is not refunded, and rehiring costs a new fee.'],
+          facts: [`You lose: ${describeEffect(holder.effect)}`, 'Their signing fee is not refunded, and rehiring costs a new fee.'],
           confirmLabel: 'Let go',
         }, () => {
-          ops.letExecutiveGo(state, chair.role as ExecutiveRole);
+          ops.letExecutiveGo(state, seat.seat);
           changed();
         }),
       );
-      card.append(portraitElement(chair.holder.id, chair.role, 44), body);
+      card.append(portraitElement(holder.id, holder.role, 44), body);
       nodes.push(card);
     }
-    for (const candidate of chair.candidates) {
-      if (!candidate.appointed) nodes.push(candidateCard(state, candidate, chair.role, chair.holder?.name ?? null, changed));
+    for (const candidate of seat.candidates) {
+      nodes.push(candidateCard(state, candidate, seat, candidate.id === seat.advice.better?.id, changed));
     }
   }
   return nodes;
 }
 
 /** Under their NPS line: how many days are left before the hire walks, in a warning line. Nothing otherwise. */
-function lapseLine(state: SimState, role: ExecutiveRole, npsNeeded: number | null): HTMLElement[] {
-  const below = state.executives[role]?.daysBelowLine ?? 0;
-  if (below === 0 || npsNeeded === null) return [];
-  return [line(`NPS under ${npsNeeded} · leaves in ${EXECUTIVE_LAPSE_DAYS - below}d`, 'inspector-line office-card-price')];
+function lapseLine(daysBelow: number, npsNeeded: number | null): HTMLElement[] {
+  if (daysBelow === 0 || npsNeeded === null) return [];
+  return [line(`NPS under ${npsNeeded} · leaves in ${EXECUTIVE_LAPSE_DAYS - daysBelow}d`, 'inspector-line office-card-price')];
 }
 
 /** The innovation opened below the tree, if any, kept while the view rebuilds. */

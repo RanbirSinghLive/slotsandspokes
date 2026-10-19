@@ -293,7 +293,7 @@ export function heavyCheckDueIn(aircraft: Aircraft): number {
  * gate, not free slack:
  * - each push on the same check costs 50% more than the one before;
  * - the most a check can be pushed is a base allowance, plus what the
- *   Director of Maintenance and the base's hangar bays add (`toleranceCapDays`);
+ *   heavy maintenance director and the base's hangar bays add (`toleranceCapDays`);
  * - every day the check runs past its unpushed due date wears the plane like
  *   extra age (`toleranceWearYears`), so more breakdowns and delays until it
  *   goes in.
@@ -309,7 +309,7 @@ const TOLERANCE_COST_FACTOR: Record<number, number> = { 1: 0.5, 5: 2, 15: 5 };
 /** The most this plane's C check can be pushed in all: base allowance, the Director's days and 2 a hangar bay at its base. */
 export function toleranceCapDays(state: SimState, aircraft: Aircraft): number {
   const bays = aircraft.baseAirport ? heavyBays(state, aircraft.baseAirport) : 0;
-  return Math.min(TOLERANCE_MAX_CAP_DAYS, TOLERANCE_BASE_CAP_DAYS + executiveToleranceExtraDays(state) + TOLERANCE_BAY_DAYS * bays);
+  return Math.min(TOLERANCE_MAX_CAP_DAYS, TOLERANCE_BASE_CAP_DAYS + executiveToleranceExtraDays(state, aircraft.typeCode) + TOLERANCE_BAY_DAYS * bays);
 }
 
 /** Extra age a pushed plane wears while its check is past the date it would have fallen due. */
@@ -323,7 +323,7 @@ export function toleranceWearYears(aircraft: Aircraft): number {
 /** What pushing this plane's C check later by `days` costs, dearer for each earlier push on it. */
 export function heavyToleranceCost(state: SimState, aircraft: Aircraft, days: number): number {
   const escalation = 1 + TOLERANCE_ESCALATION * (aircraft.heavyPushes ?? 0);
-  return Math.round(contractCost(heavyCheckWorkMinutes(aircraft.typeCode)) * (TOLERANCE_COST_FACTOR[days] ?? 0) * escalation * executiveToleranceMultiplier(state));
+  return Math.round(contractCost(heavyCheckWorkMinutes(aircraft.typeCode)) * (TOLERANCE_COST_FACTOR[days] ?? 0) * escalation * executiveToleranceMultiplier(state, aircraft.typeCode));
 }
 
 export function heavyShiftOf(aircraft: Aircraft): number {

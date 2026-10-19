@@ -5,6 +5,7 @@ import { toleranceHeavyCheck } from './playerActions';
 import { heavyCheckDueIn, heavyToleranceCost, finishHeavyCheck, toleranceCapDays, toleranceWearYears, TOLERANCE_BASE_CAP_DAYS } from './mxChecks';
 import { wornAge } from './mxChecks';
 import { step } from './step';
+import { AIRCRAFT_CLASSES } from './aircraftClasses';
 
 // Run with `npm run tolerancetest`: a C check can only be pushed later
 // inside its window, each push costs its fee, the total is capped, and
@@ -40,10 +41,15 @@ aircraft.heavyShiftDays = 0;
 assert.equal(wornAge(aircraft), worn - wear, 'wear stayed after the push ended');
 aircraft.heavyShiftDays = 5;
 aircraft.daysSinceHeavyCheck = 86;
+// The heavy maintenance director works on narrowbodies and up, not propellers (sim/executives.ts).
+const typeCode = aircraft.typeCode;
+aircraft.typeCode = AIRCRAFT_CLASSES[2].code;
 const baseCap = toleranceCapDays(state, aircraft);
-state.executives.dom = { candidateId: 'dom-bakare', hiredAtMinute: 0 };
-assert.ok(heavyToleranceCost(state, aircraft, 5) < fee, 'the Director of Maintenance did not cut the fee');
-assert.ok(toleranceCapDays(state, aircraft) > baseCap, 'the Director of Maintenance did not raise the cap');
+const narrowbodyFee = heavyToleranceCost(state, aircraft, 5);
+state.executives.coo = { candidateId: 'dom-bakare', hiredAtMinute: 0 };
+assert.ok(heavyToleranceCost(state, aircraft, 5) < narrowbodyFee, 'the heavy maintenance director did not cut the fee');
+assert.ok(toleranceCapDays(state, aircraft) > baseCap, 'the heavy maintenance director did not raise the cap');
+aircraft.typeCode = typeCode;
 
 finishHeavyCheck(state, aircraft);
 assert.equal(aircraft.heavyShiftDays, undefined);

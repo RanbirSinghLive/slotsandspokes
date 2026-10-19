@@ -1,4 +1,5 @@
 import { powertrainMark } from '../powertrainMark';
+import { execNudge } from '../execNudge';
 import { nightStopCostPerNight, nightStopLegs } from '../../sim/nightStops';
 import { AIRCRAFT_CLASSES, classByCode, pluralClassName } from '../../sim/aircraftClasses';
 import { dayIndex } from '../../sim/clock';
@@ -90,7 +91,10 @@ const collapsedFleetTypes = new Set<string>();
 export function buildFleetView(state: SimState, changed: () => void): HTMLElement {
   const root = document.createElement('div');
   root.className = 'inspector-view';
-  root.append(title('Fleet'));
+  const heading = title('Fleet');
+  const nudge = execNudge(state, ['coo-inflight', 'cfo-adeyemi']);
+  if (nudge) heading.append(nudge);
+  root.append(heading);
 
   if (state.aircraft.length === 0) {
     root.append(lineWithInfo('No aircraft', 'Tap an airport on the map and choose Plane to lease one.'));

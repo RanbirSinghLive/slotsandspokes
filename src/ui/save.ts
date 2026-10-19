@@ -1,6 +1,7 @@
 import type { SimState } from '../sim/state';
 import { ensureCrewBases } from '../sim/crews';
 import { repairDuplicateLegIds } from '../sim/schedule';
+import { migrateExecutives } from '../sim/executives';
 import { removeOrphanFlights } from '../sim/fleetTiming';
 import { GAME_VERSION } from './version';
 
@@ -30,7 +31,7 @@ const SAVE_KEY = 'slotsandspokes-save';
 const LEGACY_KEY = 'airgame-save-v46';
 
 /** The shape of SimState this build writes. Bump it with a migration below. */
-export const SAVE_FORMAT = 2;
+export const SAVE_FORMAT = 3;
 
 type SaveFile = { format: number; gameVersion: string; savedAt?: string; state: SimState };
 
@@ -41,6 +42,8 @@ type SaveFile = { format: number; gameVersion: string; savedAt?: string; state: 
 const MIGRATIONS: Record<number, (state: SimState) => void> = {
   // Two rivals' codes were real airlines' (SK is SAS, IB is Iberia): rename them wherever a code is kept.
   2: (state) => renameCodes(state, { SK: 'YK', IB: 'IJ' }),
+  // Seven executive chairs became three and a board seat: move each hire to whoever does their job now.
+  3: (state) => migrateExecutives(state),
 };
 
 /**

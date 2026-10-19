@@ -1,5 +1,6 @@
 import { activeClosures, announcedClosures } from './airspace';
 import { aogFor } from './aog';
+import { appointedCandidate, EXECUTIVE_SEATS, executiveNetPerDay, ROLE_LABELS, seatAdvice } from './executives';
 import { calendarDayOfYear, DAYS_PER_YEAR, dayIndex, minuteOfDay } from './clock';
 import { crewPlan } from './crewPlan';
 import { mandateIsActive, mandatesOf } from './mandates';
@@ -56,13 +57,13 @@ export function dailyBriefDue(state: SimState): boolean {
 }
 
 export type DailyChip = {
-  kind: 'weather' | 'closure' | 'aog' | 'hold' | 'crew' | 'event' | 'late';
+  kind: 'weather' | 'closure' | 'aog' | 'hold' | 'crew' | 'event' | 'late' | 'exec';
   /** The number shown on the chip. */
   count: number;
   /** A sentence for the tooltip. */
   tip: string;
   /** Where the chip's tap goes. */
-  target: { screen: 'fleet' | 'crews' | 'maintenance' | 'routes' } | { airport: string } | null;
+  target: { screen: 'fleet' | 'crews' | 'maintenance' | 'routes' | 'headOffice' } | { airport: string } | null;
 };
 
 export type DailyBrief = {
@@ -145,8 +146,42 @@ export function buildDailyBrief(state: SimState): DailyBrief {
     chips.push({ kind: 'late', count: yesterday.cancelled, tip: `${yesterday.cancelled} cancelled yesterday; opens Routes by completion`, target: { screen: 'routes' } });
   }
 
+  const execTips = executiveNudges(state, today);
+  if (execTips.length > 0) {
+    chips.push({ kind: 'exec', count: execTips.length, tip: execTips.join('; '), target: { screen: 'headOffice' } });
+  }
+
   const settled = (state.priorityLog ?? []).filter((entry) => entry.day === today - 1).map(({ a, b, text }) => ({ a, b, text }));
   return { day: today, chips, yesterday, settled };
+}
+
+/** Days before the brief mentions the same executive seat again. */
+export const EXEC_NUDGE_DAYS = 7;
+
+/**
+ * Seats someone would fit clearly better, or whose holder costs more than
+ * they earn (sim/executives.ts's seatAdvice()), each at most once every
+ * EXEC_NUDGE_DAYS: the day it is mentioned is kept, so the same day's
+ * brief built again says the same.
+ */
+function executiveNudges(state: SimState, today: number): string[] {
+  const briefs = (state.briefs ??= {});
+  const last = (briefs.lastExecNudge ??= {});
+  const tips: string[] = [];
+  for (const seat of EXECUTIVE_SEATS) {
+    const advice = seatAdvice(state, seat);
+    const holder = appointedCandidate(state, seat);
+    const better = advice.better && (holder || advice.empty) ? advice.better : null;
+    if (!better && !advice.underwater) continue;
+    if (last[seat] !== undefined && last[seat] !== today && today - last[seat] < EXEC_NUDGE_DAYS) continue;
+    last[seat] = today;
+    tips.push(
+      better
+        ? `${ROLE_LABELS[seat]}: ${better.name} est. +$${Math.round(executiveNetPerDay(state, better)).toLocaleString()}/day`
+        : `${ROLE_LABELS[seat]}: ${holder?.name} costs more than they earn`,
+    );
+  }
+  return tips;
 }
 
 /** True once a season review is due; the first call only starts the clock, so a new game or an old save gets its first review half a year on. */
