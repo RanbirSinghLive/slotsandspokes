@@ -391,7 +391,7 @@ const REGIONS: Region[] = [
   {
     name: 'Oceania',
     continent: 'OC',
-    count: 20,
+    count: 50,
     hubs: [
       ['SYD', 'Sydney'],
       ['MEL', 'Melbourne'],
