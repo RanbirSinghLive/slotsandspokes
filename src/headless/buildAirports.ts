@@ -192,6 +192,23 @@ const AIRPORTS: [iata: string, name: string][] = [
   ['SIN', 'Singapore Changi'],
   ['GRU', 'São Paulo Guarulhos'],
   ['JNB', 'Johannesburg O.R. Tambo'],
+  // Regional Australia and New Zealand: the towns their regional airlines
+  // fly to. OurAirports lists few of them as scheduled medium airports, so
+  // the fill-out alone left Sydney three propeller routes.
+  ['WGA', 'Wagga Wagga'],
+  ['ABX', 'Albury'],
+  ['DBO', 'Dubbo'],
+  ['PQQ', 'Port Macquarie'],
+  ['TMW', 'Tamworth'],
+  ['ARM', 'Armidale'],
+  ['OAG', 'Orange'],
+  ['BNK', 'Ballina'],
+  ['ROK', 'Rockhampton'],
+  ['MKY', 'Mackay'],
+  ['LST', 'Launceston'],
+  ['MQL', 'Mildura'],
+  ['NSN', 'Nelson'],
+  ['IVC', 'Invercargill'],
 ];
 
 /**
@@ -391,7 +408,7 @@ const REGIONS: Region[] = [
   {
     name: 'Oceania',
     continent: 'OC',
-    count: 20,
+    count: 50,
     hubs: [
       ['SYD', 'Sydney'],
       ['MEL', 'Melbourne'],
@@ -764,8 +781,12 @@ function chooseFillAirports(region: Region, alreadyChosen: AirportPoint[], candi
     add(hub);
   }
 
+  // An airport with nobody in its own country within reach has no
+  // catchment and can't be on the map (Rota, in the Northern Marianas,
+  // has no place of 1,000 people within reach), so it is never a pick.
+  const hasPeople = (candidate: AirportPoint) => grid.near(candidate, CATCHMENT_MAX_KM).some((place) => place.country === candidate.country);
   for (const tier of [true, false]) {
-    let remaining = candidates.filter((c) => c.large === tier && !chosen.includes(c));
+    let remaining = candidates.filter((c) => c.large === tier && !chosen.includes(c) && hasPeople(c));
     while (added.length < region.count) {
       remaining = remaining.filter((c) => !tooClose(c));
       if (remaining.length === 0) break;

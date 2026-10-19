@@ -48,7 +48,7 @@ export function buildPoolRows(
   crewShareOf?: CrewShareOf,
   /** Planes of a class on their way (sim/fleetTiming.ts), shown as "+N" after the count. */
   inboundOf?: (classCode: string) => number,
-  /** One class's cabin team hours for a second thin bar, for the classes that carry cabin crew. */
+  /** One class's attendants against full service, for a second thin bar, for the classes that carry cabin crew. */
   cabinShareOf?: CrewShareOf,
 ): HTMLElement[] {
   const touching = (pool: ClassPool) => effects.filter((e) => e.classCode === pool.code && (base === undefined || e.base === base));
@@ -135,7 +135,7 @@ export function buildPoolRows(
         row.title += `. Crews: ${Math.round(crew.share * 100)}% of their hours booked${crew.short ? ', too few to fly every plane' : ''}.`;
       }
 
-      // And its cabin teams (Regional and up), a second thin bar under the pilots'.
+      // And its attendants (Regional and up), a second thin bar under the pilots'.
       const cabin = cabinShareOf?.(pool.code);
       if (cabin) {
         const cabinBar = document.createElement('span');
@@ -146,7 +146,7 @@ export function buildPoolRows(
         cabinFill.style.background = cabin.short ? CAPACITY_RING_RED : capacityColor(cabin.share);
         cabinBar.appendChild(cabinFill);
         bars.append(cabinBar);
-        row.title += ` Cabin: ${Math.round(cabin.share * 100)}% of their hours booked${cabin.short ? ', too few teams: flights lose NPS' : ''}.`;
+        row.title += ` Cabin: full service needs ${Math.round(cabin.share * 100)}% of the attendants${cabin.short ? ', under the legal floor: planes grounded' : ''}.`;
       }
 
       row.append(name, bars, value);

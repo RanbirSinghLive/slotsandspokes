@@ -4,7 +4,7 @@ import { DIFFICULTIES, type GameDifficulty } from '../sim/difficulty';
 import { currentPotentialDemand } from '../sim/marketDemand';
 import { marketLoadFactor } from '../sim/loadFactor';
 import { saleBlockedReason, saleMarginChangePerDay } from '../sim/seatSale';
-import { CABIN_TEAMS_PER_SHIFT, crewsForRisk } from '../sim/crews';
+import { attendantsForRisk, crewsForRisk } from '../sim/crews';
 import { mxLevel } from '../sim/bases';
 import { dayOfYear, marketSeasonOn } from '../sim/seasons';
 import { SEASONAL_PREMIUM } from '../sim/seasonalLease';
@@ -294,7 +294,7 @@ function recklessPlayer(): Player {
         }
         for (const crew of actions.crewReadout(state, iata)?.classes ?? []) {
           if (!crew.cabin) continue;
-          const short = crew.cabin.ideal + CREWS_PER_NEW_PLANE * (CABIN_TEAMS_PER_SHIFT[crew.classCode] ?? 0) * inboundAt(state, iata, crew.classCode).length - crew.cabin.teams - crew.cabin.arriving;
+          const short = cabinTarget(state, iata, crew.classCode, crew.cabin) - crew.cabin.attendants - crew.cabin.arriving;
           const seats = actions.crewReadout(state, iata)?.training.cabin.free ?? 0;
           if (short <= 0 || seats <= 0) continue;
           const hired = actions.hireCabinAt(state, iata, crew.classCode, Math.min(short, seats));
@@ -1440,19 +1440,27 @@ function keepHeavyChecks(state: SimState): string[] {
 const CREW_GROUNDING_RISK = 0.05;
 
 /**
- * Cabin teams follow the same rule as pilots without the sickness reserve:
- * each class's need at ideal shifts plus CREWS_PER_NEW_PLANE shifts of
- * teams for each plane on its way, hired up to the base's free cabin
- * training seats and let go after CREW_RELEASE_AFTER_DAYS spare.
+ * The attendants the player keeps for a class at a base: full service on
+ * every plane, or more where sickness would ground one more often than
+ * CREW_GROUNDING_RISK a week, plus CREWS_PER_NEW_PLANE shifts of a new
+ * plane's full cabin for each plane on its way.
  */
-function keepCabin(state: SimState, memory: Memory, iata: string, classes: { classCode: string; cabin: { teams: number; arriving: number; ideal: number } | null }[]): string[] {
+function cabinTarget(state: SimState, iata: string, classCode: string, cabin: { full: number; perNewShift: { full: number } }): number {
+  return attendantsForRisk(state, iata, classCode, CREW_GROUNDING_RISK, cabin.full) + CREWS_PER_NEW_PLANE * cabin.perNewShift.full * inboundAt(state, iata, classCode).length;
+}
+
+/**
+ * Attendants follow the same rule as pilots: cabinTarget(), hired up to
+ * the base's free cabin training seats and let go after
+ * CREW_RELEASE_AFTER_DAYS spare.
+ */
+function keepCabin(state: SimState, memory: Memory, iata: string, classes: { classCode: string; cabin: { attendants: number; arriving: number; full: number; perNewShift: { full: number } } | null }[]): string[] {
   const log: string[] = [];
   for (const crew of classes) {
     if (!crew.cabin) continue;
     const key = `${iata}:${crew.classCode}:cabin`;
-    const perShift = CABIN_TEAMS_PER_SHIFT[crew.classCode] ?? 0;
-    const target = crew.cabin.ideal + CREWS_PER_NEW_PLANE * perShift * inboundAt(state, iata, crew.classCode).length;
-    const short = target - crew.cabin.teams - crew.cabin.arriving;
+    const target = cabinTarget(state, iata, crew.classCode, crew.cabin);
+    const short = target - crew.cabin.attendants - crew.cabin.arriving;
     if (short > 0) {
       memory.spareCrewDays.delete(key);
       const seats = actions.crewReadout(state, iata)?.training.cabin.free ?? 0;
@@ -1461,7 +1469,7 @@ function keepCabin(state: SimState, memory: Memory, iata: string, classes: { cla
       if (hired.ok) log.push(hired.message);
       continue;
     }
-    const spare = crew.cabin.teams - target;
+    const spare = crew.cabin.attendants - target;
     if (spare <= 0 || crew.cabin.arriving > 0) {
       memory.spareCrewDays.delete(key);
       continue;

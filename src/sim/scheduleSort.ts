@@ -69,7 +69,7 @@ function awayFromBase(fixedLegs: ScheduleLeg[], base: string): Busy[] {
 /** Plan the sort of tomorrow's schedule; an empty list of moves means it is already sorted. */
 export function planSort(state: SimState, mode: SortMode): SortPlan {
   const view = tomorrowView(state);
-  const moves: DraftMove[] = [];
+  const groupMoves: DraftMove[][] = [];
 
   const groups = new Map<string, string[]>();
   for (const aircraft of state.aircraft) {
@@ -113,16 +113,27 @@ export function planSort(state: SimState, mode: SortMode): SortPlan {
     // group stays as it is.
     const today = new Map(movable.map((item) => [item.rotation.legs[0].legId, item.rotation.tail]));
     if (planeMarketPairs(available, fixed, movable, placed) > planeMarketPairs(available, fixed, movable, today)) continue;
+    const group: DraftMove[] = [];
     for (const { rotation } of movable) {
       const tail = placed.get(rotation.legs[0].legId)!;
-      if (tail !== rotation.tail) moves.push({ legIds: rotation.legs.map((leg) => leg.legId), tail, start: rotation.departMinute });
+      if (tail !== rotation.tail) group.push({ legIds: rotation.legs.map((leg) => leg.legId), tail, start: rotation.departMinute });
     }
+    if (group.length > 0) groupMoves.push(group);
   }
 
-  if (moves.length === 0) return { ok: true, moves, note: unsortedNote(state, view) };
-  // All or nothing, the same check the ✓ makes: nothing is changed here.
-  const check = commitDraft(state, moves, { dryRun: true });
-  return check.ok ? { ok: true, moves } : { ok: false, reason: check.reason };
+  // All or nothing per group, the same check the ✓ makes: nothing is
+  // changed here. The deal above sees busy times, not every rule the ✓
+  // checks (a late return is curfew-exempt only on a plane flying nothing
+  // else), so a group that fails stays as it is and the rest still sort.
+  let moves: DraftMove[] = [];
+  let firstRefusal: string | null = null;
+  for (const group of groupMoves) {
+    const check = commitDraft(state, [...moves, ...group], { dryRun: true });
+    if (check.ok) moves = [...moves, ...group];
+    else firstRefusal ??= check.reason;
+  }
+  if (moves.length === 0) return { ok: true, moves, note: firstRefusal !== null ? `Left as it is · ${firstRefusal}` : unsortedNote(state, view) };
+  return { ok: true, moves };
 }
 
 /**

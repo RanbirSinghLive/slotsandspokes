@@ -39,6 +39,9 @@ function breakTheDay(hour: number): string {
   aircraft.status = 'ground';
   aircraft.atAirport = rotations[0].legs[0].origin;
   aircraft.groundSinceMinute = state.simMinute - 60;
+  // Set up by hand: whatever the played days left the plane with (an AOG, a crew grounding) is cleared.
+  state.aogs = state.aogs.filter((event) => event.tail !== tail);
+  state.groundedTails = state.groundedTails.filter((grounded) => grounded !== tail);
   // The first rotation earns little and the ones the curfew would take earn a lot, so giving up the first is the sensible call.
   rotations.forEach((r, i) => {
     for (const leg of r.legs) state.revenueHistoryByMarket[marketKey(leg.origin, leg.dest)] = [i === 0 ? 100 : 20000];

@@ -4,6 +4,7 @@ import { leaseAircraft } from './leasing';
 import { fitStandardOnDelivery } from './fleetCabins';
 import { settleMaintenance } from './mxChecks';
 import type { MarketListing } from './market';
+import { legsServingMarket, marketKey } from './schedule';
 import type { Aircraft, SimState } from './state';
 
 /**
@@ -126,6 +127,8 @@ export function rollDailyFleet(state: SimState): void {
   const leaving = state.aircraft.filter((aircraft) => aircraft.returningOnDay !== undefined && aircraft.returningOnDay <= today);
   for (const aircraft of leaving) {
     settleMaintenance(state, aircraft);
+    // Its flights go with it, even ones handed on to it since its return started (AOG cover, say).
+    removeFlightsOf(state, aircraft.tail);
     state.aircraft = state.aircraft.filter((a) => a !== aircraft);
     state.market.listings.push({
       id: state.market.nextListingId++,
@@ -135,6 +138,31 @@ export function rollDailyFleet(state: SimState): void {
       listedDay: today,
     });
   }
+}
+
+/**
+ * Take every flight off a plane. A market left with none loses its
+ * settings, as when a rotation is removed by hand. Returns the legs removed.
+ */
+export function removeFlightsOf(state: SimState, tail: string): number {
+  const legs = state.schedule.filter((leg) => leg.tail === tail);
+  if (legs.length === 0) return 0;
+  state.schedule = state.schedule.filter((leg) => leg.tail !== tail);
+  for (const leg of legs) {
+    if (legsServingMarket(leg.origin, leg.dest, state.schedule) === 0) delete state.routeSettings[marketKey(leg.origin, leg.dest)];
+  }
+  if (state.wrappedFrom) delete state.wrappedFrom[tail];
+  return legs.length;
+}
+
+/** Flights on planes no longer in the fleet, which older saves can hold, come off. Returns how many. */
+export function removeOrphanFlights(state: SimState): number {
+  const tails = new Set(state.aircraft.map((aircraft) => aircraft.tail));
+  let removed = 0;
+  for (const tail of new Set(state.schedule.map((leg) => leg.tail))) {
+    if (!tails.has(tail)) removed += removeFlightsOf(state, tail);
+  }
+  return removed;
 }
 
 export type PendingAt = {

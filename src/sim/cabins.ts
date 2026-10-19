@@ -2,6 +2,7 @@ import aircraftTypesData from '../../data/aircraft-types.json';
 import { marketMix } from './marketCharacter';
 import { summarizeMarket } from './marketSummary';
 import { marketKey } from './schedule';
+import { cabinCostPerDay } from './crews';
 import { noteRefitTarget } from './fleetCabins';
 import type { Aircraft, SimState } from './state';
 import type { SegmentName } from './timeOfDay';
@@ -209,9 +210,12 @@ export function refitWorkMinutes(typeCode: string): number {
 
 /**
  * What a plane's markets would make a day with `target` fitted, against
- * now: each market it flies summarised both ways through the game's own
- * forecast (sim/marketSummary.ts). The seats are swapped on the plane for
- * the forecast and put back; nothing else changes.
+ * now, less what its attendants cost a day more (sim/crews.ts's
+ * cabinCostPerDay(): premium seats need more of them, and a cabin that
+ * drops to 50 seats needs one fewer): each market it flies summarised both
+ * ways through the game's own forecast (sim/marketSummary.ts). The seats
+ * are swapped on the plane for the forecast and put back; nothing else
+ * changes.
  */
 export function cabinGainPerDay(state: SimState, tail: string, target: RefitTarget): number {
   const aircraft = state.aircraft.find((a) => a.tail === tail);
@@ -222,7 +226,7 @@ export function cabinGainPerDay(state: SimState, tail: string, target: RefitTarg
       const [a, b] = key.split('-');
       const settings = state.routeSettings[key];
       return settings ? sum + summarizeMarket(a, b, state, settings).margin : sum;
-    }, 0);
+    }, 0) - cabinCostPerDay(state, tail);
   const before = marginNow();
   const hadCabin = aircraft.cabin;
   const hadPlan = aircraft.seatPlan;

@@ -37,13 +37,14 @@ import {
 } from './bases';
 import {
   CREW_BASE_FEE,
-  CABIN_TEAMS_PER_SHIFT,
   cabinArriving,
   cabinHireFee,
   cabinLeadDays,
   cabinNeed,
-  cabinStandbyCost,
+  cabinReadiness,
   cabinTeamsOf,
+  cabinWage,
+  typeAttendants,
   crewBases,
   CREWS_PER_NEW_PLANE,
   crewNeed,
@@ -1182,12 +1183,12 @@ function crewAdvice(state: SimState, iata: string, classCode: string): string | 
   const inbound = inboundAt(state, iata, classCode).length * CREWS_PER_NEW_PLANE;
   const name = classByCode(classCode)?.name ?? classCode;
   if (have < need.minimum + inbound) return `${iata} short of ${name} crews for it · hire or retrain now to join by delivery`;
-  // Cabin teams for the plane too: a short cabin doesn't ground it, but its NPS suffers.
+  // Attendants for the plane too: without its cabin's legal floor it stays on the ground.
   if (!needsCabinCrew(classCode)) return null;
   const cabinHave = cabinTeamsOf(base, classCode) + cabinArriving(base, classCode);
-  const cabinInbound = inboundAt(state, iata, classCode).length * CREWS_PER_NEW_PLANE * (CABIN_TEAMS_PER_SHIFT[classCode] ?? 0);
+  const cabinInbound = inboundAt(state, iata, classCode).length * CREWS_PER_NEW_PLANE * typeAttendants(state, classCode).floor;
   if (cabinHave >= cabinNeed(state, iata, classCode).minimum + cabinInbound) return null;
-  return `${iata} short of ${name} cabin teams for it · hire them on the Crews screen to protect NPS`;
+  return `${iata} short of ${name} attendants for it · hire them on the Crews screen or it can't fly`;
 }
 
 
@@ -1207,8 +1208,18 @@ export type ClassCrewReadout = {
   standbyPerDay: number;
   /** Whether the ladder has opened this class to the airline (sim/ladder.ts), so its crews can be hired. */
   open: boolean;
-  /** Cabin teams for this class (null for a class that flies without them): on hand, joining, needed, and costs. */
-  cabin: { teams: number; arriving: number; ideal: number; minimum: number; hireFee: number; standbyPerDay: number } | null;
+  /** Attendants for this class (null for a class that flies without them): on hand, joining, off sick, needed for full service and at the legal floor, a new plane's shift, costs, and the weekly chance sickness grounds a plane. */
+  cabin: {
+    attendants: number;
+    arriving: number;
+    sick: number;
+    full: number;
+    minimum: number;
+    perNewShift: { floor: number; full: number };
+    hireFee: number;
+    wagePerDay: number;
+    weeklyRisk: number;
+  } | null;
 };
 
 /** One workforce's training seats at a base: in use and the total. */
@@ -1247,7 +1258,19 @@ export function crewReadout(state: SimState, iata: string): CrewReadout | null {
       standbyPerDay: standbyCost(cls.code),
       open: classOpen(state, cls.code),
       cabin: needsCabinCrew(cls.code)
-        ? { teams: cabinTeamsOf(base, cls.code), arriving: cabinArriving(base, cls.code), ...cabinNeed(state, iata, cls.code), hireFee: cabinHireFee(cls.code), standbyPerDay: cabinStandbyCost(cls.code) }
+        ? (() => {
+            const readiness = cabinReadiness(state, iata, cls.code);
+            return {
+              attendants: cabinTeamsOf(base, cls.code),
+              arriving: cabinArriving(base, cls.code),
+              sick: readiness.sick,
+              ...cabinNeed(state, iata, cls.code),
+              perNewShift: typeAttendants(state, cls.code),
+              hireFee: cabinHireFee(cls.code),
+              wagePerDay: cabinWage(cls.code),
+              weeklyRisk: readiness.weeklyRisk,
+            };
+          })()
         : null,
     };
   }).filter((c) => c.open || c.crews > 0 || c.arriving > 0 || c.bookedHours > 0);

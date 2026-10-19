@@ -67,10 +67,10 @@ All from public sources (CLAUDE.md). Some are **generated** by scripts in
 `src/headless/` — change the script and re-run it rather than editing the
 JSON by hand.
 
-- **`airports.json`** — 585 airports, one per metro: a hand-kept list
+- **`airports.json`** — 626 airports, one per metro: a hand-kept list
   (eastern Canada, 29 northern and regional Canadian airports from Thunder
   Bay to Iqaluit, including Comox, Nanaimo, Terrace, Prince Rupert and Smithers, the north-east US, about 40 of Europe's main cities,
-  and world hubs such as DXB and HND), then a fill-out region by region
+  and world hubs such as DXB and HND, and 13 regional Australian and New Zealand towns from Wagga Wagga to Invercargill), then a fill-out region by region
   (the script's `REGIONS`) from OurAirports' large and medium airports
   with scheduled service:
 
@@ -83,12 +83,13 @@ JSON by hand.
   | Middle East | 20 |
   | Asia | 100 |
   | Africa | 25 |
-  | Oceania | 20 |
+  | Oceania | up to 50 |
 
   North America comes first and is unchanged from when it was the only
   fill-out. Each region takes its hand-named hubs first, then all its
   large airports and then the medium ones, each time the one that would
-  serve the most people not already nearer an airport on the map. A
+  serve the most people not already nearer an airport on the map, never
+  one with nobody in its own country within 60 km. A
   metro's second airport that would take the first's people (Istanbul
   Sabiha Gökçen) is left out (`SECOND_AIRPORTS`), and Ukraine is left out
   while its airspace is closed. Then a **home-reach top-up**
@@ -2123,7 +2124,12 @@ lose: long-haul is a bet on filling 300 seats.
 **Returning a lease** (`returnLease()`) costs 14 days of it
 (`RETURN_FEE_LEASE_DAYS`) and puts the airframe back on the market for
 anyone. It is refused while the plane still has flights, is grounded by
-an AOG, or is in the air.
+an AOG, or is in the air. While it goes back it takes no new flights:
+the route planner refuses it and AOG cover passes it over (as it does a
+plane ferrying to another base). Anything still on it when it leaves the
+fleet comes off with it (`removeFlightsOf()` in `sim/fleetTiming.ts`),
+and a save holding flights on a plane no longer in the fleet loses them
+on load.
 
 ## Brand position (`src/sim/brand.ts`)
 
@@ -2481,7 +2487,7 @@ once a day at rollover; a milestone met stays met.
 | Tier | Needed | Gate milestones | Extras | Opens |
 |---|---|---|---|---|
 | Start-up | 4 of 4 | fly your first route; a route that makes money for a week after its share of fixed costs; a route 72% full over a week; hold a city no rival flies to, on a route flown 30 days (judged on rivals, not hunger, so thin regions can climb) | two routes; a crew based away from home | Regional aircraft; crew academy |
-| Regional carrier | 3 of 4 | serve 8 airports; connect 150 a day through one airport; put a Regional into service; make money every day for a week of a shock | cabin teams for a Regional; accept an event | Narrowbody; online booking, younger airframes |
+| Regional carrier | 3 of 4 | serve 8 airports; connect 150 a day through one airport; put a Regional into service; make money every day for a week of a shock | attendants for a Regional; accept an event | Narrowbody; online booking, younger airframes |
 | Network airline | 3 of 5 | fly 60% of the movements at a busy airport; four routes 4+ a day each way; trailing NPS 15, with 1,000 flights flown; planes based at two airports; put a Narrowbody into service | a line base away from home; first freight revenue | Widebody; loyalty scheme, winglet retrofits |
 | International | 2 of 4 | a route to another continent; connect 750 a day through one airport; airports in 5 countries; a plane based outside the home country | | codeshare feed, spoilage management I–III |
 | Operator | 3 of 5 | a hangar away from home; a line base and hangar at one away airport; 30 days with no AOG (3+ planes); a crew retraining for another class; 10 aircraft | | |
@@ -3391,10 +3397,10 @@ and route views) has a thin unlabelled crew bar under its plane bar:
 duty hours booked against what that class's crews fly at 8-hour shifts,
 red when planes are grounded for want of crews. The two bars lining up
 is balance; the crew bar past the plane bar, or red, is short.
-Regional and bigger classes have a second thin bar under it for cabin
-teams (`cabinShare()`): duty booked times the teams a shift carries,
-against what their teams work at 8-hour shifts, red when teams are below
-the legal minimum and flights lose NPS.
+Regional and bigger classes have a second thin bar under it for
+attendants (`cabinShare()`): what full service on every plane needs
+against the attendants on hand, red when they are below the legal floor
+and planes are grounded.
 
 **The headless players** keep each class's crews at its planes' need
 plus 2 for each plane of the class on its way, hiring them the day the
@@ -3439,27 +3445,55 @@ the longer shifts. The same trip by day costs less.
 
 ## Cabin crew and training seats (`src/sim/crews.ts`)
 
-**Cabin crew** staff Regional planes and up; a Propeller flies without.
-Cabin teams are rated for a class like pilots and live at the same crew
-base. A plane needs `CABIN_TEAMS_PER_SHIFT` teams (1 for Regional and
-Narrowbody, 2 for Widebody) for each shift its pilots fly, so cabin need
-follows the pilot need and the plane's duty day. A team costs half a
-pilot crew in the same class (hire and standby), trains in 4 days (shorter with
-the crew academy), and can be hired and released but not
-converted between classes. Each rollover, after pilots are crewed, each
-flying plane is given the teams it needs in fleet order.
+**Cabin crew** are flight attendants. They staff Regional planes and up (a
+Propeller flies without), are rated for a class like pilots and live at
+the same crew base. How many a plane needs follows its **seat plan**
+(`sim/cabins.ts`), not its pilots, on each shift its pilots fly
+(`planeCabinNeed()`):
 
-A short cabin never grounds a plane. It flies, and every flight on it
-loses service points in its NPS score: the service component is scaled by
-the share of teams it has, and a flight with no cabin team at all loses
-a further `CABIN_SHORT_NPS_PENALTY` (25) points. So short cabins show up
-as a falling name, not as cancellations. Spare teams stand by at their
-cost. An older save's bases are given the teams their planes need on
-load (`ensureCrewBases()`).
+- **The legal floor** is one attendant for every `SEATS_PER_ATTENDANT`
+  (50) seats or part of them, as the FAA and Transport Canada rule it: a
+  75-seat Regional needs 2, a 150-seat Narrowbody 3, a 300-seat Widebody 6.
+  A plane that can't get its floor is **grounded** like one short of
+  pilots (alert `CABIN · tail grounded`). Premium seats take more room, so
+  a cabin can drop under a threshold: a Regional refitted to 50 seats or
+  fewer needs one attendant, not two. That's why 50-seat regional jets
+  exist.
+- **Full service** needs one attendant for every 50 Y, 25 W or 12 J seats
+  (`SERVICE_SEATS_PER_ATTENDANT`), never fewer than the floor. An
+  all-economy plane's floor is its full service. Between the floor and full
+  service a plane flies with a thin cabin, and every flight on it loses
+  service points in its NPS score: the service component is scaled by the
+  cabin's share of full service (`cabinCover()`), less up to
+  `CABIN_SHORT_NPS_PENALTY` (25) points for the share missing.
+
+At rollover each flying plane gets its pilots and its floor in fleet
+order (a plane that can't have both is grounded, and its pilots stay
+spare), then attendants over the floors go one at a time to the thinnest
+cabin. **Attendants are paid by the day**, flying or standing by
+(`cabinWage()`, 60% of a pilot crew's standby in the class), so a seat
+plan carries its crew cost: the refit forecast (`cabinGainPerDay()`, the
+Product screen's type forecast) counts the change in attendants' pay at
+full service. Attendants call in sick like pilots, on the same chance, and
+the Crews screen gives their weekly grounding risk. A hire costs 20% of a
+pilot crew's fee and trains in 4 days (shorter with the crew academy); they
+can be hired and released but not converted between classes. The seat map
+shows a cabin's attendants a shift, legal and full, against now.
+
+A save from when cabin crew counted in teams has each team turned into the
+attendants it stood for (2 on a Regional, 3 on a Narrowbody or Widebody),
+never below the legal floor, on load (`ensureCrewBases()`, marked
+`cabinUnit`); a base from before cabin crews gets full service.
+
+The headless players keep attendants for full service, more where
+sickness would ground a plane more than 5% of weeks
+(`attendantsForRisk()`), plus two shifts of a new plane's full cabin for
+each plane on its way.
 
 **Training seats** gate how fast a base can grow. Pilots and cabin each
-have their own seats at a base: `TRAINING_SEATS_BASE` (2) plus one for
-every two crews already on the roster. A hire, and for pilots a
+have their own seats at a base: `TRAINING_SEATS_BASE` (2 for pilots, 6
+for attendants, so a plane's cabin trains in one course) plus one for
+every two crews or attendants already on the roster. A hire, and for pilots a
 retraining, takes a seat from the day it is paid until the crews join,
 and a hire or conversion that doesn't fit is refused. So a new base
 trains two crews at a time, and a big roster can grow faster than a small
@@ -3467,7 +3501,7 @@ one; a crew academy shortens hiring courses and a chief pilot retraining ones, w
 headless player hires up to the free seats each day and the rest the
 days after. Seats are shown per base on the Crews screen.
 
-Cabin teams are hired on the Crews screen, in the Roster: each open class
+Attendants are hired on the Crews screen, in the Roster: each open class
 from Regional up has a "cabin" row under its pilot row, shown even before
 its first plane so teams can be trained ahead of delivery. The airport
 menu's "Hire pilots and cabin crew" lists them too, and leasing a plane

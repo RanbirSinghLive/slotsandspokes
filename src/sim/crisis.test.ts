@@ -83,7 +83,12 @@ assert.equal(crisis.status, 'missed');
 assert.ok(crisis.flights >= 4 && (state.cancellationsByCause.waived ?? 0) >= crisis.flights);
 console.log('waive, miss: ok');
 
-// Fly on, storm misses: nothing.
+// Fly on, storm misses: nothing beyond the day's own weather elsewhere, measured with no forecast at all.
+restore();
+state.crises = [];
+weatherBefore = state.cancellationsByCause.weather;
+throughRollover();
+const ordinaryWeather = state.cancellationsByCause.weather - weatherBefore;
 restore();
 crisis = forecast(0);
 cash = state.cash;
@@ -91,7 +96,7 @@ weatherBefore = state.cancellationsByCause.weather;
 throughRollover();
 assert.equal(crisis.status, 'missed');
 assert.equal(crisis.paid, 0);
-assert.equal(state.cancellationsByCause.weather, weatherBefore);
+assert.equal(state.cancellationsByCause.weather - weatherBefore, ordinaryWeather);
 console.log('fly on, miss: ok');
 
 // The player's choice, and its deadline.

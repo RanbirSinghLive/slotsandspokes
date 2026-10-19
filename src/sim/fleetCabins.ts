@@ -1,4 +1,5 @@
 import { canHaveBusinessCabin, layoutFor, maxBusinessSeats, maxPremiumSeats, orderRefit, planOfTarget, refitBlockedReason, sameSeatPlan, seatPlanOf, seatPlanProblem, seatsOfType, describeLayout, type SeatPlan } from './cabins';
+import { cabinCostPerDay } from './crews';
 import { summarizeMarket } from './marketSummary';
 import { marketKey } from './schedule';
 import type { Aircraft, CabinTemplate, SimState } from './state';
@@ -188,9 +189,10 @@ export function fitStandardOnDelivery(state: SimState, aircraft: Aircraft): void
 
 /**
  * What every plane of the type that follows the standard would make a day
- * with `plan`, against now: all of them swapped at once and their markets
- * summarised through the game's own forecast, then put back. Planes kept
- * on their own cabin are left as they are.
+ * with `plan`, against now, less what their attendants cost a day more
+ * (sim/crews.ts's cabinCostPerDay()): all of them swapped at once and
+ * their markets summarised through the game's own forecast, then put
+ * back. Planes kept on their own cabin are left as they are.
  */
 export function typeCabinGainPerDay(state: SimState, typeCode: string, plan: SeatPlan): number {
   const planes = state.aircraft.filter((a) => a.typeCode === typeCode && !a.ownCabin);
@@ -203,7 +205,7 @@ export function typeCabinGainPerDay(state: SimState, typeCode: string, plan: Sea
       const [a, b] = key.split('-');
       const settings = state.routeSettings[key];
       return settings ? sum + summarizeMarket(a, b, state, settings).margin : sum;
-    }, 0);
+    }, 0) - planes.reduce((sum, a) => sum + cabinCostPerDay(state, a.tail), 0);
   const before = margin();
   const saved = planes.map((a) => ({ a, cabin: a.cabin, seatPlan: a.seatPlan }));
   for (const a of planes) {

@@ -31,7 +31,7 @@ state.schedule = [];
 // Crews for both planes: flying them is not what is under test.
 const yvrCrews = (state.crewBases ??= {}).YVR ?? { crewsByClass: {}, hiring: [], retraining: [] };
 yvrCrews.crewsByClass.WIDEBODY = 20;
-yvrCrews.cabinByClass = { ...yvrCrews.cabinByClass, WIDEBODY: 20 };
+yvrCrews.cabinByClass = { ...yvrCrews.cabinByClass, WIDEBODY: 40 };
 state.crewBases.YVR = yvrCrews;
 state.knownAirports = [...new Set([...state.knownAirports, 'SYD'])];
 
