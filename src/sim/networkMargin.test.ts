@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createPlayer } from '../headless/player';
 import { startHeadlessGame } from '../headless/newGame';
+import { flightsByGauge, flightsEachWay } from './routeYield';
 import { costWeek, flownMarkets, smoothedMarginHistory, networkMargin, routeGroups, routeMarginShare, routeTags, routeWeek } from './networkMargin';
 import { regionOf } from './regions';
 import { step } from './step';
@@ -27,13 +28,21 @@ assert.ok(margin.flying <= 1 && margin.allIn <= 1);
 
 // Each route is in exactly one group of either kind, and the groups add up to the routes.
 const markets = flownMarkets(state);
-for (const by of ['hub', 'sector', 'region'] as const) {
+for (const by of ['hub', 'sector', 'region', 'gauge', 'band'] as const) {
   const groups = routeGroups(state, by);
   const keys = groups.flatMap((group) => group.keys).sort();
   assert.deepEqual(keys, markets.map((m) => m.key).sort(), `${by} groups cover every route once`);
   const total = groups.reduce((sum, group) => sum + group.perDay, 0);
   const routes = markets.reduce((sum, m) => sum + (routeWeek(state, m.key).perDay ?? 0), 0);
   assert.ok(Math.abs(total - routes) < 1e-6, `${by} groups add up`);
+}
+
+// A route's flights split by plane size add back up to its frequency.
+for (const m of markets) {
+  const [out, back] = flightsEachWay(state, m.a, m.b);
+  const gauges = flightsByGauge(state, m.a, m.b);
+  assert.equal(gauges.reduce((sum, g) => sum + g.out, 0), out, `${m.key} gauges add up outbound`);
+  assert.equal(gauges.reduce((sum, g) => sum + g.back, 0), back, `${m.key} gauges add up inbound`);
 }
 
 // A route's week matches its own history.

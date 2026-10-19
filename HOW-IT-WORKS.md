@@ -2518,7 +2518,16 @@ line and a tap or hover tip per day; a day nothing flew breaks the line.
 **Frequency and PRASM on routes** (`src/sim/routeYield.ts`). A route's
 frequency counts one direction: a plane flying A-B-A once a day is
 "1/day", not two legs, and a route flown more one way than the other
-reads "2/1/day". PRASM is profit (revenue less cost) over seats flown times
+reads "2/1/day". An alternate-day leg counts as half a flight ("½/day"
+for one plane flying every other day). In the Routes table the /day tip
+splits the count by plane size ("Propeller 1/day · Regional 1/day"), and a
+route flown by more than one size gets a dotted underline; on a phone a
+tap on /day shows the tip rather than opening the route. The table can be
+grouped by hub, sector (domestic or international), region, plane size
+("Mixed" when more than one size flies it) or margin band (losing, thin,
+healthy, too new), switched by an icon row; each group heading folds and
+carries the same subtotals as the bottom row (flights and margin add up,
+the rest are plain averages of the routes). PRASM is profit (revenue less cost) over seats flown times
 great-circle statute miles, over the last 7 finished days, in cents per
 available seat-mile; negative when the route loses money. Fare per mile
 is not shown: the fare has a fixed part, so short routes always read high.

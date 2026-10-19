@@ -7097,6 +7097,39 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
   color: #fff;
   border-color: rgba(255, 255, 255, 0.35);
 }
+.routes-grouping .glyph {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  vertical-align: -2px;
+}
+.routes-grouping .glyph svg {
+  width: 100%;
+  height: 100%;
+}
+.routes-grouping .routes-fold-all {
+  margin-left: auto;
+}
+@media (pointer: coarse) {
+  .routes-grouping button {
+    min-width: 36px;
+    min-height: 30px;
+  }
+}
+/* A /day flown by more than one size of plane: its tip splits it by size. */
+.routes-table td.routes-freq.is-mixed {
+  text-decoration: underline dotted rgba(255, 255, 255, 0.45);
+  text-underline-offset: 2px;
+}
+.route-group-row .is-good {
+  color: #7ed6a8;
+}
+.route-group-row .is-fair {
+  color: #ffd166;
+}
+.route-group-row .is-poor {
+  color: #ff8080;
+}
 .margin-chip {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
