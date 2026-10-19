@@ -3789,10 +3789,105 @@ button.inspector-crumb:hover {
   vector-effect: non-scaling-stroke;
 }
 
-.fuel-chart-hedge {
+.fuel-chart-paid {
+  fill: none;
   stroke: #7ed6a8;
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
+}
+
+.fuel-chart-rung {
+  stroke: rgba(126, 214, 168, 0.35);
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+  vector-effect: non-scaling-stroke;
+}
+
+/* The Fuel view (ui/inspector/fuel.ts): green is cheaper or money made, red dearer or money lost. */
+.fuel-today,
+.fuel-ladder {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0;
+}
+
+.fuel-chip,
+.fuel-rung {
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #c8d0e0;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.fuel-chip.is-good,
+.fuel-rung.is-good,
+.fuel-book-cell.is-good {
+  color: #7fd88f;
+  border-color: rgba(127, 216, 143, 0.5);
+}
+
+.fuel-chip.is-bad,
+.fuel-rung.is-bad,
+.fuel-book-cell.is-bad {
+  color: #ff8080;
+  border-color: rgba(255, 128, 128, 0.5);
+}
+
+.fuel-chip.is-warn {
+  color: #ffd166;
+  border-color: rgba(255, 209, 102, 0.5);
+}
+
+/* The cover chip fills from the left with the share hedged. */
+.fuel-cover {
+  background: linear-gradient(90deg, rgba(126, 214, 168, 0.25) calc(var(--cover, 0) * 100%), rgba(255, 255, 255, 0.05) 0);
+}
+
+/* A rung's fill is the share of its term left. */
+.fuel-rung {
+  border-radius: 4px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.12) calc(var(--left, 0) * 100%), rgba(255, 255, 255, 0.03) 0);
+}
+
+.fuel-book {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 4px 0 2px;
+}
+
+.fuel-book-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #c8d0e0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+}
+
+.fuel-book-label {
+  font-size: 10px;
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.fuel-dial-label {
+  font-size: 11px;
+  color: #9aa3b8;
+  margin-top: 6px;
+}
+
+.rd-budget:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 /* A card in the Head office view (an innovation, an executive): green

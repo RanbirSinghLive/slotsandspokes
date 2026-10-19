@@ -29,6 +29,7 @@ export type Selection =
   | { kind: 'game' }
   | { kind: 'goals' }
   | { kind: 'headOffice' }
+  | { kind: 'fuel' }
   /** Tenders to bid on, running contracts and the last few finished (ui/inspector/contracts.ts). */
   | { kind: 'contracts' }
   /** Cash over time, the runway and today's costs (ui/inspector/money.ts). */

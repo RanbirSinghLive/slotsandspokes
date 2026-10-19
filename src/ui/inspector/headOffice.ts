@@ -1,9 +1,6 @@
-import { dayIndex } from '../../sim/clock';
-import { info, line, heading, lineWithInfo } from './dom';
+import { info, line, heading } from './dom';
 import { money } from '../format';
 import { cashAfterRows, showConfirm } from '../confirmModal';
-import { FUEL_PRICE_BASELINE } from '../../sim/fuel';
-import { activeHedge, describeFuelPrice } from '../../sim/fuelPrice';
 import type { SimState } from '../../sim/state';
 import * as ops from '../routeActions';
 import type { ExecutiveOption, InnovationOption } from '../routeActions';
@@ -17,8 +14,7 @@ import { buyRights, dropRights, EARN_DAYS, LAPSE_DAYS, licencesAllowed, rightsBl
 
 /**
  * The Head office view (Network › Head office): the airline's decisions
- * that aren't made on the map. Fuel, with its price chart and the hedge
- * (sim/fuelPrice.ts); the executives' three chairs
+ * that aren't made on the map: the executives' chairs
  * (sim/executives.ts), each opening to its candidates; and the
  * innovations the ladder opens (sim/innovations.ts), as a tech tree.
  */
@@ -297,110 +293,6 @@ function techTree(state: SimState, changed: () => void): HTMLElement[] {
   return nodes;
 }
 
-const SVG = 'http://www.w3.org/2000/svg';
-const CHART_WIDTH = 300;
-const CHART_HEIGHT = 90;
-
-function svgLine(x1: number, y1: number, x2: number, y2: number, className: string): SVGLineElement {
-  const el = document.createElementNS(SVG, 'line');
-  el.setAttribute('x1', String(x1));
-  el.setAttribute('y1', String(y1));
-  el.setAttribute('x2', String(x2));
-  el.setAttribute('y2', String(y2));
-  el.setAttribute('class', className);
-  return el;
-}
-
-/**
- * The market price over the last days, with the usual price dashed and a
- * running hedge's locked price as a line across the days it covers. An
- * SVG built as DOM, like any other panel element: the canvas is the map's.
- */
-function fuelChart(state: SimState): SVGSVGElement {
-  const history = state.fuelPriceHistory ?? [];
-  const hedge = state.fuelHedge;
-  const today = dayIndex(state);
-  const values = [...history, FUEL_PRICE_BASELINE, ...(hedge ? [hedge.lockedPrice] : [])];
-  const low = Math.min(...values) - 0.05;
-  const high = Math.max(...values) + 0.05;
-  const days = Math.max(history.length, 2);
-  const x = (i: number) => (i / (days - 1)) * CHART_WIDTH;
-  const y = (price: number) => CHART_HEIGHT - ((price - low) / (high - low)) * CHART_HEIGHT;
-
-  const svg = document.createElementNS(SVG, 'svg');
-  svg.setAttribute('viewBox', `0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`);
-  svg.setAttribute('class', 'fuel-chart');
-  svg.setAttribute('role', 'img');
-  svg.setAttribute('aria-label', `Fuel price over the last ${history.length} days`);
-  svg.append(svgLine(0, y(FUEL_PRICE_BASELINE), CHART_WIDTH, y(FUEL_PRICE_BASELINE), 'fuel-chart-usual'));
-
-  // The history's last entry is today; entry i is (length − 1 − i) days ago.
-  if (hedge) {
-    const firstDay = today - (history.length - 1);
-    const from = Math.max(0, hedge.startDay - firstDay);
-    const to = Math.min(history.length - 1, hedge.endDay - 1 - firstDay);
-    if (to >= from) svg.append(svgLine(x(from), y(hedge.lockedPrice), x(to), y(hedge.lockedPrice), 'fuel-chart-hedge'));
-  }
-  if (history.length > 1) {
-    const path = document.createElementNS(SVG, 'polyline');
-    path.setAttribute('points', history.map((price, i) => `${x(i).toFixed(1)},${y(price).toFixed(1)}`).join(' '));
-    path.setAttribute('class', 'fuel-chart-price');
-    svg.append(path);
-  }
-  return svg;
-}
-
-/** Where the hedge stands: running and what it has saved, or how the last one ended. */
-function hedgeStatus(state: SimState): HTMLElement | null {
-  const hedge = state.fuelHedge;
-  if (!hedge) return null;
-  const net = hedge.saved - hedge.premium;
-  const result = `vs market ${hedge.saved >= 0 ? '+' : ''}${money(hedge.saved)} · premium ${money(hedge.premium)} · net ${net >= 0 ? '+' : ''}${money(net)}`;
-  if (activeHedge(state)) {
-    return line(`Hedged at ${describeFuelPrice(hedge.lockedPrice)} to day ${hedge.endDay} · ${result}`, `inspector-line ${net >= 0 ? 'is-good' : ''}`);
-  }
-  return line(`Last hedge (days ${hedge.startDay}–${hedge.endDay}) · ${result}`);
-}
-
-/** One button per hedge length, each through a confirm window since the premium is spent for good. */
-function hedgeButtons(state: SimState, changed: () => void): HTMLElement[] {
-  const options = ops.hedgeOptions(state);
-  const blocked = options.find((option) => option.blocked)?.blocked;
-  if (options.every((option) => option.blocked)) return blocked ? [line(blocked, 'inspector-line goal-ahead')] : [];
-  return options.map((option) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'inspector-plan-hub';
-    button.textContent = `Hedge ${option.days}d · ${money(option.premium)}`;
-    button.disabled = option.blocked !== null;
-    button.addEventListener('click', () => {
-      showConfirm({
-        title: `Hedge fuel ${option.days} days`,
-        rows: [
-          { label: 'Locked price', value: describeFuelPrice(option.lockedPrice) },
-          { label: 'Runs to', value: `day ${dayIndex(state) + option.days}` },
-          { label: 'Premium', value: `${money(option.premium)} (spent either way)` },
-          { label: 'Fuel covered', value: money(option.covers) },
-          ...cashAfterRows(state, option.premium),
-        ],
-        facts: ['If fuel rises you pay less than the market; if it falls you still pay today\'s price.'],
-        confirmLabel: 'Hedge',
-        run: () => {
-          ops.hedgeFuel(state, option.days);
-          changed();
-        },
-      });
-    });
-    return button;
-  });
-}
-
-/** One line for the Network view: today's fuel price, and whether it's hedged. */
-export function headOfficeSummary(state: SimState): string {
-  const hedge = activeHedge(state);
-  return `Fuel ${describeFuelPrice(state.fuelPriceIndex)}${hedge ? ` · hedged to day ${hedge.endDay}` : ''}`;
-}
-
 export function buildHeadOfficeView(state: SimState, changed: () => void): HTMLElement {
   const root = document.createElement('div');
   root.className = 'inspector-view';
@@ -408,23 +300,6 @@ export function buildHeadOfficeView(state: SimState, changed: () => void): HTMLE
   title.className = 'inspector-title';
   title.textContent = 'Head office';
   root.append(title);
-
-  const history = state.fuelPriceHistory ?? [];
-  root.append(
-    heading('Fuel', 'The price wanders from day to day and drifts back to the usual price; a fuel spike sends it up for weeks.'),
-    line(`Today · ${describeFuelPrice(state.fuelPriceIndex)}`),
-    fuelChart(state),
-    line(`${history.length}d · dashed usual${state.fuelHedge ? ' · green locked' : ''}`, 'inspector-line goal-ahead'),
-  );
-  const status = hedgeStatus(state);
-  if (status) root.append(status);
-  root.append(
-    lineWithInfo(
-      'Hedge',
-      "A hedge locks today's price on all your fuel. If fuel rises, you pay less than the market; if it falls, you still pay today's price. The premium is spent either way, so hedging at random loses money: it's a bet on where the price goes.",
-    ),
-    ...hedgeButtons(state, changed),
-  );
 
   root.append(...executivesSection(state, changed));
   root.append(...rightsSection(state, changed));

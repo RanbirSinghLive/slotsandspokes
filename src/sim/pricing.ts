@@ -26,7 +26,16 @@ export const FARE_POLICY_MAX = 2.5;
  * override. Rounded to whole dollars, same as `recommendedFare()` itself.
  */
 export function policyFare(state: SimState, origin: string, dest: string): number {
-  return Math.round(recommendedFare(origin, dest) * state.farePolicyMultiplier);
+  return Math.round(recommendedFare(origin, dest) * state.farePolicyMultiplier * fuelSurchargeMultiplier(state));
+}
+
+/**
+ * The fuel surcharge (sim/fuelPrice.ts's policy) on fares priced by
+ * policy or stance, set at rollover. A fare set by hand is the player's
+ * own number and is left as it is.
+ */
+function fuelSurchargeMultiplier(state: SimState): number {
+  return 1 + (state.fuelSurcharge ?? 0);
 }
 
 /** How far under the cheapest rival Undercut prices. */
@@ -53,9 +62,10 @@ export function stanceFare(state: SimState, origin: string, dest: string, stance
     .map((route) => route.fare);
   if (rivalFares.length === 0) return policyFare(state, origin, dest);
   const cheapestRival = Math.min(...rivalFares);
-  if (stance === 'undercut') return Math.round(cheapestRival * (1 - UNDERCUT_SHARE));
-  if (stance === 'match') return cheapestRival;
-  return Math.round(recommendedFare(origin, dest) * (1 + PREMIUM_SHARE));
+  const surcharge = fuelSurchargeMultiplier(state);
+  if (stance === 'undercut') return Math.round(cheapestRival * (1 - UNDERCUT_SHARE) * surcharge);
+  if (stance === 'match') return Math.round(cheapestRival * surcharge);
+  return Math.round(recommendedFare(origin, dest) * (1 + PREMIUM_SHARE) * surcharge);
 }
 
 /**
