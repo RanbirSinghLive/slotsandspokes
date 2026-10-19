@@ -1,7 +1,7 @@
 import { marketLoadFactor } from '../../sim/loadFactor';
 import { formatNps, marketNps, RIVAL_NPS } from '../../sim/nps';
 import { OTP_BASELINE, trailingMarketOtp } from '../../sim/routeOtp';
-import { formatFrequency, marketPrasmCents, formatPrasm } from '../../sim/routeYield';
+import { flightsByGauge, flightsEachWay, formatFrequency, gaugeFlightsText, marketPrasmCents, formatPrasm, perDayCount, sumGaugeFlights, type GaugeFlights } from '../../sim/routeYield';
 import { fareClassPolicy, pricingSummary, seatPolicySummary } from '../../sim/pricing';
 import { flownMarkets, marginBand, routeGroups, routeMarginShare, routeTags, routeWeek, type RouteGroup, type RouteGroupBy, type RouteTags, type RouteWeek, type Sector } from '../../sim/networkMargin';
 import type { SimState } from '../../sim/state';
@@ -10,7 +10,7 @@ import { select, type RouteSort } from '../selection';
 import { priorityButton } from '../priority';
 import { adopt, info } from './dom';
 import { linkToMap } from '../mapLink';
-import { glyph } from '../glyphs';
+import { glyph, type GlyphName } from '../glyphs';
 import { onTimeColor } from '../../render/mapmodes';
 import { percentText, trendMark } from '../marginChip';
 import { shortMoney } from '../format';
@@ -34,6 +34,9 @@ type RouteRow = {
   week: RouteWeek;
   tags: RouteTags;
   frequency: string;
+  /** Flights a day the busier way, for subtotals. */
+  flightsPerDay: number;
+  gauges: GaugeFlights[];
   prasmCents: number | null;
   loadFactor: number | null;
   onTime: number | null;
@@ -129,6 +132,8 @@ function routeRows(state: SimState): RouteRow[] {
       week: routeWeek(state, key),
       tags: routeTags(state, a, b),
       frequency: formatFrequency(state, a, b),
+      flightsPerDay: Math.max(...flightsEachWay(state, a, b)),
+      gauges: flightsByGauge(state, a, b),
       prasmCents: marketPrasmCents(state, a, b),
       loadFactor: marketLoadFactor(state, a, b).factor,
       onTime: reliability.otp,
@@ -148,7 +153,7 @@ const LONG_TABLE = 12;
 function loadGrouping(): Grouping {
   try {
     const saved = localStorage.getItem(GROUPING_KEY);
-    if (saved === 'hub' || saved === 'sector' || saved === 'region') return saved;
+    if (saved === 'hub' || saved === 'sector' || saved === 'region' || saved === 'gauge' || saved === 'band') return saved;
   } catch {
     // Storage can be blocked; the table still works ungrouped.
   }
@@ -228,44 +233,28 @@ function tagsFor(row: RouteRow): HTMLElement | null {
   return wrap;
 }
 
-function groupHeader(group: RouteGroup, by: RouteGroupBy, open: boolean, lens: Lens, columnCount: number, onToggle: () => void): HTMLTableRowElement {
-  const tr = document.createElement('tr');
-  tr.className = 'route-group-row';
-  const name = document.createElement('td');
-  name.colSpan = 2;
-  const caret = document.createElement('span');
-  caret.className = 'route-group-caret';
-  caret.textContent = open ? '▾' : '▸';
-  name.append(caret, by === 'hub' ? glyph('hub') : by === 'region' ? glyph('mapPin') : glyph(group.name === 'domestic' ? 'flag' : 'globe'), `${group.name} · ${group.keys.length}`);
-  if (lens === 'money') {
-    const margin = document.createElement('td');
-    const trend = group.previousPerDay === null ? '' : trendMark(group.perDay, group.previousPerDay);
-    margin.textContent = `${perDayText(group.perDay)}${group.share === null ? '' : ` · ${percentText(group.share)}`} ${trend}`.trim();
-    if (group.share !== null) margin.classList.add(`is-${marginBand(group.share)}`);
-    margin.dataset.tip = `${group.name}: ${perDayText(group.perDay)}/day over the last 7 days, summed over its routes`;
-    tr.append(name, margin);
-    const rest = document.createElement('td');
-    rest.colSpan = Math.max(1, columnCount - 1);
-    tr.append(rest);
-  } else {
-    const rest = document.createElement('td');
-    rest.colSpan = columnCount;
-    tr.append(name, rest);
-  }
-  tr.addEventListener('click', onToggle);
-  return tr;
+/** The tip on a /day cell: the flights split by plane size, so a mixed route reads at a glance. */
+function gaugeTip(gauges: GaugeFlights[], scope: string): string {
+  return `${scope} · ${gauges.map(gaugeFlightsText).join(' · ')}`;
 }
 
-/** Pinned bottom row: margin and revenue add up over every route; the other columns are plain averages. */
-function totalFoot(rows: RouteRow[], columns: (typeof COLUMNS)[number][]): HTMLTableSectionElement {
-  const foot = document.createElement('tfoot');
-  const tr = document.createElement('tr');
-  tr.className = 'routes-total';
-  const name = document.createElement('td');
-  name.textContent = `Σ ${rows.length}`;
-  name.dataset.tip = `All ${rows.length} routes`;
-  tr.append(name, document.createElement('td'));
-  for (const c of columns) {
+/** The /day cell; the dotted underline marks a route flown by more than one size of plane. */
+function frequencyCell(text: string, gauges: GaugeFlights[], scope: string): HTMLTableCellElement {
+  const td = document.createElement('td');
+  td.className = 'routes-freq';
+  td.textContent = text;
+  if (gauges.length > 1) td.classList.add('is-mixed');
+  if (gauges.length > 0) td.dataset.tip = gaugeTip(gauges, scope);
+  return td;
+}
+
+/**
+ * One cell per column summing up a set of routes: margin and revenue add
+ * up, the other columns are plain averages of the routes. Shared by the
+ * group headings and the total row so the two always read the same way.
+ */
+function subtotalCells(rows: RouteRow[], columns: (typeof COLUMNS)[number][]): HTMLTableCellElement[] {
+  return columns.map((c) => {
     const td = document.createElement('td');
     if (c.sort === 'margin') {
       const known = rows.filter((r) => r.week.perDay !== null);
@@ -273,16 +262,68 @@ function totalFoot(rows: RouteRow[], columns: (typeof COLUMNS)[number][]): HTMLT
       const revenue = rows.reduce((sum, r) => sum + r.week.revenuePerDay, 0);
       td.textContent = known.length === 0 ? '—' : `${perDayText(margin)}${revenue > 0 ? ` · ${percentText(margin / revenue)}` : ''}`;
       td.classList.add('routes-margin');
+      if (known.length > 0 && revenue > 0) td.classList.add(`is-${marginBand(margin / revenue)}`);
       td.dataset.tip = `Margin a day over the last 7 days, summed over ${known.length} routes with 3+ flown days · revenue ${shortMoney(revenue)}/day`;
     } else {
       const values = rows.map((r) => c.value(r)).filter((v): v is number => v !== null);
       const mean = values.length === 0 ? null : values.reduce((a, b) => a + b, 0) / values.length;
       const probe = { ...rows[0], loadFactor: mean, onTime: mean, completion: mean, nps: mean ?? 0, prasmCents: mean };
       td.textContent = mean === null ? '—' : c.show(probe);
+      const rating = mean === null ? null : c.rate(probe);
+      if (rating) td.classList.add(`is-${rating}`);
       td.dataset.tip = 'Average of the routes, not weighted by passengers';
     }
-    tr.append(td);
+    return td;
+  });
+}
+
+/** The flights a day of a set of routes, the busier way summed, with its split by plane size. */
+function subtotalFrequency(rows: RouteRow[], scope: string): HTMLTableCellElement {
+  const total = rows.reduce((sum, r) => sum + r.flightsPerDay, 0);
+  return frequencyCell(`${perDayCount(total)}/day`, sumGaugeFlights(rows.map((r) => r.gauges)), scope);
+}
+
+const GROUP_ICON: Record<RouteGroupBy, GlyphName> = { hub: 'hub', sector: 'flag', region: 'mapPin', gauge: 'plane', band: 'coin' };
+
+function groupHeader(group: RouteGroup, by: RouteGroupBy, open: boolean, members: RouteRow[], columns: (typeof COLUMNS)[number][], onToggle: () => void): HTMLTableRowElement {
+  const tr = document.createElement('tr');
+  tr.className = 'route-group-row';
+  const name = document.createElement('td');
+  const caret = document.createElement('span');
+  caret.className = 'route-group-caret';
+  caret.textContent = open ? '▾' : '▸';
+  const icon = by === 'sector' && group.name === 'international' ? 'globe' : GROUP_ICON[by];
+  const label = document.createElement('span');
+  label.textContent = `${group.name} · ${group.keys.length}`;
+  if (by === 'band') label.classList.add(`is-${{ losing: 'poor', thin: 'fair', healthy: 'good' }[group.name] ?? 'none'}`);
+  name.append(caret, glyph(icon), label);
+  tr.append(name, subtotalFrequency(members, group.name));
+  const cells = subtotalCells(members, columns);
+  const marginAt = columns.findIndex((c) => c.sort === 'margin');
+  if (marginAt >= 0 && group.previousPerDay !== null) {
+    const arrow = document.createElement('span');
+    arrow.className = 'routes-trend';
+    arrow.textContent = trendMark(group.perDay, group.previousPerDay);
+    cells[marginAt].append(arrow);
+    cells[marginAt].dataset.tip += ` · week before ${perDayText(group.previousPerDay)}/day`;
   }
+  tr.append(...cells);
+  tr.addEventListener('click', (event) => {
+    if (event.target instanceof Element && event.target.closest('.routes-freq') && window.matchMedia('(pointer: coarse)').matches) return;
+    onToggle();
+  });
+  return tr;
+}
+
+/** Pinned bottom row: the same subtotals over every route. */
+function totalFoot(rows: RouteRow[], columns: (typeof COLUMNS)[number][]): HTMLTableSectionElement {
+  const foot = document.createElement('tfoot');
+  const tr = document.createElement('tr');
+  tr.className = 'routes-total';
+  const name = document.createElement('td');
+  name.textContent = `Σ ${rows.length}`;
+  name.dataset.tip = `All ${rows.length} routes`;
+  tr.append(name, subtotalFrequency(rows, 'All routes'), ...subtotalCells(rows, columns));
   foot.append(tr);
   return foot;
 }
@@ -426,27 +467,46 @@ export function buildRoutesView(state: SimState, sort: RouteSort): HTMLElement {
   const intro = document.createElement('div');
   intro.className = 'inspector-line';
   intro.textContent = `${bestFirst ? 'Best' : 'Worst'} ${column.name.toLowerCase()} first`;
-  intro.append(' ', info('The money lens is first; the stopwatch lens reads reliability. Margin is the average a day over the last 7 days, with the last 14 as a line (dashed = $0), the share of revenue in the tip, and an arrow against the week before. Tags: contract and event pay are inside it; a sprout is a route under 2 weeks old. On-time, flown, load and PRASM (profit per available seat-mile, in cents) are the last 7 days; flights are per direction; NPS about the last month. Group by hub (the end with more routes), by sector (domestic = both ends in your home country) or by region (where the far end is, by map position, so approximate). Click a heading to sort by it, again to flip the order, or a route to open it. The bottom row totals the routes: margin and revenue add up, the rest are plain averages of the routes. The fare strip under the table opens the fare policy and seat split.'));
+  intro.append(' ', info('The money lens is first; the stopwatch lens reads reliability. Margin is the average a day over the last 7 days, with the last 14 as a line (dashed = $0), the share of revenue in the tip, and an arrow against the week before. Tags: contract and event pay are inside it; a sprout is a route under 2 weeks old. On-time, flown, load and PRASM (profit per available seat-mile, in cents) are the last 7 days; flights are per direction (a dotted /day is flown by more than one size of plane: its tip splits it by size; on a phone tap it); NPS about the last month. Group by hub (the end with more routes), sector (domestic = both ends in your home country), region (where the far end is, by map position, so approximate), plane size (mixed = more than one size) or margin band; each group heading carries its subtotals and folds on a tap, and ▸ folds them all. Click a heading to sort by it, again to flip the order, or a route to open it. The bottom row and group headings total their routes: flights and margin add up, the rest are plain averages of the routes. The fare strip under the table opens the fare policy and seat split.'));
   root.append(intro);
 
   const chips = document.createElement('div');
   chips.className = 'routes-grouping';
-  for (const [value, label, tip] of [
-    ['none', 'All', 'One list'],
-    ['hub', 'Hub', 'Grouped by the airport each route hangs off'],
-    ['sector', 'Sector', 'Domestic or international'],
-    ['region', 'Region', "Where the far end is, by map position (approximate)"],
+  for (const [value, icon, tip] of [
+    ['none', 'list', 'One list'],
+    ['hub', 'hub', 'By hub: the airport each route hangs off'],
+    ['sector', 'flag', 'By sector: domestic or international'],
+    ['region', 'mapPin', 'By region: where the far end is (approximate)'],
+    ['gauge', 'plane', 'By plane size: mixed when more than one size flies it'],
+    ['band', 'coin', 'By margin: losing, thin, healthy, too new'],
   ] as const) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.textContent = label;
+    button.append(glyph(icon));
     button.dataset.tip = tip;
+    button.setAttribute('aria-label', tip);
     button.classList.toggle('is-active', grouping === value);
     button.addEventListener('click', () => {
       setGrouping(value);
       root.replaceWith(buildRoutesView(state, column.sort));
     });
     chips.append(button);
+  }
+  if (grouping !== 'none') {
+    // One tap folds every group, or opens them all when they are all folded.
+    const groupIds = routeGroups(state, grouping).map((group) => `${grouping}:${group.name}`);
+    const anyOpen = groupIds.some((id) => groupOpen.get(id) ?? rows.length <= LONG_TABLE);
+    const fold = document.createElement('button');
+    fold.type = 'button';
+    fold.className = 'routes-fold-all';
+    fold.textContent = anyOpen ? '▸' : '▾';
+    fold.dataset.tip = anyOpen ? 'Fold every group' : 'Open every group';
+    fold.setAttribute('aria-label', fold.dataset.tip);
+    fold.addEventListener('click', () => {
+      for (const id of groupIds) groupOpen.set(id, !anyOpen);
+      root.replaceWith(buildRoutesView(state, column.sort));
+    });
+    chips.append(fold);
   }
   root.append(chips);
 
@@ -485,15 +545,17 @@ export function buildRoutesView(state: SimState, sort: RouteSort): HTMLElement {
   const renderRow = (row: RouteRow) => {
     const tr = linkToMap(document.createElement('tr'), { kind: 'route', a: row.a, b: row.b });
     tr.className = 'routes-row';
-    tr.addEventListener('click', () => select({ kind: 'route', a: row.a, b: row.b }));
+    tr.addEventListener('click', (event) => {
+      // On a phone a tap on /day shows its split by plane size instead of opening the route.
+      if (event.target instanceof Element && event.target.closest('.routes-freq') && window.matchMedia('(pointer: coarse)').matches) return;
+      select({ kind: 'route', a: row.a, b: row.b });
+    });
     const route = document.createElement('td');
     route.textContent = `${row.a} – ${row.b} `;
     route.append(priorityButton(state, row.a, row.b, () => {}));
     const tags = tagsFor(row);
     if (tags) route.append(tags);
-    const count = document.createElement('td');
-    count.textContent = row.frequency;
-    tr.append(route, count);
+    tr.append(route, frequencyCell(row.frequency, row.gauges, `${row.a} – ${row.b}`));
     for (const c of columns) {
       if (c.sort === 'margin') {
         const cell = marginCell(row);
@@ -524,14 +586,14 @@ export function buildRoutesView(state: SimState, sort: RouteSort): HTMLElement {
     for (const group of routeGroups(state, grouping)) {
       const id = `${grouping}:${group.name}`;
       const open = groupOpen.get(id) ?? rows.length <= LONG_TABLE;
+      const members = group.keys.map((key) => byKey.get(key)).filter((row): row is RouteRow => row !== undefined);
       tbody.append(
-        groupHeader(group, grouping, open, lens, columns.length, () => {
+        groupHeader(group, grouping, open, members, columns, () => {
           groupOpen.set(id, !open);
           root.replaceWith(buildRoutesView(state, column.sort));
         }),
       );
       if (!open) continue;
-      const members = group.keys.map((key) => byKey.get(key)).filter((row): row is RouteRow => row !== undefined);
       members.sort(byColumn(column));
       for (const row of members) renderRow(row);
     }

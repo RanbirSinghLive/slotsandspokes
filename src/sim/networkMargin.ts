@@ -1,5 +1,7 @@
+import { AIRCRAFT_CLASSES } from './aircraftClasses';
 import { contractOn } from './contracts';
 import { regionOf } from './regions';
+import { flightsByGauge } from './routeYield';
 import { countryOf, homeCountry } from './rights';
 import { marketKey } from './schedule';
 import type { SimState } from './state';
@@ -151,7 +153,36 @@ export function hubOf(state: SimState, a: string, b: string, routeCounts: Map<st
   return a < b ? a : b;
 }
 
-export type RouteGroupBy = 'hub' | 'sector' | 'region';
+/**
+ * How the Routes table can be grouped: by the hub a route hangs off, domestic
+ * or international, the far end's region, the size of plane flying it
+ * ("mixed" when more than one size does), or how its margin reads.
+ */
+export type RouteGroupBy = 'hub' | 'sector' | 'region' | 'gauge' | 'band';
+
+/** Margin bands as group names, worst first; "too new" holds routes under 3 flown days. */
+export const BAND_GROUPS = ['losing', 'thin', 'healthy', 'too new'] as const;
+export const MIXED_GAUGE = 'Mixed';
+
+const classRankByName = (name: string): number => AIRCRAFT_CLASSES.findIndex((c) => c.name === name);
+
+function gaugeGroupOf(state: SimState, a: string, b: string): string {
+  const gauges = flightsByGauge(state, a, b);
+  return gauges.length === 1 ? gauges[0].name : MIXED_GAUGE;
+}
+
+function bandGroupOf(state: SimState, key: string): string {
+  const share = routeMarginShare(routeWeek(state, key));
+  if (share === null) return 'too new';
+  return { poor: 'losing', fair: 'thin', good: 'healthy' }[marginBand(share)];
+}
+
+/** Where a group sits in the list: fixed orders for gauge and band, best margin first for the rest. */
+function groupRank(by: RouteGroupBy, name: string): number {
+  if (by === 'band') return BAND_GROUPS.indexOf(name as (typeof BAND_GROUPS)[number]);
+  if (by === 'gauge') return name === MIXED_GAUGE ? Number.MAX_SAFE_INTEGER : classRankByName(name);
+  return 0;
+}
 
 export type RouteGroup = {
   name: string;
@@ -183,11 +214,16 @@ export function flownMarkets(state: SimState): { key: string; a: string; b: stri
   });
 }
 
-/** Routes grouped by hub or sector with each group's week, best first. */
+/** Routes grouped (RouteGroupBy) with each group's week; best first unless the grouping has its own order. */
 export function routeGroups(state: SimState, by: RouteGroupBy): RouteGroup[] {
   const groups = new Map<string, string[]>();
   for (const market of flownMarkets(state)) {
-    const name = by === 'hub' ? market.hub : by === 'sector' ? market.sector : market.region;
+    const name =
+      by === 'hub' ? market.hub
+      : by === 'sector' ? market.sector
+      : by === 'region' ? market.region
+      : by === 'gauge' ? gaugeGroupOf(state, market.a, market.b)
+      : bandGroupOf(state, market.key);
     groups.set(name, [...(groups.get(name) ?? []), market.key]);
   }
   return [...groups.entries()]
@@ -206,7 +242,7 @@ export function routeGroups(state: SimState, by: RouteGroupBy): RouteGroup[] {
         revenuePerDay,
       };
     })
-    .sort((x, y) => y.perDay - x.perDay);
+    .sort((x, y) => groupRank(by, x.name) - groupRank(by, y.name) || y.perDay - x.perDay);
 }
 
 /** How a margin share reads: below 0% loses money, 0–10% is thin, above is healthy. */
