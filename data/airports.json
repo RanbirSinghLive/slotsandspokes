@@ -842,6 +842,118 @@
     "population": 15124375
   },
   {
+    "iata": "WGA",
+    "name": "Wagga Wagga",
+    "lat": -35.1635,
+    "lon": 147.4683,
+    "utcOffsetMinutes": 600,
+    "population": 11097
+  },
+  {
+    "iata": "ABX",
+    "name": "Albury",
+    "lat": -36.0668,
+    "lon": 146.9591,
+    "utcOffsetMinutes": 600,
+    "population": 89478
+  },
+  {
+    "iata": "DBO",
+    "name": "Dubbo",
+    "lat": -32.2167,
+    "lon": 148.575,
+    "utcOffsetMinutes": 600,
+    "population": 57823
+  },
+  {
+    "iata": "PQQ",
+    "name": "Port Macquarie",
+    "lat": -31.4358,
+    "lon": 152.863,
+    "utcOffsetMinutes": 600,
+    "population": 93715
+  },
+  {
+    "iata": "TMW",
+    "name": "Tamworth",
+    "lat": -31.0779,
+    "lon": 150.8455,
+    "utcOffsetMinutes": 600,
+    "population": 66148
+  },
+  {
+    "iata": "ARM",
+    "name": "Armidale",
+    "lat": -30.5281,
+    "lon": 151.617,
+    "utcOffsetMinutes": 600,
+    "population": 28536
+  },
+  {
+    "iata": "OAG",
+    "name": "Orange",
+    "lat": -33.382,
+    "lon": 149.1313,
+    "utcOffsetMinutes": 600,
+    "population": 99740
+  },
+  {
+    "iata": "BNK",
+    "name": "Ballina",
+    "lat": -28.8332,
+    "lon": 153.5615,
+    "utcOffsetMinutes": 600,
+    "population": 100294
+  },
+  {
+    "iata": "ROK",
+    "name": "Rockhampton",
+    "lat": -23.38,
+    "lon": 150.4754,
+    "utcOffsetMinutes": 600,
+    "population": 112854
+  },
+  {
+    "iata": "MKY",
+    "name": "Mackay",
+    "lat": -21.1708,
+    "lon": 149.1826,
+    "utcOffsetMinutes": 600,
+    "population": 99536
+  },
+  {
+    "iata": "LST",
+    "name": "Launceston",
+    "lat": -41.5449,
+    "lon": 147.2108,
+    "utcOffsetMinutes": 600,
+    "population": 119914
+  },
+  {
+    "iata": "MQL",
+    "name": "Mildura",
+    "lat": -34.2292,
+    "lon": 142.086,
+    "utcOffsetMinutes": 600,
+    "population": 57326
+  },
+  {
+    "iata": "NSN",
+    "name": "Nelson",
+    "lat": -41.2967,
+    "lon": 173.2243,
+    "utcOffsetMinutes": 720,
+    "population": 120836
+  },
+  {
+    "iata": "IVC",
+    "name": "Invercargill",
+    "lat": -46.4124,
+    "lon": 168.313,
+    "utcOffsetMinutes": 720,
+    "population": 85531
+  },
+  {
     "iata": "SFO",
     "name": "San Francisco",
     "lat": 37.6198,
@@ -4007,7 +4119,7 @@
     "lat": -28.166,
     "lon": 153.5066,
     "utcOffsetMinutes": 600,
-    "population": 714311
+    "population": 689841
   },
   {
     "iata": "NTL",
@@ -4088,6 +4200,246 @@
     "lon": 144.7973,
     "utcOffsetMinutes": 600,
     "population": 173653
+  },
+  {
+    "iata": "NOU",
+    "name": "Nouméa (La Tontouta)",
+    "lat": -22.0146,
+    "lon": 166.213,
+    "utcOffsetMinutes": 660,
+    "population": 161273
+  },
+  {
+    "iata": "HIR",
+    "name": "Honiara",
+    "lat": -9.428,
+    "lon": 160.055,
+    "utcOffsetMinutes": 660,
+    "population": 116852
+  },
+  {
+    "iata": "APW",
+    "name": "Apia",
+    "lat": -13.83,
+    "lon": -172.008,
+    "utcOffsetMinutes": 780,
+    "population": 101724
+  },
+  {
+    "iata": "LAE",
+    "name": "Lae",
+    "lat": -6.568,
+    "lon": 146.7265,
+    "utcOffsetMinutes": 600,
+    "population": 76255
+  },
+  {
+    "iata": "TRW",
+    "name": "South Tarawa",
+    "lat": 1.3816,
+    "lon": 173.147,
+    "utcOffsetMinutes": 720,
+    "population": 75988
+  },
+  {
+    "iata": "TBU",
+    "name": "Nuku'alofa",
+    "lat": -21.2414,
+    "lon": -175.1492,
+    "utcOffsetMinutes": 780,
+    "population": 60303
+  },
+  {
+    "iata": "ZQN",
+    "name": "Queenstown",
+    "lat": -45.0192,
+    "lon": 168.7464,
+    "utcOffsetMinutes": 720,
+    "population": 46143
+  },
+  {
+    "iata": "PPG",
+    "name": "Pago Pago",
+    "lat": -14.331,
+    "lon": -170.71,
+    "utcOffsetMinutes": -660,
+    "population": 44696
+  },
+  {
+    "iata": "VLI",
+    "name": "Port Vila",
+    "lat": -17.6993,
+    "lon": 168.32,
+    "utcOffsetMinutes": 660,
+    "population": 38386
+  },
+  {
+    "iata": "MAJ",
+    "name": "Majuro Atoll",
+    "lat": 7.0651,
+    "lon": 171.2717,
+    "utcOffsetMinutes": 720,
+    "population": 29015
+  },
+  {
+    "iata": "ROR",
+    "name": "Babelthuap Island",
+    "lat": 7.367,
+    "lon": 134.5441,
+    "utcOffsetMinutes": 540,
+    "population": 19671
+  },
+  {
+    "iata": "BME",
+    "name": "Broome",
+    "lat": -17.9492,
+    "lon": 122.2283,
+    "utcOffsetMinutes": 480,
+    "population": 16023
+  },
+  {
+    "iata": "PHE",
+    "name": "Port Hedland",
+    "lat": -20.3828,
+    "lon": 118.6298,
+    "utcOffsetMinutes": 480,
+    "population": 15298
+  },
+  {
+    "iata": "RAR",
+    "name": "Avarua",
+    "lat": -21.2027,
+    "lon": -159.806,
+    "utcOffsetMinutes": -600,
+    "population": 14391
+  },
+  {
+    "iata": "TKK",
+    "name": "Weno Island",
+    "lat": 7.4619,
+    "lon": 151.843,
+    "utcOffsetMinutes": 600,
+    "population": 13856
+  },
+  {
+    "iata": "KSA",
+    "name": "Okat",
+    "lat": 5.357,
+    "lon": 162.958,
+    "utcOffsetMinutes": 660,
+    "population": 13015
+  },
+  {
+    "iata": "YAP",
+    "name": "Yap Island",
+    "lat": 9.4989,
+    "lon": 138.083,
+    "utcOffsetMinutes": 600,
+    "population": 7371
+  },
+  {
+    "iata": "CXI",
+    "name": "Kiritimati",
+    "lat": 1.9863,
+    "lon": -157.35,
+    "utcOffsetMinutes": 840,
+    "population": 6089
+  },
+  {
+    "iata": "VAV",
+    "name": "Vava'u Island",
+    "lat": -18.5853,
+    "lon": -173.962,
+    "utcOffsetMinutes": 780,
+    "population": 5250
+  },
+  {
+    "iata": "WLS",
+    "name": "Wallis Island",
+    "lat": -13.2394,
+    "lon": -176.1986,
+    "utcOffsetMinutes": 720,
+    "population": 1200
+  },
+  {
+    "iata": "CBR",
+    "name": "Canberra",
+    "lat": -35.3069,
+    "lon": 149.195,
+    "utcOffsetMinutes": 600,
+    "population": 483692
+  },
+  {
+    "iata": "TRG",
+    "name": "Tauranga",
+    "lat": -37.6719,
+    "lon": 176.196,
+    "utcOffsetMinutes": 720,
+    "population": 305452
+  },
+  {
+    "iata": "HLZ",
+    "name": "Hamilton, New Zealand",
+    "lat": -37.867,
+    "lon": 175.332,
+    "utcOffsetMinutes": 720,
+    "population": 283121
+  },
+  {
+    "iata": "TSV",
+    "name": "Townsville",
+    "lat": -19.2529,
+    "lon": 146.7665,
+    "utcOffsetMinutes": 600,
+    "population": 202432
+  },
+  {
+    "iata": "NPE",
+    "name": "Napier",
+    "lat": -39.4658,
+    "lon": 176.87,
+    "utcOffsetMinutes": 720,
+    "population": 183759
+  },
+  {
+    "iata": "DUD",
+    "name": "Dunedin",
+    "lat": -45.929,
+    "lon": 170.1978,
+    "utcOffsetMinutes": 720,
+    "population": 182825
+  },
+  {
+    "iata": "PMR",
+    "name": "Palmerston North",
+    "lat": -40.3206,
+    "lon": 175.617,
+    "utcOffsetMinutes": 720,
+    "population": 151399
+  },
+  {
+    "iata": "CFS",
+    "name": "Coffs Harbour",
+    "lat": -30.3206,
+    "lon": 153.116,
+    "utcOffsetMinutes": 600,
+    "population": 135444
+  },
+  {
+    "iata": "NPL",
+    "name": "New Plymouth",
+    "lat": -39.0086,
+    "lon": 174.179,
+    "utcOffsetMinutes": 720,
+    "population": 131872
+  },
+  {
+    "iata": "HVB",
+    "name": "Hervey Bay",
+    "lat": -25.3201,
+    "lon": 152.8807,
+    "utcOffsetMinutes": 600,
+    "population": 113988
   },
   {
     "iata": "PNR",
@@ -4256,14 +4608,6 @@
     "lon": -68.1557,
     "utcOffsetMinutes": -180,
     "population": 600881
-  },
-  {
-    "iata": "CBR",
-    "name": "Canberra",
-    "lat": -35.3069,
-    "lon": 149.195,
-    "utcOffsetMinutes": 600,
-    "population": 483692
   },
   {
     "iata": "MBA",
@@ -4664,21 +5008,5 @@
     "lon": -56.0007,
     "utcOffsetMinutes": -180,
     "population": 150611
-  },
-  {
-    "iata": "TRG",
-    "name": "Tauranga",
-    "lat": -37.6719,
-    "lon": 176.196,
-    "utcOffsetMinutes": 720,
-    "population": 305452
-  },
-  {
-    "iata": "HLZ",
-    "name": "Hamilton, New Zealand",
-    "lat": -37.867,
-    "lon": 175.332,
-    "utcOffsetMinutes": 720,
-    "population": 283121
   }
 ]
