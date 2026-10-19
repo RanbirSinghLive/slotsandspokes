@@ -5,7 +5,6 @@ import { pluralClassName } from '../sim/aircraftClasses';
 import { classByCode } from '../sim/aircraftClasses';
 import { gameDate, shortMoney } from './format';
 import { RIVAL_CLOSE_AFTER_LOSING_DAYS, RIVAL_SQUEEZED_RESPITE_DAYS } from '../sim/pressure';
-import { activeHedge } from '../sim/fuelPrice';
 import { activeClosures, announcedClosures, closureIsRelevant, closureLine } from '../sim/airspace';
 import { dayIndex } from '../sim/clock';
 import { mandatesOf, mandateIsActive } from '../sim/mandates';
@@ -238,9 +237,9 @@ function pollShockEvents(state: SimState): void {
   }
   // The same shock (or still none) since the last poll: nothing to say.
   if (seenShock?.startDay === running?.startDay && seenShock?.kind === running?.kind) return;
-  // A fuel spike is read against the fuel chart at Head office.
+  // A fuel spike is read against the Fuel view's chart.
   const shockTarget = (shock: Shock): Selection | undefined =>
-    shock.kind === 'fuel' ? { kind: 'headOffice' } : shock.centre ? { kind: 'airport', iata: shock.centre } : undefined;
+    shock.kind === 'fuel' ? { kind: 'fuel' } : shock.centre ? { kind: 'airport', iata: shock.centre } : undefined;
   if (seenShock) pushEvent(state.simMinute, 'SHOCK', shockEndedLine(seenShock), shockTarget(seenShock));
   if (running) pushEvent(state.simMinute, 'SHOCK', describeShock(state)!.headline, shockTarget(running));
   seenShock = running;
@@ -289,18 +288,16 @@ function pollMandateEvents(state: SimState): void {
   seenMandates = now;
 }
 
-// The running hedge's start day at the last poll, so its end is said once.
-let seenHedgeStart: number | null | undefined;
+// Rungs missed for want of cash at the last poll, so each miss is said once.
+let seenMissedRungs: number | undefined;
 
-/** How a hedge went, the day it runs out (sim/fuelPrice.ts). */
-function pollHedgeEvents(state: SimState): void {
-  const running = activeHedge(state)?.startDay ?? null;
-  if (seenHedgeStart !== undefined && seenHedgeStart !== null && running !== seenHedgeStart && state.fuelHedge?.startDay === seenHedgeStart) {
-    const hedge = state.fuelHedge;
-    const net = hedge.saved - hedge.premium;
-    pushEvent(state.simMinute, 'FUEL', `Hedge ended · ${net >= 0 ? '+' : ''}${shortMoney(net)} net of premium`, { kind: 'headOffice' });
+/** A hedge rung that came due and couldn't be paid for (sim/fuelPrice.ts): a gap opening in the ladder. */
+function pollFuelEvents(state: SimState): void {
+  const missed = state.fuelBook?.missed ?? 0;
+  if (seenMissedRungs !== undefined && missed > seenMissedRungs) {
+    pushEvent(state.simMinute, 'FUEL', 'Hedge rung missed · no cash', { kind: 'fuel' });
   }
-  seenHedgeStart = running;
+  seenMissedRungs = missed;
 }
 
 // The fleet and crews at the last poll, so arrivals and departures are
@@ -791,7 +788,7 @@ export function updateTicker(state: SimState): void {
   pollShockEvents(state);
   pollAirspaceEvents(state);
   pollMandateEvents(state);
-  pollHedgeEvents(state);
+  pollFuelEvents(state);
   pollFleetEvents(state);
   pollPositionEvents(state);
   pollAogEvents(state);

@@ -21,7 +21,7 @@ import type { HubStyle } from './hubStyle';
 import type { AogEvent } from './aog';
 import { createMarket, ensureRivalFleets, type MarketState } from './market';
 import { FUEL_PRICE_BASELINE } from './fuel';
-import type { FuelHedge } from './fuelPrice';
+import type { FuelBook, FuelPolicy, FuelTranche, LegacyFuelHedge } from './fuelPrice';
 import { STARTING_NPS } from './nps';
 import type { CrewBase, CrewDay } from './crews';
 import type { InboundLease } from './fleetTiming';
@@ -637,8 +637,21 @@ export type SimState = {
   nextMandateId?: number;
   /** The mandates' own random stream, apart from rngSeed. */
   mandateSeed?: number;
-  /** The latest fuel hedge bought, running or ended (sim/fuelPrice.ts), or absent if none ever was. */
-  fuelHedge?: FuelHedge;
+  /** An older save's one fuel hedge, turned into a rung at its first rollover (sim/fuelPrice.ts). */
+  fuelHedge?: LegacyFuelHedge;
+  /** The standing fuel policy (sim/fuelPrice.ts). Absent: no hedging, no surcharge. */
+  fuelPolicy?: FuelPolicy;
+  /** The hedge ladder's rungs still running. */
+  fuelTranches?: FuelTranche[];
+  /** The day the last rung was bought, and the day the next one is due. */
+  fuelLastRungDay?: number;
+  fuelNextRungDay?: number;
+  /** How the current policy has done since it was set. */
+  fuelBook?: FuelBook;
+  /** The share the fuel surcharge adds to policy and stance fares today. */
+  fuelSurcharge?: number;
+  /** The price index the airline paid at each of the last 90 rollovers, beside `fuelPriceHistory`. */
+  fuelPaidHistory?: number[];
   /**
    * A multiplier on the fuel-sensitive slice of every flight's cost, 1.0
    * meaning no mitigation — lower is better (less fuel burned for the

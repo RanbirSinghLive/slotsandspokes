@@ -8,6 +8,7 @@ import { RUNWAY_WARN_DAYS } from './runway';
 import { getSelection, select, type Selection } from './selection';
 import { contractsOf, faceOf, takeoverOpen } from '../sim/contracts';
 import { anyEntryShort } from '../sim/crewPlan';
+import { activeShock } from '../sim/shocks';
 
 /**
  * The rail down the side panel's left edge: every screen one click away,
@@ -20,7 +21,7 @@ import { anyEntryShort } from '../sim/crewPlan';
  *     (Fleet, red), a plane AOG (Mtc, red), a class short of crews (Crews, red; stretched, or a
  *     plane on its way that would enter service short, amber),
  *     a route that lost money yesterday (Routes, amber), cash running out
- *     within a month (Money, red), a running contract whose buyer is sad
+ *     within a month (Money, red), a fuel spike running (Fuel, amber), a running contract whose buyer is sad
  *     (Contracts, amber; red once a rival circles it);
  *   - something new since the screen was last open, like unread mail: a
  *     milestone met (Goals, green), a rival on one of your markets
@@ -34,7 +35,7 @@ const railEl = document.querySelector<HTMLElement>('#rail')!;
 const items = [...railEl.querySelectorAll<HTMLButtonElement>('.rail-item[data-go]')];
 const hideButton = railEl.querySelector<HTMLButtonElement>('#rail-hide')!;
 
-type Screen = 'network' | 'routes' | 'airports' | 'fleet' | 'product' | 'crews' | 'maintenance' | 'rivals' | 'money' | 'goals' | 'contracts' | 'headOffice' | 'game';
+type Screen = 'network' | 'routes' | 'airports' | 'fleet' | 'product' | 'crews' | 'maintenance' | 'rivals' | 'money' | 'goals' | 'contracts' | 'fuel' | 'headOffice' | 'game';
 
 /** Where each rail item goes. Routes opens worst margin first. */
 function targetOf(screen: Screen): Selection {
@@ -117,6 +118,7 @@ export function conditions(state: SimState): Partial<Record<Screen, Dot>> {
     contracts: contractsOf(state).some(takeoverOpen) ? 'bad' : contractsOf(state).some((c) => c.status === 'active' && faceOf(c) === 'sad') ? 'warn' : null,
     routes: losing ? 'warn' : null,
     money: runway !== null && runway <= RUNWAY_WARN_DAYS ? 'bad' : null,
+    fuel: activeShock(state)?.kind === 'fuel' ? 'warn' : null,
   };
 }
 

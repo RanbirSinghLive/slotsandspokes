@@ -83,7 +83,8 @@ import { AIRCRAFT_CLASSES, classByCode, classRank, pluralClassName } from './air
 import { applyHubStyleChange, planHubStyleChange } from './hubs';
 import { HUB_STYLES, type HubStyle } from './hubStyle';
 import { setAncillaryLevel, setExtra, setRouteFeeLevel, type AncillaryLevel, type ExtraId } from './ancillaries';
-import { buyHedge, HEDGE_TERMS, hedgeQuote, type HedgeQuote } from './fuelPrice';
+import { setFuelPolicy, type FuelPolicy } from './fuelPrice';
+import { applyFarePolicy } from './pricing';
 import {
   adoptBlockedReason,
   INNOVATIONS,
@@ -1070,15 +1071,14 @@ export function buildCharger(state: SimState, iata: string): Outcome<{ message: 
   return buildChargerRule(state, iata);
 }
 
-// --- Fuel hedging --------------------------------------------------------------
+// --- Fuel policy ---------------------------------------------------------------
 
-/** A quote for each hedge length on offer (sim/fuelPrice.ts). */
-export function hedgeOptions(state: SimState): HedgeQuote[] {
-  return HEDGE_TERMS.map((days) => hedgeQuote(state, days));
-}
-
-export function hedgeFuel(state: SimState, days: number): Outcome<{ message: string }> {
-  return buyHedge(state, days);
+/** Set the standing fuel policy: hedge cover, term, buying rule and surcharge (sim/fuelPrice.ts). */
+export function changeFuelPolicy(state: SimState, policy: FuelPolicy): Outcome<{ message: string }> {
+  const result = setFuelPolicy(state, policy);
+  // The surcharge reprices fares at once, not at the next rollover.
+  if (result.ok) applyFarePolicy(state);
+  return result;
 }
 
 // --- Ancillary fees ------------------------------------------------------------

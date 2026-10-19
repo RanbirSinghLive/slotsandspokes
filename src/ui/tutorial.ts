@@ -98,8 +98,13 @@ const STEPS: Step[] = [
     target: '#rail .rail-item[data-go="maintenance"]',
   },
   {
+    title: 'Fuel',
+    text: 'A standing fuel policy: how much fuel to keep hedged, for how long, whether to lock only on dips, and how much of a price rise to pass into fares. The chart shows the market against what you pay.',
+    target: '#rail .rail-item[data-go="fuel"]',
+  },
+  {
     title: 'Head office',
-    text: 'Fuel and hedging, domestic air rights abroad, seven executive chairs that open up the ladder (click one to meet its candidates), and the innovations each rung opens, as a tree.',
+    text: 'Domestic air rights abroad, seven executive chairs that open up the ladder (click one to meet its candidates), and the innovations each rung opens, as a tree.',
     target: '#rail .rail-item[data-go="headOffice"]',
   },
   {

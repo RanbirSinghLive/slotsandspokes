@@ -18,6 +18,7 @@ import { airportHours, averageHourLoad } from '../sim/hours';
 import { lastWeekMargin } from '../sim/pnlHistory';
 import { AIRCRAFT_CLASSES, classByCode } from '../sim/aircraftClasses';
 import { dayIndex } from '../sim/clock';
+import { fuelPolicyOf, type FuelPolicy } from '../sim/fuelPrice';
 import { LOAD_FACTOR, RECAPTURE_RATE } from '../sim/economy';
 import { connectingPassengersThrough } from '../sim/hubs';
 import {
@@ -207,11 +208,16 @@ export const INNOVATION_RUNNING_MARGIN = 1.5;
 const INNOVATION_RESERVE_DAYS = 60;
 
 /**
- * The steady player hedges fuel (sim/fuelPrice.ts) for the longest term
- * when the price is at least this far below usual, betting on the walk's
- * drift back up; never when it's above. The sitter never hedges.
+ * The steady player's standing fuel policy (sim/fuelPrice.ts), set on its
+ * first day: half its fuel hedged 90 days, rungs bought only on dips,
+ * no surcharge. Locking only on dips is the timing that pays (the walk
+ * drifts back up from a dip). AIRGAME_FUEL_POLICY="cover,term,buy,surcharge"
+ * (e.g. "0.75,30,any,1") tries another. The sitter never hedges.
  */
-export const HEDGE_BELOW_PRICE = 0.95;
+export const STEADY_FUEL_POLICY: FuelPolicy = (() => {
+  const [cover, termDays, buy, surcharge] = (process.env.AIRGAME_FUEL_POLICY ?? '0.5,90,dips,0').split(',');
+  return { cover: Number(cover), termDays: Number(termDays), buy: buy === 'any' ? 'any' : 'dips', surcharge: Number(surcharge) };
+})();
 
 /**
  * The steady player hires an executive (sim/executives.ts) when last
@@ -391,7 +397,7 @@ function steadyPlayer(kind: 'steady' | 'sitter' | 'bold'): Player {
         ...takeNightStops(state),
         ...runSeatSales(state),
         ...adoptInnovations(state),
-        ...(kind === 'steady' ? hedgeWhenCheap(state) : []),
+        ...(kind === 'steady' ? keepFuelPolicy(state) : []),
         ...(kind === 'steady' ? setFees(state) : []),
         ...(kind === 'steady' ? hireExecutives(state) : []),
       ];
@@ -1222,15 +1228,13 @@ function adoptInnovations(state: SimState): string[] {
 
 // --- Fuel ----------------------------------------------------------------------------
 
-/** Buy the longest hedge when fuel is cheap and no hedge runs, leaving the same cash reserve as innovations. */
-function hedgeWhenCheap(state: SimState): string[] {
-  if (state.fuelPriceIndex > HEDGE_BELOW_PRICE) return [];
-  const quote = actions.hedgeOptions(state).at(-1);
-  if (!quote || quote.blocked) return [];
-  const leases = state.aircraft.reduce((sum, aircraft) => sum + aircraft.leaseCostPerDay, 0);
-  if (state.cash < quote.premium + INNOVATION_RESERVE_DAYS * leases) return [];
-  const hedged = actions.hedgeFuel(state, quote.days);
-  return hedged.ok ? [hedged.message] : [];
+/** Set the standing fuel policy once; the ladder then runs itself at rollover. */
+function keepFuelPolicy(state: SimState): string[] {
+  const current = fuelPolicyOf(state);
+  const wanted = STEADY_FUEL_POLICY;
+  if (current.cover === wanted.cover && current.termDays === wanted.termDays && current.buy === wanted.buy && current.surcharge === wanted.surcharge) return [];
+  const set = actions.changeFuelPolicy(state, wanted);
+  return set.ok ? [set.message] : [];
 }
 
 // --- Fees ----------------------------------------------------------------------------
