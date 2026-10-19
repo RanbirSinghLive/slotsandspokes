@@ -25,7 +25,7 @@ const tabsEl = document.querySelector<HTMLDivElement>('#brief-tabs')!;
 
 const ICONS: Record<BriefId, string> = { daily: '☀', season: '📅' };
 const NAMES: Record<BriefId, string> = { daily: 'Daily brief', season: 'Season review' };
-const CHIP_ICONS: Record<string, string> = { weather: '🌩', closure: '⛔', aog: '🔧', hold: '⏸', crew: '👥', event: '★', late: '✕' };
+const CHIP_ICONS: Record<string, string> = { weather: '🌩', closure: '⛔', aog: '🔧', hold: '⏸', crew: '👥', event: '★', late: '✕', exec: '👔' };
 
 type Slot = { exists: boolean; unread: boolean; build: () => HTMLElement };
 const slots: Record<BriefId, Slot> = {
@@ -77,7 +77,7 @@ function minimize(): void {
   renderTabs();
 }
 
-function jump(target: { screen: 'fleet' | 'crews' | 'maintenance' | 'routes' } | { airport: string } | null): void {
+function jump(target: { screen: 'fleet' | 'crews' | 'maintenance' | 'routes' | 'headOffice' } | { airport: string } | null): void {
   if (!target) return;
   if ('airport' in target) select({ kind: 'airport', iata: target.airport });
   else if (target.screen === 'routes') select({ kind: 'routes', sort: 'completion' });

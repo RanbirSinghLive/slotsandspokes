@@ -534,7 +534,7 @@ export function step(state: SimState): void {
     state.delayMinutesByCause.knockOn += delayBreakdown.knockOn;
     state.delayMinutesByCause.congestion += delayBreakdown.congestion;
     state.delayMinutesByCause.ground = (state.delayMinutesByCause.ground ?? 0) + delayBreakdown.ground;
-    // A flight-ops COO scales the whole rolled delay down. Applied to
+    // An ops control executive scales the whole rolled delay down. Applied to
     // the summed total rather than to each cause, so the per-cause
     // attribution the On-Time panel reports stays the raw picture of
     // *why* flights run late, with the executive's effect visible as the

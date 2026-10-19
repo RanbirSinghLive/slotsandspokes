@@ -1,4 +1,5 @@
 import { AIRCRAFT_CLASSES, pluralClassName } from '../../sim/aircraftClasses';
+import { execNudge } from '../execNudge';
 import { aogChance, aogFor, daysUntilReturn, expediteCost, expediteRepair } from '../../sim/aog';
 import { ageDelayParameters } from '../../sim/delays';
 import { USEFUL_LIFE_YEARS } from '../../sim/leasing';
@@ -36,6 +37,8 @@ export function buildMaintenanceView(state: SimState, changed: () => void): HTML
   const title = document.createElement('h3');
   title.className = 'inspector-title';
   title.textContent = 'Maintenance';
+  const nudge = execNudge(state, ['coo-maintenance', 'dom-bakare']);
+  if (nudge) title.append(nudge);
   root.append(title);
 
   const repairsToday = state.todayCostByCategory.maintenance;

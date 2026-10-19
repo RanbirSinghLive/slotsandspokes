@@ -3937,8 +3937,8 @@ button.inspector-crumb:hover {
    each a tile in its holder's colour (--role) that opens to its candidates. */
 .office-chairs {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
   margin: 6px 0 4px;
 }
 
@@ -6529,7 +6529,8 @@ button.ops-item:hover {
 .brief-chip.is-hold,
 .brief-chip.is-crew,
 .brief-chip.is-weather,
-.brief-chip.is-event {
+.brief-chip.is-event,
+.brief-chip.is-exec {
   border-color: #ffd166;
 }
 .brief-yesterday {
@@ -7614,4 +7615,27 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
     min-width: 32px;
     min-height: 32px;
   }
+}
+
+/* A greyed portrait beside a screen's title when an executive would fit (ui/execNudge.ts). */
+.exec-nudge {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: 8px;
+  padding: 0;
+  background: none;
+  border: 1px dashed rgba(255, 209, 102, 0.6);
+  border-radius: 7px;
+  cursor: pointer;
+  filter: grayscale(0.7);
+  opacity: 0.8;
+}
+
+.exec-nudge:hover {
+  filter: none;
+  opacity: 1;
+}
+
+.exec-nudge .portrait {
+  border-radius: 6px;
 }

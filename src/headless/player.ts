@@ -239,6 +239,8 @@ export const STEADY_FUEL_POLICY: FuelPolicy = (() => {
 export const EXECUTIVE_MARGIN_TIMES_SALARY = 3;
 /** Days a switch of executive must pay its signing fee back in, from the better net a day. */
 export const EXECUTIVE_PAYBACK_DAYS = 120;
+/** Days a hire keeps their seat before the steady player will switch them, so a week's swing doesn't churn fees. */
+export const EXECUTIVE_MIN_TENURE_DAYS = 90;
 
 /** Planes the sitter grows to before it stops growing. */
 export const SITTER_FLEET_SIZE = 5;
@@ -1295,7 +1297,8 @@ function setFees(state: SimState): string[] {
  * Fill each seat with the candidate who would net the airline most a day
  * (worth less salary, sim/executives.ts), or switch to one who nets
  * clearly more than the holder: enough more to earn back the new signing
- * fee within EXECUTIVE_PAYBACK_DAYS. So the hires move as the fleet grows.
+ * fee within EXECUTIVE_PAYBACK_DAYS, once the holder has sat
+ * EXECUTIVE_MIN_TENURE_DAYS. So the hires move as the fleet grows.
  */
 function hireExecutives(state: SimState): string[] {
   const lastWeek = state.marginHistory.slice(-7);
@@ -1305,6 +1308,7 @@ function hireExecutives(state: SimState): string[] {
   const done: string[] = [];
   for (const seat of actions.executiveOptions(state)) {
     if (seat.opensAt) continue;
+    if (seat.holder && seat.hiredDay !== null && dayIndex(state) - seat.hiredDay < EXECUTIVE_MIN_TENURE_DAYS) continue;
     const net = (candidate: ExecutiveOption) => candidate.worthPerDay - candidate.salaryNow;
     const holderNet = seat.holder ? net(seat.holder) : 0;
     const best = seat.candidates

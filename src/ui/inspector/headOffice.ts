@@ -183,6 +183,11 @@ function candidateCard(state: SimState, candidate: ExecutiveOption, seat: Execut
 /** The seat opened to show its holder and candidates, if any: one at a time, kept while the view rebuilds. */
 let openSeat: ExecutiveSeat | null = null;
 
+/** Open a seat the next time the Office draws, for a nudge that leads there (ui/execNudge.ts). */
+export function openExecutiveSeat(seat: ExecutiveSeat): void {
+  openSeat = seat;
+}
+
 /** Whether a seat wants a look: amber when its holder costs more than they earn or someone fits clearly better. */
 function seatWantsLook(seat: ExecutiveSeatOption): boolean {
   return seat.advice.underwater || (seat.holder !== null && seat.advice.better !== null);
@@ -226,7 +231,7 @@ function executivesSection(state: SimState, changed: () => void): HTMLElement[] 
     role.textContent = seat.label;
     const who = document.createElement('span');
     who.className = 'office-chair-who';
-    who.textContent = seat.holder ? seat.holder.name : seat.opensAt ? `🔒 ${seat.opensAt}` : 'Vacant';
+    who.textContent = seat.holder ? seat.holder.name : seat.opensAt ? '🔒' : 'Vacant';
     tile.append(portraitElement(seat.holder?.id ?? null, colourRole, 56), role, who);
     if (seat.holder) {
       const net = seat.holder.worthPerDay - seat.holder.salaryNow;

@@ -2,6 +2,9 @@ import executivesData from '../../data/executives.json';
 import { networkNps } from './nps';
 import { LADDER, tiersClimbed } from './ladder';
 import { classRank } from './aircraftClasses';
+import { crewBases } from './crews';
+import { actualDailyDemand, currentPotentialDemand } from './marketDemand';
+import { marketKey } from './schedule';
 import type { SimState } from './state';
 
 /**
@@ -227,8 +230,8 @@ export function executiveSalariesPerDay(state: SimState): number {
 /**
  * Candidates from the seven chairs older saves had, mapped to whoever does
  * their job now. Run on load (ui/save.ts): each old holder goes to the new
- * person's chair if it is free, else to the board seat if that is free,
- * else leaves. Safe to run again.
+ * person's chair if it is free, else to the board seat if the airline has
+ * opened it and it is free, else leaves. Safe to run again.
  */
 const RETIRED_CANDIDATES: Record<string, string> = {
   'coo-fleet': 'cfo-adeyemi',
@@ -263,7 +266,8 @@ export function migrateExecutives(state: SimState): void {
   for (const { appointment } of seated) {
     const candidate = candidateById(appointment.candidateId);
     if (!candidate || placed.has(candidate.id)) continue;
-    const seat: ExecutiveSeat | null = !next[candidate.role] ? candidate.role : !next.board ? 'board' : null;
+    const boardOpen = !next.board && seatOpensAt(state, 'board') === null;
+    const seat: ExecutiveSeat | null = !next[candidate.role] ? candidate.role : boardOpen ? 'board' : null;
     if (!seat) continue;
     next[seat] = appointment;
     placed.add(candidate.id);
@@ -430,8 +434,6 @@ export function executiveEventPenaltyMultiplier(state: SimState): number {
 
 /** Days of history the worth estimate averages over. */
 const WORTH_WINDOW_DAYS = 7;
-/** A market younger than this many days of history still counts as building, for the market builder. */
-const YOUNG_MARKET_DAYS = 60;
 
 function recentAverage(history: number[] | undefined): number {
   const days = (history ?? []).slice(-WORTH_WINDOW_DAYS);
@@ -455,23 +457,30 @@ export function executiveWorthPerDay(state: SimState, candidate: ExecutiveCandid
   switch (effect.kind) {
     case 'maintenance':
       // Tech delays and AOG days: missed connections, refunds, spare lift.
-      worth = revenue * 0.1 * (1 - effect.ageFactorMultiplier);
+      worth = revenue * 0.05 * (1 - effect.ageFactorMultiplier);
       break;
     case 'flight-ops':
-      worth = revenue * 0.1 * (1 - effect.delayMultiplier);
+      worth = revenue * 0.06 * (1 - effect.delayMultiplier);
       break;
     case 'maintenance-bases':
-      worth = cost('maintenance') * 0.6 * (1 - effect.costMultiplier);
+      worth = cost('maintenance') * (1 - effect.costMultiplier);
       break;
-    case 'crew-programmes':
-      worth = cost('crew') * 0.1 * (1 - effect.trainingTimeMultiplier) + revenue * 0.01 * (1 - effect.trainingTimeMultiplier);
+    case 'crew-programmes': {
+      // A crew away retraining is a plane short; a fleet of one class seldom retrains, one adding a class does.
+      const retraining = Object.values(crewBases(state)).reduce((sum, base) => sum + (base.retraining ?? []).reduce((count, batch) => count + batch.count, 0), 0);
+      const perPlane = state.aircraft.length > 0 ? revenue / state.aircraft.length : 0;
+      worth = (retraining * perPlane * 0.25 + revenue * 0.01) * (1 - effect.trainingTimeMultiplier);
       break;
+    }
     case 'market-building': {
-      let young = 0;
-      for (const [key, history] of Object.entries(state.revenueHistoryByMarket)) {
-        if (history.length < YOUNG_MARKET_DAYS) young += recentAverage(state.revenueHistoryByMarket[key]);
+      // Revenue on markets still short of where they'd settle: the growth they have left is what speeds up.
+      const flown = new Set(state.schedule.map((leg) => marketKey(leg.origin, leg.dest)));
+      for (const key of flown) {
+        const [origin, dest] = key.split('-');
+        const potential = currentPotentialDemand(state, origin, dest);
+        const room = potential > 0 ? Math.max(0, 1 - actualDailyDemand(state, origin, dest) / potential) : 0;
+        worth += recentAverage(state.revenueHistoryByMarket[key]) * room * 0.1 * (effect.growthMultiplier - 1);
       }
-      worth = young * 0.4 * (effect.growthMultiplier - 1);
       break;
     }
     case 'inflight':
@@ -487,7 +496,7 @@ export function executiveWorthPerDay(state: SimState, candidate: ExecutiveCandid
       worth = cost('overhead') * (1 - effect.overheadMultiplier) + cost('slots') * (1 - (effect.slotFeeMultiplier ?? 1));
       break;
     case 'treasury':
-      worth = cost('fuel') * 0.03 + cost('overhead') * (1 - effect.overheadMultiplier);
+      worth = cost('fuel') * 0.06 + cost('overhead') * (1 - effect.overheadMultiplier);
       break;
     case 'leasing':
       // Only new leases get the rate, so about half the bill turns over within a hire.
@@ -532,6 +541,20 @@ export function seatAdvice(state: SimState, seat: ExecutiveSeat): { empty: boole
     }
   }
   return { empty: !holder && better !== null, underwater: !!holder && holderNet < 0, better };
+}
+
+/**
+ * The seat a candidate would clearly fit now, or null: the one whose
+ * advice names them, their own chair first. For the small portrait
+ * nudges where a candidate's line of work shows (ui/execNudge.ts).
+ */
+export function seatToFit(state: SimState, candidateId: string): ExecutiveSeat | null {
+  const candidate = candidateById(candidateId);
+  if (!candidate || seatOf(state, candidateId)) return null;
+  for (const seat of [candidate.role, 'board'] as ExecutiveSeat[]) {
+    if (seatAdvice(state, seat).better?.id === candidateId) return seat;
+  }
+  return null;
 }
 
 /** What an effect does, in words, for the Office, at full strength. */

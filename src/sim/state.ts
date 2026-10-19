@@ -770,6 +770,8 @@ export type SimState = {
     settings?: { daily: boolean; season: boolean; seasonPause: boolean; callPause?: boolean };
     lastDailyDay?: number;
     lastSeasonDay?: number;
+    /** The day the daily brief last mentioned each executive seat (sim/briefs.ts). */
+    lastExecNudge?: Record<string, number>;
     /** `marketTotals` when the last review appeared, so the next one reads only its half year. */
     seasonBaseline?: Record<string, { revenue: number; cost: number; passengers: number }>;
   };

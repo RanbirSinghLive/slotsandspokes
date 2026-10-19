@@ -245,7 +245,7 @@ export function hireLeadDays(state: SimState): number {
   return Math.max(1, Math.round(HIRE_LEAD_DAYS * crewHireTimeFactor(state)));
 }
 
-/** Days a crew is away retraining: shorter with a chief people officer (sim/executives.ts). */
+/** Days a crew is away retraining: shorter with a chief pilot (sim/executives.ts). */
 export function retrainDays(state: SimState): number {
   return Math.max(1, Math.round(RETRAIN_DAYS * crewRetrainTimeFactor(state)));
 }

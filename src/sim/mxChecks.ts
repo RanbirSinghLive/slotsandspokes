@@ -293,7 +293,7 @@ export function heavyCheckDueIn(aircraft: Aircraft): number {
  * gate, not free slack:
  * - each push on the same check costs 50% more than the one before;
  * - the most a check can be pushed is a base allowance, plus what the
- *   Director of Maintenance and the base's hangar bays add (`toleranceCapDays`);
+ *   heavy maintenance director and the base's hangar bays add (`toleranceCapDays`);
  * - every day the check runs past its unpushed due date wears the plane like
  *   extra age (`toleranceWearYears`), so more breakdowns and delays until it
  *   goes in.

@@ -125,7 +125,7 @@ export const INNOVATIONS: Innovation[] = [
     id: 'crew-academy',
     name: 'Crew academy',
     summary: 'Hiring 2× faster',
-    description: `Train your own crews: hiring them takes half the time, so a new plane is crewed sooner. Retraining stays with the chief people officer.`,
+    description: `Train your own crews: hiring them takes half the time, so a new plane is crewed sooner. Retraining stays with the chief pilot.`,
     openedBy: 'start-up',
     oneOffPrice: 150_000,
     runningCost: null,

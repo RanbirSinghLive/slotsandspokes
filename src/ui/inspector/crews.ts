@@ -1,4 +1,5 @@
 import { dayIndex } from '../../sim/clock';
+import { execNudge } from '../execNudge';
 import { crewPlan, type ClassPlan, type PlaneEntry } from '../../sim/crewPlan';
 import { AIRCRAFT_CLASSES, classByCode } from '../../sim/aircraftClasses';
 import { classOpen, tierThatOpens } from '../../sim/ladder';
@@ -87,6 +88,8 @@ export function buildCrewsView(state: SimState, changed: () => void): HTMLElemen
   const title = document.createElement('h3');
   title.className = 'inspector-title';
   title.textContent = 'Crews';
+  const nudge = execNudge(state, ['cpo-solheim']);
+  if (nudge) title.append(nudge);
   root.append(title);
 
   const today = dayIndex(state);

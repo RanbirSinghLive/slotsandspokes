@@ -14,6 +14,7 @@ import {
   seatOpensAt,
 } from './executives';
 import { AIRCRAFT_CLASSES } from './aircraftClasses';
+import { buildDailyBrief } from './briefs';
 import { chooseHome } from './homes';
 import { LADDER } from './ladder';
 import { createNewGameState } from './state';
@@ -54,7 +55,7 @@ assert.equal(new Set(everyone.map((candidate) => candidate.effect.kind)).size, e
   assert.equal(state.executives.board?.candidateId, 'coo-maintenance');
   // Salaries: base plus a share per plane, for both.
   const planes = state.aircraft.length;
-  assert.equal(executiveSalariesPerDay(state), 1500 + 100 * planes + 1500 + 100 * planes);
+  assert.equal(executiveSalariesPerDay(state), 1000 + 80 * planes + 1000 + 80 * planes);
 }
 
 // Effects land by class: line maintenance is strongest on propellers; the inflight director does nothing on one.
@@ -101,14 +102,38 @@ assert.equal(new Set(everyone.map((candidate) => candidate.effect.kind)).size, e
   // Whoever already sat in their own chair keeps it: Sato's job is the revenue manager's, still Commercial.
   assert.equal(state.executives.cco?.candidateId, 'cco-mensah');
   assert.equal(state.executives.cfo?.candidateId, 'cfo-mercer');
-  // The inflight director, Commercial now, finds that chair taken and goes to the board, earliest hire first;
-  // the chief pilot takes the Operations chair she left; freight (now the network planner) finds no seat.
-  assert.equal(state.executives.board?.candidateId, 'coo-inflight');
+  // The inflight director, Commercial now, finds that chair taken and the board not yet open, so leaves;
+  // the chief pilot takes the Operations chair; freight (now the network planner) finds no seat.
+  assert.equal(state.executives.board, null);
   assert.equal(state.executives.coo?.candidateId, 'cpo-solheim');
+  // An airline that has opened the board seat keeps the inflight director there.
+  const network = newState();
+  network.milestonesMet = Object.fromEntries(
+    LADDER.slice(0, 2).flatMap((tier) => tier.milestones.filter((milestone) => !milestone.extra).map((milestone) => [milestone.id, 0])),
+  );
+  (network as { executives: unknown }).executives = {
+    coo: { candidateId: 'coo-inflight', hiredAtMinute: 10 },
+    cco: { candidateId: 'cco-sato', hiredAtMinute: 20 },
+  };
+  migrateExecutives(network);
+  assert.equal(network.executives.board?.candidateId, 'coo-inflight');
   // Running it again changes nothing.
   const before = JSON.stringify(state.executives);
   migrateExecutives(state);
   assert.equal(JSON.stringify(state.executives), before);
+}
+
+// The daily brief names a seat someone would fit, then not again for a week.
+{
+  const state = newState();
+  state.revenueHistory = Array(7).fill(150_000);
+  const chip = () => buildDailyBrief(state).chips.find((c) => c.kind === 'exec');
+  assert.ok(chip(), 'no executive chip with an empty Operations chair a hire would pay in');
+  assert.ok(chip(), 'the same day built again dropped it');
+  state.simMinute += 1440;
+  assert.equal(chip(), undefined, 'mentioned again the next day');
+  state.simMinute += 7 * 1440;
+  assert.ok(chip(), 'not mentioned again after a week');
 }
 
 console.log('executive tests passed');

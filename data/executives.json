@@ -7,8 +7,8 @@
     "flavor": "A licensed engineer who still reads the defect log himself. Reckons a well-kept airframe owes you nothing and a neglected one takes it out of your schedule.",
     "npsNeeded": null,
     "signingFee": 150000,
-    "salaryPerDay": 1500,
-    "salaryPerPlane": 100,
+    "salaryPerDay": 1000,
+    "salaryPerPlane": 80,
     "classWeights": [1, 0.8, 0.4, 0.2],
     "effect": {
       "kind": "maintenance",
@@ -73,8 +73,8 @@
     "flavor": "Built a low-cost carrier's network one town at a time: the travel agents, the local papers, the chamber of commerce. New routes fill faster when he's been there first.",
     "npsNeeded": null,
     "signingFee": 150000,
-    "salaryPerDay": 1500,
-    "salaryPerPlane": 100,
+    "salaryPerDay": 1000,
+    "salaryPerPlane": 80,
     "classWeights": [1, 0.8, 0.5, 0.3],
     "effect": {
       "kind": "market-building",
@@ -138,12 +138,12 @@
     "flavor": "Spent a career in the back offices of charter airlines, where a head-office cost nobody can name is a cost that gets cut. Brings a red pen and uses it.",
     "npsNeeded": null,
     "signingFee": 150000,
-    "salaryPerDay": 1500,
-    "salaryPerPlane": 100,
+    "salaryPerDay": 1000,
+    "salaryPerPlane": 80,
     "classWeights": [1, 0.8, 0.5, 0.3],
     "effect": {
       "kind": "overhead",
-      "overheadMultiplier": 0.8,
+      "overheadMultiplier": 0.75,
       "slotFeeMultiplier": 0.9
     }
   },
