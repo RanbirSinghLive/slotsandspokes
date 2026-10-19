@@ -192,6 +192,24 @@ const AIRPORTS: [iata: string, name: string][] = [
   ['SIN', 'Singapore Changi'],
   ['GRU', 'São Paulo Guarulhos'],
   ['JNB', 'Johannesburg O.R. Tambo'],
+  // Regional Australia and New Zealand: the towns their regional airlines
+  // fly to. OurAirports lists few of them as scheduled medium airports, so
+  // the fill-out alone left Sydney three propeller routes.
+  ['WGA', 'Wagga Wagga'],
+  ['ABX', 'Albury'],
+  ['DBO', 'Dubbo'],
+  ['PQQ', 'Port Macquarie'],
+  ['TMW', 'Tamworth'],
+  ['ARM', 'Armidale'],
+  ['OAG', 'Orange'],
+  ['BNK', 'Ballina'],
+  ['ROK', 'Rockhampton'],
+  ['MKY', 'Mackay'],
+  ['LST', 'Launceston'],
+  ['MQL', 'Mildura'],
+  ['NSN', 'Nelson'],
+  ['ROT', 'Rotorua'],
+  ['IVC', 'Invercargill'],
 ];
 
 /**
