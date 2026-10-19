@@ -23,6 +23,7 @@ balance-output.csv
 
 # Each quick balance read's results (npm run quick); the reference is committed.
 balance-quick-last.json
+balance-global-last.json
 
 # Editor directories and files
 .vscode/*
