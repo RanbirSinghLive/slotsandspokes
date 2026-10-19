@@ -351,6 +351,15 @@ reliability, but at no more than a quarter (`MAX_DECAY`) of the slide an
 abandoned market gets, reached at 20%. A spoke on old planes can stall or
 shrink slowly; a turn buffer or a newer plane brings it back.
 
+**Reliability moves bookings too** (`reliabilityBookingFactor()`, same 7
+days, in `bookingPerks()` and so in every `flightResult()`): growth takes
+weeks, so without this a route nobody else flies filled the same seats at
+the same fare however often it cancelled. Local demand is scaled down by
+cancellations (each 1% of flights cancelled below 98% flown costs about 1%)
+and by lateness (up to 15% at none on time, nothing at 70%+), never below
+half. Connecting and contract passengers are not scaled. The route view's
+on-time chart shows it as "Bookings −N%".
+
 `SimState.onTimeByMarket: Record<marketKey, { departed, onTime }>`
 mirrors `flightsDepartedTotal`/`flightsOnTimeTotal` exactly, just split
 per market — lazily created the first time a market's first leg ever

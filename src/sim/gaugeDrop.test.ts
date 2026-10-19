@@ -26,7 +26,8 @@ assert.ok(props.length > 0 && regionals.length > 0, 'the game needs props and a 
 // A regional with its day cleared, so a prop round trip has free time to land on whatever the game booked.
 const roomy = structuredClone(state);
 roomy.schedule = roomy.schedule.filter((leg) => leg.tail !== regionals[0].tail);
-// Night stops read as breaks in the chain here, so compare against how many there were.
+// Night stops read as breaks in the chain here, and moving a rotation off a
+// plane can clear an overlap it had, so the check is that none are added.
 const startingConflicts = scheduleConflicts(roomy).length;
 
 // Upgauge: a prop round trip dropped on a regional's free time goes there, block times from the regional's speed.
@@ -44,7 +45,7 @@ for (const rotation of props) {
         assert.equal(leg.tail, plane.tail);
         assert.equal(leg.blockMinutes, computeBlockMinutes(leg.origin, leg.dest, 360), 'block time not re-timed for the regional');
       }
-      assert.equal(scheduleConflicts(copy).length, startingConflicts, 'upgauge left an overlap');
+      assert.ok(scheduleConflicts(copy).length <= startingConflicts, 'upgauge left an overlap');
       upgauged++;
       break;
     }
