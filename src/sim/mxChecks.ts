@@ -377,26 +377,47 @@ export type NightResult = 'checked' | 'cleared' | 'short' | 'contracted' | 'away
  * are in the hangar or in transit, and skip it. Also counts a flying day
  * toward the heavy check, and forces an overdue one.
  */
+/**
+ * Where and when a plane's night starts, judged at the rollover: parked,
+ * since it landed; or still in the air on a flight that lands before
+ * `releaseBy` (a day that ends just after midnight), from that landing.
+ * Null when it is still flying at release time: no night at all.
+ */
+function nightStart(state: SimState, aircraft: Aircraft, releaseBy: number): { station: string; since: number } | null {
+  if (aircraft.status === 'ground') return aircraft.atAirport ? { station: aircraft.atAirport, since: aircraft.groundSinceMinute } : null;
+  const flight = state.activeFlights.find((f) => f.tail === aircraft.tail);
+  return flight && flight.arriveMinute < releaseBy ? { station: flight.dest, since: flight.arriveMinute } : null;
+}
+
 export function rollNightlyChecks(state: SimState, dayStartMinute: number): void {
   const results: Record<string, NightResult> = {};
-  const checked: { aircraft: Aircraft; station: string | null }[] = [];
+  const checked: { aircraft: Aircraft; station: string | null; since: number }[] = [];
   for (const aircraft of state.aircraft) {
     const legs = state.schedule.filter((leg) => leg.tail === aircraft.tail);
-    if (legs.length === 0 || aircraft.rebase) continue;
-    if (state.aogs.some((event) => event.tail === aircraft.tail)) continue;
+    if (aircraft.rebase || state.aogs.some((event) => event.tail === aircraft.tail)) continue;
+    if (legs.length === 0) {
+      // A day on the ground at a line base clears an item: the work is done in daylight.
+      if (deferredItems(aircraft) > 0 && aircraft.status === 'ground' && lineRated(state, aircraft.atAirport ?? '', aircraft.typeCode)) {
+        aircraft.deferredItems = deferredItems(aircraft) - 1;
+        if (aircraft.deferredItems === 0) delete aircraft.deferredItems;
+      }
+      continue;
+    }
     if (aircraft.daysSinceHeavyCheck === undefined) staggerUsageClocks(aircraft);
     aircraft.daysSinceHeavyCheck = daysSinceHeavyCheck(aircraft) + 1;
     aircraft.daysSinceD = daysSinceD(aircraft) + 1;
-    checked.push({ aircraft, station: aircraft.status === 'ground' ? aircraft.atAirport : null });
+    const firstDeparture = dayStartMinute + Math.min(...legs.map((leg) => leg.departMinute));
+    const start = nightStart(state, aircraft, firstDeparture - RELEASE_MINUTES);
+    checked.push({ aircraft, station: start?.station ?? null, since: start?.since ?? 0 });
   }
   const sleepers = checked.flatMap((entry) => (entry.station ? [{ aircraft: entry.aircraft, station: entry.station }] : []));
   const inHouse = lineCheckedTails(state, sleepers);
 
-  for (const { aircraft, station } of checked) {
+  for (const { aircraft, station, since } of checked) {
     const legs = state.schedule.filter((leg) => leg.tail === aircraft.tail);
     let result: NightResult;
     const firstDeparture = dayStartMinute + Math.min(...legs.map((leg) => leg.departMinute));
-    const night = firstDeparture - RELEASE_MINUTES - aircraft.groundSinceMinute;
+    const night = firstDeparture - RELEASE_MINUTES - since;
     const work = lineCheckMinutes(state, aircraft);
     if (!station || (!inHouse.has(aircraft.tail) && outstationCheck(state, station) === 'defer')) {
       result = 'away';
@@ -425,6 +446,61 @@ export function rollNightlyChecks(state: SimState, dayStartMinute: number): void
     results[aircraft.tail] = result;
   }
   state.lastNightChecks = results;
+}
+
+/**
+ * Wear levelling, each morning before the night's checks are judged: a
+ * plane whose night would be too short for its line check, or that carries
+ * more deferred items than an idle twin, hands its whole day to that twin
+ * (same type and base, parked at the same airport with nothing to fly and
+ * a long enough night of its own). The worn plane rests the day, and the
+ * day goes back at the next rollover like a swap (sim/controller.ts), so a
+ * plane flying a day too long for its nights alternates with its spare
+ * instead of piling up items. Free: it's planned overnight.
+ */
+export function levelWear(state: SimState, dayStart: number): void {
+  const busy = new Set(state.schedule.map((leg) => leg.tail));
+  const unavailable = (aircraft: Aircraft) =>
+    aircraft.status !== 'ground' ||
+    !!aircraft.rebase ||
+    state.aogs.some((event) => event.tail === aircraft.tail) ||
+    state.groundedTails.includes(aircraft.tail) ||
+    nightStopStation(state, aircraft.tail) !== null;
+  const used = new Set<string>();
+  for (const worn of state.aircraft) {
+    const legs = state.schedule.filter((leg) => leg.tail === worn.tail);
+    if (legs.length === 0 || used.has(worn.tail)) continue;
+    if (worn.rebase || state.aogs.some((event) => event.tail === worn.tail) || state.groundedTails.includes(worn.tail)) continue;
+    const firstLeg = legs.reduce((first, leg) => (leg.departMinute < first.departMinute ? leg : first));
+    const releaseBy = dayStart + firstLeg.departMinute - RELEASE_MINUTES;
+    // Parked at base, or landing there before the day starts.
+    const wornNight = nightStart(state, worn, releaseBy);
+    if (!wornNight || wornNight.station !== firstLeg.origin || worn.baseAirport !== firstLeg.origin) continue;
+    const spec = LINE_CHECK_MINUTES[worn.typeCode] ?? LINE_CHECK_MINUTES.PROP;
+    const work = spec.base + spec.perCycle * legs.length;
+    const nightFor = (aircraft: Aircraft) => releaseBy - aircraft.groundSinceMinute;
+    const wornShort = releaseBy - wornNight.since < work;
+    const twin = state.aircraft.find(
+      (other) =>
+        other.tail !== worn.tail &&
+        !busy.has(other.tail) &&
+        !used.has(other.tail) &&
+        other.typeCode === worn.typeCode &&
+        other.baseAirport === worn.baseAirport &&
+        other.atAirport === firstLeg.origin &&
+        !unavailable(other) &&
+        nightFor(other) >= work &&
+        (wornShort ? deferredItems(other) <= deferredItems(worn) : deferredItems(other) < deferredItems(worn)),
+    );
+    if (!twin) continue;
+    const swapped = (state.swappedToday ??= []);
+    for (const leg of legs) {
+      if (!swapped.some((entry) => entry.legId === leg.legId)) swapped.push({ legId: leg.legId, fromTail: leg.tail });
+      leg.tail = twin.tail;
+    }
+    used.add(worn.tail);
+    used.add(twin.tail);
+  }
 }
 
 /**
@@ -464,12 +540,15 @@ export function chargeMaintenance(state: SimState, cost: number): void {
 export function morningHolds(state: SimState): { tail: string; legIds: string[] }[] {
   const holds: { tail: string; legIds: string[] }[] = [];
   for (const aircraft of state.aircraft) {
-    if (deferredItems(aircraft) < MX_HOLD_AT || aircraft.status !== 'ground') continue;
+    if (deferredItems(aircraft) < MX_HOLD_AT) continue;
     if (state.aogs.some((event) => event.tail === aircraft.tail)) continue;
     const first = rotationsForTail(state, aircraft.tail)[0];
     if (!first) continue;
+    // Still in the air, it is held once it lands, if that's before the rotation's first departure.
+    const start = nightStart(state, aircraft, dayStartMinute(state) + first.legs[0].departMinute);
+    if (!start || start.station !== first.legs[0].origin) continue;
     holds.push({ tail: aircraft.tail, legIds: first.legs.map((leg) => leg.legId) });
-    if (!lineRated(state, aircraft.atAirport ?? '', aircraft.typeCode)) chargeMaintenance(state, contractCost(lineCheckMinutes(state, aircraft) * deferredItems(aircraft)));
+    if (!lineRated(state, start.station, aircraft.typeCode)) chargeMaintenance(state, contractCost(lineCheckMinutes(state, aircraft) * deferredItems(aircraft)));
     delete aircraft.deferredItems;
   }
   return holds;

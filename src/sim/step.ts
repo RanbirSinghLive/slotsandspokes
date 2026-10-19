@@ -1,7 +1,7 @@
 import { rollStandingOrders } from './standingOrders';
 import { endSeasonalLeases } from './seasonalLease';
 import { demandFactors, rollDailyDemandEvents } from './demandEvents';
-import { accrueMaintenance, morningHolds, recordFlown, rollNightlyChecks, wornAge } from './mxChecks';
+import { accrueMaintenance, levelWear, morningHolds, recordFlown, rollNightlyChecks, wornAge } from './mxChecks';
 import { chargeNightStops } from './nightStops';
 import { applyPendingRetimes } from './retime';
 import { rollDailyFareWars } from './fareWars';
@@ -219,6 +219,8 @@ export function step(state: SimState): void {
     handBackSwaps(state);
     // Gantt moves held for tomorrow (sim/retime.ts) take effect with the new day.
     applyPendingRetimes(state);
+    // A plane whose night is too short rests today and an idle twin flies its day (sim/mxChecks.ts).
+    levelWear(state, state.simMinute);
     // Yesterday's fare-class sales, for the route view (sim/fareClasses.ts).
     state.yesterdayFareClasses = state.todayFareClasses ?? {};
     state.todayFareClasses = {};

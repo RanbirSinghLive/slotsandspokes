@@ -33,6 +33,7 @@ const planesPerMarket = (s: typeof state): number => {
   return [...planes.values()].reduce((sum, set) => sum + set.size, 0);
 };
 
+const unscrambled = planesPerMarket(state);
 // Scramble the fleet first: swap pairs of rotations between planes (seeded, so it repeats).
 let seed = 12345;
 const random = (n: number) => ((seed = (seed * 1103515245 + 12345) % 2147483648), seed % n);
@@ -67,7 +68,8 @@ for (const mode of ['fifo', 'lifo', 'optimise'] as SortMode[]) {
   assert.ok(result.ok || plan.moves.length === 0, `${mode} commit refused: ${result.ok ? '' : result.reason}`);
   for (const leg of copy.schedule) assert.equal(leg.departMinute, times.get(leg.legId), `${mode} moved a departure time`);
   assert.deepEqual(scheduleConflicts(copy), [], `${mode} left the schedule overlapping`);
-  anyTidied ||= planesPerMarket(copy) < before;
+  // Back to no more planes per market than before the scramble (which may or may not have split any).
+  anyTidied ||= planesPerMarket(copy) <= unscrambled;
   assert.ok(planesPerMarket(copy) <= before, `${mode} split markets over more planes (${planesPerMarket(copy)} > ${before})`);
   
   if (mode !== 'optimise') assert.equal(planSort(copy, mode).ok && (planSort(copy, mode) as { moves: unknown[] }).moves.length, 0, `${mode} twice should change nothing`);

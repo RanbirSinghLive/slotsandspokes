@@ -137,3 +137,31 @@ console.log('controller cancel: ok');
   state.aircraft.pop();
   console.log('controller mx-hold spare: ok');
 }
+
+// Wear levelling: a plane whose night is too short for its line check
+// hands its day to an idle twin with a full night, for the day only.
+{
+  const { levelWear } = await import('./mxChecks');
+  const { handBackSwaps } = await import('./controller');
+  const worn = state.aircraft.find((a) => a.tail === tail)!;
+  const ids = state.schedule.filter((leg) => leg.tail === tail).map((leg) => leg.legId);
+  const dayStart = dayStartMinute(state);
+  const firstDepart = Math.min(...state.schedule.filter((leg) => leg.tail === tail).map((leg) => dayStart + leg.departMinute));
+  worn.status = 'ground';
+  worn.atAirport = worn.baseAirport;
+  worn.groundSinceMinute = firstDepart - 90; // landed an hour and a half before its first departure
+  state.aogs = state.aogs.filter((event) => event.tail !== tail);
+  state.groundedTails = state.groundedTails.filter((grounded) => grounded !== tail);
+  state.swappedToday = [];
+  const spare = { ...worn, tail: 'T-SPARE', groundSinceMinute: firstDepart - 2000, deferredItems: undefined };
+  state.aircraft.push(spare);
+  levelWear(state, dayStart);
+  assert.ok(ids.every((id) => state.schedule.find((l) => l.legId === id)!.tail === 'T-SPARE'), 'short night: the idle twin should fly the day');
+  handBackSwaps(state);
+  assert.ok(ids.every((id) => state.schedule.find((l) => l.legId === id)!.tail === tail), 'hand back');
+  worn.groundSinceMinute = firstDepart - 2000;
+  levelWear(state, dayStart);
+  assert.ok(ids.every((id) => state.schedule.find((l) => l.legId === id)!.tail === tail), 'a rested plane with no items keeps its day');
+  state.aircraft.pop();
+  console.log('controller wear levelling: ok');
+}
