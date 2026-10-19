@@ -73,6 +73,7 @@ export {
   type MarketSummary,
   type CrewReadout,
   type ExecutiveOption,
+  type ExecutiveSeatOption,
   type InnovationOption,
   type Outcome,
   type PlaneOption,

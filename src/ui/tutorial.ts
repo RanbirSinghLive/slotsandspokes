@@ -104,7 +104,7 @@ const STEPS: Step[] = [
   },
   {
     title: 'Head office',
-    text: 'Domestic air rights abroad, seven executive chairs that open up the ladder (click one to meet its candidates), and the innovations each rung opens, as a tree.',
+    text: 'Domestic air rights abroad, three executive chairs and a board seat (click one to meet its candidates; who fits changes as your planes get bigger), and the innovations each rung opens, as a tree.',
     target: '#rail .rail-item[data-go="headOffice"]',
   },
   {

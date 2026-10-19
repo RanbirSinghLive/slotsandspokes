@@ -524,7 +524,7 @@ export function step(state: SimState): void {
       // hour this flight uses it (sim/hours.ts): a full hour queues its
       // departures and holds its arrivals alike.
       Math.max(stationLoadAt(state, leg.origin, hourOf(leg.departMinute)), stationLoadAt(state, leg.dest, hourOf(leg.departMinute + leg.blockMinutes))),
-      MAINTENANCE_AGE_FACTOR * executiveMaintenanceMultiplier(state),
+      MAINTENANCE_AGE_FACTOR * executiveMaintenanceMultiplier(state, aircraft.typeCode),
       handlingParameters(state, leg.origin),
     );
     state.rngSeed = nextSeed;
@@ -543,7 +543,7 @@ export function step(state: SimState): void {
     const fatigue = legFatigue(state, leg);
     const delayMinutes = Math.round(
       (delayBreakdown.age + delayBreakdown.weather + delayBreakdown.knockOn + delayBreakdown.congestion + delayBreakdown.ground) *
-        executiveDelayMultiplier(state) *
+        executiveDelayMultiplier(state, aircraft.typeCode) *
         (1 + (FATIGUE_DELAY_MULTIPLIER - 1) * fatigue),
     );
 
@@ -562,7 +562,7 @@ export function step(state: SimState): void {
       1 - fatigue,
       // A short cabin loses service points on every flight (sim/crews.ts).
       cabinCover(state, leg.tail),
-    ) + executiveNpsBonus(state) - ancillaryNpsPenalty(state, leg.origin, leg.dest);
+    ) + executiveNpsBonus(state, aircraft.typeCode) - ancillaryNpsPenalty(state, leg.origin, leg.dest);
     recordFlightNps(state, leg.origin, leg.dest, satisfactionScore);
 
     // Flying round an airspace closure adds minutes to the flight and to

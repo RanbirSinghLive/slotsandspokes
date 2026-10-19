@@ -1,5 +1,6 @@
 import { allAirports, dailyDeparturesAt, dailyMovementsAt } from './airports';
 import type { SimState } from './state';
+import { executiveSlotFeeMultiplier } from './executives';
 import { airportHours, freeInDay, hourOf, hourPriceMultiplier } from './hours';
 
 /**
@@ -109,10 +110,12 @@ export function heritagePairs(state: SimState, iata: string): number {
 
 /** What the airline pays per day for every slot it holds here, heritage pairs at their discount. */
 export function slotFeesPerDayAt(state: SimState, iata: string): number {
-  return (state.slotsHeld[iata] ?? []).reduce(
+  const fees = (state.slotsHeld[iata] ?? []).reduce(
     (total, fee, index) => total + (isHeritage(state, iata, index) ? fee * (1 - HERITAGE_DISCOUNT) : fee),
     0,
   );
+  // A cost controller negotiates the airport's charges down (sim/executives.ts).
+  return fees * executiveSlotFeeMultiplier(state);
 }
 
 /** The share of this airport's movements, every airline's, flown on the player's heritage pairs. */

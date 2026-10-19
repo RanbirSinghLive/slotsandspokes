@@ -3,22 +3,24 @@ import {
   appointBlockedReason,
   appointExecutive,
   candidateById,
-  chairOpensAt,
-  executiveCargoMultiplier,
-  executiveCrewTrainingMultiplier,
-  executiveEventPenaltyMultiplier,
-  executiveEventPremiumMultiplier,
-  executiveMaintenanceBaseMultiplier,
+  executiveMaintenanceMultiplier,
+  executiveNetPerDay,
+  executiveNpsBonus,
+  executiveSalariesPerDay,
+  executiveWorthPerDay,
+  EXECUTIVE_ROLES,
   loadExecutives,
+  migrateExecutives,
+  seatOpensAt,
 } from './executives';
+import { AIRCRAFT_CLASSES } from './aircraftClasses';
 import { chooseHome } from './homes';
-import { crewRetrainTimeFactor, crewHireTimeFactor } from './innovations';
 import { LADDER } from './ladder';
 import { createNewGameState } from './state';
 
-// Run with `npm run executivetest`: chairs open as the airline climbs the
-// ladder, a hire needs the tier its candidate asks for, and each new
-// chair's effect reaches the system it names.
+// Run with `npm run executivetest`: three chairs and a board seat that
+// opens at Network airline, effects that land by aircraft class, and old
+// saves' seven chairs folded into the new ones.
 function newState() {
   const state = createNewGameState(1, 'YUL');
   chooseHome(state, 'YUL', 'summer', 'medium');
@@ -26,53 +28,87 @@ function newState() {
   return state;
 }
 
-// Every candidate's tier exists, and ids are unique.
+// Ids are unique, every candidate sits in a real chair, and each chair has four people with a weight per class.
 const everyone = loadExecutives();
 assert.equal(new Set(everyone.map((candidate) => candidate.id)).size, everyone.length);
-for (const candidate of everyone) {
-  if (candidate.requiresTier) assert.ok(LADDER.some((tier) => tier.id === candidate.requiresTier), candidate.id);
-}
+for (const role of EXECUTIVE_ROLES) assert.equal(everyone.filter((candidate) => candidate.role === role).length, 4, role);
+for (const candidate of everyone) assert.equal(candidate.classWeights.length, AIRCRAFT_CLASSES.length, candidate.id);
+// Each effect kind belongs to one candidate, so two seated never stack the same lever.
+assert.equal(new Set(everyone.map((candidate) => candidate.effect.kind)).size, everyone.length);
 
-// A new airline sees the chief pilot's chair locked until it becomes a network airline.
+// The board seat waits for Network airline; a chair takes only its own people, the board anyone.
 {
   const state = newState();
-  assert.equal(chairOpensAt(state, 'cpo'), 'Network airline');
-  assert.equal(chairOpensAt(state, 'coo'), null);
-  assert.match(appointBlockedReason(state, candidateById('cpo-solheim')!) ?? '', /Needs Network airline/);
-  assert.equal(appointExecutive(state, 'cpo-solheim').ok, false);
-  // The same hire works once the tier is climbed.
+  assert.equal(seatOpensAt(state, 'coo'), null);
+  assert.equal(seatOpensAt(state, 'board'), 'Network airline');
+  assert.match(appointBlockedReason(state, candidateById('cco-lindqvist')!, 'board') ?? '', /Needs Network airline/);
+  assert.match(appointBlockedReason(state, candidateById('cco-lindqvist')!, 'coo') ?? '', /Not a Operations candidate/);
   state.milestonesMet = Object.fromEntries(
     LADDER.slice(0, 2).flatMap((tier) => tier.milestones.filter((milestone) => !milestone.extra).map((milestone) => [milestone.id, 0])),
   );
-  assert.equal(chairOpensAt(state, 'cpo'), null);
-  assert.equal(appointExecutive(state, 'cpo-solheim').ok, true);
-  assert.equal(executiveCrewTrainingMultiplier(state), 0.8);
-  assert.equal(crewRetrainTimeFactor(state), 0.8);
-  assert.equal(crewHireTimeFactor(state), 1);
+  assert.equal(seatOpensAt(state, 'board'), null);
+  assert.equal(appointExecutive(state, 'cco-lindqvist').ok, true);
+  // The same person can't take two seats.
+  assert.match(appointBlockedReason(state, candidateById('cco-lindqvist')!, 'board') ?? '', /Sits in Commercial/);
+  assert.equal(appointExecutive(state, 'coo-maintenance', 'board').ok, true);
+  assert.equal(state.executives.board?.candidateId, 'coo-maintenance');
+  // Salaries: base plus a share per plane, for both.
+  const planes = state.aircraft.length;
+  assert.equal(executiveSalariesPerDay(state), 1500 + 100 * planes + 1500 + 100 * planes);
 }
 
-// A save from before the new chairs has no slots for them, and nothing breaks.
+// Effects land by class: line maintenance is strongest on propellers; the inflight director does nothing on one.
 {
   const state = newState();
-  delete (state.executives as Partial<typeof state.executives>).hoc;
-  assert.equal(executiveCargoMultiplier(state), 1);
-  assert.equal(chairOpensAt(state, 'hoc'), 'International');
+  state.executives.coo = { candidateId: 'coo-maintenance', hiredAtMinute: 0 };
+  state.executives.cco = { candidateId: 'coo-inflight', hiredAtMinute: 0 };
+  const [prop, , , wide] = AIRCRAFT_CLASSES.map((aircraftClass) => aircraftClass.code);
+  assert.ok(Math.abs(executiveMaintenanceMultiplier(state, prop) - 0.7) < 1e-9);
+  assert.ok(executiveMaintenanceMultiplier(state, wide) > 0.9);
+  assert.equal(executiveNpsBonus(state, prop), 0);
+  assert.equal(executiveNpsBonus(state, wide), 10);
 }
 
-// Each new chair's effect reads as its multiplier once seated.
+// The best fit moves with the fleet: on a propeller airline line maintenance out-earns the inflight director; on widebodies the reverse.
 {
   const state = newState();
-  const seat = (id: string) => {
-    const candidate = candidateById(id)!;
-    state.executives[candidate.role] = { candidateId: id, hiredAtMinute: 0 };
+  state.revenueHistory = Array(7).fill(150_000);
+  const [prop, , , wide] = AIRCRAFT_CLASSES.map((aircraftClass) => aircraftClass.code);
+  const line = candidateById('coo-maintenance')!;
+  const inflight = candidateById('coo-inflight')!;
+  for (const aircraft of state.aircraft) aircraft.typeCode = prop;
+  assert.equal(executiveWorthPerDay(state, inflight), 0);
+  assert.ok(executiveWorthPerDay(state, line) > executiveWorthPerDay(state, inflight));
+  for (const aircraft of state.aircraft) aircraft.typeCode = wide;
+  assert.ok(executiveWorthPerDay(state, inflight) > executiveWorthPerDay(state, line));
+  assert.ok(executiveNetPerDay(state, inflight) > 0);
+}
+
+// An old save's seven chairs fold into three and the board: each hire goes to whoever does their job now.
+{
+  const state = newState();
+  (state as { executives: unknown }).executives = {
+    coo: { candidateId: 'coo-inflight', hiredAtMinute: 10 },
+    cfo: { candidateId: 'cfo-mercer', hiredAtMinute: 5 },
+    cco: { candidateId: 'cco-sato', hiredAtMinute: 20 },
+    cpo: { candidateId: 'cpo-malhotra', hiredAtMinute: 30 },
+    dom: null,
+    hoc: { candidateId: 'hoc-lindahl', hiredAtMinute: 40 },
+    hga: null,
   };
-  seat('dom-bakare');
-  seat('hoc-lindahl');
-  seat('hga-eze');
-  assert.equal(executiveMaintenanceBaseMultiplier(state), 0.7);
-  assert.equal(executiveCargoMultiplier(state), 1.25);
-  assert.equal(executiveEventPremiumMultiplier(state), 1.5);
-  assert.equal(executiveEventPenaltyMultiplier(state), 0.6);
+  migrateExecutives(state);
+  assert.deepEqual(Object.keys(state.executives).sort(), ['board', 'cco', 'cfo', 'coo']);
+  // Whoever already sat in their own chair keeps it: Sato's job is the revenue manager's, still Commercial.
+  assert.equal(state.executives.cco?.candidateId, 'cco-mensah');
+  assert.equal(state.executives.cfo?.candidateId, 'cfo-mercer');
+  // The inflight director, Commercial now, finds that chair taken and goes to the board, earliest hire first;
+  // the chief pilot takes the Operations chair she left; freight (now the network planner) finds no seat.
+  assert.equal(state.executives.board?.candidateId, 'coo-inflight');
+  assert.equal(state.executives.coo?.candidateId, 'cpo-solheim');
+  // Running it again changes nothing.
+  const before = JSON.stringify(state.executives);
+  migrateExecutives(state);
+  assert.equal(JSON.stringify(state.executives), before);
 }
 
 console.log('executive tests passed');

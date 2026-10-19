@@ -3,7 +3,7 @@
  * in the game's palette, drawn as SVG so they stay sharp at any size and
  * need no image files. Each candidate is a set of traits (skin, hair,
  * glasses, beard); the jacket is their chair's colour, so a row of chairs
- * reads COO teal, CFO amber, CCO violet. An empty chair is a silhouette.
+ * reads Operations teal, Commercial violet, Finance amber. An empty chair is a silhouette.
  */
 
 type Hair = 'short' | 'side' | 'long' | 'bun' | 'curly' | 'bald';
@@ -15,7 +15,6 @@ const HAIR = { black: '#1d1a1f', brown: '#5a3a24', blond: '#d7b064', grey: '#b9b
 
 const TRAITS: Record<string, Traits> = {
   'coo-maintenance': { skin: SKIN.light, hair: 'short', hairColour: HAIR.grey, glasses: true, beard: true },
-  'coo-fleet': { skin: SKIN.fair, hair: 'bun', hairColour: HAIR.blond },
   'coo-flightops': { skin: SKIN.deep, hair: 'short', hairColour: HAIR.black, beard: true },
   'coo-inflight': { skin: SKIN.brown, hair: 'long', hairColour: HAIR.black },
   'cfo-mercer': { skin: SKIN.light, hair: 'side', hairColour: HAIR.brown, glasses: true },
@@ -23,23 +22,14 @@ const TRAITS: Record<string, Traits> = {
   'cfo-adeyemi': { skin: SKIN.brown, hair: 'bun', hairColour: HAIR.black, glasses: true },
   'cco-lindqvist': { skin: SKIN.fair, hair: 'side', hairColour: HAIR.blond },
   'cco-carvalho': { skin: SKIN.olive, hair: 'long', hairColour: HAIR.auburn },
-  'cco-sato': { skin: SKIN.light, hair: 'short', hairColour: HAIR.black, glasses: true },
   'cco-mensah': { skin: SKIN.deep, hair: 'bald', hairColour: HAIR.black, glasses: true },
-  'coo-director-ops': { skin: SKIN.light, hair: 'short', hairColour: HAIR.black, glasses: true },
-  'cfo-treasurer': { skin: SKIN.fair, hair: 'side', hairColour: HAIR.grey },
-  'cco-alliances': { skin: SKIN.olive, hair: 'curly', hairColour: HAIR.brown, beard: true },
   'cpo-solheim': { skin: SKIN.fair, hair: 'long', hairColour: HAIR.blond },
-  'cpo-malhotra': { skin: SKIN.brown, hair: 'short', hairColour: HAIR.black, glasses: true },
-  'dom-aaltonen': { skin: SKIN.light, hair: 'bun', hairColour: HAIR.auburn },
   'dom-bakare': { skin: SKIN.deep, hair: 'bald', hairColour: HAIR.black, beard: true },
-  'hoc-karimova': { skin: SKIN.olive, hair: 'long', hairColour: HAIR.black },
-  'hoc-lindahl': { skin: SKIN.fair, hair: 'short', hairColour: HAIR.blond, beard: true },
   'hga-fontaine': { skin: SKIN.light, hair: 'side', hairColour: HAIR.grey, glasses: true },
-  'hga-eze': { skin: SKIN.deep, hair: 'curly', hairColour: HAIR.black, glasses: true },
 };
 
 /** Each chair's colour, the jacket in its portraits. */
-export const ROLE_COLOURS: Record<string, string> = { coo: '#5ed6c8', cfo: '#f2a541', cco: '#9d8cf0', cpo: '#6fb4f2', dom: '#e07a5f', hoc: '#8bcf7a', hga: '#e68ac0' };
+export const ROLE_COLOURS: Record<string, string> = { coo: '#5ed6c8', cfo: '#f2a541', cco: '#9d8cf0', board: '#c8d0e0' };
 
 function hairShape(traits: Traits, behind: boolean): string {
   const c = traits.hairColour;

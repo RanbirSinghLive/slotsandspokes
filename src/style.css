@@ -3933,8 +3933,8 @@ button.inspector-crumb:hover {
   margin: 4px 0 8px;
 }
 
-/* The executives' three chairs (ui/inspector/headOffice.ts), each a tile
-   in its chair's colour (--role) that opens to its candidates. */
+/* The executives' three chairs and board seat (ui/inspector/headOffice.ts),
+   each a tile in its holder's colour (--role) that opens to its candidates. */
 .office-chairs {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
@@ -3961,6 +3961,98 @@ button.inspector-crumb:hover {
 
 .office-chair-tile.is-locked {
   opacity: 0.55;
+}
+
+/* Amber: the holder costs more than they earn, or someone fits clearly better. */
+.office-chair-tile.wants-look,
+.office-person.wants-look {
+  border-color: #ffd166;
+  box-shadow: 0 0 0 1px rgba(255, 209, 102, 0.35);
+}
+
+/* An empty seat a hire would pay in: a dot in the corner. */
+.office-chair-tile {
+  position: relative;
+}
+
+.office-chair-tile.has-hire::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  background: #7fd88f;
+  border-radius: 50%;
+}
+
+.office-chair-note.is-paying {
+  color: #7fd88f;
+}
+
+/* The candidate the seat's advice names. */
+.office-person.is-better {
+  border-color: #7fd88f;
+}
+
+/* A person's fit: worth a day against the salary tick, net, then one pip per aircraft class. */
+.exec-fit-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 3px 0 2px;
+}
+
+.exec-fit {
+  position: relative;
+  flex: 0 1 90px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+}
+
+.exec-fit-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: #6b7694;
+  border-radius: 3px;
+}
+
+.exec-fit.is-paying .exec-fit-fill {
+  background: #7fd88f;
+}
+
+.exec-fit-salary {
+  position: absolute;
+  top: -2px;
+  width: 2px;
+  height: 10px;
+  margin-left: -1px;
+  background: #c8d0e0;
+}
+
+.exec-fit-net {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: #8a93a6;
+}
+
+.exec-fit.is-paying + .exec-fit-net {
+  color: #7fd88f;
+}
+
+.exec-pips {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.exec-pip {
+  width: 7px;
+  height: 7px;
+  border: 1px solid rgba(200, 208, 224, 0.5);
+  border-radius: 2px;
+  background: rgba(94, 214, 200, calc(var(--fill) * 0.9));
 }
 
 .office-chair-tile:hover {

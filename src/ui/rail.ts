@@ -25,8 +25,8 @@ import { activeShock } from '../sim/shocks';
  *     (Contracts, amber; red once a rival circles it);
  *   - something new since the screen was last open, like unread mail: a
  *     milestone met (Goals, green), a rival on one of your markets
- *     (Rivals, amber), an executive or innovation newly on
- *     offer (Office, green), a contract newly out to tender (Contracts, green). Opening the screen reads it.
+ *     (Rivals, amber), an executive seat newly wanting a look or an
+ *     innovation newly on offer (Office, green), a contract newly out to tender (Contracts, green). Opening the screen reads it.
  * The first look only records what's there, so loading a game lights no
  * "new" dots.
  */
@@ -83,7 +83,11 @@ const seen: Partial<Record<Screen, Set<string>>> = {};
 function newsIds(state: SimState): Partial<Record<Screen, string[]>> {
   const flown = new Set(state.schedule.map((leg) => marketKey(leg.origin, leg.dest)));
   const offers = [
-    ...ops.executiveOptions(state).flatMap((chair) => chair.candidates.filter((c) => !c.blocked).map((c) => `exec:${c.id}`)),
+    // A seat that wants a look: someone fits clearly better, a hire would pay in an empty one, or the holder costs more than they earn.
+    ...ops.executiveOptions(state).flatMap((seat) => [
+      ...(seat.advice.better ? [`exec:${seat.seat}:${seat.advice.better.id}`] : []),
+      ...(seat.advice.underwater ? [`exec:${seat.seat}:underwater`] : []),
+    ]),
     ...ops.innovationOptions(state).filter((option) => !option.adopted && !option.blocked).map((option) => `innovation:${option.id}`),
   ];
   return {

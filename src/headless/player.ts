@@ -36,6 +36,7 @@ import { cashNeededToLease } from '../sim/leasing';
 import { overheadAddedByNextPlane, overheadSavedByOneFewer } from '../sim/overhead';
 import { freeHeavyBays } from '../sim/mxChecks';
 import * as actions from '../sim/playerActions';
+import type { ExecutiveOption } from '../sim/playerActions';
 import { forecastStance } from '../sim/fareForecast';
 import { setFareClasses, setFareStance } from '../sim/pricing';
 import { grantedCountries, legRights, homeCountry } from '../sim/rights';
@@ -233,11 +234,11 @@ export const STEADY_FUEL_POLICY: FuelPolicy = (() => {
 /**
  * The steady player hires an executive (sim/executives.ts) when last
  * week's average margin is at least this many times their salary, and the
- * signing fee leaves the same cash reserve as an innovation. It fills an
- * empty chair, or replaces the holder with a candidate who needs a higher
- * NPS, since those are the stronger hires.
+ * signing fee leaves the same cash reserve as an innovation.
  */
-export const EXECUTIVE_MARGIN_TIMES_SALARY = 10;
+export const EXECUTIVE_MARGIN_TIMES_SALARY = 3;
+/** Days a switch of executive must pay its signing fee back in, from the better net a day. */
+export const EXECUTIVE_PAYBACK_DAYS = 120;
 
 /** Planes the sitter grows to before it stops growing. */
 export const SITTER_FLEET_SIZE = 5;
@@ -1290,22 +1291,29 @@ function setFees(state: SimState): string[] {
 
 // --- Executives --------------------------------------------------------------------
 
-/** Fill or upgrade each chair with the strongest candidate the airline can get and afford. */
+/**
+ * Fill each seat with the candidate who would net the airline most a day
+ * (worth less salary, sim/executives.ts), or switch to one who nets
+ * clearly more than the holder: enough more to earn back the new signing
+ * fee within EXECUTIVE_PAYBACK_DAYS. So the hires move as the fleet grows.
+ */
 function hireExecutives(state: SimState): string[] {
   const lastWeek = state.marginHistory.slice(-7);
   if (lastWeek.length < 7) return [];
   const averageMargin = lastWeek.reduce((sum, margin) => sum + margin, 0) / 7;
-  const leases = committedLeasesPerDay(state);
+  const leases = state.aircraft.reduce((sum, aircraft) => sum + aircraft.leaseCostPerDay, 0);
   const done: string[] = [];
-  for (const chair of actions.executiveOptions(state)) {
-    const holderRank = chair.holder ? (chair.holder.npsNeeded ?? 0) : -1;
-    const best = chair.candidates
-      .filter((candidate) => !candidate.blocked && (candidate.npsNeeded ?? 0) > holderRank)
-      .filter((candidate) => averageMargin >= EXECUTIVE_MARGIN_TIMES_SALARY * candidate.salaryPerDay)
+  for (const seat of actions.executiveOptions(state)) {
+    if (seat.opensAt) continue;
+    const net = (candidate: ExecutiveOption) => candidate.worthPerDay - candidate.salaryNow;
+    const holderNet = seat.holder ? net(seat.holder) : 0;
+    const best = seat.candidates
+      .filter((candidate) => !candidate.blocked && net(candidate) > 0)
+      .filter((candidate) => averageMargin >= EXECUTIVE_MARGIN_TIMES_SALARY * candidate.salaryNow)
       .filter((candidate) => state.cash >= candidate.signingFee + INNOVATION_RESERVE_DAYS * leases)
-      .sort((a, b) => (b.npsNeeded ?? 0) - (a.npsNeeded ?? 0))[0];
+      .filter((candidate) => net(candidate) - holderNet > candidate.signingFee / EXECUTIVE_PAYBACK_DAYS)[0];
     if (!best) continue;
-    const hired = actions.appointExecutiveById(state, best.id);
+    const hired = actions.appointExecutiveById(state, best.id, seat.seat);
     if (hired.ok) done.push(hired.message);
   }
   return done;

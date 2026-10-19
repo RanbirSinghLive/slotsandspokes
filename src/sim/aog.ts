@@ -104,7 +104,7 @@ export function aogFor(state: SimState, tail: string): AogEvent | undefined {
 
 function effectiveAge(state: SimState, aircraft: Aircraft): number {
   // Deferred items wear it like extra years (sim/mxChecks.ts).
-  return wornAge(aircraft) * MAINTENANCE_AGE_FACTOR * executiveMaintenanceMultiplier(state);
+  return wornAge(aircraft) * MAINTENANCE_AGE_FACTOR * executiveMaintenanceMultiplier(state, aircraft.typeCode);
 }
 
 /** Today's chance this plane goes AOG. Exported for the dev tools and any readout that wants to explain it. */
