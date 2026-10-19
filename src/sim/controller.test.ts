@@ -114,3 +114,26 @@ console.log('controller cancel: ok');
   state.aircraft.pop();
   console.log('controller swap: ok');
 }
+
+// MX hold: a plane held for its deferred items hands its first rotation to
+// an idle plane of the same type at base instead of cancelling it, and
+// cancels when there's no such plane.
+{
+  const { handHeldRotationToSpare, handBackSwaps } = await import('./controller');
+  const held = state.aircraft.find((a) => a.tail === tail)!;
+  held.status = 'ground';
+  held.atAirport = rotations[0].legs[0].origin;
+  state.cancelledToday = [];
+  const ids = rotations[0].legs.map((leg) => leg.legId);
+  assert.equal(handHeldRotationToSpare(state, tail, ids, new Set([tail])), null, 'no idle twin: nothing to hand to');
+
+  const spare = { ...held, tail: 'T-SPARE', status: 'ground' as const, atAirport: held.baseAirport };
+  state.aircraft.push(spare);
+  assert.equal(handHeldRotationToSpare(state, tail, ids, new Set([tail, 'T-SPARE'])), null, 'a plane held too is not a spare');
+  assert.equal(handHeldRotationToSpare(state, tail, ids, new Set([tail])), 'T-SPARE');
+  assert.ok(ids.every((id) => state.schedule.find((l) => l.legId === id)!.tail === 'T-SPARE'));
+  handBackSwaps(state);
+  assert.ok(ids.every((id) => state.schedule.find((l) => l.legId === id)!.tail === tail), 'hand back');
+  state.aircraft.pop();
+  console.log('controller mx-hold spare: ok');
+}

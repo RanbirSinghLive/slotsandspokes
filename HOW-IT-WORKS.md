@@ -3753,10 +3753,12 @@ short nights and stations set to defer.
 
 **Deferred items wear the plane.** Each counts as 3 more years of age
 for breakdowns and mechanical delays (`wornAge()`). At 3 the plane is
-held that morning where it slept: its first rotation is cancelled (cause
-"Maintenance hold", the ticker's "MX hold") and the items are cleared,
-by contract (a line check's price for each) away from a maintenance
-base.
+held that morning where it slept and the items are cleared, by contract
+(a line check's price for each) away from a maintenance base. Its first
+rotation goes to an idle plane of the same type at the same base for the
+day, free, handed back at the next rollover like a swap
+(`handHeldRotationToSpare()`); with no such plane it is cancelled (cause
+"Maintenance hold", the ticker's "MX hold").
 
 **The heavy check is the C check** (the screens call it C; the code says heavy).
 It is due after 90 flying days, 900 flight hours or 750 cycles, whichever comes
