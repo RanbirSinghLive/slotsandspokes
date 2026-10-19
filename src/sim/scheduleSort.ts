@@ -108,6 +108,11 @@ export function planSort(state: SimState, mode: SortMode): SortPlan {
 
     const placed = mode === 'optimise' ? improve(available, fixed, movable) : assign(available, fixed, movable, mode);
     if (!placed) continue;
+    // FIFO and LIFO deal planes out greedily, which can now and then leave a
+    // market on more planes than today: a sort never does that, so such a
+    // group stays as it is.
+    const today = new Map(movable.map((item) => [item.rotation.legs[0].legId, item.rotation.tail]));
+    if (planeMarketPairs(available, fixed, movable, placed) > planeMarketPairs(available, fixed, movable, today)) continue;
     for (const { rotation } of movable) {
       const tail = placed.get(rotation.legs[0].legId)!;
       if (tail !== rotation.tail) moves.push({ legIds: rotation.legs.map((leg) => leg.legId), tail, start: rotation.departMinute });
@@ -157,6 +162,14 @@ function assign(tails: string[], fixed: Map<string, Busy[]>, movable: Movable[],
     result.set(item.rotation.legs[0].legId, pick);
   }
   return result;
+}
+
+/** How many (plane, market) pairs a group flies with each movable rotation on the plane `planeOf` gives it. */
+function planeMarketPairs(tails: string[], fixed: Map<string, Busy[]>, movable: Movable[], planeOf: Map<string, string>): number {
+  const pairs = new Set<string>();
+  for (const tail of tails) for (const busy of fixed.get(tail) ?? []) pairs.add(`${tail}|${busy.market}`);
+  for (const item of movable) pairs.add(`${planeOf.get(item.rotation.legs[0].legId)}|${item.market}`);
+  return pairs.size;
 }
 
 const SPLIT_COST = 1000;

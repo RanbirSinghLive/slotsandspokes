@@ -22,7 +22,7 @@ import {
 } from './pressure';
 import { moneyOnTable } from './attractiveness';
 import { rivalSecuresCapacity } from './market';
-import { legRights, rivalHomeCountry } from './rights';
+import { countryOf, legRights, rivalHomeCountry } from './rights';
 import { rivalSlotQuote } from './slots';
 import type { SimState } from './state';
 
@@ -260,6 +260,26 @@ export function rollCompetitorRouteOpenings(state: SimState, dayStartMinute: num
 /** A newcomer airline from data/rival-airlines.json; `country` is where it is from. */
 type RivalPoolEntry = { airline: string; code: string; country: string };
 
+/**
+ * The newcomer that opens `origin`–`dest`, and the country it flies for:
+ * one from the pool whose own country may fly the market, or else a pool
+ * name starting up locally, as a carrier of the origin's country. The pool
+ * names only a dozen countries, and a domestic market is closed to foreign
+ * newcomers, so without the local start-up an airline based anywhere else
+ * never met a rival on its own routes and kept every edge for good.
+ */
+function newcomerFor(pool: RivalPoolEntry[], origin: string, dest: string, roll: number): { rival: RivalPoolEntry; country: string } | null {
+  if (pool.length === 0) return null;
+  const eligible = pool.filter((rival) => legRights(rival.country, origin, dest).ok);
+  if (eligible.length > 0) {
+    const rival = eligible[Math.min(eligible.length - 1, Math.floor(roll * eligible.length))];
+    return { rival, country: rival.country };
+  }
+  const local = countryOf(origin);
+  if (!local || !legRights(local, origin, dest).ok) return null;
+  return { rival: pool[Math.min(pool.length - 1, Math.floor(roll * pool.length))], country: local };
+}
+
 const SEED_CODES = new Set((competitorsData as { code: string }[]).map((route) => route.code));
 
 /**
@@ -329,14 +349,17 @@ export function rollRivalEntry(state: SimState, dayStartMinute: number): void {
   // A newcomer has a nationality of its own, so it can only open the market
   // if its country's carriers may fly it: a domestic market is closed to
   // foreign newcomers (sim/rights.ts).
-  const eligible = pool.filter((rival) => legRights(rival.country, origin, dest).ok);
-  if (eligible.length === 0) return;
-  const rival = eligible[Math.min(eligible.length - 1, Math.floor(nameRoll * eligible.length))];
-  // A new airline needs slots at both ends and its first plane from the
-  // market, like anyone.
+  const newcomer = newcomerFor(pool, origin, dest, nameRoll);
+  if (!newcomer) return;
+  const { rival, country } = newcomer;
+  // A new airline needs slots at both ends, like anyone. Its first plane
+  // comes from the shelf when there is one; otherwise it brings its own
+  // (ensureRivalFleets() records it), since a player who keeps the shelf
+  // bare would otherwise never see a newcomer at all. Leasing up the
+  // shelf still holds back how fast rivals grow once they're in.
   const slotFees = rivalSlotQuote(state, origin, dest);
   if (slotFees === null) return;
-  if (!rivalSecuresCapacity(state, rival.code, origin, dest)) return;
+  rivalSecuresCapacity(state, rival.code, origin, dest);
   state.competitorRoutes.push({
     airline: rival.airline,
     code: rival.code,
@@ -347,7 +370,7 @@ export function rollRivalEntry(state: SimState, dayStartMinute: number): void {
     baseFare: recommendedFare(origin, dest),
     openedAtMinute: dayStartMinute,
     slotFeesPerDay: slotFees,
-    homeCountry: rival.country,
+    homeCountry: country,
   });
 }
 
@@ -390,9 +413,9 @@ export function placeHomeRival(state: SimState): void {
   const origin = a === home ? a : b;
   const dest = a === home ? b : a;
   // The home rival is a local start-up: its nationality has to be allowed on that market.
-  const eligible = pool.filter((rival) => legRights(rival.country, origin, dest).ok);
-  if (eligible.length === 0) return;
-  const rival = eligible[Math.min(eligible.length - 1, Math.floor(nameRoll * eligible.length))];
+  const newcomer = newcomerFor(pool, origin, dest, nameRoll);
+  if (!newcomer) return;
+  const { rival, country } = newcomer;
   state.competitorRoutes.push({
     airline: rival.airline,
     code: rival.code,
@@ -402,7 +425,7 @@ export function placeHomeRival(state: SimState): void {
     fare: incumbentFare(origin, dest),
     baseFare: incumbentFare(origin, dest),
     openedAtMinute: PRE_EXISTING_OPENED_AT_MINUTE,
-    homeCountry: rival.country,
+    homeCountry: country,
   });
 }
 

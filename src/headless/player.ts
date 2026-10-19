@@ -208,6 +208,17 @@ export const INNOVATION_RUNNING_MARGIN = 1.5;
 const INNOVATION_RESERVE_DAYS = 60;
 
 /**
+ * The daily lease bill the reserve is kept against: the fleet, and the
+ * planes leased but not yet delivered, whose leases are already signed.
+ * Without these, a week-old airline with a second plane on its way could
+ * spend the cash that plane's first weeks need on a signing fee.
+ */
+function committedLeasesPerDay(state: SimState): number {
+  const fleet = state.aircraft.reduce((sum, aircraft) => sum + aircraft.leaseCostPerDay, 0);
+  return fleet + (state.inboundLeases ?? []).reduce((sum, lease) => sum + lease.leasePricePerDay, 0);
+}
+
+/**
  * The steady player's standing fuel policy (sim/fuelPrice.ts), set on its
  * first day: half its fuel hedged 90 days, rungs bought only on dips,
  * no surcharge. Locking only on dips is the timing that pays (the walk
@@ -1092,6 +1103,10 @@ function fillDelivered(state: SimState, memory: Memory): string[] {
     const opened = fillPlane(state, aircraft.tail, {
       latestLanding: LATEST_LANDING_MINUTE,
       avoid: (key) => coolingDown(state, memory, key),
+      // The bar it was leased against: a big plane on a thin market loses
+      // its lease every day, and where the region's big markets are few
+      // (Oceania) its day would otherwise fill with them.
+      minScore: worthFlying(aircraft.typeCode),
       checkSlotFees: true,
       onOpen: (key) => memory.openedOn.set(key, dayIndex(state)),
     });
@@ -1205,7 +1220,7 @@ const RESEARCH_BUDGET_LEVEL = 2;
  * the airline holds its usual cash reserve.
  */
 function adoptInnovations(state: SimState): string[] {
-  const leases = state.aircraft.reduce((sum, aircraft) => sum + aircraft.leaseCostPerDay, 0);
+  const leases = committedLeasesPerDay(state);
   const reserve = INNOVATION_RESERVE_DAYS * leases;
   const done: string[] = [];
   const busy = actions.innovationOptions(state).find((option) => option.active);
@@ -1280,7 +1295,7 @@ function hireExecutives(state: SimState): string[] {
   const lastWeek = state.marginHistory.slice(-7);
   if (lastWeek.length < 7) return [];
   const averageMargin = lastWeek.reduce((sum, margin) => sum + margin, 0) / 7;
-  const leases = state.aircraft.reduce((sum, aircraft) => sum + aircraft.leaseCostPerDay, 0);
+  const leases = committedLeasesPerDay(state);
   const done: string[] = [];
   for (const chair of actions.executiveOptions(state)) {
     const holderRank = chair.holder ? (chair.holder.npsNeeded ?? 0) : -1;
@@ -1314,7 +1329,7 @@ function expectedGroundMinutes(tier: HandlingTier): number {
 function keepStations(state: SimState): string[] {
   if (dayIndex(state) % 7 !== 3) return [];
   const log: string[] = [];
-  const leases = state.aircraft.reduce((sum, aircraft) => sum + aircraft.leaseCostPerDay, 0);
+  const leases = committedLeasesPerDay(state);
   const stations = new Set(state.schedule.map((leg) => leg.origin));
   for (const iata of stations) {
     const tier = stationTier(state, iata);

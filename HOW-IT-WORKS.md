@@ -2053,7 +2053,9 @@ falling back to smaller ones.
 So leasing the last Regional before a rival does is a real move. Rivals
 fall back as far as a Propeller, but never take the last one listed: it
 is the class every airline starts and first grows with, and rivals act
-before the player each day.
+before the player each day. A newcomer airline is the exception: it takes its first plane from
+the shelf when there is one, and otherwise brings its own, so a bare
+shelf slows rivals' growth but never keeps a new one out.
 
 **Held for you.** A new listing is the player's alone for 3 days
 (`HOLD_DAYS`): rivals skip it until the hold ends, and the HUD chip's
@@ -2478,7 +2480,7 @@ once a day at rollover; a milestone met stays met.
 
 | Tier | Needed | Gate milestones | Extras | Opens |
 |---|---|---|---|---|
-| Start-up | 4 of 4 | fly your first route; a route that makes money for a week after its share of fixed costs; a route 72% full over a week; hold a starved city no rival flies to, on a route flown 30 days | two routes; a crew based away from home | Regional aircraft; crew academy |
+| Start-up | 4 of 4 | fly your first route; a route that makes money for a week after its share of fixed costs; a route 72% full over a week; hold a city no rival flies to, on a route flown 30 days (judged on rivals, not hunger, so thin regions can climb) | two routes; a crew based away from home | Regional aircraft; crew academy |
 | Regional carrier | 3 of 4 | serve 8 airports; connect 150 a day through one airport; put a Regional into service; make money every day for a week of a shock | cabin teams for a Regional; accept an event | Narrowbody; online booking, younger airframes |
 | Network airline | 3 of 5 | fly 60% of the movements at a busy airport; four routes 4+ a day each way; trailing NPS 15, with 1,000 flights flown; planes based at two airports; put a Narrowbody into service | a line base away from home; first freight revenue | Widebody; loyalty scheme, winglet retrofits |
 | International | 2 of 4 | a route to another continent; connect 750 a day through one airport; airports in 5 countries; a plane based outside the home country | | codeshare feed, spoilage management I–III |
@@ -3338,7 +3340,11 @@ airport. A rival's home country is stamped on the routes it opens
 its oldest route starts. A newcomer has a nationality of its own
 (`country` in `data/rival-airlines.json`) and only opens a market its
 country's carriers may fly, so a foreign newcomer can't enter a domestic
-market; the home rival is picked the same way.
+market; the home rival is picked the same way. When no pool airline's
+country may fly the market, a pool name starts up locally instead, as a
+carrier of the market's origin country (`newcomerFor()`): the pool names
+only a dozen countries, and without this an airline based anywhere else
+never met a newcomer on its own routes.
 
 ---
 
