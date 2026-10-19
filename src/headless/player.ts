@@ -17,6 +17,8 @@ import { DEFAULT_FARE_CLASSES } from '../sim/fareClasses';
 import { airportHours, averageHourLoad } from '../sim/hours';
 import { lastWeekMargin } from '../sim/pnlHistory';
 import { AIRCRAFT_CLASSES, classByCode } from '../sim/aircraftClasses';
+import { returnFee } from '../sim/market';
+import { demandAgainstSeats } from '../sim/marketSize';
 import { dayIndex } from '../sim/clock';
 import { fuelPolicyOf, type FuelPolicy } from '../sim/fuelPrice';
 import { LOAD_FACTOR, RECAPTURE_RATE } from '../sim/economy';
@@ -746,6 +748,7 @@ type FillOptions = {
 function fillPlane(state: SimState, tail: string, options: FillOptions): string[] {
   const aircraft = state.aircraft.find((a) => a.tail === tail)!;
   const home = airportByIata.get(aircraft.baseAirport ?? state.homeAirport)!;
+  const seats = classByCode(aircraft.typeCode)?.seats ?? 0;
   const opened: string[] = [];
   // A safety cap: every rotation uses up part of the day, so the loop ends on its own long before this.
   const MAX_ROTATIONS_PER_PLANE = 20;
@@ -760,6 +763,11 @@ function fillPlane(state: SimState, tail: string, options: FillOptions): string[
       if (options.avoid?.(marketKey(home.iata, dest.iata))) continue;
       const flights = legsServingMarket(home.iata, dest.iata, state.schedule);
       if (options.unservedOnly && flights > 0) continue;
+      // A market already flown gets another round trip only if the route
+      // builder wouldn't call it "mostly empty now": potential says how big
+      // it can grow, not how many fly it today, and stacking a thin market
+      // only spreads its few riders over more empty seats.
+      if (flights > 0 && demandAgainstSeats(state, home.iata, dest.iata, flights + 2, seats).thin) continue;
       const score = demand / (1 + flights);
       if (score < (options.minScore ?? 0)) continue;
       candidates.push({ dest, score });
@@ -1018,6 +1026,8 @@ function shedWhenOverheadBites(state: SimState, memory: Memory): string[] {
   }
   if (toShed === null) return [];
   const shedTail = toShed;
+  // A return fee the cash can't cover ends the game on the spot; keep flying it and look again tomorrow.
+  if (!canPayReturn(state, shedTail)) return [];
   const itsMarkets = new Set(state.schedule.filter((leg) => leg.tail === shedTail).map((leg) => marketKey(leg.origin, leg.dest)));
   const cleared = actions.clearPlane(state, toShed);
   if (!cleared.ok) return [];
@@ -1028,6 +1038,12 @@ function shedWhenOverheadBites(state: SimState, memory: Memory): string[] {
   return [`${toShed} hasn't paid its lease and overhead for ${SHED_AFTER_DAYS} days: ${cleared.message}${returned.ok ? ` ${returned.message}` : ''}`];
 }
 
+/** Whether handing this plane back leaves cash above zero once its return fee is paid. */
+function canPayReturn(state: SimState, tail: string): boolean {
+  const aircraft = state.aircraft.find((a) => a.tail === tail);
+  return aircraft !== undefined && returnFee(aircraft) < state.cash;
+}
+
 function returnIdle(state: SimState, memory: Memory): string[] {
   const log: string[] = [];
   for (const aircraft of [...state.aircraft]) {
@@ -1036,7 +1052,7 @@ function returnIdle(state: SimState, memory: Memory): string[] {
     const flies = state.schedule.some((leg) => leg.tail === aircraft.tail);
     const idle = flies ? 0 : (memory.idleDays.get(aircraft.tail) ?? 0) + 1;
     memory.idleDays.set(aircraft.tail, idle);
-    if (idle < IDLE_DAYS_TO_RETURN) continue;
+    if (idle < IDLE_DAYS_TO_RETURN || !canPayReturn(state, aircraft.tail)) continue;
     const returned = actions.returnPlane(state, aircraft.tail);
     if (returned.ok) {
       memory.idleDays.delete(aircraft.tail);

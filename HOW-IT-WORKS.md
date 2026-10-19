@@ -665,7 +665,10 @@ planner the route builder uses, and the ring's actions in
   each time to the known airport with the most potential demand
   (`marketScore()`, what a player reads off the Demand lens) per flight
   already on that market, and never takes a rotation that lands after
-  21:00. (Ranked by the market's words alone, size and service, it
+  21:00. A market it already flies gets another round trip only if the
+  route builder wouldn't call it "mostly empty now": potential says how
+  big a market can grow, not how many fly it today. It never hands a
+  plane back when the return fee would take cash to zero. (Ranked by the market's words alone, size and service, it
   picked blind among "Huge, starved" markets and its year fell two- to
   four-fold; ranked up for hunger or down for rivals, it fell by
   two-thirds in Montréal.) Then, every day, in order:
