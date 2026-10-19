@@ -3742,18 +3742,30 @@ plane that flies:
 - **The work:** a base amount plus more per flight on its day (a
   Propeller needs 2h plus 24 min a cycle; a Widebody 4h plus 36 min).
 - **The night:** from its landing to an hour before its first
-  departure.
+  departure. A plane still in the air at midnight is judged from the
+  landing it is about to make, if that's before then (a long-haul day
+  ending at 00:30 is a short night, not an "away" one).
 
-A plane with no check (a station set to defer, or in the air
-overnight), or whose night is shorter than the work, carries a
-**deferred item** (●). A night with 2h to spare at a line base
-clears one. Planes on an AOG, a refit, a heavy check or a ferry skip it.
+A plane with no check (a station set to defer, or still flying an hour
+before its first departure), or whose night is shorter than the work,
+carries a **deferred item** (●). A night with 2h to spare at a line base
+clears one, and so does a day with nothing to fly parked at one. Planes
+on an AOG, a refit, a heavy check or a ferry skip it.
+
+**Wear levelling** (`levelWear()`), each midnight before the nights are
+judged: a plane whose night would be too short for its work, or that
+carries more items than an idle twin, hands its whole day to that twin
+(same type and base, parked where the day starts, nothing to fly, a long
+enough night of its own). The worn plane rests and its night isn't
+judged; the day goes back at the next midnight like a swap, free. So a
+day too long for one plane's nights alternates between two planes
+instead of piling up items.
 The 22:00 curfew keeps nights at base long, so items come mostly from
 short nights and stations set to defer.
 
 **Deferred items wear the plane.** Each counts as 3 more years of age
 for breakdowns and mechanical delays (`wornAge()`). At 3 the plane is
-held that morning where it slept and the items are cleared, by contract
+held that morning where it slept (or lands, if still in the air) and the items are cleared, by contract
 (a line check's price for each) away from a maintenance base. Its first
 rotation goes to an idle plane of the same type at the same base for the
 day, free, handed back at the next rollover like a swap
