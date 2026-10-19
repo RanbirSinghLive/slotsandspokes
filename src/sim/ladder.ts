@@ -13,7 +13,6 @@ import { networkNps } from './nps';
 import { networkAirports } from './reach';
 import { routeFixedCosts } from './routeCosts';
 import { marketKey } from './schedule';
-import { hungerByAirport } from './serviceLevel';
 import { activeShock } from './shocks';
 import type { SimState } from './state';
 
@@ -278,13 +277,16 @@ export const LADDER: Tier[] = [
       {
         id: 'first-in',
         name: 'First in',
-        description: `Hold a city that is starved for service, with no rival there, on a route flown for ${HOLD_DAYS} days.`,
+        description: `Hold a city no rival flies to, on a route flown for ${HOLD_DAYS} days.`,
+        // Judged on rivals alone, as rivals judge it (sim/rivalLadder.ts).
+        // Not on hunger: the player's own flights make a small city count
+        // as served, so where every reachable city is small (Oceania,
+        // West Africa) the tier could never be climbed.
         met: (state) => {
-          const hunger = hungerByAirport(state);
           const rivalAirports = new Set(state.competitorRoutes.flatMap((route) => [route.origin, route.dest]));
           return markets(state).some(([a, b]) => {
             if ((state.revenueHistoryByMarket[marketKey(a, b)] ?? []).length < HOLD_DAYS) return false;
-            return [a, b].some((iata) => iata !== state.homeAirport && !rivalAirports.has(iata) && (hunger.get(iata) ?? 0) >= 0.75);
+            return [a, b].some((iata) => iata !== state.homeAirport && !rivalAirports.has(iata));
           });
         },
         progress: () => null,
