@@ -7,6 +7,7 @@ import { positionEdge } from './brand';
 import type { SegmentName } from './timeOfDay';
 import { ULTRA_LONG_RANGE_BONUS_NM } from './range';
 import type { SimState } from './state';
+import { marketReliabilityBookingFactor } from './routeOtp';
 
 /**
  * Innovations (WEEK-TEN.md, thread 2): airline programmes the ladder
@@ -229,6 +230,8 @@ export type BookingPerks = {
   ancillaryPerPassenger: number;
   /** Dollars the fee adds to the price each segment compares (sim/ancillaries.ts). */
   ancillaryPriceDrag: Record<SegmentName, number>;
+  /** Share of the market's passengers who still book it after how it has flown here lately (sim/routeOtp.ts). */
+  reliability: number;
 };
 
 export function bookingPerks(state: SimState, origin: string, dest: string): BookingPerks {
@@ -241,6 +244,7 @@ export function bookingPerks(state: SimState, origin: string, dest: string): Boo
     recaptureRate: isAdopted(state, 'loyalty-scheme') ? LOYALTY_RECAPTURE_RATE : RECAPTURE_RATE,
     ancillaryPerPassenger: ancillaryPerPassenger(state, origin, dest),
     ancillaryPriceDrag: ancillaryPriceDrag(state, origin, dest),
+    reliability: marketReliabilityBookingFactor(state, origin, dest),
   };
 }
 

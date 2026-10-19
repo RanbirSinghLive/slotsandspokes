@@ -122,3 +122,47 @@ export function reliabilityDemandFactor(otp: number | null): number {
   if (otp >= STALL_OTP) return (otp - STALL_OTP) / (OTP_BASELINE - STALL_OTP);
   return Math.max(-MAX_DECAY, (-(STALL_OTP - otp) / (STALL_OTP - FULL_REVERSE_OTP)) * MAX_DECAY);
 }
+
+/** The share of flights flown at which cancellations stop costing bookings: an odd weather day is forgiven. */
+const COMPLETION_NEUTRAL = 0.98;
+/** Bookings lost per share of flights cancelled below that: each 1% cancelled costs about 1% of passengers. */
+const BOOKINGS_LOST_PER_CANCELLED_SHARE = 1;
+/** The most lateness alone costs, at none on time. */
+const MAX_LATENESS_BOOKING_LOSS = 0.15;
+/** However bad it gets, some passengers have no other way to go. */
+const RELIABILITY_BOOKING_FLOOR = 0.5;
+
+/**
+ * How many of a market's passengers still book this airline, given how it
+ * has flown the market over the same window: 1 when it flies what it sells
+ * and mostly on time, down to RELIABILITY_BOOKING_FLOOR. Growth
+ * (reliabilityDemandFactor, above) moves the market over weeks; this is
+ * the booking that happens today. Without it a route nobody else flies
+ * filled the same seats at the same fare however often it cancelled,
+ * because the name (sim/nps.ts) only moves passengers between airlines.
+ *
+ * Cancellations count most: a traveller who was stranded last week books
+ * elsewhere, connects through another hub or stays home. Lateness counts
+ * less: people grumble about a late airline and still fly it.
+ *
+ *   all flown, 70%+ on time  → 1.0
+ *   1 in 10 cancelled        → about 0.92
+ *   half cancelled           → 0.5 (the floor)
+ *   all flown, none on time  → 0.85
+ *
+ * Neutral (1) on too small a sample, as for growth.
+ */
+export function reliabilityBookingFactor(trailing: TrailingOtp): number {
+  const flights = trailing.arrived + trailing.cancelled;
+  if (flights < MIN_SAMPLE_ARRIVALS) return 1;
+  const completion = trailing.arrived / flights;
+  const completionFactor = 1 - Math.max(0, COMPLETION_NEUTRAL - completion) * BOOKINGS_LOST_PER_CANCELLED_SHARE;
+  const punctuality = trailing.arrived > 0 ? trailing.onTime / trailing.arrived : OTP_BASELINE;
+  const punctualityFactor = 1 - (Math.max(0, OTP_BASELINE - punctuality) / OTP_BASELINE) * MAX_LATENESS_BOOKING_LOSS;
+  return Math.max(RELIABILITY_BOOKING_FLOOR, completionFactor * punctualityFactor);
+}
+
+/** The booking factor for one market (bookingPerks(), sim/innovations.ts). */
+export function marketReliabilityBookingFactor(state: SimState, a: string, b: string): number {
+  return reliabilityBookingFactor(trailingMarketOtp(state, a, b));
+}

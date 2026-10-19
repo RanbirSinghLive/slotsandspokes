@@ -251,9 +251,14 @@ export function flightResult(
   /** The plane's seats by cabin (sim/cabins.ts): J and W seats take the room of economy ones. */
   layout: CabinLayout = cabinLayout(type.seats, 'economy'),
 ): FlightResult {
-  const demandPerFlight = timing
-    ? marketDailyDemand * flightDemandShare(timing.departMinute, timing.marketDepartMinutes, marketMix(leg.origin, leg.dest), timing.crowding)
-    : marketDailyDemand / legsServingMarket;
+  // Local travellers let down here lately book elsewhere or stay home, rival
+  // or not (sim/routeOtp.ts). Connecting and contract passengers are already
+  // booked onto the network.
+  const demandPerFlight =
+    perks.reliability *
+    (timing
+      ? marketDailyDemand * flightDemandShare(timing.departMinute, timing.marketDepartMinutes, marketMix(leg.origin, leg.dest), timing.crowding)
+      : marketDailyDemand / legsServingMarket);
   const connecting = connectingDailyDemand * connectingPriceResponse(fare, legsServingMarket, leg.origin, leg.dest, competitorRoutes, perks.brandEdge);
   const seatCeiling = Math.round(layout.economy * perks.loadFactor);
   // The seats sold class by class, in booking order (sim/fareClasses.ts).

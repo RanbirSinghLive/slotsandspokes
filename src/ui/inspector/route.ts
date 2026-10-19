@@ -31,7 +31,7 @@ import { moneyOnTable } from '../../sim/attractiveness';
 import { describeShock } from '../../sim/shocks';
 import { rivalResponseChance } from '../../sim/rivalResponse';
 import { routeFixedCosts } from '../../sim/routeCosts';
-import { reliabilityDemandFactor, trailingMarketOtp } from '../../sim/routeOtp';
+import { reliabilityBookingFactor, reliabilityDemandFactor, trailingMarketOtp } from '../../sim/routeOtp';
 import { legsServingMarket, marketKey, recommendedFare } from '../../sim/schedule';
 import type { FareStance, SimState } from '../../sim/state';
 import { utilisationPools } from '../../sim/utilisation';
@@ -963,7 +963,7 @@ function buildRouteOtp(state: SimState, a: string, b: string): HTMLElement {
   header.className = 'pnl-chart-header';
   const labelEl = document.createElement('span');
   labelEl.textContent = 'On-time · 7d';
-  labelEl.append(' ', info(`Each bar is a day: the share of scheduled flights that flew and arrived within ${ON_TIME_GRACE_MINUTES} minutes. Cancellations count against it. A reliable route grows its demand faster; a late one slows or shrinks it. A turn buffer adds ground time so one late arrival doesn't make the next flight late.`));
+  labelEl.append(' ', info(`Each bar is a day: the share of scheduled flights that flew and arrived within ${ON_TIME_GRACE_MINUTES} minutes. Cancellations count against it. A reliable route grows its demand faster; a late one slows or shrinks it, and cancellations lose bookings now. A turn buffer adds ground time so one late arrival doesn't make the next flight late.`));
   const statEl = document.createElement('span');
   statEl.className = 'pnl-chart-stat';
   statEl.textContent = trailing.otp === null ? '—' : `${Math.round(trailing.otp * 100)}%`;
@@ -1014,6 +1014,13 @@ function buildRouteOtp(state: SimState, a: string, b: string): HTMLElement {
     chart.append(line(`Demand growth ${Math.round(factor * 100)}% of normal · delays`, 'route-otp-line is-warning'));
   } else {
     chart.append(line('Demand shrinking · delays', 'route-otp-line is-problem'));
+  }
+  const bookings = reliabilityBookingFactor(trailing);
+  if (bookings < 1) {
+    const cause = trailing.cancelled > 0 ? 'CNX' : 'delays';
+    const bookingsLine = line(`Bookings −${Math.round((1 - bookings) * 100)}% · ${cause}`, `route-otp-line ${bookings < 0.85 ? 'is-problem' : 'is-warning'}`);
+    bookingsLine.append(' ', info('Travellers let down this week book elsewhere or stay home, even where no rival flies. Cancellations cost the most: each 1% of flights cancelled loses about 1% of local passengers, down to half. Lateness alone costs up to 15%. Connecting and contract passengers still fly.'));
+    chart.append(bookingsLine);
   }
   // Stalled or shrinking with little buffer: the cheapest fix is one the player can make right here.
   if (trailing.otp !== null && factor < STALLING_FACTOR && buffer < SUGGESTED_TURN_BUFFER_MINUTES) {
