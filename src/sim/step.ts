@@ -42,7 +42,7 @@ import { revealReach } from './reach';
 import { cabinCover, FATIGUE_DELAY_MULTIPLIER, legFatigue, rollDailyCrews } from './crews';
 import { MAINTENANCE_AGE_FACTOR } from './aog';
 import { isAog, rollDailyAogs, startRefitOnLanding } from './aog';
-import { handBackSwaps } from './controller';
+import { handBackSwaps, handHeldRotationToSpare } from './controller';
 import { applyPriorityPolicy } from './priority';
 import { rollDailyCrisis } from './crisis';
 import {
@@ -332,15 +332,19 @@ export function step(state: SimState): void {
     // A plane stranded away from base with nothing to fly from there goes home empty (sim/ferry.ts).
     ferryStrandedPlanes(state);
     rollDailyAogs(state, state.simMinute);
-    // Planes with too many deferred items are held at base this morning: their first rotation cancels.
-    for (const hold of morningHolds(state)) {
+    // Planes with too many deferred items are held at base this morning:
+    // an idle plane of the same type flies their first rotation, or it cancels.
+    const holds = morningHolds(state);
+    const heldTails = new Set(holds.map((hold) => hold.tail));
+    for (const hold of holds) {
+      (state.mxHoldsToday ??= []).push(hold.tail);
+      if (handHeldRotationToSpare(state, hold.tail, hold.legIds, heldTails)) continue;
       for (const legId of hold.legIds) {
         const leg = state.schedule.find((l) => l.legId === legId);
         if (!leg) continue;
         state.cancelledToday.push(legId);
         recordCancellation(state, leg, 'maintenance');
       }
-      (state.mxHoldsToday ??= []).push(hold.tail);
     }
 
 

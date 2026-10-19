@@ -251,6 +251,45 @@ export function swapRotation(state: SimState, legId: string, toTail: string): { 
   return { ok: true, message: `SWAP ${found.tail} → ${toTail} · ${route}` };
 }
 
+/**
+ * A plane held this morning for its deferred items (sim/mxChecks.ts) hands
+ * the rotation it would have flown to an idle plane of the same type at
+ * the same base, for today only, the way a swap does: a spare kept on the
+ * ground is there for exactly this. No fee, since the hold was known
+ * overnight. Returns the spare's tail, or null when none is free and the
+ * rotation cancels. Planes in `unavailable` (others held this morning) are
+ * not used.
+ */
+export function handHeldRotationToSpare(state: SimState, tail: string, legIds: string[], unavailable: Set<string>): string | null {
+  const held = state.aircraft.find((a) => a.tail === tail);
+  const rotation = rotationsForTail(state, tail).find((r) => r.legs[0].legId === legIds[0]);
+  if (!held || !rotation) return null;
+  const origin = rotation.legs[0].origin;
+  const spare = state.aircraft.find(
+    (other) =>
+      other.tail !== tail &&
+      !unavailable.has(other.tail) &&
+      other.typeCode === held.typeCode &&
+      other.baseAirport === held.baseAirport &&
+      other.status === 'ground' &&
+      other.atAirport === origin &&
+      !other.rebase &&
+      !isAog(state, other.tail) &&
+      !state.groundedTails.includes(other.tail) &&
+      nightStopStation(state, other.tail) === null &&
+      !rotationsForTail(state, other.tail).some(
+        (r) => r.departMinute < rotation.arriveMinute + MIN_TURN_MINUTES && r.arriveMinute + MIN_TURN_MINUTES > rotation.departMinute,
+      ),
+  );
+  if (!spare) return null;
+  const swapped = (state.swappedToday ??= []);
+  for (const leg of rotation.legs) {
+    if (!swapped.some((entry) => entry.legId === leg.legId)) swapped.push({ legId: leg.legId, fromTail: leg.tail });
+    leg.tail = spare.tail;
+  }
+  return spare.tail;
+}
+
 /** Morning rollover: swapped flying goes back to the plane it was scheduled on. */
 export function handBackSwaps(state: SimState): void {
   for (const { legId, fromTail } of state.swappedToday ?? []) {
