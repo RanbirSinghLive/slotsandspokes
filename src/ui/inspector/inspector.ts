@@ -2,6 +2,7 @@ import { chipIconFor } from './chipIcons';
 import { buildGoalsView } from './goals';
 import { buildContractsView } from './contracts';
 import { buildHeadOfficeView } from './headOffice';
+import { buildFuelView } from './fuel';
 import { buildMoneyView } from './money';
 import { buildRoutesView } from './routes';
 import type { SimState } from '../../sim/state';
@@ -87,6 +88,10 @@ function trail(state: SimState, selection: Selection): { label: string; target: 
   }
   if (selection.kind === 'headOffice') {
     steps.push({ label: 'Head office', target: selection });
+    return steps;
+  }
+  if (selection.kind === 'fuel') {
+    steps.push({ label: 'Fuel', target: selection });
     return steps;
   }
   if (selection.kind === 'contracts') {
@@ -235,6 +240,8 @@ export function renderInspector(state: SimState): void {
     bodyEl.replaceChildren(buildGoalsView(state));
   } else if (selection.kind === 'headOffice') {
     bodyEl.replaceChildren(buildHeadOfficeView(state, rebuild));
+  } else if (selection.kind === 'fuel') {
+    bodyEl.replaceChildren(buildFuelView(state, rebuild));
   } else if (selection.kind === 'contracts') {
     bodyEl.replaceChildren(buildContractsView(state, rebuild));
   } else if (selection.kind === 'money') {

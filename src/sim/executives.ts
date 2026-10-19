@@ -228,6 +228,11 @@ export function executiveOverheadMultiplier(state: SimState): number {
   return (effectOf(state, 'overhead')?.overheadMultiplier ?? 1) * (effectOf(state, 'treasury')?.overheadMultiplier ?? 1);
 }
 
+/** Whether a treasury CFO sits in the chair: the banks write the longest fuel hedges only then (sim/fuelPrice.ts). */
+export function hasTreasuryCfo(state: SimState): boolean {
+  return effectOf(state, 'treasury') !== undefined;
+}
+
 export function executiveHedgePremiumMultiplier(state: SimState): number {
   return effectOf(state, 'treasury')?.hedgePremiumMultiplier ?? 1;
 }
@@ -304,7 +309,7 @@ export function describeEffect(effect: ExecutiveEffect): string {
     case 'overhead':
       return `Overhead −${percent(effect.overheadMultiplier)}`;
     case 'treasury':
-      return `Hedge premium −${percent(effect.hedgePremiumMultiplier)} · overhead −${percent(effect.overheadMultiplier)}`;
+      return `Hedge premium −${percent(effect.hedgePremiumMultiplier)} · 180d hedges · overhead −${percent(effect.overheadMultiplier)}`;
     case 'leasing':
       return `New leases −${percent(effect.leaseMultiplier)}/day`;
     case 'market-building':

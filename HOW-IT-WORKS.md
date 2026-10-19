@@ -647,6 +647,8 @@ minute but before the next rollover resets the day's totals.
 
 **`npm run quick`** (`src/headless/quickBalance.ts`, about 4 to 5 minutes) plays the steady player for 365 days from four homes (YUL, YYZ, PHL, YHZ), 10 seeds each, and compares the result with `balance-reference.json`. `--winter` starts in winter; `--save-last` saves the last read as the new reference and is used only when the owner accepts a read.
 
+**`npm run global`** (`src/headless/globalBalance.ts`, about half an hour on four cores) plays the steady player on Medium for 365 days from 24 homes, a strong pair (big cities, many first routes) and a weak pair (small or isolated) on each continent, 3 seeds each. It has no reference: it shows whether the game works everywhere, per home as median cash, range, busts with their days, and the planes, markets and ladder tiers of the airlines still flying. `--only EU` plays one continent; `--winter` starts in winter. Games go to `balance-global-last.json` (not committed).
+
 **It plays the real game.** `startHeadlessGame()` in
 `src/headless/newGame.ts` makes the same two calls the browser does —
 `createNewGameState()`, then `chooseHome()` — with a fixed seed so runs
@@ -701,8 +703,9 @@ planner the route builder uses, and the ring's actions in
   8. **Pick stances.** Every 7 days, on each market a rival also flies,
      it takes the stance whose forecast (`sim/fareForecast.ts`) makes
      the most once fares and rivals' capacity settle, ties to Match.
-  9. **Head office.** It adopts innovations on a 90-day payback, hedges
-     fuel 90 days when it's 5% or more below usual, and hires executives
+  9. **Head office.** It adopts innovations on a 90-day payback, sets a
+     standing fuel policy on day one (50% cover, 90 days, dips only, no
+     surcharge; `AIRGAME_FUEL_POLICY` tries another), and hires executives
      when last week's margin covers ten times the salary (see those
      sections).
 
@@ -1909,7 +1912,7 @@ home picker), your airline (the map), fly your first route (with the
 type choice), the clock, today's operation (ops board and P&L strip, and the amber ★ event chip),
 the lenses, the rail, the Schedule (the step opens Fleet on it), hours
 filling (peaks, the planner's next free hour, peak against off-peak),
-crews and maintenance (Mtc), Head office (fuel, contracts, air rights, the seven chairs,
+crews and maintenance (Mtc), Fuel (the standing policy), Head office (contracts, air rights, the seven chairs,
 the tree), Goals, and a last word on edges fading, size drawing rivals,
 cash, and the year one report. A step pointing inside a screen opens it
 first (`open`). The two hands-on steps, choosing a
@@ -2050,7 +2053,9 @@ falling back to smaller ones.
 So leasing the last Regional before a rival does is a real move. Rivals
 fall back as far as a Propeller, but never take the last one listed: it
 is the class every airline starts and first grows with, and rivals act
-before the player each day.
+before the player each day. A newcomer airline is the exception: it takes its first plane from
+the shelf when there is one, and otherwise brings its own, so a bare
+shelf slows rivals' growth but never keeps a new one out.
 
 **Held for you.** A new listing is the player's alone for 3 days
 (`HOLD_DAYS`): rivals skip it until the hold ends, and the HUD chip's
@@ -2356,7 +2361,7 @@ The headless player takes an offer worth at least $3,000 a day that a
 plane based at either end can fit, keeps its last round trip while the
 term runs, and pads its plane's turns when it pays under half.
 
-## Fuel prices and hedging (`src/sim/fuel.ts`, `src/sim/fuelPrice.ts`)
+## Fuel prices and the fuel policy (`src/sim/fuel.ts`, `src/sim/fuelPrice.ts`)
 
 `fuelPriceIndex` is the market price, unitless, 1.0 being baseline.
 It moves every rollover (`rollDailyFuelPrice()`, right after the shocks
@@ -2366,28 +2371,56 @@ and drifts back. A fuel spike (see Shocks) multiplies on top. The index
 is clamped to 0.6–2.0, and the last 90 days are kept in
 `fuelPriceHistory` for the chart. Rivals pay the market price.
 
-**A hedge** (`buyHedge()`) locks today's price on all the airline's fuel
-for 30, 60 or 90 days. The player's flights then pay the locked price
-(`airlineFuelPrice()`), and each arrival books what that saved or cost
-against the market into `fuelHedge.saved`. The premium, paid up front,
-is 1% plus 0.02% per day of term of the fuel it covers (the schedule's
-daily fuel bill at the locked price, times the days). One hedge at a
-time; the last one stays on record for the view and the ticker, which
-says how it went when it ends. The premium is a cash outlay, not part of
-the day's P&L, like an innovation's price.
+**The standing policy** (`state.fuelPolicy`, set with `setFuelPolicy()`)
+has four dials:
 
-Measured over 36 sitter games (hedging bolted on): hedging whenever
-nothing is hedged loses 38% of the premiums on 30-day terms and 99% on
-90-day ones; hedging 90 days only when fuel is 5% or more below usual
-returns about 4 times the premium. Timing is the skill; always hedging
-is a slow leak. The steady headless player uses the second rule; the
-sitter never hedges.
+- **Cover** 0/25/50/75%: the share of fuel kept hedged, held as a ladder
+  of 3 rungs (`fuelTranches`). A rung is bought every term ÷ 3 days,
+  covers cover ÷ 3 of the fuel at that day's market price for one term,
+  and its premium is paid up front: 1% plus 0.02% per day of term of the
+  fuel it covers (the schedule's daily fuel bill at that price, times the
+  term), less the treasury CFO's discount. The ladder fills over one
+  term. A rung that comes due without the cash for it is missed (the
+  ticker says so) and tried again the next day.
+- **Term** 30/90/180 days. A longer term blends more days, so the price
+  paid is smoother and lags the market both ways, and costs more premium.
+  180 days needs a treasury CFO (`hasTreasuryCfo()`).
+- **Buy** any day / dips: under "dips" a due rung waits until the market
+  is at −3% or under.
+- **Surcharge** off/half/full: `fuelSurcharge` = dial × fuel above usual
+  × 0.3 (fuel's share of a fare), set each rollover from the market price
+  and nothing at or under usual. It multiplies policy and stance fares
+  (`policyFare()`, `stanceFare()`), not fares set by hand. Rivals charge
+  none, but they raise their fares behind a dearer player fare
+  (sim/competitors.ts), so a surcharge also helps them ride out a spike.
 
-**Head office** (Network › Head office, `ui/inspector/headOffice.ts`)
-shows today's price against usual, a 90-day chart (dashed: usual; green:
-the locked price), the hedge and its running result, one button per
-term with its premium (a confirm window), and the innovations. The Network
-view's Head office row shows the price and whether it's hedged.
+The airline pays a blend (`airlineFuelPrice()`): each running rung's
+locked price on its share, the market on the rest. Each rollover
+(`rollDailyFuelPolicy()`, after the price moves) drops expired rungs,
+buys a due one, sets the surcharge and records the blend in
+`fuelPaidHistory`. Changing a dial buys a due rung at once, but the next
+rung never comes sooner than one interval after the last, so flicking the
+dials can't buy faster than the ladder. Rungs already bought run out
+their term.
+
+`fuelBook` tracks the policy since its dials last changed: what hedging
+saved against the market (each arrival books fuel paid × (market ÷ paid
+− 1)), premiums, surcharge revenue (each arrival on a policy- or
+stance-priced market books its fare revenue × s ÷ (1 + s)) and rungs
+missed. A save from before the policy has one `fuelHedge`; it reads as a
+rung covering all the fuel and becomes one at the first rollover.
+
+Earlier sitter games (36, one-off hedges) found hedging at random a slow
+leak and locking only on dips about 4× the premium back; the "dips" rule
+keeps that skill in a standing policy. The policy's effect on balance is
+not measured.
+
+**Fuel** (rail, `ui/inspector/fuel.ts`) shows the market, the price
+paid and the share hedged as coloured chips, a 90-day chart (amber
+market, green paid, dashed usual, faint locked rungs), the running rungs
+(green under today's market, red over, filled by the term left), the next
+rung, the book as four coloured cells, and the four dials. Its rail item
+shows an amber dot while a fuel spike runs.
 
 `legCostBreakdown()` splits each type's flat `costPerBlockHour` into
 slices rather than touching the hand-authored data: 35% fuel-sensitive,
@@ -2452,7 +2485,7 @@ once a day at rollover; a milestone met stays met.
 
 | Tier | Needed | Gate milestones | Extras | Opens |
 |---|---|---|---|---|
-| Start-up | 4 of 4 | fly your first route; a route that makes money for a week after its share of fixed costs; a route 72% full over a week; hold a starved city no rival flies to, on a route flown 30 days | two routes; a crew based away from home | Regional aircraft; crew academy |
+| Start-up | 4 of 4 | fly your first route; a route that makes money for a week after its share of fixed costs; a route 72% full over a week; hold a city no rival flies to, on a route flown 30 days (judged on rivals, not hunger, so thin regions can climb) | two routes; a crew based away from home | Regional aircraft; crew academy |
 | Regional carrier | 3 of 4 | serve 8 airports; connect 150 a day through one airport; put a Regional into service; make money every day for a week of a shock | cabin teams for a Regional; accept an event | Narrowbody; online booking, younger airframes |
 | Network airline | 3 of 5 | fly 60% of the movements at a busy airport; four routes 4+ a day each way; trailing NPS 15, with 1,000 flights flown; planes based at two airports; put a Narrowbody into service | a line base away from home; first freight revenue | Widebody; loyalty scheme, winglet retrofits |
 | International | 2 of 4 | a route to another continent; connect 750 a day through one airport; airports in 5 countries; a plane based outside the home country | | codeshare feed, spoilage management I–III |
@@ -2486,7 +2519,7 @@ and 30 calm days after each; otherwise a 1-in-90 daily chance, about
 three a year, all from the seeded stream:
 - **Fuel spike**: fuel 40–80% dearer for 30–75 days (fuel is 35% of the
   block-hour cost, so flights cost about 15–30% more), on top of
-  wherever the daily price is (see Fuel prices and hedging).
+  wherever the daily price is (see Fuel prices and the fuel policy).
 - **Recession**: every market's potential 15–25% lower for 60–120 days
   (`potentialMultiplier()` in `sim/marketDemand.ts`); demand already
   above the new ceiling falls to it at the next rollover.
@@ -3312,7 +3345,11 @@ airport. A rival's home country is stamped on the routes it opens
 its oldest route starts. A newcomer has a nationality of its own
 (`country` in `data/rival-airlines.json`) and only opens a market its
 country's carriers may fly, so a foreign newcomer can't enter a domestic
-market; the home rival is picked the same way.
+market; the home rival is picked the same way. When no pool airline's
+country may fly the market, a pool name starts up locally instead, as a
+carrier of the market's origin country (`newcomerFor()`): the pool names
+only a dozen countries, and without this an airline based anywhere else
+never met a newcomer on its own routes.
 
 ---
 
@@ -3528,7 +3565,7 @@ numbers from `previewBaseChange()`) shows the fee, the running cost before and
 after, the cash left, and what changes at that airport. The same window
 asks before leasing a plane, returning one, rebasing, ordering or calling off
 a refit, removing a route, and hiring, converting or releasing crews on the
-Crews screen. It also asks before a fuel hedge, adopting an innovation,
+Crews screen. It also asks before adopting an innovation,
 appointing, replacing or letting go an executive, starting a seat sale, and
 switching a hub's style (map menu and Plan hub window). Holding a ring button to repeat (add or remove a flight, hire
 on the map) stays one click each.
@@ -4111,7 +4148,7 @@ needs 20 (judged at hiring). A hire with a line must keep it: network NPS under 
 | Chair | Anyone | NPS 15 | NPS 20 |
 |---|---|---|---|
 | COO | Errol Vance: breakdowns as if 15% younger; Lena Fischer (NPS 10): deliveries and returns in half the time | Marcus Oyelaran: delays 15% shorter | Priya Raghunathan: +8 NPS a flight |
-| CFO | Dale Mercer: overhead −15% | Hana Okafor: hedge premiums halved, overhead −5% | Simone Adeyemi: new leases −12% |
+| CFO | Dale Mercer: overhead −15% | Hana Okafor: hedge premiums halved, 180-day hedges, overhead −5% | Simone Adeyemi: new leases −12% |
 | CCO | Tomas Lindqvist: markets grow 25% faster | Inês Carvalho: +15% connecting passengers | Kofi Mensah: +3% yield |
 
 A fourth CCO, Akira Sato (NPS 25, $500,000, $5,000 a day), lifts yield 5% (and sharpens fare estimates like Mensah). Seats sold belong to Spoilage management alone (see Innovations).
@@ -4140,7 +4177,7 @@ new chairs has no slots for them and fills them as it hires.
 Fees run $150,000 (journeymen) to $800,000, salaries $1,500 to $8,000 a
 day. The effects are read where they apply: delays (sim/cascade.ts,
 step.ts), NPS, AOG age (sim/aog.ts), overhead (sim/overhead.ts), hedge
-quotes (sim/fuelPrice.ts), lease rates (`asLeased()` in
+premiums and the 180-day term (sim/fuelPrice.ts), lease rates (`asLeased()` in
 sim/playerActions.ts), market growth, hub flows (sim/hubs.ts, in the
 cache key) and yield (`bookingPerks()`).
 

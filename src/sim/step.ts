@@ -22,7 +22,7 @@ import { rollDailyWeather, isAirportClosed } from './weather';
 import { legAirspace, rollDailyAirspace } from './airspace';
 import { rollDailyMandates, settleMandateArrival, settleMandateCancellation } from './mandates';
 import { rollDailyShocks } from './shocks';
-import { airlineFuelPrice, recordHedgedFuel, rollDailyFuelPrice } from './fuelPrice';
+import { airlineFuelPrice, recordHedgedFuel, recordSurcharge, rollDailyFuelPolicy, rollDailyFuelPrice } from './fuelPrice';
 import { hourOf } from './hours';
 import { connectingDemandOnMarket } from './hubs';
 import { rollTotalDelayMinutes, isOnTimeArrival } from './delays';
@@ -386,6 +386,7 @@ export function step(state: SimState): void {
     // Shocks first (sim/shocks.ts): the weather, fuel and demand rolls below read them.
     rollDailyShocks(state);
     rollDailyFuelPrice(state);
+    rollDailyFuelPolicy(state);
     rollDailyWeather(state, state.simMinute);
 
     // Competitor AI (sim/competitors.ts): once a day, each
@@ -627,7 +628,7 @@ export function step(state: SimState): void {
           const result = flightResult(
             { origin: flight.origin, dest: flight.dest, blockMinutes },
             type,
-            // The locked price under a hedge (sim/fuelPrice.ts).
+            // The blend of market and locked prices under the hedge ladder (sim/fuelPrice.ts).
             airlineFuelPrice(state),
             state.fuelEfficiencyMultiplier * powertrainFuelFactor(aircraft),
             actualDailyDemand(state, flight.origin, flight.dest),
@@ -666,6 +667,7 @@ export function step(state: SimState): void {
           state.todayCost += result.cost;
           state.todayCostByCategory.fuel += result.costBreakdown.fuel;
           recordHedgedFuel(state, result.costBreakdown.fuel);
+          if (!state.routeSettings[key]?.fareIsOverridden) recordSurcharge(state, result.revenue - result.ancillaryRevenue);
           state.todayCostByCategory.blockNonFuel += result.costBreakdown.blockNonFuel;
           state.todayCostByCategory.departure += result.costBreakdown.departure;
           state.todayMargin += result.margin;
