@@ -58,3 +58,37 @@ export function adopt(id: string): HTMLElement {
 }
 
 const adopted = new Map<string, HTMLElement>();
+
+/** One choice on a view switch: its glyph-and-word label, tip, and an optional count badge. */
+export type ViewChoice<T extends string> = { id: T; label: string; icon?: HTMLElement; tip: string; badge?: number };
+
+/**
+ * A row of buttons that switches a screen between its views, the chosen one
+ * lit, drawn like the Crews switch (`.crews-view`). The screen keeps which view is on and redraws when `pick` runs.
+ */
+export function viewSwitch<T extends string>(choices: ViewChoice<T>[], current: T, pick: (id: T) => void): HTMLElement {
+  const bar = document.createElement('div');
+  bar.className = 'crews-view';
+  bar.setAttribute('role', 'tablist');
+  for (const choice of choices) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.setAttribute('role', 'tab');
+    button.setAttribute('aria-selected', String(choice.id === current));
+    button.classList.toggle('is-active', choice.id === current);
+    if (choice.icon) button.append(choice.icon);
+    button.append(choice.label);
+    if (choice.badge) {
+      const badge = document.createElement('span');
+      badge.className = 'view-switch-badge';
+      badge.textContent = String(choice.badge);
+      button.append(badge);
+    }
+    button.title = choice.tip;
+    button.addEventListener('click', () => {
+      if (choice.id !== current) pick(choice.id);
+    });
+    bar.append(button);
+  }
+  return bar;
+}

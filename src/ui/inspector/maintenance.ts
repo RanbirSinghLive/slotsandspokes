@@ -5,7 +5,7 @@ import { ageDelayParameters } from '../../sim/delays';
 import { USEFUL_LIFE_YEARS } from '../../sim/leasing';
 import { LINE_INTERVAL_NIGHTS, A_OVERDUE, A_WINDOW, C_INTERVAL_CYCLES, C_INTERVAL_HOURS, D_INTERVAL_DAYS, D_INTERVAL_HOURS, D_WEAR_YEARS, D_WINDOW_DAYS, DEFERRED_AGE_YEARS, HEAVY_INTERVAL_DAYS, HEAVY_WINDOW_DAYS, MX_HOLD_AT, OVERDUE_GRACE_DAYS, wornAge } from '../../sim/mxChecks';
 import * as ops from '../routeActions';
-import type { BaseCandidate, EngineReadout, HeavyCheckReadout, LevelledBaseReadout, MxStationCard, OutstationReadout, StationClassReadout } from '../../sim/playerActions';
+import type { EngineReadout, HeavyCheckReadout, LevelledBaseReadout, MxStationCard, OutstationReadout, StationClassReadout } from '../../sim/playerActions';
 import type { SimState } from '../../sim/state';
 import { ENGINE_SHOP_DAYS, ENGINE_WAIT_DAYS, type EngineSupport } from '../../sim/enginePool';
 import { dayIndex } from '../../sim/clock';
@@ -17,20 +17,46 @@ import { select } from '../selection';
 import { MX_RATING_FEE, MX_RATING_PER_DAY } from '../../sim/bases';
 import { costRows, showConfirm } from '../confirmModal';
 import { confirmDBooking, confirmHeavyBooking } from '../checkBooking';
-import { pipelineLink } from '../pipelineLink';
 import { noneLine } from './bases';
-import { heading, line } from './dom';
+import { heading, line, viewSwitch } from './dom';
+
+/** The Mtc screen's three views; the one shown is remembered across visits. */
+type MtcView = 'stations' | 'fleet' | 'engines';
+const VIEW_KEY = 'slotsandspokes-mtc-view';
+
+function loadView(): MtcView {
+  try {
+    const saved = localStorage.getItem(VIEW_KEY);
+    if (saved === 'stations' || saved === 'fleet' || saved === 'engines') return saved;
+  } catch {
+    // Storage can be blocked; the screen opens on Stations.
+  }
+  return 'stations';
+}
+
+let view: MtcView = loadView();
+
+function setView(next: MtcView): void {
+  view = next;
+  try {
+    localStorage.setItem(VIEW_KEY, next);
+  } catch {
+    // Not remembered; fine.
+  }
+}
 
 /**
  * The Maintenance screen (Mtc on the rail, under Crews): the fleet's
- * technical side in one place.
+ * technical side, in three views.
  *
- * - **AOG**: every plane grounded, what's wrong, when it's back, and the
- *   button to pay a day off the repair.
- * - **Fleet**: a release-to-service board, a strip of how the fleet stands
- *   and a tech-log card per plane: heavy-check clock, deferred items, wear,
- *   tech and AOG figures.
- * - **Maintenance bases** and the **stations** planes sleep at without one.
+ * - **Stations**: every plane grounded (AOG) with the button to pay a day
+ *   off the repair, then a card per maintenance station: its line base, its
+ *   hangar bays with the planes in them and the ones coming due, and its
+ *   ratings; then the outstations planes sleep at without one. New stations
+ *   are opened from the airport's panel or map ring.
+ * - **Fleet**: a release-to-service board and a tech-log card per plane,
+ *   grouped by type: check clocks, deferred items, wear.
+ * - **Engines**: each class's engine support plan and its book.
  *
  * What an AOG cancels goes in the ticker, and a plane's own view keeps its
  * own figures; this is the board across the fleet.
@@ -48,43 +74,61 @@ export function buildMaintenanceView(state: SimState, changed: () => void): HTML
   const repairsToday = state.todayCostByCategory.maintenance;
   root.append(line(`${state.aogs.length} AOG · ${state.aircraft.length} aircraft` + (repairsToday > 0 ? ` · expedited ${money(repairsToday)} today` : '')));
 
+  const stationCount = ops.mxStationBoard(state).length;
   root.append(
-    heading('AOG', 'Aircraft on ground: a fault keeps the plane out until it is repaired. Its flying moves to other planes at its base where they have time; the rest is cancelled until it is back. Expediting pays to bring it back a day sooner.'),
+    viewSwitch<MtcView>(
+      [
+        { id: 'stations', label: 'Stations', icon: glyph('hangar'), tip: `AOG, ${stationCount} station${stationCount === 1 ? '' : 's'} with their line slots, hangar bays and ratings, and outstations`, badge: state.aogs.length },
+        { id: 'fleet', label: 'Fleet', icon: glyph('plane'), tip: 'Release to service and every plane\'s check clocks, by type' },
+        { id: 'engines', label: 'Engines', icon: glyph('engine'), tip: 'Engine support plan by class' },
+      ],
+      view,
+      (next) => {
+        setView(next);
+        changed();
+      },
+    ),
   );
-  if (state.aogs.length === 0) {
-    root.append(line('None'));
-  } else {
-    for (const event of state.aogs) {
-      const row = linkToMap(document.createElement('div'), { kind: 'aircraft', tail: event.tail });
-      row.className = 'airport-aog-row mx-aog-row';
-      const text = document.createElement('button');
-      text.type = 'button';
-      text.className = 'inspector-link';
-      const aircraft = state.aircraft.find((a) => a.tail === event.tail);
-      if (aircraft) text.append(planeIconElement(aircraft.typeCode), ' ');
-      text.append(`${event.tail} · ${event.base} · ${event.fault} · back ${daysUntilReturn(state, event)}d` + (event.uncoveredRoutes.length > 0 ? ` · CNX ${event.uncoveredRoutes.join(', ')}` : ''));
-      text.addEventListener('click', () => select({ kind: 'aircraft', tail: event.tail }));
-      row.append(text);
-      const cost = expediteCost(state, event.tail);
-      if (cost !== null) {
-        const expedite = document.createElement('button');
-        expedite.type = 'button';
-        expedite.textContent = `Expedite 1d · ${money(cost)}`;
-        expedite.disabled = state.cash < cost;
-        if (expedite.disabled) expedite.title = `Needs $${cost.toLocaleString()} on hand.`;
-        expedite.addEventListener('click', () => {
-          expediteRepair(state, event.tail);
-          changed();
-        });
-        row.append(expedite);
-      }
-      root.append(row);
-    }
-  }
 
-  // Stations sit above the plane cards: they are where the fleet's maintenance capacity is decided.
-  root.append(...buildHangar(state, changed), pipelineLink('C and D checks due'), ...buildMxBases(state, changed), ...buildFleetBoard(state, changed), ...buildEngines(state, changed));
+  if (view === 'fleet') root.append(...buildFleetBoard(state, changed));
+  else if (view === 'engines') root.append(...buildEngines(state, changed));
+  else root.append(...buildAogs(state, changed), ...buildMxBases(state, changed));
   return root;
+}
+
+/** Every plane grounded: what's wrong, when it's back, and the button to pay a day off the repair. */
+function buildAogs(state: SimState, changed: () => void): HTMLElement[] {
+  const nodes: HTMLElement[] = [
+    heading('AOG', 'Aircraft on ground: a fault keeps the plane out until it is repaired. Its flying moves to other planes at its base where they have time; the rest is cancelled until it is back. Expediting pays to bring it back a day sooner.'),
+  ];
+  if (state.aogs.length === 0) return [...nodes, line('None')];
+  for (const event of state.aogs) {
+    const row = linkToMap(document.createElement('div'), { kind: 'aircraft', tail: event.tail });
+    row.className = 'airport-aog-row mx-aog-row';
+    const text = document.createElement('button');
+    text.type = 'button';
+    text.className = 'inspector-link';
+    const aircraft = state.aircraft.find((a) => a.tail === event.tail);
+    if (aircraft) text.append(planeIconElement(aircraft.typeCode), ' ');
+    text.append(`${event.tail} · ${event.base} · ${event.fault} · back ${daysUntilReturn(state, event)}d` + (event.uncoveredRoutes.length > 0 ? ` · CNX ${event.uncoveredRoutes.join(', ')}` : ''));
+    text.addEventListener('click', () => select({ kind: 'aircraft', tail: event.tail }));
+    row.append(text);
+    const cost = expediteCost(state, event.tail);
+    if (cost !== null) {
+      const expedite = document.createElement('button');
+      expedite.type = 'button';
+      expedite.textContent = `Expedite 1d · ${money(cost)}`;
+      expedite.disabled = state.cash < cost;
+      if (expedite.disabled) expedite.title = `Needs $${cost.toLocaleString()} on hand.`;
+      expedite.addEventListener('click', () => {
+        expediteRepair(state, event.tail);
+        changed();
+      });
+      row.append(expedite);
+    }
+    nodes.push(row);
+  }
+  return nodes;
 }
 
 const NIGHT_WORDS: Record<string, string> = { checked: 'checked', cleared: 'cleared 1', short: 'short', free: 'not due', contracted: 'contracted', away: 'missed' };
@@ -116,26 +160,37 @@ function box(className: string, text = ''): HTMLElement {
 const collapsedTypes = new Set<string>();
 
 /**
- * The hangar: a bay for each plane in its heavy check, with the days until
- * it's out, and a dashed bay for each plane whose check is next to come
- * due (its window open or overdue), so the hangar's coming load shows.
+ * A station's hangar bays: a filled bay for each plane in its C or D check
+ * or a cabin refit there, with the days until it's out, an empty bay for
+ * each one free, and a dashed bay for each plane based here whose C check
+ * is within its window or overdue, so the hangar's coming load shows on the
+ * station that will take it. A waiting bay carries its action: book when
+ * the plane is parked at base, else a tip saying what it waits for.
  */
-function buildHangar(state: SimState, changed: () => void): HTMLElement[] {
-  const nodes: HTMLElement[] = [
-    heading(
-      'Hangar',
-      `C checks in work and coming. A filled bay is a plane in its C check or a cabin refit, grounded until it's done. A dashed bay is a plane whose check is within ${HEAVY_WINDOW_DAYS} days or overdue: book it from the wrench when it is parked at base, or if it runs ${OVERDUE_GRACE_DAYS} days overdue it goes in whenever it is. Planes that go in together fill the bays and the rest are contracted out.`,
-    ),
-  ];
-  const bays = box('mx-bays');
-  for (const plane of ops.heavyCheckReadouts(state)) {
-    const event = plane.inCheck ? aogFor(state, plane.tail) : undefined;
-    if (!event && !plane.open) continue;
-    const bay = box(`mx-bay ${event ? 'is-working' : 'is-waiting'}`);
-    bay.append(box('mx-bay-tail', plane.tail), box('mx-bay-state', event ? `out in ${daysUntilReturn(state, event)}d` : plane.dueIn > 0 ? `due ${plane.dueIn}d` : `${-plane.dueIn}d over`));
-    if (!event) bay.classList.toggle('is-late', plane.dueIn <= 0);
-    // The action sits on the bay itself: book when the plane is parked at base, else the tip says what it waits for.
-    if (!event && plane.canBook) {
+function hangarBays(state: SimState, iata: string, level: number, readouts: HeavyCheckReadout[], changed: () => void): HTMLElement {
+  const bays = box('mx-bays mx-station-bays');
+  const inHangar = state.aogs.filter((event) => event.base === iata && (event.check === true || event.inBay === true));
+  for (const event of inHangar) {
+    const plane = readouts.find((entry) => entry.tail === event.tail);
+    const refit = event.refitTo !== undefined && event.inBay === true;
+    const what = refit ? 'refit' : plane?.dInCheck ? 'D' : 'C';
+    const bay = box(`mx-bay is-working${refit ? ' is-refit' : ''}`);
+    bay.append(box('mx-bay-tail', event.tail), box('mx-bay-state', `${what} · out ${daysUntilReturn(state, event)}d`));
+    bay.dataset.tip = `${event.tail} · ${refit ? 'cabin refit' : `${what} check`} in a bay at ${iata} · back in ${daysUntilReturn(state, event)}d`;
+    bays.append(bay);
+  }
+  for (let free = inHangar.length; free < level; free++) {
+    const bay = box('mx-bay is-free');
+    bay.dataset.tip = `Bay free at ${iata} tonight`;
+    bays.append(bay);
+  }
+  for (const plane of readouts) {
+    if (plane.base !== iata || plane.inCheck || !plane.open) continue;
+    const bay = box('mx-bay is-waiting');
+    bay.classList.toggle('is-late', plane.dueIn <= 0);
+    bay.append(box('mx-bay-tail', plane.tail), box('mx-bay-state', plane.dueIn > 0 ? `C ${plane.dueIn}d` : `C ${-plane.dueIn}d over`));
+    if (level === 0) bay.dataset.tip = `${plane.tail} · C ${plane.dueIn > 0 ? `due in ${plane.dueIn}d` : `${-plane.dueIn}d overdue`} · no hangar at ${iata}: contracted out`;
+    if (plane.canBook) {
       const book = document.createElement('button');
       book.type = 'button';
       book.className = 'mx-bay-book';
@@ -144,25 +199,14 @@ function buildHangar(state: SimState, changed: () => void): HTMLElement[] {
       book.addEventListener('click', () => confirmHeavyBooking(state, plane, changed));
       bay.classList.add('is-bookable');
       bay.append(book);
-    } else if (!event && plane.bookBlocker) {
+    } else if (plane.bookBlocker) {
       const wait = box('mx-bay-wait');
       wait.append(glyph('plane', plane.bookBlocker));
       bay.append(wait);
     }
     bays.append(bay);
   }
-  // A cabin refit done in house holds a bay too (sim/cabins.ts): a filled bay marked with the seat icon.
-  for (const event of state.aogs) {
-    if (!event.refitTo || !event.inBay) continue;
-    const bay = box('mx-bay is-working is-refit');
-    bay.append(box('mx-bay-tail', event.tail), box('mx-bay-state', `refit · out in ${daysUntilReturn(state, event)}d`));
-    bay.dataset.tip = `${event.tail} · cabin refit in a bay at ${event.base} · back in ${daysUntilReturn(state, event)}d`;
-    bays.append(bay);
-  }
-  const capacity = ops.mxBaseReadout(state, 'heavy').bases.map((base) => `${base.iata} ${base.used}/${base.level} bays`).join(' · ');
-  nodes.push(line(capacity || 'No hangar'));
-  nodes.push(bays.childElementCount > 0 ? bays : noneLine('Hangar clear · no check or refit in work or within its window'));
-  return nodes;
+  return bays;
 }
 
 /**
@@ -391,15 +435,34 @@ function buildMxBases(state: SimState, changed: () => void): HTMLElement[] {
   const heavyReadout = ops.mxBaseReadout(state, 'heavy');
   const stationHead = heading(
     'Stations',
-    `Each maintenance station: its line base slots (wrench: planes it checks a night, most deferred items first) and hangar bays (planes in a C or D check at once), filled by tonight's use, red past full. Chips are the mechanics' ratings by class, with that class's planes asleep here tonight: solid is rated; dashed amber is a class sleeping here unrated. Each plane needs a line check once every ${LINE_INTERVAL_NIGHTS} nights, and a base checks planes early when it has room, so a level covers several planes. One due and missed (past the slots, an unrated class) gets a deferred item each night; nothing is contracted. A station's first rating is free; each further class costs ${money(MX_RATING_FEE)} and ${money(MX_RATING_PER_DAY)} a day. A new line base costs ${money(lineReadout.fee)}, a hangar ${money(heavyReadout.fee)}, then ${money(lineReadout.perLevelPerDay)} and ${money(heavyReadout.perLevelPerDay)} a day a level; home's first 3 of each are free.`,
+    `Each maintenance station: its line base slots (wrench: planes it checks a night, most deferred items first) and its hangar bays as tiles: filled is a plane in its C or D check or a refit, grounded until out; free is an empty bay; dashed is a plane based here whose C check is within ${HEAVY_WINDOW_DAYS} days or overdue. Book it from its wrench when it is parked at base; ${OVERDUE_GRACE_DAYS} days overdue it goes in whenever it is. Planes past the bays are contracted out. Chips are the mechanics' ratings by class, with that class's planes asleep here tonight: solid is rated; dashed amber is a class sleeping here unrated. Each plane needs a line check once every ${LINE_INTERVAL_NIGHTS} nights, and a base checks planes early when it has room, so a level covers several planes. One due and missed (past the slots, an unrated class) gets a deferred item each night; nothing is contracted. A station's first rating is free; each further class costs ${money(MX_RATING_FEE)} and ${money(MX_RATING_PER_DAY)} a day. A new line base costs ${money(lineReadout.fee)}, a hangar ${money(heavyReadout.fee)}, then ${money(lineReadout.perLevelPerDay)} and ${money(heavyReadout.perLevelPerDay)} a day a level; home's first 3 of each are free. Open a new station from its airport's panel or map ring (Bases).`,
   );
   stationHead.prepend(glyph('wrench', undefined, 'base-head-glyph'), ' ');
   const nodes: HTMLElement[] = [stationHead];
   const cards = ops.mxStationBoard(state);
   const board = new Set(cards.map((card) => card.iata));
+  const readouts = ops.heavyCheckReadouts(state);
   const list = box('mx-stations');
-  for (const card of cards) list.append(stationCard(state, card, lineReadout.fee, heavyReadout.fee, changed));
-  nodes.push(list, stationOpener(state, board, lineReadout, heavyReadout, changed));
+  for (const card of cards) list.append(stationCard(state, card, lineReadout.fee, heavyReadout.fee, readouts, changed));
+  nodes.push(list);
+  if (cards.length === 0) nodes.push(noneLine('No station · open one from an airport\'s panel'));
+
+  // Planes coming due a C check whose base has no station at all: contracted out, shown so none goes unseen.
+  const homeless = [...new Set(readouts.filter((plane) => plane.base && !board.has(plane.base) && plane.open && !plane.inCheck).map((plane) => plane.base!))];
+  for (const iata of homeless) {
+    const row = linkToMap(document.createElement('div'), { kind: 'airport', iata });
+    row.className = 'mx-station is-warn';
+    const head = box('mx-station-head');
+    const code = document.createElement('b');
+    code.className = 'iata-plate';
+    code.textContent = iata;
+    const note = document.createElement('span');
+    note.className = 'inspector-row-detail is-warn';
+    note.append(glyph('hangar', `No hangar at ${iata}: C checks for planes based here are contracted out`), ' contracted');
+    head.append(code, note);
+    row.append(head, hangarBays(state, iata, 0, readouts, changed));
+    nodes.push(row);
+  }
 
   const stations = ops.mxStationsReadout(state).filter((station) => !board.has(station.iata));
   nodes.push(
@@ -495,9 +558,11 @@ function capacityRow(state: SimState, iata: string, kind: 'line' | 'heavy', base
     return row;
   }
   const unit = isLine ? 'checked tonight' : 'bays held';
-  const tip = `${isLine ? 'Line base' : 'Hangar'} L${base.level} · ${base.used}/${base.level} ${unit}${base.overflow > 0 ? ` · ${base.overflow} more rated plane${base.overflow === 1 ? '' : 's'} than slots, contracted` : ''}`;
+  const tip = `${isLine ? 'Line base' : 'Hangar'} L${base.level} · ${base.used}/${base.level} ${unit}${base.overflow > 0 ? ` · ${base.overflow} more rated plane${base.overflow === 1 ? '' : 's'} than slots, ${isLine ? 'missed ●' : 'contracted'}` : ''}`;
   const slots = box('mx-station-slots');
-  slots.append(icon, ' ', pips(base.used, base.level, tip, isLine ? 'wrench' : 'hangar'));
+  // The hangar's bays are drawn as tiles under the card, so its row only counts them.
+  slots.append(icon);
+  if (isLine) slots.append(' ', pips(base.used, base.level, tip, 'wrench'));
   if (base.overflow > 0) slots.append(' ', pips(base.overflow, base.overflow, tip, 'warn'));
   const count = document.createElement('span');
   count.className = 'mx-station-count';
@@ -575,7 +640,7 @@ function ratingChip(state: SimState, card: MxStationCard, entry: StationClassRea
   return chip;
 }
 
-function stationCard(state: SimState, card: MxStationCard, lineFee: number, heavyFee: number, changed: () => void): HTMLElement {
+function stationCard(state: SimState, card: MxStationCard, lineFee: number, heavyFee: number, readouts: HeavyCheckReadout[], changed: () => void): HTMLElement {
   const el = linkToMap(document.createElement('div'), { kind: 'airport', iata: card.iata });
   el.className = 'mx-station';
   if (card.classes.some((entry) => !entry.rated && entry.sleeping > 0) || (card.line?.overflow ?? 0) > 0) el.classList.add('is-warn');
@@ -599,7 +664,11 @@ function stationCard(state: SimState, card: MxStationCard, lineFee: number, heav
 
   const chips = box('mx-ratings');
   for (const entry of card.classes) chips.append(ratingChip(state, card, entry, changed));
-  el.append(head, capacity, chips);
+  el.append(head, capacity);
+  const level = card.heavy?.level ?? 0;
+  const bays = hangarBays(state, card.iata, level, readouts, changed);
+  if (bays.childElementCount > 0) el.append(bays);
+  el.append(chips);
 
   if (card.unchecked > 0) {
     const tonight = box('mx-station-tonight');
@@ -612,47 +681,6 @@ function stationCard(state: SimState, card: MxStationCard, lineFee: number, heav
     el.append(tonight);
   }
   return el;
-}
-
-/** One picker for a new station: a line base or a hangar at any known airport without one. */
-function stationOpener(
-  state: SimState,
-  board: Set<string>,
-  lineReadout: { candidates: BaseCandidate[]; fee: number },
-  heavyReadout: { candidates: BaseCandidate[]; fee: number },
-  changed: () => void,
-): HTMLElement {
-  const lineCandidates = lineReadout.candidates;
-  const heavyCandidates = heavyReadout.candidates;
-  const opener = box('base-open');
-  const select_ = document.createElement('select');
-  select_.className = 'base-open-select';
-  const names = new Map([...lineCandidates, ...heavyCandidates].map((candidate) => [candidate.iata, candidate.name]));
-  for (const iata of [...names.keys()].filter((code) => !board.has(code)).sort()) {
-    const option = document.createElement('option');
-    option.value = iata;
-    option.textContent = `${iata} · ${names.get(iata)}`;
-    select_.append(option);
-  }
-  const buttons = (['line', 'heavy'] as const).map((kind) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'inspector-plan-hub';
-    button.append(glyph(kind === 'line' ? 'wrench' : 'hangar'), ` + ${money((kind === 'line' ? lineReadout : heavyReadout).fee)}`);
-    button.addEventListener('click', () => confirmBase(state, kind, select_.value, 'open', changed));
-    return { kind, button };
-  });
-  const refresh = () => {
-    for (const { kind, button } of buttons) {
-      const blocked = (kind === 'line' ? lineCandidates : heavyCandidates).find((candidate) => candidate.iata === select_.value)?.blocked ?? null;
-      button.disabled = select_.value === '' || blocked !== null;
-      button.title = blocked ?? `Open a ${KIND_NAME[kind]} at ${select_.value}`;
-    }
-  };
-  select_.addEventListener('change', refresh);
-  refresh();
-  opener.append(select_, ...buttons.map((entry) => entry.button));
-  return opener;
 }
 
 const ENGINE_PLAN_NAMES: Record<EngineSupport, string> = { adhoc: 'Ad hoc', pool: 'Spares', pbh: 'PBH' };
