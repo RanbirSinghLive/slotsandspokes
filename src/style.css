@@ -8118,6 +8118,7 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
 /* An empty bay: a narrow open box, so a big hangar's free bays don't crowd the card. */
 .mx-station-bays .mx-bay.is-free {
   min-width: 14px;
+  min-height: 28px;
   padding: 0;
   border: 1px solid rgba(242, 165, 65, 0.35);
   background: none;
