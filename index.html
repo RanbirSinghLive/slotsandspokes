@@ -81,8 +81,11 @@
         <button type="button" id="zoom-home" class="tool" data-tip="Back to home" aria-label="Back to home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11 12 3l9 8"/><path d="M5 10v10h14V10"/></svg></button>
         <button type="button" id="share-network" class="tool" data-tip="Share card · your network" aria-label="Share card · your network"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>
       </div>
+      <button type="button" id="pipeline-toggle" class="tool" aria-expanded="false" data-tip="Pipeline · the next 30 days" aria-label="Pipeline · the next 30 days"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/></svg></button>
       <button type="button" id="map-tools-toggle" class="tool" aria-expanded="false" data-tip="Lens and airport filter" aria-label="Lens and airport filter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></button>
     </div>
+    <!-- Bottom left: the next 30 days of checks, deliveries, crews, contracts and closures (ui/pipeline.ts). On a phone it opens from #pipeline-toggle. -->
+    <div id="pipeline"></div>
     <!-- Beside the tools: the lens's key, and a chip per rival under Rivals (main.ts). -->
     <div id="lens-corner">
       <div id="lens-legend" hidden>
