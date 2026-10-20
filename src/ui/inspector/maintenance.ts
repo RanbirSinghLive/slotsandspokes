@@ -78,8 +78,8 @@ export function buildMaintenanceView(state: SimState, changed: () => void): HTML
     }
   }
 
-  root.append(...buildHangar(state, changed), ...buildDueTimeline(state, changed), ...buildFleetBoard(state, changed));
-  root.append(...buildMxBases(state, changed));
+  // Stations sit above the plane cards: they are where the fleet's maintenance capacity is decided.
+  root.append(...buildHangar(state, changed), ...buildDueTimeline(state, changed), ...buildMxBases(state, changed), ...buildFleetBoard(state, changed), ...buildEngines(state, changed));
   return root;
 }
 
@@ -575,7 +575,6 @@ function buildMxBases(state: SimState, changed: () => void): HTMLElement[] {
   for (const card of cards) list.append(stationCard(state, card, lineReadout.fee, heavyReadout.fee, changed));
   nodes.push(list, stationOpener(state, board, lineReadout, heavyReadout, changed));
 
-  nodes.push(...buildEngines(state, changed));
   const stations = ops.mxStationsReadout(state).filter((station) => !board.has(station.iata));
   nodes.push(
     heading(

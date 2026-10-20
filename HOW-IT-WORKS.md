@@ -3601,7 +3601,7 @@ the Propeller; a station you open is rated for your most numerous class),
 and each further class costs $50,000 and $150/day, so a mixed fleet costs
 more to maintain.
 
-The Mtc screen's **Stations** has a card per maintenance station: line
+The Mtc screen's **Stations**, above the plane cards, has a card per maintenance station: line
 base slots and hangar bays filled by tonight's use (red past full), with
 − / + / × each, a dashed button to open the kind it lacks, and a rating chip
 per class showing that class's planes asleep there tonight. A solid chip is
