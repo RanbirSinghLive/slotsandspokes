@@ -1683,11 +1683,18 @@ plane that has other rotations in that time of day **swaps**: those
 rotations go to the dragged one's plane at their own times (a lone one
 can also take the place the dragged one left), all or nothing. One long
 flight dropped on two short ones sends both across. The tip reads "⇄
-C-P001 ×2" and the rotations that would trade are outlined green. A drop
-that fails only because it sits on other flights (and can't swap) is
-**held as a draft** instead of refused: the timeline plans on a copy of
-the state (`structuredClone`), flights may overlap, and overlaps draw red
-and striped. A pencil bar with a count shows over the timeline: ✓ (green,
+C-P001 ×2" and the rotations that would trade are outlined green.
+**Every Gantt change goes into a draft** (a drop, a swap, a night stop made
+or brought home with ⌂, a turn step, a sort), so nothing changes on the
+real schedule until ✓. A drop that fails only because it sits on other
+flights (and can't swap) is held in the draft too instead of refused. The
+timeline plans on a copy of the state (`structuredClone`), flights may
+overlap, and overlaps draw red and striped. A plane whose flights join up
+in the draft is drawn grouped as the draft has it, so a night stop made
+there shows as its two halves; one with overlaps keeps the real
+schedule's grouping. A move on a plane that's in the air is held for
+tomorrow as usual once saved, drawn dashed with ⏭ and its new time.
+× removes a rotation for real, so it shows only with no draft open. A pencil bar with a count shows over the timeline: ✓ (green,
 tooltip "Verify and save") replays every drop on the real state with
 `commitDraft()`, which makes the moves with overlaps allowed and then
 checks every plane they touched joins up (no flight on top of another,
@@ -1696,8 +1703,7 @@ and says why, and the draft stays open. ↶ takes back the last drop and ✕
 throws the draft away. The draft is UI-only: it is kept in this browser's storage (not in the save)
 and replayed when the page reloads, dropped if it no longer fits or is
 another game's. A draft whose flights are all back where the real
-schedule has them closes itself. Inside a draft a night stop can't be
-made or undone.
+schedule has them closes itself.
 
 **One-click sorts** (`sim/scheduleSort.ts`). Three icons beside the draft
 bar re-deal the rotations between planes of the same type at the same
@@ -1727,8 +1733,7 @@ same curfew, hourly room, collision and slot re-pricing checks as a drag, but
 never making or undoing a night stop: `noWrap`). It can't go below the
 scheduled turn, and the last flight of the day has nothing to push. A plane
 on a long-haul pair or alternate days is moved by dragging its round trip. A
-step is made like a drop: on the real schedule, or in the draft while one is
-open. `commitDraft()` only refuses an overlap the moves made, so a plane
+step goes into the draft like a drop. `commitDraft()` only refuses an overlap the moves made, so a plane
 that already had one can still be re-timed. `npm run groundtimetest`.
 
 **Connections while planning** (⇆ beside the sorts; `connectionsWith()` in

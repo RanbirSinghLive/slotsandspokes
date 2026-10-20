@@ -659,8 +659,8 @@ export function retimeRotation(state: SimState, legIds: string[], toTail: string
 }
 
 /** What dropping a rotation here would do: a move, a swap with the rotations in its way, or a hold in the draft (sim/scheduleDraft.ts). */
-export function planDropRotation(state: SimState, legIds: string[], toTail: string, startMinute: number, inDraft = false): DropPlan {
-  return planDrop(state, legIds, toTail, startMinute, inDraft);
+export function planDropRotation(state: SimState, legIds: string[], toTail: string, startMinute: number): DropPlan {
+  return planDrop(state, legIds, toTail, startMinute);
 }
 
 /** A longer or shorter wait at a flight's arrival airport: the plane's later flights that day moved together (sim/scheduleDraft.ts). Made with dropRotation(), or in a draft. */

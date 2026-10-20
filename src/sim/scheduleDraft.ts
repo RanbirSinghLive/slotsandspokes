@@ -1,4 +1,4 @@
-import { commitRetime, planRetime, tomorrowView, type RetimePlan } from './retime';
+import { commitBringHome, commitRetime, planRetime, tomorrowView, type RetimePlan } from './retime';
 import { connectingPassengersThrough, connectionsWith, spokesOf, type LegConnection } from './hubs';
 import type { ScheduleLeg } from './schedule';
 import type { SimState } from './state';
@@ -23,6 +23,8 @@ import { rotationsForTail, scheduledTurnMinutes, USABLE_DAY_END_MINUTE, USABLE_D
  *   is kept as a draft move. The timeline plans on a copy of the state
  *   while a draft is open, and every move in it is replayed here on the real
  *   state when the player verifies it.
+ * - **Every change is a draft**: the Gantt puts every drop, turn step, sort
+ *   and ⌂ into the draft, and nothing is real until the player saves it.
  * - **Verify**: `commitDraft()` makes the moves one by one with overlaps
  *   allowed, then checks every plane they touched joins up. If any step or
  *   the final check fails, nothing changes.
@@ -35,6 +37,8 @@ export type DraftMove = {
   start: number;
   /** A stretched or shortened turn (planGroundTime()): the flights it pushes never make or undo a night stop. */
   noWrap?: boolean;
+  /** The night stop's ⌂: `tail` brought home for the night (sim/retime.ts commitBringHome()), `legIds` and `start` unused. */
+  bringHome?: boolean;
 };
 
 export type DropPlan = {
@@ -139,7 +143,9 @@ export function commitDraft(state: SimState, moves: DraftMove[], options: Commit
   };
   const messages: string[] = [];
   for (const move of moves) {
-    const result = commitRetime(state, move.legIds, move.tail, move.start, { allowOverlap: true, allowTypeChange: true, noWrap: move.noWrap });
+    const result = move.bringHome
+      ? commitBringHome(state, move.tail)
+      : commitRetime(state, move.legIds, move.tail, move.start, { allowOverlap: true, allowTypeChange: true, noWrap: move.noWrap });
     if (!result.ok) return fail(result.reason);
     messages.push(result.message);
   }
@@ -154,15 +160,10 @@ export function commitDraft(state: SimState, moves: DraftMove[], options: Commit
 
 /**
  * What dropping this rotation here would do: move, swap, hold in a draft, or
- * nothing. `inDraft`: planning on a draft copy, where a night stop can't be
- * made or undone (its rotations are grouped as the real schedule has them).
+ * nothing. A move may make or undo a night stop (sim/retime.ts).
  */
-export function planDrop(state: SimState, legIds: string[], toTail: string, start: number, inDraft = false): DropPlan {
-  const result = planDropOn(state, legIds, toTail, start);
-  if (inDraft && result.ok && result.plan.kind !== 'move') {
-    return { ...result, ok: false, reason: 'Save the draft first · night stops are made on the real schedule' };
-  }
-  return result;
+export function planDrop(state: SimState, legIds: string[], toTail: string, start: number): DropPlan {
+  return planDropOn(state, legIds, toTail, start);
 }
 
 function planDropOn(state: SimState, legIds: string[], toTail: string, start: number): DropPlan {
