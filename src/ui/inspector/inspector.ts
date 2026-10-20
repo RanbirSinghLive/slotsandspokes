@@ -1,3 +1,4 @@
+import { fleetView } from '../fleetView';
 import { chipIconFor } from './chipIcons';
 import { buildGoalsView } from './goals';
 import { buildContractsView } from './contracts';
@@ -225,8 +226,8 @@ export function renderInspector(state: SimState): void {
   } else if (selection.kind === 'aircraft') {
     bodyEl.replaceChildren(buildAircraftView(state, selection.tail, rebuild));
   } else if (selection.kind === 'fleet') {
-    // The fleet head, every plane on its Gantt row, and the lessor's shelf.
-    bodyEl.replaceChildren(buildFleetView(state), adopt('rotations-section'), adopt('market-section'));
+    // The fleet head and its switch, then either every plane on its Gantt row or the lessor's shelf.
+    bodyEl.replaceChildren(buildFleetView(state, rebuild), adopt(fleetView() === 'gantt' ? 'rotations-section' : 'market-section'));
   } else if (selection.kind === 'crews') {
     bodyEl.replaceChildren(buildCrewsView(state, rebuild));
   } else if (selection.kind === 'product') {

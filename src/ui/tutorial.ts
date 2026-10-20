@@ -1,5 +1,5 @@
+import { openFleet } from './fleetView';
 import type { SimState } from '../sim/state';
-import { select, type Selection } from './selection';
 
 /**
  * The first-run tutorial: a click-through over the real screen for a
@@ -34,10 +34,11 @@ type Step = {
 };
 
 /** Open a screen in the side panel and bring a part of it into view, for a step that points inside it. */
-function openScreen(selection: Selection, scrollTo?: string): () => void {
+/** Opens Fleet on its Gantt and scrolls to `scrollTo`. */
+function openGanttAt(scrollTo: string): () => void {
   return () => {
-    select(selection);
-    if (scrollTo) requestAnimationFrame(() => document.querySelector(scrollTo)?.scrollIntoView({ block: 'start' }));
+    openFleet('gantt');
+    requestAnimationFrame(() => document.querySelector(scrollTo)?.scrollIntoView({ block: 'start' }));
   };
 }
 
@@ -85,7 +86,7 @@ const STEPS: Step[] = [
     title: 'The Schedule',
     text: "Each plane's day, flight by flight, grouped by type; the airport between flights is where it waits on the ground. You never have to touch it. When you want to, drag a rotation left or right to move it in the day, or onto another plane of its type.",
     target: '#rotations-section',
-    open: openScreen({ kind: 'fleet' }, '#rotations-section'),
+    open: openGanttAt('#rotations-section'),
   },
   {
     title: 'Hours fill up',

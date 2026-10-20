@@ -1,23 +1,34 @@
-import { AIRCRAFT_CLASSES, pluralClassName } from '../sim/aircraftClasses';
+import { AIRCRAFT_CLASSES, classByCode, pluralClassName, type AircraftClass } from '../sim/aircraftClasses';
+import { dayIndex } from '../sim/clock';
+import { crewBases } from '../sim/crews';
+import { ageDelayParameters, expectedAgeDelayMinutes } from '../sim/delays';
 import { airlineCalled, classOpen, tierThatOpens } from '../sim/ladder';
-import { cashNeededToLease } from '../sim/leasing';
-import { daysUntilNextListing, holdDaysLeft, HOLD_DAYS, listingsOf, priceIndexOf } from '../sim/market';
+import { cashNeededToLease, LEASE_RESERVE_DAYS, USEFUL_LIFE_YEARS } from '../sim/leasing';
+import { daysUntilNextListing, holdDaysLeft, HOLD_DAYS, listingsOf, MARKET_RHYTHM, priceIndexOf, type MarketListing } from '../sim/market';
+import { overheadAddedByNextPlane } from '../sim/overhead';
 import { clearStandingOrder, setStandingOrder, standingOrderOf } from '../sim/standingOrders';
 import { deliveryDays } from '../sim/fleetTiming';
 import { select } from './selection';
 import { showConfirm } from './confirmModal';
-import { money } from './format';
+import { money, shortMoney } from './format';
 import type { SimState } from '../sim/state';
 import { info } from './inspector/dom';
-import { planeIconElement } from './planeIcons';
+import { renderInspector } from './inspector/inspector';
+import { linkToMap } from './mapLink';
+import { planeIconElement, TYPE_COLOURS } from './planeIcons';
+import { glyph, type GlyphName } from './glyphs';
+import { openFleet } from './fleetView';
+import * as ops from './routeActions';
 
 /**
  * The fleet market's readouts (sim/market.ts), apart from the lease
  * buttons themselves (ui/mapMenu.ts):
  *
- *   - The Lessor strip in the Fleet tab: per class, what's listed and when
- *     the next one arrives, so a player can plan around the timers
- *     instead of checking the lease fan over and over.
+ *   - The Market half of the Fleet tab (ui/fleetView.ts): leases on
+ *     order, then one card per class with its specs, the price trend, a
+ *     standing-order bell and its shelf, one place per airframe the class
+ *     can hold. A listed airframe leases from its tile, so a player can
+ *     plan around the timers and lease without hunting for an airport.
  *   - A pop-up the moment the ladder opens a class to the player
  *     (sim/ladder.ts) — a whole new kind of airline becomes possible.
  *     Everyday arrivals and rival leases go in the ticker (ui/ticker.ts)
@@ -35,7 +46,8 @@ debutClose.addEventListener('click', () => {
 });
 
 const chipEl = document.querySelector<HTMLButtonElement>('#market-chip')!;
-chipEl.addEventListener('click', () => select({ kind: 'fleet' }));
+// The chip means the shelf, so it opens Fleet on its Market half.
+chipEl.addEventListener('click', () => openFleet('market'));
 
 let stripSignature = '';
 let chipSignature = '';
@@ -124,73 +136,256 @@ function renderChip(state: SimState): void {
   chipEl.title = lines.join('\n');
 }
 
-function renderStrip(state: SimState): void {
-  const rows = AIRCRAFT_CLASSES.map((cls) => {
-    const listings = listingsOf(state, cls.code);
-    const next = daysUntilNextListing(state, cls.code);
-    const opener = tierThatOpens(cls.code);
-    // A locked class is just locked: its listings are for rivals until the ladder opens it.
-    const locked = !classOpen(state, cls.code);
-    return {
-      code: cls.code,
-      name: cls.name,
-      listed: String(listings.length),
-      ages: listings.length > 0 ? listings.map((l) => l.ageYears).join(' ') : '—',
-      next: `${next}d`,
-      holds: listings.map((l) => holdDaysLeft(state, l)),
-      order: standingOrderOf(state, cls.code)?.maxAgeYears ?? 0,
-      why: locked ? `Opens as ${opener ? airlineCalled(opener) : 'a bigger airline'}. See Goals.` : null,
-      empty: locked || listings.length === 0,
-      price: locked ? 1 : priceIndexOf(state.market, cls.code),
-    };
+/** Bases a class can be leased into now (sim/playerActions.ts's planeOptions()), home first; the home's refusal when none can. */
+function leaseBases(state: SimState, code: string): { bases: string[]; refusal: string | null } {
+  const stations = [...new Set([state.homeAirport, ...Object.keys(crewBases(state))])];
+  const bases: string[] = [];
+  let refusal: string | null = null;
+  for (const iata of stations) {
+    const option = ops.planeOptions(state, iata).find((o) => o.code === code && o.powertrain !== 'electric');
+    if (!option) continue;
+    if (option.disabledReason) refusal ??= option.disabledReason;
+    else bases.push(iata);
+  }
+  return { bases, refusal: bases.length > 0 ? null : refusal };
+}
+
+/** The lease confirm for one listed airframe: the player picks the base, the rows say what it adds. */
+function openLeaseDialog(state: SimState, code: string, listing: MarketListing, bases: string[]): void {
+  const cls = classByCode(code)!;
+  const overhead = overheadAddedByNextPlane(state);
+  const held = holdDaysLeft(state, listing);
+  const arrives = dayIndex(state) + deliveryDays(state);
+  const rowsFor = (index: number) => [
+    { label: 'Airframe', value: `${cls.seats} seats · ${listing.ageYears} yrs (${Math.max(0, USEFUL_LIFE_YEARS - listing.ageYears)} left)` },
+    { label: 'Late from age', value: `~${Math.round(expectedAgeDelayMinutes(listing.ageYears))} min/flight` },
+    { label: 'Lease', value: `${money(listing.leasePricePerDay)}/day` },
+    { label: 'Fleet overhead added', value: `${money(overhead)}/day` },
+    { label: 'Running cost added', value: `${money(listing.leasePricePerDay + overhead)}/day` },
+    { label: 'Based at', value: `${bases[index]} · arrives day ${arrives} (${deliveryDays(state)}d)` },
+    ...(held > 0 ? [{ label: 'Held for you', value: `${held}d before rivals can lease it` }] : []),
+  ];
+  showConfirm({
+    title: `Lease ${cls.name} · ${listing.ageYears} yrs`,
+    rows: [],
+    choices: {
+      selected: 0,
+      rowsFor,
+      chips: bases.map((iata) => ({ label: iata, title: iata === state.homeAirport ? `Base it at ${iata} (home)` : `Base it at ${iata}` })),
+    },
+    facts: ['Standing lease. For a 90-day season lease, tap an airport on the map and choose Plane.', 'Crews are hired separately: have crews rated on this type at the base before its first flight.'],
+    confirmLabel: 'Lease',
+    run: (index) => {
+      ops.leasePlane(state, bases[index], code, false, undefined, listing.id);
+      stripSignature = '';
+      chipSignature = '';
+      renderInspector(state);
+    },
   });
-  const signature = rows.map((row) => `${row.name}:${row.listed}:${row.ages}:${row.next}:${row.why}:${row.holds.join('.')}:${row.order}:${row.price}`).join('|');
+}
+
+/** An empty or coming place on the shelf: dashed, with the days to the next airframe on the first one. */
+function emptySlot(text: string, tip: string, timer = false): HTMLElement {
+  const slot = document.createElement('div');
+  slot.className = 'market-slot is-empty';
+  if (timer) slot.append(glyph('timer'));
+  slot.append(text);
+  slot.dataset.tip = tip;
+  return slot;
+}
+
+/** One listed airframe: age, rate, how often it leaves on time, the player-first hold, and the tap that leases it. */
+function listingTile(state: SimState, code: string, listing: MarketListing, bases: string[], refusal: string | null): HTMLElement {
+  const tile = document.createElement('button');
+  tile.type = 'button';
+  tile.className = 'market-slot';
+  const affordable = state.cash >= cashNeededToLease(listing.leasePricePerDay);
+  const blocked = refusal ?? (affordable ? null : `Needs ${money(cashNeededToLease(listing.leasePricePerDay))} on hand (${LEASE_RESERVE_DAYS} days of lease)`);
+  tile.classList.toggle('is-short', blocked !== null);
+  const onTime = ageDelayParameters(listing.ageYears).onTimeProbability;
+  const age = document.createElement('span');
+  age.className = 'market-slot-age';
+  age.textContent = `${listing.ageYears}y`;
+  const rate = document.createElement('span');
+  rate.className = 'market-slot-rate';
+  rate.textContent = shortMoney(listing.leasePricePerDay);
+  // Taller bar = more on time, as in the lease fan's chips.
+  const meter = document.createElement('i');
+  meter.className = 'market-slot-meter';
+  meter.style.setProperty('--fill', `${Math.round(onTime * 100)}%`);
+  tile.append(meter, age, rate);
+  const hold = holdDaysLeft(state, listing);
+  if (hold > 0) {
+    const ring = document.createElement('i');
+    ring.className = 'market-slot-hold';
+    ring.style.setProperty('--left', `${Math.round((hold / HOLD_DAYS) * 100)}%`);
+    tile.append(ring);
+  }
+  tile.dataset.tip =
+    `${listing.ageYears} yrs · ${money(listing.leasePricePerDay)}/day · tech dispatch ${Math.round(onTime * 100)}% · ~${Math.round(expectedAgeDelayMinutes(listing.ageYears))} min late/flight from age` +
+    (hold > 0 ? ` · yours ${hold}d more` : ' · rivals may lease') +
+    (blocked ? ` · ${blocked}` : ' · tap to lease');
+  tile.disabled = blocked !== null;
+  tile.addEventListener('click', () => currentState && openLeaseDialog(currentState, code, listing, bases));
+  return tile;
+}
+
+/** Specs as icon-led chips: seats, range, cruise, cost per block hour. */
+function specChips(code: string): HTMLElement {
+  const cls = classByCode(code) as (AircraftClass & { cruiseKts?: number; costPerBlockHour?: number }) | undefined;
+  const specs = document.createElement('div');
+  specs.className = 'market-specs';
+  const chip = (icon: GlyphName, text: string, tip: string) => {
+    const el = document.createElement('span');
+    el.className = 'market-spec';
+    el.dataset.tip = tip;
+    el.append(glyph(icon), ` ${text}`);
+    return el;
+  };
+  if (!cls) return specs;
+  specs.append(chip('seat', String(cls.seats), 'Seats, all economy, before any refit'), chip('globe', `${cls.rangeNm.toLocaleString()} nm`, 'Range: the longest sector it can fly'));
+  if (cls.cruiseKts) specs.append(chip('timer', `${cls.cruiseKts} kt`, 'Cruise speed: sets block time'));
+  if (cls.costPerBlockHour) specs.append(chip('coin', `${shortMoney(cls.costPerBlockHour)}/bh`, 'Running cost per block hour: fuel, crew time and wear, before the lease'));
+  return specs;
+}
+
+function renderStrip(state: SimState): void {
+  const today = dayIndex(state);
+  const inbound = [...(state.inboundLeases ?? [])].sort((a, b) => a.arrivesDay - b.arrivesDay);
+  const classes = AIRCRAFT_CLASSES.map((cls) => {
+    const locked = !classOpen(state, cls.code);
+    const listings = listingsOf(state, cls.code);
+    return { cls, locked, listings, lease: locked ? { bases: [], refusal: null } : leaseBases(state, cls.code) };
+  });
+  const signature =
+    `${today}:${Math.floor(state.cash / 10000)}:${state.aircraft.length}:` +
+    inbound.map((l) => `${l.typeCode}.${l.base}.${l.arrivesDay}`).join(',') +
+    '|' +
+    classes
+      .map(({ cls, locked, listings, lease }) =>
+        [cls.code, locked, listings.map((l) => `${l.id}.${holdDaysLeft(state, l)}`).join(','), daysUntilNextListing(state, cls.code), standingOrderOf(state, cls.code)?.maxAgeYears ?? 0, priceIndexOf(state.market, cls.code).toFixed(2), lease.bases.join('.'), lease.refusal].join(':'),
+      )
+      .join('|');
   if (signature === stripSignature) return;
   stripSignature = signature;
 
-  // A grid: class, how many listed, their ages in years, days to the next arrival.
-  const cell = (text: string, className = '') => {
-    const span = document.createElement('span');
-    span.className = className;
-    span.textContent = text;
-    return span;
-  };
-  const header = [cell('Class'), cell('Listed', 'market-num'), cell('Ages (yrs)', 'market-num'), cell('Next', 'market-num')];
-  header.forEach((span) => span.classList.add('market-head'));
-  const cells: HTMLElement[] = [...header];
-  for (const row of rows) {
-    const name = cell('', row.empty ? 'is-empty' : '');
-    name.append(planeIconElement(row.code), ` ${row.name}`);
-    // The lessor's price level: an arrow once it is 5% or more off the rate card.
-    if (!row.why && Math.abs(row.price - 1) >= 0.05) {
-      const trend = document.createElement('span');
-      const pct = Math.round(Math.abs(row.price - 1) * 100);
-      trend.className = row.price > 1 ? 'market-trend is-up' : 'market-trend is-down';
-      trend.textContent = row.price > 1 ? ' ▲' : ' ▼';
-      trend.title = `Lessor rates ${row.price > 1 ? `+${pct}% · shelf running short` : `−${pct}% · listings sitting`}. A lease keeps the rate it was signed at.`;
-      name.append(trend);
+  const parts: HTMLElement[] = [];
+
+  // Leases signed and not yet delivered, soonest first: a dashed plane with its base and day.
+  if (inbound.length > 0) {
+    const orders = document.createElement('div');
+    orders.className = 'market-orders';
+    for (const lease of inbound) {
+      const row = linkToMap(document.createElement('button'), { kind: 'airport', iata: lease.base });
+      row.type = 'button';
+      row.className = 'market-order';
+      row.addEventListener('click', () => select({ kind: 'airport', iata: lease.base }));
+      const left = Math.max(0, lease.arrivesDay - today);
+      const total = Math.max(1, deliveryDays(state));
+      const bar = document.createElement('i');
+      bar.className = 'market-order-bar';
+      bar.style.setProperty('--done', `${Math.round(Math.max(0, Math.min(1, 1 - left / total)) * 100)}%`);
+      const icon = planeIconElement(lease.typeCode);
+      icon.style.color = TYPE_COLOURS[lease.typeCode] ?? '';
+      const text = document.createElement('span');
+      text.textContent = `→ ${lease.base} · ${left}d`;
+      row.append(icon, text, bar);
+      row.dataset.tip = `On order: ${classByCode(lease.typeCode)?.name ?? lease.typeCode}, delivered at ${lease.base} on day ${lease.arrivesDay}; ${money(lease.leasePricePerDay)}/day from then.`;
+      orders.append(row);
     }
-    cells.push(name);
-    if (row.why) {
-      const locked = cell('🔒 Locked ', 'market-locked is-empty');
-      locked.append(info(row.why));
-      cells.push(locked);
+    parts.push(orders);
+  }
+
+  const cards = document.createElement('div');
+  cards.className = 'market-cards';
+  for (const { cls, locked, listings, lease } of classes) {
+    const card = document.createElement('section');
+    card.className = `market-card${locked ? ' is-locked' : ''}`;
+    card.style.setProperty('--type', TYPE_COLOURS[cls.code] ?? '#5ed6c8');
+
+    const head = document.createElement('div');
+    head.className = 'market-card-head';
+    const icon = planeIconElement(cls.code);
+    icon.classList.add('market-card-icon');
+    const name = document.createElement('span');
+    name.className = 'market-card-name';
+    name.textContent = cls.name;
+    head.append(icon, name);
+    const flying = state.aircraft.filter((a) => a.typeCode === cls.code).length;
+    const coming = inbound.filter((l) => l.typeCode === cls.code).length;
+    if (flying + coming > 0) {
+      const owned = document.createElement('span');
+      owned.className = 'market-card-owned';
+      owned.textContent = `${flying}${coming > 0 ? ` +${coming}` : ''}`;
+      owned.dataset.tip = `${flying} in your fleet` + (coming > 0 ? ` · ${coming} on order` : '');
+      head.append(owned);
+    }
+    // The lessor's price level: an arrow once it is 5% or more off the rate card.
+    const price = locked ? 1 : priceIndexOf(state.market, cls.code);
+    if (Math.abs(price - 1) >= 0.05) {
+      const pct = Math.round(Math.abs(price - 1) * 100);
+      const trend = document.createElement('span');
+      trend.className = price > 1 ? 'market-trend is-up' : 'market-trend is-down';
+      trend.textContent = `${price > 1 ? '▲' : '▼'}${pct}%`;
+      trend.dataset.tip = `Lessor rates ${price > 1 ? `+${pct}% · shelf running short` : `−${pct}% · listings sitting`}. A lease keeps the rate it was signed at.`;
+      head.append(trend);
+    }
+    if (locked) {
+      const opener = tierThatOpens(cls.code);
+      const lock = document.createElement('span');
+      lock.className = 'market-card-lock';
+      lock.append('🔒 ', info(`Opens as ${opener ? airlineCalled(opener) : 'a bigger airline'}. See Goals. Until then its listings are for rivals.`));
+      head.append(lock);
     } else {
-      const ages = cell(row.ages, 'market-num is-empty');
-      if (row.holds.some((h) => h > 0)) ages.title = `Yours ${Math.max(...row.holds)}d more: rivals cannot lease these yet`;
       // The bell places or removes a standing order for this class.
+      const order = standingOrderOf(state, cls.code)?.maxAgeYears ?? 0;
       const bell = document.createElement('button');
       bell.type = 'button';
-      bell.className = `market-bell${row.order ? ' is-set' : ''}`;
+      bell.className = `market-bell${order ? ' is-set' : ''}`;
       bell.textContent = '🔔';
-      bell.title = row.order ? `Standing order ≤${row.order}y · tap to remove` : 'Standing order: lease the next one for you';
-      bell.addEventListener('click', () => currentState && openOrderDialog(currentState, row.code, row.name));
-      const count = cell(row.listed, `market-num${row.empty ? ' is-empty' : ''}`);
-      count.append(' ', bell);
-      cells.push(count, ages, cell(row.next, 'market-num'));
+      bell.dataset.tip = order ? `Standing order ≤${order}y · tap to remove` : 'Standing order: lease the next one for you';
+      bell.setAttribute('aria-label', bell.dataset.tip);
+      bell.addEventListener('click', () => currentState && openOrderDialog(currentState, cls.code, cls.name));
+      head.append(bell);
     }
+    card.append(head, specChips(cls.code));
+
+    // The shelf: one place per airframe it can hold, listed ones first.
+    const rhythm = MARKET_RHYTHM[cls.code];
+    const cap = rhythm?.cap ?? Math.max(1, listings.length);
+    const next = daysUntilNextListing(state, cls.code);
+    const shelf = document.createElement('div');
+    shelf.className = 'market-shelf';
+    const youngestFirst = [...listings].sort((a, b) => a.ageYears - b.ageYears || a.id - b.id);
+    for (const listing of youngestFirst) {
+      if (locked) {
+        const slot = emptySlot(`${listing.ageYears}y`, `${listing.ageYears} yrs · ${money(listing.leasePricePerDay)}/day · rivals only until it opens`);
+        slot.classList.add('is-rival');
+        shelf.append(slot);
+      } else {
+        shelf.append(listingTile(state, cls.code, listing, lease.bases, lease.refusal));
+      }
+    }
+    for (let i = listings.length; i < cap; i++) {
+      shelf.append(i === listings.length ? emptySlot(`${next}d`, `Next ${cls.name} listed in ${next}d · first come first served`, true) : emptySlot('', 'Room on the shelf'));
+    }
+    if (listings.length >= cap) {
+      // A full shelf: the next arrival is lost unless someone leases one first.
+      const full = emptySlot(`${next}d`, `Shelf full: the ${cls.name} due in ${next}d is lost unless one is leased first`, true);
+      full.classList.add('is-full');
+      shelf.append(full);
+    }
+    card.append(shelf);
+    if (!locked && lease.refusal && listings.length > 0) {
+      const why = document.createElement('div');
+      why.className = 'market-card-why';
+      why.textContent = lease.refusal;
+      card.append(why);
+    }
+    cards.append(card);
   }
-  stripEl.replaceChildren(...cells);
+  parts.push(cards);
+  stripEl.replaceChildren(...parts);
 }
 
 // Classes already open when this page loaded aren't announced, only one

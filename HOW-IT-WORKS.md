@@ -1363,8 +1363,12 @@ themselves (Fare policy, the Lessor, the rotations timeline, Reliability,
 Game) wait hidden in `#panel-parts` until a screen adopts them
 (`adopt()` in `ui/inspector/dom.ts`): Routes shows the table first, with the Reliability section (late
 minutes and cancellations by cause) above it in the stopwatch lens and
-Fare policy folded under it to one line in the money lens; Fleet shows every plane, then the rotations timeline and the
-Lessor; **Crews** (`ui/inspector/crews.ts`) shows every base's crews by
+Fare policy folded under it to one line in the money lens; Fleet has a
+two-way switch under its head (`ui/fleetView.ts`, remembered in the
+browser): **Gantt** shows the rotations timeline, every plane a row, and
+**Market** shows the Lessor (leases on order, then one card per class).
+A schedule alert or the tutorial opens Gantt; the HUD market chip opens
+Market; the badge on Market counts the airframes the player could lease; **Crews** (`ui/inspector/crews.ts`) shows every base's crews by
 class, one line per class (bar, crews/comfortable, status chip, then + hire, ⇄ retrain and − release as icon buttons whose tips carry the fee), shortest-handed base first.
 
 **The Network summary is a grid of cards**: Cash, Runway, On-time,
@@ -2124,7 +2128,21 @@ on-time bar; picking one shows its age, the minutes late it adds per
 flight from age alone (`expectedAgeDelayMinutes()`) and its rate. The
 lease takes exactly that listing.
 
-**Standing order.** The bell on a Lessor row places one order per class
+**The Market cards.** Fleet's Market half (`ui/market.ts`) gives each
+class a card in its type colour: seats, range, cruise and running cost
+per block hour, how many the player flies and has on order, the price
+arrow and the standing-order bell. Under them is the shelf, one place per
+airframe the class can hold (its cap): a listed airframe is a tile with
+its age, rate, an on-time bar and the hold strip, and tapping it opens a
+lease confirm whose chips are the player's crew bases that can take the
+class (home first) instead of the airframes. A tile is amber and inert
+when cash can't cover 30 days of it. Empty places are dashed, the first
+with the days to the next arrival; a full shelf adds a red place for the
+arrival that will be lost. A locked class's card is greyed with its
+listings shown as rivals' (greyed, not hidden). The season term stays in
+the map's lease fan.
+
+**Standing order.** The bell on a Lessor card places one order per class
 ("next one aged 17 / 20 / any or younger"), based at the home airport.
 At rollover, right after the day's delivery, the youngest matching listing
 is leased through the same lease the player presses (class open, crew
@@ -2156,7 +2174,7 @@ base interval divided by the level, never under 60% of it (Regional 7 days
 falls to 4 at the top). Every listing is re-priced to the level each day,
 so the lease confirm, the HUD chip and standing orders all quote it. **A
 lease keeps the rate it was signed at**: a later squeeze changes nothing
-for a plane already leased. The Lessor strip shows a ▲ (amber) or ▼
+for a plane already leased. The Lessor card shows a ▲ (amber) or ▼
 (teal) beside a class once its level is 5% or more off the card, with the
 percentage in its tip.
 
