@@ -3599,7 +3599,19 @@ A plane of an unrated class is treated like one at an outstation, at a line
 base or a hangar. A station's first rating is free (home starts rated for
 the Propeller; a station you open is rated for your most numerous class),
 and each further class costs $50,000 and $150/day, so a mixed fleet costs
-more to maintain. Chips on the Mtc screen's Ratings list rate or drop them.
+more to maintain.
+
+The Mtc screen's **Stations** has a card per maintenance station: line
+base slots and hangar bays filled by tonight's use (red past full), with
+− / + / × each, a dashed button to open the kind it lacks, and a rating chip
+per class showing that class's planes asleep there tonight. A solid chip is
+rated (tap to drop); a dashed amber one is a class sleeping there unrated;
+a red underline means rated planes over the line base's slots. The card's
+moon line counts tonight's unchecked planes, what they cost, and the
+contract/defer switch. Rating a class only moves its planes in house where
+the line base has slots left, so a full base needs a level too
+(`mxStationBoard()`). Below, one picker opens a station elsewhere, and
+**Outstations** lists airports with no base where planes sleep tonight.
 
 Clicking an airport's ring has one Create base button with a crew, line base or hangar choice; it greys out for a kind the airport already has and opens the same confirm as the screens. Opening or closing a base asks first: a confirm window (`ui/confirmModal.ts`,
 numbers from `previewBaseChange()`) shows the fee, the running cost before and
@@ -3615,7 +3627,7 @@ on the map) stays one click each.
 class, a plane stranded away), the night is a **contracted check**, $300 an
 hour of the night's work (a Propeller on 4 flights a day: $840), or **no
 check and a deferred item**, by the station's setting on the Mtc screen's
-Stations list (contracted unless changed). So
+station card or Outstations list (contracted unless changed). So
 a crew base alone is cheap to open and dearer to run, and a line base pays
 for itself at about one plane sleeping there.
 

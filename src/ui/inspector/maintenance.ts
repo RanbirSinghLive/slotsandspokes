@@ -5,7 +5,7 @@ import { ageDelayParameters } from '../../sim/delays';
 import { USEFUL_LIFE_YEARS } from '../../sim/leasing';
 import { A_OVERDUE, A_WINDOW, C_INTERVAL_CYCLES, C_INTERVAL_HOURS, D_INTERVAL_DAYS, D_INTERVAL_HOURS, D_WEAR_YEARS, D_WINDOW_DAYS, DEFERRED_AGE_YEARS, HEAVY_INTERVAL_DAYS, HEAVY_WINDOW_DAYS, MX_HOLD_AT, OVERDUE_GRACE_DAYS, wornAge } from '../../sim/mxChecks';
 import * as ops from '../routeActions';
-import type { HeavyCheckReadout } from '../../sim/playerActions';
+import type { BaseCandidate, HeavyCheckReadout, LevelledBaseReadout, MxStationCard, StationClassReadout } from '../../sim/playerActions';
 import type { SimState } from '../../sim/state';
 import { money } from '../format';
 import { linkToMap } from '../mapLink';
@@ -14,7 +14,7 @@ import { glyph, pips } from '../glyphs';
 import { select } from '../selection';
 import { MX_RATING_FEE, MX_RATING_PER_DAY } from '../../sim/bases';
 import { cashAfterRows, costRows, showConfirm } from '../confirmModal';
-import { baseSection, noneLine } from './bases';
+import { noneLine } from './bases';
 import { heading, line } from './dom';
 
 /**
@@ -553,137 +553,290 @@ function buildFleetBoard(state: SimState, changed: () => void): HTMLElement[] {
 }
 
 /**
- * Line bases and hangars (sim/bases.ts), the ratings of each station's
- * mechanics, and the stations where planes sleep tonight without an
- * in-house check, each set to contract its checks or defer them.
+ * The maintenance stations (sim/bases.ts), one card each: the line base's
+ * slots and the hangar's bays with tonight's use, and a chip per aircraft
+ * class for the mechanics' ratings, counting that class's planes asleep
+ * there tonight, so a class flying in and out unrated stands out. Then the
+ * outstations planes sleep at without a base, each set to contract its
+ * checks or defer them.
  */
 function buildMxBases(state: SimState, changed: () => void): HTMLElement[] {
-  const nodes: HTMLElement[] = [];
-  for (const kind of ['line', 'heavy'] as const) {
-    const readout = ops.mxBaseReadout(state, kind);
-    const isLine = kind === 'line';
-    nodes.push(
-      ...baseSection({
-        title: isLine ? 'Line bases' : 'Hangars',
-        icon: isLine ? 'wrench' : 'hangar',
-        info: isLine
-          ? `Where a night is a line check. The level is how many planes it checks a night, most deferred items first; a plane past that, or of a class it isn't rated for, is treated like a night at an outstation. Opening one costs ${money(readout.fee)}, then ${money(readout.perLevelPerDay)} a day for each level; home starts at level 3, free.`
-          : `Where C and D checks are done. The level is the number of bays: that many planes can be in a check here at once; the rest are contracted out by the hour. Opening one costs ${money(readout.fee)}, then ${money(readout.perLevelPerDay)} a day for each level; home starts at level 3, free.`,
-        kind: isLine ? 'line base' : 'hangar',
-        bases: readout.bases,
-        candidates: readout.candidates,
-        fee: readout.fee,
-        perDay: readout.perLevelPerDay,
-        preview: (action, iata) => ops.previewBaseChange(state, kind, action, iata),
-        open: (iata) => ops.openMxBaseAt(state, kind, iata),
-        close: (iata) => ops.closeMxBaseAt(state, kind, iata),
-        level: { preview: (iata, delta) => ops.previewMxLevel(state, kind, iata, delta), change: (iata, delta) => ops.changeMxLevel(state, kind, iata, delta) },
-        changed,
-      }),
-    );
-  }
-  nodes.push(...buildRatings(state, changed));
+  const lineReadout = ops.mxBaseReadout(state, 'line');
+  const heavyReadout = ops.mxBaseReadout(state, 'heavy');
+  const stationHead = heading(
+    'Stations',
+    `Each maintenance station: its line base slots (wrench: planes it checks a night, most deferred items first) and hangar bays (planes in a C or D check at once), filled by tonight's use, red past full. Chips are the mechanics' ratings by class, with that class's planes asleep here tonight: solid is rated; dashed amber is a class sleeping here unrated, contracted or deferred like an outstation. A station's first rating is free; each further class costs ${money(MX_RATING_FEE)} and ${money(MX_RATING_PER_DAY)} a day. A new line base costs ${money(lineReadout.fee)}, a hangar ${money(heavyReadout.fee)}, then ${money(lineReadout.perLevelPerDay)} and ${money(heavyReadout.perLevelPerDay)} a day a level; home's first 3 of each are free.`,
+  );
+  stationHead.prepend(glyph('wrench', undefined, 'base-head-glyph'), ' ');
+  const nodes: HTMLElement[] = [stationHead];
+  const cards = ops.mxStationBoard(state);
+  const board = new Set(cards.map((card) => card.iata));
+  const list = box('mx-stations');
+  for (const card of cards) list.append(stationCard(state, card, lineReadout.fee, heavyReadout.fee, changed));
+  nodes.push(list, stationOpener(state, board, lineReadout, heavyReadout, changed));
+
   nodes.push(...buildEngines(state, changed));
-  const stations = ops.mxStationsReadout(state);
+  const stations = ops.mxStationsReadout(state).filter((station) => !board.has(station.iata));
   nodes.push(
     heading(
-      'Stations',
-      'Airports where planes sleep tonight without an in-house line check: no line base, a full one, or a class the mechanics are not rated for. Contracted: the station does the line check, paid by the hour of work, and the plane gets no deferred item if the night is long enough. Deferred: no check and no cost, and a deferred item each night.',
+      'Outstations',
+      'Airports with no maintenance base where planes sleep tonight. Contracted: the station does the line check, paid by the hour of work, and the plane gets no deferred item if the night is long enough. Deferred: no check and no cost, and a deferred item each night.',
     ),
   );
   if (stations.length === 0) {
-    nodes.push(noneLine('None tonight · every plane is checked at a line base'));
+    nodes.push(noneLine('None tonight · every plane sleeps at a station'));
     return nodes;
   }
-  const list = document.createElement('div');
-  list.className = 'inspector-rows';
+  const outstations = document.createElement('div');
+  outstations.className = 'inspector-rows';
   for (const station of stations) {
     const row = linkToMap(document.createElement('div'), { kind: 'airport', iata: station.iata });
     row.className = 'inspector-row base-row';
     const name = document.createElement('span');
-    name.append(glyph('moon', `${station.planes} plane${station.planes === 1 ? '' : 's'} sleeping here tonight`), ` ${station.iata} · ${station.planes} plane${station.planes === 1 ? '' : 's'} tonight · ${station.reason}`);
-    const detail = document.createElement('span');
-    detail.className = 'inspector-row-detail';
-    detail.textContent = station.check === 'contract' ? `contracted · ${money(station.contractPerNight)}/night` : 'deferred · ● each night';
-    detail.classList.add(station.check === 'contract' ? 'is-contract' : 'is-deferred');
-    if (station.check === 'defer') detail.classList.add('is-warn');
-    const toggle = document.createElement('button');
-    toggle.type = 'button';
-    toggle.className = 'base-close';
-    toggle.textContent = station.check === 'contract' ? 'Defer' : 'Contract';
-    toggle.addEventListener('click', () => {
-      ops.setStationCheck(state, station.iata, station.check === 'contract' ? 'defer' : 'contract');
-      changed();
-    });
-    row.append(name, detail, toggle);
-    list.append(row);
+    name.append(glyph('moon', `${station.planes} plane${station.planes === 1 ? '' : 's'} sleeping here tonight`), ` ${station.iata} · ${station.planes}`);
+    row.append(name, checkDetail(station.check, station.contractPerNight), checkToggle(state, station.iata, station.check, changed));
+    outstations.append(row);
   }
-  nodes.push(list);
+  nodes.push(outstations);
   return nodes;
 }
 
-/**
- * Each station's mechanics' ratings: a chip per aircraft class, filled where
- * rated (click to drop), dashed where not (click to rate, with its price).
- */
-function buildRatings(state: SimState, changed: () => void): HTMLElement[] {
-  const nodes: HTMLElement[] = [
-    heading(
-      'Ratings',
-      `Mechanics are rated by aircraft class, like crews. Planes of an unrated class are treated like a night at an outstation, at a line base or a hangar. A station's first rating is free; each further class costs ${money(MX_RATING_FEE)} and ${money(MX_RATING_PER_DAY)} a day, so a mixed fleet costs more to maintain.`,
-    ),
-  ];
-  const list = document.createElement('div');
-  list.className = 'inspector-rows';
-  for (const entry of ops.mxRatingsReadout(state)) {
-    const row = linkToMap(document.createElement('div'), { kind: 'airport', iata: entry.iata });
-    row.className = 'inspector-row base-row';
-    const name = document.createElement('span');
-    name.textContent = `${entry.iata} · ${entry.name}`;
-    const chips = box('mx-ratings');
-    for (const classCode of entry.rated) {
-      const chip = document.createElement('button');
-      chip.type = 'button';
-      chip.className = 'mx-rating is-rated';
-      chip.style.setProperty('--puck', TYPE_COLOURS[classCode] ?? '#8ab4ff');
-      chip.append(planeIconElement(classCode), ` ${classCode}`);
-      const blocked = entry.dropBlocked[classCode];
-      chip.disabled = blocked !== null && blocked !== undefined;
-      chip.title = blocked ?? `Rated · click to drop`;
-      chip.addEventListener('click', () => {
-        ops.unrateStation(state, entry.iata, classCode);
+function checkDetail(check: 'contract' | 'defer', contractPerNight: number): HTMLElement {
+  const detail = document.createElement('span');
+  detail.className = 'inspector-row-detail';
+  detail.textContent = check === 'contract' ? `contracted · ${money(contractPerNight)}/night` : 'deferred · ● each night';
+  detail.classList.add(check === 'contract' ? 'is-contract' : 'is-deferred');
+  if (check === 'defer') detail.classList.add('is-warn');
+  return detail;
+}
+
+function checkToggle(state: SimState, iata: string, check: 'contract' | 'defer', changed: () => void): HTMLElement {
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'base-close';
+  toggle.textContent = check === 'contract' ? 'Defer' : 'Contract';
+  toggle.title = check === 'contract' ? `Defer ${iata}'s unchecked nights: no cost, a deferred item each night` : `Contract ${iata}'s unchecked nights: paid by the hour of work`;
+  toggle.addEventListener('click', () => {
+    ops.setStationCheck(state, iata, check === 'contract' ? 'defer' : 'contract');
+    changed();
+  });
+  return toggle;
+}
+
+const KIND_NAME = { line: 'line base', heavy: 'hangar' } as const;
+
+/** Open, close or level a station's line base or hangar, each through the confirm window. */
+function confirmBase(state: SimState, kind: 'line' | 'heavy', iata: string, action: 'open' | 'close' | 1 | -1, changed: () => void): void {
+  if (action === 'open' || action === 'close') {
+    const preview = ops.previewBaseChange(state, kind, action, iata);
+    showConfirm({
+      title: `${action === 'open' ? 'Open' : 'Close'} ${KIND_NAME[kind]} · ${iata}`,
+      rows: costRows(preview.fee, preview.kindPerDayBefore, preview.kindPerDayAfter, preview.cashAfter),
+      facts: preview.blocked ? [preview.blocked] : preview.facts,
+      confirmLabel: action === 'open' ? `Open · ${money(preview.fee)}` : 'Close base',
+      run: () => {
+        if (action === 'open') ops.openMxBaseAt(state, kind, iata);
+        else ops.closeMxBaseAt(state, kind, iata);
         changed();
-      });
-      chips.append(chip);
-    }
-    for (const option of entry.options) {
-      const chip = document.createElement('button');
-      chip.type = 'button';
-      chip.className = 'mx-rating';
-      chip.style.setProperty('--puck', TYPE_COLOURS[option.classCode] ?? '#8ab4ff');
-      chip.append('+ ', planeIconElement(option.classCode), ` ${option.classCode}`);
-      chip.disabled = option.blocked !== null;
-      chip.title = option.blocked ?? `Rate for ${option.classCode} · ${money(MX_RATING_FEE)}`;
-      chip.addEventListener('click', () => {
-        const preview = ops.previewMxRating(state, entry.iata, option.classCode);
-        showConfirm({
-          title: `Rate ${entry.iata} for ${option.classCode}`,
-          rows: costRows(preview.fee, preview.kindPerDayBefore, preview.kindPerDayAfter, preview.cashAfter),
-          facts: preview.blocked ? [preview.blocked] : preview.facts,
-          confirmLabel: `Rate · ${money(preview.fee)}`,
-          run: () => {
-            ops.rateStation(state, entry.iata, option.classCode);
-            changed();
-          },
-        });
-      });
-      chips.append(chip);
-    }
-    row.append(name, chips);
-    list.append(row);
+      },
+    });
+    return;
   }
-  nodes.push(list);
-  return nodes;
+  const preview = ops.previewMxLevel(state, kind, iata, action);
+  showConfirm({
+    title: `${action === 1 ? 'Raise' : 'Lower'} ${KIND_NAME[kind]} · ${iata}`,
+    rows: costRows(preview.fee, preview.kindPerDayBefore, preview.kindPerDayAfter, preview.cashAfter),
+    facts: preview.blocked ? [preview.blocked] : preview.facts,
+    confirmLabel: action === 1 ? `Raise · ${money(preview.fee)}` : 'Lower',
+    run: () => {
+      ops.changeMxLevel(state, kind, iata, action);
+      changed();
+    },
+  });
+}
+
+function smallButton(text: string, tip: string, blocked: string | null, run: () => void): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'base-close';
+  button.textContent = text;
+  button.disabled = blocked !== null;
+  button.title = blocked ?? tip;
+  button.addEventListener('click', run);
+  return button;
+}
+
+/** A station's line base or hangar: slots filled by tonight's use (red past full), − / + and ×; or a dashed button to open one. */
+function capacityRow(state: SimState, iata: string, kind: 'line' | 'heavy', base: LevelledBaseReadout | null, openFee: number, changed: () => void): HTMLElement {
+  const isLine = kind === 'line';
+  const row = box(`mx-station-row is-${kind}`);
+  const icon = glyph(isLine ? 'wrench' : 'hangar', isLine ? 'Line base' : 'Hangar');
+  if (!base) {
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'mx-station-open';
+    open.append(icon, ` + ${money(openFee)}`);
+    open.title = `Open a ${KIND_NAME[kind]} at ${iata} · ${money(openFee)}`;
+    open.addEventListener('click', () => confirmBase(state, kind, iata, 'open', changed));
+    row.append(open);
+    return row;
+  }
+  const unit = isLine ? 'checked tonight' : 'bays held';
+  const tip = `${isLine ? 'Line base' : 'Hangar'} L${base.level} · ${base.used}/${base.level} ${unit}${base.overflow > 0 ? ` · ${base.overflow} more rated plane${base.overflow === 1 ? '' : 's'} than slots, contracted` : ''}`;
+  const slots = box('mx-station-slots');
+  slots.append(icon, ' ', pips(base.used, base.level, tip, isLine ? 'wrench' : 'hangar'));
+  if (base.overflow > 0) slots.append(' ', pips(base.overflow, base.overflow, tip, 'warn'));
+  const count = document.createElement('span');
+  count.className = 'mx-station-count';
+  count.textContent = `${base.used}/${base.level}`;
+  if (base.overflow > 0) count.classList.add('is-over');
+  slots.append(' ', count);
+  slots.title = tip;
+  row.append(
+    slots,
+    smallButton('−', 'Level down', base.downBlocked, () => confirmBase(state, kind, iata, -1, changed)),
+    smallButton('+', `Level up · ${money(base.upFee)}`, base.upBlocked, () => confirmBase(state, kind, iata, 1, changed)),
+    smallButton('×', `Close the ${KIND_NAME[kind]}`, base.closeBlocked, () => confirmBase(state, kind, iata, 'close', changed)),
+  );
+  return row;
+}
+
+/** A class's rating chip: its plane in the class colour and its planes asleep here tonight. */
+function ratingChip(state: SimState, card: MxStationCard, entry: StationClassReadout, changed: () => void): HTMLElement {
+  const chip = document.createElement('button');
+  chip.type = 'button';
+  chip.className = 'mx-rating';
+  chip.style.setProperty('--puck', TYPE_COLOURS[entry.classCode] ?? '#8ab4ff');
+  const sleepers = entry.sleeping > 0 ? ` · ${entry.sleeping} asleep here tonight` : '';
+  const basedText = entry.based > 0 ? ` · ${entry.based} based` : '';
+  const short = entry.sleeping - entry.checked;
+  chip.append(planeIconElement(entry.classCode));
+  if (entry.rated) {
+    chip.classList.add('is-rated');
+    if (entry.sleeping > 0) chip.append(` ${entry.sleeping}`);
+    if (short > 0) chip.classList.add('is-short');
+    const shortText = short > 0 ? ` · ${short} over the line base, ${card.check === 'contract' ? `contracted ${money(entry.contractPerNight)}/night` : 'deferred'}` : '';
+    chip.title = entry.dropBlocked ?? `${entry.classCode} rated${sleepers}${shortText}${basedText} · tap to drop`;
+    chip.disabled = entry.dropBlocked !== null;
+    chip.addEventListener('click', () =>
+      showConfirm({
+        title: `Drop ${card.iata}'s ${entry.classCode} rating`,
+        rows: [],
+        facts: [
+          `Saves ${money(MX_RATING_PER_DAY)} a day; rating again costs ${money(MX_RATING_FEE)}.`,
+          ...(entry.sleeping > 0 ? [`${entry.sleeping} ${entry.classCode} asleep here tonight would be ${card.check === 'contract' ? 'contracted' : 'deferred'}.`] : []),
+        ],
+        confirmLabel: 'Drop rating',
+        run: () => {
+          ops.unrateStation(state, card.iata, entry.classCode);
+          changed();
+        },
+      }),
+    );
+    return chip;
+  }
+  if (entry.sleeping > 0) {
+    chip.classList.add('is-gap');
+    chip.append(` ${entry.sleeping}`);
+  } else {
+    chip.prepend('+');
+  }
+  // Rating only moves planes into the line base where it has slots left tonight.
+  const room = entry.sleeping > 0 && card.line && card.lineFree < entry.sleeping ? ` · line base has ${card.lineFree} slot${card.lineFree === 1 ? '' : 's'} left: raise it too` : '';
+  const cost = entry.sleeping > 0 ? ` · ${card.check === 'contract' ? `contracted ${money(entry.contractPerNight)}/night` : 'deferred'}` : '';
+  chip.title = entry.rateBlocked ?? `${entry.classCode} not rated${sleepers}${cost}${basedText}${room} · rate ${money(MX_RATING_FEE)} + ${money(MX_RATING_PER_DAY)}/day`;
+  chip.disabled = entry.rateBlocked !== null;
+  chip.addEventListener('click', () => {
+    const preview = ops.previewMxRating(state, card.iata, entry.classCode);
+    showConfirm({
+      title: `Rate ${card.iata} for ${entry.classCode}`,
+      rows: costRows(preview.fee, preview.kindPerDayBefore, preview.kindPerDayAfter, preview.cashAfter),
+      facts: preview.blocked ? [preview.blocked] : [...preview.facts, ...(room ? [card.lineFree === 0 ? `Line base ${card.line!.used}/${card.line!.level} tonight: full, so they stay ${card.check === 'contract' ? 'contracted' : 'deferred'} until it is raised.` : `Line base ${card.line!.used}/${card.line!.level} tonight: only ${card.lineFree} more can be checked in house until it is raised.`] : [])],
+      confirmLabel: `Rate · ${money(preview.fee)}`,
+      run: () => {
+        ops.rateStation(state, card.iata, entry.classCode);
+        changed();
+      },
+    });
+  });
+  return chip;
+}
+
+function stationCard(state: SimState, card: MxStationCard, lineFee: number, heavyFee: number, changed: () => void): HTMLElement {
+  const el = linkToMap(document.createElement('div'), { kind: 'airport', iata: card.iata });
+  el.className = 'mx-station';
+  if (card.classes.some((entry) => !entry.rated && entry.sleeping > 0) || (card.line?.overflow ?? 0) > 0) el.classList.add('is-warn');
+  const head = box('mx-station-head');
+  const name = document.createElement('button');
+  name.type = 'button';
+  name.className = 'inspector-link';
+  const code = document.createElement('b');
+  code.className = 'iata-plate';
+  code.textContent = card.iata;
+  name.append(code, ` ${card.name}`);
+  name.addEventListener('click', () => select({ kind: 'airport', iata: card.iata }));
+  const detail = document.createElement('span');
+  detail.className = 'inspector-row-detail';
+  const based = card.classes.reduce((total, entry) => total + entry.based, 0);
+  detail.append(glyph('plane', `${based} plane${based === 1 ? '' : 's'} based`), ` ${based} · ${card.perDay > 0 ? `${money(card.perDay)}/day` : 'free'}`);
+  head.append(name, detail);
+
+  const capacity = box('mx-station-capacity');
+  capacity.append(capacityRow(state, card.iata, 'line', card.line, lineFee, changed), capacityRow(state, card.iata, 'heavy', card.heavy, heavyFee, changed));
+
+  const chips = box('mx-ratings');
+  for (const entry of card.classes) chips.append(ratingChip(state, card, entry, changed));
+  el.append(head, capacity, chips);
+
+  if (card.unchecked > 0) {
+    const tonight = box('mx-station-tonight');
+    const what = document.createElement('span');
+    what.append(glyph('moon', `${card.unchecked} asleep here tonight not checked in house`), ` ${card.unchecked} · `);
+    tonight.append(what, checkDetail(card.check, card.contractPerNight), checkToggle(state, card.iata, card.check, changed));
+    el.append(tonight);
+  }
+  return el;
+}
+
+/** One picker for a new station: a line base or a hangar at any known airport without one. */
+function stationOpener(
+  state: SimState,
+  board: Set<string>,
+  lineReadout: { candidates: BaseCandidate[]; fee: number },
+  heavyReadout: { candidates: BaseCandidate[]; fee: number },
+  changed: () => void,
+): HTMLElement {
+  const lineCandidates = lineReadout.candidates;
+  const heavyCandidates = heavyReadout.candidates;
+  const opener = box('base-open');
+  const select_ = document.createElement('select');
+  select_.className = 'base-open-select';
+  const names = new Map([...lineCandidates, ...heavyCandidates].map((candidate) => [candidate.iata, candidate.name]));
+  for (const iata of [...names.keys()].filter((code) => !board.has(code)).sort()) {
+    const option = document.createElement('option');
+    option.value = iata;
+    option.textContent = `${iata} · ${names.get(iata)}`;
+    select_.append(option);
+  }
+  const buttons = (['line', 'heavy'] as const).map((kind) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'inspector-plan-hub';
+    button.append(glyph(kind === 'line' ? 'wrench' : 'hangar'), ` + ${money((kind === 'line' ? lineReadout : heavyReadout).fee)}`);
+    button.addEventListener('click', () => confirmBase(state, kind, select_.value, 'open', changed));
+    return { kind, button };
+  });
+  const refresh = () => {
+    for (const { kind, button } of buttons) {
+      const blocked = (kind === 'line' ? lineCandidates : heavyCandidates).find((candidate) => candidate.iata === select_.value)?.blocked ?? null;
+      button.disabled = select_.value === '' || blocked !== null;
+      button.title = blocked ?? `Open a ${KIND_NAME[kind]} at ${select_.value}`;
+    }
+  };
+  select_.addEventListener('change', refresh);
+  refresh();
+  opener.append(select_, ...buttons.map((entry) => entry.button));
+  return opener;
 }
 
 /** The spare engine pool: a row per class with its spares ready and a − / + to hold more. */

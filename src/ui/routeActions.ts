@@ -20,7 +20,7 @@ export {
   crewReadout,
   crewBaseReadout,
   mxBaseReadout,
-  mxRatingsReadout,
+  mxStationBoard,
   mxStationsReadout,
   previewBaseChange,
   appointExecutiveById,
