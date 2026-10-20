@@ -1,10 +1,8 @@
-import { powertrainMark } from '../powertrainMark';
 import { execNudge } from '../execNudge';
 import { nightStopCostPerNight, nightStopLegs } from '../../sim/nightStops';
-import { AIRCRAFT_CLASSES, classByCode, pluralClassName } from '../../sim/aircraftClasses';
+import { classByCode } from '../../sim/aircraftClasses';
 import { dayIndex } from '../../sim/clock';
 import { line, heading, lineWithInfo } from './dom';
-import { glyph } from '../glyphs';
 import { takeCallBlockFlash } from '../callAlert';
 import { gameDate, money } from '../format';
 import { aogFor, daysUntilReturn } from '../../sim/aog';
@@ -21,7 +19,7 @@ import { select, selectRoute } from '../selection';
 import { linkToMap } from '../mapLink';
 import { cashAfterRows, showConfirm } from '../confirmModal';
 import { REBASE_DAYS, REBASE_FEE_LEASE_DAYS } from '../../sim/rebase';
-import { describeLayout, layoutFor, layoutOf, planOfTarget, seatPlanOf, seatsOfType, type RefitTarget } from '../../sim/cabins';
+import { describeLayout, layoutFor, layoutOf, planOfTarget, seatsOfType, type RefitTarget } from '../../sim/cabins';
 import { showSeatMap } from '../seatMap';
 import { C_INTERVAL_CYCLES, C_INTERVAL_HOURS, DEFERRED_AGE_YEARS, deferredItems, HEAVY_INTERVAL_DAYS, heavyCheckDueIn, MX_HOLD_AT, tonightCheck } from '../../sim/mxChecks';
 import { delayIconsFor } from '../delayCodes';
@@ -84,11 +82,12 @@ export function aircraftLink(tail: string): HTMLButtonElement {
   return link;
 }
 
-/** Every plane the airline has, each a row opening its view. */
-/** Types whose rows are folded away in the Fleet list, by type code: remembered for the session. */
-const collapsedFleetTypes = new Set<string>();
-
-export function buildFleetView(state: SimState, changed: () => void): HTMLElement {
+/**
+ * The Fleet screen's head: the count and the leases, then leases on order.
+ * Every plane's row is its line on the Gantt below (ui/panels.ts), and
+ * hovering its tail shows planeTip().
+ */
+export function buildFleetView(state: SimState): HTMLElement {
   const root = document.createElement('div');
   root.className = 'inspector-view';
   const heading = title('Fleet');
@@ -96,7 +95,7 @@ export function buildFleetView(state: SimState, changed: () => void): HTMLElemen
   if (nudge) heading.append(nudge);
   root.append(heading);
 
-  if (state.aircraft.length === 0) {
+  if (state.aircraft.length === 0 && (state.inboundLeases ?? []).length === 0) {
     root.append(lineWithInfo('No aircraft', 'Tap an airport on the map and choose Plane to lease one.'));
     return root;
   }
@@ -104,94 +103,84 @@ export function buildFleetView(state: SimState, changed: () => void): HTMLElemen
   root.append(
     lineWithInfo(
       `${state.aircraft.length} aircraft · leases ${money(leases)}/day`,
-      'Each row: base · share of the usable day flown (over 100% cannot be flown) · OTP, arrivals on time of flown today · LF, load factor today · seat icon, the cabin (teal business, amber when a refit would pay; tap to refit). AOG is grounded by a fault. A dashed row is a lease on order, with its delivery day; ✦ is a delivery with no flights yet.',
+      'Each plane is a row of the Schedule below. Hover its tail (tap on a phone, tap again to open it) for its cabin, base, age, lease, today\'s OTP and load factor, and where it is. Beside the tail: AOG red, refit or ferry amber, ✦ a delivery with no flights yet, then its share of the usable day (red over 100%) and tonight\'s line check. A dashed row here is a lease on order, with its delivery day.',
     ),
   );
 
-  const list = document.createElement('div');
-  list.className = 'inspector-rows';
-  // Leases signed and not yet delivered, soonest first, above the fleet.
+  // Leases signed and not yet delivered, soonest first.
   const today = dayIndex(state);
-  for (const lease of [...(state.inboundLeases ?? [])].sort((a, b) => a.arrivesDay - b.arrivesDay)) {
-    const row = linkToMap(document.createElement('button'), { kind: 'airport', iata: lease.base });
-    row.type = 'button';
-    row.className = 'inspector-row is-inbound';
-    row.addEventListener('click', () => select({ kind: 'airport', iata: lease.base }));
-    const name = document.createElement('span');
-    name.append(planeIconElement(lease.typeCode), ` ${classByCode(lease.typeCode)?.name ?? lease.typeCode}`);
-    const detail = document.createElement('span');
-    detail.className = 'inspector-row-detail';
-    detail.textContent = `→ ${lease.base} · day ${lease.arrivesDay} · ${Math.max(0, lease.arrivesDay - today)}d`;
-    row.title = `On order: delivered at ${lease.base} on day ${lease.arrivesDay}; leased at ${money(lease.leasePricePerDay)}/day from then.`;
-    row.append(name, detail);
-    list.append(row);
-  }
-  // New deliveries with no flights yet come first, marked.
-  const newTails = new Set(state.aircraft.filter((a) => isNewDelivery(state, a)).map((a) => a.tail));
-  const ordered = [...state.aircraft.filter((a) => newTails.has(a.tail)), ...state.aircraft.filter((a) => !newTails.has(a.tail))];
-  // A phone's row has no room for the OTP count too: it wrapped, so rows changed height. The plane's own view has it.
-  const narrowScreen = window.matchMedia('(pointer: coarse)').matches;
-  for (const cls of AIRCRAFT_CLASSES) {
-    const planes = ordered.filter((a) => a.typeCode === cls.code);
-    if (planes.length === 0) continue;
-    const collapsed = collapsedFleetTypes.has(cls.code);
-    const header = document.createElement('button');
-    header.type = 'button';
-    header.className = 'fleet-group';
-    header.setAttribute('aria-expanded', String(!collapsed));
-    header.append(`${collapsed ? '▸' : '▾'} `, planeIconElement(cls.code), ` ${pluralClassName(cls.name)} ×${planes.length}`);
-    // A folded group still shows trouble inside it.
-    const down = planes.filter((a) => aogFor(state, a.tail)).length;
-    if (down > 0) {
-      const downEl = document.createElement('span');
-      downEl.className = 'inspector-row-detail is-over';
-      downEl.textContent = `AOG ${down}`;
-      header.append(downEl);
-    }
-    header.addEventListener('click', () => {
-      if (collapsedFleetTypes.has(cls.code)) collapsedFleetTypes.delete(cls.code);
-      else collapsedFleetTypes.add(cls.code);
-      changed();
-    });
-    list.append(header);
-    if (collapsed) continue;
-      for (const aircraft of planes) {
-      const use = aircraftUtilisation(state, aircraft.tail);
-      const { flown, onTime, loadFactor } = todayOnTime(state, aircraft.tail);
-      const row = linkToMap(document.createElement('button'), { kind: 'aircraft', tail: aircraft.tail });
+  const inbound = [...(state.inboundLeases ?? [])].sort((a, b) => a.arrivesDay - b.arrivesDay);
+  if (inbound.length > 0) {
+    const list = document.createElement('div');
+    list.className = 'inspector-rows';
+    for (const lease of inbound) {
+      const row = linkToMap(document.createElement('button'), { kind: 'airport', iata: lease.base });
       row.type = 'button';
-      row.className = 'inspector-row';
+      row.className = 'inspector-row is-inbound';
+      row.addEventListener('click', () => select({ kind: 'airport', iata: lease.base }));
       const name = document.createElement('span');
-      name.append(planeIconElement(aircraft.typeCode), ` ${aircraft.tail}`);
-      const mark = powertrainMark(aircraft);
-      if (mark) name.append(' ', mark);
+      name.append(planeIconElement(lease.typeCode), ` ${classByCode(lease.typeCode)?.name ?? lease.typeCode}`);
       const detail = document.createElement('span');
       detail.className = 'inspector-row-detail';
-      detail.textContent =
-        (aircraft.rebase ? `${aircraft.rebase.from}→${aircraft.rebase.to} day ${aircraft.rebase.arrivesDay}` : (aircraft.baseAirport ?? 'no base')) +
-        ` · ${Math.round(use.share * 100)}%` +
-        (flown > 0 && !narrowScreen ? ` · OTP ${onTime}/${flown}` : '') +
-        (loadFactor !== null ? ` · LF ${Math.round(loadFactor * 100)}%` : '') +
-        (aogFor(state, aircraft.tail) ? (aogFor(state, aircraft.tail)?.refitTo ? ' · refit' : ' · AOG') : aircraft.refitPending ? ' · refit tomorrow' : '') +
-        '';
-      if (aogFor(state, aircraft.tail) || use.share > 1) detail.classList.add('is-over');
-      const cabinMark = cabinMarkFor(state, aircraft.tail, changed);
-      if (cabinMark) name.append(cabinMark);
-      if (newTails.has(aircraft.tail)) {
-        const fresh = document.createElement('span');
-        fresh.className = 'fleet-new-mark';
-        fresh.textContent = '✦';
-        fresh.title = `Delivered day ${aircraft.deliveredDay} · no flights yet · lease charged. Draw a route from ${aircraft.baseAirport ?? 'its base'} to put it to work.`;
-        name.append(' ', fresh);
-        row.classList.add('is-new');
-      }
+      detail.textContent = `→ ${lease.base} · day ${lease.arrivesDay} · ${Math.max(0, lease.arrivesDay - today)}d`;
+      row.title = `On order: delivered at ${lease.base} on day ${lease.arrivesDay}; leased at ${money(lease.leasePricePerDay)}/day from then.`;
       row.append(name, detail);
-      row.addEventListener('click', () => select({ kind: 'aircraft', tail: aircraft.tail }));
       list.append(row);
     }
+    root.append(list);
   }
-  root.append(list);
   return root;
+}
+
+/**
+ * What a plane is doing out of the ordinary, as the short mark beside its
+ * tail on the Gantt: grounded, in refit, ferrying to a new base, going
+ * back to the lessor, or just delivered. Null when it is flying its day.
+ */
+export function planeStatus(state: SimState, tail: string): { text: string; tone: 'over' | 'warn' | 'new' } | null {
+  const aircraft = state.aircraft.find((a) => a.tail === tail);
+  if (!aircraft) return null;
+  const aog = aogFor(state, tail);
+  if (aog) return aog.refitTo ? { text: 'refit', tone: 'warn' } : { text: 'AOG', tone: 'over' };
+  if (aircraft.refitPending) return { text: 'refit', tone: 'warn' };
+  if (aircraft.rebase) return { text: `→${aircraft.rebase.to}`, tone: 'warn' };
+  if (aircraft.returningOnDay !== undefined) return { text: '↩', tone: 'warn' };
+  if (isNewDelivery(state, aircraft)) return { text: '✦', tone: 'new' };
+  return null;
+}
+
+/**
+ * A plane at a glance, one fact per line: the hover tip on its tail on the
+ * Gantt. Read live each time it shows, since the Gantt only rebuilds when
+ * the schedule changes.
+ */
+export function planeTip(state: SimState, tail: string): string {
+  const aircraft = state.aircraft.find((a) => a.tail === tail);
+  if (!aircraft) return tail;
+  const spec = classByCode(aircraft.typeCode);
+  const type = aircraft.powertrain === 'electric' ? 'Electric 25-seater' : aircraft.powertrain === 'hybrid' ? `Hybrid ${spec?.name ?? aircraft.typeCode}` : (spec?.name ?? aircraft.typeCode);
+  const lines = [`${tail} · ${type}`];
+  const cabin = seatsText(aircraft, spec?.seats);
+  const standing = ops.refitOptionFor(state, tail) ? (aircraft.ownCabin ? ' · own cabin' : ' · fleet standard') : '';
+  lines.push(`${cabin}${standing}` + (aircraft.refitPending ? ` · refit to ${targetText(aircraft.typeCode, aircraft.refitPending)} ordered` : ''));
+  const use = aircraftUtilisation(state, tail);
+  lines.push(`${aircraft.baseAirport ?? 'no base'} · ${Math.round(use.share * 100)}% of day · ${use.legs} legs`);
+  lines.push(`${aircraft.ageYears} yrs · lease ${money(aircraft.leaseCostPerDay)}/day`);
+  const { flown, onTime, loadFactor } = todayOnTime(state, tail);
+  if (flown > 0) lines.push(`Today OTP ${onTime}/${flown}` + (loadFactor !== null ? ` · LF ${Math.round(loadFactor * 100)}%` : ''));
+  const aog = aogFor(state, tail);
+  if (aog) {
+    const days = daysUntilReturn(state, aog);
+    lines.push(aog.refitTo ? `Refit · ${aog.base} · back ${days}d` : `AOG · ${aog.base} · ${aog.fault} · back ${days}d`);
+  } else if (aircraft.rebase) {
+    lines.push(`Ferrying ${aircraft.rebase.from}→${aircraft.rebase.to} · day ${aircraft.rebase.arrivesDay}`);
+  } else if (aircraft.returningOnDay !== undefined) {
+    lines.push(`Returning · gone day ${aircraft.returningOnDay}`);
+  } else {
+    lines.push(whereNow(state, tail));
+  }
+  if (isNewDelivery(state, aircraft)) lines.push(`✦ Delivered day ${aircraft.deliveredDay} · no flights yet`);
+  return lines.join('\n');
 }
 
 /**
@@ -500,45 +489,6 @@ function seatsText(aircraft: Parameters<typeof layoutOf>[0], seats: number | und
 function targetText(typeCode: string, target: RefitTarget): string {
   const seats = seatsOfType(typeCode);
   return describeLayout(layoutFor(seats, planOfTarget(target, seats)));
-}
-
-/**
- * The seat icon on a Fleet row: grey for an all-economy plane, teal with
- * J or W seats, amber when a refit would pay by the forecast, with the
- * seats and the forecast in the tip. Tapping it opens the seat map
- * (ui/seatMap.ts). A plane that can't be fitted (a Propeller) gets none.
- */
-function cabinMarkFor(state: SimState, tail: string, changed: () => void): HTMLElement | null {
-  const aircraft = state.aircraft.find((a) => a.tail === tail)!;
-  const option = ops.refitOptionFor(state, tail);
-  if (!option) return null;
-  const plan = seatPlanOf(aircraft);
-  const premium = plan.business > 0 || plan.premium > 0;
-  const sign = option.gainPerDay >= 0 ? '+' : '−';
-  const forecast = `${sign}${money(Math.abs(option.gainPerDay))}/day`;
-  const pays = option.blocked === null && option.gainPerDay > 0 && !aircraft.refitPending;
-  const seats = seatsOfType(aircraft.typeCode);
-  const tip = aircraft.refitPending
-    ? `Refit to ${targetText(aircraft.typeCode, aircraft.refitPending)} ordered · open the plane to call it off`
-    : `${describeLayout(layoutFor(seats, plan))} · ${option.to === 'business' ? 'business cabin' : 'all economy'} would be ${forecast} · tap for the seat map` + (option.blocked ? ` · ${option.blocked}` : '');
-  const mark = glyph('seat', tip, 'cabin-mark');
-  mark.classList.toggle('is-business', premium);
-  mark.classList.toggle('is-pays', pays);
-  mark.classList.toggle('is-pending', aircraft.refitPending !== undefined);
-  mark.setAttribute('role', 'button');
-  mark.tabIndex = 0;
-  const open = (event: Event) => {
-    event.stopPropagation();
-    if (!aircraft.refitPending) showSeatMap(state, tail, changed);
-  };
-  mark.addEventListener('click', open);
-  mark.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      open(event);
-    }
-  });
-  return mark;
 }
 
 /**

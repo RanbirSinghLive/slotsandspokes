@@ -1405,8 +1405,8 @@ Rivals, Goals), with Game at the foot. The detail views sit under
 | An airport | click its dot, or its row | presence, waiting riders, load, slots, a line per grounded plane (opening Maintenance), Plan hub, planes based there, and every market flown from it. Its crews are on the Crews screen only |
 | Maintenance | the rail (Mtc), an AOG line in the ticker or an airport | every AOG with its fault, days back, what it cancels and Expedite 1d; every plane's health by type, oldest first: age, tech dispatch, today's AOG chance, useful life left |
 | A route | click its line, or a market row | the route view: flights, demand, rivals, fare stances, pools, margin and on-time |
-| Fleet list | the rail, the map's fleet bars, or the breadcrumb from a plane | every aircraft: base, how much of its day it uses, on time today, AOG |
-| An aircraft | click it in flight on the map, its row in the Fleet list or timeline, or its tail in an airport's view | its specs and age (and what the age does to its delays), where it is now, how much of the day it uses, its whole day in order (flown legs with how late and why, passengers and margin; the one in the air; upcoming legs with projected lateness; cancelled ones), its rotations, and Return to lessor |
+| Fleet | the rail, the map's fleet bars, or the breadcrumb from a plane | the count and leases, leases on order, then every aircraft as its row of the Schedule: tail, AOG/refit/ferry/new mark, share of the day, tonight's check; hovering the tail (a tap on a phone, a second tap opens it) shows its cabin, base, age, lease, today's OTP and load factor, and where it is |
+| An aircraft | click it in flight on the map, its tail on the Fleet screen's Schedule, or its tail in an airport's view | its specs and age (and what the age does to its delays), where it is now, how much of the day it uses, its whole day in order (flown legs with how late and why, passengers and margin; the one in the air; upcoming legs with projected lateness; cancelled ones), its rotations, and Return to lessor |
 | Rivals list | the rail, "All" among the Rivals lens's chips, or the breadcrumb | a card per rival in reach, the ones on markets you fly first: generated logo tile, flag, a pip per plane coloured by class, a block per route (green earns, red loses, amber ring = you fly it too), estimated margin a day, a blue ★ chip naming its hubs (airports with 4 or more of its routes), and ⚔ / ⏱ counts. Chips at the top total them. Rivals you can't see yet stay as greyed locked cards with their flag. Every symbol has a tip (on tap on a phone); hovering or selecting a card marks its routes on the map |
 | A rival | its name anywhere in the panel, or its chip under the Rivals lens | logo, flag and fleet pips, estimated margin a day, five tiles (routes against the 20-route cap, flights a day, ★ hubs, ⚔ vs you, ⏱ losing), its network sketched small (green or red by margin, hubs ringed blue), and every route worst first: a margin bar, frequency, a fare gauge against the going rate and the days until it pulls out. Markets it closed recently are listed under that |
 
@@ -1616,7 +1616,11 @@ header ("▾ Regionals ×3 · 27% used") that folds the group away, and
 every rotation is a block in its **type's colour** (`TYPE_COLOURS`,
 `ui/planeIcons.ts`: Propeller teal, Regional orange, Narrowbody violet,
 Widebody rose), its flights solid inside it and labelled with where
-they land. Gaps are idle time. A yellow line marks now. Hovering a
+they land. Gaps are idle time. A yellow line marks now. The rows are the
+Fleet list too: beside each tail an AOG (red), refit or →base ferry
+(amber) or ✦ new delivery (teal) mark, its share of the day (red over
+100%) and tonight's check, and the tail's tip is the plane at a glance
+(`planeTip()` in `ui/inspector/aircraft.ts`, read live). Hovering a
 rotation shows its chain, window and share; clicking it opens its route;
 its × removes it (two clicks).
 
@@ -2558,7 +2562,7 @@ whole network (so a route since closed still counts for the days it
 flew). It's the headline under Completion in the Network view, and it
 shows in each route's view ("load factor 68% (204 passengers in 300
 seats, last 7 days)"), an airport's market list, a plane's rotations
-(its route's) and its day (each flight's own), the Fleet list (today's),
+(its route's) and its day (each flight's own), a plane's tip on the Schedule (today's),
 the On-time table, and the flight hover (the route's, since a flight's
 passengers are settled when it lands). Once a route has a load factor,
 its view drops the forecast "about half full for now" words. Below the
@@ -2970,9 +2974,8 @@ whose C check starts that morning goes in for the check and its refit
 waits. Mtc's Hangar shows a refit as a hatched bay.
 
 The plane's view shows its seats and a Seat map button under the seats and
-base line. Each Fleet row carries a seat icon (grey economy, teal with J or
-W seats, amber when the forecast pays); its tip gives the seats and the
-forecast, and tapping it opens the seat map (`ui/seatMap.ts`): the cabin
+base line, and the Product screen sets cabins by type; a plane's tail on
+the Schedule shows its seats in its tip. The seat map (`ui/seatMap.ts`): the cabin
 drawn seat by seat, J and W steppers (or a tap on a seat to move it up a
 class), the forecast, cost, days out and bay or contract for the plan, and
 above it who flies the markets the plane's type flies now

@@ -10,7 +10,7 @@
  * strip, on the side with room.
  */
 
-const TOUCH_TIP_MS = 2200;
+export const TOUCH_TIP_MS = 2200;
 
 export function setupMapToolTips(): void {
   const strip = document.querySelector<HTMLElement>('#map-tools');
