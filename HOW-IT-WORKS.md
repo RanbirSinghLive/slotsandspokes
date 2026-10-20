@@ -3534,8 +3534,9 @@ into service (EIS) needs `CREWS_PER_NEW_PLANE` crews on top of what the
 base's planes need today, against the crews on hand plus everything
 joining by that day. It's a read-out with no rules of its own.
 
-- **Next 30 days**: a strip with each EIS (✈, red if it would arrive
-  short), each batch joining (●) and each plane going back (↩).
+- **The pipeline link**: each EIS, each batch joining and each plane
+  going back are on the map's pipeline (see "The pipeline" below); a line
+  at the top of the screen opens it.
 - **To do**: every type whose next EIS would arrive short, with the last
   day a hire still joins in time ("Hire by day 29") or how late one would
   be, a button to hire the shortfall, and one to convert reserve crews of
@@ -3555,6 +3556,32 @@ with the plane's silhouette. Its hint shows the fee, the day the crew
 joins, crews rated and joining against need, and any shortfall at an EIS.
 One click hires one crew; hold for more. Converting and releasing crews
 stay on the Crews screen, where the whole roster is in view.
+
+## The pipeline (`src/ui/pipeline.ts`, read-out in `src/sim/pipeline.ts`)
+
+The bottom left of the map holds the next 30 days (`PIPELINE_DAYS`) of
+everything dated coming at the airline, on one axis from today, with a lane
+per department. `pipelineItems()` gathers it from the mechanics that own
+each thing; it has no rules of its own. Something overdue sits on today; a
+span (a plane out of service, a closure, an event) runs as a bar to its end.
+
+| Lane | Marks | Quick edits in the tip |
+| --- | --- | --- |
+| Mtc | C check (teal, amber in its booking window, red overdue, dashed when booked), D check (violet), a plane in its heavy check or AOG or refit, as a bar to the day it's back | induct or push a C check +1/+5/+15d, book or cancel a D check, expedite an AOG |
+| Fleet | a delivery (EIS; red with "−N" when it would arrive short of crews), a ferry to another base, a plane going back to the lessor or a seasonal lease ending | hire the crews a delivery is short |
+| Crews | a batch of crews joining (hired or converting) | |
+| Sales | a contract term ending, an offer or award lapsing, a tender being decided, a rival's takeover window closing, a mandate offer lapsing or a mandate running | |
+| Network | an airspace closure near the network (`closureIsRelevant()`), a demand event at an airport on the map, a station upgrade finishing | |
+
+Every tip also has a link to the screen that owns the item (Mtc, Crews,
+Contracts, the plane or the airport), and hovering a mark marks its plane or
+airport on the map. Marks that would overlap take a row of their own in
+their lane. The head folds the panel to one line with the count and the
+number of red items; the fold is remembered in the browser. On a desktop a
+tip shows on hover and a click pins it; on a touch screen a tap opens it and
+a second tap closes it. On a phone the panel opens from the clock button in
+the map tools, above the strip where the lens rows open, and a red dot on
+that button says something is red.
 
 ## Stranded planes (`src/sim/ferry.ts`)
 
@@ -3866,8 +3893,8 @@ A C check costs the plane its flying days. A fleet flown near capacity has no
 spare planes to take its flying, so its rotations are cancelled for the day:
 book checks into the quiet days, one plane at a time.
 
-**Tolerance.** Inside its window, tap a plane's puck on the "C checks due"
-axis to induct it (the booking above) or push the check later by 1, 5 or 15
+**Tolerance.** Inside its window, tap a plane's C mark on the map's pipeline
+to induct it (the booking above) or push the check later by 1, 5 or 15
 days (`applyHeavyTolerance()`, `heavyShiftDays`), so checks that fall together
 can be spread over the hangar. It is a soft gate. A push costs 0.5, 2 or 5
 times the check's contract price, and each earlier push on the same check
@@ -3963,10 +3990,9 @@ only when the money leaves moves. The Mtc card shows what is due.
   readouts. Planes are grouped by type, each group folding shut with its
   planes' lamps still showing. Above the board, a **Hangar** row has each hangar's bays in use, a bay
   for each plane in its heavy check (days until it's out) and a dashed bay
-  for each whose check window is open or overdue (the wrench books it), and **Heavy checks due**
-  puts every plane's due date on one 30-day axis so a bunching fleet
-  shows as a cluster. A plane whose D check falls due inside that
-  axis gets a violet D marker too (overdue ones at the left edge); Markers read "C P001" / "D P001". A D check also does the C check, so a plane's C marker dims when its D falls due first and goes once the D is booked. Tap a D marker to book the D check (or cancel the booking); `dBookBlocker()` says why it can't yet.
+  for each whose check window is open or overdue (the wrench books it). Under it a
+  line opens the map's **pipeline**, where every C and D check due in the next
+  30 days sits on one axis (see "The pipeline" below).
 - **The Gantt:** a key above the rows explains the night cell, and each
   plane's label carries tonight's check as the day is going ("☾✓" checked,
   "☾2" not due for 2 nights, "☾−40m" short, "☾✗" due and missed). The plane's own view says the same in words

@@ -39,16 +39,18 @@ function linkedFrom(node: EventTarget | null): Selection | null {
 }
 
 export function setupMapLinks(changed: () => void): void {
-  const panel = document.querySelector('#panel')!;
-  panel.addEventListener('mouseover', (event) => {
-    const next = linkedFrom(event.target);
-    if (next === hovered) return;
-    hovered = next;
-    changed();
-  });
-  panel.addEventListener('mouseleave', () => {
-    if (hovered === null) return;
-    hovered = null;
-    changed();
-  });
+  // The side panel, and the pipeline over the map (ui/pipeline.ts).
+  for (const area of document.querySelectorAll('#panel, #pipeline')) {
+    area.addEventListener('mouseover', (event) => {
+      const next = linkedFrom(event.target);
+      if (next === hovered) return;
+      hovered = next;
+      changed();
+    });
+    area.addEventListener('mouseleave', () => {
+      if (hovered === null) return;
+      hovered = null;
+      changed();
+    });
+  }
 }
