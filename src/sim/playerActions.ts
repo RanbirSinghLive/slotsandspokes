@@ -1,3 +1,4 @@
+import { aogChance, ENGINE_FAULT_SHARE } from './aog';
 import { dayIndex } from './clock';
 import {
   closeCrewBase as closeCrewBaseRule,
@@ -106,7 +107,7 @@ import { cashNeededToLease, LEASE_RESERVE_DAYS, loadLeaseRates } from './leasing
 import { inboundAt, orderLease } from './fleetTiming';
 import { startSeatSale as startSeatSaleRule } from './seatSale';
 import { SEASON_DAYS, SEASONAL_PREMIUM } from './seasonalLease';
-import { changeSpareEngines as changeSpareEnginesRule, holdPerDay, shopVisitCost, sparesHeld, sparesReady } from './enginePool';
+import { changeSpareEngines as changeSpareEnginesRule, type EngineBook, type EngineSupport, engineBook, engineSupport, ENGINE_WAIT_DAYS, holdPerDay, pbhPerHour, setEngineSupport as setEngineSupportRule, shopVisitCost, sparesHeld, sparesReady } from './enginePool';
 import { aBankedMinutes, aCheckOpen, aCheckProgress, aCheckWorkMinutes, cyclesSinceHeavy, deferredItems, flightHoursSinceHeavy, heavyBankedMinutes, maintenanceReserve, heavyCheckDueIn, canBookHeavyCheck, heavyBookBlocker, applyHeavyTolerance, heavyToleranceBlocker, heavyToleranceCost, heavyShiftOf, toleranceCapDays, toleranceWearYears, TOLERANCE_STEPS, canBookDCheck, dBookBlocker, dCheckDueIn, dCheckOpen, flightHoursSinceD, heavyCheckOpen, heavyCheckWorkMinutes, holdsBay, freeHeavyBays, tonightCheck } from './mxChecks';
 import { rebaseOptions, rebasePlane, type RebaseOption } from './rebase';
 import { bestTypeSeatPlan, deleteCabinTemplate as deleteCabinTemplateRule, fleetCabinOf, fleetCabinStatus, followFleetCabin as followFleetCabinRule, renameCabinTemplate as renameCabinTemplateRule, saveCabinTemplate as saveCabinTemplateRule, setFleetCabin as setFleetCabinRule, templatesFor, typeCabinGainPerDay, type FleetCabinStatus } from './fleetCabins';
@@ -810,18 +811,51 @@ export function bookHeavyCheck(state: SimState, tail: string): Outcome<{ message
   return { ok: true, message: `${tail} booked for its C check tomorrow.` };
 }
 
-export type EngineReadout = { classCode: string; held: number; ready: number; perDay: number; shopVisit: number };
+export type EngineReadout = {
+  classCode: string;
+  plan: EngineSupport;
+  planes: number;
+  held: number;
+  ready: number;
+  perDay: number;
+  shopVisit: number;
+  pbhPerHour: number;
+  /** Flight hours a day the class's schedule flies, for the power-by-the-hour fee. */
+  hoursPerDay: number;
+  /** Engine faults the class can expect a year at today's breakdown chances. */
+  faultsPerYear: number;
+  waitDays: number;
+  book: EngineBook | null;
+};
 
-/** The spare engine pool by class, for the classes in the fleet or holding spares (sim/enginePool.ts). */
+/** Engine support by class, for the classes in the fleet or holding spares (sim/enginePool.ts). */
 export function engineReadouts(state: SimState): EngineReadout[] {
   const classes = new Set([...state.aircraft.map((aircraft) => aircraft.typeCode), ...Object.keys(state.enginePool?.spares ?? {})]);
-  return AIRCRAFT_CLASSES.filter((cls) => classes.has(cls.code)).map((cls) => ({
-    classCode: cls.code,
-    held: sparesHeld(state, cls.code),
-    ready: sparesReady(state, cls.code),
-    perDay: holdPerDay(cls.code),
-    shopVisit: shopVisitCost(cls.code),
-  }));
+  const typeByTail = new Map(state.aircraft.map((aircraft) => [aircraft.tail, aircraft.typeCode]));
+  return AIRCRAFT_CLASSES.filter((cls) => classes.has(cls.code)).map((cls) => {
+    const planes = state.aircraft.filter((aircraft) => aircraft.typeCode === cls.code);
+    const minutes = state.schedule.filter((leg) => typeByTail.get(leg.tail) === cls.code).reduce((total, leg) => total + leg.blockMinutes, 0);
+    // One fault in ENGINE_FAULT_SHARE is the engine (sim/aog.ts).
+    const faultsPerYear = planes.reduce((total, aircraft) => total + aogChance(state, aircraft), 0) * ENGINE_FAULT_SHARE * 365;
+    return {
+      classCode: cls.code,
+      plan: engineSupport(state, cls.code),
+      planes: planes.length,
+      held: sparesHeld(state, cls.code),
+      ready: sparesReady(state, cls.code),
+      perDay: holdPerDay(cls.code),
+      shopVisit: shopVisitCost(cls.code),
+      pbhPerHour: pbhPerHour(cls.code),
+      hoursPerDay: minutes / 60,
+      faultsPerYear,
+      waitDays: ENGINE_WAIT_DAYS,
+      book: engineBook(state, cls.code) ?? null,
+    };
+  });
+}
+
+export function setEngineSupport(state: SimState, classCode: string, plan: EngineSupport): Outcome<{ message: string }> {
+  return setEngineSupportRule(state, classCode, plan);
 }
 
 export function changeSpareEngines(state: SimState, classCode: string, delta: 1 | -1): Outcome<{ message: string }> {

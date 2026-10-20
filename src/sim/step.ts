@@ -1,7 +1,7 @@
 import { rollStandingOrders } from './standingOrders';
 import { endSeasonalLeases } from './seasonalLease';
 import { demandFactors, rollDailyDemandEvents } from './demandEvents';
-import { accrueMaintenance, levelWear, morningHolds, recordFlown, rollNightlyChecks, wornAge } from './mxChecks';
+import { accrueMaintenance, chargeMaintenance, levelWear, morningHolds, recordFlown, rollNightlyChecks, wornAge } from './mxChecks';
 import { chargeNightStops } from './nightStops';
 import { applyPendingRetimes } from './retime';
 import { rollDailyFareWars } from './fareWars';
@@ -37,6 +37,7 @@ import { handlingParameters, recordStationDeparture, rollDailyMoats, rollDailySt
 import { addTally, emptyTally } from './fareClasses';
 import { networkOverheadPerDay } from './overhead';
 import { basesCostPerDay } from './bases';
+import { powerByHourFee } from './enginePool';
 import { rollDailyMarketDemand, actualDailyDemand } from './marketDemand';
 import { revealReach } from './reach';
 import { cabinCover, FATIGUE_DELAY_MULTIPLIER, legFatigue, rollDailyCrews } from './crews';
@@ -619,6 +620,9 @@ export function step(state: SimState): void {
       startRefitOnLanding(state, aircraft);
       // Ground delay is part of the arrival time but is not time in the air.
       recordFlown(aircraft, flight.arriveMinute - flight.departMinute - flight.delayMinutes);
+      // Engines on power by the hour pay by the airborne hour (sim/enginePool.ts), under maintenance.
+      const powerByHour = powerByHourFee(state, aircraft.typeCode, flight.arriveMinute - flight.departMinute - flight.delayMinutes);
+      if (powerByHour > 0) chargeMaintenance(state, powerByHour);
 
       const type = aircraftTypesByCode.get(aircraft.typeCode);
       if (type) {

@@ -60,6 +60,7 @@ export {
   bookDCheck,
   engineReadouts,
   changeSpareEngines,
+  setEngineSupport,
   cancelBookedDCheck,
   previewDCheckBooking,
   previewHeavyCheckBooking,

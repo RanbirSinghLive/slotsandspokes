@@ -1,5 +1,5 @@
 import { ancillaryLevel, extraOn, feeLevelOn, isContested, type ExtraId } from '../sim/ancillaries';
-import { MAX_SPARE_ENGINES, sparesHeld } from '../sim/enginePool';
+import { engineSupport, MAX_SPARE_ENGINES, sparesHeld } from '../sim/enginePool';
 import { DIFFICULTIES, type GameDifficulty } from '../sim/difficulty';
 import { currentPotentialDemand } from '../sim/marketDemand';
 import { marketLoadFactor } from '../sim/loadFactor';
@@ -1393,6 +1393,7 @@ function keepStations(state: SimState): string[] {
  */
 const HANGAR_PLANES_PER_BAY = 4;
 const ENGINE_SPARE_PER_PLANES = 6;
+const ENGINE_PBH_FROM_PLANES = 2;
 
 function keepMaintenance(state: SimState): string[] {
   const log: string[] = [];
@@ -1420,10 +1421,20 @@ function keepMaintenance(state: SimState): string[] {
       }
     }
   }
-  // One spare engine for each ENGINE_SPARE_PER_PLANES planes of a class, so a fleet that breaks engines often doesn't wait on the lease market.
+  // Engine support by fleet size: a couple of planes ride power by the hour,
+  // a fleet of ENGINE_SPARE_PER_PLANES or more holds a spare for each that many,
+  // and a lone plane takes its chances on the lease market.
   for (const cls of AIRCRAFT_CLASSES) {
-    const wanted = Math.floor(state.aircraft.filter((aircraft) => aircraft.typeCode === cls.code).length / ENGINE_SPARE_PER_PLANES);
-    while (sparesHeld(state, cls.code) < Math.min(wanted, MAX_SPARE_ENGINES)) {
+    const planes = state.aircraft.filter((aircraft) => aircraft.typeCode === cls.code).length;
+    if (planes === 0) continue;
+    const plan = planes >= ENGINE_SPARE_PER_PLANES ? 'pool' : planes >= ENGINE_PBH_FROM_PLANES ? 'pbh' : 'adhoc';
+    if (engineSupport(state, cls.code) !== plan) {
+      const set = actions.setEngineSupport(state, cls.code, plan);
+      if (set.ok) log.push(set.message);
+    }
+    if (plan !== 'pool') continue;
+    const wanted = Math.min(Math.floor(planes / ENGINE_SPARE_PER_PLANES), MAX_SPARE_ENGINES);
+    while (sparesHeld(state, cls.code) < wanted) {
       const added = actions.changeSpareEngines(state, cls.code, 1);
       if (!added.ok) break;
       log.push(added.message);

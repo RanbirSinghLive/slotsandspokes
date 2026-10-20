@@ -3862,16 +3862,34 @@ it. A plane past due wears like 2 more years of age (`D_WEAR_YEARS`, in
 starts staggered by tail, at least 120 days from due, its hours clock with it.
 The headless player never books, so its planes wear past due.
 
-**Spare engines** (`src/sim/enginePool.ts`, the Engines section of the Mtc
-screen). An AOG whose fault is an engine leaves the plane waiting 4 days more
-for a lease engine. A spare of the plane's class in the pool swaps in at once:
-the plane is back the next morning, and the pulled engine goes to the shop for
-20 days, paid then (40 days of the spare's holding cost), before it rejoins the
-pool. Each spare costs its holding cost a day, on the shelf or in the shop
-(Propeller $60, Regional $150, Narrowbody $350, Widebody $750), under
-maintenance (scaled by the heavy maintenance director), up to 3 a class and only for a class in the fleet. Spares are
-given back only when on the shelf. The headless player holds one per 6 planes
-of a class.
+**Engine support** (`src/sim/enginePool.ts`, the Engines section of the Mtc
+screen). One breakdown in eight (`ENGINE_FAULT_SHARE` in `sim/aog.ts`) is an
+engine, and each aircraft class is on one of three plans for it:
+- **Ad hoc** (the default for a class with no spares): nothing paid until a
+  fault, then the plane waits 4 days more for a lease engine.
+- **Own spares**: spares of the class (up to 3) cost a holding fee a day, on the
+  shelf or in the shop (Propeller $60, Regional $150, Narrowbody $350,
+  Widebody $750, under maintenance, scaled by the heavy maintenance director).
+  A fault swaps one in and the plane is back the next morning; the pulled
+  engine goes to the shop for 20 days, paid then (40 days of holding cost),
+  and rejoins the pool. Choosing it holds one spare; spares are given back
+  only from the shelf.
+- **Power by the hour** (PBH): a fee on every airborne hour the class flies
+  (Propeller $3, Regional $7, Narrowbody $15, Widebody $32), charged on
+  landing under maintenance. A fault is back the next morning with no shop
+  bill. It costs what a spare does at two or three planes, so it suits a
+  small fleet and gets dear for a big one.
+
+Leaving own spares gives the shelf spares back at once and the ones in the
+shop when they are done. Each class keeps a book since its plan was last set:
+engine faults, plane-days saved (or waited on a lease engine), money spent
+(holding, shop visits, PBH fees), and a net that values each saved or waited
+day at the plane's margin a day when it failed (an estimate: other planes
+covering its flying make the real loss smaller). The Mtc card shows each
+plan's cost a day for that class (PBH from the scheduled flight hours) and
+the faults a year to expect at today's breakdown chances. The headless player
+leaves a lone plane ad hoc, puts 2 to 5 planes of a class on PBH, and from 6
+holds one spare per 6.
 
 **Usage clocks.** Each landed flight adds its airborne minutes (ground delay
 excluded) and one cycle to the plane (`recordFlown()`), counted since the last
