@@ -7640,7 +7640,7 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
 #pipeline {
   position: absolute;
   left: 12px;
-  bottom: 40px;
+  bottom: var(--pipeline-bottom);
   width: min(400px, max(260px, calc(100cqw - 360px)));
   padding: 6px 10px 8px;
   box-sizing: border-box;
@@ -7863,10 +7863,19 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
   background: #ff8080;
 }
 
+/* Above the ticker; above the brief's minimized tabs too while they show (they sit in the same corner, ui/briefWindow.ts). */
+:root {
+  --pipeline-bottom: 40px;
+}
+
+:root:has(#brief-tabs:not([hidden])) {
+  --pipeline-bottom: 78px;
+}
+
 /* A narrow map moves the lens key to the bottom left: above the pipeline. */
 @container (max-width: 880px) {
   #lens-corner {
-    bottom: calc(48px + var(--pipeline-height, 0px));
+    bottom: calc(var(--pipeline-bottom) + 8px + var(--pipeline-height, 0px));
   }
 }
 
