@@ -26,6 +26,7 @@ import { money as pnlMoney } from '../pnlBars';
 import { buildPoolRows } from '../poolBars';
 import * as ops from '../routeActions';
 import { select } from '../selection';
+import { costRows, showConfirm } from '../confirmModal';
 import { aircraftLink } from './aircraft';
 import { linkToMap } from '../mapLink';
 import { airportRightsMark } from './rights';
@@ -83,17 +84,17 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
     );
   }
 
-  // Bases here (sim/bases.ts): opened on the Crews and Mtc screens.
+  // Bases here (sim/bases.ts): the crew base opens and closes here, maintenance bases on the Mtc screen.
   const crewBase = hasCrewBase(state, iata);
   const lineLevel = mxLevel(state, 'line', iata);
   const heavyLevel = mxLevel(state, 'heavy', iata);
   const mtcText = [lineLevel > 0 ? `line L${lineLevel}` : 'no line base', heavyLevel > 0 ? `hangar L${heavyLevel}` : 'no hangar'].join(' · ');
-  root.append(
-    lineWithInfo(
-      [crewBase ? 'Crew base' : 'No crew base', mtcText].join(' · '),
-      'A crew base is where planes can be leased and based (open one on the Crews screen). A line base checks as many planes a night as its level; a hangar has a bay for each level and is where C and D checks are done (the Mtc screen). A plane needs a line check every 5 nights; due one where there is no line base, a full one, or a type its mechanics aren\'t rated for, it misses it and gets a deferred item.',
-    ),
+  const basesLine = lineWithInfo(
+    [crewBase ? 'Crew base' : 'No crew base', mtcText].join(' · '),
+    'A crew base is where crews live and planes can be leased and based: open or close one here, or from the airport\'s menu on the map. A line base checks as many planes a night as its level; a hangar has a bay for each level and is where C and D checks are done (the Mtc screen). A plane needs a line check every 5 nights; due one where there is no line base, a full one, or a type its mechanics aren\'t rated for, it misses it and gets a deferred item.',
   );
+  basesLine.append(' ', crewBaseButton(state, iata, crewBase, changed));
+  root.append(basesLine);
 
   root.append(...stationSection(state, iata, changed));
 
@@ -391,4 +392,35 @@ function marketRows(state: SimState, iata: string): HTMLElement {
     list.append(row);
   }
   return list;
+}
+
+/**
+ * Open a crew base here, or close it: the same confirm as the map menu's,
+ * greyed with the reason when the rules say no (home, planes or crews still
+ * here, cash short, an airport the airline has no rights at).
+ */
+function crewBaseButton(state: SimState, iata: string, exists: boolean, changed: () => void): HTMLButtonElement {
+  const action = exists ? 'close' : 'open';
+  const preview = ops.previewBaseChange(state, 'crew', action, iata);
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = exists ? 'base-close' : 'inspector-plan-hub';
+  button.textContent = exists ? 'Close' : `Open · ${money(preview.fee)}`;
+  button.disabled = preview.blocked !== null;
+  button.dataset.tip = preview.blocked ?? (exists ? `Close crew base · saves ${money(preview.perDay)}/day` : `Open crew base · ${money(preview.fee)} + ${money(preview.perDay)}/day`);
+  button.setAttribute('aria-label', button.dataset.tip);
+  button.addEventListener('click', () => {
+    showConfirm({
+      title: `${exists ? 'Close' : 'Open'} crew base · ${iata}`,
+      rows: costRows(preview.fee, preview.kindPerDayBefore, preview.kindPerDayAfter, preview.cashAfter),
+      facts: preview.facts,
+      confirmLabel: exists ? 'Close base' : `Open · ${money(preview.fee)}`,
+      run: () => {
+        if (exists) ops.closeCrewBaseAt(state, iata);
+        else ops.openCrewBaseAt(state, iata);
+        changed();
+      },
+    });
+  });
+  return button;
 }

@@ -369,9 +369,10 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
   });
   crewChoices.push(...cabinCrewChoices, ...lockedChoices);
 
-  // Create base: one entry, then crew, line base or hangar. Each opens the same
-  // confirm the Crews and Mtc screens use (fee, running cost, cash after).
+  // Bases: one entry, then crew, line base or hangar. Each opens the same
+  // confirm the airport panel and Mtc screen use (fee, running cost, cash after).
   const baseChoice = (kind: 'crew' | 'line' | 'heavy'): RadialAction => {
+    if (kind === 'crew' && hasCrewBase(state, airport.iata)) return closeCrewBaseChoice();
     const exists = kind === 'crew' ? hasCrewBase(state, airport.iata) : mxLevel(state, kind, airport.iata) > 0;
     const word = kind === 'crew' ? 'crew' : kind === 'line' ? 'line' : 'hangar';
     const preview = ops.previewBaseChange(state, kind, 'open', airport.iata);
@@ -392,6 +393,33 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
           confirmLabel: `Open · ${money(preview.fee)}`,
           run: () => {
             const result = kind === 'crew' ? ops.openCrewBaseAt(state, airport.iata) : ops.openMxBaseAt(state, kind, airport.iata);
+            notice = result.ok ? result.message : result.reason;
+            refresh();
+          },
+        });
+        return false;
+      },
+    };
+  };
+
+  // A crew base closes here too, so the map is the one place crew bases come and go; the rules grey it out at home or with planes or crews still here.
+  const closeCrewBaseChoice = (): RadialAction => {
+    const preview = ops.previewBaseChange(state, 'crew', 'close', airport.iata);
+    return {
+      id: 'base:crew',
+      label: `Close crew base · saves ${money(preview.perDay)}/day`,
+      icon: ICON.crew,
+      large: true,
+      angleDeg: 0,
+      disabledReason: preview.blocked ?? undefined,
+      onSelect: () => {
+        showConfirm({
+          title: `Close crew base · ${airport.iata}`,
+          rows: costRows(preview.fee, preview.kindPerDayBefore, preview.kindPerDayAfter, preview.cashAfter),
+          facts: preview.facts,
+          confirmLabel: 'Close base',
+          run: () => {
+            const result = ops.closeCrewBaseAt(state, airport.iata);
             notice = result.ok ? result.message : result.reason;
             refresh();
           },
@@ -501,10 +529,9 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
     },
     {
       id: 'base',
-      label: `Create base at ${airport.iata} · crew, line, hangar or charger`,
+      label: `Bases at ${airport.iata} · open or close a crew base, open a line base, hangar or charger`,
       icon: ICON.base,
       angleDeg: 60,
-      disabledReason: hasCrewBase(state, airport.iata) && mxLevel(state, 'line', airport.iata) > 0 && mxLevel(state, 'heavy', airport.iata) > 0 && ops.chargerReadout(state, airport.iata).built ? `${airport.iata} has a crew base, a line base, a hangar and a charger` : undefined,
       children: [baseChoice('crew'), baseChoice('line'), baseChoice('heavy'), chargerChoice()],
     },
     {

@@ -8030,3 +8030,74 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
   display: none;
 }
 
+
+/* Crews screen: the Bases & hiring | Pairings switch, and the folding headers of its sections. */
+.crews-view {
+  display: flex;
+  margin: 4px 0 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.crews-view button {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: #8a93a6;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.crews-view button + button {
+  border-left: 1px solid rgba(255, 255, 255, 0.18);
+}
+.crews-view button.is-active {
+  background: #252b3a;
+  color: #fff;
+}
+.crews-view svg {
+  width: 14px;
+  height: 14px;
+}
+.crew-fold {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #c8d0e0;
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  min-width: 0;
+}
+.crew-fold svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.crew-fold-detail {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 400;
+  color: #8a93a6;
+  white-space: nowrap;
+}
+.crew-base-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.crew-base-head .crew-base-map {
+  flex: none;
+  line-height: 0;
+}

@@ -3419,7 +3419,7 @@ never met a newcomer on its own routes.
 Crews live at **crew bases**, the airports where the airline bases
 planes, and each is **rated for one aircraft class**: Propeller crews fly
 only Propellers. Home starts with 2 Propeller crews, enough for the
-starting plane. A new base is opened deliberately, on the Crews screen
+starting plane. A new base is opened deliberately, from its airport on the map
 (see Bases), with no crews; planes can be leased or based only at one.
 
 **Each day, at rollover** (`rollDailyCrews()`), hires and retraining
@@ -3572,7 +3572,9 @@ complexity; their hire buttons are disabled.
 
 ## The crew planning board (`src/ui/inspector/crews.ts`, read-out in `src/sim/crewPlan.ts`)
 
-The Crews screen reads like a crew planner's board. `crewPlan()` counts,
+The Crews screen reads like a crew planner's board, with a switch at the
+top between **Bases & hiring** (the default) and **Pairings**; the browser
+remembers which was open. `crewPlan()` counts,
 for each base and type rating, the crews on hand, each batch joining
 (hired or converted, with its day), and each plane on its way: its entry
 into service (EIS) needs `CREWS_PER_NEW_PLANE` crews on top of what the
@@ -3586,11 +3588,19 @@ joining by that day. It's a read-out with no rules of its own.
   day a hire still joins in time ("Hire by day 29") or how late one would
   be, a button to hire the shortfall, and one to convert reserve crews of
   another type at the base.
-- **Roster**: per base, per type, a bar of crews on hand (solid) and
+- **Roster**: one folding section per crew base (its header keeps crews,
+  planes based, the crew room's cost and the worst SHORT or TIGHT chip
+  when folded, and a pin to the airport, where bases open and close);
+  inside, per type, a bar of crews on hand (solid) and
   joining (hatched) against marks for the legal minimum (red), the
   comfortable number for 8-hour shifts (white) and the need at EIS
   (amber), with a chip: SHORT, SHORT AT EIS, TIGHT, OK or RESERVE +N.
-  Hire, Convert and Release beside it.
+  Hire, Convert and Release beside it. A base with no crews yet has a
+  hire button per open type.
+
+The Pairings side folds by aircraft type, each header carrying planes,
+crews, the share of duty spent flying and night pairings, with a block per
+crew base inside. Which sections are folded is remembered in the browser.
 
 The Crews dot on the rail lights amber when an inbound plane would enter
 service short, as well as red when a class is short today.
@@ -3651,7 +3661,7 @@ base and a hangar from the start, inside the starting cost.
 |---|---|---|---|
 | What it is | Where crews live; the only places planes can be leased or based | Where line checks are done, one a plane every 5 nights | Where C and D checks are done |
 | Level | none | planes checked a night | bays: planes in a C or D check at once |
-| Opened on | the Crews screen, or the map ring's Create base | the Mtc screen, or the map ring's Create base | the Mtc screen, or the map ring's Create base |
+| Opened on | the airport panel, or the map ring's Bases (which also closes it) | the Mtc screen, or the map ring's Bases | the Mtc screen, or the map ring's Bases |
 | Open | $100,000, then $500/day | $150,000, then $100/day a level | $400,000, then $300/day a level |
 | Each level above 1 | n/a | $25,000 | $100,000 |
 | Closes | when no planes are based there and its crews are released | any time away from home | any time away from home |

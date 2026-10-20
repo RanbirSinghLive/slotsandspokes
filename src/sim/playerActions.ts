@@ -563,7 +563,7 @@ function planeOption(state: SimState, iata: string, typeCode: string, powertrain
     disabledReason = `No ${cls.name} on the market. The next arrives in ${days(daysUntilNextListing(state, typeCode))}, first come first served.`;
   } else if (!hasCrewBase(state, iata)) {
     // Planes are based only where crews live (sim/bases.ts).
-    disabledReason = `No crew base at ${iata}: open one on the Crews tab.`;
+    disabledReason = `No crew base at ${iata}: open one from its airport on the map.`;
   } else if (powertrain === 'electric' && !hasCharger(state, iata)) {
     disabledReason = `No charger at ${iata}: build one in the airport view.`;
   } else if (state.cash < cashNeededToLease(Math.min(...choices.map((c) => c.leasePricePerDay)))) {
