@@ -1,5 +1,3 @@
-import { contractCost, lineRated, outstationCheck } from './bases';
-import { lineCheckMinutes } from './mxChecks';
 import type { ScheduleLeg } from './schedule';
 import type { Aircraft, SimState } from './state';
 import { scheduledTurnMinutes, USABLE_DAY_END_MINUTE, USABLE_DAY_START_MINUTE, wrappedLongHaul } from './utilisation';
@@ -22,8 +20,9 @@ import { scheduledTurnMinutes, USABLE_DAY_END_MINUTE, USABLE_DAY_START_MINUTE, w
  * last arrival and land WRAP_SLACK_MINUTES before the curfew.
  *
  * **What a night there costs:** the crew's hotel (HOTEL_PER_CREW for each
- * crew the plane flies with), and the line check by sim/bases.ts's rule:
- * free at a maintenance base, contracted or deferred anywhere else.
+ * crew the plane flies with). Its line check only happens at a line base
+ * (sim/mxChecks.ts), so a plane that night-stops where there is none
+ * misses every check it's due.
  *
  * **When it breaks** (the flight out cancelled, or held by the curfew),
  * the plane sleeps at base and the morning flight from the station is
@@ -63,10 +62,9 @@ export function hotelPerNight(state: SimState, aircraft: Aircraft): number {
   return (HOTEL_PER_CREW[aircraft.typeCode] ?? HOTEL_PER_CREW.PROP) * crews;
 }
 
-/** A night at the station: the hotel, and the check where it's contracted. */
-export function nightStopCostPerNight(state: SimState, aircraft: Aircraft, station: string): number {
-  const check = !lineRated(state, station, aircraft.typeCode) && outstationCheck(state, station) === 'contract' ? contractCost(lineCheckMinutes(state, aircraft)) : 0;
-  return hotelPerNight(state, aircraft) + check;
+/** A night at the station: the hotel. (Its line check is done back at a line base, sim/mxChecks.ts.) */
+export function nightStopCostPerNight(state: SimState, aircraft: Aircraft, _station: string): number {
+  return hotelPerNight(state, aircraft);
 }
 
 /**

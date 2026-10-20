@@ -27,14 +27,12 @@ import {
   mxStationList,
   mxUnrateBlocked,
   mxCostPerDay,
+  isMxStation,
   openCrewBaseAt as openCrewBaseRule,
   openMxBase as openMxBaseRule,
-  outstationCheck,
   rateStation as rateStationRule,
   unrateStation as unrateStationRule,
   type MxKind,
-  setOutstationCheck as setOutstationCheckRule,
-  type OutstationCheck,
 } from './bases';
 import {
   CREW_BASE_FEE,
@@ -753,7 +751,7 @@ export type HeavyCheckReadout = {
   toleranceCap: number;
   /** Grounded for it, booked or having gone too far overdue. */
   inCheck: boolean;
-  lastNight: 'checked' | 'cleared' | 'short' | 'contracted' | 'away' | null;
+  lastNight: 'checked' | 'cleared' | 'short' | 'free' | 'away' | null;
   /** The D check: days to due (negative: overdue), whether booking is open, airborne hours since, booked, bookable now, and whether it is the check in the hangar. */
   dDueIn: number;
   dOpen: boolean;
@@ -1365,7 +1363,7 @@ export type LevelledBaseReadout = BaseReadout & {
   level: number;
   /** Planes it checks tonight (line base) or holds in a bay (hangar). */
   used: number;
-  /** Planes of a rated class asleep there that a full line base can't take. */
+  /** Planes of a rated class asleep there, due a line check, that a full line base can't take. */
   overflow: number;
   unit: string;
   upFee: number;
@@ -1396,7 +1394,7 @@ export function mxBaseReadout(
       if (!check) continue;
       const entry = tonight.get(check.station) ?? { checked: 0, overflow: 0 };
       if (check.inHouse) entry.checked++;
-      else if (hasLineBase(state, check.station) && mxRated(state, check.station, aircraft.typeCode)) entry.overflow++;
+      else if (check.due && hasLineBase(state, check.station) && mxRated(state, check.station, aircraft.typeCode)) entry.overflow++;
       tonight.set(check.station, entry);
     }
   }
@@ -1421,21 +1419,23 @@ export function mxBaseReadout(
 }
 
 /**
- * The stations where planes sleep tonight without an in-house line check
- * (no line base, a full one, or an unrated class), each with its setting,
- * what a contracted night costs there and why it isn't checked in house.
+ * The outstations (no maintenance base of the player's) where planes sleep
+ * tonight: how many, and how many of them are due a line check, which they
+ * miss there and so defer.
  */
-export function mxStationsReadout(state: SimState): { iata: string; name: string; planes: number; check: OutstationCheck; contractPerNight: number; reason: string }[] {
-  const sleeping = new Map<string, { planes: number; work: number; reasons: Set<string> }>();
+export type OutstationReadout = { iata: string; name: string; planes: number; due: number };
+
+export function mxStationsReadout(state: SimState): OutstationReadout[] {
+  const sleeping = new Map<string, { planes: number; due: number }>();
   for (const aircraft of state.aircraft) {
     const tonight = tonightCheck(state, aircraft.tail);
-    if (!tonight || tonight.inHouse) continue;
-    const reason = !hasLineBase(state, tonight.station) ? 'no line base' : !mxRated(state, tonight.station, aircraft.typeCode) ? `not rated ${aircraft.typeCode}` : 'line base full';
-    const entry = sleeping.get(tonight.station) ?? { planes: 0, work: 0, reasons: new Set<string>() };
-    entry.reasons.add(reason);
-    sleeping.set(tonight.station, { planes: entry.planes + 1, work: entry.work + tonight.work, reasons: entry.reasons });
+    if (!tonight || isMxStation(state, tonight.station)) continue;
+    const entry = sleeping.get(tonight.station) ?? { planes: 0, due: 0 };
+    entry.planes++;
+    if (tonight.due) entry.due++;
+    sleeping.set(tonight.station, entry);
   }
-  return [...sleeping].map(([iata, { planes, work, reasons }]) => ({ iata, name: nameOf(iata), planes, check: outstationCheck(state, iata), contractPerNight: contractCost(work), reason: [...reasons].join(' · ') }));
+  return [...sleeping].map(([iata, entry]) => ({ iata, name: nameOf(iata), ...entry }));
 }
 
 /** One aircraft class at a maintenance station: whether its mechanics are rated for it and where its planes there sleep tonight. */
@@ -1444,11 +1444,10 @@ export type StationClassReadout = {
   rated: boolean;
   /** Planes of the class based here. */
   based: number;
-  /** Planes of the class asleep here tonight, and how many of them the line base checks. */
+  /** Planes of the class asleep here tonight, how many of them the line base checks, and how many are due one and miss it. */
   sleeping: number;
   checked: number;
-  /** What tonight's unchecked ones here cost a night contracted (0 when the station defers). */
-  contractPerNight: number;
+  missed: number;
   /** Why rating it can't happen now (null when it can), or why it can't be dropped. */
   rateBlocked: string | null;
   dropBlocked: string | null;
@@ -1466,10 +1465,8 @@ export type MxStationCard = {
   line: LevelledBaseReadout | null;
   heavy: LevelledBaseReadout | null;
   classes: StationClassReadout[];
-  check: OutstationCheck;
-  /** Planes asleep here tonight that aren't checked in house, and what that costs a night. */
+  /** Planes asleep here tonight due a line check that they miss: each gets a deferred item. */
   unchecked: number;
-  contractPerNight: number;
   /** Line slots left tonight: a newly rated class's planes only get in when this is above 0. */
   lineFree: number;
 };
@@ -1484,9 +1481,7 @@ export function mxStationBoard(state: SimState): MxStationCard[] {
   });
   return mxStationList(state).map((iata) => {
     const here = tonight.filter((entry) => entry.check.station === iata);
-    const unchecked = here.filter((entry) => !entry.check.inHouse);
-    const check = outstationCheck(state, iata);
-    const costOf = (entries: typeof here) => (check === 'contract' ? contractCost(entries.reduce((total, entry) => total + entry.check.work, 0)) : 0);
+    const unchecked = here.filter((entry) => entry.check.away);
     const line = lines.get(iata) ?? null;
     return {
       iata,
@@ -1503,14 +1498,12 @@ export function mxStationBoard(state: SimState): MxStationCard[] {
           based: state.aircraft.filter((aircraft) => aircraft.baseAirport === iata && aircraft.typeCode === classCode).length,
           sleeping: ofClass.length,
           checked: ofClass.filter((entry) => entry.check.inHouse).length,
-          contractPerNight: costOf(ofClass.filter((entry) => !entry.check.inHouse)),
+          missed: ofClass.filter((entry) => entry.check.away).length,
           rateBlocked: rated ? null : mxRatingBlocked(state, iata, classCode),
           dropBlocked: rated ? mxUnrateBlocked(state, iata, classCode) : null,
         };
       }),
-      check,
       unchecked: unchecked.length,
-      contractPerNight: costOf(unchecked),
       lineFree: line ? Math.max(0, line.level - line.used) : 0,
     };
   });
@@ -1544,19 +1537,20 @@ export function previewBaseChange(state: SimState, kind: 'crew' | MxKind, action
   const facts: string[] = [];
   if (action === 'open' && isCrew) {
     facts.push('Starts with no crews: hire them here before basing a plane.');
-    facts.push('Not a maintenance base: nights here are contracted or deferred.');
+    facts.push('Not a maintenance base: planes due a line check here miss it and defer.');
   } else if (action === 'open' && kind === 'line') {
     facts.push('Starts at level 1: one plane checked a night. Raise the level for more.');
     facts.push('Rated for your most numerous class; rate other classes on the Mtc screen.');
     const station = mxStationsReadout(state).find((entry) => entry.iata === iata);
-    if (station) facts.push(`${station.planes} plane${station.planes === 1 ? '' : 's'} sleep here tonight: saves ${station.contractPerNight > 0 ? `$${station.contractPerNight.toLocaleString()}` : 'the'} contracted check a night.`);
+    if (station) facts.push(`${station.planes} plane${station.planes === 1 ? '' : 's'} sleep here tonight${station.due > 0 ? `, ${station.due} due a line check they'd otherwise miss` : ''}.`);
+    facts.push('Checks as many planes a night as its level, longest since a check first; each needs one every 5 nights.');
   } else if (action === 'open') {
     facts.push('Starts at level 1: one bay. Planes holding a bay bank heavy-check hours on their nights here.');
     facts.push('Does no line checks: that is the line base.');
   } else if (isCrew) {
     facts.push('No planes or crews are left here; reopening costs the fee again.');
   } else {
-    facts.push(kind === 'line' ? 'Nights here go back to contracted checks unless set to defer; the fee is not refunded.' : 'Planes here bank no heavy-check hours; a plane past due is checked by contract. The fee is not refunded.');
+    facts.push(kind === 'line' ? 'Planes due a line check here miss it and defer; the fee is not refunded.' : 'Planes here bank no heavy-check hours; a plane past due is checked by contract. The fee is not refunded.');
   }
   return {
     fee,
@@ -1601,7 +1595,7 @@ export function previewMxRating(state: SimState, iata: string, classCode: string
     cashAfter: state.cash - MX_RATING_FEE,
     kindPerDayBefore: before,
     kindPerDayAfter: before + MX_RATING_PER_DAY,
-    facts: [`${classCode} planes get line checks and heavy-check hours here; otherwise their nights are contracted or deferred.`],
+    facts: [`${classCode} planes get line checks and heavy-check hours here; otherwise one due a line check here misses it and defers.`],
     blocked: mxRatingBlocked(state, iata, classCode),
   };
 }
@@ -1634,6 +1628,3 @@ export function unrateStation(state: SimState, iata: string, classCode: string):
   return unrateStationRule(state, iata, classCode);
 }
 
-export function setStationCheck(state: SimState, iata: string, check: OutstationCheck): Outcome<{ message: string }> {
-  return setOutstationCheckRule(state, iata, check);
-}

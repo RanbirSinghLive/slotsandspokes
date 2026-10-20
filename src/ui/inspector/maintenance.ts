@@ -3,9 +3,9 @@ import { execNudge } from '../execNudge';
 import { aogChance, aogFor, daysUntilReturn, expediteCost, expediteRepair } from '../../sim/aog';
 import { ageDelayParameters } from '../../sim/delays';
 import { USEFUL_LIFE_YEARS } from '../../sim/leasing';
-import { A_OVERDUE, A_WINDOW, C_INTERVAL_CYCLES, C_INTERVAL_HOURS, D_INTERVAL_DAYS, D_INTERVAL_HOURS, D_WEAR_YEARS, D_WINDOW_DAYS, DEFERRED_AGE_YEARS, HEAVY_INTERVAL_DAYS, HEAVY_WINDOW_DAYS, MX_HOLD_AT, OVERDUE_GRACE_DAYS, wornAge } from '../../sim/mxChecks';
+import { LINE_INTERVAL_NIGHTS, A_OVERDUE, A_WINDOW, C_INTERVAL_CYCLES, C_INTERVAL_HOURS, D_INTERVAL_DAYS, D_INTERVAL_HOURS, D_WEAR_YEARS, D_WINDOW_DAYS, DEFERRED_AGE_YEARS, HEAVY_INTERVAL_DAYS, HEAVY_WINDOW_DAYS, MX_HOLD_AT, OVERDUE_GRACE_DAYS, wornAge } from '../../sim/mxChecks';
 import * as ops from '../routeActions';
-import type { BaseCandidate, EngineReadout, HeavyCheckReadout, LevelledBaseReadout, MxStationCard, StationClassReadout } from '../../sim/playerActions';
+import type { BaseCandidate, EngineReadout, HeavyCheckReadout, LevelledBaseReadout, MxStationCard, OutstationReadout, StationClassReadout } from '../../sim/playerActions';
 import type { SimState } from '../../sim/state';
 import { ENGINE_SHOP_DAYS, ENGINE_WAIT_DAYS, type EngineSupport } from '../../sim/enginePool';
 import { dayIndex } from '../../sim/clock';
@@ -85,7 +85,7 @@ export function buildMaintenanceView(state: SimState, changed: () => void): HTML
   return root;
 }
 
-const NIGHT_WORDS: Record<string, string> = { checked: 'checked', cleared: 'cleared 1', short: 'short', contracted: 'contracted', away: 'no check' };
+const NIGHT_WORDS: Record<string, string> = { checked: 'checked', cleared: 'cleared 1', short: 'short', free: 'not due', contracted: 'contracted', away: 'missed' };
 
 /** How a plane stands for release to service, worst first. */
 type Standing = 'aog' | 'check' | 'due' | 'watch' | 'ok';
@@ -567,7 +567,7 @@ function buildMxBases(state: SimState, changed: () => void): HTMLElement[] {
   const heavyReadout = ops.mxBaseReadout(state, 'heavy');
   const stationHead = heading(
     'Stations',
-    `Each maintenance station: its line base slots (wrench: planes it checks a night, most deferred items first) and hangar bays (planes in a C or D check at once), filled by tonight's use, red past full. Chips are the mechanics' ratings by class, with that class's planes asleep here tonight: solid is rated; dashed amber is a class sleeping here unrated, contracted or deferred like an outstation. A station's first rating is free; each further class costs ${money(MX_RATING_FEE)} and ${money(MX_RATING_PER_DAY)} a day. A new line base costs ${money(lineReadout.fee)}, a hangar ${money(heavyReadout.fee)}, then ${money(lineReadout.perLevelPerDay)} and ${money(heavyReadout.perLevelPerDay)} a day a level; home's first 3 of each are free.`,
+    `Each maintenance station: its line base slots (wrench: planes it checks a night, most deferred items first) and hangar bays (planes in a C or D check at once), filled by tonight's use, red past full. Chips are the mechanics' ratings by class, with that class's planes asleep here tonight: solid is rated; dashed amber is a class sleeping here unrated. Each plane needs a line check once every ${LINE_INTERVAL_NIGHTS} nights, and a base checks planes early when it has room, so a level covers several planes. One due and missed (past the slots, an unrated class) gets a deferred item each night; nothing is contracted. A station's first rating is free; each further class costs ${money(MX_RATING_FEE)} and ${money(MX_RATING_PER_DAY)} a day. A new line base costs ${money(lineReadout.fee)}, a hangar ${money(heavyReadout.fee)}, then ${money(lineReadout.perLevelPerDay)} and ${money(heavyReadout.perLevelPerDay)} a day a level; home's first 3 of each are free.`,
   );
   stationHead.prepend(glyph('wrench', undefined, 'base-head-glyph'), ' ');
   const nodes: HTMLElement[] = [stationHead];
@@ -581,7 +581,7 @@ function buildMxBases(state: SimState, changed: () => void): HTMLElement[] {
   nodes.push(
     heading(
       'Outstations',
-      'Airports with no maintenance base where planes sleep tonight. Contracted: the station does the line check, paid by the hour of work, and the plane gets no deferred item if the night is long enough. Deferred: no check and no cost, and a deferred item each night.',
+      `Airports with no maintenance base of yours where planes sleep tonight. Line checks are only done at your own line bases, so a plane due one here misses it and gets a deferred item each night until it's checked.`,
     ),
   );
   if (stations.length === 0) {
@@ -595,33 +595,21 @@ function buildMxBases(state: SimState, changed: () => void): HTMLElement[] {
     row.className = 'inspector-row base-row';
     const name = document.createElement('span');
     name.append(glyph('moon', `${station.planes} plane${station.planes === 1 ? '' : 's'} sleeping here tonight`), ` ${station.iata} · ${station.planes}`);
-    row.append(name, checkDetail(station.check, station.contractPerNight), checkToggle(state, station.iata, station.check, changed));
+    row.append(name, outstationDetail(station));
     outstations.append(row);
   }
   nodes.push(outstations);
   return nodes;
 }
 
-function checkDetail(check: 'contract' | 'defer', contractPerNight: number): HTMLElement {
+/** An outstation's night: how many planes there are due a line check they miss. */
+function outstationDetail(station: OutstationReadout): HTMLElement {
   const detail = document.createElement('span');
   detail.className = 'inspector-row-detail';
-  detail.textContent = check === 'contract' ? `contracted · ${money(contractPerNight)}/night` : 'deferred · ● each night';
-  detail.classList.add(check === 'contract' ? 'is-contract' : 'is-deferred');
-  if (check === 'defer') detail.classList.add('is-warn');
+  detail.textContent = station.due > 0 ? `${station.due} due · missed ●` : 'none due';
+  if (station.due > 0) detail.classList.add('is-deferred', 'is-warn');
+  detail.title = station.due > 0 ? `${station.due} of the planes asleep at ${station.iata} tonight are due a line check: no line base here, so each gets a deferred item.` : `No plane asleep at ${station.iata} tonight is due a line check.`;
   return detail;
-}
-
-function checkToggle(state: SimState, iata: string, check: 'contract' | 'defer', changed: () => void): HTMLElement {
-  const toggle = document.createElement('button');
-  toggle.type = 'button';
-  toggle.className = 'base-close';
-  toggle.textContent = check === 'contract' ? 'Defer' : 'Contract';
-  toggle.title = check === 'contract' ? `Defer ${iata}'s unchecked nights: no cost, a deferred item each night` : `Contract ${iata}'s unchecked nights: paid by the hour of work`;
-  toggle.addEventListener('click', () => {
-    ops.setStationCheck(state, iata, check === 'contract' ? 'defer' : 'contract');
-    changed();
-  });
-  return toggle;
 }
 
 const KIND_NAME = { line: 'line base', heavy: 'hangar' } as const;
@@ -716,7 +704,7 @@ function ratingChip(state: SimState, card: MxStationCard, entry: StationClassRea
     chip.classList.add('is-rated');
     if (entry.sleeping > 0) chip.append(` ${entry.sleeping}`);
     if (short > 0) chip.classList.add('is-short');
-    const shortText = short > 0 ? ` · ${short} over the line base, ${card.check === 'contract' ? `contracted ${money(entry.contractPerNight)}/night` : 'deferred'}` : '';
+    const shortText = short > 0 ? ` · ${short} due and over the line base, ● each night` : '';
     chip.title = entry.dropBlocked ?? `${entry.classCode} rated${sleepers}${shortText}${basedText} · tap to drop`;
     chip.disabled = entry.dropBlocked !== null;
     chip.addEventListener('click', () =>
@@ -725,7 +713,7 @@ function ratingChip(state: SimState, card: MxStationCard, entry: StationClassRea
         rows: [],
         facts: [
           `Saves ${money(MX_RATING_PER_DAY)} a day; rating again costs ${money(MX_RATING_FEE)}.`,
-          ...(entry.sleeping > 0 ? [`${entry.sleeping} ${entry.classCode} asleep here tonight would be ${card.check === 'contract' ? 'contracted' : 'deferred'}.`] : []),
+          ...(entry.sleeping > 0 ? [`${entry.sleeping} ${entry.classCode} asleep here tonight would get a deferred item on each night they're due.`] : []),
         ],
         confirmLabel: 'Drop rating',
         run: () => {
@@ -743,8 +731,8 @@ function ratingChip(state: SimState, card: MxStationCard, entry: StationClassRea
     chip.prepend('+');
   }
   // Rating only moves planes into the line base where it has slots left tonight.
-  const room = entry.sleeping > 0 && card.line && card.lineFree < entry.sleeping ? ` · line base has ${card.lineFree} slot${card.lineFree === 1 ? '' : 's'} left: raise it too` : '';
-  const cost = entry.sleeping > 0 ? ` · ${card.check === 'contract' ? `contracted ${money(entry.contractPerNight)}/night` : 'deferred'}` : '';
+  const room = entry.missed > 0 && card.line && card.lineFree < entry.missed ? ` · line base has ${card.lineFree} slot${card.lineFree === 1 ? '' : 's'} left: raise it too` : '';
+  const cost = entry.missed > 0 ? ` · ${entry.missed} due, missed ●` : '';
   chip.title = entry.rateBlocked ?? `${entry.classCode} not rated${sleepers}${cost}${basedText}${room} · rate ${money(MX_RATING_FEE)} + ${money(MX_RATING_PER_DAY)}/day`;
   chip.disabled = entry.rateBlocked !== null;
   chip.addEventListener('click', () => {
@@ -752,7 +740,7 @@ function ratingChip(state: SimState, card: MxStationCard, entry: StationClassRea
     showConfirm({
       title: `Rate ${card.iata} for ${entry.classCode}`,
       rows: costRows(preview.fee, preview.kindPerDayBefore, preview.kindPerDayAfter, preview.cashAfter),
-      facts: preview.blocked ? [preview.blocked] : [...preview.facts, ...(room ? [card.lineFree === 0 ? `Line base ${card.line!.used}/${card.line!.level} tonight: full, so they stay ${card.check === 'contract' ? 'contracted' : 'deferred'} until it is raised.` : `Line base ${card.line!.used}/${card.line!.level} tonight: only ${card.lineFree} more can be checked in house until it is raised.`] : [])],
+      facts: preview.blocked ? [preview.blocked] : [...preview.facts, ...(room ? [card.lineFree === 0 ? `Line base ${card.line!.used}/${card.line!.level} tonight: full, so they keep deferring until it is raised.` : `Line base ${card.line!.used}/${card.line!.level} tonight: only ${card.lineFree} more can be checked in house until it is raised.`] : [])],
       confirmLabel: `Rate · ${money(preview.fee)}`,
       run: () => {
         ops.rateStation(state, card.iata, entry.classCode);
@@ -792,8 +780,11 @@ function stationCard(state: SimState, card: MxStationCard, lineFee: number, heav
   if (card.unchecked > 0) {
     const tonight = box('mx-station-tonight');
     const what = document.createElement('span');
-    what.append(glyph('moon', `${card.unchecked} asleep here tonight not checked in house`), ` ${card.unchecked} · `);
-    tonight.append(what, checkDetail(card.check, card.contractPerNight), checkToggle(state, card.iata, card.check, changed));
+    what.append(glyph('moon', `${card.unchecked} asleep here tonight due a line check and missing it: a deferred item each`), ` ${card.unchecked} · `);
+    const detail = document.createElement('span');
+    detail.className = 'inspector-row-detail is-deferred is-warn';
+    detail.textContent = 'due · missed ●';
+    tonight.append(what, detail);
     el.append(tonight);
   }
   return el;

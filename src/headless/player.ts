@@ -5,7 +5,7 @@ import { currentPotentialDemand } from '../sim/marketDemand';
 import { marketLoadFactor } from '../sim/loadFactor';
 import { saleBlockedReason, saleMarginChangePerDay } from '../sim/seatSale';
 import { attendantsForRisk, crewsForRisk } from '../sim/crews';
-import { mxLevel } from '../sim/bases';
+import { lineRated, mxLevel } from '../sim/bases';
 import { dayOfYear, marketSeasonOn } from '../sim/seasons';
 import { SEASONAL_PREMIUM } from '../sim/seasonalLease';
 import { contractOn, contractsOf, counterTakeover, performanceFactor, takeoverOpen } from '../sim/contracts';
@@ -447,7 +447,7 @@ function networkMargin(state: SimState): number {
  * Once a week, the one night stop worth the most: an out-and-back from
  * base dragged past the end of the day (sim/nightStops.ts, through the
  * same retime the Gantt uses), taken when the network's margin with it,
- * less the night's hotel and check and the chance of it breaking (a lost
+ * less the night's hotel and the chance of it breaking (a lost
  * morning flight), beats today's by NIGHT_STOP_WORTH_PER_DAY. Never one
  * that would leave the base short of crews. The forecast is the player's,
  * not the page's.
@@ -463,6 +463,8 @@ function takeNightStops(state: SimState): string[] {
       const legIds = rotation.legs.map((leg) => leg.legId);
       const plan = actions.planRetimeRotation(state, legIds, aircraft.tail, USABLE_DAY_END_MINUTE);
       if (!plan.ok || plan.kind !== 'wrap' || !plan.station || plan.crewWarning) continue;
+      // A plane that never sleeps at a line base misses its line check every fifth night, so only where it gets one.
+      if (!lineRated(state, plan.station, aircraft.typeCode)) continue;
       const byId = new Map(plan.legs.map((leg) => [leg.legId, leg]));
       const after = { ...state, schedule: state.schedule.map((leg) => byId.get(leg.legId) ?? leg) };
       const [a, b] = [rotation.legs[0].origin, rotation.legs[0].dest];
@@ -1386,12 +1388,15 @@ function keepStations(state: SimState): string[] {
  */
 /**
  * Keep each base's maintenance matched to its planes: the mechanics rated
- * for every class based there, a line base level for every plane, and a bay
+ * for every class based there, a line base level for every
+ * PLANES_PER_LINE_LEVEL planes (each needs a check one night in five, with
+ * slack for nights some sleep away), and a bay
  * for every HANGAR_PLANES_PER_BAY planes (never fewer than home starts
  * with). A plane's nights are what the player's day plan builds on, so
  * the headless player pays for what it flies.
  */
 const HANGAR_PLANES_PER_BAY = 4;
+const PLANES_PER_LINE_LEVEL = 3;
 const ENGINE_SPARE_PER_PLANES = 6;
 const ENGINE_PBH_FROM_PLANES = 2;
 
@@ -1411,7 +1416,7 @@ function keepMaintenance(state: SimState): string[] {
       const rated = actions.rateStation(state, iata, code);
       if (rated.ok) log.push(rated.message);
     }
-    const lineWanted = planes;
+    const lineWanted = Math.ceil(planes / PLANES_PER_LINE_LEVEL);
     const bayWanted = Math.ceil(planes / HANGAR_PLANES_PER_BAY);
     for (const [kind, wanted] of [['line', lineWanted], ['heavy', bayWanted]] as const) {
       while (mxLevel(state, kind, iata) < wanted) {

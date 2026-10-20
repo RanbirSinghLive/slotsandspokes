@@ -205,7 +205,3 @@ export function rateStation(state: SimState, iata: string, classCode: string) {
 export function unrateStation(state: SimState, iata: string, classCode: string) {
   return afterChange(state, actions.unrateStation(state, iata, classCode));
 }
-
-export function setStationCheck(state: SimState, iata: string, check: 'contract' | 'defer') {
-  return afterChange(state, actions.setStationCheck(state, iata, check));
-}

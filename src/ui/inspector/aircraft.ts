@@ -21,7 +21,7 @@ import { cashAfterRows, showConfirm } from '../confirmModal';
 import { REBASE_DAYS, REBASE_FEE_LEASE_DAYS } from '../../sim/rebase';
 import { describeLayout, layoutFor, layoutOf, planOfTarget, seatsOfType, type RefitTarget } from '../../sim/cabins';
 import { showSeatMap } from '../seatMap';
-import { C_INTERVAL_CYCLES, C_INTERVAL_HOURS, DEFERRED_AGE_YEARS, deferredItems, HEAVY_INTERVAL_DAYS, heavyCheckDueIn, MX_HOLD_AT, tonightCheck } from '../../sim/mxChecks';
+import { C_INTERVAL_CYCLES, C_INTERVAL_HOURS, DEFERRED_AGE_YEARS, deferredItems, HEAVY_INTERVAL_DAYS, heavyCheckDueIn, LINE_INTERVAL_NIGHTS, MX_HOLD_AT, tonightCheck } from '../../sim/mxChecks';
 import { delayIconsFor } from '../delayCodes';
 import { flightNumber } from '../../sim/flightNumbers';
 import { CREWS_PER_NEW_PLANE } from '../../sim/crews';
@@ -242,7 +242,7 @@ export function buildAircraftView(state: SimState, tail: string, changed: () => 
     root.append(
       lineWithInfo(
         `Night stop ${station} · out ${minuteOfDayToTimeString(nightStop.evening.departMinute)} · back ${minuteOfDayToTimeString(nightStop.morning.departMinute)} · ${money(nightStopCostPerNight(state, plane, station))}/night`,
-        `It sleeps at ${station}, not at base: the crew's hotel every night, and the line check by the station's setting on the Mtc screen (free at a maintenance base). If its flight out is cancelled or held by the curfew, it sleeps at base and the morning flight from ${station} is cancelled. On the Schedule, push either half past its end of the day to bring it home.`,
+        `It sleeps at ${station}, not at base: the crew's hotel every night, and no line check there unless it's one of your line bases: it needs one every ${LINE_INTERVAL_NIGHTS} nights, so it has to sleep at a line base in between. If its flight out is cancelled or held by the curfew, it sleeps at base and the morning flight from ${station} is cancelled. On the Schedule, push either half past its end of the day to bring it home.`,
       ),
     );
   }
@@ -252,13 +252,15 @@ export function buildAircraftView(state: SimState, tail: string, changed: () => 
     const deferred = deferredItems(plane);
     const hours = (minutes: number) => `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`;
     const text = tonight.away
-      ? `Tonight ☾✗ · ${tonight.station} · checks deferred · no line check`
-      : `Tonight ☾${tonight.short ? `−${tonight.work - tonight.night}m` : tonight.contracted ? 'c' : '✓'} · ${tonight.station}${tonight.contracted ? ' contracted' : ''} · ${hours(tonight.night)} for ${hours(tonight.work)} of work`;
+      ? `Tonight ☾✗ · ${tonight.station} · line check due · missed`
+      : tonight.inHouse
+        ? `Tonight ☾${tonight.short ? `−${tonight.work - tonight.night}m` : '✓'} · ${tonight.station} · ${hours(tonight.night)} for ${hours(tonight.work)} of work`
+        : `Tonight ☾${tonight.nightsLeft} · ${tonight.station} · line check due in ${tonight.nightsLeft} night${tonight.nightsLeft === 1 ? '' : 's'}`;
     const heavy = ` · C due ${heavyCheckDueIn(plane)}d`;
     root.append(
       lineWithInfo(
         text + heavy + (deferred > 0 ? ` · ${'●'.repeat(Math.min(deferred, MX_HOLD_AT))} ${deferred} deferred` : ''),
-        `The line check: each night the plane needs hangar work, more for more flights a day, between landing and an hour before its first departure. ☾✓ means tonight is at a maintenance base with time for it, ☾c a contracted check at a station without one, ☾−40m that it's that much short, ☾✗ a station set to defer, so no check. A short or missed check leaves a deferred item (●): each wears the plane like ${DEFERRED_AGE_YEARS} more years, and at ${MX_HOLD_AT} it's held a morning. The A check (every 100 flight hours or 80 cycles) and the C check (every ${HEAVY_INTERVAL_DAYS} flying days, ${C_INTERVAL_HOURS} flight hours or ${C_INTERVAL_CYCLES} cycles) are hangar work: the A check is done from the spare hours of nights at a maintenance base, the C check as one stretch out of service, booked on the Mtc screen or forced when it runs well overdue. The Mtc screen lists every plane's, and its bases and stations.`,
+        `The line check: once every ${LINE_INTERVAL_NIGHTS} nights the plane needs a night of hangar work at one of your line bases rated for its type, between landing and an hour before its first departure. A base checks as many planes a night as its level, longest since a check first, so a base with room checks planes early. ☾✓ tonight is its check, ☾−40m it's that much short, ☾2 not due for 2 more nights, ☾✗ due and missed (no line base, a full one, or an unrated type). A short or missed check that's due leaves a deferred item (●), and another each night until checked: each wears the plane like ${DEFERRED_AGE_YEARS} more years, and at ${MX_HOLD_AT} it's held a morning. The A check (every 100 flight hours or 80 cycles) and the C check (every ${HEAVY_INTERVAL_DAYS} flying days, ${C_INTERVAL_HOURS} flight hours or ${C_INTERVAL_CYCLES} cycles) are hangar work: the A check is done from the spare hours of nights at a maintenance base, the C check as one stretch out of service, booked on the Mtc screen or forced when it runs well overdue. The Mtc screen lists every plane's, and its bases and stations.`,
         tonight.away || tonight.short || deferred >= MX_HOLD_AT - 1 ? 'inspector-line is-warn' : 'inspector-line',
       ),
     );

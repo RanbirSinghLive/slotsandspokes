@@ -3577,7 +3577,7 @@ base and a hangar from the start, inside the starting cost.
 
 | | Crew base | Line base | Hangar (heavy base) |
 |---|---|---|---|
-| What it is | Where crews live; the only places planes can be leased or based | Where a night is a line check | Where C and D checks are done |
+| What it is | Where crews live; the only places planes can be leased or based | Where line checks are done, one a plane every 5 nights | Where C and D checks are done |
 | Level | none | planes checked a night | bays: planes in a C or D check at once |
 | Opened on | the Crews screen, or the map ring's Create base | the Mtc screen, or the map ring's Create base | the Mtc screen, or the map ring's Create base |
 | Open | $100,000, then $500/day | $150,000, then $100/day a level | $400,000, then $300/day a level |
@@ -3609,12 +3609,12 @@ base slots and hangar bays filled by tonight's use (red past full), with
 − / + / × each, a dashed button to open the kind it lacks, and a rating chip
 per class showing that class's planes asleep there tonight. A solid chip is
 rated (tap to drop); a dashed amber one is a class sleeping there unrated;
-a red underline means rated planes over the line base's slots. The card's
-moon line counts tonight's unchecked planes, what they cost, and the
-contract/defer switch. Rating a class only moves its planes in house where
-the line base has slots left, so a full base needs a level too
-(`mxStationBoard()`). Below, one picker opens a station elsewhere, and
-**Outstations** lists airports with no base where planes sleep tonight.
+a red underline means rated planes due tonight over the line base's slots. The card's
+moon line counts tonight's planes due a line check that miss it. Rating a
+class only gets its planes checked where the line base has slots left, so
+a full base needs a level too (`mxStationBoard()`). Below, one picker opens
+a station elsewhere, and **Outstations** lists airports with no base where
+planes sleep tonight, with how many are due and miss their check.
 
 Clicking an airport's ring has one Create base button with a crew, line base or hangar choice; it greys out for a kind the airport already has and opens the same confirm as the screens. Opening or closing a base asks first: a confirm window (`ui/confirmModal.ts`,
 numbers from `previewBaseChange()`) shows the fee, the running cost before and
@@ -3626,13 +3626,12 @@ appointing, replacing or letting go an executive, starting a seat sale, and
 switching a hub's style (map menu and Plan hub window). Holding a ring button to repeat (add or remove a flight, hire
 on the map) stays one click each.
 
-**Anywhere else a plane sleeps** (no line base, a full one, an unrated
-class, a plane stranded away), the night is a **contracted check**, $300 an
-hour of the night's work (a Propeller on 4 flights a day: $840), or **no
-check and a deferred item**, by the station's setting on the Mtc screen's
-station card or Outstations list (contracted unless changed). So
-a crew base alone is cheap to open and dearer to run, and a line base pays
-for itself at about one plane sleeping there.
+**Line checks are never bought.** A plane due its line check that
+sleeps anywhere it can't get one (no line base, a full one, an unrated
+class, in the air) misses it and gets a deferred item, and another each
+night until it's checked. So a fleet that outgrows its stations pays in
+wear and MX holds, and growth has to come with line slots and ratings. A
+crew base alone is not a maintenance base.
 
 The Airports screen's Base column and each airport's view say what's
 where. A save from before levels has a line base and a hangar at every old
@@ -3703,8 +3702,8 @@ leaves the station at 06:00, and the flight out leaves as late as it can
 and still land 30 minutes before the 22:00 curfew. Push either half past
 its own end of the day and it wraps back (`planUnwrap()`) into an
 out-and-back at the end of the day. The tip says what the night is, in
-ops terms ("Night stop YOW · out 20:50 · back 06:00 · no line base:
-contracted check"), and the halves are drawn dashed.
+ops terms ("Night stop YOW · out 20:50 · back 06:00 · no line base: line
+check back at base every 5 nights"), and the halves are drawn dashed.
 
 **Removing.** The × on either half removes the night stop, both flights
 (two clicks); hovering or arming one lights the other's ×, since one half
@@ -3729,8 +3728,9 @@ out.
 
 **Every night there costs** the crew's hotel ($200 a crew for a
 Propeller, $250 Regional, $400 Narrowbody, $900 Widebody, under crew),
-and the line check by the Bases rule: free at a line base with room,
-contracted or deferred elsewhere. At 3 deferred items it's held there a
+and nothing for the line check, which it only gets at a line base: a
+plane that night-stops every night where there is none misses every check
+it's due and ends up held. At 3 deferred items it's held there a
 morning, as anywhere. It can break down there overnight, and an overdue
 heavy check grounds it there, contracted.
 
@@ -3745,30 +3745,38 @@ flight out; made in between, tonight's flight home flies again.
 
 **The headless player** looks once a week for the wrap worth the most:
 the network's margin with it (a morning flight into base feeds
-connections), less the night's hotel and check, less a 5% chance of
-losing the morning flight, has to beat today's by $500 a day, without
-leaving the base short of crews.
+connections), less the night's hotel, less a 5% chance of losing the
+morning flight, has to beat today's by $500 a day, without leaving the
+base short of crews, and only at a station with a line base rated for the
+plane's class, so it keeps getting its line checks.
 
 ## Maintenance checks (`src/sim/mxChecks.ts`)
 
-**The line check is a night at a line base** (see Bases);
-elsewhere it's contracted or deferred. Judged at midnight for every
-plane that flies:
-- **The work:** a base amount plus more per flight on its day (a
-  Propeller needs 2h plus 24 min a cycle; a Widebody 4h plus 36 min).
+**The line check is a night at a line base** (see Bases), needed once
+every 5 nights a plane flies (`LINE_INTERVAL_NIGHTS`). Each midnight a
+line base checks as many of the planes asleep there as its level, rated
+classes only, the longest since a check first, so a base with room checks
+planes early and the fleet's checks spread across the nights on their
+own. Planes with no check yet (old saves, new leases) start part-way
+through the five nights by tail, so they aren't all due at once. Judged
+at midnight for every plane that flies:
+- **The work:** a fixed time by class: Propeller 3h 30m, Regional 4h,
+  Narrowbody 5h, Widebody 6h 30m.
 - **The night:** from its landing to an hour before its first
   departure. A plane still in the air at midnight is judged from the
   landing it is about to make, if that's before then (a long-haul day
   ending at 00:30 is a short night, not an "away" one).
 
-A plane with no check (a station set to defer, or still flying an hour
-before its first departure), or whose night is shorter than the work,
-carries a **deferred item** (●). A night with 2h to spare at a line base
+A plane due its check (5 nights since the last) that doesn't get it
+(no rated line base slot, or still flying an hour before its first
+departure), or whose check night is shorter than the work, carries a
+**deferred item** (●), and another each night until it's checked. A
+night it isn't due and isn't checked ("free") costs nothing. A night with 2h to spare at a line base
 clears one, and so does a day with nothing to fly parked at one. Planes
 on an AOG, a refit, a heavy check or a ferry skip it.
 
 **Wear levelling** (`levelWear()`), each midnight before the nights are
-judged: a plane whose night would be too short for its work, or that
+judged: a plane due tonight whose night would be too short for its work, or that
 carries more items than an idle twin, hands its whole day to that twin
 (same type and base, parked where the day starts, nothing to fly, a long
 enough night of its own). The worn plane rests and its night isn't
@@ -3776,7 +3784,7 @@ judged; the day goes back at the next midnight like a swap, free. So a
 day too long for one plane's nights alternates between two planes
 instead of piling up items.
 The 22:00 curfew keeps nights at base long, so items come mostly from
-short nights and stations set to defer.
+full or unrated line bases and planes that sleep away when due.
 
 **Deferred items wear the plane.** Each counts as 3 more years of age
 for breakdowns and mechanical delays (`wornAge()`). At 3 the plane is
@@ -3901,12 +3909,12 @@ staggered by tail, so a fleet doesn't come due together.
 or 80 cycles, whichever comes first, so a plane on short hops is due as soon as
 one on long ones. Its work is 4 hours for a Propeller, 5 for a Regional, 6 for
 a Narrowbody and 8 for a Widebody. From 80% of the interval, whatever a night
-has left after the line check goes to the A check (at a line base, or
-contracted at a station that has none, paid by the hour). A done A check restarts its
+at a line base rated for the plane has left after any line check goes to the
+A check, line-check night or not. A done A check restarts its
 interval and pays the plane's maintenance reserve. A plane 25% past due adds a
 deferred item every night it flies (not on top of a night already adding one),
-so one that never gets its A check ends up held. A night away or at a station
-set to defer makes no progress.
+so one that never gets its A check ends up held. A night away from a rated
+line base makes no progress.
 
 **Maintenance is paid at the check.** One fifth of a flight's non-fuel block
 cost (`MAINTENANCE_SHARE_OF_NON_FUEL`) is maintenance. A landed flight does
@@ -3935,8 +3943,8 @@ only when the money leaves moves. The Mtc card shows what is due.
   shows as a cluster. A plane whose D check falls due inside that
   axis gets a violet D marker too (overdue ones at the left edge); Markers read "C P001" / "D P001". A D check also does the C check, so a plane's C marker dims when its D falls due first and goes once the D is booked. Tap a D marker to book the D check (or cancel the booking); `dBookBlocker()` says why it can't yet.
 - **The Gantt:** a key above the rows explains the night cell, and each
-  plane's label carries tonight's check as the day is going ("☾✓", "☾c" contracted,
-  "☾−40m" short, "☾✗" away). The plane's own view says the same in words
+  plane's label carries tonight's check as the day is going ("☾✓" checked,
+  "☾2" not due for 2 nights, "☾−40m" short, "☾✗" due and missed). The plane's own view says the same in words
   ("Tonight ☾✓ · 9h 24m at base for 4h 24m of work · C due 11d"). It works from the projected
   rest of the day, so a late afternoon shows tonight getting shorter. When
   the night's spare hours will go to the A check, the cell is hatched amber and
