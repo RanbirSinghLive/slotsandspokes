@@ -11,7 +11,7 @@ import { applyRefit, refitDays, refitWorkMinutes, type RefitTarget } from './cab
 import { type BayClaims, bookedDChecks, chargeMaintenance, freeHeavyBays, bookedHeavyChecks, finishDCheck, finishHeavyCheck, forcedHeavyChecks, wornAge } from './mxChecks';
 import { nightStopStation } from './nightStops';
 import { rollFleetCabins } from './fleetCabins';
-import { engineFault, returnEngines } from './enginePool';
+import { engineFault, rollEngineDay } from './enginePool';
 import { contractCost, heavyRated } from './bases';
 import type { Aircraft, SimState } from './state';
 
@@ -63,6 +63,8 @@ const EXPEDITE_LEASE_DAYS_PER_DAY = 5;
 
 const MINUTES_PER_DAY = 1440;
 const FAULTS = ['hydraulics', 'landing gear', 'engine', 'avionics', 'bird strike', 'pressurisation', 'fuel system', 'flight controls'];
+/** The share of breakdowns that are an engine, for readouts that estimate how often one comes. */
+export const ENGINE_FAULT_SHARE = 1 / FAULTS.length;
 
 export type AogEvent = {
   tail: string;
@@ -120,6 +122,11 @@ export function aogChance(state: SimState, aircraft: Aircraft): number {
   return Math.min(AOG_CHANCE_MAX, base * congestion * strain);
 }
 
+/** What a plane's flying earns a day, roughly: the sum of its rotations' values. For the engine book. */
+function planeDayValue(state: SimState, tail: string): number {
+  return rotationsForTail(state, tail).reduce((total, rotation) => total + rotationValue(state, rotation), 0);
+}
+
 /** What one rotation earns a day, roughly: each leg's share of its route's margin. For choosing what to cover first. */
 function rotationValue(state: SimState, rotation: Rotation): number {
   let value = 0;
@@ -164,7 +171,7 @@ function coverGroundedPlanes(state: SimState): void {
  * as the pools allow.
  */
 export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
-  returnEngines(state, dayStartMinute);
+  rollEngineDay(state, dayStartMinute);
   const repaired = state.aogs.filter((event) => event.returnsAtMinute <= dayStartMinute);
   state.aogs = state.aogs.filter((event) => event.returnsAtMinute > dayStartMinute);
   for (const event of repaired) {
@@ -225,8 +232,8 @@ export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
     const maxExtraDays = DURATION_BASE_EXTRA_DAYS + Math.round(effectiveAge(state, aircraft) * DURATION_EXTRA_DAYS_PER_EFFECTIVE_YEAR);
     const faultDays = 1 + Math.floor(durationRoll * durationRoll * (maxExtraDays + 1));
     const fault = FAULTS[Math.floor(durationRoll * 997) % FAULTS.length];
-    // An engine fault waits for a lease engine, or swaps in a spare from the pool (sim/enginePool.ts).
-    const engine = fault === 'engine' ? engineFault(state, aircraft.typeCode, faultDays, dayStartMinute) : null;
+    // An engine fault waits for a lease engine, or is covered by the class's engine plan (sim/enginePool.ts).
+    const engine = fault === 'engine' ? engineFault(state, aircraft.typeCode, faultDays, dayStartMinute, planeDayValue(state, aircraft.tail)) : null;
     const days = engine?.days ?? faultDays;
     if (engine && engine.shopCost > 0) chargeEngineShop(state, engine.shopCost);
     state.lastAogDay = dayIndex(state);

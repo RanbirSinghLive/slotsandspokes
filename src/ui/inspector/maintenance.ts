@@ -5,9 +5,11 @@ import { ageDelayParameters } from '../../sim/delays';
 import { USEFUL_LIFE_YEARS } from '../../sim/leasing';
 import { A_OVERDUE, A_WINDOW, C_INTERVAL_CYCLES, C_INTERVAL_HOURS, D_INTERVAL_DAYS, D_INTERVAL_HOURS, D_WEAR_YEARS, D_WINDOW_DAYS, DEFERRED_AGE_YEARS, HEAVY_INTERVAL_DAYS, HEAVY_WINDOW_DAYS, MX_HOLD_AT, OVERDUE_GRACE_DAYS, wornAge } from '../../sim/mxChecks';
 import * as ops from '../routeActions';
-import type { BaseCandidate, HeavyCheckReadout, LevelledBaseReadout, MxStationCard, StationClassReadout } from '../../sim/playerActions';
+import type { BaseCandidate, EngineReadout, HeavyCheckReadout, LevelledBaseReadout, MxStationCard, StationClassReadout } from '../../sim/playerActions';
 import type { SimState } from '../../sim/state';
-import { money } from '../format';
+import { ENGINE_SHOP_DAYS, ENGINE_WAIT_DAYS, type EngineSupport } from '../../sim/enginePool';
+import { dayIndex } from '../../sim/clock';
+import { money, shortMoney } from '../format';
 import { linkToMap } from '../mapLink';
 import { planeIconElement, TYPE_COLOURS } from '../planeIcons';
 import { glyph, pips } from '../glyphs';
@@ -839,41 +841,97 @@ function stationOpener(
   return opener;
 }
 
-/** The spare engine pool: a row per class with its spares ready and a − / + to hold more. */
+const ENGINE_PLAN_NAMES: Record<EngineSupport, string> = { adhoc: 'Ad hoc', pool: 'Spares', pbh: 'PBH' };
+
+/** Engine support: per class, the plan in force (ad hoc, own spares or power by the hour), its spares, and its book. */
 function buildEngines(state: SimState, changed: () => void): HTMLElement[] {
   const nodes: HTMLElement[] = [
     heading(
       'Engines',
-      'Spare engines by aircraft class. An engine fault waits 4 days for a lease engine; with a spare ready the plane is back the next morning and the pulled engine goes to the shop for 20 days (paid then), rejoining the pool. Each spare costs its daily holding cost, in the shop or on the shelf, so a pool pays for a fleet that breaks engines often.',
+      `How each aircraft class gets an engine when one fails. Ad hoc pays nothing until then, and the plane waits ${ENGINE_WAIT_DAYS} more days for a lease engine. Own spares (Spares) cost a holding fee a day each; a fault swaps one in and the plane is back the next morning, while the pulled engine spends ${ENGINE_SHOP_DAYS} days in the shop, paid then. Power by the hour (PBH) is a fee on every flight hour; a fault is back the next morning with no shop bill. PBH suits a few planes, spares a big fleet, ad hoc a fleet whose flying others can cover. Changing a plan starts a new book.`,
     ),
   ];
   const list = document.createElement('div');
   list.className = 'inspector-rows';
   for (const entry of ops.engineReadouts(state)) {
+    const card = box('engine-card');
     const row = document.createElement('div');
     row.className = 'inspector-row base-row';
     const name = document.createElement('span');
-    name.append(glyph('engine'), ` ${entry.classCode} · `, pips(entry.ready, entry.held, `${entry.ready} of ${entry.held} spares ready; the rest are in the shop`, 'engine'));
-    const detail = document.createElement('span');
-    detail.className = 'inspector-row-detail';
-    detail.textContent = `${money(entry.held * entry.perDay)}/day · shop ${money(entry.shopVisit)}`;
-    detail.title = `${money(entry.perDay)} a day for each spare`;
-    const controls = box('base-level');
-    for (const delta of [-1, 1] as const) {
+    name.append(glyph('engine'), ` ${entry.classCode} · ${entry.planes} · ≈${entry.faultsPerYear.toFixed(1)}/yr`);
+    name.dataset.tip = `${entry.planes} plane${entry.planes === 1 ? '' : 's'} · about ${entry.faultsPerYear.toFixed(1)} engine faults a year at today's breakdown chances`;
+    row.append(name);
+    if (entry.plan === 'pool') {
+      row.append(pips(entry.ready, entry.held, `${entry.ready} of ${entry.held} spares ready; the rest are in the shop`, 'engine'));
+      const controls = box('base-level');
+      for (const delta of [-1, 1] as const) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'base-close';
+        button.textContent = delta > 0 ? '+' : '−';
+        button.title = delta > 0 ? `Hold another ${entry.classCode} spare · ${money(entry.perDay)}/day` : 'Give a spare back';
+        button.addEventListener('click', () => {
+          ops.changeSpareEngines(state, entry.classCode, delta);
+          changed();
+        });
+        controls.append(button);
+      }
+      row.append(controls);
+    }
+    const pbhPerDay = entry.hoursPerDay * entry.pbhPerHour;
+    const plans: { plan: EngineSupport; text: string; tip: string }[] = [
+      { plan: 'adhoc', text: 'Ad hoc · $0', tip: `Nothing a day · an engine fault waits ${entry.waitDays} more days` },
+      { plan: 'pool', text: `Spares · ${money(Math.max(1, entry.held) * entry.perDay)}/d`, tip: `${money(entry.perDay)} a day a spare · back next morning · shop ${money(entry.shopVisit)} a fault` },
+      { plan: 'pbh', text: `PBH · ≈${money(pbhPerDay)}/d`, tip: `${money(entry.pbhPerHour)} a flight hour · ${entry.hoursPerDay.toFixed(0)} h a day scheduled · back next morning, no shop bill` },
+    ];
+    const buttons = document.createElement('div');
+    buttons.className = 'rd-budgets';
+    for (const option of plans) {
       const button = document.createElement('button');
       button.type = 'button';
-      button.className = 'base-close';
-      button.textContent = delta > 0 ? '+' : '−';
-      button.title = delta > 0 ? `Hold another ${entry.classCode} spare · ${money(entry.perDay)}/day` : 'Give a spare back';
+      button.className = 'rd-budget';
+      button.classList.toggle('is-on', option.plan === entry.plan);
+      button.textContent = option.text;
+      button.dataset.tip = option.tip;
       button.addEventListener('click', () => {
-        ops.changeSpareEngines(state, entry.classCode, delta);
+        if (option.plan === entry.plan) return;
+        ops.setEngineSupport(state, entry.classCode, option.plan);
         changed();
       });
-      controls.append(button);
+      buttons.append(button);
     }
-    row.append(name, detail, controls);
-    list.append(row);
+    card.append(row, buttons, ...engineBookCells(state, entry));
+    list.append(card);
   }
   nodes.push(list);
   return nodes;
+}
+
+/** A class's book since its plan was set, as four cells the way the fuel book shows. */
+function engineBookCells(state: SimState, entry: EngineReadout): HTMLElement[] {
+  const record = entry.book;
+  if (!record) return [line(`${ENGINE_PLAN_NAMES[entry.plan]} · no book yet`, 'inspector-line goal-ahead')];
+  const net = record.protectedValue - record.lostValue - record.spent;
+  const grid = box('fuel-book');
+  const cell = (label: string, text: string, tone: number, tip: string) => {
+    const el = box('fuel-book-cell');
+    el.classList.toggle('is-good', tone > 0);
+    el.classList.toggle('is-bad', tone < 0);
+    const top = document.createElement('span');
+    top.className = 'fuel-book-label';
+    top.textContent = label;
+    const value = document.createElement('span');
+    value.textContent = text;
+    el.append(top, value);
+    el.dataset.tip = tip;
+    return el;
+  };
+  const days = record.daysSaved - record.daysWaited;
+  grid.append(
+    cell('Faults', String(record.faults), 0, 'Engine faults on this plan'),
+    cell('Days', `${days > 0 ? '+' : ''}${days}`, days, `Plane-days back sooner than ad hoc · ${record.daysSaved} saved · ${record.daysWaited} waited on a lease engine`),
+    cell('Spent', shortMoney(-record.spent), -record.spent, 'Holding, shop visits and PBH fees'),
+    cell('Net', `${net > 0 ? '+' : ''}${shortMoney(net)}`, net, `Est. flying the saved days kept (${money(record.protectedValue)}) − flying the waits lost (${money(record.lostValue)}) − spent. At each plane's margin a day; other planes covering its flying make it less.`),
+  );
+  return [grid, line(`${ENGINE_PLAN_NAMES[entry.plan]} · since day ${record.sinceDay} · ${dayIndex(state) - record.sinceDay}d`, 'inspector-line goal-ahead')];
 }
