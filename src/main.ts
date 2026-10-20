@@ -67,6 +67,7 @@ import { openCallPopup } from './ui/callPopup';
 import { updateHudPnl } from './ui/hudPnl';
 import { updateAlerts } from './ui/alerts';
 import { updatePoolBars } from './ui/poolBars';
+import { setupPipeline, updatePipeline } from './ui/pipeline';
 import { setupGameOver, updateGameOver } from './ui/gameOver';
 import { showYearReport } from './ui/yearReport';
 
@@ -308,6 +309,7 @@ function render(nowMs: number = performance.now()): void {
   updateTutorial(state, choosingHome);
   updateMarket(state);
   updatePoolBars(state);
+  updatePipeline(state, choosingHome);
   // Always visible, whatever screen is open: see ui/alerts.ts's own
   // comment for why that's the point. An alert with no view of its own
   // (a schedule problem) opens Fleet, where the rotations are.
@@ -527,6 +529,16 @@ document.querySelector('#about-tutorial-button')!.addEventListener('click', () =
   startTutorial();
 });
 setupMapLinks(() => render());
+// The pipeline (ui/pipeline.ts): its quick edits rebuild the panel; its links on Crews and Mtc show the map on a phone.
+setupPipeline(
+  () => {
+    renderInspector(state);
+    render();
+  },
+  () => {
+    if (isNarrowWindow()) setPanelHidden(true);
+  },
+);
 document.querySelector('#rail-jump')!.addEventListener('click', () => openJumpBox(state));
 
 // The inspector (ui/inspector/) follows the selection: a map click, a link
@@ -1183,6 +1195,8 @@ const toolsToggle = document.querySelector<HTMLButtonElement>('#map-tools-toggle
 toolsToggle.addEventListener('click', () => {
   const open = !document.documentElement.hasAttribute('data-tools');
   document.documentElement.toggleAttribute('data-tools', open);
+  // The pipeline opens in the same place: one or the other.
+  if (open) document.documentElement.removeAttribute('data-pipeline');
   toolsToggle.setAttribute('aria-expanded', String(open));
   toolsToggle.classList.toggle('active', open);
 });

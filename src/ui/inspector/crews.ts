@@ -14,23 +14,22 @@ import { select } from '../selection';
 import { baseSection } from './bases';
 import { heading, info, line, lineWithInfo } from './dom';
 import { pairingsSection } from './pairings';
+import { pipelineLink } from '../pipelineLink';
 
 /**
  * The Crews screen as a crew planner's board (sim/crewPlan.ts): what's
  * coming over the next month, what needs doing about it, and each base's
  * roster by type rating.
  *
- * - **The horizon**: the next HORIZON_DAYS, with each plane's entry into
- *   service (red if it would arrive short of crews), each batch of crews
- *   joining, and each plane going back.
+ * - **The pipeline link**: what's coming over the next month (deliveries,
+ *   crews joining, planes going back) is on the map's pipeline
+ *   (ui/pipeline.ts).
  * - **To do**: every plane that would enter service short, with the last
  *   day a hire still lands in time and a button to hire the shortfall, or
  *   to convert reserve crews of another type at the base.
  * - **Roster**: per base, per type, a bar of crews on hand and joining
  *   against the minimum and comfortable marks, with a status chip.
  */
-
-const HORIZON_DAYS = 30;
 
 type Chip = { text: string; tone: 'bad' | 'warn' | 'good' | 'info' | 'idle' };
 
@@ -111,7 +110,7 @@ export function buildCrewsView(state: SimState, changed: () => void): HTMLElemen
     ),
   );
 
-  root.append(...horizon(plan, today));
+  root.append(pipelineLink('Deliveries and crews joining'));
   root.append(...toDo(state, plan, today, changed));
   root.append(...roster(state, plan, today, changed));
   root.append(...pairingsSection(state));
@@ -160,43 +159,6 @@ function crewBasesSection(state: SimState, plan: ReturnType<typeof crewPlan>, ch
     }
     nodes.push(buttons);
   }
-  return nodes;
-}
-
-/** The next HORIZON_DAYS as a strip: EIS, crews joining, planes going back. */
-function horizon(plan: ReturnType<typeof crewPlan>, today: number): HTMLElement[] {
-  const strip = document.createElement('div');
-  strip.className = 'crew-horizon';
-  const at = (day: number) => `${(Math.min(HORIZON_DAYS, Math.max(0, day - today)) / HORIZON_DAYS) * 100}%`;
-  for (const d of [0, 10, 20, 30]) {
-    const tick = document.createElement('span');
-    tick.className = 'crew-horizon-tick';
-    tick.style.left = at(today + d);
-    tick.textContent = d === 0 ? 'today' : `+${d}d`;
-    strip.append(tick);
-  }
-  let marks = 0;
-  const mark = (day: number, className: string, glyph: string, text: string) => {
-    if (day - today > HORIZON_DAYS) return;
-    const el = document.createElement('span');
-    el.className = `crew-horizon-mark ${className}`;
-    el.style.left = at(day);
-    el.textContent = glyph;
-    el.title = text;
-    strip.append(el);
-    marks++;
-  };
-  for (const base of plan) {
-    for (const c of base.classes) {
-      for (const entry of c.entries) {
-        mark(entry.day, entry.short > 0 ? 'is-short' : 'is-eis', '✈', `${base.iata} ${c.name} EIS day ${entry.day}${entry.short > 0 ? ` · short ${entry.short}` : ' · crewed'}`);
-      }
-      for (const j of c.joining) mark(j.day, 'is-joining', '●', `${base.iata} +${j.count} ${c.name} crew${j.count === 1 ? '' : 's'} day ${j.day} (${j.kind})`);
-      for (const day of c.returningDays) mark(day, 'is-returning', '↩', `${base.iata} ${c.name} back to lessor day ${day}`);
-    }
-  }
-  const nodes: HTMLElement[] = [heading(`Next ${HORIZON_DAYS} days`, '✈ a plane entering service (red if it would arrive short of crews), ● crews joining, ↩ a plane going back to the lessor. Hover a mark for its day.'), strip];
-  if (marks === 0) nodes.push(line('Nothing coming · lease a plane and its EIS shows here', 'inspector-line goal-ahead'));
   return nodes;
 }
 
