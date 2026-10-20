@@ -208,8 +208,11 @@ export const SNAP_MINUTES = 10;
  */
 export function snapStart(state: SimState, legIds: string[], toTail: string, rawStart: number): number {
   const view = tomorrowView(state);
-  const own = view.schedule.filter((leg) => legIds.includes(leg.legId)).sort((a, b) => a.departMinute - b.departMinute);
+  let own = view.schedule.filter((leg) => legIds.includes(leg.legId)).sort((a, b) => a.departMinute - b.departMinute);
   if (own.length === 0) return rawStart;
+  // A long-haul pair across midnight stores its flight back a day early: measured flight out first.
+  const wrapped = wrappedLongHaul(view, own[0].tail);
+  if (wrapped) own = [wrapped.out, { ...wrapped.back, departMinute: wrapped.back.departMinute + 24 * 60 }];
   const first = own[0];
   const last = own[own.length - 1];
   const span = last.departMinute + last.blockMinutes - first.departMinute;
