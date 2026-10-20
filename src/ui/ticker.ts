@@ -759,7 +759,7 @@ function pollContractEvents(state: SimState): void {
         pushEvent(state.simMinute, 'CONTRACT', `${market} taken by ${c.lostTo} · demand −${Math.round(SNAP_BACK_SHARE * 100)}%`, route);
       } else if (c.status === 'ended') {
         pushEvent(state.simMinute, 'CONTRACT', `${market} contract over · demand −${Math.round(SNAP_BACK_SHARE * 100)}%`, route);
-      } else if (c.status === 'lapsed') {
+      } else if (c.status === 'lapsed' && !c.declined) {
         pushEvent(state.simMinute, 'CONTRACT', `${market} offer lapsed`);
       }
     }

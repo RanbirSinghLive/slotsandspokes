@@ -3,6 +3,7 @@ import {
   contractsOf,
   counterRenewal,
   counterTakeover,
+  declineContract,
   faceOf,
   graduation,
   paymentShare,
@@ -10,6 +11,7 @@ import {
   renewalTerms,
   RENEWAL_WINDOW_DAYS,
   satisfactionOf,
+  setContractsOff,
   SNAP_BACK_SHARE,
   takeoverOpen,
   type Contract,
@@ -183,7 +185,14 @@ function tenderCard(state: SimState, contract: Contract, changed: () => void): H
     changed();
   });
   bid.classList.add('is-bid');
-  controls.append(glyphButton('−', `Ask ${money(step)} less`, () => move(-step)), ask, glyphButton('+', `Ask ${money(step)} more`, () => move(step)), frequency, bid);
+  const decline = glyphButton('✕', 'Decline · drop this tender', () => {
+    declineContract(state, contract.id);
+    drafts.delete(contract.id);
+    answers.delete(contract.id);
+    changed();
+  });
+  decline.classList.add('is-decline');
+  controls.append(glyphButton('−', `Ask ${money(step)} less`, () => move(-step)), ask, glyphButton('+', `Ask ${money(step)} more`, () => move(step)), frequency, bid, decline);
   card.append(controls);
 
   if (contract.bid) {
@@ -301,15 +310,26 @@ export function buildContractsView(state: SimState, changed: () => void): HTMLEl
   const all = contractsOf(state);
   const tenders = all.filter((c) => c.status === 'offered').sort((x, y) => x.id - y.id);
   const running = all.filter((c) => c.status === 'active').sort((x, y) => x.id - y.id);
-  const past = all.filter((c) => c.status === 'ended' || c.status === 'lapsed').sort((x, y) => y.id - x.id);
+  // Declined tenders were the player's own no, so they don't come back as history either.
+  const past = all.filter((c) => (c.status === 'ended' || c.status === 'lapsed') && !c.declined).sort((x, y) => y.id - x.id);
+  const off = state.contractsOff === true;
 
-  root.append(
-    heading(
+  const tendersHeading = heading(
       'Tenders',
       `Route contracts for small, underserved communities. Name a price a day and how often you fly it each way; with no rival able to bid you win at once, otherwise it is decided on the closing day against the rivals' bids, mostly on price. Then fly the market both ways to start it. The riders and half the pay depend on the route's on-time, completion and NPS against stricter bars than ordinary passengers hold it to. The buyer's mood follows that, and moves what it pays when the term renews. A market that has built up enough to stand on its own ends the contract. A buyer left too unhappy ends it, the market's built-up demand drops ${Math.round(SNAP_BACK_SHARE * 100)}% and the route goes out to tender again.`,
-    ),
   );
-  if (tenders.length === 0) root.append(line('None open', 'inspector-line goal-ahead'));
+  const toggle = glyphButton(off ? '🔕' : '🔔', off ? 'Tenders off · tap to take new tenders again' : 'Tenders on · tap to stop new tenders (open ones are declined, running contracts carry on)', () => {
+    setContractsOff(state, !off);
+    drafts.clear();
+    answers.clear();
+    changed();
+  });
+  toggle.classList.add('contract-toggle');
+  toggle.classList.toggle('is-off', off);
+  toggle.setAttribute('aria-pressed', String(!off));
+  tendersHeading.append(' ', toggle);
+  root.append(tendersHeading);
+  if (tenders.length === 0) root.append(line(off ? 'Off · no new tenders' : 'None open', 'inspector-line goal-ahead'));
   for (const contract of tenders) root.append(tenderCard(state, contract, changed));
 
   root.append(heading('Running'));

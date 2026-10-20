@@ -6978,6 +6978,24 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
   background: rgba(127, 216, 143, 0.12);
 }
 
+.contract-glyph-button.is-decline {
+  margin-left: auto;
+  border-color: rgba(255, 140, 120, 0.4);
+  color: #ff9c8a;
+}
+
+.contract-glyph-button.contract-toggle {
+  min-width: 26px;
+  height: 24px;
+  padding: 0 6px;
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+.contract-glyph-button.contract-toggle.is-off {
+  opacity: 0.6;
+}
+
 .contract-won {
   color: #7ed6a8;
 }

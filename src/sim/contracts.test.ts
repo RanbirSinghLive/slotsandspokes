@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import airportCountries from '../../data/airport-countries.json';
-import { counterRenewal, GRACE_DAYS, performanceFactor, counterTakeover, faceOf, graduation, makeOffers, renewalTerms, rollDailyContracts } from './contracts';
+import { counterRenewal, declineContract, GRACE_DAYS, setContractsOff, performanceFactor, counterTakeover, faceOf, graduation, makeOffers, renewalTerms, rollDailyContracts } from './contracts';
 import { dayIndex } from './clock';
 import { currentPotentialDemand } from './marketDemand';
 import { marketKey } from './schedule';
@@ -54,6 +54,26 @@ function freshTender(seed: number): { state: ReturnType<typeof createNewGameStat
   assert.equal(tender.awardedDay, 0, 'a solo bid is awarded at once');
   assert.equal(tender.paymentPerDay, reserve, 'pays the ask');
   assert.equal(placeBid(state, id, reserve, 1).ok, false, 'an awarded tender cannot be rebid');
+}
+
+// Declining drops a tender; switching tenders off declines the open ones and stops new offers.
+{
+  const { state, id } = freshTender(3);
+  assert.equal(declineContract(state, id).ok, true);
+  const declined = state.contracts!.find((c) => c.id === id)!;
+  assert.equal(declined.status, 'lapsed');
+  assert.equal(declined.declined, true);
+  assert.equal(declineContract(state, id).ok, false, 'a declined tender cannot be declined again');
+
+  const fresh = freshTender(5);
+  setContractsOff(fresh.state, true);
+  assert.ok(fresh.state.contracts!.every((c) => c.status !== 'offered'), 'switching off declines open tenders');
+  const before = fresh.state.contracts!.length;
+  makeOffers(fresh.state, false);
+  assert.equal(fresh.state.contracts!.length, before, 'no new offers while off');
+  assert.ok(JSON.parse(JSON.stringify(fresh.state)).contractsOff, 'the switch is saved');
+  setContractsOff(fresh.state, false);
+  assert.equal(fresh.state.contractsOff, undefined);
 }
 
 // Twice-daily flying: bigger band, more riders, and it needs four legs to start.

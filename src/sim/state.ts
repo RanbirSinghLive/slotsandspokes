@@ -640,6 +640,8 @@ export type SimState = {
   /** Contracts offered, running and lately finished (sim/contracts.ts). Absent in older saves. */
   contracts?: Contract[];
   nextContractId?: number;
+  /** The player switched tenders off on the Contracts screen (setContractsOff()): no new offers. */
+  contractsOff?: boolean;
   /** The day the next round of contract offers is made. */
   nextContractOfferDay?: number;
   /** The contracts' own random stream (sim/contracts.ts), apart from rngSeed so offers don't shift every other roll. */
