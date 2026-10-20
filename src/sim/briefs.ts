@@ -128,7 +128,7 @@ export function buildDailyBrief(state: SimState): DailyBrief {
     chips.push({
       kind: 'event',
       count: eventsToday.length,
-      tip: `Events flying today: ${eventsToday.map((mandate) => `${mandate.origin}→${mandate.dest}`).join(', ')}`,
+      tip: `Requests flying today: ${eventsToday.map((mandate) => `${mandate.origin}→${mandate.dest}`).join(', ')}`,
       target: { screen: 'fleet' },
     });
   }

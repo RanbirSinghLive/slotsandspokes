@@ -185,14 +185,20 @@ the economy's rules, so a route pays the same on every tier:
 | Medium | $500,000 | day 15 | ×1 | day 60 |
 | Hard | $350,000 | day 10 | ×1.5 | day 40 |
 
-Next to the tiers, a ★ button turns events (priority flights, below) off for the
-game: `state.eventsOff` is set at the start and `rollDailyMandates()` then offers
-none (absent in older saves, which have events). It is not a difficulty tier.
+Next to the tiers, a ★ button turns events (requests, i.e. priority flights,
+below, and crisis days) off for the game: `state.eventsOff` is set at the start,
+`rollDailyMandates()` then offers no requests and no storm is forecast (absent
+in older saves, which have events). It is not a difficulty tier.
 
-Events show above the Fleet Schedule: an open offer has Details, an accepted
-one is a row that opens the plane flying it (the route if no flight matches),
-and an offer that lapsed stays greyed and struck through for two days. The
-Gantt stars the rotation that flies an accepted event.
+Requests (`sim/mandates.ts`, called mandates in the code) show on the
+Contracts screen under their own heading: an open offer has Details, an
+accepted one is a row that opens the plane flying it (the route if no flight
+matches), and an offer that lapsed stays greyed and struck through for two
+days. The 🔔/🔕 by the heading is `setRequestsOff()` (`state.requestsOff`,
+saved; absent follows `eventsOff`): off, no new offers come, open ones lapse as
+declined (not kept as history) and accepted ones carry on. The daily draws are
+the same either way. The HUD ★ chip opens the Contracts screen. The Gantt stars
+the rotation that flies an accepted request.
 
 Medium is the game `balance-reference.json` measures. The headless
 runner takes `--difficulty easy|medium|hard` (`npm run headless`). Home
@@ -3615,7 +3621,7 @@ span (a plane out of service, a closure, an event) runs as a bar to its end.
 | Mtc | C check (teal, amber in its booking window, red overdue, dashed when booked), D check (violet), a plane in its heavy check or AOG or refit, as a bar to the day it's back | induct or push a C check +1/+5/+15d, book or cancel a D check, expedite an AOG |
 | Fleet | a delivery (EIS; red with "−N" when it would arrive short of crews), a ferry to another base, a plane going back to the lessor or a seasonal lease ending | hire the crews a delivery is short |
 | Crews | a batch of crews joining (hired or converting) | |
-| Sales | a contract term ending, an offer or award lapsing, a tender being decided, a rival's takeover window closing, a mandate offer lapsing or a mandate running | decline a tender or offer not yet awarded |
+| Sales | a contract term ending, an offer or award lapsing, a tender being decided, a rival's takeover window closing, a request offer lapsing or a request running; the lane goes when tenders and requests are both switched off | decline a tender or offer not yet awarded |
 | Network | an airspace closure near the network (`closureIsRelevant()`), a demand event at an airport on the map, a station upgrade finishing | |
 
 Every tip also has a link to the screen that owns the item (Mtc, Crews,

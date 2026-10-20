@@ -2712,8 +2712,9 @@ button.ticker-item:hover {
   background: #b9a6ff;
 }
 
-/* Contracts: gold, money that comes with terms. */
-.ticker-tag--contract {
+/* Contracts and requests: gold, money that comes with terms. */
+.ticker-tag--contract,
+.ticker-tag--request {
   background: #e8c170;
 }
 

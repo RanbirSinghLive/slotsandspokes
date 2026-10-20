@@ -7,6 +7,7 @@ import * as ops from './routeActions';
 import { RUNWAY_WARN_DAYS } from './runway';
 import { getSelection, select, type Selection } from './selection';
 import { contractsOf, faceOf, takeoverOpen } from '../sim/contracts';
+import { mandatesOf } from '../sim/mandates';
 import { anyEntryShort } from '../sim/crewPlan';
 import { activeShock } from '../sim/shocks';
 
@@ -94,7 +95,10 @@ function newsIds(state: SimState): Partial<Record<Screen, string[]>> {
     goals: Object.keys(state.milestonesMet ?? {}),
     rivals: state.competitorRoutes.filter((route) => flown.has(marketKey(route.origin, route.dest))).map((route) => `${route.code}:${marketKey(route.origin, route.dest)}`),
     headOffice: offers,
-    contracts: contractsOf(state).filter((c) => c.status === 'offered').map((c) => `contract:${c.id}`),
+    contracts: [
+      ...contractsOf(state).filter((c) => c.status === 'offered').map((c) => `contract:${c.id}`),
+      ...mandatesOf(state).filter((m) => m.status === 'offered').map((m) => `request:${m.id}`),
+    ],
   };
 }
 

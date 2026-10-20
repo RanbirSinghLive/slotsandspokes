@@ -47,7 +47,7 @@ const LANES: Record<PipelineLane, { glyph: GlyphName; name: string }> = {
   mtc: { glyph: 'wrench', name: 'Mtc · checks, hangar, AOG' },
   fleet: { glyph: 'plane', name: 'Fleet · deliveries, ferries, returns' },
   crew: { glyph: 'people', name: 'Crews · joining' },
-  commercial: { glyph: 'contract', name: 'Sales · contracts, tenders, mandates' },
+  commercial: { glyph: 'contract', name: 'Sales · contracts, tenders, requests' },
   network: { glyph: 'globe', name: 'Network · closures, events, stations' },
 };
 
@@ -165,7 +165,7 @@ function targets(item: PipelineItem): { map: Selection | null; open: Selection |
     case 'takeover':
       return { map: airport, open: { kind: 'contracts' }, openLabel: 'Contracts' };
     case 'mandate':
-      return { map: airport, open: { kind: 'fleet' }, openLabel: 'Fleet' };
+      return { map: airport, open: { kind: 'contracts' }, openLabel: 'Contracts' };
     case 'closure':
       return { map: null, open: null, openLabel: '' };
     case 'event':
@@ -186,6 +186,11 @@ function tipButton(label: string | Node, tip: string | null, ready: boolean, run
     run();
   });
   return button;
+}
+
+/** Read the pipeline again on the next frame even with the clock paused: for a screen that changed what feeds it. */
+export function refreshPipeline(): void {
+  signature = null;
 }
 
 function changedNow(): void {
@@ -336,8 +341,8 @@ function tipBody(state: SimState, item: PipelineItem): { title: string; lines: s
       const mandate = mandatesOf(state).find((m) => m.id === item.id);
       if (!mandate) break;
       const market = `${mandate.origin}–${mandate.dest}`;
-      if (mandate.status === 'offered') return { title: `Mandate offer · ${market}`, lines: [`Lapses ${inDays(mandate.startDay, today)} unless accepted`, `${money(mandate.premium)} premium · ${money(mandate.penalty)} penalty`], actions: [] };
-      return { title: `Mandate · ${market}`, lines: [mandate.startDay > today ? `Starts ${inDays(mandate.startDay, today)}` : `Running · ends ${inDays(mandate.endDay, today)}`, `${mandate.flown} flown · ${mandate.failed} failed`], actions: [] };
+      if (mandate.status === 'offered') return { title: `Request offer · ${market}`, lines: [`Lapses ${inDays(mandate.startDay, today)} unless accepted`, `${money(mandate.premium)} premium · ${money(mandate.penalty)} penalty`], actions: [] };
+      return { title: `Request · ${market}`, lines: [mandate.startDay > today ? `Starts ${inDays(mandate.startDay, today)}` : `Running · ends ${inDays(mandate.endDay, today)}`, `${mandate.flown} flown · ${mandate.failed} failed`], actions: [] };
     }
     case 'closure': {
       const closure = (state.airspaceClosures ?? []).find((c) => c.id === item.id);

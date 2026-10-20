@@ -17,17 +17,19 @@ import {
   type Contract,
   type Face,
 } from '../../sim/contracts';
+import { LATE_MINUTES, requestsOff, setRequestsOff } from '../../sim/mandates';
 import type { SimState } from '../../sim/state';
 import { standingOf, standingPips } from '../../sim/standing';
 import { buyerKey, buyerTypeOf, eligibleRivals, frequencyOf, minAskPerDay, placeBid, referencePerDay, reservePerDay } from '../../sim/tenders';
+import { requestRows } from '../mandates';
 import { money, shortMoney } from '../format';
 import { select } from '../selection';
 import { heading, line } from './dom';
 
 /**
  * The Contracts screen (Network › Contracts): tenders to bid on, the
- * contracts running with the buyer's face and a ring to the renewal, and
- * the last few finished. The rules live in sim/contracts.ts and
+ * contracts running with the buyer's face and a ring to the renewal, the
+ * last few finished, and requests (ui/mandates.ts). The rules live in sim/contracts.ts and
  * sim/tenders.ts; this is only the gesture and the cards. Icons carry the
  * state and the words are in the tips.
  */
@@ -305,6 +307,25 @@ function pastCard(contract: Contract): HTMLElement {
   return card;
 }
 
+/** Requests: a client asks for a set flight on a route you fly, on time, for a premium. Its own switch, like tenders'. */
+function requestsSection(state: SimState, changed: () => void): HTMLElement[] {
+  const off = requestsOff(state);
+  const requestsHeading = heading(
+    'Requests',
+    `A client (a band, a delegation, a medical team) asks for one flight a day on a route you already fly, for a term, announced two to four weeks ahead. Accepting is free. Each flight on time pays a premium; each cancelled or more than ${LATE_MINUTES} minutes late costs a penalty, except for weather and closed airspace; a term kept pays a bonus. Crews go to that plane first. Standing with a client rises with every flight kept, raises what it pays and brings it back.`,
+  );
+  const toggle = glyphButton(off ? '🔕' : '🔔', off ? 'Requests off · tap to take new requests again' : 'Requests on · tap to stop new requests (open offers lapse, accepted ones carry on)', () => {
+    setRequestsOff(state, !off);
+    changed();
+  });
+  toggle.classList.add('contract-toggle');
+  toggle.classList.toggle('is-off', off);
+  toggle.setAttribute('aria-pressed', String(!off));
+  requestsHeading.append(' ', toggle);
+  const rows = requestRows(state, changed);
+  return [requestsHeading, ...(rows.length > 0 ? rows : [line(off ? 'Off · no new requests' : 'None open', 'inspector-line goal-ahead')])];
+}
+
 export function buildContractsView(state: SimState, changed: () => void): HTMLElement {
   const root = document.createElement('div');
   const all = contractsOf(state);
@@ -335,6 +356,8 @@ export function buildContractsView(state: SimState, changed: () => void): HTMLEl
   root.append(heading('Running'));
   if (running.length === 0) root.append(line('None running', 'inspector-line goal-ahead'));
   for (const contract of running) root.append(runningCard(state, contract, changed));
+
+  root.append(...requestsSection(state, changed));
 
   if (past.length > 0) {
     root.append(heading('Past'));

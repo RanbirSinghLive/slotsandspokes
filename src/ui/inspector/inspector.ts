@@ -1,3 +1,4 @@
+import { refreshPipeline } from '../pipeline';
 import { chipIconFor } from './chipIcons';
 import { buildGoalsView } from './goals';
 import { buildContractsView } from './contracts';
@@ -213,7 +214,11 @@ export function renderInspector(state: SimState): void {
   // keeps the reader's place; a new selection starts at the top.
   const scroll = key === renderedKey ? inspectorEl.scrollTop : 0;
   renderedKey = key;
-  const rebuild = () => renderInspector(state);
+  // An action on a screen can change what the pipeline shows, so it is read again even with the clock paused.
+  const rebuild = () => {
+    refreshPipeline();
+    renderInspector(state);
+  };
   if (selection.kind === 'route') {
     const view = buildRouteView(state, selection.a, selection.b, rebuild);
     bodyEl.replaceChildren(view.root);
