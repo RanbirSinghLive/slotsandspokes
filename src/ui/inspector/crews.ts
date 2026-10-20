@@ -11,7 +11,8 @@ import { planeIconElement } from '../planeIcons';
 import { cashAfterRows, showConfirm } from '../confirmModal';
 import * as ops from '../routeActions';
 import { select } from '../selection';
-import { baseSection } from './bases';
+import { foldHeader, isFolded } from './crewsFold';
+import { glyph } from '../glyphs';
 import { heading, info, line, lineWithInfo } from './dom';
 import { pairingsSection } from './pairings';
 import { pipelineLink } from '../pipelineLink';
@@ -81,6 +82,57 @@ function when(day: number, today: number): string {
   return d === 0 ? 'today' : d > 0 ? `in ${d}d` : `${-d}d ago`;
 }
 
+/** The two halves of the Crews screen: where crews live and who to hire, or the duty the schedule asks of them. */
+type CrewsView = 'bases' | 'pairings';
+
+const VIEW_KEY = 'slotsandspokes-crews-view';
+
+// Remembered in the browser so the screen opens the way it was left; a
+// blocked localStorage (private window) just means the default each time.
+function readView(): CrewsView {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'pairings' ? 'pairings' : 'bases';
+  } catch {
+    return 'bases';
+  }
+}
+
+let view = readView();
+
+function setView(next: CrewsView): void {
+  view = next;
+  try {
+    localStorage.setItem(VIEW_KEY, next);
+  } catch {
+    // Not remembered; the switch still works for this visit.
+  }
+}
+
+/** The switch at the top: crew bases and hiring, or pairings. */
+function viewSwitch(changed: () => void): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'crews-view';
+  wrap.setAttribute('role', 'tablist');
+  for (const [value, icon, label] of [
+    ['bases', 'people', 'Bases & hiring'],
+    ['pairings', 'timer', 'Pairings'],
+  ] as const) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.setAttribute('role', 'tab');
+    button.setAttribute('aria-selected', String(view === value));
+    button.classList.toggle('is-active', view === value);
+    button.append(glyph(icon), ` ${label}`);
+    button.addEventListener('click', () => {
+      if (view === value) return;
+      setView(value);
+      changed();
+    });
+    wrap.append(button);
+  }
+  return wrap;
+}
+
 export function buildCrewsView(state: SimState, changed: () => void): HTMLElement {
   const root = document.createElement('div');
   root.className = 'inspector-view';
@@ -89,7 +141,7 @@ export function buildCrewsView(state: SimState, changed: () => void): HTMLElemen
   title.textContent = 'Crews';
   const nudge = execNudge(state, ['cpo-solheim']);
   if (nudge) title.append(nudge);
-  root.append(title);
+  root.append(title, viewSwitch(changed));
 
   const today = dayIndex(state);
   const plan = crewPlan(state);
@@ -101,65 +153,24 @@ export function buildCrewsView(state: SimState, changed: () => void): HTMLElemen
     (sum, base) => sum + base.classes.reduce((s, c) => s + Math.max(0, c.crews - c.ideal) * standbyCost(c.classCode), 0),
     0,
   );
+  const baseCount = ops.crewBaseReadout(state).bases.length;
   root.append(
     line(
-      `${crews} crews · ${ops.crewBaseReadout(state).bases.length} base${ops.crewBaseReadout(state).bases.length === 1 ? '' : 's'}` +
+      `${crews} crews · ${baseCount} base${baseCount === 1 ? '' : 's'}` +
         (joining > 0 ? ` · +${joining} joining` : '') +
         (reserveCost > 0 ? ` · reserve ${money(reserveCost)}/day` : '') +
         ` · hire ${hireLeadDays(state)}d · conversion ${retrainDays(state)}d`,
     ),
   );
 
+  if (view === 'pairings') {
+    root.append(...pairingsSection(state, changed));
+    return root;
+  }
   root.append(pipelineLink('Deliveries and crews joining'));
   root.append(...toDo(state, plan, today, changed));
   root.append(...roster(state, plan, today, changed));
-  root.append(...pairingsSection(state));
-  root.append(...crewBasesSection(state, plan, changed));
   return root;
-}
-
-/**
- * The crew bases (sim/bases.ts): open one at any airport on the map, close
- * an empty one. A new base has no crews: hire them here, then lease or
- * move planes to it.
- */
-function crewBasesSection(state: SimState, plan: ReturnType<typeof crewPlan>, changed: () => void): HTMLElement[] {
-  const readout = ops.crewBaseReadout(state);
-  const nodes = baseSection({
-    title: 'Crew bases',
-    icon: 'people',
-    info: `Where crews live, and the only places planes can be leased or based. Opening one costs ${money(readout.fee)} and ${money(readout.perDay)} a day for the crew room; home's comes with the start. A new base has no crews: hire them before its first plane. A crew base is not a maintenance base: planes get line checks only at a line base, opened on the Mtc screen.`,
-    kind: 'crew base',
-    bases: readout.bases,
-    candidates: readout.candidates,
-    fee: readout.fee,
-    perDay: readout.perDay,
-    preview: (action, iata) => ops.previewBaseChange(state, 'crew', action, iata),
-    open: (iata) => ops.openCrewBaseAt(state, iata),
-    close: (iata) => ops.closeCrewBaseAt(state, iata),
-    changed,
-  });
-  // A base with no roster yet (no crews, no planes) has nothing in the roster above to hire from.
-  for (const base of readout.bases) {
-    if (plan.some((entry) => entry.iata === base.iata)) continue;
-    const classes = ops.crewReadout(state, base.iata)?.classes.filter((c) => c.open) ?? [];
-    if (classes.length === 0) continue;
-    const buttons = document.createElement('div');
-    buttons.className = 'crew-buttons';
-    buttons.append(line(`${base.iata} · no crews yet`, 'inspector-line crew-row-detail'));
-    const emptySeats = ops.crewReadout(state, base.iata)?.training.pilot.free ?? 0;
-    for (const c of classes) {
-      const hire = actionButton('+', emptySeats === 0 || state.cash < hireFee(c.classCode), () => ops.hireCrewsAt(state, base.iata, c.classCode, 1), changed, {
-        title: `Hire 1 ${c.name} crew · ${base.iata}`,
-        rows: [{ label: 'Fee now', value: money(hireFee(c.classCode)) }, ...cashAfterRows(state, hireFee(c.classCode))],
-        confirmLabel: `Hire · ${money(hireFee(c.classCode))}`,
-      }, emptySeats === 0 ? 'No free training seats' : `Hire 1 ${c.name} crew · ${money(hireFee(c.classCode))}`);
-      hire.prepend(planeIconElement(c.classCode), ' ');
-      buttons.append(hire);
-    }
-    nodes.push(buttons);
-  }
-  return nodes;
 }
 
 /** Every plane that would enter service short, with what to do and by when. */
@@ -237,19 +248,64 @@ function entryRow(state: SimState, iata: string, c: ClassPlan, entry: PlaneEntry
   return row;
 }
 
-/** Each base's roster, type by type. */
+/** The worst chip among a base's types, so a folded base still says whether it needs anything. */
+const TONE_ORDER: Chip['tone'][] = ['bad', 'warn', 'info', 'good', 'idle'];
+
+/**
+ * Each crew base's roster, type by type, folding on its header. A base with
+ * no crews or planes yet has hire buttons for every open type instead.
+ * Bases open and close from the airport's menu on the map.
+ */
 function roster(state: SimState, plan: ReturnType<typeof crewPlan>, today: number, changed: () => void): HTMLElement[] {
-  const nodes: HTMLElement[] = [heading('Roster', 'Crews by type rating at each base. The bar is crews on hand (solid) and joining (hatched); the marks are the legal minimum (red), the comfortable number for 8-hour shifts (white), and what the planes on their way will need (amber). Short grounds planes; tight flies late legs tired; reserve crews stand by at a daily cost. Regional and bigger types have a cabin row under their pilots: attendants by the seat plan, where under the legal floor grounds a plane and under full service costs NPS.')];
-  for (const base of plan) {
+  const readout = ops.crewBaseReadout(state);
+  const nodes: HTMLElement[] = [
+    heading(
+      'Roster',
+      `Crews by type rating at each crew base; tap a base to fold it. The bar is crews on hand (solid) and joining (hatched); the marks are the legal minimum (red), the comfortable number for 8-hour shifts (white), and what the planes on their way will need (amber). Short grounds planes; tight flies late legs tired; reserve crews stand by at a daily cost. Regional and bigger types have a cabin row under their pilots: attendants by the seat plan, where under the legal floor grounds a plane and under full service costs NPS. A crew base is where crews live and the only place planes can be leased or based: open one (${money(readout.fee)} + ${money(readout.perDay)}/day) or close an empty one from the airport's menu on the map. It is not a maintenance base: line checks happen only at a line base, opened on the Mtc screen.`,
+    ),
+  ];
+  // Home first, then the rest as the crew planner orders them, then bases with nothing on them yet.
+  const order = [...plan.map((entry) => entry.iata), ...readout.bases.map((base) => base.iata).filter((iata) => !plan.some((entry) => entry.iata === iata))];
+  for (const iata of order) {
+    const base = plan.find((entry) => entry.iata === iata);
+    const baseInfo = readout.bases.find((entry) => entry.iata === iata);
     const card = document.createElement('div');
     card.className = 'crew-base';
-    const name = linkToMap(document.createElement('button'), { kind: 'airport', iata: base.iata });
-    name.type = 'button';
-    name.className = 'inspector-link crew-base-name';
-    name.textContent = `${base.iata} · crew base`;
-    name.addEventListener('click', () => select({ kind: 'airport', iata: base.iata }));
-    card.append(name);
-    const training = ops.crewReadout(state, base.iata)?.training;
+    const key = `base:${iata}`;
+
+    const code = document.createElement('b');
+    code.className = 'iata-plate';
+    code.textContent = iata;
+    code.title = baseInfo?.name ?? iata;
+    const crews = base?.classes.reduce((sum, c) => sum + c.crews, 0) ?? 0;
+    const summary = document.createElement('span');
+    summary.className = 'crew-fold-detail';
+    const planes = baseInfo?.planes ?? 0;
+    summary.textContent = `${crews} crew${crews === 1 ? '' : 's'} · ✈ ${planes}` + (baseInfo && baseInfo.perDay > 0 ? ` · ${money(baseInfo.perDay)}/day` : '');
+    summary.title = `${crews} crews · ${planes} plane${planes === 1 ? '' : 's'} based · crew room ${baseInfo && baseInfo.perDay > 0 ? `${money(baseInfo.perDay)}/day` : 'free at home'}`;
+    const chips = (base?.classes ?? []).map(chipFor);
+    const worst = chips.sort((x, y) => TONE_ORDER.indexOf(x.tone) - TONE_ORDER.indexOf(y.tone))[0];
+    const header = foldHeader(key, changed, code, summary);
+    if (worst && (worst.tone === 'bad' || worst.tone === 'warn')) header.append(chipElement(worst));
+    // The map pin sits beside the fold header, not inside it: a button can't hold a button.
+    const head = document.createElement('div');
+    head.className = 'crew-base-head';
+    head.append(header);
+    card.append(head);
+    const toMap = linkToMap(document.createElement('button'), { kind: 'airport', iata });
+    toMap.type = 'button';
+    toMap.className = 'inspector-link crew-base-map';
+    toMap.append(glyph('mapPin'));
+    toMap.dataset.tip = `${iata} on the map · open or close bases from its menu`;
+    toMap.setAttribute('aria-label', toMap.dataset.tip);
+    toMap.addEventListener('click', () => select({ kind: 'airport', iata }));
+    head.append(toMap);
+    if (isFolded(key)) {
+      nodes.push(card);
+      continue;
+    }
+
+    const training = ops.crewReadout(state, iata)?.training;
     if (training) {
       card.append(
         lineWithInfo(
@@ -259,12 +315,16 @@ function roster(state: SimState, plan: ReturnType<typeof crewPlan>, today: numbe
         ),
       );
     }
-    for (const c of base.classes) {
-      card.append(classRow(state, base.iata, c, base.classes, today, changed));
-      const cabin = ops.crewReadout(state, base.iata)?.classes.find((r) => r.classCode === c.classCode)?.cabin;
-      if (cabin) card.append(cabinRow(state, base.iata, c, cabin, changed));
+    if (base) {
+      for (const c of base.classes) {
+        card.append(classRow(state, iata, c, base.classes, today, changed));
+        const cabin = ops.crewReadout(state, iata)?.classes.find((r) => r.classCode === c.classCode)?.cabin;
+        if (cabin) card.append(cabinRow(state, iata, c, cabin, changed));
+      }
+    } else {
+      card.append(emptyBaseHire(state, iata, changed));
     }
-    // Types the airline can't fly yet still show their cabin row, greyed out: a hint of what comes later.
+    // Types the airline can't fly yet still show, greyed out: a hint of what comes later.
     for (const cls of AIRCRAFT_CLASSES) {
       if (classOpen(state, cls.code)) continue;
       card.append(lockedRow(state, cls.code, 'pilot'));
@@ -273,6 +333,25 @@ function roster(state: SimState, plan: ReturnType<typeof crewPlan>, today: numbe
     nodes.push(card);
   }
   return nodes;
+}
+
+/** A base with no roster yet (no crews, no planes): a hire button per open type, to crew it before its first plane. */
+function emptyBaseHire(state: SimState, iata: string, changed: () => void): HTMLElement {
+  const buttons = document.createElement('div');
+  buttons.className = 'crew-buttons';
+  buttons.append(line('No crews yet', 'inspector-line crew-row-detail'));
+  const classes = ops.crewReadout(state, iata)?.classes.filter((c) => c.open) ?? [];
+  const emptySeats = ops.crewReadout(state, iata)?.training.pilot.free ?? 0;
+  for (const c of classes) {
+    const hire = actionButton('+', emptySeats === 0 || state.cash < hireFee(c.classCode), () => ops.hireCrewsAt(state, iata, c.classCode, 1), changed, {
+      title: `Hire 1 ${c.name} crew · ${iata}`,
+      rows: [{ label: 'Fee now', value: money(hireFee(c.classCode)) }, ...cashAfterRows(state, hireFee(c.classCode))],
+      confirmLabel: `Hire · ${money(hireFee(c.classCode))}`,
+    }, emptySeats === 0 ? 'No free training seats' : `Hire 1 ${c.name} crew · ${money(hireFee(c.classCode))}`);
+    hire.prepend(planeIconElement(c.classCode), ' ');
+    buttons.append(hire);
+  }
+  return buttons;
 }
 
 function classRow(state: SimState, iata: string, c: ClassPlan, siblings: ClassPlan[], today: number, changed: () => void): HTMLElement {
