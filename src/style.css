@@ -1628,6 +1628,7 @@ button,
    check saves them. The bar holds icons only; their tips name them. */
 #timeline-tools {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   margin-bottom: 6px;
@@ -1833,8 +1834,10 @@ button,
     opacity: 1;
   }
 
+  /* Below the corner, so on a short half it doesn't sit under the × above it. */
   .timeline-rotation .night-home-button {
-    top: -9px;
+    top: auto;
+    bottom: -9px;
     left: -9px;
     width: 22px;
     height: 22px;

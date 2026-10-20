@@ -6,14 +6,14 @@ import { TOUCH_TIP_MS } from './mapTools';
 import { nightStopLegs } from '../sim/nightStops';
 import { hasLineBase } from '../sim/bases';
 import { deferredItems, MX_HOLD_AT, tonightCheck } from '../sim/mxChecks';
-import { bringNightStopHome, draftProblem, dropRotation, dropRotationInDraft, overlappingLegs, planBringNightStopHome, planConnections, planFleetSort, planDropRotation, planGroundTimeChange, removeRotation as removeRotationFromSchedule, saveDraft, scheduleAfterSlips, snappedStart, type DraftMove, type DropPlan, type SortMode } from '../sim/playerActions';
+import { draftProblem, dropRotationInDraft, overlappingLegs, planBringNightStopHome, planConnections, planFleetSort, planDropRotation, planGroundTimeChange, removeRotation as removeRotationFromSchedule, saveDraft, scheduleAfterSlips, snappedStart, type DraftMove, type DropPlan, type SortMode } from '../sim/playerActions';
 import { GROUND_STEP_MINUTES, type DropConnections } from '../sim/scheduleDraft';
 import { cancelPendingRetime, type RetimePlan } from '../sim/retime';
 import { airportHours, FIRST_OPEN_HOUR, freeInHour, OPEN_HOURS } from '../sim/hours';
 import { money, shortMoney } from './format';
 import { formatNps, networkNps } from '../sim/nps';
 import { validateSchedule, type ScheduleLeg } from '../sim/schedule';
-import { allRotations, USABLE_DAY_END_MINUTE, USABLE_DAY_MINUTES, USABLE_DAY_START_MINUTE, utilisationProblems, wrappedLongHaul, type Rotation } from '../sim/utilisation';
+import { allRotations, rotationsForTail, USABLE_DAY_END_MINUTE, USABLE_DAY_MINUTES, USABLE_DAY_START_MINUTE, utilisationProblems, wrappedLongHaul, type Rotation } from '../sim/utilisation';
 import { select, selectRoute, type Selection } from './selection';
 import { networkTrends, type Measure } from '../sim/trends';
 import { AIRCRAFT_CLASSES, pluralClassName } from '../sim/aircraftClasses';
@@ -291,11 +291,12 @@ function rebuildTimeline(): void {
 // --- Planning a draft -------------------------------------------------------
 
 /**
- * A drop that fails only because it sits on other flights is kept in a
- * **draft**: the timeline then plans on a copy of the state, where flights
- * may overlap (red where they do), until the green ✓ replays every drop on
- * the real state (sim/scheduleDraft.ts), all or nothing. ✕ throws the draft
- * away, ↶ takes back the last drop.
+ * Every Gantt change (a drop, a swap, a turn step, a sort, a night stop's ⌂)
+ * goes in a **draft**: the timeline then plans on a copy of the state, where
+ * flights may overlap (red where they do), until the green ✓ replays every
+ * change on the real state (sim/scheduleDraft.ts), all or nothing. ✕ throws
+ * the draft away, ↶ takes back the last change. One rule, so the player
+ * always knows a change isn't made until ✓.
  */
 type Draft = {
   world: SimState;
@@ -491,8 +492,20 @@ function draftChangesNothing(live: SimState, world: SimState): boolean {
   });
 }
 
-/** The real state's rotations, drawn where the draft has put their flights. */
+/**
+ * The draft's rotations. A plane whose flights join up in the draft is
+ * grouped as the draft has it (a night stop made or brought home there
+ * shows as one); a plane with overlaps keeps the real schedule's grouping,
+ * drawn where the draft has put its flights.
+ */
 function draftRotations(live: SimState, world: SimState): Rotation[] {
+  const conflicted = overlappingLegs(world);
+  const clean = new Set(world.aircraft.map((a) => a.tail).filter((tail) => !world.schedule.some((leg) => leg.tail === tail && conflicted.has(leg.legId))));
+  return [...[...clean].flatMap((tail) => rotationsForTail(world, tail)), ...realRotationsIn(live, world).filter((rotation) => !clean.has(rotation.tail))];
+}
+
+/** The real state's rotations, drawn where the draft has put their flights. */
+function realRotationsIn(live: SimState, world: SimState): Rotation[] {
   const byId = new Map(world.schedule.map((leg) => [leg.legId, leg]));
   return allRotations(live).map((rotation) => {
     const moved = rotation.legs.map((leg) => byId.get(leg.legId) ?? leg);
@@ -572,7 +585,7 @@ function saveTheDraft(): void {
  * 5-minute steps, or down or up onto another plane of its type at its
  * base. While it's held, the sim plans the move (sim/retime.ts) and a tip
  * says what it would do or why it can't, and the base's hours show across
- * the top, room in each (sim/hours.ts). Let go to make it; Esc puts it
+ * the top, room in each (sim/hours.ts). Let go to put it in the draft (✓ saves); Esc puts it
  * back. A click without a drag opens its route.
  */
 function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
@@ -794,12 +807,12 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
           track.classList.add('has-wrap');
           track.append(twin);
         }
-        // Not in a draft: ⌂ and × act on the real schedule.
+        // ⌂ goes in the draft like a drag; × removes for real, so it waits until the draft is saved or thrown away.
+        if (half) span.append(nightHomeButtonFor(aircraft.tail, state));
         if (draft) {
           track.append(span);
           continue;
         }
-        if (half) span.append(nightHomeButtonFor(aircraft.tail, state));
         const removeButton = removeButtonFor(rotation, state, half ? own.find((other) => other !== rotation && (other.legs[0] === nightStop!.morning || other.legs[0] === nightStop!.evening)) : undefined);
         if (half) halfButtons.push(removeButton);
         // Past the axis's end, the × goes on the end that shows: the morning back at the start.
@@ -1045,7 +1058,7 @@ function onDragMove(event: PointerEvent): void {
 
   if (!drag.target || drag.target.tail !== tail || drag.target.start !== start) {
     drag.target = { tail, start };
-    drag.drop = planDropRotation(lastTimelineState, drag.rotation.legs.map((leg) => leg.legId), tail, start, draft !== null);
+    drag.drop = planDropRotation(lastTimelineState, drag.rotation.legs.map((leg) => leg.legId), tail, start);
     // A swap lights the rotations that would trade places with the held one.
     const swapping = new Set(drag.drop.kind === 'swap' ? drag.drop.moves.slice(1).flatMap((move) => move.legIds) : []);
     for (const other of rotationsTimelineEl.querySelectorAll<HTMLElement>('.timeline-rotation')) {
@@ -1119,15 +1132,8 @@ function onDragEnd(): void {
   justDragged = true;
   setTimeout(() => (justDragged = false), 0);
   if (drop?.ok && target && liveState && (target.start !== rotation.departMinute || target.tail !== rotation.tail)) {
-    if (draft || drop.kind === 'hold') {
-      // Planning: it goes in the draft and nothing real changes yet.
-      addToDraft(drop.moves);
-      if (draft && drop.kind === 'hold') flashTip(`✎ ${drop.reason} · ✓ saves when nothing overlaps`, false);
-    } else {
-      const result = dropRotation(liveState, drop.moves);
-      renderScheduleWarnings(scheduleProblems(liveState));
-      flashTip(result.ok ? (drop.kind === 'swap' ? `⇄ ${rotation.tail} ↔ ${swapName(drop)}` : result.message) : result.reason, !result.ok);
-    }
+    // Every change goes in the draft: nothing real changes until ✓.
+    if (addToDraft(drop.moves)) flashTip(drop.kind === 'hold' ? `✎ ${drop.reason} · ✓ saves when nothing overlaps` : `✎ ${drop.kind === 'swap' ? `⇄ ${swapName(drop)}` : describeRetime(drop.plan, target.tail, rotation.tail, target.start)} · ✓ saves`, false);
   } else if (drop && !drop.ok) {
     // Snapped back: say why, where the tip was, so the player isn't left guessing.
     flashTip(`Not moved · ${drop.reason}`, true);
@@ -1271,21 +1277,11 @@ function stepGround(legId: string, deltaMinutes: number): void {
   }
   const hubs = hubsText(planConnections(lastTimelineState, plan.plan.legs));
   const later = plan.moves[0].legIds.length;
-  let made = true;
-  let reason: string | null = null;
-  if (draft) {
-    made = addToDraft(plan.moves);
-  } else {
-    const result = dropRotation(liveState, plan.moves);
-    renderScheduleWarnings(scheduleProblems(liveState));
-    if (!result.ok) {
-      made = false;
-      reason = result.reason;
-    }
-  }
+  // Into the draft, like every Gantt change: ✓ saves it.
+  const made = addToDraft(plan.moves);
   rebuildTimeline();
   if (!made) {
-    drawGroundStepper(reason ?? 'Not changed', true);
+    drawGroundStepper('Not changed', true);
     return;
   }
   const parts = [`${deltaMinutes > 0 ? '+' : '−'}${Math.abs(deltaMinutes)}m`, `${later} later flight${later === 1 ? '' : 's'} moved`];
@@ -1337,9 +1333,11 @@ function nightHomeButtonFor(tail: string, state: SimState): HTMLButtonElement {
   button.setAttribute('aria-label', `Bring ${tail} night stop home`);
   button.addEventListener('click', (event) => {
     event.stopPropagation();
-    const result = bringNightStopHome(state, tail);
-    renderScheduleWarnings(scheduleProblems(state));
-    flashTip(result.ok ? result.message : result.reason, !result.ok);
+    // Into the draft, like every Gantt change: ✓ saves it.
+    const pair = nightStopLegs(state, tail);
+    if (plan?.ok && addToDraft([{ legIds: pair ? [pair.morning.legId, pair.evening.legId] : [], tail, start: 0, bringHome: true }])) {
+      flashTip(`✎ ${describeRetime(plan, tail, tail, plan.legs[0].departMinute)} · ✓ saves`, false);
+    } else if (!plan?.ok) flashTip(plan?.reason ?? 'Not on a night stop', true);
     rebuildTimeline();
   });
   return button;
