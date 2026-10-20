@@ -7644,18 +7644,6 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
   min-width: 36px;
 }
 
-.mx-stations + .base-open {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 6px;
-}
-
-.mx-stations + .base-open .base-open-select {
-  flex: 1 1 120px;
-  min-width: 0;
-}
-
 /* One aircraft class's engine plan on the Mtc screen: its row, plan buttons and book. */
 .engine-card {
   padding: 4px 0 6px;
@@ -8101,4 +8089,37 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
 .crew-base-head .crew-base-map {
   flex: none;
   line-height: 0;
+}
+
+/* A count on a view switch button: AOGs on Mtc's Stations. */
+.view-switch-badge {
+  min-width: 16px;
+  padding: 0 4px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 10px;
+  line-height: 16px;
+  color: #0a0c12;
+  background: #ff8080;
+  border-radius: 8px;
+}
+
+/* A station card's hangar bays: smaller tiles than a full-width board. */
+.mx-station-bays {
+  gap: 4px;
+  margin: 0;
+}
+
+.mx-station-bays .mx-bay {
+  min-width: 64px;
+  padding: 3px 6px;
+  font-size: 10px;
+}
+
+/* An empty bay: a narrow open box, so a big hangar's free bays don't crowd the card. */
+.mx-station-bays .mx-bay.is-free {
+  min-width: 14px;
+  min-height: 28px;
+  padding: 0;
+  border: 1px solid rgba(242, 165, 65, 0.35);
+  background: none;
 }

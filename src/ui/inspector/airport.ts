@@ -2,6 +2,7 @@ import { dailyMovementsAt } from '../../sim/airports';
 import { airportHours, FIRST_OPEN_HOUR, freeInHour, hoursWithRoom, OPEN_HOURS, peakHour, type AirportHours } from '../../sim/hours';
 import { inboundAt } from '../../sim/fleetTiming';
 import { money, shortMoney } from '../format';
+import { glyph } from '../glyphs';
 import { cabinShare, crewShare } from '../../sim/crews';
 import { hasCrewBase, mxLevel } from '../../sim/bases';
 import { line, heading, lineWithInfo } from './dom';
@@ -84,16 +85,18 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
     );
   }
 
-  // Bases here (sim/bases.ts): the crew base opens and closes here, maintenance bases on the Mtc screen.
+  // Bases here (sim/bases.ts): the crew base opens and closes here, and a line base or hangar opens here; their levels are set on the Mtc screen.
   const crewBase = hasCrewBase(state, iata);
   const lineLevel = mxLevel(state, 'line', iata);
   const heavyLevel = mxLevel(state, 'heavy', iata);
   const mtcText = [lineLevel > 0 ? `line L${lineLevel}` : 'no line base', heavyLevel > 0 ? `hangar L${heavyLevel}` : 'no hangar'].join(' · ');
   const basesLine = lineWithInfo(
     [crewBase ? 'Crew base' : 'No crew base', mtcText].join(' · '),
-    'A crew base is where crews live and planes can be leased and based: open or close one here, or from the airport\'s menu on the map. A line base checks as many planes a night as its level; a hangar has a bay for each level and is where C and D checks are done (the Mtc screen). A plane needs a line check every 5 nights; due one where there is no line base, a full one, or a type its mechanics aren\'t rated for, it misses it and gets a deferred item.',
+    'A crew base is where crews live and planes can be leased and based: open or close one here, or from the airport\'s menu on the map. A line base checks as many planes a night as its level; a hangar has a bay for each level and is where C and D checks are done: open either here (wrench, hangar), and level or close it on the Mtc screen. A plane needs a line check every 5 nights; due one where there is no line base, a full one, or a type its mechanics aren\'t rated for, it misses it and gets a deferred item.',
   );
   basesLine.append(' ', crewBaseButton(state, iata, crewBase, changed));
+  if (lineLevel === 0) basesLine.append(' ', mxBaseButton(state, iata, 'line', changed));
+  if (heavyLevel === 0) basesLine.append(' ', mxBaseButton(state, iata, 'heavy', changed));
   root.append(basesLine);
 
   root.append(...stationSection(state, iata, changed));
@@ -418,6 +421,36 @@ function crewBaseButton(state: SimState, iata: string, exists: boolean, changed:
       run: () => {
         if (exists) ops.closeCrewBaseAt(state, iata);
         else ops.openCrewBaseAt(state, iata);
+        changed();
+      },
+    });
+  });
+  return button;
+}
+
+/**
+ * Open a line base or a hangar here: a glyph and the fee, through the same
+ * confirm as the map menu's, greyed with the reason when the rules say no
+ * (cash short, no rights, no crew base yet where that is required).
+ */
+function mxBaseButton(state: SimState, iata: string, kind: 'line' | 'heavy', changed: () => void): HTMLButtonElement {
+  const word = kind === 'line' ? 'line base' : 'hangar';
+  const preview = ops.previewBaseChange(state, kind, 'open', iata);
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'inspector-plan-hub';
+  button.append(glyph(kind === 'line' ? 'wrench' : 'hangar'), ` ${money(preview.fee)}`);
+  button.disabled = preview.blocked !== null;
+  button.dataset.tip = preview.blocked ?? `Open ${word} · ${money(preview.fee)} + ${money(preview.perDay)}/day · ${kind === 'line' ? 'nights here are line checks' : 'bays for C and D checks'}`;
+  button.setAttribute('aria-label', button.dataset.tip);
+  button.addEventListener('click', () => {
+    showConfirm({
+      title: `Open ${word} · ${iata}`,
+      rows: costRows(preview.fee, preview.kindPerDayBefore, preview.kindPerDayAfter, preview.cashAfter),
+      facts: preview.facts,
+      confirmLabel: `Open · ${money(preview.fee)}`,
+      run: () => {
+        ops.openMxBaseAt(state, kind, iata);
         changed();
       },
     });

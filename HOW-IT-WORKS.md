@@ -1409,7 +1409,7 @@ Rivals, Goals), with Game at the foot. The detail views sit under
 |---|---|---|
 | Airports list | the rail | every known airport (served, or all known), sortable by departures, load, slots, waiting riders or delay |
 | An airport | click its dot, or its row | presence, waiting riders, load, slots, a line per grounded plane (opening Maintenance), Plan hub, planes based there, and every market flown from it. Its crews are on the Crews screen only |
-| Maintenance | the rail (Mtc), an AOG line in the ticker or an airport | every AOG with its fault, days back, what it cancels and Expedite 1d; every plane's health by type, oldest first: age, tech dispatch, today's AOG chance, useful life left |
+| Maintenance | the rail (Mtc), an AOG line in the ticker or an airport | three views, the last one used remembered: Stations (every AOG with its fault, days back, what it cancels and Expedite 1d; a card per station with its line slots, hangar bays and ratings; outstations), Fleet (release to service and every plane's check clocks, by type) and Engines (each class's engine plan and book) |
 | A route | click its line, or a market row | the route view: flights, demand, rivals, fare stances, pools, margin and on-time |
 | Fleet | the rail, the map's fleet bars, or the breadcrumb from a plane | the count and leases, leases on order, then every aircraft as its row of the Schedule: tail, AOG/refit/ferry/new mark, share of the day, tonight's check; hovering the tail (a tap on a phone, a second tap opens it) shows its cabin, base, age, lease, today's OTP and load factor, and where it is |
 | An aircraft | click it in flight on the map, its tail on the Fleet screen's Schedule, or its tail in an airport's view | its specs and age (and what the age does to its delays), where it is now, how much of the day it uses, its whole day in order (flown legs with how late and why, passengers and margin; the one in the air; upcoming legs with projected lateness; cancelled ones), its rotations, and Return to lessor |
@@ -3022,7 +3022,7 @@ class with a bay free, the same bays C and D checks use
 (`REFIT_WORK_HOURS` through `contractCost()`, on top of the refit cost).
 Refits start after the morning's checks have taken their bays, so a plane
 whose C check starts that morning goes in for the check and its refit
-waits. Mtc's Hangar shows a refit as a hatched bay.
+waits. The station's card on Mtc shows a refit as a hatched bay.
 
 The plane's view shows its seats and a Seat map button under the seats and
 base line, and the Product screen sets cabins by type; a plane's tail on
@@ -3667,7 +3667,7 @@ base and a hangar from the start, inside the starting cost.
 |---|---|---|---|
 | What it is | Where crews live; the only places planes can be leased or based | Where line checks are done, one a plane every 5 nights | Where C and D checks are done |
 | Level | none | planes checked a night | bays: planes in a C or D check at once |
-| Opened on | the airport panel, or the map ring's Bases (which also closes it) | the Mtc screen, or the map ring's Bases | the Mtc screen, or the map ring's Bases |
+| Opened on | the airport panel, or the map ring's Bases (which also closes it) | the airport panel, the map ring's Bases, or the dashed button on a station's card | the airport panel, the map ring's Bases, or the dashed button on a station's card |
 | Open | $100,000, then $500/day | $150,000, then $100/day a level | $400,000, then $300/day a level |
 | Each level above 1 | n/a | $25,000 | $100,000 |
 | Closes | when no planes are based there and its crews are released | any time away from home | any time away from home |
@@ -3692,16 +3692,25 @@ the Propeller; a station you open is rated for your most numerous class),
 and each further class costs $50,000 and $150/day, so a mixed fleet costs
 more to maintain.
 
-The Mtc screen's **Stations**, above the plane cards, has a card per maintenance station: line
-base slots and hangar bays filled by tonight's use (red past full), with
-− / + / × each, a dashed button to open the kind it lacks, and a rating chip
+The Mtc screen has three views on a switch at the top (Stations, Fleet,
+Engines; the last one used is kept in the browser, and Stations carries a
+red count of AOGs). **Stations** lists every AOG, then a card per
+maintenance station: line base slots filled by tonight's use (red past
+full) and the hangar's bays as tiles (filled: a plane in its C or D check
+or a refit there, with days to out; free; dashed: a plane based here whose
+C check is in its window or overdue, with its book wrench or a tip saying
+what it waits for), with − / + / × each, a dashed button to open the kind
+it lacks, and a rating chip
 per class showing that class's planes asleep there tonight. A solid chip is
 rated (tap to drop); a dashed amber one is a class sleeping there unrated;
 a red underline means rated planes due tonight over the line base's slots. The card's
 moon line counts tonight's planes due a line check that miss it. Rating a
 class only gets its planes checked where the line base has slots left, so
-a full base needs a level too (`mxStationBoard()`). Below, one picker opens
-a station elsewhere, and **Outstations** lists airports with no base where
+a full base needs a level too (`mxStationBoard()`). Planes coming due
+whose base has no station at all get a small "contracted" card. A new
+station is opened from the airport's panel (the wrench and hangar
+buttons on its bases line) or its map ring (Bases); both grey out a kind
+the airport already has or can't take, with the reason. **Outstations** lists airports with no base where
 planes sleep tonight, with how many are due and miss their check.
 
 Clicking an airport's ring has one Create base button with a crew, line base or hangar choice; it greys out for a kind the airport already has and opens the same confirm as the screens. Opening or closing a base asks first: a confirm window (`ui/confirmModal.ts`,
@@ -3935,7 +3944,7 @@ as a forced check (`bookedHeavyChecks()`, fault "C check booked"), so the
 player picks a quiet week instead of taking the 7-day grace. The booking is
 cancelled with ✕ any time before then; a booked plane away from base waits at
 the booking until it is back. The same booking is a wrench on the plane's
-hangar bay (the dashed red box at the top of Mtc); a plane that can't book yet
+hangar bay (the dashed box on its base's station card on Mtc); a plane that can't book yet
 (in the air, or away from base) shows a plane icon there whose tip says what
 it waits for (`heavyBookBlocker()`). The headless player books each plane once
 its window is open and it is parked at base, when a hangar bay is free there
@@ -3983,7 +3992,7 @@ it. A plane past due wears like 2 more years of age (`D_WEAR_YEARS`, in
 starts staggered by tail, at least 120 days from due, its hours clock with it.
 The headless player never books, so its planes wear past due.
 
-**Engine support** (`src/sim/enginePool.ts`, the Engines section of the Mtc
+**Engine support** (`src/sim/enginePool.ts`, the Engines view of the Mtc
 screen). One breakdown in eight (`ENGINE_FAULT_SHARE` in `sim/aog.ts`) is an
 engine, and each aircraft class is on one of three plans for it:
 - **Ad hoc** (the default for a class with no spares): nothing paid until a
@@ -4039,7 +4048,7 @@ Route margins, rivals and planners still count the whole flight cost, so
 only when the money leaves moves. The Mtc card shows what is due.
 
 **What you see:**
-- **The Mtc screen's Fleet board:** a strip of how many planes are
+- **The Mtc screen's Fleet view:** a strip of how many planes are
   serviceable, on watch, due for action (held, or a heavy check overdue),
   in the hangar or on the ground, then a card per plane, worst first. Each
   card has the heavy-check clock (days since the last check, the booking
