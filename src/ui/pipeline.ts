@@ -2,7 +2,7 @@ import { classByCode } from '../sim/aircraftClasses';
 import { closureLine } from '../sim/airspace';
 import { aogFor, daysUntilReturn, expediteCost, expediteRepair } from '../sim/aog';
 import { dayIndex } from '../sim/clock';
-import { contractsOf } from '../sim/contracts';
+import { contractsOf, declineContract } from '../sim/contracts';
 import { hireFee, hireLeadDays } from '../sim/crews';
 import { crewPlan } from '../sim/crewPlan';
 import { HEAVY_WINDOW_DAYS } from '../sim/mxChecks';
@@ -319,8 +319,18 @@ function tipBody(state: SimState, item: PipelineItem): { title: string; lines: s
       const when = inDays(item.day, today);
       if (item.kind === 'contractEnd') return { title: `Contract · ${market}`, lines: [`Term ends ${when}`, `${money(contract.paymentPerDay)}/day · renewal in Contracts`], actions: [] };
       if (item.kind === 'takeover') return { title: `Takeover · ${market}`, lines: [`${contract.takeoverBy ?? 'A rival'} takes it ${when}`, 'Counter in Contracts'], actions: [] };
-      if (item.kind === 'tender') return { title: `Tender · ${market}`, lines: [`Decided ${when}`, `${money(contract.paymentPerDay)}/day`], actions: [] };
-      return { title: `${contract.awardedDay !== undefined ? 'Awarded' : 'Offer'} · ${market}`, lines: [`Lapses ${when} unless flown`, `${money(contract.paymentPerDay)}/day · ${contract.termDays}d term`], actions: [] };
+      const decline =
+        contract.awardedDay === undefined
+          ? [
+              tipButton('✕ decline', 'Drop this tender · off the pipeline and Contracts', true, () => {
+                declineContract(state, contract.id);
+                closeTip();
+                changedNow();
+              }),
+            ]
+          : [];
+      if (item.kind === 'tender') return { title: `Tender · ${market}`, lines: [`Decided ${when}`, `${money(contract.paymentPerDay)}/day`], actions: decline };
+      return { title: `${contract.awardedDay !== undefined ? 'Awarded' : 'Offer'} · ${market}`, lines: [`Lapses ${when} unless flown`, `${money(contract.paymentPerDay)}/day · ${contract.termDays}d term`], actions: decline };
     }
     case 'mandate': {
       const mandate = mandatesOf(state).find((m) => m.id === item.id);

@@ -85,6 +85,8 @@ export type Contract = {
   awardedDay?: number;
   /** The rival airline that won the tender instead. */
   lostTo?: string;
+  /** The airline turned the tender down (declineContract()); it lapsed at once. */
+  declined?: boolean;
   /** The buyer's mood, 0 to 100, moving slowly with performance; absent means SATISFACTION_START. */
   satisfaction?: number;
   /** Consecutive days the buyer has been sad, for the takeover window. */
@@ -435,6 +437,32 @@ export function contractsOf(state: SimState): Contract[] {
   return state.contracts ?? [];
 }
 
+/**
+ * Turn down a tender not yet awarded: it lapses now, so it drops off the
+ * Contracts screen and the pipeline. No standing is lost; declining is
+ * only saying no early, and an untaken offer lapses the same way.
+ */
+export function declineContract(state: SimState, contractId: number): Outcome {
+  const contract = contractsOf(state).find((c) => c.id === contractId);
+  if (!contract || contract.status !== 'offered') return { ok: false, reason: 'That tender is closed' };
+  if (contract.awardedDay !== undefined) return { ok: false, reason: 'Already awarded to you' };
+  contract.status = 'lapsed';
+  contract.declined = true;
+  return { ok: true, message: `Declined · ${contract.a}–${contract.b}` };
+}
+
+/**
+ * Switch tenders off or back on. Off, no new tenders are offered or put
+ * back out (a buyer that ends unhappy just ends) and the open ones not
+ * yet awarded are declined; running contracts and awarded tenders carry
+ * on. Offers draw from their own stream, so this moves no other roll.
+ */
+export function setContractsOff(state: SimState, off: boolean): void {
+  state.contractsOff = off || undefined;
+  if (!off) return;
+  for (const contract of contractsOf(state)) if (contract.status === 'offered' && contract.awardedDay === undefined) declineContract(state, contract.id);
+}
+
 function runningOn(state: SimState, a: string, b: string): Contract | undefined {
   const key = marketKey(a, b);
   return contractsOf(state).find((c) => c.status === 'active' && marketKey(c.a, c.b) === key);
@@ -470,6 +498,10 @@ function offersToMake(weakness: number, atStart: boolean): number {
  */
 export function makeOffers(state: SimState, atStart: boolean): void {
   const today = dayIndex(state);
+  if (state.contractsOff) {
+    state.nextContractOfferDay = today + OFFER_INTERVAL_DAYS;
+    return;
+  }
   const weakness = homeWeakness(state.homeAirport);
   const hunger = hungerByAirport(state);
   const range = bestRangeNm(state);
@@ -596,7 +628,7 @@ export function rollDailyContracts(state: SimState): void {
         if (terms.outcome === 'retender') {
           const built = state.marketDemand[key];
           if (built !== undefined) state.marketDemand[key] = built * (1 - SNAP_BACK_SHARE);
-          retenders.push(contract);
+          if (!state.contractsOff) retenders.push(contract);
         }
       }
     }

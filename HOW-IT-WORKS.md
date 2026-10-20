@@ -2295,6 +2295,14 @@ balance lever for a weak home.
   awarded you have 30 days to fly it, then it starts. Flying an unbid
   offer places a bid at the reference. Dealt from the contracts' own
   random stream.
+- **Declining and switching off.** `declineContract()` turns down a tender
+  not yet awarded: it lapses at once (`declined`), leaves the Contracts
+  screen and the pipeline, isn't listed under Past and costs no standing.
+  `setContractsOff()` (`state.contractsOff`, saved with the game) stops
+  new offers and re-tenders and declines every open tender not yet
+  awarded; running contracts and awarded tenders carry on, and switching
+  back on brings offers from the next round. Offers use their own random
+  stream, so neither moves any other roll.
 - **Sized by the home's weakness.** `homeWeakness()`: the median home's
   five best Propeller markets over this home's, from 0.5 (New York,
   Toronto, London) to 4 (the thinnest). Payment a day is $2,500 × that ×
@@ -2358,7 +2366,8 @@ balance lever for a weak home.
 - **Where it shows:** the Contracts screen (rail item, key none), with
   three groups. *Tenders*: route, rivals who may bid (◌ none, ⚔ n),
   days until bids close, and an ask stepper (± 5% of the reference), a
-  1×/2× toggle and a bid button (✋; ↻ to change a bid); an awarded tender
+  1×/2× toggle, a bid button (✋; ↻ to change a bid) and ✕ to decline; a
+  🔔/🔕 button by the heading switches tenders on or off; an awarded tender
   reads "Won" with its fly-by day. *Running*: the buyer's face (😀 😐 ☹,
   mood in its tip), a ring of the term, pay and riders, a bar of how far
   the market has built toward standing on its own, and in the last 30
@@ -3570,7 +3579,7 @@ span (a plane out of service, a closure, an event) runs as a bar to its end.
 | Mtc | C check (teal, amber in its booking window, red overdue, dashed when booked), D check (violet), a plane in its heavy check or AOG or refit, as a bar to the day it's back | induct or push a C check +1/+5/+15d, book or cancel a D check, expedite an AOG |
 | Fleet | a delivery (EIS; red with "−N" when it would arrive short of crews), a ferry to another base, a plane going back to the lessor or a seasonal lease ending | hire the crews a delivery is short |
 | Crews | a batch of crews joining (hired or converting) | |
-| Sales | a contract term ending, an offer or award lapsing, a tender being decided, a rival's takeover window closing, a mandate offer lapsing or a mandate running | |
+| Sales | a contract term ending, an offer or award lapsing, a tender being decided, a rival's takeover window closing, a mandate offer lapsing or a mandate running | decline a tender or offer not yet awarded |
 | Network | an airspace closure near the network (`closureIsRelevant()`), a demand event at an airport on the map, a station upgrade finishing | |
 
 Every tip also has a link to the screen that owns the item (Mtc, Crews,
