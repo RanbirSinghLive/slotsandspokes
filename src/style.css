@@ -7639,3 +7639,123 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
 .exec-nudge .portrait {
   border-radius: 6px;
 }
+
+/* Mtc stations: one card per maintenance station, line slots and hangar bays above its rating chips. */
+
+.mx-stations {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mx-station {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 7px 9px 8px;
+  background: #0e1016;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 3px solid #5ed6c8;
+  border-radius: 4px;
+}
+
+.mx-station.is-warn {
+  border-left-color: #ffb347;
+}
+
+.mx-station-head,
+.mx-station-tonight {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mx-station-tonight {
+  justify-content: flex-start;
+  font-size: 12px;
+}
+
+.mx-station-tonight .base-close {
+  margin-left: auto;
+}
+
+.mx-station-capacity {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.mx-station-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.mx-station-row .glyph svg {
+  width: 13px;
+  height: 13px;
+  vertical-align: -2px;
+}
+
+.mx-station-row.is-line .glyph { color: #5ed6c8; }
+.mx-station-row.is-heavy .glyph { color: #f2a541; }
+
+.mx-station-slots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 4px;
+  white-space: nowrap;
+}
+
+.mx-station-count {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  color: #9aa3b8;
+}
+
+.mx-station-count.is-over {
+  color: #ff8080;
+}
+
+.mx-station-open {
+  padding: 2px 7px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  color: #9aa3b8;
+  background: transparent;
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.mx-rating.is-gap {
+  color: #ffb347;
+  border-color: #ffb347;
+  background: rgba(255, 179, 71, 0.1);
+}
+
+.mx-rating.is-gap svg {
+  color: var(--puck, #8ab4ff);
+}
+
+.mx-rating.is-short {
+  box-shadow: inset 0 -2px 0 #ff8080;
+}
+
+.mx-station .mx-rating {
+  min-width: 36px;
+}
+
+.mx-stations + .base-open {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.mx-stations + .base-open .base-open-select {
+  flex: 1 1 120px;
+  min-width: 0;
+}
