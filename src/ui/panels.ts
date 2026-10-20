@@ -6,7 +6,7 @@ import { TOUCH_TIP_MS } from './mapTools';
 import { nightStopLegs } from '../sim/nightStops';
 import { hasLineBase } from '../sim/bases';
 import { deferredItems, MX_HOLD_AT, tonightCheck } from '../sim/mxChecks';
-import { bringNightStopHome, draftProblem, dropRotation, dropRotationInDraft, overlappingLegs, planBringNightStopHome, planFleetSort, planDropRotation, removeRotation as removeRotationFromSchedule, saveDraft, snappedStart, type DraftMove, type DropPlan, type SortMode } from '../sim/playerActions';
+import { bringNightStopHome, draftProblem, dropRotation, dropRotationInDraft, overlappingLegs, planBringNightStopHome, planFleetSort, planDropRotation, removeRotation as removeRotationFromSchedule, saveDraft, scheduleAfterSlips, snappedStart, type DraftMove, type DropPlan, type SortMode } from '../sim/playerActions';
 import { cancelPendingRetime, type RetimePlan } from '../sim/retime';
 import { airportHours, FIRST_OPEN_HOUR, freeInHour, OPEN_HOURS } from '../sim/hours';
 import { money, shortMoney } from './format';
@@ -1164,5 +1164,6 @@ export function removeRotation(rotation: Rotation, state: SimState): void {
  * every call site gets both, never only half.
  */
 export function scheduleProblems(state: SimState): string[] {
-  return [...validateSchedule(state.schedule, state.aircraft), ...utilisationProblems(state)];
+  // Read as the schedule flies from tomorrow, so a plane mid line slip (sim/lineSlips.ts) isn't flagged as stranded.
+  return [...validateSchedule(scheduleAfterSlips(state), state.aircraft), ...utilisationProblems(state)];
 }

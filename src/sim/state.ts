@@ -103,6 +103,8 @@ export type Aircraft = {
   deferredItems?: number;
   /** Nights flown since its last line check (sim/mxChecks.ts). Absent: staggered by tail. */
   nightsSinceLine?: number;
+  /** Keeps its own line of flying: never trades it with a twin (sim/lineSlips.ts). Absent: free to trade. */
+  lineLocked?: true;
   /** Flying days since the last heavy check (sim/mxChecks.ts). Absent: staggered by tail. */
   daysSinceHeavyCheck?: number;
   /** Hangar minutes done at night toward its heavy check this time round (sim/mxChecks.ts). */
@@ -129,6 +131,23 @@ export type Aircraft = {
   flightMinutesSinceD?: number;
   /** The player booked its D check: it goes in the next morning. */
   dCheckBooked?: boolean;
+};
+
+/**
+ * Two planes that met on the ground today and traded the rest of their
+ * days (sim/lineSlips.ts). `handOver` is the flying each did before they
+ * met, which changes plane at the next rollover so each keeps the other's
+ * whole line from then on.
+ */
+export type LineSlip = {
+  /** The plane due its line check, which goes to bed where its twin would have. */
+  tail: string;
+  /** The twin that takes its line. */
+  with: string;
+  /** Where they meet, and the home-local minute of day the first of them leaves after it. */
+  station: string;
+  minute: number;
+  handOver: { legId: string; toTail: string }[];
 };
 
 /** How one leg went, once it has landed. */
@@ -322,6 +341,8 @@ export type SimState = {
    * Optional: made on first use.
    */
   swappedToday?: { legId: string; fromTail: string }[];
+  /** Today's line slips (sim/lineSlips.ts): two planes that traded the rest of their days. Optional: made on first use. */
+  lineSlipsToday?: LineSlip[];
   /**
    * What the controller does about a plane whose day is breaking
    * (sim/priority.ts): settle it by route priority, or ask. Absent means

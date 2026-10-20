@@ -4,6 +4,7 @@ import { executiveToleranceExtraDays, executiveToleranceMultiplier } from './exe
 import { nightStopStation } from './nightStops';
 import { projectRestOfDay } from './cascade';
 import { rotationsForTail } from './utilisation';
+import type { ScheduleLeg } from './schedule';
 import type { Aircraft, SimState } from './state';
 
 /**
@@ -400,7 +401,7 @@ export type NightResult = 'checked' | 'cleared' | 'short' | 'free' | 'away';
  * `releaseBy` (a day that ends just after midnight), from that landing.
  * Null when it is still flying at release time: no night at all.
  */
-function nightStart(state: SimState, aircraft: Aircraft, releaseBy: number): { station: string; since: number } | null {
+export function nightStart(state: SimState, aircraft: Aircraft, releaseBy: number): { station: string; since: number } | null {
   if (aircraft.status === 'ground') return aircraft.atAirport ? { station: aircraft.atAirport, since: aircraft.groundSinceMinute } : null;
   const flight = state.activeFlights.find((f) => f.tail === aircraft.tail);
   return flight && flight.arriveMinute < releaseBy ? { station: flight.dest, since: flight.arriveMinute } : null;
@@ -413,9 +414,10 @@ export function rollNightlyChecks(state: SimState, dayStartMinute: number): void
     const legs = state.schedule.filter((leg) => leg.tail === aircraft.tail);
     if (aircraft.rebase || state.aogs.some((event) => event.tail === aircraft.tail)) continue;
     if (legs.length === 0) {
-      // A day on the ground at a line base clears an item: the work is done in daylight.
-      if (deferredItems(aircraft) > 0 && aircraft.status === 'ground' && lineRated(state, aircraft.atAirport ?? '', aircraft.typeCode)) {
-        aircraft.deferredItems = deferredItems(aircraft) - 1;
+      // A day on the ground at a line base is its line check and clears an item: the work is done in daylight.
+      if (aircraft.status === 'ground' && lineRated(state, aircraft.atAirport ?? '', aircraft.typeCode)) {
+        aircraft.nightsSinceLine = 0;
+        if (deferredItems(aircraft) > 0) aircraft.deferredItems = deferredItems(aircraft) - 1;
         if (aircraft.deferredItems === 0) delete aircraft.deferredItems;
       }
       continue;
@@ -482,7 +484,7 @@ export function levelWear(state: SimState, dayStart: number): void {
   const used = new Set<string>();
   for (const worn of state.aircraft) {
     const legs = state.schedule.filter((leg) => leg.tail === worn.tail);
-    if (legs.length === 0 || used.has(worn.tail)) continue;
+    if (legs.length === 0 || used.has(worn.tail) || worn.lineLocked) continue;
     if (worn.rebase || state.aogs.some((event) => event.tail === worn.tail) || state.groundedTails.includes(worn.tail)) continue;
     const firstLeg = legs.reduce((first, leg) => (leg.departMinute < first.departMinute ? leg : first));
     const releaseBy = dayStart + firstLeg.departMinute - RELEASE_MINUTES;
@@ -495,6 +497,7 @@ export function levelWear(state: SimState, dayStart: number): void {
     const twin = state.aircraft.find(
       (other) =>
         other.tail !== worn.tail &&
+        !other.lineLocked &&
         !busy.has(other.tail) &&
         !used.has(other.tail) &&
         other.typeCode === worn.typeCode &&
@@ -681,6 +684,16 @@ export function finishHeavyCheck(state: SimState, aircraft: Aircraft): void {
  * at a line base with room and the class rated, not due so free, or due
  * and missed (away). Null for a plane with nothing to fly.
  */
+/**
+ * The plane's flying tomorrow, earliest first: its legs today, with any
+ * line slip's hand-over (sim/lineSlips.ts) already made, since that
+ * flying changes plane at the rollover.
+ */
+export function tomorrowsLegs(state: SimState, tail: string): ScheduleLeg[] {
+  const handOver = new Map((state.lineSlipsToday ?? []).flatMap((slip) => slip.handOver.map((entry) => [entry.legId, entry.toTail] as const)));
+  return state.schedule.filter((leg) => (handOver.get(leg.legId) ?? leg.tail) === tail).sort((a, b) => a.departMinute - b.departMinute);
+}
+
 export function tonightCheck(
   state: SimState,
   tail: string,
@@ -692,7 +705,9 @@ export function tonightCheck(
   const last = legs[legs.length - 1];
   const projected = projectRestOfDay(state, tail).filter((p) => !p.cancelled);
   const landing = projected.length > 0 ? projected[projected.length - 1].projectedArriveMinute : Math.max(dayStart + last.departMinute + last.blockMinutes, aircraft.status === 'ground' && legs.every((leg) => state.completedToday.includes(leg.legId) || state.cancelledToday.includes(leg.legId)) ? aircraft.groundSinceMinute : 0);
-  const night = dayStart + MINUTES_PER_DAY + legs[0].departMinute - RELEASE_MINUTES - landing;
+  // Tomorrow's first flight, on the line the plane keeps after any slip today (sim/lineSlips.ts).
+  const tomorrow = tomorrowsLegs(state, tail);
+  const night = dayStart + MINUTES_PER_DAY + (tomorrow[0] ?? legs[0]).departMinute - RELEASE_MINUTES - landing;
   const work = lineCheckMinutes(aircraft);
   const station = last.dest;
   // Who else ends the day at this station decides whether the line base has room.

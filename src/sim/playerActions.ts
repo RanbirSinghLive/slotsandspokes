@@ -890,6 +890,7 @@ export function cancelBookedDCheck(state: SimState, tail: string): void {
 }
 
 export { previewHeavyCheckBooking, previewDCheckBooking } from './mxChecks';
+export { lineSlipOf, scheduleAfterSlips, setLineLocked } from './lineSlips';
 
 // --- Seat sales --------------------------------------------------------------
 
