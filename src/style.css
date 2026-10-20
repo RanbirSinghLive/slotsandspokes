@@ -1359,6 +1359,22 @@ button,
   font-variant-numeric: tabular-nums;
 }
 
+.timeline-share.is-over {
+  color: #ff8080;
+}
+
+/* AOG, refit, ferry or a new delivery beside a plane's tail (ui/panels.ts, planeStatus()). */
+.timeline-status:empty {
+  display: none;
+}
+.timeline-status.is-over { color: #ff8080; font-weight: 600; }
+.timeline-status.is-warn { color: #ffb347; }
+.timeline-status.is-new { color: #2fb8a6; }
+
+.timeline-group-down {
+  color: #ff8080;
+}
+
 .timeline-track {
   position: relative;
   height: 20px;
@@ -3509,6 +3525,8 @@ button.ticker-item:hover {
   font-family: system-ui, sans-serif;
   font-size: 12px;
   line-height: 1.5;
+  /* A tip with line breaks (a plane at a glance on the Gantt) keeps them. */
+  white-space: pre-line;
   pointer-events: none;
 }
 
@@ -4590,22 +4608,6 @@ button.inspector-crumb:hover {
 
 .inspector-return {
   margin-top: 12px;
-}
-
-/* The cabin refit icon on a Fleet row (ui/inspector/aircraft.ts). */
-.inspector-row .cabin-mark {
-  margin-left: 4px;
-  padding: 3px;
-  color: #6c7691;
-  cursor: pointer;
-  vertical-align: middle;
-}
-.inspector-row .cabin-mark.is-business { color: #5ed6c8; }
-.inspector-row .cabin-mark.is-pays { color: #ffb347; }
-.inspector-row .cabin-mark.is-pending { color: #ffb347; opacity: 0.6; }
-.inspector-row .cabin-mark:hover { background: rgba(255, 255, 255, 0.08); border-radius: 4px; }
-@media (pointer: coarse) {
-  .inspector-row .cabin-mark { padding: 10px; margin: -8px -4px -8px 2px; }
 }
 
 .mx-bay.is-refit .mx-bay-state { color: #9d8cf0; }

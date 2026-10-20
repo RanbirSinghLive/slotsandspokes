@@ -1,5 +1,8 @@
 import { mandatedLeg, mandatesOf } from '../sim/mandates';
 import { powertrainMark } from './powertrainMark';
+import { planeStatus, planeTip } from './inspector/aircraft';
+import { aogFor } from '../sim/aog';
+import { TOUCH_TIP_MS } from './mapTools';
 import { nightStopLegs } from '../sim/nightStops';
 import { hasLineBase, outstationCheck } from '../sim/bases';
 import { deferredItems, MX_HOLD_AT, tonightCheck } from '../sim/mxChecks';
@@ -569,7 +572,11 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
     const usedEl = document.createElement('span');
     usedEl.className = 'timeline-share';
     usedEl.textContent = `${Math.round((used / planes.length) * 100)}% used`;
-    header.append(usedEl);
+    // A folded group still shows a grounded plane inside it, kept live by updateNightCells().
+    const downEl = document.createElement('span');
+    downEl.className = 'timeline-group-down';
+    downEl.dataset.type = cls.code;
+    header.append(downEl, usedEl);
     header.addEventListener('click', () => {
       if (collapsedTypes.has(cls.code)) collapsedTypes.delete(cls.code);
       else collapsedTypes.add(cls.code);
@@ -584,16 +591,23 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
       const row = document.createElement('div');
       row.className = 'timeline-row';
 
-      // The plane opens its own view (ui/inspector/aircraft.ts).
+      // The plane opens its own view (ui/inspector/aircraft.ts); its tip is the plane at a glance.
       const plane = linkToMap(document.createElement('button'), { kind: 'aircraft', tail: aircraft.tail });
       plane.type = 'button';
       plane.className = 'inspector-link timeline-plane';
+      plane.dataset.tail = aircraft.tail;
       plane.append(aircraft.tail);
       const mark = powertrainMark(aircraft);
       if (mark) plane.append(mark);
+      // AOG, refit, ferry or new delivery, kept live by updateNightCells().
+      const statusEl = document.createElement('span');
+      statusEl.className = 'timeline-status';
+      statusEl.dataset.tail = aircraft.tail;
+      plane.append(statusEl);
       const share = own.reduce((sum, rotation) => sum + rotation.share, 0);
       const shareEl = document.createElement('span');
       shareEl.className = 'timeline-share';
+      shareEl.classList.toggle('is-over', share > 1);
       shareEl.textContent = `${Math.round(share * 100)}%`;
       plane.append(shareEl);
       // Tonight's line check and deferred items (sim/mxChecks.ts), kept live by updateNightCells().
@@ -601,8 +615,24 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
       nightEl.className = 'timeline-night';
       nightEl.dataset.tail = aircraft.tail;
       plane.append(nightEl);
-      plane.title = `${cls.name} ${aircraft.tail} · ${aircraft.baseAirport ?? 'no base'} · ${Math.round(share * 100)}% of its day`;
-      plane.addEventListener('click', () => select({ kind: 'aircraft', tail: aircraft.tail }));
+      plane.dataset.tip = aircraft.tail;
+      // The tip is read when it shows (ui/mapTools.ts listens further up, so this runs first).
+      const refreshTip = () => {
+        if (liveState) plane.dataset.tip = planeTip(liveState, aircraft.tail);
+      };
+      plane.addEventListener('mouseover', refreshTip);
+      plane.addEventListener('focusin', refreshTip);
+      plane.addEventListener('click', () => {
+        refreshTip();
+        // On a touch screen the first tap shows the tip; a second one while it is up opens the plane.
+        if (window.matchMedia('(pointer: coarse)').matches && tippedTail?.tail !== aircraft.tail) {
+          window.clearTimeout(tippedTail?.timer);
+          tippedTail = { tail: aircraft.tail, timer: window.setTimeout(() => (tippedTail = null), TOUCH_TIP_MS) };
+          return;
+        }
+        tippedTail = null;
+        select({ kind: 'aircraft', tail: aircraft.tail });
+      });
 
       const track = document.createElement('div');
       track.className = 'timeline-track';
@@ -735,6 +765,9 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
   }
   return rows;
 }
+
+/** The plane whose tip a tap put up, and the timer that forgets it: a second tap on it while the tip is up opens the plane. */
+let tippedTail: { tail: string; timer: number } | null = null;
 
 /** A wait at base shorter than this has no room to name it. */
 const BASE_LABEL_MIN_GAP = 45;
@@ -1066,6 +1099,15 @@ const NIGHT_REFRESH_MINUTES = 15;
 function updateNightCells(state: SimState, force = false): void {
   if (!force && Math.abs(state.simMinute - nightCellsMinute) < NIGHT_REFRESH_MINUTES) return;
   nightCellsMinute = state.simMinute;
+  for (const cell of rotationsTimelineEl.querySelectorAll<HTMLElement>('.timeline-status')) {
+    const status = planeStatus(state, cell.dataset.tail!);
+    cell.textContent = status?.text ?? '';
+    cell.className = `timeline-status${status ? ` is-${status.tone}` : ''}`;
+  }
+  for (const cell of rotationsTimelineEl.querySelectorAll<HTMLElement>('.timeline-group-down')) {
+    const down = state.aircraft.filter((a) => a.typeCode === cell.dataset.type && aogFor(state, a.tail) && !aogFor(state, a.tail)?.refitTo).length;
+    cell.textContent = down > 0 ? `AOG ${down}` : '';
+  }
   for (const cell of rotationsTimelineEl.querySelectorAll<HTMLElement>('.timeline-night')) {
     const tail = cell.dataset.tail!;
     const aircraft = state.aircraft.find((a) => a.tail === tail);
