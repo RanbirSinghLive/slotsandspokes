@@ -21,6 +21,8 @@ export {
   crewBaseReadout,
   mxBaseReadout,
   mxStationBoard,
+  lineSlipOf,
+  setLineLocked,
   mxStationsReadout,
   previewBaseChange,
   appointExecutiveById,

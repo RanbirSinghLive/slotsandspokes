@@ -44,6 +44,7 @@ import { cabinCover, FATIGUE_DELAY_MULTIPLIER, legFatigue, rollDailyCrews } from
 import { MAINTENANCE_AGE_FACTOR } from './aog';
 import { isAog, rollDailyAogs, startRefitOnLanding } from './aog';
 import { handBackSwaps, handHeldRotationToSpare } from './controller';
+import { finishLineSlips, planLineSlips } from './lineSlips';
 import { applyPriorityPolicy } from './priority';
 import { rollDailyCrisis } from './crisis';
 import {
@@ -218,6 +219,8 @@ export function step(state: SimState): void {
     state.mxHoldsToday = [];
     state.retimedToday = [];
     handBackSwaps(state);
+    // Planes that traded lines yesterday keep each other's whole line from today (sim/lineSlips.ts).
+    finishLineSlips(state);
     // Gantt moves held for tomorrow (sim/retime.ts) take effect with the new day.
     applyPendingRetimes(state);
     // A plane whose night is too short rests today and an idle twin flies its day (sim/mxChecks.ts).
@@ -349,6 +352,8 @@ export function step(state: SimState): void {
         recordCancellation(state, leg, 'maintenance');
       }
     }
+    // A plane due its line check on a line that won't give it one trades lines with a twin it meets today (sim/lineSlips.ts).
+    planLineSlips(state, state.simMinute);
 
 
     // Airspace closures (sim/airspace.ts) come before the day's cancellations,

@@ -2,7 +2,7 @@ import { execNudge } from '../execNudge';
 import { nightStopCostPerNight, nightStopLegs } from '../../sim/nightStops';
 import { classByCode } from '../../sim/aircraftClasses';
 import { dayIndex } from '../../sim/clock';
-import { line, heading, lineWithInfo } from './dom';
+import { info, line, heading, lineWithInfo } from './dom';
 import { takeCallBlockFlash } from '../callAlert';
 import { gameDate, money } from '../format';
 import { aogFor, daysUntilReturn } from '../../sim/aog';
@@ -137,7 +137,7 @@ export function buildFleetView(state: SimState): HTMLElement {
  * tail on the Gantt: grounded, in refit, ferrying to a new base, going
  * back to the lessor, or just delivered. Null when it is flying its day.
  */
-export function planeStatus(state: SimState, tail: string): { text: string; tone: 'over' | 'warn' | 'new' } | null {
+export function planeStatus(state: SimState, tail: string): { text: string; tone: 'over' | 'warn' | 'new' | 'plain' } | null {
   const aircraft = state.aircraft.find((a) => a.tail === tail);
   if (!aircraft) return null;
   const aog = aogFor(state, tail);
@@ -146,7 +146,17 @@ export function planeStatus(state: SimState, tail: string): { text: string; tone
   if (aircraft.rebase) return { text: `→${aircraft.rebase.to}`, tone: 'warn' };
   if (aircraft.returningOnDay !== undefined) return { text: '↩', tone: 'warn' };
   if (isNewDelivery(state, aircraft)) return { text: '✦', tone: 'new' };
+  if (ops.lineSlipOf(state, tail)) return { text: '⇄', tone: 'new' };
+  if (aircraft.lineLocked) return { text: '🔒', tone: 'plain' };
   return null;
+}
+
+/** Today's line slip (sim/lineSlips.ts) in a line: who it traded with, where and from when. Null when it hasn't. */
+function slipText(state: SimState, tail: string): string | null {
+  const slip = ops.lineSlipOf(state, tail);
+  if (!slip) return null;
+  const other = slip.tail === tail ? slip.with : slip.tail;
+  return `⇄ ${other} · ${slip.station} ${minuteOfDayToTimeString(slip.minute)} · ${slip.tail === tail ? 'to bed at a line base' : 'takes its line'}`;
 }
 
 /**
@@ -180,6 +190,9 @@ export function planeTip(state: SimState, tail: string): string {
     lines.push(whereNow(state, tail));
   }
   if (isNewDelivery(state, aircraft)) lines.push(`✦ Delivered day ${aircraft.deliveredDay} · no flights yet`);
+  const slip = slipText(state, tail);
+  if (slip) lines.push(slip);
+  else if (aircraft.lineLocked) lines.push('🔒 Line locked');
   return lines.join('\n');
 }
 
@@ -242,7 +255,7 @@ export function buildAircraftView(state: SimState, tail: string, changed: () => 
     root.append(
       lineWithInfo(
         `Night stop ${station} · out ${minuteOfDayToTimeString(nightStop.evening.departMinute)} · back ${minuteOfDayToTimeString(nightStop.morning.departMinute)} · ${money(nightStopCostPerNight(state, plane, station))}/night`,
-        `It sleeps at ${station}, not at base: the crew's hotel every night, and no line check there unless it's one of your line bases: it needs one every ${LINE_INTERVAL_NIGHTS} nights, so it has to sleep at a line base in between. If its flight out is cancelled or held by the curfew, it sleeps at base and the morning flight from ${station} is cancelled. On the Schedule, push either half past its end of the day to bring it home.`,
+        `It sleeps at ${station}, not at base: the crew's hotel every night, and no line check there unless it's one of your line bases: it needs one every ${LINE_INTERVAL_NIGHTS} nights, so when due it trades lines with a free twin it meets at base and sleeps there (unless locked). If its flight out is cancelled or held by the curfew, it sleeps at base and the morning flight from ${station} is cancelled. On the Schedule, push either half past its end of the day to bring it home.`,
       ),
     );
   }
@@ -265,6 +278,8 @@ export function buildAircraftView(state: SimState, tail: string, changed: () => 
       ),
     );
   }
+
+  root.append(buildLineLock(state, tail, changed));
 
   const use = aircraftUtilisation(state, tail);
   const useLine = lineWithInfo(`${Math.round(use.share * 100)}% of day · ${use.legs} legs`, 'The share of the usable day, 06:00–22:00 home time, its flying and turns take up. Over 100% cannot be flown.');
@@ -304,6 +319,33 @@ export function buildAircraftView(state: SimState, tail: string, changed: () => 
   const returnBlock = buildReturn(state, tail, changed);
   if (returnBlock) root.append(returnBlock);
   return root;
+}
+
+/**
+ * Whether the plane keeps its own line (sim/lineSlips.ts): one button that
+ * flips it, and today's slip when it traded.
+ */
+function buildLineLock(state: SimState, tail: string, changed: () => void): HTMLElement {
+  const aircraft = state.aircraft.find((a) => a.tail === tail)!;
+  const row = document.createElement('div');
+  row.className = 'inspector-line';
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = `inspector-plan-hub${aircraft.lineLocked ? ' is-current' : ''}`;
+  button.textContent = aircraft.lineLocked ? '🔒 Line locked' : '🔓 Line free';
+  button.setAttribute('aria-pressed', String(!!aircraft.lineLocked));
+  button.addEventListener('click', () => {
+    ops.setLineLocked(state, tail, !aircraft.lineLocked);
+    changed();
+  });
+  const slip = slipText(state, tail);
+  row.append(button, slip ? ` ${slip} ` : ' ');
+  row.append(
+    info(
+      `Free planes trade lines. A plane due its line check whose line ends away from a line base, or too late for the check (a night stop, a long-haul landing after midnight), trades the rest of its day with a free twin (same type, base and cabin) it meets on the ground with a turn to spare. It goes to bed at a line base and the twin takes its line; from the next day each keeps the other's whole line, so the line passes round the pool. ⇄ on the Schedule marks today's trades. Locked keeps this plane on its own line: its checks are then yours to plan. AOG and hold cover and ⇄ swaps still use it for a day.`,
+    ),
+  );
+  return row;
 }
 
 /**

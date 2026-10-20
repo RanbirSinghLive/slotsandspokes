@@ -22,7 +22,8 @@ import { scheduledTurnMinutes, USABLE_DAY_END_MINUTE, USABLE_DAY_START_MINUTE, w
  * **What a night there costs:** the crew's hotel (HOTEL_PER_CREW for each
  * crew the plane flies with). Its line check only happens at a line base
  * (sim/mxChecks.ts), so a plane that night-stops where there is none
- * misses every check it's due.
+ * trades its line with a free twin when due (sim/lineSlips.ts), or, locked
+ * or with no twin to meet, misses the check.
  *
  * **When it breaks** (the flight out cancelled, or held by the curfew),
  * the plane sleeps at base and the morning flight from the station is

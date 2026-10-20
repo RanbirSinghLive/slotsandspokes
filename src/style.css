@@ -1370,6 +1370,7 @@ button,
 .timeline-status.is-over { color: #ff8080; font-weight: 600; }
 .timeline-status.is-warn { color: #ffb347; }
 .timeline-status.is-new { color: #2fb8a6; }
+.timeline-status.is-plain { font-size: 10px; }
 
 .timeline-group-down {
   color: #ff8080;

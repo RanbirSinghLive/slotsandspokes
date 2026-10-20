@@ -3799,7 +3799,8 @@ A plane due its check (5 nights since the last) that doesn't get it
 departure), or whose check night is shorter than the work, carries a
 **deferred item** (●), and another each night until it's checked. A
 night it isn't due and isn't checked ("free") costs nothing. A night with 2h to spare at a line base
-clears one, and so does a day with nothing to fly parked at one. Planes
+clears one. A day with nothing to fly parked at one clears one too, and
+counts as the plane's line check. Planes
 on an AOG, a refit, a heavy check or a ferry skip it.
 
 **Wear levelling** (`levelWear()`), each midnight before the nights are
@@ -3809,7 +3810,31 @@ carries more items than an idle twin, hands its whole day to that twin
 enough night of its own). The worn plane rests and its night isn't
 judged; the day goes back at the next midnight like a swap, free. So a
 day too long for one plane's nights alternates between two planes
-instead of piling up items.
+instead of piling up items. A locked plane (below) doesn't level.
+
+**Line slips** (`src/sim/lineSlips.ts`). A line is a day's flying that
+repeats daily, the legs on one tail; planes trade lines unless the player
+locks one to its own (🔒 in the plane view, `Aircraft.lineLocked`).
+Each morning, after the nights are judged and holds placed, a free plane
+due its check tonight whose line won't give it one (it ends away from a
+rated line base, as a night stop does, or lands too late for the work, as
+a long-haul day does) looks for a free twin: same type, base and seat
+plan, not due tonight itself, not held, broken, ferrying, booked into a
+heavy check, swapped today or on alternate-day legs. They must meet on
+the ground at one airport today with each one's scheduled turn to spare
+before the other's next departure; of the meetings that put the due plane
+to bed long enough at a rated line base, the one with the most time to
+spare wins (then the twin furthest from its own check). At the meeting
+they trade the rest of their days (`planLineSlips()`); the flying each
+did before it changes plane at the next midnight (`finishLineSlips()`),
+so from then each keeps the other's whole line. The bad line passes round
+the pool as each plane falls due, with no cost. Meeting before either has
+flown is a whole-day trade, and a twin with nothing to fly takes the line
+outright, leaving the due plane parked at base. The Gantt marks today's
+trades ⇄ beside the tail and a locked plane 🔒; the tail's tip and the
+plane view say who it traded with, where and when. AOG and hold cover
+and ⇄ swaps still move a locked plane's flying for a day. The headless
+player never locks.
 The 22:00 curfew keeps nights at base long, so items come mostly from
 full or unrated line bases and planes that sleep away when due.
 
