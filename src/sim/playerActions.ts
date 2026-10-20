@@ -111,14 +111,14 @@ import { rebaseOptions, rebasePlane, type RebaseOption } from './rebase';
 import { bestTypeSeatPlan, deleteCabinTemplate as deleteCabinTemplateRule, fleetCabinOf, fleetCabinStatus, followFleetCabin as followFleetCabinRule, renameCabinTemplate as renameCabinTemplateRule, saveCabinTemplate as saveCabinTemplateRule, setFleetCabin as setFleetCabinRule, templatesFor, typeCabinGainPerDay, type FleetCabinStatus } from './fleetCabins';
 import { bestSeatPlan, cabinGainPerDay, canHaveBusinessCabin, layoutOf, refitCostForLease, sameSeatPlan, cabinOf, cancelRefit as cancelRefitRule, layoutFor, maxBusinessSeats, maxPremiumSeats, orderRefit as orderRefitRule, refitBlockedReason, refitCost, refitDays, refitWorkMinutes, seatPlanOf, seatsOfType, typeSegmentSplit, type Cabin, type RefitTarget, type SeatPlan } from './cabins';
 import { commitBringHome, commitRetime, planBringHome, planRetime, type RetimePlan } from './retime';
-import { commitDraft, conflictingLegIds, planDrop, snapStart, type DraftMove, type DropPlan } from './scheduleDraft';
+import { commitDraft, conflictingLegIds, dropConnections, planDrop, planGroundTime, snapStart, type DraftMove, type DropConnections, type DropPlan, type GroundTimePlan } from './scheduleDraft';
 import { planSort, type SortMode, type SortPlan } from './scheduleSort';
 import { daysUntilNextListing, listingsOf, marketRate, returnBlockedReason, returnFee, returnLease, takeListing, type MarketListing } from './market';
 import { airlineCalled, classOpen, tierThatOpens } from './ladder';
 import { actualDailyDemand, currentPotentialDemand } from './marketDemand';
 import { revealReach } from './reach';
 import { applyRotation, candidateTailsAt, planRotation, type RotationPlan, type RotationStop } from './rotations';
-import { isAircraftTypeAllowedAt, legsServingMarket, marketKey } from './schedule';
+import { isAircraftTypeAllowedAt, legsServingMarket, marketKey, type ScheduleLeg } from './schedule';
 import type { CabinTemplate, SimState } from './state';
 import { applyTurnBufferChange, planTurnBufferChange } from './turnBuffer';
 import { allRotations, type PoolEffect, type Rotation } from './utilisation';
@@ -661,6 +661,16 @@ export function retimeRotation(state: SimState, legIds: string[], toTail: string
 /** What dropping a rotation here would do: a move, a swap with the rotations in its way, or a hold in the draft (sim/scheduleDraft.ts). */
 export function planDropRotation(state: SimState, legIds: string[], toTail: string, startMinute: number, inDraft = false): DropPlan {
   return planDrop(state, legIds, toTail, startMinute, inDraft);
+}
+
+/** A longer or shorter wait at a flight's arrival airport: the plane's later flights that day moved together (sim/scheduleDraft.ts). Made with dropRotation(), or in a draft. */
+export function planGroundTimeChange(state: SimState, legId: string, deltaMinutes: number): GroundTimePlan {
+  return planGroundTime(state, legId, deltaMinutes);
+}
+
+/** The flights a planned move would connect with at its hubs, and connecting passengers a day there before and after (sim/scheduleDraft.ts). */
+export function planConnections(state: SimState, legs: ScheduleLeg[]): DropConnections {
+  return dropConnections(state, legs);
 }
 
 /** Where a rotation dragged to this start settles when it is pulled to a neighbouring flight or the day's ends (sim/scheduleDraft.ts). */

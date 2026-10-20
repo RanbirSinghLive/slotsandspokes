@@ -7901,3 +7901,98 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
 :root[data-narrow][data-pipeline] #lens-corner {
   display: none;
 }
+
+/* ⇆ CNX (ui/panels.ts): lit while on; a held or hovered rotation lights the
+   flights it connects with at a hub, green a good wait and amber a long
+   one, and the rest of the timeline dims. */
+.draft-button.is-cnx.is-on {
+  color: #0a0c12;
+  background: #5ed6c8;
+  border-color: #5ed6c8;
+}
+
+#rotations-timeline.is-cnx-live .timeline-rotation:not(.is-cnx-hit) {
+  opacity: 0.25;
+}
+
+#rotations-timeline.is-cnx-live .timeline-rotation.is-cnx-hit .timeline-leg:not(.is-cnx-good):not(.is-cnx-poor) {
+  opacity: 0.45;
+}
+
+#rotations-timeline.is-cnx-live .timeline-rotation.is-dragging .timeline-leg,
+#rotations-timeline.is-cnx-live .timeline-rotation:hover .timeline-leg {
+  opacity: 1;
+}
+
+.timeline-leg.is-cnx-good {
+  box-shadow: 0 0 0 2px #3ddc84;
+  z-index: 1;
+}
+
+.timeline-leg.is-cnx-poor {
+  box-shadow: 0 0 0 2px #ffb347;
+  z-index: 1;
+}
+
+/* A long press on a flight opens its turn, not the phone's own menu. */
+.timeline-rotation {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* The turn stepper (ui/panels.ts): − station wait + over the end of a flight. */
+#timeline-ground-stepper {
+  position: fixed;
+  z-index: 61;
+  padding: 4px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  color: #e6e9f0;
+  background: #11151f;
+  border: 1px solid #2a3142;
+  border-radius: 5px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  max-width: calc(100vw - 16px);
+}
+
+#timeline-ground-stepper[hidden] {
+  display: none;
+}
+
+#timeline-ground-stepper .ground-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+#timeline-ground-stepper .ground-value {
+  min-width: 64px;
+  text-align: center;
+  font-weight: 600;
+}
+
+#timeline-ground-stepper .draft-button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+#timeline-ground-stepper .is-ground-close {
+  margin-left: 4px;
+  font-size: 11px;
+  color: #8a93a6;
+}
+
+#timeline-ground-stepper .ground-status {
+  margin-top: 4px;
+  max-width: 300px;
+  color: #8a93a6;
+}
+
+#timeline-ground-stepper .ground-status.is-bad {
+  color: #ff8080;
+}
+
+#timeline-ground-stepper .ground-status[hidden] {
+  display: none;
+}

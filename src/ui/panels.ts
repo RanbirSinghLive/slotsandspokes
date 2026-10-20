@@ -6,7 +6,8 @@ import { TOUCH_TIP_MS } from './mapTools';
 import { nightStopLegs } from '../sim/nightStops';
 import { hasLineBase } from '../sim/bases';
 import { deferredItems, MX_HOLD_AT, tonightCheck } from '../sim/mxChecks';
-import { bringNightStopHome, draftProblem, dropRotation, dropRotationInDraft, overlappingLegs, planBringNightStopHome, planFleetSort, planDropRotation, removeRotation as removeRotationFromSchedule, saveDraft, scheduleAfterSlips, snappedStart, type DraftMove, type DropPlan, type SortMode } from '../sim/playerActions';
+import { bringNightStopHome, draftProblem, dropRotation, dropRotationInDraft, overlappingLegs, planBringNightStopHome, planConnections, planFleetSort, planDropRotation, planGroundTimeChange, removeRotation as removeRotationFromSchedule, saveDraft, scheduleAfterSlips, snappedStart, type DraftMove, type DropPlan, type SortMode } from '../sim/playerActions';
+import { GROUND_STEP_MINUTES, type DropConnections } from '../sim/scheduleDraft';
 import { cancelPendingRetime, type RetimePlan } from '../sim/retime';
 import { airportHours, FIRST_OPEN_HOUR, freeInHour, OPEN_HOURS } from '../sim/hours';
 import { money, shortMoney } from './format';
@@ -334,6 +335,66 @@ const SORTS: { mode: SortMode; glyph: GlyphName; tip: string }[] = [
   { mode: 'optimise', glyph: 'sortBest', tip: 'Optimise · same markets together, fewest rotations moved' },
 ];
 
+// --- Connections at the hubs --------------------------------------------------
+
+/**
+ * ⇆ on: a rotation held in a drag, or hovered, lights the flights it would
+ * connect with at a hub (sim/hubs.ts connectionsWith(): green a good wait,
+ * amber a long one) and dims the rest, and the drag tip gives the hub's
+ * connecting passengers a day before and after. Remembered in this browser.
+ */
+const CNX_KEY = 'slotsandspokes-gantt-cnx';
+let cnxOn = false;
+try {
+  cnxOn = localStorage.getItem(CNX_KEY) === '1';
+} catch {
+  // Storage blocked: off until switched on.
+}
+const cnxButton = document.createElement('button');
+cnxButton.type = 'button';
+cnxButton.className = 'draft-button is-cnx';
+cnxButton.textContent = '⇆';
+cnxButton.dataset.tip = 'CNX · drag or hover a rotation: flights it connects with at a hub light up (green 40–75m, amber up to 3h), the rest dim · tip: hub connecting pax/day before→after';
+cnxButton.setAttribute('aria-label', 'Show connections');
+const showCnxButton = () => {
+  cnxButton.classList.toggle('is-on', cnxOn);
+  cnxButton.setAttribute('aria-pressed', String(cnxOn));
+};
+showCnxButton();
+cnxButton.addEventListener('click', () => {
+  cnxOn = !cnxOn;
+  showCnxButton();
+  if (!cnxOn) clearConnections();
+  try {
+    localStorage.setItem(CNX_KEY, cnxOn ? '1' : '0');
+  } catch {
+    // Storage blocked: it lasts until the page closes.
+  }
+});
+
+/** Light the flights in `found` and dim every other rotation but `held`. */
+function showConnections(found: DropConnections, held: HTMLElement): void {
+  clearConnections();
+  rotationsTimelineEl.classList.add('is-cnx-live');
+  held.classList.add('is-cnx-hit');
+  for (const connection of found.connections) {
+    const block = rotationsTimelineEl.querySelector<HTMLElement>(`.timeline-leg[data-leg="${CSS.escape(connection.legId)}"]`);
+    if (!block) continue;
+    block.classList.add(connection.quality >= 1 ? 'is-cnx-good' : 'is-cnx-poor');
+    block.closest('.timeline-rotation')?.classList.add('is-cnx-hit');
+  }
+}
+
+function clearConnections(): void {
+  rotationsTimelineEl.classList.remove('is-cnx-live');
+  for (const el of rotationsTimelineEl.querySelectorAll('.is-cnx-good, .is-cnx-poor, .is-cnx-hit')) el.classList.remove('is-cnx-good', 'is-cnx-poor', 'is-cnx-hit');
+}
+
+/** The hubs' connecting passengers a day, in the tip: "⇆ YYZ 140→155", or "⇆ YYZ 140" when it doesn't change. */
+function hubsText(found: DropConnections): string {
+  return found.hubs.map((h) => (h.before === h.after ? `⇆ ${h.hub} ${h.after}` : `⇆ ${h.hub} ${h.before}→${h.after}`)).join(' · ');
+}
+
 const sortGroup = document.createElement('div');
 sortGroup.id = 'timeline-sorts';
 for (const { mode, glyph, tip } of SORTS) {
@@ -341,7 +402,7 @@ for (const { mode, glyph, tip } of SORTS) {
   button.innerHTML = glyphSvg(glyph);
   sortGroup.append(button);
 }
-timelineTools.append(sortGroup, draftBar);
+timelineTools.append(sortGroup, cnxButton, draftBar);
 
 function sortFleet(mode: SortMode): void {
   if (!liveState) return;
@@ -444,18 +505,19 @@ function draftRotations(live: SimState, world: SimState): Rotation[] {
 }
 
 /** Start a draft, or carry on with the open one: make a drop's moves on its copy of the state. */
-function addToDraft(moves: DraftMove[]): void {
-  if (!liveState) return;
+function addToDraft(moves: DraftMove[]): boolean {
+  if (!liveState) return false;
   if (!draft) draft = { world: structuredClone(liveState), drops: [] };
   const result = dropRotationInDraft(draft.world, moves);
   if (!result.ok) {
     flashTip(result.reason, true);
     if (draft.drops.length === 0) draft = null;
-    return;
+    return false;
   }
   draft.drops.push(moves);
   closeIfUnchanged();
   storeDraft();
+  return true;
 }
 
 /** A draft that has put everything back closes itself: there is nothing to verify. */
@@ -667,13 +729,28 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
           (half
             ? ` · night stop ${nightStop!.morning.origin} · ⌂ or push it past ${rotation.legs[0] === nightStop!.morning ? 'the start' : 'the end'} of the day to bring it home`
             : rotation.closed
-              ? ' · drag to move it · past either end of the day for a night stop'
+              ? ' · drag to move it · past either end of the day for a night stop · double-click or hold a flight to stretch its turn'
               : ' · never returns to base');
         span.addEventListener('pointerdown', (event) => startDrag(event, span, rotation, track, rotation.closed || half));
-        span.addEventListener('click', () => {
+        // Double-click, or a long press on touch (startDrag()): the turn after the flight under the pointer.
+        span.addEventListener('dblclick', (event) => {
+          clearTimeout(routeClickTimer);
+          const legId = legUnderPointer(span, rotation, event.clientX);
+          if (legId) openGroundStepper(legId);
+        });
+        span.addEventListener('mouseenter', () => {
+          if (cnxOn && !drag) showConnections(planConnections(state, rotation.legs), span);
+        });
+        span.addEventListener('mouseleave', () => {
+          if (cnxOn && !drag) clearConnections();
+        });
+        span.addEventListener('click', (event) => {
           // A drag ends in a click too; only a plain click opens the route.
           if (justDragged) return;
-          selectRoute(state, rotation.airports[0], rotation.airports[1]);
+          // With a mouse, a moment's wait: the click may be the first of a double-click, which opens the turn instead.
+          clearTimeout(routeClickTimer);
+          if (event.pointerType === 'mouse' && event.detail === 1) routeClickTimer = setTimeout(() => selectRoute(state, rotation.airports[0], rotation.airports[1]), DOUBLE_CLICK_MS);
+          else if (event.detail <= 1) selectRoute(state, rotation.airports[0], rotation.airports[1]);
         });
         const within = (minute: number) => `${((minute - rotation.departMinute) / (rotation.arriveMinute - rotation.departMinute)) * 100}%`;
         // A long-haul pair over midnight stores its flight back a day early (sim/utilisation.ts wrappedLongHaul): drawn after the flight out.
@@ -681,6 +758,7 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
         rotation.legs.forEach((leg, i) => {
           const block = document.createElement('div');
           block.className = 'timeline-leg';
+          block.dataset.leg = leg.legId;
           block.style.left = within(departOf(leg));
           block.style.width = `${(leg.blockMinutes / (rotation.arriveMinute - rotation.departMinute)) * 100}%`;
           span.append(block);
@@ -794,6 +872,10 @@ type Drag = {
   moved: boolean;
   target: { tail: string; start: number } | null;
   drop: DropPlan | null;
+  /** The held rotation's connections at its new time, when ⇆ is on. */
+  connections: DropConnections | null;
+  /** A touch held still this long opens the turn stepper instead (LONG_PRESS_MS). */
+  pressTimer: ReturnType<typeof setTimeout> | undefined;
 };
 
 let drag: Drag | null = null;
@@ -813,6 +895,11 @@ export function setScheduleClock(clock: { hold: () => void; release: () => void 
 }
 let timelineHours: { label: HTMLElement; strip: HTMLElement; at: (minute: number) => string; width: (minutes: number) => string } | null = null;
 const DRAG_THRESHOLD_PX = 4;
+/** A route's click waits this long for a second one: a double-click opens the turn stepper instead. */
+const DOUBLE_CLICK_MS = 250;
+let routeClickTimer: ReturnType<typeof setTimeout> | undefined;
+/** How long a touch held still opens the turn stepper. */
+const LONG_PRESS_MS = 500;
 
 const dragTip = document.createElement('div');
 dragTip.id = 'timeline-drag-tip';
@@ -835,7 +922,22 @@ function startDrag(event: PointerEvent, span: HTMLElement, rotation: Rotation, t
     moved: false,
     target: null,
     drop: null,
+    connections: null,
+    pressTimer: undefined,
   };
+  // A finger held still on a flight: its turn, as a double-click is with a mouse.
+  if (event.pointerType !== 'mouse') {
+    const clientX = event.clientX;
+    drag.pressTimer = setTimeout(() => {
+      if (!drag || drag.moved) return;
+      const legId = legUnderPointer(span, rotation, clientX);
+      cancelDrag();
+      // The click when the finger lifts isn't a click on the route.
+      justDragged = true;
+      window.addEventListener('pointerup', () => setTimeout(() => (justDragged = false), 0), { once: true });
+      if (legId) openGroundStepper(legId);
+    }, LONG_PRESS_MS);
+  }
   // Keep the pointer while it's held, even off the row; not every pointer can be captured.
   try {
     span.setPointerCapture(event.pointerId);
@@ -855,6 +957,8 @@ function onDragMove(event: PointerEvent): void {
   if (!drag.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
   if (!drag.moved) {
     drag.moved = true;
+    clearTimeout(drag.pressTimer);
+    closeGroundStepper();
     scheduleClock.hold();
     drag.span.classList.add('is-dragging');
     // The browser's own hover tips would sit over what's being dragged.
@@ -895,6 +999,10 @@ function onDragMove(event: PointerEvent): void {
     for (const other of rotationsTimelineEl.querySelectorAll<HTMLElement>('.timeline-rotation')) {
       other.classList.toggle('is-swapping', other !== drag.span && (other.dataset.legs ?? '').split(',').some((id) => swapping.has(id)));
     }
+    // Where it would sit; a refused drop has nothing to connect.
+    drag.connections = cnxOn && drag.drop.ok ? planConnections(lastTimelineState, drag.drop.plan.legs) : null;
+    if (drag.connections) showConnections(drag.connections, drag.span);
+    else clearConnections();
   }
   const { plan, kind } = drag.drop!;
   drag.span.classList.toggle('is-bad', !drag.drop!.ok);
@@ -907,6 +1015,8 @@ function onDragMove(event: PointerEvent): void {
       : kind === 'hold'
         ? `✎ ${minuteOfDayToTimeString(start)} · ${tail} · ${drag.drop!.reason}`
         : describeRetime(plan, tail, drag.rotation.tail, start);
+  // The other side of a swap moves too, which these numbers don't count.
+  if (drag.connections && drag.connections.hubs.length > 0 && kind !== 'swap') dragTip.textContent += ` · ${hubsText(drag.connections)}`;
   dragTip.classList.toggle('is-bad', !drag.drop!.ok);
   dragTip.hidden = false;
   const spanRect = drag.span.getBoundingClientRect();
@@ -975,6 +1085,8 @@ function cancelDrag(): void {
 function finishDrag(): void {
   if (!drag) return;
   const moved = drag.moved;
+  clearTimeout(drag.pressTimer);
+  clearConnections();
   drag.span.removeEventListener('pointermove', onDragMove);
   drag.span.removeEventListener('pointerup', onDragEnd);
   drag.span.removeEventListener('pointercancel', cancelDrag);
@@ -1016,6 +1128,125 @@ function flashTip(text: string, bad: boolean): void {
     if (!drag) dragTip.hidden = true;
   }, 2500);
 }
+
+// --- A flight's turn ----------------------------------------------------------
+
+/**
+ * The turn stepper: double-click a flight, or hold a finger on it, and − / +
+ * shorten or stretch the wait at the airport it lands at by
+ * GROUND_STEP_MINUTES, the plane's later flights that day moving with it
+ * (sim/scheduleDraft.ts planGroundTime()). Each step is made like a drop:
+ * on the real schedule, or in the draft while one is open. A step that
+ * can't be made says why, red, and changes nothing.
+ */
+const groundStepper = document.createElement('div');
+groundStepper.id = 'timeline-ground-stepper';
+groundStepper.hidden = true;
+document.body.append(groundStepper);
+let groundLegId: string | null = null;
+
+/** The flight under the pointer in a rotation's block: the last one to leave before that point, so a turn's gap belongs to the flight into it. */
+function legUnderPointer(span: HTMLElement, rotation: Rotation, clientX: number): string | null {
+  const rect = span.getBoundingClientRect();
+  const minute = rotation.departMinute + ((clientX - rect.left) / Math.max(1, rect.width)) * (rotation.arriveMinute - rotation.departMinute);
+  const departOf = (leg: ScheduleLeg) => (leg.departMinute < rotation.departMinute ? leg.departMinute + 24 * 60 : leg.departMinute);
+  let found: string | null = rotation.legs[0]?.legId ?? null;
+  for (const leg of rotation.legs) if (departOf(leg) <= minute) found = leg.legId;
+  return found;
+}
+
+function closeGroundStepper(): void {
+  groundStepper.hidden = true;
+  groundLegId = null;
+}
+
+function openGroundStepper(legId: string): void {
+  groundLegId = legId;
+  drawGroundStepper(null, false);
+}
+
+/** The stepper beside the flight's block: the station and its wait between − and +, and a line for what the last step did. */
+function drawGroundStepper(status: string | null, bad: boolean): void {
+  const state = lastTimelineState;
+  const block = groundLegId ? rotationsTimelineEl.querySelector<HTMLElement>(`.timeline-leg[data-leg="${CSS.escape(groundLegId)}"]`) : null;
+  if (!state || !groundLegId || !block) {
+    closeGroundStepper();
+    return;
+  }
+  const legId = groundLegId;
+  const now = planGroundTimeChange(state, legId, 0);
+  const fixed = now.groundMinutes === 0 && !now.ok;
+  const minus = draftButton('is-ground', '−', `${GROUND_STEP_MINUTES} min less at ${now.station} · later flights earlier`, () => stepGround(legId, -GROUND_STEP_MINUTES));
+  const plus = draftButton('is-ground', '+', `${GROUND_STEP_MINUTES} min more at ${now.station} · later flights later`, () => stepGround(legId, GROUND_STEP_MINUTES));
+  minus.disabled = fixed || now.groundMinutes - GROUND_STEP_MINUTES < now.minimumMinutes;
+  plus.disabled = fixed;
+  const value = document.createElement('span');
+  value.className = 'ground-value';
+  value.textContent = fixed ? now.station : `${now.station} ${now.groundMinutes}m`;
+  value.dataset.tip = fixed ? (now.reason ?? '') : `Turn at ${now.station} · ${now.groundMinutes}m on the ground · min ${now.minimumMinutes}m`;
+  const close = draftButton('is-ground-close', '✕', 'Close', closeGroundStepper);
+  const line = document.createElement('div');
+  line.className = 'ground-status';
+  line.classList.toggle('is-bad', bad || fixed);
+  line.textContent = status ?? (fixed ? (now.reason ?? '') : '');
+  line.hidden = line.textContent === '';
+  const controls = document.createElement('div');
+  controls.className = 'ground-controls';
+  controls.append(minus, value, plus, close);
+  groundStepper.replaceChildren(controls, line);
+  groundStepper.hidden = false;
+  // Over the end of the flight, where the turn starts; kept on screen.
+  const rect = block.getBoundingClientRect();
+  const left = Math.max(8, Math.min(window.innerWidth - groundStepper.offsetWidth - 8, rect.right - groundStepper.offsetWidth / 2));
+  const above = rect.top - groundStepper.offsetHeight - 6;
+  groundStepper.style.left = `${left}px`;
+  groundStepper.style.top = `${above >= 8 ? above : rect.bottom + 6}px`;
+}
+
+function stepGround(legId: string, deltaMinutes: number): void {
+  if (!lastTimelineState || !liveState) return;
+  const plan = planGroundTimeChange(lastTimelineState, legId, deltaMinutes);
+  if (!plan.ok) {
+    drawGroundStepper(plan.reason, true);
+    return;
+  }
+  const hubs = hubsText(planConnections(lastTimelineState, plan.plan.legs));
+  const later = plan.moves[0].legIds.length;
+  let made = true;
+  let reason: string | null = null;
+  if (draft) {
+    made = addToDraft(plan.moves);
+  } else {
+    const result = dropRotation(liveState, plan.moves);
+    renderScheduleWarnings(scheduleProblems(liveState));
+    if (!result.ok) {
+      made = false;
+      reason = result.reason;
+    }
+  }
+  rebuildTimeline();
+  if (!made) {
+    drawGroundStepper(reason ?? 'Not changed', true);
+    return;
+  }
+  const parts = [`${deltaMinutes > 0 ? '+' : '−'}${Math.abs(deltaMinutes)}m`, `${later} later flight${later === 1 ? '' : 's'} moved`];
+  if (plan.plan.marginChangePerDay !== 0) parts.push(`${plan.plan.marginChangePerDay > 0 ? '+' : '−'}${shortMoney(Math.abs(plan.plan.marginChangePerDay))}/day`);
+  if (plan.plan.slotFeeChangePerDay !== 0) parts.push(`slots ${plan.plan.slotFeeChangePerDay > 0 ? '+' : '−'}${shortMoney(Math.abs(plan.plan.slotFeeChangePerDay))}/day`);
+  if (plan.plan.startsTomorrow || plan.plan.deferred) parts.push('from tomorrow');
+  if (hubs) parts.push(hubs);
+  drawGroundStepper(parts.join(' · '), false);
+}
+
+// A tap or click anywhere else closes it; so does Esc.
+document.addEventListener('pointerdown', (event) => {
+  if (!groundStepper.hidden && !groundStepper.contains(event.target as Node)) closeGroundStepper();
+}, true);
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !groundStepper.hidden) {
+    event.stopImmediatePropagation();
+    closeGroundStepper();
+  }
+}, true);
 
 /** The dragged rotation's base across the top of the timeline, an hour a cell: room left (dim), full (amber). */
 function showBaseHours(state: SimState, iata: string): void {
