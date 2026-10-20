@@ -3,7 +3,7 @@ import { lastWeekMargin } from './pnlHistory';
 import { hasHeavyBase, hasLineBase, mxStationList } from './bases';
 import { crewBases } from './crews';
 import { loadFactorCap } from './innovations';
-import { mandatesOf } from './mandates';
+import { mandatesOf, requestsOff } from './mandates';
 import { countryOf, homeCountry } from './rights';
 import { airportLoad, dailyMovementsAt } from './airports';
 import { dayIndex } from './clock';
@@ -354,9 +354,9 @@ export const LADDER: Tier[] = [
       {
         id: 'first-event',
         name: 'Special request',
-        description: 'Accept an event: a priority flight on a route you already fly.',
+        description: 'Accept a request: a priority flight on a route you already fly.',
         extra: true,
-        applies: (state) => !state.eventsOff,
+        applies: (state) => !requestsOff(state),
         met: (state) => eventsAccepted(state) >= 1,
         progress: noProgress,
       },
@@ -534,10 +534,10 @@ export const LADDER: Tier[] = [
       {
         id: 'five-events',
         name: 'Always on call',
-        description: 'Accept 5 events.',
-        applies: (state) => !state.eventsOff,
+        description: 'Accept 5 requests.',
+        applies: (state) => !requestsOff(state),
         met: (state) => eventsAccepted(state) >= 5,
-        progress: (state) => ({ current: Math.min(5, eventsAccepted(state)), target: 5, unit: 'events' }),
+        progress: (state) => ({ current: Math.min(5, eventsAccepted(state)), target: 5, unit: 'requests' }),
       },
       {
         id: 'ninety-in-the-black',

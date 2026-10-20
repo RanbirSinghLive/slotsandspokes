@@ -3,7 +3,7 @@ import { daysUntilReturn } from './aog';
 import { dayIndex } from './clock';
 import { contractsOf } from './contracts';
 import { crewPlan } from './crewPlan';
-import { mandatesOf } from './mandates';
+import { mandatesOf, requestsOff } from './mandates';
 import { heavyCheckReadouts } from './playerActions';
 import type { SimState } from './state';
 
@@ -49,7 +49,7 @@ export type PipelineKind =
   | 'tender'
   /** A rival's takeover window on a sad buyer closing. */
   | 'takeover'
-  /** A mandate offer lapsing, or a running mandate ending. */
+  /** A request offer lapsing, or a running request ending. */
   | 'mandate'
   /** An airspace closure near the network. */
   | 'closure'
@@ -128,8 +128,9 @@ export function pipelineItems(state: SimState, horizon = PIPELINE_DAYS): Pipelin
     if (goes !== undefined) add({ key: `return:${aircraft.tail}`, lane: 'fleet', kind: 'return', day: goes, tone: 'info', tail: aircraft.tail, classCode: aircraft.typeCode, iata: aircraft.baseAirport ?? undefined });
   }
 
-  // Commercial: contract terms, offers and tenders, and mandates.
-  for (const contract of contractsOf(state)) {
+  // Commercial: contract terms, offers and tenders, and requests. With both switched off the lane goes, running ones included.
+  const salesOff = state.contractsOff === true && requestsOff(state);
+  for (const contract of salesOff ? [] : contractsOf(state)) {
     if (contract.status === 'active') {
       if (contract.endsDay !== undefined) add({ key: `contractEnd:${contract.id}`, lane: 'commercial', kind: 'contractEnd', day: contract.endsDay, tone: 'warn', id: contract.id, iata: contract.b });
       if (contract.takeoverEndsDay !== undefined) add({ key: `takeover:${contract.id}`, lane: 'commercial', kind: 'takeover', day: contract.takeoverEndsDay, tone: 'bad', id: contract.id, iata: contract.b });
@@ -141,7 +142,7 @@ export function pipelineItems(state: SimState, horizon = PIPELINE_DAYS): Pipelin
       }
     }
   }
-  for (const mandate of mandatesOf(state)) {
+  for (const mandate of salesOff ? [] : mandatesOf(state)) {
     if (mandate.status === 'offered') add({ key: `mandate:${mandate.id}`, lane: 'commercial', kind: 'mandate', day: mandate.startDay, tone: 'warn', id: mandate.id, iata: mandate.dest });
     else if (mandate.status === 'accepted') add({ key: `mandate:${mandate.id}`, lane: 'commercial', kind: 'mandate', day: mandate.startDay, endDay: mandate.endDay - 1, tone: 'info', id: mandate.id, iata: mandate.dest });
   }

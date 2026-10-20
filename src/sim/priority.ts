@@ -151,19 +151,19 @@ function tryCancel(state: SimState, tail: string, call: Call, projection: Projec
   return done.ok ? { message: done.message, legId: best.legId } : null;
 }
 
-/** An offered event on a route marked keep is taken without a card, when its flight is on the schedule. */
+/** An offered request on a route marked keep is taken without a card, when its flight is on the schedule. */
 function acceptKeepEvents(state: SimState): void {
   for (const mandate of mandatesOf(state)) {
     if (mandate.status !== 'offered' || routePriority(state, mandate.origin, mandate.dest) !== 'keep' || !mandatedLeg(state, mandate)) continue;
-    if (acceptMandate(state, mandate.id).ok) log(state, mandate.origin, mandate.dest, `Event accepted · ${mandate.origin}–${mandate.dest}`);
+    if (acceptMandate(state, mandate.id).ok) log(state, mandate.origin, mandate.dest, `Request accepted · ${mandate.origin}–${mandate.dest}`);
   }
 }
 
 /**
- * Every few minutes, with the `priority` policy: take events offered on
+ * Every few minutes, with the `priority` policy: take requests offered on
  * keep routes, and for every waiting plane whose day is breaking make the
  * swap or cancel the ranks and the money call for. A merely late plane (no
- * curfew cancel, no failing event) is left alone: a delay is not worth a
+ * curfew cancel, no failing request) is left alone: a delay is not worth a
  * cancellation's -80 NPS.
  */
 export function applyPriorityPolicy(state: SimState): void {
@@ -172,7 +172,7 @@ export function applyPriorityPolicy(state: SimState): void {
   for (const call of callsNeeded(state, true)) {
     if (call.kind === 'late') continue;
     const projection = projectGroundedDay(state, call.tail);
-    const saved = call.kind === 'curfew' ? 'saved curfew' : 'saved event';
+    const saved = call.kind === 'curfew' ? 'saved curfew' : 'saved request';
     const swapped = call.kind === 'curfew' ? trySwap(state, call.tail) : null;
     if (swapped) {
       const leg = state.schedule.find((l) => l.legId === swapped.legId);

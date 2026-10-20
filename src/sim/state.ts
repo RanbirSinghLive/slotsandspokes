@@ -265,7 +265,7 @@ export type SimState = {
   startDayOfYear?: number;
   /** Chosen with the home city (sim/difficulty.ts); absent in older saves, which play as medium. */
   difficulty?: GameDifficulty;
-  /** Chosen with the home city: true means no events (sim/mandates.ts) are offered. Absent in older saves, which have them. */
+  /** Chosen with the home city: true means no requests (sim/mandates.ts) or crisis days (sim/crisis.ts). Absent in older saves, which have them. */
   eventsOff?: boolean;
   homeAirport: string;
   /**
@@ -659,6 +659,8 @@ export type SimState = {
   nextCrisisId?: number;
   /** Priority flights offered, accepted or just finished (sim/mandates.ts). */
   mandates?: Mandate[];
+  /** The player's requests switch on the Contracts screen (setRequestsOff()); absent follows `eventsOff`. */
+  requestsOff?: boolean;
   nextMandateId?: number;
   /** The mandates' own random stream, apart from rngSeed. */
   mandateSeed?: number;

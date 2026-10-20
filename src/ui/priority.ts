@@ -10,7 +10,7 @@ import { info } from './inspector/dom';
 const SYMBOL: Record<RoutePriority, string> = { normal: '●', keep: '★', expendable: '▽' };
 const TIP: Record<RoutePriority, string> = {
   normal: 'Normal: cut only when the flights it saves are worth more',
-  keep: 'Keep: never cut for a late plane, takes the delay; events offered here are accepted',
+  keep: 'Keep: never cut for a late plane, takes the delay; requests offered here are accepted',
   expendable: 'Expendable: first to be cut when a day breaks',
 };
 const POLICY_SYMBOL: Record<CallPolicy, string> = { priority: '★', ask: '✋' };
@@ -19,7 +19,7 @@ const POLICY_TIP: Record<CallPolicy, string> = {
   ask: 'Ask: stop and let me decide',
 };
 export const PRIORITY_INFO =
-  'Rank a route once and the controller uses it when a day breaks (the 22:00 curfew will cancel a rotation, or an event flight will fail). ★ keep is never cut: the plane takes its delay, and events offered on it are accepted. ● normal is cut only when the flights it saves are worth more than it gives up. ▽ expendable goes first whenever its loss saves a flight. A swap to an idle plane is tried before any cut. A plane that is only late is left alone. Tap the icon to cycle. Priority on the Game screen settles it with no stop; ✋ ask stops and lets you decide (with a pause if Pause on call is on). The same policy answers a storm forecast: a busy airport with a ★ route flies on; otherwise the day is waived when the forecast is above the break-even. Yesterday\'s cuts are listed in the morning brief.';
+  'Rank a route once and the controller uses it when a day breaks (the 22:00 curfew will cancel a rotation, or a request flight will fail). ★ keep is never cut: the plane takes its delay, and requests offered on it are accepted. ● normal is cut only when the flights it saves are worth more than it gives up. ▽ expendable goes first whenever its loss saves a flight. A swap to an idle plane is tried before any cut. A plane that is only late is left alone. Tap the icon to cycle. Priority on the Game screen settles it with no stop; ✋ ask stops and lets you decide (with a pause if Pause on call is on). The same policy answers a storm forecast: a busy airport with a ★ route flies on; otherwise the day is waived when the forecast is above the break-even. Yesterday\'s cuts are listed in the morning brief.';
 
 /** One tap-to-cycle icon for the route `a`–`b`; `changed` runs after a tap so the page can redraw. */
 export function priorityButton(state: SimState, a: string, b: string, changed: () => void): HTMLButtonElement {

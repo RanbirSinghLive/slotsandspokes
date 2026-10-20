@@ -314,7 +314,7 @@ function render(nowMs: number = performance.now()): void {
   // comment for why that's the point. An alert with no view of its own
   // (a schedule problem) opens Fleet, where the rotations are.
   updateAlerts(state, () => select({ kind: 'fleet' }), choosingHome);
-  if (updateMandates(state, choosingHome, () => select({ kind: 'fleet' }))) runwayPauseRequested = true;
+  if (updateMandates(state, choosingHome, () => select({ kind: 'contracts' }))) runwayPauseRequested = true;
   if (updateCrisis(state, choosingHome)) runwayPauseRequested = true;
   if (updateBriefs(state, choosingHome, briefSpeed)) runwayPauseRequested = true;
   const newCall = updateCalls(state, choosingHome);
