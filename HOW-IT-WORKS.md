@@ -1715,6 +1715,34 @@ first and refused with a reason if it wouldn't hold. `npm run sorttest`.
 
 A leg keeps its id (`<tail>-<n>`) when its rotation moves to another plane, and a new leg's number counts every leg carrying that tail's name, wherever it flies now (`nextLegId()`), so ids stay unique. A save that already holds two legs with one id has the second renamed on load (`repairDuplicateLegIds()`).
 
+**Stretching a turn** (`planGroundTime()` in `sim/scheduleDraft.ts`).
+Double-click a flight, or hold a finger on it for half a second, and a
+stepper opens over its end: − station wait +. Each tap moves the wait at the
+airport it lands at by 5 minutes, and every later flight that plane flies in
+the day moves with it, together, as one move through `planRetime()` (the
+same curfew, hourly room, collision and slot re-pricing checks as a drag, but
+never making or undoing a night stop: `noWrap`). It can't go below the
+scheduled turn, and the last flight of the day has nothing to push. A plane
+on a long-haul pair or alternate days is moved by dragging its round trip. A
+step is made like a drop: on the real schedule, or in the draft while one is
+open. `commitDraft()` only refuses an overlap the moves made, so a plane
+that already had one can still be re-timed. `npm run groundtimetest`.
+
+**Connections while planning** (⇆ beside the sorts; `connectionsWith()` in
+`sim/hubs.ts`, `dropConnections()` in `sim/scheduleDraft.ts`). With ⇆ on, a
+rotation held in a drag, or hovered with a mouse, lights the flights it
+would connect with at a hub (anywhere the player flies two spokes or more),
+by the connecting flows' own rule: in from one spoke and out to a different
+one, the wait 40–180 minutes, or onward on the same plane. Green is a good
+wait (up to 75 minutes), amber a longer one; every other rotation dims, and
+it updates as the rotation slides. The drag tip adds each hub's connecting
+passengers a day, now→then ("⇆ YYZ 140→155"), worked out by
+`connectingPassengersThrough()` on the schedule as the drop would leave it
+(not counted for a swap, whose other side moves too); the turn stepper shows
+the same. The highlights are timing only: whether anyone flies the pair also
+depends on circuity, rights and nonstop rivals, which the number includes.
+On or off is kept in this browser.
+
 A dragged rotation **snaps** (`snapStart()`) to within 10 minutes of the
 flight before it (its turn included), the flight after it, or the ends of
 the usable day. On touch the × shows on every rotation and rows are

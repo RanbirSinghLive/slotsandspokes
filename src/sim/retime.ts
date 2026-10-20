@@ -88,6 +88,8 @@ export type RetimeOptions = {
   unwrapStart?: number;
   /** Let the move sit on top of the new plane's other flights; a draft (sim/scheduleDraft.ts) checks the whole day once it's done. */
   allowOverlap?: boolean;
+  /** Never make or undo a night stop: off either end of the day is refused. A turn stretched at the Gantt (sim/scheduleDraft.ts planGroundTime) pushes flights, it doesn't reshape the plane's night. */
+  noWrap?: boolean;
 };
 
 /** The schedule as it will stand after the midnight rollover applies the pending retimes. */
@@ -194,7 +196,7 @@ export function planRetime(state: SimState, legIds: string[], toTail: string, st
   const offEnd = !longHaul && moved[moved.length - 1].departMinute + moved[moved.length - 1].blockMinutes > USABLE_DAY_END_MINUTE;
   // Off either end of the day on its own plane: an out-and-back wraps into a
   // night stop, and a night stop's half pushed past its own end wraps back.
-  if (toTail === fromTail && (offStart || offEnd) && !longHaul) {
+  if (toTail === fromTail && (offStart || offEnd) && !longHaul && !options.noWrap) {
     const pair = nightStopLegs(world, fromTail);
     const isHalf = pair !== null && legs.length === 1;
     const wrap = isHalf

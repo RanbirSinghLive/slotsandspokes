@@ -1,7 +1,8 @@
 import { commitRetime, planRetime, tomorrowView, type RetimePlan } from './retime';
+import { connectingPassengersThrough, connectionsWith, spokesOf, type LegConnection } from './hubs';
 import type { ScheduleLeg } from './schedule';
 import type { SimState } from './state';
-import { rotationsForTail, scheduledTurnMinutes, USABLE_DAY_END_MINUTE, USABLE_DAY_START_MINUTE } from './utilisation';
+import { rotationsForTail, scheduledTurnMinutes, USABLE_DAY_END_MINUTE, USABLE_DAY_START_MINUTE, wrappedLongHaul } from './utilisation';
 
 /**
  * Planning the Gantt (the Schedule timeline, ui/panels.ts) without the
@@ -28,7 +29,13 @@ import { rotationsForTail, scheduledTurnMinutes, USABLE_DAY_END_MINUTE, USABLE_D
  */
 
 /** One drop of a rotation: which flights, onto which plane, starting when. */
-export type DraftMove = { legIds: string[]; tail: string; start: number };
+export type DraftMove = {
+  legIds: string[];
+  tail: string;
+  start: number;
+  /** A stretched or shortened turn (planGroundTime()): the flights it pushes never make or undo a night stop. */
+  noWrap?: boolean;
+};
 
 export type DropPlan = {
   ok: boolean;
@@ -121,22 +128,24 @@ type CommitOptions = {
 export function commitDraft(state: SimState, moves: DraftMove[], options: CommitOptions = {}): { ok: true; message: string } | { ok: false; reason: string } {
   const final = options.final ?? true;
   const saved = snapshot(state);
+  // Overlaps already there before these moves aren't theirs to answer for: a turn stretched on a plane that already had one still goes.
+  const pairOf = (c: Conflict) => `${c.a.legId}|${c.b.legId}`;
+  const touchedTails = (legIds: Set<string>) => [...new Set([...moves.map((move) => move.tail), ...saved.legs.filter(([legId]) => legIds.has(legId)).map(([, tail]) => tail)])];
+  const movedIds = new Set(moves.flatMap((move) => move.legIds));
+  const existing = final ? new Set(scheduleConflicts(state, touchedTails(movedIds)).map(pairOf)) : new Set<string>();
   const fail = (reason: string) => {
     restore(state, saved);
     return { ok: false as const, reason };
   };
   const messages: string[] = [];
   for (const move of moves) {
-    const result = commitRetime(state, move.legIds, move.tail, move.start, { allowOverlap: true, allowTypeChange: true });
+    const result = commitRetime(state, move.legIds, move.tail, move.start, { allowOverlap: true, allowTypeChange: true, noWrap: move.noWrap });
     if (!result.ok) return fail(result.reason);
     messages.push(result.message);
   }
   if (final) {
-    const moved = new Set(moves.flatMap((move) => move.legIds));
-    const tails = [...new Set(moves.map((move) => move.tail))];
     // A leg that left a plane can leave a problem behind on it too.
-    const origins = saved.legs.filter(([legId]) => moved.has(legId)).map(([, tail]) => tail);
-    const problem = scheduleConflicts(state, [...new Set([...tails, ...origins])]).find((c) => moved.has(c.a.legId) || moved.has(c.b.legId));
+    const problem = scheduleConflicts(state, touchedTails(movedIds)).find((c) => (movedIds.has(c.a.legId) || movedIds.has(c.b.legId)) && !existing.has(pairOf(c)));
     if (problem) return fail(problem.text);
   }
   if (options.dryRun) restore(state, saved);
@@ -222,4 +231,81 @@ export function snapStart(state: SimState, legIds: string[], toTail: string, raw
     }
   }
   return best;
+}
+
+/** What one tap of the Gantt's turn stepper changes the wait by, in minutes. */
+export const GROUND_STEP_MINUTES = 5;
+
+export type GroundTimePlan = DropPlan & {
+  /** Where the plane waits after the flight. */
+  station: string;
+  /** The wait there now, and the shortest one allowed (the scheduled turn). */
+  groundMinutes: number;
+  minimumMinutes: number;
+};
+
+/**
+ * Longer or shorter on the ground at a flight's arrival airport: every later
+ * flight that plane flies in the day moves by `deltaMinutes`, together, the
+ * same checks as a drag (sim/retime.ts) with no night stop made or undone.
+ * Never shorter than the scheduled turn. A plane flying a long-haul pair or
+ * alternate days is moved by dragging its round trip instead.
+ */
+export function planGroundTime(state: SimState, legId: string, deltaMinutes: number): GroundTimePlan {
+  const view = tomorrowView(state);
+  const leg = view.schedule.find((l) => l.legId === legId);
+  // An empty plan for a refusal: nothing to show but the reason.
+  const blankPlan = planRetime(state, [], '', 0);
+  const refuse = (reason: string, extra: Partial<GroundTimePlan> = {}): GroundTimePlan => ({
+    ok: false,
+    kind: 'move',
+    plan: blankPlan,
+    moves: [],
+    swapWith: [],
+    reason,
+    station: leg?.dest ?? '',
+    groundMinutes: 0,
+    minimumMinutes: 0,
+    ...extra,
+  });
+  if (!leg) return refuse('That flight is gone.');
+  const day = view.schedule.filter((l) => l.tail === leg.tail).sort((a, b) => a.departMinute - b.departMinute);
+  if (wrappedLongHaul(view, leg.tail) || day.some((l) => l.dayParity !== undefined)) return refuse('Long-haul round trip · drag it to move it');
+  const later = day.filter((l) => l.departMinute > leg.departMinute);
+  const minimumMinutes = scheduledTurnMinutes(view, leg.origin, leg.dest);
+  const groundMinutes = later.length > 0 ? later[0].departMinute - (leg.departMinute + leg.blockMinutes) : 0;
+  const numbers = { station: leg.dest, groundMinutes, minimumMinutes };
+  if (later.length === 0) return refuse(`Last flight of ${leg.tail}'s day`, numbers);
+  const laterIds = later.map((l) => l.legId);
+  // A move held for tomorrow that this would split: its other flights would be lost from it.
+  const split = (state.pendingRetimes ?? []).some((p) => p.legs.some((l) => laterIds.includes(l.legId)) && p.legs.some((l) => !laterIds.includes(l.legId)));
+  if (split) return refuse(`A move held for tomorrow on ${leg.tail} · ✕ it first`, numbers);
+  if (groundMinutes + deltaMinutes < minimumMinutes) return refuse(`${leg.dest} turn ${minimumMinutes}m minimum`, numbers);
+  const start = later[0].departMinute + deltaMinutes;
+  const plan = planRetime(state, laterIds, leg.tail, start, { noWrap: true });
+  const move: DraftMove = { legIds: laterIds, tail: leg.tail, start, noWrap: true };
+  if (!plan.ok) return { ...refuse(plan.reason ?? 'It can’t go there.', numbers), plan };
+  return { ok: true, kind: 'move', plan, moves: [move], swapWith: [], reason: null, ...numbers, groundMinutes: groundMinutes + deltaMinutes };
+}
+
+/** What a planned move does at the hubs its flights touch: the flights it would meet, and connecting passengers a day before and after. */
+export type DropConnections = {
+  connections: LegConnection[];
+  hubs: { hub: string; before: number; after: number }[];
+};
+
+/**
+ * The connections these flights would make at the times given
+ * (sim/hubs.ts), on tomorrow's schedule. Passengers are counted for a move
+ * of these flights alone; the other side of a swap isn't moved here.
+ */
+export function dropConnections(state: SimState, legs: ScheduleLeg[]): DropConnections {
+  const before = tomorrowView(state);
+  const byId = new Map(legs.map((leg) => [leg.legId, leg]));
+  const after: SimState = { ...before, schedule: before.schedule.map((leg) => byId.get(leg.legId) ?? leg) };
+  const touched = [...new Set(legs.flatMap((leg) => [leg.origin, leg.dest]))].filter((iata) => spokesOf(after, iata).size >= 2);
+  const hubs = touched
+    .map((hub) => ({ hub, before: Math.round(connectingPassengersThrough(before, hub)), after: Math.round(connectingPassengersThrough(after, hub)) }))
+    .filter((h) => h.before > 0 || h.after > 0);
+  return { connections: connectionsWith(after, legs), hubs };
 }

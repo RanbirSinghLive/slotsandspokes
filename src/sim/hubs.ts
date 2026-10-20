@@ -3,7 +3,7 @@ import { executiveConnectingMultiplier } from './executives';
 import { connectingFeedMultiplier } from './innovations';
 import { actualDailyDemand, currentPotentialDemand } from './marketDemand';
 import { flowRights, grantedCountries, homeCountry } from './rights';
-import { marketKey } from './schedule';
+import { marketKey, type ScheduleLeg } from './schedule';
 import { hubStyleAt, type HubStyle } from './hubStyle';
 import { planRespace, applyRespace, workingCopy, type TurnBufferPlan } from './turnBuffer';
 import { recessionFactor } from './shocks';
@@ -157,6 +157,42 @@ function connectingChance(times: SpokeTimes, a: string, b: string): number {
   const flights = (spoke: string) => ((times.arrivalsFrom.get(spoke)?.length ?? 0) + (times.departuresTo.get(spoke)?.length ?? 0)) / 2;
   const frequency = 1 - Math.exp(-Math.min(flights(a), flights(b)) / FREQUENCY_SCALE);
   return frequency * (TIMING_FLOOR + (1 - TIMING_FLOOR) * (ab + ba) / 2);
+}
+
+/** Another flight that meets one of yours at a hub, and how good the connection is (connectionQuality()). */
+export type LegConnection = { legId: string; hub: string; quality: number };
+
+/**
+ * The other flights that connect with these at a hub, by the rule the
+ * connecting flows use: in from a spoke and out to a different one, a
+ * wait in the connecting window between them (or onward on the same
+ * plane). A hub is anywhere the player flies two spokes or more. Each
+ * flight is counted once, at its best connection. Timing only: the
+ * passengers it carries also depend on the spoke pair (connectingFlowsAt()).
+ */
+export function connectionsWith(state: SimState, legs: ScheduleLeg[]): LegConnection[] {
+  const own = new Set(legs.map((leg) => leg.legId));
+  const isHub = new Map<string, boolean>();
+  const hub = (iata: string) => {
+    if (!isHub.has(iata)) isHub.set(iata, spokesOf(state, iata).size >= 2);
+    return isHub.get(iata)!;
+  };
+  const best = new Map<string, LegConnection>();
+  const consider = (legId: string, at: string, quality: number) => {
+    if (quality > 0 && quality > (best.get(legId)?.quality ?? 0)) best.set(legId, { legId, hub: at, quality });
+  };
+  const quality = (wait: number, sameTail: boolean) => (sameTail && wait >= 0 && wait <= MAX_CONNECT_MINUTES ? 1 : connectionQuality(wait));
+  for (const leg of legs) {
+    const landed = leg.departMinute + leg.blockMinutes;
+    for (const other of state.schedule) {
+      if (own.has(other.legId)) continue;
+      // In on this flight, out on the other.
+      if (other.origin === leg.dest && other.dest !== leg.origin && hub(leg.dest)) consider(other.legId, leg.dest, quality(other.departMinute - landed, other.tail === leg.tail));
+      // In on the other, out on this flight.
+      if (other.dest === leg.origin && other.origin !== leg.dest && hub(leg.origin)) consider(other.legId, leg.origin, quality(leg.departMinute - (other.departMinute + other.blockMinutes), other.tail === leg.tail));
+    }
+  }
+  return [...best.values()];
 }
 
 /** A flight at the hub: when it lands or leaves (schedule minutes, home clock) and on which plane. */
