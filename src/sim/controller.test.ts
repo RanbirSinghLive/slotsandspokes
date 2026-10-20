@@ -150,6 +150,7 @@ console.log('controller cancel: ok');
   worn.status = 'ground';
   worn.atAirport = worn.baseAirport;
   worn.groundSinceMinute = firstDepart - 90; // landed an hour and a half before its first departure
+  worn.nightsSinceLine = 4; // and due its line check tonight
   state.aogs = state.aogs.filter((event) => event.tail !== tail);
   state.groundedTails = state.groundedTails.filter((grounded) => grounded !== tail);
   state.swappedToday = [];

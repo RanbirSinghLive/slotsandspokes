@@ -10,23 +10,24 @@ import type { SimState } from './state';
  * (sim/crews.ts holds its crews). It's opened deliberately, on the Crews
  * tab, for CREW_BASE_FEE and CREW_BASE_PER_DAY for the crew room.
  *
- * **A line base** is where nights are line checks (sim/mxChecks.ts). Its
- * level is how many planes it can check in a night; a plane past that is
- * treated like one at an outstation. **A heavy base** is a hangar: its
+ * **A line base** is where line checks are done (sim/mxChecks.ts): a plane
+ * needs one every LINE_INTERVAL_NIGHTS nights. Its level is how many planes
+ * it can check in a night. **A heavy base** is a hangar: its
  * level is how many bays it has, and only a plane holding a bay banks
  * heavy-check hours on its nights there. The two are opened and levelled
  * apart on the Mtc tab, so a station can be line-only (cheap, never does a
  * heavy check) or a hangar.
  *
  * **Ratings.** A station's mechanics are rated by aircraft class, like
- * crews. A plane of an unrated class is treated like one at an outstation.
+ * crews. A plane of an unrated class gets no line check or bay there.
  * A station's first rating is free; each further class costs
  * MX_RATING_PER_DAY, so a mixed fleet costs more to maintain.
  *
- * **Anywhere else** a plane sleeps (no base, a full base, an unrated
- * class), the night is a **contracted check**, paid CONTRACT_CHECK_PER_HOUR
- * of the night's work, or a **deferred item**, by the station's setting
- * (contracted unless the player changes it).
+ * **Line checks are only done at your own line bases**, never bought: a
+ * plane due one that sleeps past the line base's level, of an unrated
+ * class, or anywhere without a line base, gets a **deferred item**
+ * (sim/mxChecks.ts). So a fleet that outgrows its stations pays in wear,
+ * and growth has to come with line slots and ratings.
  *
  * Home starts with both at level MX_HOME_FREE_LEVELS, rated for the
  * starting class, inside the starting cost: those cost nothing to run.
@@ -48,9 +49,8 @@ export const MX_PER_LEVEL_PER_DAY: Record<MxKind, number> = { line: 100, heavy: 
 /** Rating a station's mechanics for another aircraft class: once, then a day. */
 export const MX_RATING_FEE = 50_000;
 export const MX_RATING_PER_DAY = 150;
+/** Heavy checks, refits and MX holds away from a rated base are contracted out, by the hour of work. */
 export const CONTRACT_CHECK_PER_HOUR = 300;
-
-export type OutstationCheck = 'contract' | 'defer';
 
 type Outcome = { ok: true; message: string } | { ok: false; reason: string };
 
@@ -117,16 +117,9 @@ export function heavyRated(state: SimState, iata: string, classCode: string): bo
   return hasHeavyBase(state, iata) && mxRated(state, iata, classCode);
 }
 
-/** What a night the station can't check itself is (no line base, full, or an unrated class): contracted unless set to defer. */
-export function outstationCheck(state: SimState, iata: string): OutstationCheck {
-  return state.outstationChecks?.[iata] ?? 'contract';
-}
-
-export function setOutstationCheck(state: SimState, iata: string, check: OutstationCheck): Outcome {
-  const checks = (state.outstationChecks ??= {});
-  if (check === 'contract') delete checks[iata];
-  else checks[iata] = check;
-  return { ok: true, message: `${iata} · ${check === 'contract' ? 'contracted checks' : 'checks deferred'}` };
+/** Whether the airport has a maintenance base of the player's, line or hangar. */
+export function isMxStation(state: SimState, iata: string): boolean {
+  return hasLineBase(state, iata) || hasHeavyBase(state, iata);
 }
 
 /** A contracted check's price for `minutes` of work. */
@@ -232,7 +225,7 @@ export function closeMxBase(state: SimState, kind: MxKind, iata: string): Outcom
   const levels = ownMxLevels(state);
   delete levels[kind][iata];
   if (state.mxRatings && !levels.line[iata] && !levels.heavy[iata]) delete state.mxRatings[iata];
-  return { ok: true, message: `${kind === 'line' ? 'Line base' : 'Hangar'} closed · ${iata} · nights here contracted unless set to defer` };
+  return { ok: true, message: `${kind === 'line' ? 'Line base' : 'Hangar'} closed · ${iata} · planes due a line check here defer` };
 }
 
 /** Why a station can't be rated for the class, or null. */

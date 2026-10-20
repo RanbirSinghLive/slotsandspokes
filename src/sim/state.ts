@@ -101,6 +101,8 @@ export type Aircraft = {
   seasonalUntilDay?: number;
   /** Line checks missed or cut short and not yet made up (sim/mxChecks.ts). Absent: none. */
   deferredItems?: number;
+  /** Nights flown since its last line check (sim/mxChecks.ts). Absent: staggered by tail. */
+  nightsSinceLine?: number;
   /** Flying days since the last heavy check (sim/mxChecks.ts). Absent: staggered by tail. */
   daysSinceHeavyCheck?: number;
   /** Hangar minutes done at night toward its heavy check this time round (sim/mxChecks.ts). */
@@ -731,8 +733,6 @@ export type SimState = {
   heavyBases?: Record<string, number>;
   /** The aircraft classes each station's mechanics are rated for; missing in a save from before ratings, which rates every class everywhere. */
   mxRatings?: Record<string, string[]>;
-  /** Stations set to defer their line checks rather than contract them (sim/bases.ts); unlisted ones contract. */
-  outstationChecks?: Record<string, 'contract' | 'defer'>;
   /** Today's crewing (sim/crews.ts's rollDailyCrews()): crews per plane and when each duty day starts. */
   crewDay?: CrewDay;
   /**
@@ -776,7 +776,7 @@ export type SimState = {
     seasonBaseline?: Record<string, { revenue: number; cost: number; passengers: number }>;
   };
   /** How each flying plane's line check went last night (sim/mxChecks.ts), by tail. */
-  lastNightChecks?: Record<string, 'checked' | 'cleared' | 'short' | 'contracted' | 'away'>;
+  lastNightChecks?: Record<string, 'checked' | 'cleared' | 'short' | 'free' | 'away'>;
   /** Demand events announced or running (sim/demandEvents.ts). Absent in an older save: none. */
   demandEvents?: DemandEvent[];
   /** Fare wars running now (sim/fareWars.ts). Absent in an older save: none. */

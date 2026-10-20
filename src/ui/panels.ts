@@ -4,7 +4,7 @@ import { planeStatus, planeTip } from './inspector/aircraft';
 import { aogFor } from '../sim/aog';
 import { TOUCH_TIP_MS } from './mapTools';
 import { nightStopLegs } from '../sim/nightStops';
-import { hasLineBase, outstationCheck } from '../sim/bases';
+import { hasLineBase } from '../sim/bases';
 import { deferredItems, MX_HOLD_AT, tonightCheck } from '../sim/mxChecks';
 import { bringNightStopHome, draftProblem, dropRotation, dropRotationInDraft, overlappingLegs, planBringNightStopHome, planFleetSort, planDropRotation, removeRotation as removeRotationFromSchedule, saveDraft, snappedStart, type DraftMove, type DropPlan, type SortMode } from '../sim/playerActions';
 import { cancelPendingRetime, type RetimePlan } from '../sim/retime';
@@ -551,8 +551,8 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
   const key = document.createElement('div');
   key.className = 'timeline-key';
   key.append(
-    '☾ ✓ · c · −40m · ✗ · ● · ☾A ',
-    info(`Tonight's line check, beside each plane. ✓ at a maintenance base. c contracted at a station. −40m short by that long. ✗ deferred, no check. ● a deferred item (${MX_HOLD_AT} holds the plane a morning). A hatched cell with A: the night's spare hours go to that plane's A check.`),
+    '☾ ✓ · 2 · −40m · ✗ · ● · ☾A ',
+    info(`Tonight's line check, beside each plane (one every 5 nights at a line base). ✓ checked tonight. 2 not due for 2 nights. −40m short by that long. ✗ due and missed. ● a deferred item (${MX_HOLD_AT} holds the plane a morning). A hatched cell with A: the night's spare hours go to that plane's A check.`),
   );
   rows.push(key);
 
@@ -929,9 +929,7 @@ function describeRetime(plan: RetimePlan, tail: string, fromTail: string, start:
     if (plan.kind === 'unwrap') return `Sleeps at base again · ${plan.station} ${minuteOfDayToTimeString(a.departMinute)}–${minuteOfDayToTimeString(b.departMinute + b.blockMinutes)}${tomorrow}`;
     const check = hasLineBase(lastTimelineState, plan.station)
       ? 'line base: line check'
-      : outstationCheck(lastTimelineState, plan.station) === 'contract'
-        ? 'no line base: contracted check'
-        : 'no line base: deferred, ● a night';
+      : 'no line base: line check back at base every 5 nights';
     return [`Night stop ${plan.station}`, `out ${minuteOfDayToTimeString(b.departMinute)}`, `back ${minuteOfDayToTimeString(a.departMinute)}`, check, ...(plan.crewWarning ? [plan.crewWarning] : []), ...(plan.deferred ? ['from tomorrow'] : [])].join(' · ');
   }
   const parts = [minuteOfDayToTimeString(start)];
@@ -1120,14 +1118,16 @@ function updateNightCells(state: SimState, force = false): void {
       cell.title = '';
       continue;
     }
-    const status = tonight.away ? '☾✗' : tonight.short ? `☾−${tonight.work - tonight.night}m` : tonight.contracted ? '☾c' : '☾✓';
+    const status = tonight.away ? '☾✗' : tonight.short ? `☾−${tonight.work - tonight.night}m` : tonight.inHouse ? '☾✓' : `☾${tonight.nightsLeft}`;
     // The label is narrow, so a check night shows its letters in place of the tick.
     cell.textContent = (tonight.banking && !tonight.short ? '☾A' : status) + pips;
     cell.className = `timeline-night${tonight.away || tonight.short ? ' is-short' : ''}${deferred >= MX_HOLD_AT - 1 ? ' is-hold' : ''}${tonight.banking ? ' is-check' : ''}`;
     cell.title =
       (tonight.away
-        ? `Tonight at ${tonight.station}, no maintenance base, checks deferred: no line check, so a deferred item.`
-        : `Tonight at ${tonight.station}${tonight.contracted ? ', contracted check' : ', maintenance base'}: ${Math.floor(tonight.night / 60)}h ${String(tonight.night % 60).padStart(2, '0')}m for ${Math.floor(tonight.work / 60)}h ${String(tonight.work % 60).padStart(2, '0')}m of work` +
+        ? `Tonight at ${tonight.station}: line check due and no line base slot rated for it, so a deferred item.`
+        : !tonight.inHouse
+          ? `Tonight at ${tonight.station}: no line check, due in ${tonight.nightsLeft} night${tonight.nightsLeft === 1 ? '' : 's'}.`
+          : `Tonight at ${tonight.station}, line check: ${Math.floor(tonight.night / 60)}h ${String(tonight.night % 60).padStart(2, '0')}m for ${Math.floor(tonight.work / 60)}h ${String(tonight.work % 60).padStart(2, '0')}m of work` +
           (tonight.short ? ', so the check is cut short: a deferred item.' : '.')) +
       (tonight.banking ? ' The spare hours go to its A check.' : '') +
       (deferred > 0 ? ` ${deferred} deferred item${deferred === 1 ? '' : 's'} (●): at ${MX_HOLD_AT}, held for a morning.` : '');

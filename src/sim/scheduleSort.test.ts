@@ -99,7 +99,8 @@ console.log('schedule sort: ok');
 // A leg moved to another plane keeps its id, so a new leg on the plane it left must not reuse its number,
 // and a save that already holds two legs with one id is repaired.
 const ids = structuredClone(state);
-const moved = ids.schedule.find((leg) => leg.legId.startsWith(`${leg.tail}-`))!;
+// After the sorts every leg may sit on another plane than its id names; then give one a fresh id of its own plane's.
+const moved = ids.schedule.find((leg) => leg.legId.startsWith(`${leg.tail}-`)) ?? Object.assign(ids.schedule[0], { legId: nextLegId(ids.schedule[0].tail, ids.schedule) });
 const originalTail = moved.tail;
 const taken = nextLegId(originalTail, ids.schedule);
 moved.tail = 'C-ELSEWHERE';
