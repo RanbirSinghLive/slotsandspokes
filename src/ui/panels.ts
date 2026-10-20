@@ -836,12 +836,19 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
             track.append(twin);
           }
           pending.title = `Moves here tomorrow ${minuteOfDayToTimeString(held.departMinute)} · today's flying stays as it is`;
+          // Its tip can't show (the box lets the pointer through to the flying below), so the box says it: booked, from tomorrow.
+          if (i === 0) {
+            const label = document.createElement('span');
+            label.className = 'timeline-pending-label';
+            label.textContent = `⏭ ${minuteOfDayToTimeString(held.departMinute)}`;
+            pending.append(label);
+          }
           if (i === 0 && !draft) {
             const cancel = document.createElement('button');
             cancel.type = 'button';
             cancel.className = 'timeline-pending-cancel';
             cancel.textContent = '✕';
-            cancel.title = 'Cancel this move · it stays where it is today';
+            cancel.title = `Saved · flies ${minuteOfDayToTimeString(held.departMinute)} from tomorrow, today's flying stays · ✕ cancels the move`;
             cancel.setAttribute('aria-label', `Cancel the move held for tomorrow on ${aircraft.tail}`);
             cancel.addEventListener('click', (event) => {
               event.stopPropagation();

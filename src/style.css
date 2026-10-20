@@ -1739,6 +1739,13 @@ button,
   pointer-events: none;
 }
 
+/* The held move's new time, ⏭ for tomorrow. */
+.timeline-pending-label {
+  font-size: 9px;
+  color: #ffd166;
+  white-space: nowrap;
+}
+
 .timeline-pending-cancel {
   position: absolute;
   bottom: -1px;
