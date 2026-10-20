@@ -1383,6 +1383,11 @@ button,
   border-radius: 3px;
 }
 
+/* A plane on a daily long-haul round trip has a whole-day axis: its morning back past the end shows again at the start (ui/panels.ts). Clipped across only (no scrolling sideways either), so a dragged block can still slide over the rows above and below. */
+.timeline-track.has-wrap {
+  overflow-x: clip;
+}
+
 /* A line at each hour tick on a plane's row (ui/panels.ts). */
 .timeline-gridline {
   position: absolute;
@@ -8014,3 +8019,4 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
 #timeline-ground-stepper .ground-status[hidden] {
   display: none;
 }
+

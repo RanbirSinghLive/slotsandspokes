@@ -13,7 +13,7 @@ import { airportHours, FIRST_OPEN_HOUR, freeInHour, OPEN_HOURS } from '../sim/ho
 import { money, shortMoney } from './format';
 import { formatNps, networkNps } from '../sim/nps';
 import { validateSchedule, type ScheduleLeg } from '../sim/schedule';
-import { allRotations, USABLE_DAY_END_MINUTE, USABLE_DAY_START_MINUTE, utilisationProblems, wrappedLongHaul, type Rotation } from '../sim/utilisation';
+import { allRotations, USABLE_DAY_END_MINUTE, USABLE_DAY_MINUTES, USABLE_DAY_START_MINUTE, utilisationProblems, wrappedLongHaul, type Rotation } from '../sim/utilisation';
 import { select, selectRoute, type Selection } from './selection';
 import { networkTrends, type Measure } from '../sim/trends';
 import { AIRCRAFT_CLASSES, pluralClassName } from '../sim/aircraftClasses';
@@ -581,7 +581,11 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
   const heldEnds = (state.pendingRetimes ?? []).flatMap((move) =>
     move.legs.map((held) => (held.departMinute < move.legs[0].departMinute ? held.departMinute + 24 * 60 : held.departMinute) + (held.blockMinutes ?? 0)),
   );
-  const end = Math.max(USABLE_DAY_END_MINUTE, ...rotations.map((r) => r.arriveMinute), ...heldEnds);
+  // A plane on a daily long-haul round trip can start it at any hour, so the axis is then a whole day: what runs past its end comes back in at the start.
+  const wraps = rotations.some(isDailyLongHaul);
+  const end = wraps
+    ? Math.max(start + 24 * 60, ...rotations.filter((r) => !isDailyLongHaul(r)).map((r) => r.arriveMinute))
+    : Math.max(USABLE_DAY_END_MINUTE, ...rotations.map((r) => r.arriveMinute), ...heldEnds);
   timelineWindow = { start, end };
   // In a draft: which flights have been moved in it, and which now sit on others.
   // Legs flying an accepted event, starred on their rotation.
@@ -728,7 +732,9 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
           (rotation.legs[0].dayParity !== undefined ? ` · ${rotation.legs[0].dayParity === 0 ? 'even' : 'odd'} days only · a second plane on the other days makes it daily` : '') +
           (half
             ? ` · night stop ${nightStop!.morning.origin} · ⌂ or push it past ${rotation.legs[0] === nightStop!.morning ? 'the start' : 'the end'} of the day to bring it home`
-            : rotation.closed
+            : isDailyLongHaul(rotation)
+              ? ' · drag to any start · late starts fly back after midnight'
+              : rotation.closed
               ? ' · drag to move it · past either end of the day for a night stop · double-click or hold a flight to stretch its turn'
               : ' · never returns to base');
         span.addEventListener('pointerdown', (event) => startDrag(event, span, rotation, track, rotation.closed || half));
@@ -775,6 +781,19 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
           span.append(star);
           span.title += ' · ★ event flight';
         }
+        // Its morning back, past the axis's end, drawn again a day earlier at the start (the track clips both).
+        if (wraps && isDailyLongHaul(rotation)) {
+          const twin = span.cloneNode(true) as HTMLElement;
+          twin.classList.add('is-wrap-twin');
+          twin.style.left = at(rotation.departMinute - 24 * 60);
+          twin.addEventListener('pointerdown', (event) => startDrag(event, span, rotation, track, true));
+          twin.addEventListener('click', () => {
+            if (!justDragged) selectRoute(state, rotation.airports[0], rotation.airports[1]);
+          });
+          wrapTwins.set(span, twin);
+          track.classList.add('has-wrap');
+          track.append(twin);
+        }
         // Not in a draft: ⌂ and × act on the real schedule.
         if (draft) {
           track.append(span);
@@ -783,7 +802,9 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
         if (half) span.append(nightHomeButtonFor(aircraft.tail, state));
         const removeButton = removeButtonFor(rotation, state, half ? own.find((other) => other !== rotation && (other.legs[0] === nightStop!.morning || other.legs[0] === nightStop!.evening)) : undefined);
         if (half) halfButtons.push(removeButton);
-        span.append(removeButton);
+        // Past the axis's end, the × goes on the end that shows: the morning back at the start.
+        const twin = wrapTwins.get(span);
+        (twin && rotation.arriveMinute > end ? twin : span).append(removeButton);
         track.append(span);
       }
       // A night stop's two × are one control: hovering or arming either lights both.
@@ -807,6 +828,13 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
           const heldStart = held.departMinute < move.legs[0].departMinute ? held.departMinute + 24 * 60 : held.departMinute;
           pending.style.left = at(heldStart);
           pending.style.width = width(block);
+          if (wraps && heldStart + block > end) {
+            const twin = document.createElement('div');
+            twin.className = 'timeline-pending';
+            twin.style.left = at(heldStart - 24 * 60);
+            twin.style.width = width(block);
+            track.append(twin);
+          }
           pending.title = `Moves here tomorrow ${minuteOfDayToTimeString(held.departMinute)} · today's flying stays as it is`;
           if (i === 0 && !draft) {
             const cancel = document.createElement('button');
@@ -827,7 +855,8 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
       }
       // The base in each wait between rotations, where another one could drop in.
       if (aircraft.baseAirport) {
-        let free = start;
+        // A long-haul pair's morning back, wrapped to the start, is flying too.
+        let free = Math.max(start, ...(wraps ? own.map((rotation) => rotation.arriveMinute - 24 * 60) : []));
         for (const rotation of [...own].sort((a, b) => a.departMinute - b.departMinute)) {
           if (rotation.departMinute - free >= BASE_LABEL_MIN_GAP) track.append(groundLabel(aircraft.baseAirport, at((free + rotation.departMinute) / 2), true));
           free = rotation.arriveMinute;
@@ -843,6 +872,14 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
   }
   return rows;
 }
+
+/** A round trip one plane flies every day that outruns the usable day: it may start at any hour and run on past midnight (sim/retime.ts). */
+function isDailyLongHaul(rotation: Rotation): boolean {
+  return rotation.legs.length === 2 && rotation.legs[0].dayParity === undefined && rotation.arriveMinute - rotation.departMinute > USABLE_DAY_MINUTES;
+}
+
+/** Each daily long-haul rotation's copy a day earlier, which shows its morning back at the start of the axis. */
+const wrapTwins = new WeakMap<HTMLElement, HTMLElement>();
 
 /** The plane whose tip a tap put up, and the timer that forgets it: a second tap on it while the tip is up opens the plane. */
 let tippedTail: { tail: string; timer: number } | null = null;
@@ -876,6 +913,8 @@ type Drag = {
   connections: DropConnections | null;
   /** A touch held still this long opens the turn stepper instead (LONG_PRESS_MS). */
   pressTimer: ReturnType<typeof setTimeout> | undefined;
+  /** A long-haul rotation's copy a day earlier, moved with it. */
+  twin: HTMLElement | null;
 };
 
 let drag: Drag | null = null;
@@ -924,6 +963,7 @@ function startDrag(event: PointerEvent, span: HTMLElement, rotation: Rotation, t
     drop: null,
     connections: null,
     pressTimer: undefined,
+    twin: wrapTwins.get(span) ?? null,
   };
   // A finger held still on a flight: its turn, as a double-click is with a mouse.
   if (event.pointerType !== 'mouse') {
@@ -961,6 +1001,7 @@ function onDragMove(event: PointerEvent): void {
     closeGroundStepper();
     scheduleClock.hold();
     drag.span.classList.add('is-dragging');
+    drag.twin?.classList.add('is-dragging');
     // The browser's own hover tips would sit over what's being dragged.
     drag.span.removeAttribute('title');
     for (const el of rotationsTimelineEl.querySelectorAll('[title]')) el.removeAttribute('title');
@@ -990,6 +1031,10 @@ function onDragMove(event: PointerEvent): void {
   // In 5-minute steps, pulled to a neighbouring flight or the day's ends when close (sim/scheduleDraft.ts).
   const start = snappedStart(lastTimelineState, drag.rotation.legs.map((leg) => leg.legId), tail, Math.round((drag.rotation.departMinute + dx * drag.minutesPerPx) / 5) * 5);
   drag.span.style.left = `${((start - timelineWindow.start) / (timelineWindow.end - timelineWindow.start)) * 100}%`;
+  if (drag.twin) {
+    drag.twin.style.left = `${((start - 24 * 60 - timelineWindow.start) / (timelineWindow.end - timelineWindow.start)) * 100}%`;
+    drag.twin.style.transform = drag.span.style.transform;
+  }
 
   if (!drag.target || drag.target.tail !== tail || drag.target.start !== start) {
     drag.target = { tail, start };
@@ -1006,6 +1051,7 @@ function onDragMove(event: PointerEvent): void {
   }
   const { plan, kind } = drag.drop!;
   drag.span.classList.toggle('is-bad', !drag.drop!.ok);
+  drag.twin?.classList.toggle('is-bad', !drag.drop!.ok);
   drag.span.classList.toggle('is-hold', drag.drop!.ok && kind === 'hold');
   drag.span.dataset.time = minuteOfDayToTimeString(start);
   dragTip.textContent = !drag.drop!.ok
@@ -1043,6 +1089,12 @@ function describeRetime(plan: RetimePlan, tail: string, fromTail: string, start:
     return [`Night stop ${plan.station}`, `out ${minuteOfDayToTimeString(b.departMinute)}`, `back ${minuteOfDayToTimeString(a.departMinute)}`, check, ...(plan.crewWarning ? [plan.crewWarning] : []), ...(plan.deferred ? ['from tomorrow'] : [])].join(' · ');
   }
   const parts = [minuteOfDayToTimeString(start)];
+  // A long-haul round trip: when it's back at base, the next morning for a late start.
+  const [out, back] = plan.legs;
+  if (plan.legs.length === 2) {
+    const backMinute = (back.departMinute < out.departMinute ? back.departMinute + 24 * 60 : back.departMinute) + back.blockMinutes;
+    if (backMinute - out.departMinute > USABLE_DAY_MINUTES) parts.push(`↩ ${minuteOfDayToTimeString(backMinute)}`);
+  }
   if (tail !== fromTail) parts.push(tail);
   if (plan.marginChangePerDay !== 0) parts.push(`${plan.marginChangePerDay > 0 ? '+' : '−'}${shortMoney(Math.abs(plan.marginChangePerDay))}/day`);
   if (plan.slotFeeChangePerDay !== 0) parts.push(`slots ${plan.slotFeeChangePerDay > 0 ? '+' : '−'}${shortMoney(Math.abs(plan.slotFeeChangePerDay))}/day`);
@@ -1368,7 +1420,9 @@ function updateNightCells(state: SimState, force = false): void {
 function updateTimelineNow(state: SimState): void {
   updateNightCells(state);
   if (!timelineWindow) return;
-  const minute = minuteOfDay(state);
+  const today = minuteOfDay(state);
+  // A whole-day axis from 06:00 has the small hours at its end.
+  const minute = today < timelineWindow.start && today + 24 * 60 <= timelineWindow.end ? today + 24 * 60 : today;
   const inside = minute >= timelineWindow.start && minute <= timelineWindow.end;
   const left = `${((minute - timelineWindow.start) / (timelineWindow.end - timelineWindow.start)) * 100}%`;
   for (const line of rotationsTimelineEl.querySelectorAll<HTMLElement>('.timeline-now')) {

@@ -1641,7 +1641,10 @@ it back. The rules:
   midnight. A flight back after midnight is stored a day early and needs
   the plane to itself; any other flight leaving past 24:00 is refused,
   since step.ts dispatches a flight on its own day's clock and it would
-  never go),
+  never go; while a plane flies a daily long-haul round trip the Gantt's
+  axis is a whole day from its start, so there's room to drag one to any
+  hour, and what runs past the axis's end is drawn again at its start,
+  the × on that end; the tip adds when it's back, "↩ 07:34 +1"),
   its new plane's other rotations with a
   turn either side, and room in every hour its legs now use at every
   airport (its own old movements count as room, rivals stay where they
