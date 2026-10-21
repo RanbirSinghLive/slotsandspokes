@@ -272,10 +272,12 @@ const MIN_SECTIONS_FOR_CHIPS = 3;
 
 /**
  * A row of chips pinned at the top of a long view (an airport, Head
- * office, Routes), one per section heading: a click scrolls to it, so
+ * office), one per section heading: a click scrolls to it, so
  * digging doesn't mean scrolling past everything above.
  */
 function addJumpChips(): void {
+  // A screen split into views (Mtc, Crews, Routes) already has its switch in the title; chips would be a second row of navigation.
+  if (bodyEl.querySelector('.view-switch')) return;
   const headings = [...bodyEl.querySelectorAll('h2')];
   if (headings.length < MIN_SECTIONS_FOR_CHIPS) return;
   const chips = document.createElement('nav');
