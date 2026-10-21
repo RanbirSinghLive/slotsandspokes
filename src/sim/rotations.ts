@@ -297,12 +297,15 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
   // is full at one of its airports, start it later, in HOUR_SEARCH_STEP
   // steps, until every leg fits or it would no longer be home by the end
   // of the day. So a full peak sends a new flight off-peak by itself, and
-  // the plan says so (`heldBack`).
+  // the plan says so (`heldBack`). A long-haul round trip runs round the
+  // clock, so it searches on until its flight back would leave after
+  // midnight instead; an every-other-day pair already starts as late as it
+  // can.
   const roomCache = new Map<string, AirportHours>();
   const firstProblem = hourlyRoomProblem(state, legs, roomCache);
   let heldBack: RotationPlan['heldBack'] = null;
   let roomProblem = firstProblem;
-  if (firstProblem && !longHaul) {
+  if (firstProblem && !alternateDays) {
     // Each try moves the start just far enough to push the earliest
     // offending movement past the end of its full hour, so the search
     // takes at most an hour's worth of tries per hour of the day.
@@ -310,10 +313,10 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
     let start = earliestStart;
     while (problem) {
       start += Math.max(HOUR_SEARCH_STEP, Math.ceil(((hourOf(problem.minute) + 1) * 60 - (problem.minute % 1440)) / HOUR_SEARCH_STEP) * HOUR_SEARCH_STEP);
-      if (start > USABLE_DAY_END_MINUTE) break;
+      if (start > USABLE_DAY_END_MINUTE && !longHaul) break;
       const attempt = packRotationAvoidingCollisions(rotationAirports, type?.cruiseKts, start, state);
       const end = attempt[attempt.length - 1];
-      if (end && end.departMinute + end.blockMinutes > USABLE_DAY_END_MINUTE) break;
+      if (end && (longHaul ? end.departMinute >= 24 * 60 : end.departMinute + end.blockMinutes > USABLE_DAY_END_MINUTE)) break;
       problem = hourlyRoomProblem(state, attempt, roomCache);
       if (!problem) {
         heldBack = { iata: firstProblem.iata, hour: firstProblem.hour, fromMinute: legs[0]?.departMinute ?? earliestStart };
@@ -465,8 +468,8 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
   if (roomProblem) {
     const free = hoursWithRoom(roomCache.get(roomProblem.iata) ?? airportHours(state, roomProblem.iata));
     return fail(
-      `${roomProblem.iata} is full at ${hourText(roomProblem.hour)} and every later hour this rotation could use and still be home by ` +
-        `${minuteOfDayToTimeString(USABLE_DAY_END_MINUTE)}` +
+      `${roomProblem.iata} is full at ${hourText(roomProblem.hour)} and every later hour this rotation could use and still ` +
+        (longHaul ? 'fly back before midnight' : `be home by ${minuteOfDayToTimeString(USABLE_DAY_END_MINUTE)}`) +
         (free > 0 ? ` · ${free} hour${free === 1 ? '' : 's'} free there earlier: retime flights in the Schedule` : '') +
         ` · or fly bigger aircraft, or grow elsewhere.`,
     );
