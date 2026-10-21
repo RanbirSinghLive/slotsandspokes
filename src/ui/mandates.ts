@@ -24,9 +24,6 @@ let signature: string | null = null;
 /** Why the last Accept was refused, shown on the screen until the next rebuild. */
 let refusal: string | null = null;
 
-/** Days a lapsed offer stays in the list. */
-const LAPSED_SHOWN_DAYS = 2;
-
 function label(mandate: Mandate): string {
   return `${mandate.origin}→${mandate.dest} ${minuteOfDayToTimeString(mandate.departMinute)}`;
 }
@@ -68,12 +65,7 @@ function row(state: SimState, mandate: Mandate, refresh: () => void): HTMLElemen
   const el = document.createElement('div');
   el.className = 'mandate-row';
   const text = document.createElement('span');
-  if (mandate.status === 'lapsed') {
-    el.classList.add('is-lapsed');
-    text.textContent = `${label(mandate)} · ✕ expired`;
-    el.title = 'Offer expired: it was not accepted before its first flight';
-    el.append(text);
-  } else if (mandate.status === 'offered') {
+  if (mandate.status === 'offered') {
     text.textContent = `${label(mandate)} · +${shortMoney(mandate.premium)}/flt · -${shortMoney(mandate.penalty)} fail · starts ${mandate.startDay - today}d · ${termFlights(mandate)}d term`;
     el.append(text);
     const button = document.createElement('button');
@@ -110,12 +102,9 @@ function chipTip(state: SimState, shown: Mandate[]): string {
 }
 
 
-/** Offers open or running, and offers lapsed in the last couple of days so a miss is visible. */
+/** Offers open or running; a lapsed offer drops off the list the day it lapses. */
 function listed(state: SimState): Mandate[] {
-  const today = dayIndex(state);
-  const shown = mandatesOf(state).filter((m) => m.status === 'offered' || m.status === 'accepted');
-  const lapsed = mandatesOf(state).filter((m) => m.status === 'lapsed' && !m.declined && today - m.startDay <= LAPSED_SHOWN_DAYS);
-  return [...shown, ...lapsed];
+  return mandatesOf(state).filter((m) => m.status === 'offered' || m.status === 'accepted');
 }
 
 /** The rows for the Contracts screen's Requests section; `changed` rebuilds the screen. */

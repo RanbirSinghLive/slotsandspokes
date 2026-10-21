@@ -193,8 +193,7 @@ in older saves, which have events). It is not a difficulty tier.
 Requests (`sim/mandates.ts`, called mandates in the code) show on the
 Contracts screen under their own heading: an open offer has Details, an
 accepted one is a row that opens the plane flying it (the route if no flight
-matches), and an offer that lapsed stays greyed and struck through for two
-days. The 🔔/🔕 by the heading is `setRequestsOff()` (`state.requestsOff`,
+matches), and an offer that lapsed drops off the list the day it lapses. The 🔔/🔕 by the heading is `setRequestsOff()` (`state.requestsOff`,
 saved; absent follows `eventsOff`): off, no new offers come, open ones lapse as
 declined (not kept as history) and accepted ones carry on. The daily draws are
 the same either way. The HUD ★ chip opens the Contracts screen. The Gantt stars
@@ -2351,7 +2350,8 @@ balance lever for a weak home.
   the reserve. Otherwise it is decided 20 days after the offer: each
   eligible rival bids half the time, asking 80–115% of the reference;
   score is 70% price against the reserve and 30% capability, and a tie
-  goes to you. A loss shows as lapsed with the winning rival. Once
+  goes to you. A loss lapses and leaves the screen; Past lists only
+  contracts that were flown. Once
   awarded you have 30 days to fly it, then it starts. Flying an unbid
   offer places a bid at the reference. Dealt from the contracts' own
   random stream.
