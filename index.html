@@ -40,6 +40,8 @@
     </div>
     <!-- Top left of the map: now. The clock bar, and the alerts under it. -->
     <div id="now-corner">
+      <!-- The clock bar, and the brief's minimized tabs at its right end. -->
+      <div id="now-bar">
       <div id="hud">
         <div id="clock">Jan 1, 2027 · 00:00</div>
         <div id="ops-board"><span id="ops-items"></span><button type="button" id="market-chip" class="ops-item" hidden></button><button type="button" id="events-chip" class="ops-item" hidden></button><button type="button" id="crisis-chip" class="ops-item" hidden></button></div>
@@ -50,6 +52,8 @@
           <span id="speed-dots"></span>
           <button type="button" id="speed-up" data-tip="Faster · +" aria-label="Faster"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="6" x2="12" y2="18"/><line x1="6" y1="12" x2="18" y2="12"/></svg></button>
         </div>
+      </div>
+      <div id="brief-tabs" hidden></div>
       </div>
       <div id="alert-strip" hidden>
         <div id="alert-strip-list"></div>
@@ -282,12 +286,11 @@
       <input id="jump-input" type="text" autocomplete="off" spellcheck="false" placeholder="Jump to an airport, plane, rival, route or screen" aria-label="Jump to" />
       <div id="jump-results"></div>
     </div>
-    <!-- The daily brief and season review (ui/briefWindow.ts): a floating window and, when minimized, tabs above the ticker. -->
+    <!-- The daily brief and season review (ui/briefWindow.ts): a floating window, and when minimized a tab beside the clock bar (#brief-tabs). -->
     <div id="brief-window" hidden>
       <div id="brief-header"><span id="brief-title"></span><button type="button" id="brief-minimize" title="Minimize to a tab" aria-label="Minimize">–</button></div>
       <div id="brief-body"></div>
     </div>
-    <div id="brief-tabs" hidden></div>
     <div id="ticker">
       <div id="ticker-track"></div>
     </div>

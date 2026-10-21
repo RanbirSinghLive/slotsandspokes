@@ -6608,18 +6608,21 @@ button.ops-item:hover {
   overflow-y: auto;
   padding: 8px;
 }
+/* At the right end of the clock bar (#now-bar). */
+#now-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 6px;
+}
 #brief-tabs {
-  position: fixed;
-  left: calc(var(--rail-width) + 8px);
-  bottom: 32px;
   display: flex;
   gap: 6px;
-  z-index: 44;
 }
 .brief-tab {
   min-width: 36px;
   min-height: 32px;
-  border-radius: 8px 8px 0 0;
+  border-radius: 6px;
   background: rgba(14, 18, 28, 0.96);
   border: 1px solid rgba(255, 255, 255, 0.18);
   position: relative;
@@ -6778,7 +6781,7 @@ button.ops-item:hover {
   align-items: center;
 }
 @media (pointer: coarse) {
-  /* Touch has no drag: the window docks above the tab strip. */
+  /* Touch has no drag: the window docks above the map's bottom strip. */
   #brief-window {
     top: auto;
     left: 8px;
@@ -6787,10 +6790,6 @@ button.ops-item:hover {
     width: auto;
     max-height: 45vh;
     z-index: 56;
-  }
-  #brief-tabs {
-    left: 8px;
-    bottom: 32px;
   }
   .brief-tab {
     min-width: 44px;
@@ -8113,13 +8112,9 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
   background: #ff8080;
 }
 
-/* Above the ticker; above the brief's minimized tabs too while they show (they sit in the same corner, ui/briefWindow.ts). */
+/* Just above the ticker. */
 :root {
-  --pipeline-bottom: 40px;
-}
-
-:root:has(#brief-tabs:not([hidden])) {
-  --pipeline-bottom: 78px;
+  --pipeline-bottom: 34px;
 }
 
 /* A narrow map moves the lens key to the bottom left: above the pipeline. */
