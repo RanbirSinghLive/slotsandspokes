@@ -8322,3 +8322,8 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
   border: 1px solid rgba(242, 165, 65, 0.35);
   background: none;
 }
+
+/* A Rights card's earning test that tonight fails: the short part in amber. */
+.rights-short {
+  color: #e0a84a;
+}

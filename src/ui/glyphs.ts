@@ -35,6 +35,8 @@ const PATHS = {
   timer: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/>',
   boarding: '<path d="M4 12h12M11 6l6 6-6 6"/><path d="M20 4v16"/>',
   gantt: '<path d="M3 4v16h18"/><path d="M7 8h6M10 12h8M7 16h5"/>',
+  flask: '<path d="M9 3h6M10 3v6l-5.4 9.2A2 2 0 0 0 6.3 21h11.4a2 2 0 0 0 1.7-2.8L14 9V3"/><path d="M7.5 15h9"/>',
+  shield: '<path d="M12 3 4 6v6c0 4.5 3.2 7.8 8 9 4.8-1.2 8-4.5 8-9V6z"/><polyline points="8.5 12 11 14.5 15.5 9.5"/>',
   shelf: '<path d="M3 20h18M3 12h18M5 12V4h6v8M13 12V7h5v5M6 20v-5h5v5"/>',
 } as const;
 

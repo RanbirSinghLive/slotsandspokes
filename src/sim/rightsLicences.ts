@@ -127,6 +127,15 @@ function onTimeInto(state: SimState, country: string): number | null {
   return arrived >= 20 ? onTime / arrived : null;
 }
 
+/** Today's earning test for one country: its daily international departures, its on-time share, and whether the day counts. */
+export type EarningCheck = { departures: number; onTime: number | null; qualifies: boolean };
+
+export function earningCheck(state: SimState, country: string): EarningCheck {
+  const departures = internationalDeparturesTouching(state, country).length;
+  const onTime = onTimeInto(state, country);
+  return { departures, onTime, qualifies: departures >= MIN_DAILY_DEPARTURES && onTime !== null && onTime >= MIN_ON_TIME };
+}
+
 export type RightsStatus = 'locked' | 'earning' | 'offered' | 'held' | 'home';
 
 export type RightsOffer = {
@@ -219,9 +228,7 @@ export function rollDailyRights(state: SimState): void {
     if (licenceFor(state, country)) continue;
     // Domestic rights are only worth earning where a bloc or the home country doesn't already give them.
     if (mayFlyInside(home, country)) continue;
-    const departures = internationalDeparturesTouching(state, country).length;
-    const otp = onTimeInto(state, country);
-    const qualifies = departures >= MIN_DAILY_DEPARTURES && otp !== null && otp >= MIN_ON_TIME;
+    const { qualifies } = earningCheck(state, country);
     progress[country] = Math.max(0, Math.min(EARN_DAYS, (progress[country] ?? 0) + (qualifies ? 1 : -1)));
   }
   for (const country of Object.keys(progress)) if (!touched.has(country) && !licenceFor(state, country)) progress[country] = Math.max(0, progress[country] - 1);
