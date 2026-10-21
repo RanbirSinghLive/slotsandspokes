@@ -483,8 +483,10 @@ function restoreDraft(live: SimState): void {
   }
 }
 
-/** Whether every flight in the draft is back where the real schedule has it: nothing left to save. */
+/** Whether every flight in the draft is back where the real schedule has it and nothing new is held for tomorrow: nothing left to save. */
 function draftChangesNothing(live: SimState, world: SimState): boolean {
+  // A move on a plane in the air changes only what's held for tomorrow, not today's flights.
+  if (JSON.stringify(world.pendingRetimes ?? []) !== JSON.stringify(live.pendingRetimes ?? [])) return false;
   const byId = new Map(live.schedule.map((leg) => [leg.legId, leg]));
   return world.schedule.every((leg) => {
     const was = byId.get(leg.legId);
