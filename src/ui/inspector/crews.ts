@@ -13,7 +13,7 @@ import * as ops from '../routeActions';
 import { select } from '../selection';
 import { foldHeader, isFolded } from './crewsFold';
 import { glyph } from '../glyphs';
-import { heading, info, line, lineWithInfo } from './dom';
+import { heading, info, line, lineWithInfo, titleWithSwitch, viewSwitch } from './dom';
 import { pairingsSection } from './pairings';
 import { pipelineLink } from '../pipelineLink';
 
@@ -108,40 +108,21 @@ function setView(next: CrewsView): void {
   }
 }
 
-/** The switch at the top: crew bases and hiring, or pairings. */
-function viewSwitch(changed: () => void): HTMLElement {
-  const wrap = document.createElement('div');
-  wrap.className = 'crews-view';
-  wrap.setAttribute('role', 'tablist');
-  for (const [value, icon, label] of [
-    ['bases', 'people', 'Bases & hiring'],
-    ['pairings', 'timer', 'Pairings'],
-  ] as const) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.setAttribute('role', 'tab');
-    button.setAttribute('aria-selected', String(view === value));
-    button.classList.toggle('is-active', view === value);
-    button.append(glyph(icon), ` ${label}`);
-    button.addEventListener('click', () => {
-      if (view === value) return;
-      setView(value);
-      changed();
-    });
-    wrap.append(button);
-  }
-  return wrap;
-}
-
 export function buildCrewsView(state: SimState, changed: () => void): HTMLElement {
   const root = document.createElement('div');
   root.className = 'inspector-view';
-  const title = document.createElement('h3');
-  title.className = 'inspector-title';
-  title.textContent = 'Crews';
-  const nudge = execNudge(state, ['cpo-solheim']);
-  if (nudge) title.append(nudge);
-  root.append(title, viewSwitch(changed));
+  const views = viewSwitch<CrewsView>(
+    [
+      { id: 'bases', icon: glyph('people'), tip: 'Bases & hiring: each crew base\'s roster, with hire, convert and release' },
+      { id: 'pairings', icon: glyph('timer'), tip: 'Pairings: the duty the schedule asks of crews, by type' },
+    ],
+    view,
+    (next) => {
+      setView(next);
+      changed();
+    },
+  );
+  root.append(titleWithSwitch('Crews', views, execNudge(state, ['cpo-solheim'])));
 
   const today = dayIndex(state);
   const plan = crewPlan(state);

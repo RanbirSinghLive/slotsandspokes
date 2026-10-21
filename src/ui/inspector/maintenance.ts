@@ -18,7 +18,7 @@ import { MX_RATING_FEE, MX_RATING_PER_DAY } from '../../sim/bases';
 import { costRows, showConfirm } from '../confirmModal';
 import { confirmDBooking, confirmHeavyBooking } from '../checkBooking';
 import { noneLine } from './bases';
-import { heading, line, viewSwitch } from './dom';
+import { heading, line, titleWithSwitch, viewSwitch } from './dom';
 
 /** The Mtc screen's three views; the one shown is remembered across visits. */
 type MtcView = 'stations' | 'fleet' | 'engines';
@@ -64,31 +64,23 @@ function setView(next: MtcView): void {
 export function buildMaintenanceView(state: SimState, changed: () => void): HTMLElement {
   const root = document.createElement('div');
   root.className = 'inspector-view';
-  const title = document.createElement('h3');
-  title.className = 'inspector-title';
-  title.textContent = 'Maintenance';
-  const nudge = execNudge(state, ['coo-maintenance', 'dom-bakare']);
-  if (nudge) title.append(nudge);
-  root.append(title);
+  const stationCount = ops.mxStationBoard(state).length;
+  const views = viewSwitch<MtcView>(
+    [
+      { id: 'stations', icon: glyph('hangar'), tip: `Stations: AOG, ${stationCount} station${stationCount === 1 ? '' : 's'} with their line slots, hangar bays and ratings, and outstations`, badge: state.aogs.length },
+      { id: 'fleet', icon: glyph('plane'), tip: 'Fleet: release to service and every plane\'s check clocks, by type' },
+      { id: 'engines', icon: glyph('engine'), tip: 'Engines: the engine support plan by class' },
+    ],
+    view,
+    (next) => {
+      setView(next);
+      changed();
+    },
+  );
+  root.append(titleWithSwitch('Maintenance', views, execNudge(state, ['coo-maintenance', 'dom-bakare'])));
 
   const repairsToday = state.todayCostByCategory.maintenance;
   root.append(line(`${state.aogs.length} AOG · ${state.aircraft.length} aircraft` + (repairsToday > 0 ? ` · expedited ${money(repairsToday)} today` : '')));
-
-  const stationCount = ops.mxStationBoard(state).length;
-  root.append(
-    viewSwitch<MtcView>(
-      [
-        { id: 'stations', label: 'Stations', icon: glyph('hangar'), tip: `AOG, ${stationCount} station${stationCount === 1 ? '' : 's'} with their line slots, hangar bays and ratings, and outstations`, badge: state.aogs.length },
-        { id: 'fleet', label: 'Fleet', icon: glyph('plane'), tip: 'Release to service and every plane\'s check clocks, by type' },
-        { id: 'engines', label: 'Engines', icon: glyph('engine'), tip: 'Engine support plan by class' },
-      ],
-      view,
-      (next) => {
-        setView(next);
-        changed();
-      },
-    ),
-  );
 
   if (view === 'fleet') root.append(...buildFleetBoard(state, changed));
   else if (view === 'engines') root.append(...buildEngines(state, changed));
