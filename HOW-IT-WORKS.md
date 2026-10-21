@@ -3578,9 +3578,11 @@ complexity; their hire buttons are disabled.
 
 ## The crew planning board (`src/ui/inspector/crews.ts`, read-out in `src/sim/crewPlan.ts`)
 
-The Crews screen reads like a crew planner's board, with a switch at the
-top between **Bases & hiring** (the default) and **Pairings**; the browser
-remembers which was open. `crewPlan()` counts,
+The Crews screen reads like a crew planner's board, with an icon switch
+right of its title between **Bases & hiring** (people, the default) and
+**Pairings** (stopwatch); the browser remembers which was open. Every
+screen with views uses the same switch (`viewSwitch()` in
+`ui/inspector/dom.ts`): icons only, names in their tips. `crewPlan()` counts,
 for each base and type rating, the crews on hand, each batch joining
 (hired or converted, with its day), and each plane on its way: its entry
 into service (EIS) needs `CREWS_PER_NEW_PLANE` crews on top of what the
@@ -3692,8 +3694,8 @@ the Propeller; a station you open is rated for your most numerous class),
 and each further class costs $50,000 and $150/day, so a mixed fleet costs
 more to maintain.
 
-The Mtc screen has three views on a switch at the top (Stations, Fleet,
-Engines; the last one used is kept in the browser, and Stations carries a
+The Mtc screen has three views on the icon switch right of its title
+(Stations, Fleet, Engines; the last one used is kept in the browser, and Stations carries a
 red count of AOGs). **Stations** lists every AOG, then a card per
 maintenance station: line base slots filled by tonight's use (red past
 full) and the hangar's bays as tiles (filled: a plane in its C or D check

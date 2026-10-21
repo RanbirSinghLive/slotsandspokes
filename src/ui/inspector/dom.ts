@@ -59,16 +59,18 @@ export function adopt(id: string): HTMLElement {
 
 const adopted = new Map<string, HTMLElement>();
 
-/** One choice on a view switch: its glyph-and-word label, tip, and an optional count badge. */
-export type ViewChoice<T extends string> = { id: T; label: string; icon?: HTMLElement; tip: string; badge?: number };
+/** One choice on a view switch: its glyph, its name (said in the tip and to screen readers), and an optional count badge. */
+export type ViewChoice<T extends string> = { id: T; icon: HTMLElement; tip: string; badge?: number };
 
 /**
- * A row of buttons that switches a screen between its views, the chosen one
- * lit, drawn like the Crews switch (`.crews-view`). The screen keeps which view is on and redraws when `pick` runs.
+ * The switch between a screen's views: icon buttons, the chosen one lit,
+ * put on the right of the screen's title by `titleWithSwitch()`. Every
+ * screen with views uses this one, so they all look and work alike. The
+ * screen keeps which view is on and redraws when `pick` runs.
  */
 export function viewSwitch<T extends string>(choices: ViewChoice<T>[], current: T, pick: (id: T) => void): HTMLElement {
-  const bar = document.createElement('div');
-  bar.className = 'crews-view';
+  const bar = document.createElement('span');
+  bar.className = 'view-switch';
   bar.setAttribute('role', 'tablist');
   for (const choice of choices) {
     const button = document.createElement('button');
@@ -76,19 +78,29 @@ export function viewSwitch<T extends string>(choices: ViewChoice<T>[], current: 
     button.setAttribute('role', 'tab');
     button.setAttribute('aria-selected', String(choice.id === current));
     button.classList.toggle('is-active', choice.id === current);
-    if (choice.icon) button.append(choice.icon);
-    button.append(choice.label);
+    button.append(choice.icon);
     if (choice.badge) {
       const badge = document.createElement('span');
       badge.className = 'view-switch-badge';
       badge.textContent = String(choice.badge);
       button.append(badge);
     }
-    button.title = choice.tip;
+    button.dataset.tip = choice.tip;
+    button.setAttribute('aria-label', choice.tip);
     button.addEventListener('click', () => {
       if (choice.id !== current) pick(choice.id);
     });
     bar.append(button);
   }
   return bar;
+}
+
+/** A screen's title with its view switch on the right: the title's text, then anything else (a nudge), then the switch. */
+export function titleWithSwitch(text: string, viewSwitchEl: HTMLElement, ...extra: (Node | null)[]): HTMLElement {
+  const title = document.createElement('h3');
+  title.className = 'inspector-title has-view-switch';
+  title.append(text);
+  for (const node of extra) if (node) title.append(node);
+  title.append(viewSwitchEl);
+  return title;
 }
