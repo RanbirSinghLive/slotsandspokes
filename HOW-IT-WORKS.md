@@ -1350,8 +1350,8 @@ points at something (a route in any list, an airport, a plane, a rival,
 a rotation on the timeline) marks it on the
 map the way a selection is marked. Beside the breadcrumb, ‹ and › step
 back and forward through what you've opened, like a browser. A view
-with three or more sections (an airport, Routes, Head office) gets a
-row of jump chips pinned at its top, one per section (an icon with the heading as its tip where `ui/inspector/chipIcons.ts` knows one, else the heading's words). An airport's or route's title carries an air-rights mark (`ui/inspector/rights.ts`): a green shield when the home carrier may fly domestic routes there, a grey globe for international only, the details in its tip. The rail is icons only; every icon, chip and mark has a tip. On a touch screen a tap flashes the tip for about two seconds (a mark's `data-info`, a button's `data-tip`, or any non-button's `title`), and small controls keep their look but grow an invisible 44px hit area. The canvas gets the width left
+with three or more sections (an airport, Head office) gets a
+row of jump chips pinned at its top, one per section (an icon with the heading as its tip where `ui/inspector/chipIcons.ts` knows one, else the heading's words); a screen with a view switch in its title (Routes, Crews, Mtc) gets none. An airport's or route's title carries an air-rights mark (`ui/inspector/rights.ts`): a green shield when the home carrier may fly domestic routes there, a grey globe for international only, the details in its tip. The rail is icons only; every icon, chip and mark has a tip. On a touch screen a tap flashes the tip for about two seconds (a mark's `data-info`, a button's `data-tip`, or any non-button's `title`), and small controls keep their look but grow an invisible 44px hit area. The canvas gets the width left
 over (`--panel-width` covers rail and panel, kept in sync via
 `PANEL_WIDTH_PX` and `RAIL_WIDTH_PX`).
 
