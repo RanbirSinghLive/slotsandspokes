@@ -300,7 +300,7 @@ function pastCard(contract: Contract): HTMLElement {
   card.append(nameButton(contract));
   card.append(
     line(
-      contract.status === 'ended' ? (contract.lostTo ? `Taken by ${contract.lostTo} · paid ${money(contract.paidTotal)}` : `Ended · paid ${money(contract.paidTotal)}`) : contract.lostTo ? `Lost to ${contract.lostTo}` : 'Lapsed, not taken up',
+      contract.lostTo ? `Taken by ${contract.lostTo} · paid ${money(contract.paidTotal)}` : `Ended · paid ${money(contract.paidTotal)}`,
       'inspector-line goal-ahead',
     ),
   );
@@ -331,8 +331,8 @@ export function buildContractsView(state: SimState, changed: () => void): HTMLEl
   const all = contractsOf(state);
   const tenders = all.filter((c) => c.status === 'offered').sort((x, y) => x.id - y.id);
   const running = all.filter((c) => c.status === 'active').sort((x, y) => x.id - y.id);
-  // Declined tenders were the player's own no, so they don't come back as history either.
-  const past = all.filter((c) => (c.status === 'ended' || c.status === 'lapsed') && !c.declined).sort((x, y) => y.id - x.id);
+  // Past is only contracts that were flown; a tender that lapsed, was lost or declined leaves no trail.
+  const past = all.filter((c) => c.status === 'ended').sort((x, y) => y.id - x.id);
   const off = state.contractsOff === true;
 
   const tendersHeading = heading(

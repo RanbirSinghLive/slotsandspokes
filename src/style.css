@@ -6427,12 +6427,6 @@ button.ops-item:hover {
   background: rgba(255, 180, 84, 0.16);
 }
 
-.mandate-row.is-lapsed {
-  opacity: 0.5;
-  border-left-color: #6b7694;
-  text-decoration: line-through;
-}
-
 .timeline-event-star {
   position: absolute;
   top: -2px;
