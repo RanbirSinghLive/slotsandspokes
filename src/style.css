@@ -2339,19 +2339,21 @@ button,
   width: 15px;
   height: 15px;
 }
-.routes-title {
+/* A screen's title with its view switch on the right (dom.ts titleWithSwitch): icon buttons, names in tips. */
+.inspector-title.has-view-switch {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.routes-lens {
+.view-switch {
   margin-left: auto;
   display: inline-flex;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 6px;
   overflow: hidden;
 }
-.routes-lens button {
+.view-switch button {
+  position: relative;
   background: none;
   border: 0;
   color: #8a93a6;
@@ -2359,11 +2361,14 @@ button,
   cursor: pointer;
   line-height: 0;
 }
-.routes-lens button.is-active {
+.view-switch button + button {
+  border-left: 1px solid rgba(255, 255, 255, 0.18);
+}
+.view-switch button.is-active {
   background: #252b3a;
   color: #fff;
 }
-.routes-lens svg {
+.view-switch svg {
   width: 16px;
   height: 16px;
 }
@@ -2712,8 +2717,9 @@ button.ticker-item:hover {
   background: #b9a6ff;
 }
 
-/* Contracts: gold, money that comes with terms. */
-.ticker-tag--contract {
+/* Contracts and requests: gold, money that comes with terms. */
+.ticker-tag--contract,
+.ticker-tag--request {
   background: #e8c170;
 }
 
@@ -7931,18 +7937,6 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
   min-width: 36px;
 }
 
-.mx-stations + .base-open {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 6px;
-}
-
-.mx-stations + .base-open .base-open-select {
-  flex: 1 1 120px;
-  min-width: 0;
-}
-
 /* One aircraft class's engine plan on the Mtc screen: its row, plan buttons and book. */
 .engine-card {
   padding: 4px 0 6px;
@@ -8318,3 +8312,78 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
   display: none;
 }
 
+
+/* Crews screen: the folding headers of its sections. */
+.crew-fold {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #c8d0e0;
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  min-width: 0;
+}
+.crew-fold svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.crew-fold-detail {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 400;
+  color: #8a93a6;
+  white-space: nowrap;
+}
+.crew-base-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.crew-base-head .crew-base-map {
+  flex: none;
+  line-height: 0;
+}
+
+/* A count on a view's button (AOGs on Mtc's Stations), pinned to its corner so the button stays icon-sized. */
+.view-switch-badge {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  min-width: 12px;
+  padding: 0 3px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 9px;
+  line-height: 12px;
+  color: #0a0c12;
+  background: #ff8080;
+  border-radius: 8px;
+}
+
+/* A station card's hangar bays: smaller tiles than a full-width board. */
+.mx-station-bays {
+  gap: 4px;
+  margin: 0;
+}
+
+.mx-station-bays .mx-bay {
+  min-width: 64px;
+  padding: 3px 6px;
+  font-size: 10px;
+}
+
+/* An empty bay: a narrow open box, so a big hangar's free bays don't crowd the card. */
+.mx-station-bays .mx-bay.is-free {
+  min-width: 14px;
+  min-height: 28px;
+  padding: 0;
+  border: 1px solid rgba(242, 165, 65, 0.35);
+  background: none;
+}

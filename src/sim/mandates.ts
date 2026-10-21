@@ -8,7 +8,7 @@ import { marketKey, type ScheduleLeg } from './schedule';
 import type { ActiveFlight, SimState } from './state';
 
 /**
- * Priority flights ("mandates"): an offer to carry someone who must get
+ * Priority flights ("mandates"; "requests" on the page): an offer to carry someone who must get
  * there on time, on a route the airline already flies. A touring band, a
  * minister's delegation, a children's wish trip. Announced 14 to 28 days
  * before the first flight, so there is time to line up crews, a spare
@@ -62,6 +62,8 @@ export type Mandate = {
   waived: number;
   /** Net of premiums, penalties and the bonus so far. */
   netTotal: number;
+  /** Lapsed because the player switched requests off (setRequestsOff()), not missed: not kept as history. */
+  declined?: boolean;
 };
 
 export const STORIES: { who: string; headline: string }[] = [
@@ -117,6 +119,26 @@ export function mandatesOf(state: SimState): Mandate[] {
   return state.mandates ?? [];
 }
 
+/** Whether new requests are switched off: the in-game switch, or else the start screen's events choice. */
+export function requestsOff(state: SimState): boolean {
+  return state.requestsOff ?? state.eventsOff === true;
+}
+
+/**
+ * Switch requests off or back on. Off, no new offers come and the open
+ * ones lapse as declined; accepted ones carry on. The daily draws are the
+ * same either way, so this moves no other roll.
+ */
+export function setRequestsOff(state: SimState, off: boolean): void {
+  state.requestsOff = off;
+  if (!off) return;
+  for (const mandate of mandatesOf(state)) {
+    if (mandate.status !== 'offered') continue;
+    mandate.status = 'lapsed';
+    mandate.declined = true;
+  }
+}
+
 export function mandateIsActive(state: SimState, mandate: Mandate): boolean {
   const today = dayIndex(state);
   return mandate.status === 'accepted' && mandate.startDay <= today && today < mandate.endDay;
@@ -162,9 +184,9 @@ export function acceptMandate(state: SimState, id: number): { ok: true; message:
   if (!mandate) return { ok: false, reason: 'No such offer.' };
   if (mandate.status !== 'offered') return { ok: false, reason: 'No longer on offer.' };
   if (dayIndex(state) >= mandate.startDay) return { ok: false, reason: 'The offer has lapsed.' };
-  if (mandatesOf(state).filter((m) => m.status === 'accepted').length >= MAX_ACCEPTED) return { ok: false, reason: `Already carrying ${MAX_ACCEPTED} events.` };
+  if (mandatesOf(state).filter((m) => m.status === 'accepted').length >= MAX_ACCEPTED) return { ok: false, reason: `Already carrying ${MAX_ACCEPTED} requests.` };
   mandate.status = 'accepted';
-  return { ok: true, message: `Event accepted · ${mandate.origin}-${mandate.dest}` };
+  return { ok: true, message: `Request accepted · ${mandate.origin}-${mandate.dest}` };
 }
 
 function settle(state: SimState, mandate: Mandate, amount: number): void {
@@ -242,7 +264,7 @@ export function rollDailyMandates(state: SimState): void {
     }
   }
   const open = state.mandates.filter((m) => m.status === 'offered' || m.status === 'accepted');
-  const finished = state.mandates.filter((m) => m.status === 'ended' || m.status === 'lapsed').slice(-HISTORY_KEPT);
+  const finished = state.mandates.filter((m) => (m.status === 'ended' || m.status === 'lapsed') && !m.declined).slice(-HISTORY_KEPT);
   state.mandates = [...open, ...finished].sort((a, b) => a.id - b.id);
 
   // Always the same draws, whether or not an offer is made, so the stream is as long for every game.
@@ -256,7 +278,7 @@ export function rollDailyMandates(state: SimState): void {
   state.mandateSeed = s7;
   fadeStandings(state);
 
-  if (state.eventsOff || today < FIRST_OFFER_DAY || state.mandates.filter((m) => m.status === 'offered').length >= MAX_OFFERED) return;
+  if (requestsOff(state) || today < FIRST_OFFER_DAY || state.mandates.filter((m) => m.status === 'offered').length >= MAX_OFFERED) return;
 
   // A client that trusts the airline asks again, whatever the fleet's size.
   const busy = new Set(state.mandates.filter((m) => m.status === 'offered' || m.status === 'accepted').map((m) => m.story));

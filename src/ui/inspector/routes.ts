@@ -8,7 +8,7 @@ import type { SimState } from '../../sim/state';
 import * as ops from '../routeActions';
 import { select, type RouteSort } from '../selection';
 import { priorityButton } from '../priority';
-import { adopt, info } from './dom';
+import { adopt, info, titleWithSwitch, viewSwitch } from './dom';
 import { linkToMap } from '../mapLink';
 import { glyph, type GlyphName } from '../glyphs';
 import { onTimeColor } from '../../render/mapmodes';
@@ -331,26 +331,16 @@ function totalFoot(rows: RouteRow[], columns: (typeof COLUMNS)[number][]): HTMLT
 /** Whether the fare strip under the table is open; kept for the session. */
 let pricesOpen = false;
 
-/** The two-button switch between the lenses: icons only, names in tips. */
+/** The switch between the lenses: the sort the screen opens with picks one. */
 function lensSwitch(lens: Lens): HTMLElement {
-  const wrap = document.createElement('span');
-  wrap.className = 'routes-lens';
-  for (const [value, icon, tip, sort] of [
-    ['money', 'coin', 'Money: margin, load, NPS, yield', 'margin'],
-    ['reliability', 'timer', 'Reliability: on-time and flown, with what delays and cancels flights', 'onTime'],
-  ] as const) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.dataset.tip = tip;
-    button.setAttribute('aria-label', tip);
-    button.classList.toggle('is-active', lens === value);
-    button.append(glyph(icon));
-    button.addEventListener('click', () => {
-      if (lens !== value) select({ kind: 'routes', sort });
-    });
-    wrap.append(button);
-  }
-  return wrap;
+  return viewSwitch<Lens>(
+    [
+      { id: 'money', icon: glyph('coin'), tip: 'Money: margin, load, NPS, yield' },
+      { id: 'reliability', icon: glyph('timer'), tip: 'Reliability: on-time and flown, with what delays and cancels flights' },
+    ],
+    lens,
+    (next) => select({ kind: 'routes', sort: next === 'money' ? 'margin' : 'onTime' }),
+  );
 }
 
 /** Last 7 days across every route: arrivals on time, flights flown, flights cancelled. */
@@ -444,10 +434,7 @@ export function buildRoutesView(state: SimState, sort: RouteSort): HTMLElement {
   const root = document.createElement('div');
   root.className = 'inspector-view';
   const lens = lensOf(sort);
-  const title = document.createElement('h3');
-  title.className = 'inspector-title routes-title';
-  title.append('Routes', lensSwitch(lens));
-  root.append(title);
+  root.append(titleWithSwitch('Routes', lensSwitch(lens)));
 
   const rows = routeRows(state);
   if (rows.length === 0) {

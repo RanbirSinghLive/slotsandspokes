@@ -109,7 +109,7 @@ function showDifficulty(): void {
   eventsButtons.forEach((button) => {
     button.classList.toggle('active', !chosenEventsOff);
     button.setAttribute('aria-pressed', String(!chosenEventsOff));
-    button.title = chosenEventsOff ? 'Events off · no priority flights' : 'Events on · priority flights pay a premium';
+    button.title = chosenEventsOff ? 'Events off · no client requests or storm days' : 'Events on · client requests and storm days';
   });
   difficultyNoteEl.textContent = difficultyNote();
 }
