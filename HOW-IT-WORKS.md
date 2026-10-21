@@ -1369,8 +1369,8 @@ themselves (Fare policy, the Lessor, the rotations timeline, Reliability,
 Game) wait hidden in `#panel-parts` until a screen adopts them
 (`adopt()` in `ui/inspector/dom.ts`): Routes shows the table first, with the Reliability section (late
 minutes and cancellations by cause) above it in the stopwatch lens and
-Fare policy folded under it to one line in the money lens; Fleet has a
-two-way switch under its head (`ui/fleetView.ts`, remembered in the
+Fare policy folded under it to one line in the money lens; Fleet has
+two views on the title's icon switch (`viewSwitch()`, choice kept by `ui/fleetView.ts` in the
 browser): **Gantt** shows the rotations timeline, every plane a row, and
 **Market** shows the Lessor (leases on order, then one card per class).
 A schedule alert or the tutorial opens Gantt; the HUD market chip opens

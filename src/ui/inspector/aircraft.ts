@@ -3,10 +3,10 @@ import { nightStopCostPerNight, nightStopLegs } from '../../sim/nightStops';
 import { AIRCRAFT_CLASSES, classByCode } from '../../sim/aircraftClasses';
 import { classOpen } from '../../sim/ladder';
 import { listingsOf } from '../../sim/market';
-import { fleetView, setFleetView } from '../fleetView';
+import { fleetView, setFleetView, type FleetView } from '../fleetView';
 import { glyph } from '../glyphs';
 import { dayIndex } from '../../sim/clock';
-import { info, line, heading, lineWithInfo } from './dom';
+import { info, line, heading, lineWithInfo, titleWithSwitch, viewSwitch } from './dom';
 import { takeCallBlockFlash } from '../callAlert';
 import { gameDate, money } from '../format';
 import { aogFor, daysUntilReturn } from '../../sim/aog';
@@ -94,14 +94,24 @@ export function aircraftLink(tail: string): HTMLButtonElement {
 export function buildFleetView(state: SimState, changed: () => void): HTMLElement {
   const root = document.createElement('div');
   root.className = 'inspector-view';
-  const heading = title('Fleet');
-  const nudge = execNudge(state, ['coo-inflight', 'cfo-adeyemi']);
-  if (nudge) heading.append(nudge);
-  root.append(heading);
+  // The two halves: the badge on Market counts airframes the player could lease now.
+  const leasable = AIRCRAFT_CLASSES.filter((cls) => classOpen(state, cls.code)).reduce((sum, cls) => sum + listingsOf(state, cls.code).length, 0);
+  const views = viewSwitch<FleetView>(
+    [
+      { id: 'gantt', icon: glyph('gantt'), tip: 'Gantt: every plane\'s day' },
+      { id: 'market', icon: glyph('shelf'), tip: 'Market: the lessor\'s shelf and leases on order', badge: leasable },
+    ],
+    fleetView(),
+    (next) => {
+      setFleetView(next);
+      changed();
+    },
+  );
+  root.append(titleWithSwitch('Fleet', views, execNudge(state, ['coo-inflight', 'cfo-adeyemi'])));
 
   const inbound = (state.inboundLeases ?? []).length;
   if (state.aircraft.length === 0 && inbound === 0) {
-    root.append(lineWithInfo('No aircraft', 'Lease one from the Market below, or tap an airport on the map and choose Plane.'));
+    root.append(lineWithInfo('No aircraft', 'Lease one from Market (the shelf icon by the title), or tap an airport on the map and choose Plane.'));
   } else {
     const leases = state.aircraft.reduce((sum, a) => sum + a.leaseCostPerDay, 0);
     root.append(
@@ -112,36 +122,6 @@ export function buildFleetView(state: SimState, changed: () => void): HTMLElemen
     );
   }
 
-  // The two halves: the badge on Market counts airframes the player could lease now.
-  const switcher = document.createElement('div');
-  switcher.className = 'fleet-switch';
-  switcher.setAttribute('role', 'tablist');
-  const leasable = AIRCRAFT_CLASSES.filter((cls) => classOpen(state, cls.code)).reduce((sum, cls) => sum + listingsOf(state, cls.code).length, 0);
-  for (const [view, icon, label, tip] of [
-    ['gantt', 'gantt', 'Gantt', 'Every plane\'s day'],
-    ['market', 'shelf', 'Market', 'The lessor\'s shelf and leases on order'],
-  ] as const) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.setAttribute('role', 'tab');
-    button.setAttribute('aria-selected', String(fleetView() === view));
-    button.classList.toggle('is-active', fleetView() === view);
-    button.dataset.tip = tip;
-    button.append(glyph(icon), ` ${label}`);
-    if (view === 'market' && leasable > 0) {
-      const badge = document.createElement('span');
-      badge.className = 'fleet-switch-badge';
-      badge.textContent = String(leasable);
-      button.append(badge);
-    }
-    button.addEventListener('click', () => {
-      if (fleetView() === view) return;
-      setFleetView(view);
-      changed();
-    });
-    switcher.append(button);
-  }
-  root.append(switcher);
   return root;
 }
 
