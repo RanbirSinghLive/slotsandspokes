@@ -3211,7 +3211,10 @@ The airport view says "· N heritage" on its Slots line.
 hour its legs use, at every airport it touches. When the planner
 (`sim/rotations.ts`) finds one full, it starts the rotation later, in
 5-minute steps, until everything fits or it would no longer be home by
-22:00; the route card says so ("ALB 07:00 full · departs 13:10"). Only a
+22:00; the route card says so ("ALB 07:00 full · departs 13:10"). A
+long-haul round trip, which runs round the clock, keeps searching until
+its flight back would leave after midnight (an every-other-day pair
+already starts as late as it can, so it doesn't search). Only a
 rotation with no hour left is refused. Rivals are rationed the same way:
 a rival adds a flight only while the airport has room somewhere in the
 day. Rationing by the hour keeps what rationing to the peak was for (no
