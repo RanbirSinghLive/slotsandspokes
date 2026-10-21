@@ -1349,8 +1349,8 @@ points at something (a route in any list, an airport, a plane, a rival,
 a rotation on the timeline) marks it on the
 map the way a selection is marked. Beside the breadcrumb, ‹ and › step
 back and forward through what you've opened, like a browser. A view
-with three or more sections (an airport, Head office) gets a
-row of jump chips pinned at its top, one per section (an icon with the heading as its tip where `ui/inspector/chipIcons.ts` knows one, else the heading's words); a screen with a view switch in its title (Routes, Crews, Mtc) gets none. An airport's or route's title carries an air-rights mark (`ui/inspector/rights.ts`): a green shield when the home carrier may fly domestic routes there, a grey globe for international only, the details in its tip. The rail is icons only; every icon, chip and mark has a tip. On a touch screen a tap flashes the tip for about two seconds (a mark's `data-info`, a button's `data-tip`, or any non-button's `title`), and small controls keep their look but grow an invisible 44px hit area. The canvas gets the width left
+with three or more sections (an airport) gets a
+row of jump chips pinned at its top, one per section (an icon with the heading as its tip where `ui/inspector/chipIcons.ts` knows one, else the heading's words); a screen with a view switch in its title (Routes, Crews, Mtc, Fleet, Head office) gets none. Head office's switch is Executives (badged with seats that want a look), R&D and Rights, remembered under `slotsandspokes-office-view`. An airport's or route's title carries an air-rights mark (`ui/inspector/rights.ts`): a green shield when the home carrier may fly domestic routes there, a grey globe for international only, the details in its tip. The rail is icons only; every icon, chip and mark has a tip. On a touch screen a tap flashes the tip for about two seconds (a mark's `data-info`, a button's `data-tip`, or any non-button's `title`), and small controls keep their look but grow an invisible 44px hit area. The canvas gets the width left
 over (`--panel-width` covers rail and panel, kept in sync via
 `PANEL_WIDTH_PX` and `RAIL_WIDTH_PX`).
 
@@ -3409,9 +3409,12 @@ country, so it may fly and sell inside it like a bloc member.
 - **Saved** in two optional state fields (`domesticRights`,
   `rightsProgress`), so no save format change. `npm run rightstest` checks
   the rules; `npm run rights -- 700 YUL --buy` plays a year with a player that
-  buys every offer. The Head office view has a Rights section (`rightsSection()`
+  buys every offer. Head office has a Rights view (`rightsSection()`
   in `ui/inspector/headOffice.ts`): a card per foreign country flown into with
-  days earned, then Buy once offered, or weekly use and Give back once held.
+  days earned and tonight's test (departures a day against 2, on-time against
+  60%, the short part amber, and +1 or −1 a day; `earningCheck()`), then Buy
+  once offered, or weekly use and Give back once held. The view's icon carries
+  a count of countries offered.
   The Ops lens tints an offered country amber and edges one still being earned
   with a dashed amber line (`render/rightsView.ts`). While drawing a route, a
   barred airport in an offered country rings amber, and its hover says the

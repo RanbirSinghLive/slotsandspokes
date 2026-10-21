@@ -1,4 +1,5 @@
-import { info, line, heading } from './dom';
+import { info, line, heading, titleWithSwitch, viewSwitch } from './dom';
+import { glyph } from '../glyphs';
 import { money } from '../format';
 import { cashAfterRows, showConfirm } from '../confirmModal';
 import type { SimState } from '../../sim/state';
@@ -11,14 +12,40 @@ import { portraitElement, ROLE_COLOURS } from '../portraits';
 import { innovationIconElement } from '../innovationIcons';
 import { LADDER, tiersClimbed } from '../../sim/ladder';
 import { RD_BUDGETS } from '../../sim/rd';
-import { buyRights, dropRights, EARN_DAYS, LAPSE_DAYS, licencesAllowed, rightsBlocked, rightsCountries, rightsOffer } from '../../sim/rightsLicences';
+import { buyRights, dropRights, EARN_DAYS, earningCheck, LAPSE_DAYS, licencesAllowed, MIN_DAILY_DEPARTURES, MIN_ON_TIME, OTP_WINDOW_DAYS, rightsBlocked, rightsCountries, rightsOffer } from '../../sim/rightsLicences';
 
 /**
  * The Head office view (Network › Head office): the airline's decisions
- * that aren't made on the map: the executives' chairs
- * (sim/executives.ts), each opening to its candidates; and the
- * innovations the ladder opens (sim/innovations.ts), as a tech tree.
+ * that aren't made on the map, in three views: the executives' chairs
+ * (sim/executives.ts), each opening to its candidates; R&D, the
+ * innovations the ladder opens (sim/innovations.ts) as a tech tree; and
+ * domestic rights abroad (sim/rightsLicences.ts).
  */
+
+/** The Office screen's three views; the one shown is remembered across visits. */
+type OfficeView = 'executives' | 'rd' | 'rights';
+const VIEW_KEY = 'slotsandspokes-office-view';
+
+function loadView(): OfficeView {
+  try {
+    const saved = localStorage.getItem(VIEW_KEY);
+    if (saved === 'executives' || saved === 'rd' || saved === 'rights') return saved;
+  } catch {
+    // Storage can be blocked; the screen opens on Executives.
+  }
+  return 'executives';
+}
+
+let view: OfficeView = loadView();
+
+function setView(next: OfficeView): void {
+  view = next;
+  try {
+    localStorage.setItem(VIEW_KEY, next);
+  } catch {
+    // Not remembered; fine.
+  }
+}
 
 /** One project: what it does, how far research has got, and a button to work on it, or why it can't be yet. */
 function innovationCard(state: SimState, option: InnovationOption, changed: () => void): HTMLElement {
@@ -186,6 +213,7 @@ let openSeat: ExecutiveSeat | null = null;
 /** Open a seat the next time the Office draws, for a nudge that leads there (ui/execNudge.ts). */
 export function openExecutiveSeat(seat: ExecutiveSeat): void {
   openSeat = seat;
+  setView('executives');
 }
 
 /** Whether a seat wants a look: amber when its holder costs more than they earn or someone fits clearly better. */
@@ -370,19 +398,54 @@ function techTree(state: SimState, changed: () => void): HTMLElement[] {
 export function buildHeadOfficeView(state: SimState, changed: () => void): HTMLElement {
   const root = document.createElement('div');
   root.className = 'inspector-view';
-  const title = document.createElement('h3');
-  title.className = 'inspector-title';
-  title.textContent = 'Head office';
-  root.append(title);
-
-  root.append(...executivesSection(state, changed));
-  root.append(...rightsSection(state, changed));
-
-  root.append(
-    heading('R&D', 'Projects the ladder opens (see Goals): each tier down the tree opens the ones branching from it. Pick one and the daily budget researches it; each finished project is yours for good. Click one for what it does and costs.'),
-    ...techTree(state, changed),
+  const seatsToLook = ops.executiveOptions(state).filter((seat) => seatWantsLook(seat) || seat.advice.empty).length;
+  const rightsOffered = rightsCountries(state).filter((country) => rightsOffer(state, country).status === 'offered').length;
+  const views = viewSwitch<OfficeView>(
+    [
+      { id: 'executives', icon: glyph('people'), tip: 'Executives: the chairs, their holders and candidates', badge: seatsToLook },
+      { id: 'rd', icon: glyph('flask'), tip: 'R&D: the budget and the projects the ladder opens' },
+      { id: 'rights', icon: glyph('shield'), tip: 'Rights: domestic rights abroad, earned then bought', badge: rightsOffered },
+    ],
+    view,
+    (next) => {
+      setView(next);
+      changed();
+    },
   );
+  root.append(titleWithSwitch('Head office', views));
+
+  if (view === 'rd') {
+    root.append(
+      heading('R&D', 'Projects the ladder opens (see Goals): each tier down the tree opens the ones branching from it. Pick one and the daily budget researches it; each finished project is yours for good. Click one for what it does and costs.'),
+      ...techTree(state, changed),
+    );
+  } else if (view === 'rights') root.append(...rightsSection(state, changed));
+  else root.append(...executivesSection(state, changed));
   return root;
+}
+
+/** Today's earning test for a country still earning: departures a day and on-time, each amber when short, and which way the count moves tonight. */
+function earningLine(state: SimState, country: string): HTMLElement {
+  const check = earningCheck(state, country);
+  const el = document.createElement('div');
+  el.className = 'inspector-line office-card-price';
+  const part = (text: string, short: boolean) => {
+    const span = document.createElement('span');
+    span.textContent = text;
+    if (short) span.className = 'rights-short';
+    return span;
+  };
+  const fewDepartures = check.departures < MIN_DAILY_DEPARTURES;
+  const lateOrUnknown = check.onTime === null || check.onTime < MIN_ON_TIME;
+  const otpText = check.onTime === null ? 'OTP —' : `OTP ${Math.round(check.onTime * 100)}%`;
+  el.append(
+    part(fewDepartures ? `${check.departures}/${MIN_DAILY_DEPARTURES} dep/day` : `${check.departures} dep/day`, fewDepartures),
+    ' · ',
+    part(lateOrUnknown ? `${otpText}/${Math.round(MIN_ON_TIME * 100)}%` : otpText, lateOrUnknown),
+    ' · ',
+    part(check.qualifies ? '+1/day' : '−1/day', !check.qualifies),
+  );
+  return el;
 }
 
 /**
@@ -394,7 +457,7 @@ function rightsSection(state: SimState, changed: () => void): HTMLElement[] {
   const nodes: HTMLElement[] = [
     heading(
       'Rights',
-      `Domestic rights in a foreign country, for the late game (opens with widebodies). Fly international service into a country — two departures a day, 60% on time — for ${EARN_DAYS} days and it is offered. Buy it for a setup fee and a yearly levy. Fly a domestic leg there at least every ${LAPSE_DAYS} days or it lapses. Weekly domestic departures there are capped, and the cap grows with the time held. One licence once widebodies open, one more with each tier after.`,
+      `Domestic rights in a foreign country, for the late game (opens with widebodies). Each night a country you fly to earns a day if your schedule has at least ${MIN_DAILY_DEPARTURES} international departures a day touching it and those routes ran ${Math.round(MIN_ON_TIME * 100)}% on time or better over the last ${OTP_WINDOW_DAYS} days; a night that misses either loses a day. At ${EARN_DAYS} days it is offered. Buy it for a setup fee and a yearly levy. Fly a domestic leg there at least every ${LAPSE_DAYS} days or it lapses. Weekly domestic departures there are capped, and the cap grows with the time held. One licence once widebodies open, one more with each tier after.`,
     ),
   ];
   const countries = rightsCountries(state);
@@ -444,7 +507,7 @@ function rightsSection(state: SimState, changed: () => void): HTMLElement[] {
         );
       }
     } else {
-      card.append(line(`${offer.progressDays}/${EARN_DAYS}d`, 'inspector-line office-card-price'));
+      card.append(line(`${offer.progressDays}/${EARN_DAYS}d`, 'inspector-line office-card-price'), earningLine(state, country));
     }
     nodes.push(card);
   }
