@@ -54,6 +54,7 @@ import {
 import { handleMapMenuMouseDown, handleMapMenuKeyDown, hideMapMenu, isMapMenuOpen } from './ui/mapMenu';
 import { back, getSelection, NETWORK, onSelectionChange, select, type Selection } from './ui/selection';
 import { refreshInspectorForNewDay, renderInspector } from './ui/inspector/inspector';
+import { onFleetViewChange, openFleet } from './ui/fleetView';
 import { isHubPlannerOpen } from './ui/hubPlanner';
 import { setupFarePolicy, updateFarePolicy } from './ui/farePolicy';
 import { setupInfoTooltips } from './ui/infoTooltip';
@@ -313,7 +314,7 @@ function render(nowMs: number = performance.now()): void {
   // Always visible, whatever screen is open: see ui/alerts.ts's own
   // comment for why that's the point. An alert with no view of its own
   // (a schedule problem) opens Fleet, where the rotations are.
-  updateAlerts(state, () => select({ kind: 'fleet' }), choosingHome);
+  updateAlerts(state, () => openFleet('gantt'), choosingHome);
   if (updateMandates(state, choosingHome, () => select({ kind: 'contracts' }))) runwayPauseRequested = true;
   if (updateCrisis(state, choosingHome)) runwayPauseRequested = true;
   if (updateBriefs(state, choosingHome, briefSpeed)) runwayPauseRequested = true;
@@ -546,6 +547,8 @@ document.querySelector('#rail-jump')!.addEventListener('click', () => openJumpBo
 // panel comes back, since otherwise the click would seem to do nothing.
 // On a phone a tap on the map keeps the map showing, so the ring that tap opens stays in view; the rail opens the sheet.
 let mapTapInProgress = false;
+onFleetViewChange(() => renderInspector(state));
+
 onSelectionChange(() => {
   if (panelHidden && getSelection().kind !== 'network' && !(mapTapInProgress && isNarrowWindow())) setPanelHidden(false);
   clearMapHover();

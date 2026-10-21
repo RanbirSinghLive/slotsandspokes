@@ -1,8 +1,12 @@
 import { execNudge } from '../execNudge';
 import { nightStopCostPerNight, nightStopLegs } from '../../sim/nightStops';
-import { classByCode } from '../../sim/aircraftClasses';
+import { AIRCRAFT_CLASSES, classByCode } from '../../sim/aircraftClasses';
+import { classOpen } from '../../sim/ladder';
+import { listingsOf } from '../../sim/market';
+import { fleetView, setFleetView, type FleetView } from '../fleetView';
+import { glyph } from '../glyphs';
 import { dayIndex } from '../../sim/clock';
-import { info, line, heading, lineWithInfo } from './dom';
+import { info, line, heading, lineWithInfo, titleWithSwitch, viewSwitch } from './dom';
 import { takeCallBlockFlash } from '../callAlert';
 import { gameDate, money } from '../format';
 import { aogFor, daysUntilReturn } from '../../sim/aog';
@@ -13,7 +17,6 @@ import { formatLoadFactor, marketLoadFactor } from '../../sim/loadFactor';
 import { ageDelayParameters } from '../../sim/delays';
 import type { SimState } from '../../sim/state';
 import { aircraftUtilisation, rotationsForTail } from '../../sim/utilisation';
-import { planeIconElement } from '../planeIcons';
 import * as ops from '../routeActions';
 import { select, selectRoute } from '../selection';
 import { linkToMap } from '../mapLink';
@@ -83,52 +86,42 @@ export function aircraftLink(tail: string): HTMLButtonElement {
 }
 
 /**
- * The Fleet screen's head: the count and the leases, then leases on order.
- * Every plane's row is its line on the Gantt below (ui/panels.ts), and
- * hovering its tail shows planeTip().
+ * The Fleet screen's head: the count and the leases, then the switch
+ * between its two halves (ui/fleetView.ts). The Gantt is every plane's
+ * row (ui/panels.ts), and hovering its tail shows planeTip(); the Market
+ * is the lessor's shelf and the leases on order (ui/market.ts).
  */
-export function buildFleetView(state: SimState): HTMLElement {
+export function buildFleetView(state: SimState, changed: () => void): HTMLElement {
   const root = document.createElement('div');
   root.className = 'inspector-view';
-  const heading = title('Fleet');
-  const nudge = execNudge(state, ['coo-inflight', 'cfo-adeyemi']);
-  if (nudge) heading.append(nudge);
-  root.append(heading);
-
-  if (state.aircraft.length === 0 && (state.inboundLeases ?? []).length === 0) {
-    root.append(lineWithInfo('No aircraft', 'Tap an airport on the map and choose Plane to lease one.'));
-    return root;
-  }
-  const leases = state.aircraft.reduce((sum, a) => sum + a.leaseCostPerDay, 0);
-  root.append(
-    lineWithInfo(
-      `${state.aircraft.length} aircraft · leases ${money(leases)}/day`,
-      'Each plane is a row of the Schedule below. Hover its tail (tap on a phone, tap again to open it) for its cabin, base, age, lease, today\'s OTP and load factor, and where it is. Beside the tail: AOG red, refit or ferry amber, ✦ a delivery with no flights yet, then its share of the usable day (red over 100%) and tonight\'s line check. A dashed row here is a lease on order, with its delivery day.',
-    ),
+  // The two halves: the badge on Market counts airframes the player could lease now.
+  const leasable = AIRCRAFT_CLASSES.filter((cls) => classOpen(state, cls.code)).reduce((sum, cls) => sum + listingsOf(state, cls.code).length, 0);
+  const views = viewSwitch<FleetView>(
+    [
+      { id: 'gantt', icon: glyph('gantt'), tip: 'Gantt: every plane\'s day' },
+      { id: 'market', icon: glyph('shelf'), tip: 'Market: the lessor\'s shelf and leases on order', badge: leasable },
+    ],
+    fleetView(),
+    (next) => {
+      setFleetView(next);
+      changed();
+    },
   );
+  root.append(titleWithSwitch('Fleet', views, execNudge(state, ['coo-inflight', 'cfo-adeyemi'])));
 
-  // Leases signed and not yet delivered, soonest first.
-  const today = dayIndex(state);
-  const inbound = [...(state.inboundLeases ?? [])].sort((a, b) => a.arrivesDay - b.arrivesDay);
-  if (inbound.length > 0) {
-    const list = document.createElement('div');
-    list.className = 'inspector-rows';
-    for (const lease of inbound) {
-      const row = linkToMap(document.createElement('button'), { kind: 'airport', iata: lease.base });
-      row.type = 'button';
-      row.className = 'inspector-row is-inbound';
-      row.addEventListener('click', () => select({ kind: 'airport', iata: lease.base }));
-      const name = document.createElement('span');
-      name.append(planeIconElement(lease.typeCode), ` ${classByCode(lease.typeCode)?.name ?? lease.typeCode}`);
-      const detail = document.createElement('span');
-      detail.className = 'inspector-row-detail';
-      detail.textContent = `→ ${lease.base} · day ${lease.arrivesDay} · ${Math.max(0, lease.arrivesDay - today)}d`;
-      row.title = `On order: delivered at ${lease.base} on day ${lease.arrivesDay}; leased at ${money(lease.leasePricePerDay)}/day from then.`;
-      row.append(name, detail);
-      list.append(row);
-    }
-    root.append(list);
+  const inbound = (state.inboundLeases ?? []).length;
+  if (state.aircraft.length === 0 && inbound === 0) {
+    root.append(lineWithInfo('No aircraft', 'Lease one from Market (the shelf icon by the title), or tap an airport on the map and choose Plane.'));
+  } else {
+    const leases = state.aircraft.reduce((sum, a) => sum + a.leaseCostPerDay, 0);
+    root.append(
+      lineWithInfo(
+        `${state.aircraft.length} aircraft · leases ${money(leases)}/day` + (inbound > 0 ? ` · ${inbound} on order` : ''),
+        'Gantt: each plane is a row. Hover its tail (tap on a phone, tap again to open it) for its cabin, base, age, lease, today\'s OTP and load factor, and where it is. Beside the tail: AOG red, refit or ferry amber, ✦ a delivery with no flights yet, then its share of the usable day (red over 100%) and tonight\'s line check. Market: the lessor\'s shelf, one card per class, and the leases on order with their delivery day.',
+      ),
+    );
   }
+
   return root;
 }
 

@@ -34,6 +34,8 @@ const PATHS = {
   coin: '<circle cx="12" cy="12" r="9"/><path d="M14.5 9.2c-.6-.8-1.5-1.2-2.5-1.2-1.4 0-2.5.7-2.5 1.8 0 2.7 5 1.4 5 4.2 0 1.1-1.1 1.8-2.5 1.8-1.1 0-2-.5-2.6-1.3M12 6.5V8M12 16v1.5"/>',
   timer: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/>',
   boarding: '<path d="M4 12h12M11 6l6 6-6 6"/><path d="M20 4v16"/>',
+  gantt: '<path d="M3 4v16h18"/><path d="M7 8h6M10 12h8M7 16h5"/>',
+  shelf: '<path d="M3 20h18M3 12h18M5 12V4h6v8M13 12V7h5v5M6 20v-5h5v5"/>',
 } as const;
 
 export type GlyphName = keyof typeof PATHS;
