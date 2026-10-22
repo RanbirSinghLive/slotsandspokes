@@ -289,6 +289,10 @@ let mapMode: MapMode = 'none';
 // Planes move under a still pointer, so which plane is hovered is worked
 // out again every frame in render() rather than only on mousemove.
 let hoverPoint: { x: number; y: number } | null = null;
+// An airport clicked (or tapped) on the map keeps the lines hovering it
+// draws, so the pointer can follow them out without losing them. It holds
+// while that airport stays selected; a click on empty map or Esc lets go.
+let pinnedAirport: string | null = null;
 
 // Set by render() when the cash runway pop-up opens (ui/runway.ts), and
 // acted on by tick(), which owns the speed controls — the same split as the
@@ -347,12 +351,12 @@ function render(nowMs: number = performance.now()): void {
   // by estimated demand) so your own network — either plain gray or, if
   // the Competition overlay is also on, three-way colored — always draws
   // on top of it, not the other way around.
-  if (demandOverlayOn) {
-    // Lines for one airport's markets: the one under the pointer, else the selected one.
-    const hovered = hoverPoint && !isRouteBuilderActive() && !isMapMenuOpen() ? nearestAirportCandidate(hoverPoint.x, hoverPoint.y) : null;
-    const selected = getSelection();
-    drawDemandLayer(ctx, state, hovered?.airport.iata ?? (selected.kind === 'airport' ? selected.iata : null));
-  }
+  const selection = getSelection();
+  const pinned = selection.kind === 'airport' && selection.iata === pinnedAirport && !isRouteBuilderActive() ? pinnedAirport : null;
+  // The airport whose lines the lenses draw: the pinned one, else the one under the pointer, else the selected one.
+  const pointedAirport = hoverPoint && !isRouteBuilderActive() && !isMapMenuOpen() ? nearestAirportCandidate(hoverPoint.x, hoverPoint.y) : null;
+  const linesAirport = pinned ?? pointedAirport?.airport.iata ?? (selection.kind === 'airport' ? selection.iata : null);
+  if (demandOverlayOn) drawDemandLayer(ctx, state, linesAirport);
 
   // Mapmode, Competition and the plain grey network are three ways to draw
   // the same route lines, never combined — each already draws every route,
@@ -370,18 +374,13 @@ function render(nowMs: number = performance.now()): void {
   }
   // The Cargo lens draws over the routes and under the airport dots: a circle per
   // airport, your freight-carrying routes, and the hovered airport's best partners.
-  if (cargoOverlayOn) {
-    const hovered = hoverPoint && !isRouteBuilderActive() && !isMapMenuOpen() ? nearestAirportCandidate(hoverPoint.x, hoverPoint.y) : null;
-    const selected = getSelection();
-    drawCargoLayer(ctx, state, hovered?.airport.iata ?? (selected.kind === 'airport' ? selected.iata : null));
-  }
+  if (cargoOverlayOn) drawCargoLayer(ctx, state, linesAirport);
   // A rival being squeezed out of one of your markets, or the respite
   // after one left (render/pain.ts): on whichever layer drew the routes.
   drawPainGauges(ctx, state);
   // The route the side panel is showing, on top of whichever layer drew routes.
   // The selection, and the panel row under the pointer (ui/mapLink.ts),
   // marked the same way.
-  const selection = getSelection();
   const mapHover = getMapHover();
   markRoutesOf(selection);
   if (mapHover) markRoutesOf(mapHover);
@@ -429,7 +428,8 @@ function render(nowMs: number = performance.now()): void {
   // unless the Competition overlay's own card is covering airports.
   const hoveredAirport =
     hoverPoint && !hoveredFlight && !isRouteBuilderActive() && !isMapMenuOpen() ? nearestAirportCandidate(hoverPoint.x, hoverPoint.y) : null;
-  if (hoveredAirport && !cargoOverlayOn && hasHubView(state, hoveredAirport.airport.iata)) drawHubView(ctx, state, hoveredAirport.airport.iata);
+  const hubViewAirport = pinned ?? hoveredAirport?.airport.iata;
+  if (hubViewAirport && !cargoOverlayOn && hasHubView(state, hubViewAirport)) drawHubView(ctx, state, hubViewAirport);
   if (hoveredAirport && hoverPoint && !competitionOverlayOn) {
     showAirportTooltip(state, hoveredAirport.airport.iata, hoverPoint.x, hoverPoint.y);
   } else {
@@ -853,14 +853,14 @@ function updateLensLegend(): void {
       swatch(MAP_MODE_COLORS.profit, '100%') +
       '<div><span>width = seats a day</span></div>';
   } else if (lens === 'demand') {
-    lensLegendTitle.textContent = `People waiting to fly · ${isPhoneScreen ? 'tap' : 'hover'} an airport for its biggest markets`;
+    lensLegendTitle.textContent = `People waiting to fly · ${isPhoneScreen ? 'tap' : 'hover or click'} an airport for its biggest markets`;
     lensLegendScale.innerHTML =
       swatch('rgba(94, 214, 196, 0.6)', 'underserved') + swatch('rgba(154, 163, 184, 0.5)', 'well served') + swatch('#ffb347', 'you turn away') + swatch('#e8c170', 'contract offer');
   } else if (lens === 'rivals') {
     lensLegendTitle.textContent = 'Rival networks · pick one to narrow';
     lensLegendScale.innerHTML = '';
   } else if (lens === 'cargo') {
-    lensLegendTitle.textContent = `Cargo · ${isPhoneScreen ? 'tap' : 'hover'} an airport`;
+    lensLegendTitle.textContent = `Cargo · ${isPhoneScreen ? 'tap' : 'hover or click'} an airport`;
     lensLegendScale.innerHTML =
       '<div class="legend-note"><span class="cargo-key-ring is-makes">▲</span><span class="cargo-key-lane"></span><span class="cargo-key-ring is-needs">▼</span>' +
       '<span class="cargo-key-lane is-dashed" title="not flown yet"></span></div>' +
@@ -963,6 +963,8 @@ function pressMap(event: ClientPoint): void {
   // than the start of a pan. See ui/mapMenu.ts's own comment for
   // why a selected tail always means the route builder owns the click.
   if (handleMapMenuMouseDown(event, state)) {
+    const opened = getSelection();
+    pinnedAirport = opened.kind === 'airport' ? opened.iata : null;
     render();
     return;
   }
@@ -1053,7 +1055,11 @@ function releaseMap(event: ClientPoint): void {
   if (cancelRouteOnClick && isDragging && moved < CLICK_SLOP_PX) {
     cancelRouteBuilder();
     render();
-  } else if (isDragging && !cancelRouteOnClick && moved < CLICK_SLOP_PX && !ringOpenAtMouseDown) select(NETWORK);
+  } else if (isDragging && !cancelRouteOnClick && moved < CLICK_SLOP_PX) {
+    pinnedAirport = null;
+    if (ringOpenAtMouseDown) render();
+    else select(NETWORK);
+  }
   cancelRouteOnClick = false;
   isDragging = false;
 }
@@ -1158,6 +1164,10 @@ window.addEventListener(
     if (isJumpBoxOpen()) {
       closeJumpBox();
       return;
+    }
+    if (pinnedAirport) {
+      pinnedAirport = null;
+      render();
     }
     if (isRouteBuilderActive() || isMapMenuOpen() || isHubPlannerOpen()) return;
     back();
