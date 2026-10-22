@@ -30,9 +30,10 @@ export function loadLeaseRates(): LeaseRate[] {
  * flights a day once its market has grown, which also means a plane
  * leased with nothing behind it drains cash fast; this keeps a lease from
  * being a way to end the game by accident. It is also what unlocks the
- * classes: at 20-year-old prices the Propeller needs $79,200, the Regional
- * $306,000, the Narrowbody $828,000 and the Widebody $1.08M, so the
- * bigger classes open as the airline earns them.
+ * classes: at 20-year-old written prices the Propeller needs $79,200, the
+ * Regional $306,000, the Narrowbody $828,000 and the Widebody $1.08M
+ * (COST_LEVEL times that in play, sim/costLevel.ts), so the bigger classes
+ * open as the airline earns them.
  */
 export const LEASE_RESERVE_DAYS = 30;
 

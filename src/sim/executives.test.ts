@@ -18,6 +18,7 @@ import { buildDailyBrief } from './briefs';
 import { chooseHome } from './homes';
 import { LADDER } from './ladder';
 import { createNewGameState } from './state';
+import { COST_LEVEL } from './costLevel';
 
 // Run with `npm run executivetest`: three chairs and a board seat that
 // opens at Network airline, effects that land by aircraft class, and old
@@ -53,9 +54,9 @@ assert.equal(new Set(everyone.map((candidate) => candidate.effect.kind)).size, e
   assert.match(appointBlockedReason(state, candidateById('cco-lindqvist')!, 'board') ?? '', /Sits in Commercial/);
   assert.equal(appointExecutive(state, 'coo-maintenance', 'board').ok, true);
   assert.equal(state.executives.board?.candidateId, 'coo-maintenance');
-  // Salaries: base plus a share per plane, for both.
+  // Salaries: base plus a share per plane, for both, at the cost level.
   const planes = state.aircraft.length;
-  assert.equal(executiveSalariesPerDay(state), 1000 + 80 * planes + 1000 + 80 * planes);
+  assert.equal(executiveSalariesPerDay(state), (1000 + 80 * planes + 1000 + 80 * planes) * COST_LEVEL);
 }
 
 // Effects land by class: line maintenance is strongest on propellers; the inflight director does nothing on one.

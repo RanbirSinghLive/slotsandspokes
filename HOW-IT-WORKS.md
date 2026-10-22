@@ -438,6 +438,23 @@ to real all-in costs: at the old level a single Propeller ran at a
 40–50% margin and a careful airline made $58M–$104M in a year. Rivals
 are costed from the same numbers.
 
+**Cost level** (`sim/costLevel.ts`): every dollar figure for a cost or
+fee in this file and in the data files is the *written* price. The game
+charges `COST_LEVEL` times it, the player and rivals alike: the non-fuel
+part of block-hour cost (`blockNonFuel`), departure charges, lease rates
+(and so every fee counted in days of lease: returns, swaps, ferries,
+refits, expedited repairs, the 30-day lease reserve), slots, network
+overhead, crews (hire, standby, attendants, crew bases, hotels), Mtc
+(bases, levels, ratings, contracted checks, engine spares and PBH),
+stations, executives' fees and salaries, innovations' prices and the
+codeshare's daily cost, domestic-rights setup and levy, and chargers. Not scaled: fuel
+(the index stays in its 0.6–2.0 range, and its dollar slice of a flight
+stays the same), fares and every other revenue, hedge premiums (a share
+of the fuel covered), the $120 care per stranded passenger, the loyalty scheme's share of
+revenue, the R&D budget dial and starting cash. A save from before the level loads with
+its leases, shelf, standing-order caps and held slot fees multiplied by
+it (`repriceToCostLevel()`, save format 4).
+
 **Network overhead** (`sim/overhead.ts`): $75 × planes² a day, charged
 at rollover (`todayCostByCategory.overhead`). One plane pays $75, five
 $1,875, eighteen $24,300, so each plane adds more than the last: it

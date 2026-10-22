@@ -11,7 +11,8 @@ import { COST_LEVEL } from './costLevel';
  * rollover (sim/step.ts).
  *
  * It grows with the square of the fleet, so it hardly touches a small
- * airline and bites a big one: $75 a day for one plane, $1,875 for five,
+ * airline and bites a big one: at the written price (before COST_LEVEL,
+ * sim/costLevel.ts) $75 a day for one plane, $1,875 for five,
  * $24,300 for eighteen before the large-fleet term below ($26,460 with it,
  * $64,000 at twenty-five). At twice that, careful airlines in the core went
  * bust late in the year as their overhead outgrew what rivals left them. Each extra plane adds more than the last, which is

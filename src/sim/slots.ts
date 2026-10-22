@@ -47,7 +47,8 @@ import { COST_LEVEL } from './costLevel';
  */
 
 /**
- * Daily fee for a slot pair at an airport exactly as busy as the average
+ * Daily fee (written price, times COST_LEVEL: sim/costLevel.ts) for a slot
+ * pair at an airport exactly as busy as the average
  * served airport. Measured: at $75 a 32-departure Halifax hub paid about
  * $8,900/day in slots, roughly 40% of its early revenue, before the
  * connectivity bonus that's meant to pay for hubs even exists. At $50 the

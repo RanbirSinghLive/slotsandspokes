@@ -15,12 +15,12 @@ import type { SimState } from './state';
  * fares, which are revenue; hedge premiums, a share of the fuel they
  * cover; and the care paid per stranded passenger, a published rule.
  *
- * At 1 an airline scaled from one propeller to a profitable long-haul
- * network too easily, so the costs were raised against fares, which stay
- * where real tickets are. A save from before the change has its leases
- * repriced on load (repriceToCostLevel() below).
+ * Fares stay where real tickets are, so this is what sets an airline's
+ * margin: at 1.5 a grown long-haul network runs near a real airline's 5%,
+ * where at 1 it ran near 27% and growth paid at any cost. At 2 a widebody
+ * route no longer covers its lease.
  */
-export const COST_LEVEL = 2;
+export const COST_LEVEL = 1.5;
 
 /**
  * Multiply every price a save locked in by `factor`: the leases on planes
