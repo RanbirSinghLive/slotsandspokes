@@ -3689,7 +3689,7 @@ span (a plane out of service, a closure, an event) runs as a bar to its end.
 | --- | --- | --- |
 | Mtc | C check (teal, amber in its booking window, red overdue, dashed when booked), D check (violet), a plane in its heavy check or AOG or refit, as a bar to the day it's back | induct or push a C check +1/+5/+15d, book or cancel a D check, expedite an AOG |
 | Fleet | a delivery (EIS; red with "−N" when it would arrive short of crews), a ferry to another base, a plane going back to the lessor or a seasonal lease ending | hire the crews a delivery is short |
-| Crews | a batch of crews joining (hired or converting) | |
+| Crews | a batch of crews joining (hired or converting), a batch of attendants joining (☺+N) | |
 | Sales | a contract term ending, an offer or award lapsing, a tender being decided, a rival's takeover window closing, a request offer lapsing or a request running; the lane goes when tenders and requests are both switched off | decline a tender or offer not yet awarded |
 | Network | an airspace closure near the network (`closureIsRelevant()`), a demand event at an airport on the map, a station upgrade finishing | |
 

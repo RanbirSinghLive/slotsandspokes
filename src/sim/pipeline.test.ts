@@ -7,7 +7,8 @@ import { step } from './step';
 
 // The pipeline read-out: items sit inside the horizon, soonest first, an
 // overdue check sits on today, a booked D check takes its plane's C off,
-// and a grounded plane shows as a span to the day it's back.
+// a grounded plane shows as a span to the day it's back, and attendants
+// joining sit on the crew lane.
 const player = createPlayer('steady');
 const state = startHeadlessGame('YYZ', 1, player);
 for (let minute = 0; minute < 1440; minute++) step(state);
@@ -33,6 +34,12 @@ delete aircraft.dCheckBooked;
 state.aogs.push({ tail: aircraft.tail, base: aircraft.baseAirport ?? 'YYZ', fault: 'hydraulics', returnsAtMinute: (today + 4) * 1440, uncoveredRoutes: [], coveredRotations: 0, movedLegIds: [] });
 const aog = pipelineItems(state).find((item) => item.key === `aog:${aircraft.tail}`);
 assert.ok(aog && aog.day === today && aog.endDay === today + 4, 'an AOG spans to the day it is back');
+
+const home = state.crewBases?.[aircraft.baseAirport ?? 'YYZ'];
+assert.ok(home, 'the home is a crew base');
+(home.cabinHiring ??= []).push({ classCode: 'REGIONAL', count: 3, readyDay: today + 6 });
+const cabin = pipelineItems(state).find((item) => item.kind === 'cabin');
+assert.ok(cabin && cabin.lane === 'crew' && cabin.count === 3 && cabin.day === today + 6, 'attendants joining are on the crew lane');
 
 assert.deepEqual(JSON.parse(JSON.stringify(state)).aogs, state.aogs, 'reading the pipeline leaves state plain');
 console.log('ok · pipeline read-out');
