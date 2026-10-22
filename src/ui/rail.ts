@@ -19,7 +19,7 @@ import { activeShock } from '../sim/shocks';
  *
  * A dot on an item says where to dig before clicking. Two kinds:
  *   - a condition, lit while it lasts: a plane out or a schedule problem
- *     (Fleet, red), a plane AOG (Mtc, red), a class short of crews (Crews, red; stretched, or a
+ *     (Fleet, red), a plane AOG (Mtc, red), a class short of crews or attendants (Crews, red; stretched, or a
  *     plane on its way that would enter service short, amber),
  *     a route that lost money yesterday (Routes, amber), cash running out
  *     within a month (Money, red), a fuel spike running (Fuel, amber), a running contract whose buyer is sad
@@ -107,7 +107,8 @@ export function conditions(state: SimState): Partial<Record<Screen, Dot>> {
   let crews: Dot = null;
   for (const iata of Object.keys(crewBases(state))) {
     for (const crew of ops.crewReadout(state, iata)?.classes ?? []) {
-      if (crew.crews < crew.minimum) crews = 'bad';
+      // Attendants under the legal floor ground planes just as pilots do.
+      if (crew.crews < crew.minimum || (crew.cabin && crew.cabin.attendants < crew.cabin.minimum)) crews = 'bad';
       else if (crew.crews < crew.ideal && crews === null) crews = 'warn';
     }
   }

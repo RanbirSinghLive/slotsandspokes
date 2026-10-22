@@ -3628,14 +3628,20 @@ for each base and type rating, the crews on hand, each batch joining
 (hired or converted, with its day), and each plane on its way: its entry
 into service (EIS) needs `CREWS_PER_NEW_PLANE` crews on top of what the
 base's planes need today, against the crews on hand plus everything
-joining by that day. It's a read-out with no rules of its own.
+joining by that day. Types that carry a cabin are planned for
+attendants the same way: each EIS needs one shift's legal floor of the
+type's standard cabin (`typeAttendants()`) on top of today's floor,
+against attendants on hand plus hires joining by that day; a plane that
+lands under it stays on the ground. It's a read-out with no rules of its own.
 
 - **The pipeline link**: each EIS, each batch joining and each plane
   going back are on the map's pipeline (see "The pipeline" below); a line
   at the top of the screen opens it.
-- **To do**: every type whose next EIS would arrive short, with the last
+- **To do**: a type whose attendants are under the legal floor today
+  (its planes grounded now), with a button to hire the gap; and every type
+  whose next EIS would arrive short of pilots or attendants, with the last
   day a hire still joins in time ("Hire by day 29") or how late one would
-  be, a button to hire the shortfall, and one to convert reserve crews of
+  be, a button to hire each shortfall, and one to convert reserve crews of
   another type at the base.
 - **Roster**: one folding section per crew base (its header keeps crews,
   planes based, the crew room's cost and the worst SHORT or TIGHT chip
@@ -3652,7 +3658,10 @@ crews, the share of duty spent flying and night pairings, with a block per
 crew base inside. Which sections are folded is remembered in the browser.
 
 The Crews dot on the rail lights amber when an inbound plane would enter
-service short, as well as red when a class is short today.
+service short of pilots or attendants, as well as red when a class is
+short of either today. On the Routes table, a route whose plane is
+grounded for want of pilots or attendants carries a red ⚠ tag naming
+the plane, so a route reading $0 a day says why.
 
 Hiring can also be done on the map. A crew base's airport ring has **Hire
 crews**, which fans out one choice per type the ladder has opened, each

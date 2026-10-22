@@ -7365,6 +7365,9 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
   height: 11px;
   color: #9aa3b8;
 }
+.route-tags .glyph.is-bad {
+  color: #ff8080;
+}
 .route-tags .glyph svg {
   width: 100%;
   height: 100%;

@@ -76,6 +76,8 @@ export type PipelineItem = {
   /** Crews joining, or crews short at an EIS. */
   count?: number;
   short?: number;
+  /** Attendants short at an EIS. */
+  cabinShort?: number;
   /** A check the player has booked for tomorrow. */
   booked?: boolean;
   /** Days a C check has been pushed by paid tolerance. */
@@ -115,7 +117,7 @@ export function pipelineItems(state: SimState, horizon = PIPELINE_DAYS): Pipelin
   for (const base of crewPlan(state)) {
     for (const plan of base.classes) {
       plan.entries.forEach((entry, i) => {
-        add({ key: `eis:${base.iata}:${plan.classCode}:${entry.day}:${i}`, lane: 'fleet', kind: 'eis', day: entry.day, tone: entry.short > 0 ? 'bad' : 'good', iata: base.iata, classCode: plan.classCode, short: entry.short });
+        add({ key: `eis:${base.iata}:${plan.classCode}:${entry.day}:${i}`, lane: 'fleet', kind: 'eis', day: entry.day, tone: entry.short > 0 || entry.cabinShort > 0 ? 'bad' : 'good', iata: base.iata, classCode: plan.classCode, short: entry.short, cabinShort: entry.cabinShort });
       });
       plan.joining.forEach((batch, i) => {
         add({ key: `crews:${base.iata}:${plan.classCode}:${batch.day}:${i}`, lane: 'crew', kind: 'crews', day: batch.day, tone: 'info', iata: base.iata, classCode: plan.classCode, count: batch.count });
