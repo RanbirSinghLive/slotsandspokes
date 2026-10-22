@@ -930,6 +930,13 @@ regardless of the airline filter; the `includeCompetitors` filtering
 happens one layer up, in `ui/competitionTooltip.ts`, not in those two
 functions themselves.
 
+**Pinning a hover.** A click or tap that opens an airport's ring also pins
+that airport (`pinnedAirport` in `main.ts`): its hub flows, Demand arcs and
+Cargo partners stay drawn in every lens while the pointer moves away to
+follow them, and hovering other airports doesn't swap them out. The pin
+holds while that airport is selected and the route builder is idle; a click
+on empty map (one that didn't pan) or Esc lets go.
+
 Hit-testing a route needed a technique since `d3.geoPath` has no
 "distance from a point to this path" query: `findCompetitionHover()`
 samples 24 points along the geodesic (the same `geoInterpolate()`
