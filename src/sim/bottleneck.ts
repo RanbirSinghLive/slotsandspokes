@@ -64,6 +64,10 @@ export function biggestBottleneck(state: SimState): Bottleneck | null {
     if (short > 0) {
       return { kind: 'crews', text: `HOLD · ${base.iata} crews short · ${short} for next plane`, target: { kind: 'crews' } };
     }
+    const cabinShort = base.classes.reduce((worst, cls) => Math.max(worst, ...cls.entries.map((entry) => entry.cabinShort), 0), 0);
+    if (cabinShort > 0) {
+      return { kind: 'crews', text: `HOLD · ${base.iata} attendants short · ${cabinShort} for next plane`, target: { kind: 'crews' } };
+    }
   }
 
   const utilisations = state.aircraft.map((plane) => aircraftUtilisation(state, plane.tail));

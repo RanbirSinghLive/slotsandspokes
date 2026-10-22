@@ -224,9 +224,12 @@ function marginCell(row: RouteRow): HTMLTableCellElement {
 
 function tagsFor(row: RouteRow): HTMLElement | null {
   const { tags } = row;
-  if (!tags.contract && !tags.event && !tags.new) return null;
+  if (!tags.contract && !tags.event && !tags.new && tags.grounded.length === 0) return null;
   const wrap = document.createElement('span');
   wrap.className = 'route-tags';
+  for (const plane of tags.grounded) {
+    wrap.append(glyph('alert', `${plane.tail} grounded · ${plane.cabin ? 'attendants' : 'pilots'} short of the legal minimum · its flights here cancelled · hire on Crews`, 'is-bad'));
+  }
   if (tags.contract) wrap.append(glyph('contract', 'Contract: pay is part of this margin'));
   if (tags.event) wrap.append(glyph('event', 'Event running: premiums are part of this margin'));
   if (tags.new) wrap.append(glyph('sprout', 'New: under 2 weeks of history, still settling'));

@@ -3,7 +3,7 @@ import { closureLine } from '../sim/airspace';
 import { aogFor, daysUntilReturn, expediteCost, expediteRepair } from '../sim/aog';
 import { dayIndex } from '../sim/clock';
 import { contractsOf, declineContract } from '../sim/contracts';
-import { hireFee, hireLeadDays } from '../sim/crews';
+import { cabinHireFee, cabinLeadDays, hireFee, hireLeadDays } from '../sim/crews';
 import { crewPlan } from '../sim/crewPlan';
 import { HEAVY_WINDOW_DAYS } from '../sim/mxChecks';
 import { mandatesOf } from '../sim/mandates';
@@ -120,7 +120,7 @@ function markContent(item: PipelineItem, state: SimState): (string | Node)[] {
       return [event?.refitTo ? glyph('seat') : 'AOG', ` ${shortTail(item.tail)}`];
     }
     case 'eis':
-      return [plane(), item.short ? `−${item.short}` : 'EIS'];
+      return [plane(), item.short || item.cabinShort ? `−${(item.short ?? 0) + (item.cabinShort ?? 0)}` : 'EIS'];
     case 'rebase':
       return [plane(), `→${item.iata}`];
     case 'return':
@@ -224,6 +224,32 @@ function hireAction(state: SimState, item: PipelineItem): HTMLButtonElement | nu
   );
 }
 
+/** Hire a delivery's attendant shortfall at its base: without the legal floor the plane lands and stays on the ground. */
+function cabinHireAction(state: SimState, item: PipelineItem): HTMLButtonElement | null {
+  const short = item.cabinShort ?? 0;
+  if (short === 0 || !item.iata || !item.classCode) return null;
+  const today = dayIndex(state);
+  const lead = cabinLeadDays(state);
+  const seats = ops.crewReadout(state, item.iata)?.training.cabin.free ?? 0;
+  const count = Math.min(short, seats);
+  const fee = cabinHireFee(item.classCode) * count;
+  const name = classByCode(item.classCode)?.name ?? item.classCode;
+  if (count === 0) return tipButton('attendants', 'No free cabin training seats at this base', false, () => undefined);
+  const late = today + lead - item.day;
+  return tipButton(`hire ${count} ☺ · ${money(fee)}`, `Hire ${count} ${name} attendant${count === 1 ? '' : 's'} · join day ${today + lead}${late > 0 ? ` · ${late}d after EIS` : ''}`, state.cash >= fee, () =>
+    showConfirm({
+      title: `Hire ${count} ${name} attendant${count === 1 ? '' : 's'} · ${item.iata}`,
+      rows: [{ label: 'Fee now', value: money(fee) }, { label: 'Join', value: `day ${today + lead} (${lead}d)` }, ...cashAfterRows(state, fee)],
+      facts: [`Short ${short} at EIS day ${item.day}${late > 0 ? `: they join ${late}d late` : ''}.`, ...(count < short ? [`Cabin training seats cap this hire at ${count}.`] : [])],
+      confirmLabel: `Hire · ${money(fee)}`,
+      run: () => {
+        ops.hireCabinAt(state, item.iata!, item.classCode!, count);
+        changedNow();
+      },
+    }),
+  );
+}
+
 /** The tip's lines and quick edits for one item. */
 function tipBody(state: SimState, item: PipelineItem): { title: string; lines: string[]; actions: HTMLElement[] } {
   const today = dayIndex(state);
@@ -295,11 +321,14 @@ function tipBody(state: SimState, item: PipelineItem): { title: string; lines: s
       if (item.short) {
         const entry = crewPlan(state).find((base) => base.iata === item.iata)?.classes.find((c) => c.classCode === item.classCode)?.entries.find((e) => e.day === item.day);
         lines.push(`Short ${item.short} crew${item.short === 1 ? '' : 's'} at EIS${entry ? (entry.hireBy >= today ? ` · hire by day ${entry.hireBy}` : ' · too late for a hire to land in time') : ''}`);
-      } else {
-        lines.push('Crewed');
       }
-      const hire = hireAction(state, item);
-      return { title: `Delivery · day ${item.day}`, lines, actions: hire ? [hire] : [] };
+      if (item.cabinShort) {
+        const entry = crewPlan(state).find((base) => base.iata === item.iata)?.classes.find((c) => c.classCode === item.classCode)?.entries.find((e) => e.day === item.day);
+        lines.push(`Short ${item.cabinShort} attendant${item.cabinShort === 1 ? '' : 's'} at EIS · grounded without them${entry ? (entry.cabinHireBy >= today ? ` · hire by day ${entry.cabinHireBy}` : ' · too late to land in time') : ''}`);
+      }
+      if (!item.short && !item.cabinShort) lines.push('Crewed');
+      const actions = [hireAction(state, item), cabinHireAction(state, item)].filter((action): action is HTMLButtonElement => action !== null);
+      return { title: `Delivery · day ${item.day}`, lines, actions };
     }
     case 'rebase': {
       const aircraft = state.aircraft.find((a) => a.tail === item.tail);

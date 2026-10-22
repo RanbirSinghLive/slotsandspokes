@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { createPlayer } from '../headless/player';
 import { startHeadlessGame } from '../headless/newGame';
 import { layoutFor } from './cabins';
-import { attendantsForLayout, cabinCover, cabinNeed, ensureCrewBases, planeCabinNeed, rollDailyCrews } from './crews';
+import { attendantsForLayout, cabinCover, cabinNeed, ensureCrewBases, planeCabinNeed, rollDailyCrews, typeAttendants } from './crews';
+import { anyEntryShort, cabinShortToday, crewPlan } from './crewPlan';
+import { dayIndex } from './clock';
 import { step } from './step';
 
 // Run with `npm test -- cabinCrew`: attendants follow the seat plan. One for
@@ -71,5 +73,22 @@ const after = oldBase.cabinByClass![plane.typeCode];
 ensureCrewBases(old);
 assert.equal(oldBase.cabinByClass![plane.typeCode], after);
 assert.equal(base.cabinUnit, 'attendant', 'a new game counts attendants from the start');
+
+// The planner: attendants under today's floor read as short now, and a Regional on its way with no attendants for it reads as short at EIS.
+const planned = structuredClone(state);
+const plannedBase = planned.crewBases![plane.baseAirport!];
+plannedBase.crewsByClass[plane.typeCode] = 50;
+plannedBase.cabinHiring = [];
+plannedBase.cabinByClass![plane.typeCode] = 0;
+const classPlan = () => crewPlan(planned).find((b) => b.iata === plane.baseAirport)!.classes.find((c) => c.classCode === plane.typeCode)!;
+assert.ok(cabinShortToday(classPlan()) > 0, 'a class with no attendants did not read short today');
+plannedBase.cabinByClass![plane.typeCode] = cabinNeed(planned, plane.baseAirport!, plane.typeCode).minimum;
+assert.equal(cabinShortToday(classPlan()), 0);
+planned.inboundLeases = [{ typeCode: plane.typeCode, base: plane.baseAirport!, ageYears: 5, leasePricePerDay: 1000, arrivesDay: dayIndex(planned) + 10 }];
+const perPlane = typeAttendants(planned, plane.typeCode).floor;
+assert.equal(classPlan().entries[0].cabinShort, perPlane, 'a delivery with no attendants for it did not read short at EIS');
+assert.ok(anyEntryShort(planned), 'the Crews dot missed a delivery short of attendants');
+plannedBase.cabinHiring = [{ classCode: plane.typeCode, count: perPlane, readyDay: dayIndex(planned) + 4 }];
+assert.equal(classPlan().entries[0].cabinShort, 0, 'attendants joining before EIS did not cover it');
 
 console.log(`cabin crew ok · ${plane.tail} needs ${planeCabinNeed(state, plane.tail).floor} by law, ${planeCabinNeed(state, plane.tail).full} for full service`);

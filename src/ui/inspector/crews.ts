@@ -1,9 +1,9 @@
 import { dayIndex } from '../../sim/clock';
 import { execNudge } from '../execNudge';
-import { crewPlan, type ClassPlan, type PlaneEntry } from '../../sim/crewPlan';
+import { cabinShortToday, crewPlan, type ClassPlan, type PlaneEntry } from '../../sim/crewPlan';
 import { AIRCRAFT_CLASSES, classByCode } from '../../sim/aircraftClasses';
 import { classOpen, tierThatOpens } from '../../sim/ladder';
-import { cabinHireFee, needsCabinCrew, CABIN_SHORT_NPS_PENALTY, SEATS_PER_ATTENDANT, SERVICE_SEATS_PER_ATTENDANT, typeAttendants, CREWS_PER_NEW_PLANE, crewReadiness, hireFee, hireLeadDays, retrainDays, retrainFee, SICK_BASE_CHANCE, SICK_STRAIN_CHANCE, standbyCost } from '../../sim/crews';
+import { cabinHireFee, cabinLeadDays, needsCabinCrew, CABIN_SHORT_NPS_PENALTY, SEATS_PER_ATTENDANT, SERVICE_SEATS_PER_ATTENDANT, typeAttendants, CREWS_PER_NEW_PLANE, crewReadiness, hireFee, hireLeadDays, retrainDays, retrainFee, SICK_BASE_CHANCE, SICK_STRAIN_CHANCE, standbyCost } from '../../sim/crews';
 import type { SimState } from '../../sim/state';
 import { money } from '../format';
 import { linkToMap } from '../mapLink';
@@ -25,7 +25,8 @@ import { pipelineLink } from '../pipelineLink';
  * - **The pipeline link**: what's coming over the next month (deliveries,
  *   crews joining, planes going back) is on the map's pipeline
  *   (ui/pipeline.ts).
- * - **To do**: every plane that would enter service short, with the last
+ * - **To do**: planes grounded now for want of attendants, and every
+ *   plane that would enter service short of pilots or attendants, with the last
  *   day a hire still lands in time and a button to hire the shortfall, or
  *   to convert reserve crews of another type at the base.
  * - **Roster**: per base, per type, a bar of crews on hand and joining
@@ -43,6 +44,13 @@ function chipFor(plan: ClassPlan): Chip {
   if (plan.crews < plan.ideal) return { text: 'TIGHT', tone: 'warn' };
   if (plan.crews > plan.ideal) return { text: `RESERVE +${plan.crews - plan.ideal}`, tone: 'info' };
   return { text: 'OK', tone: 'good' };
+}
+
+/** The cabin's part of a folded base's chip: attendants under the floor now, or short for a plane on its way. */
+function cabinChipFor(plan: ClassPlan): Chip {
+  if (cabinShortToday(plan) - (plan.cabin?.joining ?? 0) > 0) return { text: 'CABIN SHORT', tone: 'bad' };
+  if (plan.entries.some((entry) => entry.cabinShort > 0)) return { text: 'CABIN SHORT AT EIS', tone: 'bad' };
+  return { text: '', tone: 'idle' };
 }
 
 function chipElement(chip: Chip): HTMLElement {
@@ -154,19 +162,56 @@ export function buildCrewsView(state: SimState, changed: () => void): HTMLElemen
   return root;
 }
 
-/** Every plane that would enter service short, with what to do and by when. */
+/** Planes grounded now for want of attendants, and every plane that would enter service short, with what to do and by when. */
 function toDo(state: SimState, plan: ReturnType<typeof crewPlan>, today: number, changed: () => void): HTMLElement[] {
   const rows: HTMLElement[] = [];
   for (const base of plan) {
     for (const c of base.classes) {
+      const groundedNow = cabinShortToday(c) - (c.cabin?.joining ?? 0);
+      if (groundedNow > 0) rows.push(cabinNowRow(state, base.iata, c, groundedNow, changed));
       // The first entry short is the one to act on: fixing it fixes the order after.
-      const entry = c.entries.find((e) => e.short > 0);
+      const entry = c.entries.find((e) => e.short > 0 || e.cabinShort > 0);
       if (!entry) continue;
       rows.push(entryRow(state, base.iata, c, entry, base.classes, today, changed));
     }
   }
   if (rows.length === 0) return [];
-  return [heading('To do', 'Planes that would enter service short of crews. A crew hired today joins after the hiring lead time; a conversion takes longer but uses a reserve crew of another type at the same base.'), ...rows];
+  return [heading('To do', 'Planes grounded or entering service short of pilots or attendants. A crew hired today joins after the hiring lead time, an attendant after the cabin lead time; a conversion takes longer but uses a reserve crew of another type at the same base.'), ...rows];
+}
+
+/** Hire `count` attendants of a class at a base, capped by its free cabin training seats. */
+function cabinHireButton(state: SimState, iata: string, c: ClassPlan, count: number, fact: string, changed: () => void): HTMLButtonElement {
+  const seats = ops.crewReadout(state, iata)?.training.cabin.free ?? 0;
+  const hireCount = Math.min(count, seats);
+  const fee = cabinHireFee(c.classCode) * hireCount;
+  const lead = cabinLeadDays(state);
+  return actionButton(hireCount === 0 ? 'No free cabin seats' : `Hire ${hireCount}${hireCount < count ? ` of ${count}` : ''} attendant${hireCount === 1 ? '' : 's'} · ${money(fee)}`, hireCount === 0 || state.cash < fee, () => ops.hireCabinAt(state, iata, c.classCode, hireCount), changed, {
+    title: `Hire ${hireCount} ${c.name} attendant${hireCount === 1 ? '' : 's'} · ${iata}`,
+    rows: [
+      { label: 'Fee now', value: money(fee) },
+      { label: 'Join', value: `day ${dayIndex(state) + lead} (${lead}d)` },
+      ...cashAfterRows(state, fee),
+    ],
+    facts: [fact, ...(hireCount < count ? [`Cabin training seats cap this hire at ${hireCount}.`] : [])],
+    confirmLabel: `Hire · ${money(fee)}`,
+  });
+}
+
+/** A class with planes on the ground today because its attendants are under the legal floor. */
+function cabinNowRow(state: SimState, iata: string, c: ClassPlan, short: number, changed: () => void): HTMLElement {
+  const row = linkToMap(document.createElement('div'), { kind: 'airport', iata });
+  row.className = 'crew-todo';
+  const head = document.createElement('div');
+  head.className = 'crew-todo-head';
+  const grounded = state.crewDay?.cabinShortTails?.filter((tail) => state.aircraft.find((a) => a.tail === tail)?.typeCode === c.classCode && state.aircraft.find((a) => a.tail === tail)?.baseAirport === iata) ?? [];
+  head.append(planeIconElement(c.classCode), ` ${iata} ${c.name} · ${grounded.length > 0 ? `${grounded.join(' ')} grounded` : 'grounded'} · short ${short} attendant${short === 1 ? '' : 's'}`);
+  row.append(head);
+  row.append(line(`Legal floor ${c.cabin?.minimum ?? 0} · on hand ${c.cabin?.attendants ?? 0} · flies again once hires join`, 'inspector-line is-warn'));
+  const buttons = document.createElement('div');
+  buttons.className = 'crew-buttons';
+  buttons.append(cabinHireButton(state, iata, c, short, `Short ${short} of the legal floor today: its planes stay on the ground until they join.`, changed));
+  row.append(buttons);
+  return row;
 }
 
 function entryRow(state: SimState, iata: string, c: ClassPlan, entry: PlaneEntry, siblings: ClassPlan[], today: number, changed: () => void): HTMLElement {
@@ -174,56 +219,69 @@ function entryRow(state: SimState, iata: string, c: ClassPlan, entry: PlaneEntry
   row.className = 'crew-todo';
   const head = document.createElement('div');
   head.className = 'crew-todo-head';
-  head.append(planeIconElement(c.classCode), ` ${iata} ${c.name} · EIS day ${entry.day} (${when(entry.day, today)}) · short ${entry.short}`);
+  const shortBy = [entry.short > 0 ? `${entry.short} crew${entry.short === 1 ? '' : 's'}` : '', entry.cabinShort > 0 ? `${entry.cabinShort} attendant${entry.cabinShort === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ');
+  head.append(planeIconElement(c.classCode), ` ${iata} ${c.name} · EIS day ${entry.day} (${when(entry.day, today)}) · short ${shortBy}`);
   row.append(head);
 
-  const lead = hireLeadDays(state);
-  const late = today + lead - entry.day;
-  row.append(
-    line(
-      late <= 0 ? `Hire by day ${entry.hireBy} (${when(entry.hireBy, today)}) to join in time` : `Too late to hire in time · a hire today joins day ${today + lead}, ${late}d after EIS`,
-      late <= 0 ? 'inspector-line' : 'inspector-line is-warn',
-    ),
-  );
   const buttons = document.createElement('div');
   buttons.className = 'crew-buttons';
-  // Only as many as the base has training seats for; the rest can follow as seats free up.
-  const seats = ops.crewReadout(state, iata)?.training.pilot.free ?? 0;
-  const hireCount = Math.min(entry.short, seats);
-  const fee = hireFee(c.classCode) * hireCount;
-  buttons.append(actionButton(hireCount === 0 ? 'No free training seats' : `Hire ${hireCount}${hireCount < entry.short ? ` of ${entry.short}` : ''} · ${money(fee)}`, hireCount === 0 || state.cash < fee, () => ops.hireCrewsAt(state, iata, c.classCode, hireCount), changed, {
-    title: `Hire ${hireCount} ${c.name} crew${hireCount === 1 ? '' : 's'} · ${iata}`,
-    rows: [
-      { label: 'Fee now', value: money(fee) },
-      { label: 'Join', value: `day ${today + lead} (${lead}d)` },
-      ...cashAfterRows(state, fee),
-    ],
-    facts: [`Short ${entry.short} at EIS day ${entry.day}${late > 0 ? `: they join ${late}d late` : ''}.`, ...(hireCount < entry.short ? [`Training seats cap this hire at ${hireCount}.`] : [])],
-    confirmLabel: `Hire · ${money(fee)}`,
-  }));
-  // Reserve of another type at this base, converted: slower, cheaper.
-  const donor = siblings.filter((s) => s.classCode !== c.classCode && s.crews - s.ideal > 0).sort((x, y) => y.crews - y.ideal - (x.crews - x.ideal))[0];
-  if (donor) {
-    const n = Math.min(entry.short, donor.crews - donor.ideal);
-    const ready = today + retrainDays(state);
-    buttons.append(
-      actionButton(
-        `Convert ${n} from ${donor.name} · ${money(retrainFee(c.classCode) * n)} · ready day ${ready}${ready > entry.day ? ' (late)' : ''}`,
-        n > seats,
-        () => ops.retrainCrewsAt(state, iata, donor.classCode, c.classCode, n),
-        changed,
-        {
-          title: `Convert ${n} ${donor.name} → ${c.name} · ${iata}`,
-          rows: [
-            { label: 'Fee now', value: money(retrainFee(c.classCode) * n) },
-            { label: 'Ready', value: `day ${ready}` },
-            ...cashAfterRows(state, retrainFee(c.classCode) * n),
-          ],
-          facts: [`${donor.name} reserve drops by ${n}; they fly nothing while retraining.`],
-          confirmLabel: `Convert · ${money(retrainFee(c.classCode) * n)}`,
-        },
+  if (entry.short > 0) {
+    const lead = hireLeadDays(state);
+    const late = today + lead - entry.day;
+    row.append(
+      line(
+        late <= 0 ? `Hire by day ${entry.hireBy} (${when(entry.hireBy, today)}) to join in time` : `Too late to hire in time · a hire today joins day ${today + lead}, ${late}d after EIS`,
+        late <= 0 ? 'inspector-line' : 'inspector-line is-warn',
       ),
     );
+    // Only as many as the base has training seats for; the rest can follow as seats free up.
+    const seats = ops.crewReadout(state, iata)?.training.pilot.free ?? 0;
+    const hireCount = Math.min(entry.short, seats);
+    const fee = hireFee(c.classCode) * hireCount;
+    buttons.append(actionButton(hireCount === 0 ? 'No free training seats' : `Hire ${hireCount}${hireCount < entry.short ? ` of ${entry.short}` : ''} · ${money(fee)}`, hireCount === 0 || state.cash < fee, () => ops.hireCrewsAt(state, iata, c.classCode, hireCount), changed, {
+      title: `Hire ${hireCount} ${c.name} crew${hireCount === 1 ? '' : 's'} · ${iata}`,
+      rows: [
+        { label: 'Fee now', value: money(fee) },
+        { label: 'Join', value: `day ${today + lead} (${lead}d)` },
+        ...cashAfterRows(state, fee),
+      ],
+      facts: [`Short ${entry.short} at EIS day ${entry.day}${late > 0 ? `: they join ${late}d late` : ''}.`, ...(hireCount < entry.short ? [`Training seats cap this hire at ${hireCount}.`] : [])],
+      confirmLabel: `Hire · ${money(fee)}`,
+    }));
+    // Reserve of another type at this base, converted: slower, cheaper.
+    const donor = siblings.filter((s) => s.classCode !== c.classCode && s.crews - s.ideal > 0).sort((x, y) => y.crews - y.ideal - (x.crews - x.ideal))[0];
+    if (donor) {
+      const n = Math.min(entry.short, donor.crews - donor.ideal);
+      const ready = today + retrainDays(state);
+      buttons.append(
+        actionButton(
+          `Convert ${n} from ${donor.name} · ${money(retrainFee(c.classCode) * n)} · ready day ${ready}${ready > entry.day ? ' (late)' : ''}`,
+          n > seats,
+          () => ops.retrainCrewsAt(state, iata, donor.classCode, c.classCode, n),
+          changed,
+          {
+            title: `Convert ${n} ${donor.name} → ${c.name} · ${iata}`,
+            rows: [
+              { label: 'Fee now', value: money(retrainFee(c.classCode) * n) },
+              { label: 'Ready', value: `day ${ready}` },
+              ...cashAfterRows(state, retrainFee(c.classCode) * n),
+            ],
+            facts: [`${donor.name} reserve drops by ${n}; they fly nothing while retraining.`],
+            confirmLabel: `Convert · ${money(retrainFee(c.classCode) * n)}`,
+          },
+        ),
+      );
+    }
+  }
+  if (entry.cabinShort > 0) {
+    const late = today + cabinLeadDays(state) - entry.day;
+    row.append(
+      line(
+        late <= 0 ? `Attendants by day ${entry.cabinHireBy} (${when(entry.cabinHireBy, today)}) · legal floor or it stays on the ground` : `Attendants hired today join ${late}d after EIS`,
+        late <= 0 ? 'inspector-line' : 'inspector-line is-warn',
+      ),
+    );
+    buttons.append(cabinHireButton(state, iata, c, entry.cabinShort, `Short ${entry.cabinShort} attendant${entry.cabinShort === 1 ? '' : 's'} at EIS day ${entry.day}${late > 0 ? `: they join ${late}d late` : ''}.`, changed));
   }
   row.append(buttons);
   return row;
@@ -264,7 +322,7 @@ function roster(state: SimState, plan: ReturnType<typeof crewPlan>, today: numbe
     const planes = baseInfo?.planes ?? 0;
     summary.textContent = `${crews} crew${crews === 1 ? '' : 's'} · ✈ ${planes}` + (baseInfo && baseInfo.perDay > 0 ? ` · ${money(baseInfo.perDay)}/day` : '');
     summary.title = `${crews} crews · ${planes} plane${planes === 1 ? '' : 's'} based · crew room ${baseInfo && baseInfo.perDay > 0 ? `${money(baseInfo.perDay)}/day` : 'free at home'}`;
-    const chips = (base?.classes ?? []).map(chipFor);
+    const chips = (base?.classes ?? []).flatMap((c) => [chipFor(c), cabinChipFor(c)]);
     const worst = chips.sort((x, y) => TONE_ORDER.indexOf(x.tone) - TONE_ORDER.indexOf(y.tone))[0];
     const header = foldHeader(key, changed, code, summary);
     if (worst && (worst.tone === 'bad' || worst.tone === 'warn')) header.append(chipElement(worst));
@@ -471,13 +529,15 @@ function cabinRow(state: SimState, iata: string, c: ClassPlan, cabin: NonNullabl
   const chip = chipElement(
     short
       ? { text: 'SHORT', tone: 'bad' }
-      : cabin.attendants < cabin.minimum
-        ? { text: `JOINING +${cabin.arriving}`, tone: 'info' }
-        : cabin.attendants < cabin.full
-          ? { text: 'THIN', tone: 'warn' }
-          : reserve > 0
-            ? { text: `RESERVE +${reserve}`, tone: 'info' }
-            : { text: 'OK', tone: 'good' },
+      : c.entries.some((entry) => entry.cabinShort > 0)
+        ? { text: 'SHORT AT EIS', tone: 'bad' }
+        : cabin.attendants < cabin.minimum
+          ? { text: `JOINING +${cabin.arriving}`, tone: 'info' }
+          : cabin.attendants < cabin.full
+            ? { text: 'THIN', tone: 'warn' }
+            : reserve > 0
+              ? { text: `RESERVE +${reserve}`, tone: 'info' }
+              : { text: 'OK', tone: 'good' },
   );
   const riskPercent = Math.round(cabin.weeklyRisk * 100);
   if (cabin.minimum > 0) chip.title = `Sick ${cabin.sick} · over legal ${Math.max(0, cabin.attendants - cabin.minimum)} · grounding risk ${cabin.weeklyRisk < 0.01 ? '<1' : riskPercent}%/wk`;

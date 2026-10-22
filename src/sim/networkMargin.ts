@@ -124,6 +124,8 @@ export type RouteTags = {
   event: boolean;
   /** Under two weeks of history: its numbers are still settling. */
   new: boolean;
+  /** Planes on today's schedule here grounded for want of pilots or attendants (sim/crews.ts): their flights are all cancelled. */
+  grounded: { tail: string; cabin: boolean }[];
 };
 
 export function routeTags(state: SimState, a: string, b: string): RouteTags {
@@ -133,6 +135,10 @@ export function routeTags(state: SimState, a: string, b: string): RouteTags {
     contract: running?.status === 'active',
     event: (state.mandates ?? []).some((m) => m.status === 'accepted' && marketKey(m.origin, m.dest) === key),
     new: (state.revenueHistoryByMarket[key]?.length ?? 0) < MARGIN_WINDOW_DAYS * 2,
+    grounded: [...new Set(state.schedule.filter((leg) => marketKey(leg.origin, leg.dest) === key && state.groundedTails.includes(leg.tail)).map((leg) => leg.tail))].map((tail) => ({
+      tail,
+      cabin: state.crewDay?.cabinShortTails?.includes(tail) ?? false,
+    })),
   };
 }
 

@@ -116,7 +116,7 @@ export function buildDailyBrief(state: SimState): DailyBrief {
 
   const shortBases: string[] = [];
   for (const base of crewPlan(state)) {
-    const isShort = base.classes.some((cls) => cls.entries.some((entry) => entry.day <= today + 3 && entry.short > 0));
+    const isShort = base.classes.some((cls) => cls.entries.some((entry) => entry.day <= today + 3 && (entry.short > 0 || entry.cabinShort > 0)));
     if (isShort) shortBases.push(base.iata);
   }
   if (shortBases.length > 0) {
