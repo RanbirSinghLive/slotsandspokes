@@ -127,6 +127,8 @@ function markContent(item: PipelineItem, state: SimState): (string | Node)[] {
       return [plane(), '↩'];
     case 'crews':
       return [glyph('people'), `+${item.count}`];
+    case 'cabin':
+      return [`☺+${item.count}`];
     case 'contractEnd':
     case 'contractOffer':
     case 'tender':
@@ -158,6 +160,7 @@ function targets(item: PipelineItem): { map: Selection | null; open: Selection |
       return { map: plane, open: plane, openLabel: item.tail ?? 'Plane' };
     case 'eis':
     case 'crews':
+    case 'cabin':
       return { map: airport, open: { kind: 'crews' }, openLabel: 'Crews' };
     case 'contractEnd':
     case 'contractOffer':
@@ -343,6 +346,8 @@ function tipBody(state: SimState, item: PipelineItem): { title: string; lines: s
       const batch = crewPlan(state).find((base) => base.iata === item.iata)?.classes.find((c) => c.classCode === item.classCode)?.joining.find((j) => j.day === item.day && j.count === item.count);
       return { title: `Crews joining · ${item.iata}`, lines: [`+${item.count} ${typeName} · ${inDays(item.day, today)}`, batch?.kind === 'conversion' ? `Converting from ${batch.from ? (classByCode(batch.from)?.name ?? batch.from) : 'another type'}` : 'New hire, in training'], actions: [] };
     }
+    case 'cabin':
+      return { title: `Attendants joining · ${item.iata}`, lines: [`+${item.count} ${typeName} attendant${item.count === 1 ? '' : 's'} · ${inDays(item.day, today)}`, 'New hire, in training'], actions: [] };
     case 'contractEnd':
     case 'contractOffer':
     case 'tender':

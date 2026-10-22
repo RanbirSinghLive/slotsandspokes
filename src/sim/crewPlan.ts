@@ -53,6 +53,8 @@ export type ClassPlan = {
   ideal: number;
   minimum: number;
   joining: CrewJoining[];
+  /** Attendant hires joining, soonest first; empty for a class without a cabin. */
+  cabinJoining: { count: number; day: number }[];
   entries: PlaneEntry[];
   /** Planes going back to the lessor: their crews are free after the day they go. */
   returningDays: number[];
@@ -82,7 +84,10 @@ export function crewPlan(state: SimState): BasePlan[] {
         const hasCabin = needsCabinCrew(cls.code);
         const cabinMinimum = hasCabin ? cabinNeed(state, iata, cls.code).minimum : 0;
         const attendants = cabinTeamsOf(base, cls.code);
-        const cabinJoining = (base.cabinHiring ?? []).filter((b) => b.classCode === cls.code);
+        const cabinJoining = (base.cabinHiring ?? [])
+          .filter((b) => b.classCode === cls.code)
+          .map((b) => ({ count: b.count, day: b.readyDay }))
+          .sort((x, y) => x.day - y.day);
         const perPlaneFloor = typeAttendants(state, cls.code).floor;
         const entries = inboundAt(state, iata, cls.code)
           .map((lease) => lease.arrivesDay)
@@ -91,7 +96,7 @@ export function crewPlan(state: SimState): BasePlan[] {
             const needed = need.minimum + (i + 1) * CREWS_PER_NEW_PLANE;
             const available = crews + joining.filter((j) => j.day <= day).reduce((sum, j) => sum + j.count, 0);
             const cabinNeeded = cabinMinimum + (i + 1) * perPlaneFloor;
-            const cabinAvailable = attendants + cabinJoining.filter((b) => b.readyDay <= day).reduce((sum, b) => sum + b.count, 0);
+            const cabinAvailable = attendants + cabinJoining.filter((b) => b.day <= day).reduce((sum, b) => sum + b.count, 0);
             return {
               day,
               needed,
@@ -108,14 +113,14 @@ export function crewPlan(state: SimState): BasePlan[] {
           .map((a) => a.returningOnDay!)
           .sort((x, y) => x - y);
         const cabin = hasCabin ? { attendants, minimum: cabinMinimum, joining: cabinJoining.reduce((sum, b) => sum + b.count, 0) } : null;
-        return { classCode: cls.code, name: cls.name, crews, ideal: need.ideal, minimum: need.minimum, joining, entries, returningDays, cabin };
+        return { classCode: cls.code, name: cls.name, crews, ideal: need.ideal, minimum: need.minimum, joining, cabinJoining, entries, returningDays, cabin };
       }).filter(
         (plan) =>
-          plan.crews > 0 || plan.ideal > 0 || plan.joining.length > 0 || plan.entries.length > 0 || classOpen(state, plan.classCode),
+          plan.crews > 0 || plan.ideal > 0 || plan.joining.length > 0 || plan.cabinJoining.length > 0 || plan.entries.length > 0 || classOpen(state, plan.classCode),
       );
       return { iata, classes };
     })
-    .filter((base) => base.classes.length > 0 && base.classes.some((c) => c.crews > 0 || c.ideal > 0 || c.entries.length > 0 || c.joining.length > 0))
+    .filter((base) => base.classes.length > 0 && base.classes.some((c) => c.crews > 0 || c.ideal > 0 || c.entries.length > 0 || c.joining.length > 0 || c.cabinJoining.length > 0))
     .map((base) => ({ ...base, classes: base.classes.map((c) => ({ ...c, entries: c.entries.filter((e) => e.day >= today) })) }));
 }
 

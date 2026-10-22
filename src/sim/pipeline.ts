@@ -41,6 +41,8 @@ export type PipelineKind =
   | 'return'
   /** Crews hired or converting, joining. */
   | 'crews'
+  /** Attendants hired, joining. */
+  | 'cabin'
   /** A running contract's term ending. */
   | 'contractEnd'
   /** A contract offer or award that lapses unless flown. */
@@ -73,7 +75,7 @@ export type PipelineItem = {
   classCode?: string;
   /** A contract or mandate id, or a closure's. */
   id?: number;
-  /** Crews joining, or crews short at an EIS. */
+  /** Crews or attendants joining, or crews short at an EIS. */
   count?: number;
   short?: number;
   /** Attendants short at an EIS. */
@@ -121,6 +123,9 @@ export function pipelineItems(state: SimState, horizon = PIPELINE_DAYS): Pipelin
       });
       plan.joining.forEach((batch, i) => {
         add({ key: `crews:${base.iata}:${plan.classCode}:${batch.day}:${i}`, lane: 'crew', kind: 'crews', day: batch.day, tone: 'info', iata: base.iata, classCode: plan.classCode, count: batch.count });
+      });
+      plan.cabinJoining.forEach((batch, i) => {
+        add({ key: `cabin:${base.iata}:${plan.classCode}:${batch.day}:${i}`, lane: 'crew', kind: 'cabin', day: batch.day, tone: 'info', iata: base.iata, classCode: plan.classCode, count: batch.count });
       });
     }
   }
