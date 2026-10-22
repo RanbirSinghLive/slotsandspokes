@@ -1,5 +1,6 @@
 import leaseRatesData from '../../data/lease-rates.json';
 import type { Aircraft } from './state';
+import { COST_LEVEL } from './costLevel';
 
 /**
  * Every aircraft in the game is leased. There is no purchase price and no
@@ -29,9 +30,10 @@ export function loadLeaseRates(): LeaseRate[] {
  * flights a day once its market has grown, which also means a plane
  * leased with nothing behind it drains cash fast; this keeps a lease from
  * being a way to end the game by accident. It is also what unlocks the
- * classes: at 20-year-old prices the Propeller needs $79,200, the Regional
- * $306,000, the Narrowbody $828,000 and the Widebody $1.08M, so the
- * bigger classes open as the airline earns them.
+ * classes: at 20-year-old written prices the Propeller needs $79,200, the
+ * Regional $306,000, the Narrowbody $828,000 and the Widebody $1.08M
+ * (COST_LEVEL times that in play, sim/costLevel.ts), so the bigger classes
+ * open as the airline earns them.
  */
 export const LEASE_RESERVE_DAYS = 30;
 
@@ -61,9 +63,9 @@ export const STARTING_AIRCRAFT_AGE_YEARS = 20;
 export const USEFUL_LIFE_YEARS = 25;
 const LEASE_DISCOUNT_PER_YEAR = 0.02; // 20 years old leases at 60% of new
 
-/** The rate card's new-airframe price for this class; 0 for an unknown class. */
+/** The rate card's new-airframe price for this class at the cost level (sim/costLevel.ts); 0 for an unknown class. */
 function newLeaseRate(typeCode: string): number {
-  return (leaseRatesData as LeaseRate[]).find((rate) => rate.typeCode === typeCode)?.leasePricePerDay ?? 0;
+  return ((leaseRatesData as LeaseRate[]).find((rate) => rate.typeCode === typeCode)?.leasePricePerDay ?? 0) * COST_LEVEL;
 }
 
 /** What one plane of this class and age costs per day. */
@@ -113,3 +115,4 @@ export function leaseAircraft(
   state.aircraft.push(aircraft);
   return aircraft;
 }
+

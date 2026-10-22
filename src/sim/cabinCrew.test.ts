@@ -22,6 +22,8 @@ assert.deepEqual(attendantsForLayout(layoutFor(150, { business: 12, premium: 24 
 
 const player = createPlayer('bold');
 const state = startHeadlessGame('YYZ', 4, player);
+// Cash enough to grow a fleet whatever the cost level (sim/costLevel.ts): this checks the fleet, not the economy.
+state.cash = 3_000_000;
 for (let day = 1; day <= 75; day++) {
   for (let minute = 0; minute < 1440; minute++) step(state);
   player.playDay(state);

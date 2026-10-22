@@ -6,6 +6,7 @@ import { crewBases } from './crews';
 import { actualDailyDemand, currentPotentialDemand } from './marketDemand';
 import { marketKey } from './schedule';
 import type { SimState } from './state';
+import { COST_LEVEL } from './costLevel';
 
 /**
  * The executives: three chairs beside the player, who is the chief
@@ -117,8 +118,16 @@ export const EXECUTIVE_LAPSE_DAYS = 30;
 /** Each seat's appointment. The board seat is optional: a save from before it has none. */
 export type ExecutiveSlots = Record<ExecutiveRole, ExecutiveAppointment | null> & { board?: ExecutiveAppointment | null };
 
+/** The candidates, their fees and salaries at the cost level (sim/costLevel.ts). */
+const CANDIDATES: ExecutiveCandidate[] = (executivesData as ExecutiveCandidate[]).map((candidate) => ({
+  ...candidate,
+  signingFee: candidate.signingFee * COST_LEVEL,
+  salaryPerDay: candidate.salaryPerDay * COST_LEVEL,
+  salaryPerPlane: candidate.salaryPerPlane * COST_LEVEL,
+}));
+
 export function loadExecutives(): ExecutiveCandidate[] {
-  return executivesData as ExecutiveCandidate[];
+  return CANDIDATES;
 }
 
 const CANDIDATES_BY_ID = new Map(loadExecutives().map((candidate) => [candidate.id, candidate]));

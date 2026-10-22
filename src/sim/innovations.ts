@@ -8,6 +8,7 @@ import type { SegmentName } from './timeOfDay';
 import { ULTRA_LONG_RANGE_BONUS_NM } from './range';
 import type { SimState } from './state';
 import { marketReliabilityBookingFactor } from './routeOtp';
+import { COST_LEVEL } from './costLevel';
 
 /**
  * Innovations (WEEK-TEN.md, thread 2): airline programmes the ladder
@@ -68,7 +69,7 @@ export const WINGLET_FUEL_FACTOR = 0.9;
 /** Codeshare feed: connecting passengers at every hub are multiplied by this. */
 export const CODESHARE_FEED_FACTOR = 1.3;
 /** Codeshare feed: the partner's fee, a day. */
-export const CODESHARE_COST_PER_DAY = 6000;
+export const CODESHARE_COST_PER_DAY = 6000 * COST_LEVEL;
 
 /** Spoilage management: each level lets planes sell this much more of their seats. */
 export const SPOILAGE_STEP = 0.01;
@@ -103,7 +104,8 @@ const ELECTRIC_STEPS: Innovation[] = [
   { id: 'electric-25', name: 'Electric 25-seater', summary: 'Near-zero fuel · chargers needed', description: 'A fully electric 25-seater joins the lessor: almost no energy cost per flight, and a 30% higher lease than a propeller. It only flies between airports that have a charger, and a charger is needed where it is based.', openedBy: 'regional', oneOffPrice: 600_000, runningCost: null, needs: 'charging-tech' },
 ];
 
-export const INNOVATIONS: Innovation[] = [
+/** Every innovation at the price it is written at; INNOVATIONS below is at the cost level. */
+const WRITTEN_INNOVATIONS: Innovation[] = [
   {
     id: 'online-booking',
     name: 'Online booking',
@@ -174,6 +176,9 @@ export const INNOVATIONS: Innovation[] = [
   spoilageLevel(4),
   spoilageLevel(5),
 ];
+
+/** One-off prices at the cost level (sim/costLevel.ts). */
+export const INNOVATIONS: Innovation[] = WRITTEN_INNOVATIONS.map((innovation) => ({ ...innovation, oneOffPrice: innovation.oneOffPrice * COST_LEVEL }));
 
 export function innovationById(id: string): Innovation | undefined {
   return INNOVATIONS.find((innovation) => innovation.id === id);

@@ -2,6 +2,7 @@ import { allAirports, dailyDeparturesAt, dailyMovementsAt } from './airports';
 import type { SimState } from './state';
 import { executiveSlotFeeMultiplier } from './executives';
 import { airportHours, freeInDay, hourOf, hourPriceMultiplier } from './hours';
+import { COST_LEVEL } from './costLevel';
 
 /**
  * Slots at every airport. A slot pair is the right to one daily departure
@@ -46,14 +47,15 @@ import { airportHours, freeInDay, hourOf, hourPriceMultiplier } from './hours';
  */
 
 /**
- * Daily fee for a slot pair at an airport exactly as busy as the average
+ * Daily fee (written price, times COST_LEVEL: sim/costLevel.ts) for a slot
+ * pair at an airport exactly as busy as the average
  * served airport. Measured: at $75 a 32-departure Halifax hub paid about
  * $8,900/day in slots, roughly 40% of its early revenue, before the
  * connectivity bonus that's meant to pay for hubs even exists. At $50 the
  * same hub pays about $5,900 and the next pair there still costs over
  * $450/day: expensive, but not a wall.
  */
-const SLOT_BASE_FEE_PER_DAY = 50;
+const SLOT_BASE_FEE_PER_DAY = 50 * COST_LEVEL;
 const SLOT_PRICE_EXPONENT = 1.5;
 /** A slot pair adds a takeoff and a landing. */
 const MOVEMENTS_PER_PAIR = 2;

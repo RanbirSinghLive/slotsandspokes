@@ -3,6 +3,7 @@ import { hasCrewBase, hasLineBase } from './bases';
 import { dayIndex } from './clock';
 import type { DelayBreakdown } from './delays';
 import type { SimState } from './state';
+import { COST_LEVEL } from './costLevel';
 
 /**
  * Stations: how well the ground work is done at each airport you fly from,
@@ -50,8 +51,8 @@ export const THIN_FIELD_CAPACITY = 60;
 const THIN_CHANCE_FACTOR = 1.5;
 const THIN_MINUTES_FACTOR = 1.25;
 
-export const STATION_FEE: Record<'own' | 'hub', number> = { own: 120_000, hub: 400_000 };
-export const STATION_PER_DAY: Record<'own' | 'hub', number> = { own: 400, hub: 1_200 };
+export const STATION_FEE: Record<'own' | 'hub', number> = { own: 120_000 * COST_LEVEL, hub: 400_000 * COST_LEVEL };
+export const STATION_PER_DAY: Record<'own' | 'hub', number> = { own: 400 * COST_LEVEL, hub: 1_200 * COST_LEVEL };
 export const STATION_BUILD_DAYS: Record<'own' | 'hub', number> = { own: 14, hub: 30 };
 export const HUB_MIN_DEPARTURES = 6;
 

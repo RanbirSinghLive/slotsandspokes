@@ -1,6 +1,7 @@
 import { isAdopted } from './innovations';
 import { leaseRateFor } from './leasing';
 import type { Aircraft, SimState } from './state';
+import { COST_LEVEL } from './costLevel';
 
 /**
  * Hybrid and electric planes (the R&D shop's electric path, sim/rd.ts).
@@ -24,8 +25,8 @@ export const HYBRID_LEASE_PREMIUM = 1.15;
 export const ELECTRIC_FUEL_FACTOR = 0.1;
 export const ELECTRIC_LEASE_PREMIUM = 1.3;
 export const ELECTRIC_CLASS = 'PROP';
-export const CHARGER_FEE = 250_000;
-export const CHARGER_PER_DAY = 300;
+export const CHARGER_FEE = 250_000 * COST_LEVEL;
+export const CHARGER_PER_DAY = 300 * COST_LEVEL;
 
 type Outcome = { ok: true; message: string } | { ok: false; reason: string };
 

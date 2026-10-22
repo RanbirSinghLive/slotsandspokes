@@ -14,9 +14,11 @@ import { playDays } from '../headless/simulate';
 // flights on a plane no longer in the fleet loses them on load.
 const player = createPlayer('steady');
 const state = startHeadlessGame('YYZ', 1, player);
-playDays(state, player, 20);
+// Cash enough to grow a fleet whatever the cost level (sim/costLevel.ts): this checks the fleet, not the economy.
+state.cash = 3_000_000;
+playDays(state, player, 40);
 const flying = [...new Set(state.schedule.map((leg) => leg.tail))];
-assert.ok(flying.length >= 2, 'two planes with flights by day 20');
+assert.ok(flying.length >= 2, 'two planes with flights by day 40');
 const [leaver, grounded] = flying.map((tail) => state.aircraft.find((a) => a.tail === tail)!);
 assert.equal(leaver.typeCode, grounded.typeCode, 'the starting fleet is one type');
 

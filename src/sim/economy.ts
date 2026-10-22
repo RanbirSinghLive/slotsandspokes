@@ -9,6 +9,7 @@ import { FUEL_SHARE_OF_BLOCK_HOUR_COST } from './fuel';
 import type { CompetitorOffering } from './competitors';
 import type { BookingPerks } from './innovations';
 import { rivalYieldFactor } from './pressure';
+import { COST_LEVEL } from './costLevel';
 
 export type EconomyLeg = {
   origin: string;
@@ -116,6 +117,12 @@ export type CostBreakdown = {
   departure: number;
 };
 
+/** A type's running cost for one block hour at the usual fuel price, before the lease: what the lessor's spec sheet quotes. */
+export function blockHourCostAtUsualFuel(type: EconomyAircraftType): number {
+  const { fuel, blockNonFuel } = legCostBreakdown(60, { ...type, costPerDeparture: 0 }, 1, 1);
+  return fuel + blockNonFuel;
+}
+
 export function legCostBreakdown(
   blockMinutes: number,
   type: EconomyAircraftType,
@@ -128,9 +135,10 @@ export function legCostBreakdown(
     fuel: baseFuelPortion * fuelPriceIndex * fuelEfficiencyMultiplier,
     // Whatever is left once fuel is removed: the flying crews' pay,
     // maintenance, and everything else bundled together (sim/crews.ts
-    // charges only crews standing by).
-    blockNonFuel: blockHourCost * (1 - FUEL_SHARE_OF_BLOCK_HOUR_COST),
-    departure: type.costPerDeparture,
+    // charges only crews standing by). It and the departure charge are at
+    // the cost level; fuel stays at its market price (sim/costLevel.ts).
+    blockNonFuel: blockHourCost * (1 - FUEL_SHARE_OF_BLOCK_HOUR_COST) * COST_LEVEL,
+    departure: type.costPerDeparture * COST_LEVEL,
   };
 }
 
