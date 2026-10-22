@@ -6,6 +6,7 @@ import { trailingMarketOtp } from './routeOtp';
 import { marketKey } from './schedule';
 import type { ScheduleLeg } from './schedule';
 import type { SimState } from './state';
+import { COST_LEVEL } from './costLevel';
 
 /**
  * Buying domestic rights in a foreign country (see HOW-IT-WORKS.md). Rights are earned, then paid for, then
@@ -34,9 +35,9 @@ export const CAP_STEP_WEEKLY = 14;
 export const CAP_STEP_DAYS = 90;
 export const CAP_MAX_WEEKLY = 70;
 /** Setup fee per million people in the country's airport catchments, with a floor and a ceiling; the yearly levy is a share of it. */
-export const SETUP_PER_MILLION_PEOPLE = 60_000;
-export const SETUP_MIN = 250_000;
-export const SETUP_MAX = 15_000_000;
+export const SETUP_PER_MILLION_PEOPLE = 60_000 * COST_LEVEL;
+export const SETUP_MIN = 250_000 * COST_LEVEL;
+export const SETUP_MAX = 15_000_000 * COST_LEVEL;
 export const LEVY_SHARE_OF_SETUP_PER_YEAR = 0.15;
 
 const populationByCountry = new Map<string, number>();

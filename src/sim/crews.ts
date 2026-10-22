@@ -7,6 +7,7 @@ import { mandatedTails } from './mandates';
 import { nextRandom } from './rng';
 import { flownEveryOtherDay, type ScheduleLeg } from './schedule';
 import type { Aircraft, SimState } from './state';
+import { COST_LEVEL } from './costLevel';
 
 /**
  * Crews (WEEK-TEN.md, thread 9): something to optimise on the map, not in
@@ -114,10 +115,10 @@ export const RETRAIN_DAYS = 10;
 /** Retraining costs this share of a new hire in the class it's retrained for. */
 export const RETRAIN_COST_SHARE = 0.5;
 /** A Propeller crew's hiring fee and standby a day; bigger classes cost CREW_CLASS_SCALE times as much. */
-export const HIRE_FEE_PER_CREW = 10_000;
-export const STANDBY_COST_PER_DAY = 250;
+export const HIRE_FEE_PER_CREW = 10_000 * COST_LEVEL;
+export const STANDBY_COST_PER_DAY = 250 * COST_LEVEL;
 export const CREW_CLASS_SCALE: Record<string, number> = { PROP: 1, REGIONAL: 1.5, NARROWBODY: 2, WIDEBODY: 3 };
-export const CREW_BASE_FEE = 100_000;
+export const CREW_BASE_FEE = 100_000 * COST_LEVEL;
 /** Propeller crews the home base starts with: enough for the starting plane's full day at ideal shifts. */
 export const STARTING_CREWS = 2;
 /** Crews a newly leased plane's full day needs at the legal shift: what the lease's crew advice and the crew planner (sim/crewPlan.ts) leave room for. */

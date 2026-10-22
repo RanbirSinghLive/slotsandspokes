@@ -2,6 +2,7 @@ import { executiveMaintenanceBaseMultiplier } from './executives';
 import { enginePoolCostPerDay } from './enginePool';
 import { CREW_BASE_FEE, crewBases, openCrewBase } from './crews';
 import type { SimState } from './state';
+import { COST_LEVEL } from './costLevel';
 
 /**
  * Bases as investments (WEEK-SIXTEEN.md, stage 1).
@@ -37,20 +38,20 @@ import type { SimState } from './state';
  * class (mxLevels()), so no one's planes start deferring.
  */
 
-export const CREW_BASE_PER_DAY = 500;
+export const CREW_BASE_PER_DAY = 500 * COST_LEVEL;
 export type MxKind = 'line' | 'heavy';
 export const MX_MAX_LEVEL = 6;
 /** Home's line and heavy levels at the start, and the levels there that cost nothing a day. */
 export const MX_HOME_FREE_LEVELS = 3;
-export const MX_BASE_FEE: Record<MxKind, number> = { line: 150_000, heavy: 400_000 };
+export const MX_BASE_FEE: Record<MxKind, number> = { line: 150_000 * COST_LEVEL, heavy: 400_000 * COST_LEVEL };
 /** Each level above the first: planes checked a night, or bays. */
-export const MX_LEVEL_FEE: Record<MxKind, number> = { line: 25_000, heavy: 100_000 };
-export const MX_PER_LEVEL_PER_DAY: Record<MxKind, number> = { line: 100, heavy: 300 };
+export const MX_LEVEL_FEE: Record<MxKind, number> = { line: 25_000 * COST_LEVEL, heavy: 100_000 * COST_LEVEL };
+export const MX_PER_LEVEL_PER_DAY: Record<MxKind, number> = { line: 100 * COST_LEVEL, heavy: 300 * COST_LEVEL };
 /** Rating a station's mechanics for another aircraft class: once, then a day. */
-export const MX_RATING_FEE = 50_000;
-export const MX_RATING_PER_DAY = 150;
+export const MX_RATING_FEE = 50_000 * COST_LEVEL;
+export const MX_RATING_PER_DAY = 150 * COST_LEVEL;
 /** Heavy checks, refits and MX holds away from a rated base are contracted out, by the hour of work. */
-export const CONTRACT_CHECK_PER_HOUR = 300;
+export const CONTRACT_CHECK_PER_HOUR = 300 * COST_LEVEL;
 
 type Outcome = { ok: true; message: string } | { ok: false; reason: string };
 

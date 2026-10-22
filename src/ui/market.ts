@@ -19,6 +19,7 @@ import { planeIconElement, TYPE_COLOURS } from './planeIcons';
 import { glyph, type GlyphName } from './glyphs';
 import { openFleet } from './fleetView';
 import * as ops from './routeActions';
+import { blockHourCostAtUsualFuel } from '../sim/economy';
 
 /**
  * The fleet market's readouts (sim/market.ts), apart from the lease
@@ -245,7 +246,7 @@ function specChips(code: string): HTMLElement {
   if (!cls) return specs;
   specs.append(chip('seat', String(cls.seats), 'Seats, all economy, before any refit'), chip('globe', `${cls.rangeNm.toLocaleString()} nm`, 'Range: the longest sector it can fly'));
   if (cls.cruiseKts) specs.append(chip('timer', `${cls.cruiseKts} kt`, 'Cruise speed: sets block time'));
-  if (cls.costPerBlockHour) specs.append(chip('coin', `${shortMoney(cls.costPerBlockHour)}/bh`, 'Running cost per block hour: fuel, crew time and wear, before the lease'));
+  if (cls.costPerBlockHour) specs.append(chip('coin', `${shortMoney(blockHourCostAtUsualFuel({ seats: 0, costPerBlockHour: cls.costPerBlockHour, costPerDeparture: 0 }))}/bh`, 'Running cost per block hour: fuel, crew time and wear, before the lease'));
   return specs;
 }
 

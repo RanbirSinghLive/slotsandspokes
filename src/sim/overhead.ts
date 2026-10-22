@@ -1,6 +1,7 @@
 import { executiveOverheadMultiplier } from './executives';
 import { innovationOverheadMultiplier } from './innovations';
 import type { SimState } from './state';
+import { COST_LEVEL } from './costLevel';
 
 /**
  * Network overhead: the cost of running an airline beyond its flights,
@@ -20,7 +21,7 @@ import type { SimState } from './state';
  *
  * Rivals don't pay it: they're small start-ups, capped at 20 routes.
  */
-export const OVERHEAD_PER_PLANE_SQUARED = 75;
+export const OVERHEAD_PER_PLANE_SQUARED = 75 * COST_LEVEL;
 
 /**
  * Past this many planes, running the airline gets harder faster: a big
@@ -34,7 +35,7 @@ export const OVERHEAD_PER_PLANE_SQUARED = 75;
  * planes, where the next one no longer pays, instead of 19–20.
  */
 export const LARGE_FLEET_PLANES = 15;
-export const OVERHEAD_PER_EXTRA_PLANE_CUBED = 80;
+export const OVERHEAD_PER_EXTRA_PLANE_CUBED = 80 * COST_LEVEL;
 
 /** Overhead a day for an airline with this many planes. */
 export function networkOverheadFor(planes: number): number {

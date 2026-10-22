@@ -3,6 +3,7 @@ import { ensureCrewBases } from '../sim/crews';
 import { repairDuplicateLegIds } from '../sim/schedule';
 import { migrateExecutives } from '../sim/executives';
 import { removeOrphanFlights } from '../sim/fleetTiming';
+import { COST_LEVEL, repriceToCostLevel } from '../sim/costLevel';
 import { GAME_VERSION } from './version';
 
 /**
@@ -31,7 +32,7 @@ const SAVE_KEY = 'slotsandspokes-save';
 const LEGACY_KEY = 'airgame-save-v46';
 
 /** The shape of SimState this build writes. Bump it with a migration below. */
-export const SAVE_FORMAT = 3;
+export const SAVE_FORMAT = 4;
 
 type SaveFile = { format: number; gameVersion: string; savedAt?: string; state: SimState };
 
@@ -44,6 +45,8 @@ const MIGRATIONS: Record<number, (state: SimState) => void> = {
   2: (state) => renameCodes(state, { SK: 'YK', IB: 'IJ' }),
   // Seven executive chairs became three and a board seat: move each hire to whoever does their job now.
   3: (state) => migrateExecutives(state),
+  // Costs went to COST_LEVEL times the written prices, which an older save's leases and slots were taken at.
+  4: (state) => repriceToCostLevel(state, COST_LEVEL),
 };
 
 /**

@@ -2,6 +2,7 @@ import { dayIndex } from './clock';
 import { executiveMaintenanceBaseMultiplier } from './executives';
 import type { Outcome } from './playerActions';
 import type { SimState } from './state';
+import { COST_LEVEL } from './costLevel';
 
 /**
  * Engine support: how each aircraft class gets an engine when one fails (an
@@ -30,13 +31,13 @@ export const ENGINE_SHOP_DAYS = 20;
 export const ENGINE_SHOP_VISIT_DAYS = 40;
 export const MAX_SPARE_ENGINES = 3;
 /** What one spare engine of each class costs a day to hold. */
-export const ENGINE_HOLD_PER_DAY: Record<string, number> = { PROP: 60, REGIONAL: 150, NARROWBODY: 350, WIDEBODY: 750 };
+export const ENGINE_HOLD_PER_DAY: Record<string, number> = { PROP: 60 * COST_LEVEL, REGIONAL: 150 * COST_LEVEL, NARROWBODY: 350 * COST_LEVEL, WIDEBODY: 750 * COST_LEVEL };
 /**
  * Power by the hour, a flight hour. About a plane-day of flying (10-12 h)
  * costs half a spare's holding a day, so two or three planes on it cost what
  * one spare does.
  */
-export const ENGINE_PBH_PER_HOUR: Record<string, number> = { PROP: 3, REGIONAL: 7, NARROWBODY: 15, WIDEBODY: 32 };
+export const ENGINE_PBH_PER_HOUR: Record<string, number> = { PROP: 3 * COST_LEVEL, REGIONAL: 7 * COST_LEVEL, NARROWBODY: 15 * COST_LEVEL, WIDEBODY: 32 * COST_LEVEL };
 
 export type EngineSupport = 'adhoc' | 'pool' | 'pbh';
 export const ENGINE_SUPPORTS: EngineSupport[] = ['adhoc', 'pool', 'pbh'];
