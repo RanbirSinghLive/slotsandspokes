@@ -28,6 +28,12 @@ type Pop = { milestone: Milestone; startedAtMs: number };
 
 let lastDayChecked: number | null = null;
 let pops: Pop[] = [];
+let popListener: ((milestones: Milestone[]) => void) | null = null;
+
+/** Told the milestones each time a day brings pops, so the UI can play its chime (ui/popSound.ts). */
+export function onMilestonePops(listener: (milestones: Milestone[]) => void): void {
+  popListener = listener;
+}
 
 /** Biggest news first: an airport tier, then a higher load line, then on-time. */
 function rank(milestone: Milestone): number {
@@ -49,6 +55,7 @@ function noteNewDay(state: SimState, nowMs: number): void {
     .sort((x, y) => rank(y) - rank(x))
     .slice(0, MAX_POPS_PER_DAY);
   for (const milestone of found) pops.push({ milestone, startedAtMs: nowMs });
+  if (found.length > 0) popListener?.(found);
 }
 
 /** True while a pop is on screen, so a paused map keeps redrawing smoothly until it fades. */

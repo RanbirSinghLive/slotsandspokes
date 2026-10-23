@@ -841,7 +841,12 @@ earlier was, so a route hovering on a line doesn't pop every other day.
 Nothing is stored: it's read from the daily load and on-time histories, and
 the day last checked is kept in the renderer, so loading a save pops
 nothing for days already gone. At most 4 pops a day, airports first; each
-lasts 2.6 s. The steady test player sees about one every 4 to 6 days.
+lasts 2.6 s. The steady test player sees about one every 4 to 6 days. With the
+**◎ Pops** switch on (Sound card on the Game screen, off by default,
+remembered per browser with the music's settings) each day that brings
+pops plays one chime through the shared audio output (`ui/popSound.ts`),
+in the music's key of D: a rising arpeggio for an airport tier, a rising
+fourth for a route's load, a single bell for on-time.
 
 The lens is one group of icon buttons, Network · Profit · Ops ·
 Demand · Rivals · Cargo, one on at a time (keys 1–6; O toggles Ops), with its legend and

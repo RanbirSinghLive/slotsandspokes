@@ -13,12 +13,14 @@
 export interface SoundSettings {
   /** Background lounge music. Off by default: a game that starts making noise unasked is rude. */
   music: boolean;
+  /** A short chime when a route or airport crosses a milestone on the map (ui/popSound.ts). Off by default, like music. */
+  pops: boolean;
   /** Master volume, 0 to 1. */
   volume: number;
 }
 
 const SOUND_KEY = 'airgame.sound';
-const DEFAULT_SETTINGS: SoundSettings = { music: false, volume: 0.7 };
+const DEFAULT_SETTINGS: SoundSettings = { music: false, pops: false, volume: 0.7 };
 
 function loadSettings(): SoundSettings {
   try {
@@ -27,6 +29,7 @@ function loadSettings(): SoundSettings {
     const parsed = JSON.parse(raw) as Partial<SoundSettings>;
     return {
       music: parsed.music === true,
+      pops: parsed.pops === true,
       volume: typeof parsed.volume === 'number' ? Math.min(1, Math.max(0, parsed.volume)) : DEFAULT_SETTINGS.volume,
     };
   } catch {

@@ -10,7 +10,8 @@ import { drawAirportChips } from './render/airportChips';
 import { drawRoutes,drawSelectedRoute } from './render/routes';
 import { drawPainGauges } from './render/pain';
 import { drawCallPulse, callPulseActive } from './render/callPulse';
-import { drawMilestonePops, milestonePopsActive } from './render/milestones';
+import { drawMilestonePops, milestonePopsActive, onMilestonePops } from './render/milestones';
+import { playMilestoneChime } from './ui/popSound';
 import { METRO_COLORS } from './render/metro';
 import { drawAirports, drawSelectedAirport, airports, setKnownAirports, nearestAirportCandidate, setAirportHold } from './render/airports';
 import { drawHubView, hasHubView } from './render/hubs';
@@ -826,6 +827,7 @@ function setLens(next: Lens): void {
 }
 
 lensButtons.forEach((button) => button.addEventListener('click', () => setLens(button.dataset.lens as Lens)));
+onMilestonePops(playMilestoneChime);
 // The game opens on the Network lens, whose key shows without a click.
 queueMicrotask(updateLensLegend);
 
