@@ -819,6 +819,30 @@ phone the strip moves to the bottom left and the lens and filter groups
 fold behind its layers button. The corners sit in `#map-surface`, a
 pointer-transparent box the size of the map.
 
+**The Network lens draws routes as tubes** (`render/metro.ts`), Mini Metro
+style, read over the last 7 days so the picture moves with the network and
+not with one departure. A tube's width is its seats a day (the Ops lens's
+square-root scale, 4 px up to about 11). The coloured core inside it is as
+wide as the route's load factor: a hollow tube is flying air, a solid one
+is full. The core's colour is the route's on-time share on the Ops lens's
+red-amber-green scale (blue-grey under 5 flights). A ▲ or ▼ two thirds of
+the way along is this week's load against the week before, shown when it
+moved 5 points or more. Spill (amber) stays on the Demand lens. The lens
+key sits by the map tools like the others.
+
+**Milestone pops** (`sim/milestones.ts`, drawn by `render/milestones.ts`
+in every lens). At each rollover the map pops a swelling ring and a chip
+where a route's 7-day load factor crosses 60, 75 or 85% ("YYZ–PHL · LF
+75%"), its 7-day on-time share crosses 90% ("OTP 90%"), or an airport's
+passengers a day on your routes over 7 days crosses 50, 100, 250, 500,
+1,000, 2,500, 5,000 or 10,000 ("LGA · 50 pax/d"). A line counts only when
+this week is over it and none of the seven weeks ending one to seven days
+earlier was, so a route hovering on a line doesn't pop every other day.
+Nothing is stored: it's read from the daily load and on-time histories, and
+the day last checked is kept in the renderer, so loading a save pops
+nothing for days already gone. At most 4 pops a day, airports first; each
+lasts 2.6 s. The steady test player sees about one every 4 to 6 days.
+
 The lens is one group of icon buttons, Network · Profit · Ops ·
 Demand · Rivals · Cargo, one on at a time (keys 1–6; O toggles Ops), with its legend and
 rival chips beside the strip. `setLens()` in main.ts sets the three flags

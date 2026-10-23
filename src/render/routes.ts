@@ -11,6 +11,7 @@ import type { SimState } from '../sim/state';
 import { routeWidthsByMarket } from './routeWidth';
 
 import { fareGapSuffix } from './fareGap';
+import { drawMetroRoutes } from './metro';
 
 const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]));
 
@@ -36,7 +37,7 @@ function routeKey(a: string, b: string): string {
  * between them as it projects, which is what produces the curved look
  * (see CLAUDE.md's note on this under "Geography").
  */
-export function drawRoutes(ctx: CanvasRenderingContext2D, state: SimState, withLabels = false): void {
+export function drawRoutes(ctx: CanvasRenderingContext2D, state: SimState, withLabels = false, metro = false): void {
   const path = geoPath(projection, ctx);
 
   const distinctRoutes = new Map<string, { origin: string; dest: string }>();
@@ -47,6 +48,13 @@ export function drawRoutes(ctx: CanvasRenderingContext2D, state: SimState, withL
     if (!distinctRoutes.has(key)) {
       distinctRoutes.set(key, { origin: leg.origin, dest: leg.dest });
     }
+  }
+
+  // The Network lens draws routes as tubes filled by load (render/metro.ts); spill stays on the Demand lens.
+  if (metro) {
+    drawMetroRoutes(ctx, state, distinctRoutes);
+    drawPreviewRoutes(ctx);
+    return;
   }
 
   ctx.strokeStyle = ROUTE_STROKE;
@@ -105,9 +113,16 @@ export function drawRoutes(ctx: CanvasRenderingContext2D, state: SimState, withL
     ctx.restore();
   }
 
-  // The route the hovered menu button would change, drawn over the top:
-  // green for an added flight, amber for a change, red and dashed for a
-  // removal (render/preview.ts).
+  drawPreviewRoutes(ctx);
+}
+
+/**
+ * The route the hovered menu button would change, drawn over the top:
+ * green for an added flight, amber for a change, red and dashed for a
+ * removal (render/preview.ts).
+ */
+function drawPreviewRoutes(ctx: CanvasRenderingContext2D): void {
+  const path = geoPath(projection, ctx);
   const preview = getMapPreview();
   if (!preview) return;
   ctx.save();
