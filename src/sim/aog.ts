@@ -6,7 +6,7 @@ import { hourOf } from './hours';
 import { summarizeMarket } from './marketSummary';
 import { marketKey } from './schedule';
 import { aircraftUtilisation, rotationsForTail, type Rotation } from './utilisation';
-import { coverRotations } from './turnBuffer';
+import { coverRotations, handBackCover } from './turnBuffer';
 import { applyRefit, refitDays, refitWorkMinutes, type RefitTarget } from './cabins';
 import { type BayClaims, bookedDChecks, chargeMaintenance, freeHeavyBays, bookedHeavyChecks, finishDCheck, finishHeavyCheck, forcedHeavyChecks, wornAge } from './mxChecks';
 import { nightStopStation } from './nightStops';
@@ -38,8 +38,10 @@ export const MAINTENANCE_AGE_FACTOR = 0.6;
  *
  * What an AOG does to the schedule is the one rule for any pool over
  * capacity: the grounded plane's rotations move to other planes of the
- * same class at the same base that have spare time (the pool's slack is
- * the buffer this eats), most profitable first. Whatever doesn't fit
+ * same class at the same base that have a gap for them (the pool's slack
+ * is the buffer this eats), most profitable first, without re-timing
+ * anyone's timetable (sim/turnBuffer.ts coverRotations()), and go back at
+ * their own times when it's repaired. Whatever doesn't fit
  * stays on the grounded plane and is cancelled every morning until it's
  * back — so the least profitable flying goes first. The player can free
  * time (cut a flight, trim a turn buffer or hub wait) and the next
@@ -76,8 +78,10 @@ export type AogEvent = {
   uncoveredRoutes: string[];
   /** Rotations moved onto other planes when it went down. */
   coveredRotations: number;
-  /** The ids those moved legs now have, so the flying can be handed back when it's repaired. */
+  /** The ids of those moved legs, so the flying can be handed back when it's repaired. */
   movedLegIds: string[];
+  /** When each moved leg was scheduled before it moved (home-local minute of day, by leg id), so it goes back at exactly that time. */
+  scheduledAt?: Record<string, number>;
   /** A planned refit (sim/cabins.ts) rather than a breakdown: the cabin it has when it's back. It can't be expedited. */
   refitTo?: RefitTarget;
   /** A refit done in a hangar bay at its base, which is held until it's back; absent, contracted out. */
@@ -151,9 +155,10 @@ function coverGroundedPlanes(state: SimState): void {
       event.uncoveredRoutes = [];
       continue;
     }
-    const { covered, movedLegIds } = coverRotations(state, event.tail, rotations);
+    const { covered, movedLegIds, scheduledAt } = coverRotations(state, event.tail, rotations);
     event.coveredRotations += covered;
     event.movedLegIds.push(...movedLegIds);
+    if (covered > 0) event.scheduledAt = { ...event.scheduledAt, ...scheduledAt };
     event.uncoveredRoutes = [
       ...new Set(
         rotationsForTail(state, event.tail).flatMap((rotation) =>
@@ -181,7 +186,7 @@ export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
       if (event.checkKind === 'D') finishDCheck(state, aircraft);
       else finishHeavyCheck(state, aircraft);
     }
-    handBackFlying(state, event);
+    handBackCover(state, event);
   }
   // Heavy checks overdue past the grace (sim/mxChecks.ts): grounded, the same way, for the work left.
   const bayClaims: BayClaims = new Map();
@@ -285,23 +290,6 @@ export function startRefitOnLanding(state: SimState, aircraft: Aircraft): void {
   if (!aircraft.refitPending) return;
   startRefitIfAtBase(state, aircraft, dayStartMinute(state));
   if (!aircraft.refitPending) coverGroundedPlanes(state);
-}
-
-/**
- * A repaired plane takes back the flying that was moved off it. Each moved
- * rotation is re-spread across its pool the same way cover spread it, and
- * the plane just back — the least-worked one there, since it's been flying
- * nothing — is the first place it goes. Without this, the repaired plane
- * sat idle while the rest of the pool carried its rotations late into the
- * evening, and the curfew cancelled them.
- */
-function handBackFlying(state: SimState, event: AogEvent): void {
-  const moved = new Set(event.movedLegIds);
-  const hosts = new Set(state.schedule.filter((leg) => moved.has(leg.legId)).map((leg) => leg.tail));
-  for (const host of hosts) {
-    const rotations = rotationsForTail(state, host).filter((rotation) => rotation.legs.some((leg) => moved.has(leg.legId)));
-    coverRotations(state, host, rotations);
-  }
 }
 
 /** Whole days until it's back, counting from now. */

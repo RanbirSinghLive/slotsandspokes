@@ -4213,7 +4213,17 @@ Each cause has a different answer available:
 - **Crew shortage** — a plane its base can't crew within the legal shift is grounded for the day; answered by hiring ahead.
 - **Unscheduled maintenance** (AOG) — a daily per-aircraft roll scaling
   with *effective* age, so answered by maintenance staffing and younger
-  metal.
+  metal. While a plane is out (an AOG, a C or D check, a refit), its
+  rotations move to planes of its class at its base, most profitable
+  first (`coverRotations()` in `sim/turnBuffer.ts`). Cover never re-times
+  the timetable: a rotation keeps its leg ids and goes into a gap in the
+  other plane's day, at its own times when the gap is there, else at the
+  nearest start that fits around that plane's flights, lands by 22:00 and
+  has room in every hour. The other plane's own flights don't move. What
+  fits nowhere is cancelled each morning until the plane is back. When it
+  is, every moved leg goes back on it at the time it had before
+  (`AogEvent.scheduledAt`, `handBackCover()`), so after the outage the
+  Gantt is exactly the player's again.
 - **Severe weather** — an airport closes outright. No answer at all,
   which is why it's kept rare.
 - **Curfew** — a rotation that can't be back at base by 22:00 on the
