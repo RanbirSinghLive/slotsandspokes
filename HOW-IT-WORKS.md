@@ -845,9 +845,26 @@ any lens.
    brighter when starved; grey where it's well served; an amber rim where
    you're turning passengers away today. No lines until asked: the
    hovered airport (else the selected one) gets its six biggest markets
-   as arcs, teal where you don't fly yet and amber where you do, thicker
-   the bigger. Drawn *before* the route layer below, so your network and
-   the airport dots sit on top.
+   to airports you can see (`sim/spokeFlows.ts`'s `spokeFlowsFrom()`),
+   thicker the bigger: amber where you fly it nonstop, teal where nothing
+   of yours is on the way, and blue bent through one of your airports
+   where it could connect there, with a "+N" chip for connecting
+   passengers a day once grown. A leg of a blue line you don't fly is
+   dashed: the spoke to add, or the trunk (within one class up of your
+   biggest plane's range). The three biggest markets past the fog get a
+   short faded stub pointing their way, unnamed. Drawn *before* the route
+   layer below, so your network and the airport dots sit on top.
+
+   **What a spoke could feed** (`sim/spokeFlows.ts`): every number is
+   `grownConnectingFlow()` in `sim/hubs.ts`, the hub model's flow with both
+   spoke routes established and two well-timed flights a day, so it says
+   what a route could feed, not what it feeds today. The airport view
+   shows "Via YHZ +N cnx/day" for an airport you don't fly to that hub
+   (`feedViaHubs()`), and "Would feed" for an airport you fly: the routes
+   from there its other routes would send connections onto
+   (`routesFedAt()`), with the class a route needs when it's past your
+   planes' range. The route builder adds "+N cnx once grown" to a new
+   pair (`newRouteConnecting()`). Read-only: no booking uses them.
 4. Your own network — **either** `routes.ts` (plain gray, one thin arc
    per distinct city pair, if `competitionOverlayOn` is off) **or**
    `competition.ts`'s `drawCompetitionLayer()` (if it's on). These are

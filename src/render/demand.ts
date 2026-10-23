@@ -1,14 +1,15 @@
-import { geoPath } from 'd3-geo';
+import { geoInterpolate, geoPath } from 'd3-geo';
 import type { LineString } from 'geojson';
 import { baselineScale, projection } from './projection';
 import { airports, isAirportKnown } from './airports';
-import { currentPotentialDemand } from '../sim/marketDemand';
+import { marketDistanceNm } from '../sim/demand';
 import { airportDemandSize, sizeRank } from '../sim/marketSize';
-import { marketKey } from '../sim/schedule';
 import { hungerByAirport } from '../sim/serviceLevel';
 import type { SimState } from '../sim/state';
 import { unmetDemandByAirport, unmetDemandInputs, type AirportUnmet } from '../sim/unmetDemand';
 import { contractsOf } from '../sim/contracts';
+import { spokeFlowsFrom } from '../sim/spokeFlows';
+import type { Airport } from './airports';
 
 /**
  * The Demand lens: where to fly next, readable at a glance.
@@ -26,9 +27,9 @@ import { contractsOf } from '../sim/contracts';
  * - **Contracts on offer** (sim/contracts.ts): a dashed gold
  *   line and ring.
  * - **Lines only on request**: hovering (or selecting) an airport draws
- *   its biggest markets from there, teal where nobody of yours flies yet,
- *   amber where you do, thicker the bigger. Every pair at once was
- *   thousands of lines and told nothing.
+ *   its biggest markets from there and how each could reach your network
+ *   (drawFocusMarkets()). Every pair at once was thousands of lines and
+ *   told nothing.
  *
  * Drawn under the routes and the airport dots, so they sit on top of it.
  */
@@ -49,6 +50,15 @@ const FOCUS_MIN_WIDTH = 1;
 const FOCUS_MAX_WIDTH = 6;
 const FOCUS_OPEN = '#5ed6c4';
 const FOCUS_FLOWN = '#ffd166';
+/** A market that could ride your network, changing planes at one of your airports. */
+export const FOCUS_NETWORK = '#8fb8ff';
+/** How many markets past the fog get a stub. */
+const FOGGED_MARKETS = 3;
+/** How far a stub reaches toward a market past the fog. */
+const FOGGED_STUB_NM = 120;
+/** How far along the hub's leg a "+N" chip sits. */
+const CHIP_FROM_HUB_NM = 90;
+const CHIP_FONT = '10px ui-monospace, Consolas, monospace';
 const CONTRACT_GOLD = '#e8c170';
 
 const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]));
@@ -143,33 +153,79 @@ function drawContractOffers(ctx: CanvasRenderingContext2D, state: SimState): voi
   }
 }
 
-/** The focused airport's biggest markets as arcs, to known airports only. */
+/**
+ * The focused airport's biggest markets (sim/spokeFlows.ts), thicker the
+ * more people want to fly them:
+ *
+ * - amber where you fly it nonstop, teal where nothing of yours is on the way;
+ * - blue, bent through one of your airports, where it could connect there,
+ *   with a "+N" chip for its connecting passengers a day once grown. A leg of
+ *   it you don't fly yet is dashed: the spoke to add, or the trunk;
+ * - a short faded stub, no name, toward a big market past the fog.
+ */
 function drawFocusMarkets(ctx: CanvasRenderingContext2D, state: SimState, focus: string): void {
   const from = airportsByIata.get(focus);
   if (!from || !isAirportKnown(focus)) return;
-  const flown = new Set(state.schedule.map((leg) => marketKey(leg.origin, leg.dest)));
-  const markets = airports
-    .filter((other) => other.iata !== focus && isAirportKnown(other.iata))
-    .map((other) => ({ other, potential: currentPotentialDemand(state, focus, other.iata) }))
-    .filter((market) => market.potential > 0)
-    .sort((x, y) => y.potential - x.potential)
-    .slice(0, FOCUS_MARKETS);
-  const biggest = markets[0]?.potential ?? 1;
+  const known = spokeFlowsFrom(state, focus, FOCUS_MARKETS, isAirportKnown);
+  const fogged = spokeFlowsFrom(state, focus, FOGGED_MARKETS, (iata) => !isAirportKnown(iata));
+  const biggest = Math.max(1, known[0]?.potential ?? 0, fogged[0]?.potential ?? 0);
+  const widthFor = (potential: number) => FOCUS_MIN_WIDTH + (potential / biggest) * (FOCUS_MAX_WIDTH - FOCUS_MIN_WIDTH);
   const path = geoPath(projection, ctx);
-  for (const { other, potential } of markets) {
-    const line: LineString = {
-      type: 'LineString',
-      coordinates: [
-        [from.lon, from.lat],
-        [other.lon, other.lat],
-      ],
-    };
+  const arc = (a: Airport, b: Airport, colour: string, width: number, dashed: boolean) => {
     ctx.beginPath();
-    path(line);
-    ctx.strokeStyle = flown.has(marketKey(focus, other.iata)) ? FOCUS_FLOWN : FOCUS_OPEN;
-    ctx.globalAlpha = 0.75;
-    ctx.lineWidth = FOCUS_MIN_WIDTH + (potential / biggest) * (FOCUS_MAX_WIDTH - FOCUS_MIN_WIDTH);
+    path({ type: 'LineString', coordinates: [[a.lon, a.lat], [b.lon, b.lat]] } satisfies LineString);
+    ctx.setLineDash(dashed ? [5, 4] : []);
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = width;
+    ctx.stroke();
+  };
+  const chips: { point: [number, number]; text: string }[] = [];
+
+  ctx.save();
+  ctx.globalAlpha = 0.75;
+  for (const flow of known) {
+    const other = airportsByIata.get(flow.other);
+    if (!other) continue;
+    const width = widthFor(flow.potential);
+    const hub = flow.hub ? airportsByIata.get(flow.hub) : undefined;
+    if ((flow.kind === 'viaHub' || flow.kind === 'needsTrunk') && hub) {
+      arc(from, hub, FOCUS_NETWORK, width, !flow.spokeFlown);
+      arc(hub, other, FOCUS_NETWORK, width, flow.kind === 'needsTrunk');
+      // Near the hub, so the chip stays on screen while the far end is off it.
+      const along = Math.min(0.5, CHIP_FROM_HUB_NM / Math.max(1, marketDistanceNm(hub.iata, other.iata)));
+      const point = projection(geoInterpolate([hub.lon, hub.lat], [other.lon, other.lat])(along));
+      if (point) chips.push({ point: [point[0], point[1]], text: `+${Math.round(flow.connecting)}` });
+    } else {
+      arc(from, other, flow.kind === 'nonstop' ? FOCUS_FLOWN : FOCUS_OPEN, width, false);
+    }
+  }
+
+  // Past the fog: which way the big markets lie, not where they are.
+  ctx.globalAlpha = 0.4;
+  for (const flow of fogged) {
+    const other = airportsByIata.get(flow.other);
+    if (!other) continue;
+    const toward = geoInterpolate([from.lon, from.lat], [other.lon, other.lat]);
+    const stub = Math.min(1, FOGGED_STUB_NM / Math.max(1, marketDistanceNm(focus, flow.other)));
+    ctx.beginPath();
+    path({ type: 'LineString', coordinates: [[from.lon, from.lat], toward(stub)] } satisfies LineString);
+    ctx.setLineDash([2, 3]);
+    ctx.strokeStyle = FOCUS_OPEN;
+    ctx.lineWidth = widthFor(flow.potential);
     ctx.stroke();
   }
-  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  ctx.save();
+  ctx.font = CHIP_FONT;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const { point, text } of chips) {
+    const halfWidth = ctx.measureText(text).width / 2 + 3;
+    ctx.fillStyle = 'rgba(10, 12, 18, 0.8)';
+    ctx.fillRect(point[0] - halfWidth, point[1] - 7, halfWidth * 2, 14);
+    ctx.fillStyle = FOCUS_NETWORK;
+    ctx.fillText(text, point[0], point[1]);
+  }
+  ctx.restore();
 }

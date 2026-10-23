@@ -25,7 +25,7 @@ import { drawDelayCascade } from './render/cascade';
 import { projectRestOfDay } from './sim/cascade';
 import { showFlightTooltip, hideFlightTooltip } from './ui/flightTooltip';
 import { showAirportTooltip, hideAirportTooltip } from './ui/airportTooltip';
-import { drawDemandLayer } from './render/demand';
+import { drawDemandLayer, FOCUS_NETWORK } from './render/demand';
 import { drawCompetitionLayer, competitorAirlines, findCompetitionHover, drawNewCompetitorRouteFlashes } from './render/competition';
 import { drawRouteMapMode, MAP_MODE_COLORS, type MapMode } from './render/mapmodes';
 import { cargoLegend, drawCargoLayer } from './render/cargo';
@@ -855,7 +855,7 @@ function updateLensLegend(): void {
   } else if (lens === 'demand') {
     lensLegendTitle.textContent = `People waiting to fly · ${isPhoneScreen ? 'tap' : 'hover or click'} an airport for its biggest markets`;
     lensLegendScale.innerHTML =
-      swatch('rgba(94, 214, 196, 0.6)', 'underserved') + swatch('rgba(154, 163, 184, 0.5)', 'well served') + swatch('#ffb347', 'you turn away') + swatch('#e8c170', 'contract offer');
+      swatch('rgba(94, 214, 196, 0.6)', 'underserved') + swatch('rgba(154, 163, 184, 0.5)', 'well served') + swatch('#ffb347', 'you turn away') + swatch('#e8c170', 'contract offer') + swatch(FOCUS_NETWORK, 'via your airport');
   } else if (lens === 'rivals') {
     lensLegendTitle.textContent = 'Rival networks · pick one to narrow';
     lensLegendScale.innerHTML = '';
