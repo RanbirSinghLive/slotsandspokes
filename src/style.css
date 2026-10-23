@@ -564,7 +564,8 @@ button,
 
 #lens-legend-scale {
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 4px 12px;
 }
 
 /* The Cargo lens has ten goods to key: wrap them, notes on a row of their own. */

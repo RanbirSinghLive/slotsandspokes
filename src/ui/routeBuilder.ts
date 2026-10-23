@@ -10,6 +10,7 @@ import { rightsHint, rightsOffer } from '../sim/rightsLicences';
 import { greatCircleDistanceNm } from '../sim/geo';
 import { demandAgainstSeats, marketSize, neverFills } from '../sim/marketSize';
 import { suppressedMarketReason } from '../sim/demand';
+import { newRouteConnecting } from '../sim/spokeFlows';
 import { nextSlotFees, type SlotQuote } from '../sim/slots';
 import { legsServingMarket, type ScheduleLeg } from '../sim/schedule';
 import { USABLE_DAY_MINUTES } from '../sim/utilisation';
@@ -87,7 +88,7 @@ function showRouteHoverTooltip(
     const fill = demandAgainstSeats(state, origin.iata, candidate.iata, newFrequency, type.seats);
     const pdewText = suppressed
       ? 'No market · same city'
-      : `${marketSize(state, origin.iata, candidate.iata)} market · ${type.seats} seats · ${fill.words}`;
+      : `${marketSize(state, origin.iata, candidate.iata)} market · ${type.seats} seats · ${fill.words}${connectingText(state, origin.iata, candidate.iata)}`;
 
     // A stop can be comfortably in range from here and still be a dead
     // end, because the rotation has to get *home*: the range ring is drawn
@@ -130,6 +131,16 @@ function showRouteHoverTooltip(
   routeHoverTooltip.hidden = false;
   routeHoverTooltip.style.left = `${screenX + 16}px`;
   routeHoverTooltip.style.top = `${screenY + 16}px`;
+}
+
+/**
+ * The connecting passengers a new route would carry once grown
+ * (sim/spokeFlows.ts), as a suffix: the number that says a thin spoke is
+ * worth more than its own market. Empty when it's under one a day.
+ */
+function connectingText(state: SimState, a: string, b: string): string {
+  const connecting = Math.round(newRouteConnecting(state, a, b));
+  return connecting >= 1 ? ` · +${connecting} cnx once grown` : '';
 }
 
 /**
@@ -683,7 +694,7 @@ function updateFormValidation(chain: Airport[], dest: Airport, state: SimState):
     const fill = demandAgainstSeats(state, origin.iata, dest.iata, newFrequency, type.seats);
     formPdew.textContent = suppressed
       ? `${origin.iata}–${dest.iata} · no market · ${suppressed}`
-      : `${origin.iata}–${dest.iata} · ${marketSize(state, origin.iata, dest.iata)} market · ${type.seats} seats · ${fill.words}`;
+      : `${origin.iata}–${dest.iata} · ${marketSize(state, origin.iata, dest.iata)} market · ${type.seats} seats · ${fill.words}${connectingText(state, origin.iata, dest.iata)}`;
     // See the hover tooltip's own note: thin is judged on the market fully
     // grown, not on what it carries before anyone has built it.
     formPdew.classList.toggle('thin-market', neverFills(state, origin.iata, dest.iata, newFrequency, type.seats));

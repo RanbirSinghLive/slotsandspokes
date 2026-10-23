@@ -247,6 +247,44 @@ function flowBetween(
   );
 }
 
+/** Every market anyone flies nonstop, the player or a rival, by marketKey(). */
+export function nonstopMarkets(state: SimState): Set<string> {
+  const markets = new Set<string>();
+  for (const leg of state.schedule) markets.add(marketKey(leg.origin, leg.dest));
+  for (const route of state.competitorRoutes) markets.add(marketKey(route.origin, route.dest));
+  return markets;
+}
+
+/**
+ * The chance a grown spoke pair connects: two flights a day on the
+ * thinner spoke, every one meeting a good connection (connectingChance()).
+ * What a new spoke is valued at before it is flown, so the map and the
+ * airport view can say what it would feed.
+ */
+const GROWN_CONNECTING_CHANCE = 1 - Math.exp(-2 / FREQUENCY_SCALE);
+
+/**
+ * Connecting passengers a day, both ways, between `a` and `b` through
+ * `hub` once both spoke routes are established and well timed: the same
+ * sum as flowBetween(), without today's schedule. Zero where air rights
+ * bar the trip or the hub is too far out of the way. Pass `nonstop`
+ * (nonstopMarkets()) when calling it in a loop.
+ */
+export function grownConnectingFlow(state: SimState, a: string, hub: string, b: string, nonstop: ReadonlySet<string> = nonstopMarkets(state)): number {
+  if (a === b || a === hub || b === hub) return 0;
+  if (!flowRights(homeCountry(state), a, hub, b, grantedCountries(state)).ok) return 0;
+  const nonstopFlown = nonstop.has(marketKey(a, b));
+  return (
+    currentPotentialDemand(state, a, b) *
+    CONNECT_SHARE *
+    GROWN_CONNECTING_CHANCE *
+    circuityFactor(a, hub, b) *
+    (nonstopFlown ? NONSTOP_DISCOUNT : 1) *
+    connectingFeedMultiplier(state) *
+    executiveConnectingMultiplier(state)
+  );
+}
+
 /**
  * The last flows worked out at each hub, with the inputs they came from.
  *

@@ -19,7 +19,7 @@ import { HERITAGE_DAYS, heritagePairs, nextSlotFees, slotFeesPerDayAt, slotsHeld
 import type { SimState } from '../../sim/state';
 import { unmetDemandByAirport } from '../../sim/unmetDemand';
 import { utilisationPools } from '../../sim/utilisation';
-import { airportPresence, airports } from '../../render/airports';
+import { airportPresence, airports, isAirportKnown } from '../../render/airports';
 import { hasHubView } from '../../render/hubs';
 import { getMapPreview } from '../../render/preview';
 import { openHubPlanner } from '../hubPlanner';
@@ -33,6 +33,7 @@ import { linkToMap } from '../mapLink';
 import { airportRightsMark } from './rights';
 import { stationSection } from './station';
 import { contractsOf } from '../../sim/contracts';
+import { feedViaHubs, routesFedAt } from '../../sim/spokeFlows';
 import { cargoGlyph } from '../../render/cargo';
 import { airportCargo, bestCargoPartners, neededTonnes, producedTonnes, shortagePremium } from '../../sim/cargo';
 
@@ -119,6 +120,7 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
   const service = describeServiceLevel(hungerAt(state, iata));
   root.append(lineWithInfo(service.label, `How well this airport is served by every airline: ${service.description}.`));
 
+  root.append(...connectionLines(state, iata));
   root.append(...cargoLines(state, iata));
 
   // Contracts touching this airport (sim/contracts.ts).
@@ -166,6 +168,32 @@ export function buildAirportView(state: SimState, iata: string, changed: () => v
 
   root.append(heading('Markets'), marketRows(state, iata));
   return { root, redrawPools };
+}
+
+/** How connections are worked out, for the (i) on both connection lines. */
+const CONNECTION_INFO =
+  'Connecting passengers a day once grown: people changing planes at one of your airports, both ways. Each leg sells its own fare. ' +
+  'A spoke feeds in full once it carries about 40 local passengers a day, and a trip connects only if a flight in meets one out 40 to 180 minutes later and the hub isn\'t far out of the way. ' +
+  'Fewer connect where anyone flies the pair nonstop. On the Demand lens, click an airport: blue lines bend through the airport they\'d change at, dashed where you\'d need to add the leg.';
+
+/**
+ * What this airport could add to your network through connections
+ * (sim/spokeFlows.ts): from an airport you don't fly to a hub, what a
+ * spoke there would feed; from an airport you fly, the routes its other
+ * routes would feed. A class name marks a route past your planes' range.
+ */
+function connectionLines(state: SimState, iata: string): HTMLElement[] {
+  const lines: HTMLElement[] = [];
+  for (const feed of feedViaHubs(state, iata).slice(0, 2)) {
+    const parts = feed.parts.slice(0, 3).map((part) => `${part.other} ${Math.round(part.passengers)}`);
+    lines.push(lineWithInfo([`Via ${feed.hub} +${Math.round(feed.total)} cnx/day`, ...parts].join(' · '), CONNECTION_INFO));
+  }
+  const ideas = routesFedAt(state, iata, 3, isAirportKnown);
+  if (ideas.length > 0) {
+    const text = ideas.map((idea) => `${idea.other} +${Math.round(idea.connecting)}${idea.trunkClass ? ` (${idea.trunkClass})` : ''}`).join(' · ');
+    lines.push(lineWithInfo(`Would feed · ${text} cnx/day`, CONNECTION_INFO));
+  }
+  return lines;
 }
 
 /**
