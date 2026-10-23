@@ -4594,6 +4594,14 @@ Two read-only briefs. They change no economy; `sim/briefs.ts` decides when each 
 
 `npm run briefstest` checks one brief a day, the review on day 182, ranked rows and a save round trip.
 
+## Sound and music (`src/ui/sound.ts`, `src/ui/music.ts`)
+
+UI only; the sim makes no sound and saves carry none of it.
+
+- **Settings** (Game screen, Sound): ♪ Music on/off and one volume slider, remembered per browser in `localStorage` (`airgame.sound`), not in the save. Music is off for a new player. The volume is master for every game sound, and any later sound gets its own switch on the same card.
+- **One audio context** (`sound.ts`): every sound connects to `soundOutput()`, a master gain (volume squared, so the slider sounds even) and a soft limiter. Browsers start audio only from a press, so the context is created or resumed inside one: the Music switch, or the first tap or key anywhere after a reload with music remembered on. On iPhone it declares itself a player (`navigator.audioSession`) so the ring/silent switch does not mute it. A hidden tab suspends it; turning music off fades out and then suspends it.
+- **The music** (`music.ts`) is played live, not from a file: a 68 bpm swung lounge loop in D, eight bars of major-ninth chords (Dmaj9 Bm9 Em9 A9sus · Gmaj9 F#m7 Em9 A13) on an FM electric piano with a pad, a filtered triangle bass and brushes, through a generated room reverb. A sparse bell melody on D major pentatonic is recomposed every other pass (about every 56 s), and the terminal bing-bong plays every sixth pass (about every three minutes). Notes are scheduled 0.3 s ahead on the audio clock. At full volume it averages about -20 dBFS; the default volume sits about 6 dB under that.
+
 ## Ancillary fees (`src/sim/ancillaries.ts`)
 
 An airline-wide dial at Product › Fees: bags included (level 0, the
