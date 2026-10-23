@@ -806,7 +806,7 @@ of the base map that frame. `basemap.ts` is the one layer always drawn
 first, every time the map panel is visible.
 
 **The map's three corners** each have one job: top left the clock,
-speed dots, an ops bar (today's flights flown · in the air · to go, with LATE, CALL and CNX only while non-zero) and a 7-day P&L strip (with the alerts under them, one
+speed dots, an ops bar (today's flights flown · in the air · to go, with LATE, CALL and CNX only while non-zero) and a 7-day P&L strip (ending in passengers flown over the last 7 days with ▲/▼ and the percent change against the 7 before, green up and red down: `networkPassengersWeekOnWeek()` in `sim/loadFactor.ts`) (with the alerts under them, one
 column, `#now-corner`); top right the **map tools** (`#map-tools`), one
 icon strip in three groups: the lens, the airport filter (All · Yours ·
 Contested · Uncontested, the last being airports no rival flies to, home
