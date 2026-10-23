@@ -10,6 +10,8 @@ import { drawAirportChips } from './render/airportChips';
 import { drawRoutes,drawSelectedRoute } from './render/routes';
 import { drawPainGauges } from './render/pain';
 import { drawCallPulse, callPulseActive } from './render/callPulse';
+import { drawMilestonePops, milestonePopsActive } from './render/milestones';
+import { METRO_COLORS } from './render/metro';
 import { drawAirports, drawSelectedAirport, airports, setKnownAirports, nearestAirportCandidate, setAirportHold } from './render/airports';
 import { drawHubView, hasHubView } from './render/hubs';
 import { drawFog } from './render/fog';
@@ -370,7 +372,8 @@ function render(nowMs: number = performance.now()): void {
     drawCompetitionLayer(ctx, selectedCompetitorAirline, state);
   } else {
     // Frequency and yield labels only on the Demand lens; on the plain map they clog the hubs.
-    drawRoutes(ctx, state, demandOverlayOn);
+    // The Network lens is the one with no overlay: its routes are drawn as tubes filled by load (render/metro.ts).
+    drawRoutes(ctx, state, demandOverlayOn, !demandOverlayOn && !cargoOverlayOn);
   }
   // The Cargo lens draws over the routes and under the airport dots: a circle per
   // airport, your freight-carrying routes, and the hovered airport's best partners.
@@ -442,6 +445,7 @@ function render(nowMs: number = performance.now()): void {
   // "a rival just opened a route" is news worth surfacing on the plain
   // map too, not something gated behind a specific layer being on.
   drawNewCompetitorRouteFlashes(ctx, state, nowMs);
+  drawMilestonePops(ctx, state, nowMs);
 }
 
 /**
@@ -596,7 +600,7 @@ for (const type of ['pointerdown', 'pointermove', 'pointerup', 'touchstart', 'ke
 
 function frameNeedsRender(nowMs: number): boolean {
   const sinceRenderMs = nowMs - lastRenderMs;
-  if (speedMultiplier === 0) return inputSinceRender || sinceRenderMs >= (callPulseActive() ? PULSE_REDRAW_MS : PAUSED_REDRAW_MS);
+  if (speedMultiplier === 0) return inputSinceRender || sinceRenderMs >= (callPulseActive() || milestonePopsActive(nowMs) ? PULSE_REDRAW_MS : PAUSED_REDRAW_MS);
   return !isPhoneScreen || sinceRenderMs >= PHONE_FRAME_MS;
 }
 
@@ -820,6 +824,8 @@ function setLens(next: Lens): void {
 }
 
 lensButtons.forEach((button) => button.addEventListener('click', () => setLens(button.dataset.lens as Lens)));
+// The game opens on the Network lens, whose key shows without a click.
+queueMicrotask(updateLensLegend);
 
 // Keys 1–6 pick a lens, unless the player is typing into something.
 window.addEventListener('keydown', (event) => {
@@ -837,11 +843,17 @@ window.addEventListener('keydown', (event) => {
  * needs no key.
  */
 function updateLensLegend(): void {
-  lensLegend.hidden = lens === 'network';
+  lensLegend.hidden = false;
   lensLegendScale.classList.toggle('is-wrapped', lens === 'cargo');
   const swatch = (color: string, label: string) =>
     `<div><span class="mapmode-legend-swatch" style="background:${color}"></span><span>${label}</span></div>`;
-  if (lens === 'profit') {
+  if (lens === 'network') {
+    lensLegendTitle.textContent = isPhoneScreen ? '7 days · fill = load · colour = on-time' : 'Last 7 days · fill = load factor · colour = on-time';
+    lensLegendScale.innerHTML =
+      swatch(MAP_MODE_COLORS.loss, 'late') +
+      swatch(MAP_MODE_COLORS.profit, 'on time') +
+      `<div><span style="color:${METRO_COLORS.up}">▲</span><span style="color:${METRO_COLORS.down}">▼</span><span>vs week before</span></div>`;
+  } else if (lens === 'profit') {
     lensLegendTitle.textContent = 'Margin ÷ revenue';
     lensLegendScale.innerHTML =
       swatch(MAP_MODE_COLORS.loss, 'loss') + swatch(MAP_MODE_COLORS.breakeven, 'breakeven') + swatch(MAP_MODE_COLORS.profit, '+20%');
