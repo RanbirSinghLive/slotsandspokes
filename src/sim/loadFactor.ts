@@ -86,3 +86,16 @@ export function networkLoadFactor(state: SimState, days = LOAD_WINDOW_DAYS): Loa
 export function formatLoadFactor(load: LoadFactor): string {
   return load.factor === null ? '—' : `${Math.round(load.factor * 100)}%`;
 }
+
+/**
+ * The whole airline's passengers over its last `days` finished days and
+ * the `days` before that, for the map's growth counter. `before` is null
+ * until there is a full earlier window to compare with.
+ */
+export function networkPassengersWeekOnWeek(state: SimState, days = LOAD_WINDOW_DAYS): { now: number; before: number | null } {
+  const passengers = state.loadHistory?.passengers ?? [];
+  const sum = (values: number[]) => values.reduce((total, n) => total + n, 0);
+  const now = sum(passengers.slice(-days));
+  const before = passengers.length >= days * 2 ? sum(passengers.slice(-days * 2, -days)) : null;
+  return { now, before };
+}

@@ -6,6 +6,7 @@ import { marginChip } from './marginChip';
 import { networkMargin, smoothedMarginHistory } from '../sim/networkMargin';
 import { marginMovers } from '../sim/marginMovers';
 import { select } from './selection';
+import { networkPassengersWeekOnWeek } from '../sim/loadFactor';
 
 /**
  * The P&L strip in the map's top-left corner: the last days as small bars,
@@ -58,8 +59,23 @@ export function updateHudPnl(state: SimState): void {
   const chip = marginChip(networkMargin(state), marginMovers(state));
   chip.classList.add('hud-pnl-margin');
   chip.addEventListener('click', () => select({ kind: 'money' }));
-  stripEl.replaceChildren(bars, today, chip);
+  stripEl.replaceChildren(bars, today, chip, passengerChip(state));
   if (!cardEl.hidden) cardEl.replaceChildren(...buildPnlCharts(state));
+}
+
+/** "4.2k pax ▲12%": passengers over the last 7 days and how that moved against the 7 before, so growth shows between milestone pops. */
+function passengerChip(state: SimState): HTMLElement {
+  const { now: exact, before } = networkPassengersWeekOnWeek(state);
+  const now = Math.round(exact);
+  const chip = document.createElement('span');
+  chip.className = 'hud-pax';
+  const count = now >= 1000 ? `${(now / 1000).toFixed(now >= 10000 ? 0 : 1)}k` : String(now);
+  const change = before && before > 0 ? (now - before) / before : null;
+  const moved = change !== null && Math.abs(change) >= 0.01;
+  if (moved) chip.classList.add(change! > 0 ? 'is-up' : 'is-down');
+  chip.textContent = moved ? `${count} pax ${change! > 0 ? '▲' : '▼'}${Math.round(Math.abs(change!) * 100)}%` : `${count} pax`;
+  chip.dataset.tip = before === null ? 'Passengers flown · last 7 days' : `Passengers flown · last 7 days · ${Math.round(before).toLocaleString('en-US')} the 7 before`;
+  return chip;
 }
 
 stripEl.addEventListener('mouseenter', () => {

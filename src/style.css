@@ -5355,6 +5355,21 @@ button.ops-item:hover {
   font-variant-numeric: tabular-nums;
 }
 
+/* Passengers this week against last (ui/hudPnl.ts). */
+.hud-pax {
+  color: #9aa3b8;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hud-pax.is-up {
+  color: #7fd88f;
+}
+
+.hud-pax.is-down {
+  color: #ff8080;
+}
+
 /* The full chart, on hovering the strip. */
 #hud-pnl-card {
   position: fixed;
