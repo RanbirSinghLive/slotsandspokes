@@ -14,7 +14,8 @@ import {
   type Rotation,
 } from './utilisation';
 import { nightStopStation } from './nightStops';
-import type { SimState } from './state';
+import type { AogEvent } from './aog';
+import type { Aircraft, SimState } from './state';
 
 /**
  * Per-route turn buffer: extra scheduled ground time after every flight on
@@ -160,6 +161,27 @@ function isInProgress(state: SimState, rotation: Rotation): boolean {
 }
 
 /**
+ * The planes that can take a rotation off `from`: the same class at the
+ * same base, least-worked first.
+ */
+function coverCandidates(state: SimState, work: SimState, from: Aircraft): Aircraft[] {
+  return state.aircraft
+    // A plane grounded by an AOG (sim/aog.ts) can't take anyone's flying,
+    // nor can one going back to the lessor or moving to another base.
+    .filter(
+      (a) =>
+        a.tail !== from.tail &&
+        a.typeCode === from.typeCode &&
+        a.baseAirport === from.baseAirport &&
+        a.returningOnDay === undefined &&
+        a.rebase === undefined &&
+        !state.aogs.some((event) => event.tail === a.tail) &&
+        nightStopStation(state, a.tail) === null,
+    )
+    .sort((a, b) => aircraftUtilisation(work, a.tail).minutes - aircraftUtilisation(work, b.tail).minutes);
+}
+
+/**
  * Move `rotation` off `fromTail` onto another plane of the same class
  * based at the same airport, appended after that plane's own day. Tries
  * the least-worked plane first. Returns the moved legs (with their new
@@ -173,20 +195,7 @@ function rehome(work: SimState, state: SimState, rotation: Rotation, fromTail: s
   // handed on or added behind.
   if (rotation.legs[0].origin !== from.baseAirport || rotation.legs[rotation.legs.length - 1].dest !== from.baseAirport) return null;
 
-  const candidates = state.aircraft
-    // A plane grounded by an AOG (sim/aog.ts) can't take anyone's flying,
-    // nor can one going back to the lessor or moving to another base.
-    .filter(
-      (a) =>
-        a.tail !== fromTail &&
-        a.typeCode === from.typeCode &&
-        a.baseAirport === from.baseAirport &&
-        a.returningOnDay === undefined &&
-        a.rebase === undefined &&
-        !state.aogs.some((event) => event.tail === a.tail) &&
-        nightStopStation(state, a.tail) === null,
-    )
-    .sort((a, b) => aircraftUtilisation(work, a.tail).minutes - aircraftUtilisation(work, b.tail).minutes);
+  const candidates = coverCandidates(state, work, from);
 
   // Flown or cancelled already today: either way, done for today.
   const wasHandledToday = rotation.legs.every(
@@ -293,33 +302,134 @@ export function planRespace(state: SimState, work: SimState, affectedTails: stri
  * Move as many of `rotations` (in the order given — put the ones that
  * matter most first) off `fromTail` onto other planes in its pool as
  * fit, straight into `state`. What doesn't fit stays where it was. Used by
- * AOG cover (sim/aog.ts), where the plane they're leaving is grounded, and
- * to hand that flying back once it's repaired. Returns how many moved and
- * the new ids of the legs that did, so the AOG can find them again.
+ * AOG cover (sim/aog.ts), where the plane they're leaving is grounded.
+ *
+ * Cover is for the days the plane is out, so it never re-times anyone's
+ * timetable: each rotation keeps its leg ids and goes into a gap in
+ * another plane's day, at its own times when the gap is there, else at
+ * the nearest start that fits around that plane's flights (which stay
+ * where they are), lands by 22:00 and has room in every hour it uses.
+ * Returns how many moved, the ids of the legs that did, and the time each
+ * was scheduled at before, so handBackCover() can restore them exactly.
  */
-export function coverRotations(state: SimState, fromTail: string, rotations: Rotation[]): { covered: number; movedLegIds: string[] } {
-  const work = workingCopy(state, {});
+export function coverRotations(
+  state: SimState,
+  fromTail: string,
+  rotations: Rotation[],
+): { covered: number; movedLegIds: string[]; scheduledAt: Record<string, number> } {
+  const from = state.aircraft.find((a) => a.tail === fromTail);
   let covered = 0;
   const movedLegIds: string[] = [];
+  const scheduledAt: Record<string, number> = {};
+  if (!from || !from.baseAirport) return { covered, movedLegIds, scheduledAt };
   for (const rotation of rotations) {
-    // The working copy has its own leg objects; find this rotation's.
     const ids = new Set(rotation.legs.map((leg) => leg.legId));
-    const legs = work.schedule.filter((leg) => leg.tail === fromTail && ids.has(leg.legId));
+    const legs = state.schedule.filter((leg) => leg.tail === fromTail && ids.has(leg.legId));
     if (legs.length === 0 || isInProgress(state, rotation)) continue;
-    work.schedule = work.schedule.filter((leg) => !legs.includes(leg));
-    const moved = rehome(work, state, { ...rotation, legs }, fromTail);
-    if (moved) {
+    // A night stop's half starts or ends away from base (sim/nightStops.ts): it can't be handed on.
+    if (legs[0].origin !== from.baseAirport || legs[legs.length - 1].dest !== from.baseAirport) continue;
+    for (const host of coverCandidates(state, state, from)) {
+      const delta = coverShift(state, legs, host.tail);
+      if (delta === null) continue;
+      for (const leg of legs) {
+        scheduledAt[leg.legId] = leg.departMinute;
+        leg.tail = host.tail;
+        leg.departMinute += delta;
+        movedLegIds.push(leg.legId);
+      }
       covered += 1;
-      movedLegIds.push(...moved.map((leg) => leg.legId));
-    } else {
-      work.schedule.push(...legs);
+      break;
     }
   }
-  if (covered > 0) {
-    state.schedule = work.schedule;
-    state.completedToday = work.completedToday;
+  return { covered, movedLegIds, scheduledAt };
+}
+
+/** How far to move cover with this little room before giving up on a plane: most of the usable day. */
+const COVER_SHIFT_LIMIT_MINUTES = 16 * 60;
+
+/**
+ * The shift that fits `legs` (one rotation, still on its own plane) into
+ * a gap in `hostTail`'s day without moving any of the host's flights: 0
+ * when it fits at its own times, else the smallest shift in 5-minute
+ * steps, earlier first on a tie. Null when none fits. A long-haul round
+ * trip runs round the clock and only ever moves at its own times.
+ */
+function coverShift(state: SimState, legs: ScheduleLeg[], hostTail: string): number | null {
+  const hostLegs = state.schedule.filter((leg) => leg.tail === hostTail);
+  const busy = (leg: ScheduleLeg, shift: number) => ({ from: leg.departMinute + shift, to: leg.departMinute + shift + leg.blockMinutes + scheduledTurnMinutes(state, leg.origin, leg.dest) });
+  const hostBusy = hostLegs.map((leg) => busy(leg, 0));
+  // Its booked time doesn't change wherever it goes, so whether the host's day has room for it at all is one check.
+  const withIt = { ...state, schedule: [...state.schedule.filter((leg) => !legs.includes(leg)), ...legs.map((leg) => ({ ...leg, tail: hostTail }))] };
+  if (aircraftUtilisation(withIt, hostTail).share > 1) return null;
+  const clockMinutes = legs.reduce((total, leg) => total + leg.blockMinutes + scheduledTurnMinutes(state, leg.origin, leg.dest), 0);
+  const longHaul = isLongHaulRoundTrip(legs.length, clockMinutes, flownEveryOtherDay(legs));
+  const others = state.schedule.filter((leg) => !legs.includes(leg));
+  const cache = new Map();
+
+  const fits = (shift: number): boolean => {
+    if (!longHaul) {
+      if (legs[0].departMinute + shift < USABLE_DAY_START_MINUTE) return false;
+      const last = legs[legs.length - 1];
+      if (last.departMinute + shift + last.blockMinutes > USABLE_DAY_END_MINUTE) return false;
+    }
+    // Clear of every host flight and its turn, on this day and across midnight (a host's long-haul flight back is stored a day early).
+    for (const leg of legs) {
+      const mine = busy(leg, shift);
+      for (const day of [-24 * 60, 0, 24 * 60]) {
+        if (hostBusy.some((other) => other.from < mine.to + day && mine.from + day < other.to)) return false;
+      }
+    }
+    if (shift === 0) return true;
+    // Moved off its own times: room in the hours it now uses (its own old movements count as room), and no same-market departure at the same minute.
+    const moved = legs.map((leg) => ({ ...leg, departMinute: leg.departMinute + shift }));
+    if (hourlyRoomProblem(state, moved, cache, legs)) return false;
+    return !moved.some((leg) => others.some((other) => other.origin === leg.origin && other.dest === leg.dest && other.departMinute === leg.departMinute));
+  };
+
+  if (fits(0)) return 0;
+  if (longHaul) return null;
+  for (let distance = COLLISION_NUDGE_MINUTES; distance <= COVER_SHIFT_LIMIT_MINUTES; distance += COLLISION_NUDGE_MINUTES) {
+    if (fits(-distance)) return -distance;
+    if (fits(distance)) return distance;
   }
-  return { covered, movedLegIds };
+  return null;
+}
+
+/**
+ * A repaired plane takes back the flying that was moved off it: each
+ * moved leg back on it at the time it was scheduled before the AOG, so
+ * the timetable is exactly the player's again. A rotation the player has
+ * changed meanwhile so it no longer fits there goes back as AOG cover
+ * would place it, the repaired plane first; one that fits nowhere stays
+ * where it is. A save from before cover kept times has no record of
+ * them, and its legs go back the same way, nearest the time they have.
+ */
+export function handBackCover(state: SimState, event: AogEvent): void {
+  const moved = new Set(event.movedLegIds);
+  const returning = state.aircraft.find((a) => a.tail === event.tail);
+  if (!returning) return;
+  const hosts = new Set(state.schedule.filter((leg) => moved.has(leg.legId)).map((leg) => leg.tail));
+  for (const host of hosts) {
+    for (const rotation of rotationsForTail(state, host)) {
+      const legs = rotation.legs.filter((leg) => moved.has(leg.legId));
+      if (legs.length === 0 || isInProgress(state, rotation)) continue;
+      const original = legs.map((leg) => event.scheduledAt?.[leg.legId]);
+      const shift = original[0] === undefined ? null : original[0] - legs[0].departMinute;
+      // The whole rotation went with one shift, so one shift brings it all back.
+      const restorable = shift !== null && legs.every((leg, i) => original[i] === leg.departMinute + shift);
+      if (restorable) {
+        for (const leg of legs) leg.departMinute += shift;
+        const fitsHome = coverShift(state, legs, returning.tail) === 0;
+        if (fitsHome) {
+          for (const leg of legs) leg.tail = returning.tail;
+          continue;
+        }
+        for (const leg of legs) leg.departMinute -= shift;
+      }
+      // Least-worked first, which the plane just back is.
+      coverRotations(state, host, [rotation]);
+    }
+  }
 }
 
 /** A copy of `state` safe for planRespace() to re-time: its own schedule and today's handled list. */
