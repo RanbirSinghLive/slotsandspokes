@@ -60,6 +60,7 @@ import { onFleetViewChange, openFleet } from './ui/fleetView';
 import { isHubPlannerOpen } from './ui/hubPlanner';
 import { setupFarePolicy, updateFarePolicy } from './ui/farePolicy';
 import { setupInfoTooltips } from './ui/infoTooltip';
+import { setupSoundControls } from './ui/soundControls';
 import { setupMapToolTips } from './ui/mapTools';
 import { setupNetworkCardButton } from './ui/networkCardDialog';
 import { updateTicker } from './ui/ticker';
@@ -131,6 +132,7 @@ setupGameOver();
 setupGameControls(state);
 setupBriefs(state);
 setupCloudSaveControls();
+setupSoundControls();
 void startCloudSave(state);
 
 const canvas = document.querySelector<HTMLCanvasElement>('#map')!;
