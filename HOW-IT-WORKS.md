@@ -827,7 +827,10 @@ wide as the route's load factor: a hollow tube is flying air, a solid one
 is full. The core's colour is the route's on-time share on the Ops lens's
 red-amber-green scale (blue-grey under 5 flights). A ▲ or ▼ two thirds of
 the way along is this week's load against the week before, shown when it
-moved 5 points or more. Spill (amber) stays on the Demand lens. The lens
+moved 5 points or more. Spill (amber) stays on the Demand lens. The Profit and
+Ops lenses draw the same tubes and only recolour the core: margin over
+revenue for Profit, the same 7-day on-time for Ops (which adds its
+operating detail on top). The lens
 key sits by the map tools like the others.
 
 **Milestone pops** (`sim/milestones.ts`, drawn by `render/milestones.ts`
@@ -1028,9 +1031,9 @@ per the pattern in CLAUDE.md's "Time" section.
 The Ops lens is the old On-time lens (routes coloured by on-time) and the
 old Ops lens switch in one: picking it turns on `isOpsView()` and every
 operating-detail layer below, and no other lens does. In Ops (`render/opsView.ts`) routes are drawn
-each route at a width set by its seats a day (`render/routeWidth.ts`): both
+as the Network lens's tubes, at a width set by its seats a day (`render/routeWidth.ts`): both
 directions, summed over the scheduled legs by the seats of the type each tail
-flies. The scale is square-root, 1 px up to 5 px at about 3,000 seats a day.
+flies, on a square-root scale reaching full width at about 3,000 seats a day.
 The amber spill overlay and the selection glow are drawn over it as before.
 The lens legend adds "width = seats a day".
 

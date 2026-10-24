@@ -858,11 +858,11 @@ function updateLensLegend(): void {
       swatch(MAP_MODE_COLORS.profit, 'on time') +
       `<div><span style="color:${METRO_COLORS.up}">▲</span><span style="color:${METRO_COLORS.down}">▼</span><span>vs week before</span></div>`;
   } else if (lens === 'profit') {
-    lensLegendTitle.textContent = 'Margin ÷ revenue';
+    lensLegendTitle.textContent = 'Margin ÷ revenue · fill = load factor, 7 days';
     lensLegendScale.innerHTML =
       swatch(MAP_MODE_COLORS.loss, 'loss') + swatch(MAP_MODE_COLORS.breakeven, 'breakeven') + swatch(MAP_MODE_COLORS.profit, '+20%');
   } else if (lens === 'ops') {
-    lensLegendTitle.textContent = 'On-time, last 7 days';
+    lensLegendTitle.textContent = 'On-time · fill = load factor, 7 days';
     lensLegendScale.innerHTML =
       swatch(MAP_MODE_COLORS.loss, '0%') +
       swatch(MAP_MODE_COLORS.breakeven, `${Math.round(OTP_BASELINE * 100)}% baseline`) +
