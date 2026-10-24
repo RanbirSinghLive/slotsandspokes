@@ -20,7 +20,7 @@ import { dayIndex } from '../../sim/clock';
 import { shortMoney } from '../format';
 import { openHubPlanner } from '../hubPlanner';
 import { armRouteBuilderAt } from '../routeBuilder';
-import { confirmHubStyle } from '../hubStyleConfirm';
+import { bankSummary, confirmHubStyle } from '../hubStyleConfirm';
 import { hourStrip, planHubButton } from './airport';
 import { line, titleWithSwitch, viewSwitch } from './dom';
 
@@ -432,7 +432,7 @@ function hubsView(state: SimState, changed: () => void): HTMLElement[] {
     }
     card.append(hourStrip(airportHours(state, plan.hub)));
 
-    // The styles side by side: what each would connect, how full it would make the peak, and the ground time it asks of every arrival.
+    // The styles side by side: what each would connect, how full it would make the peak, and how many rotations would leave on a wave.
     const styles = document.createElement('div');
     styles.className = 'hub-style-row';
     const current = plan.styles.find((preview) => preview.style === plan.style);
@@ -444,7 +444,7 @@ function hubsView(state: SimState, changed: () => void): HTMLElement[] {
       const isCurrent = preview.style === plan.style;
       button.classList.toggle('is-active', isCurrent);
       const title = document.createElement('b');
-      title.textContent = spec.name.replace(' banks', '');
+      title.textContent = spec.name;
       const gain = document.createElement('span');
       const delta = Math.round(preview.connecting - (current?.connecting ?? 0));
       gain.className = delta > 0 ? 'is-gain' : delta < 0 ? 'is-cost' : '';
@@ -453,14 +453,13 @@ function hubsView(state: SimState, changed: () => void): HTMLElement[] {
       peak.className = preview.load > MAX_RECOMMENDED_LOAD ? 'is-cost' : '';
       peak.textContent = `pk ${Math.round(preview.load * 100)}%`;
       const wait = document.createElement('span');
-      wait.className = spec.hubWaitMinutes > 0 ? 'is-cost' : '';
-      wait.textContent = spec.hubWaitMinutes > 0 ? `+${spec.hubWaitMinutes}m/arr` : 'no wait';
+      wait.textContent = preview.banks ? `${preview.onBank}/${preview.rotations} on bank` : 'no waves';
       if (preview.blockedReason) {
         gain.className = 'is-cost';
         gain.textContent = '✕ no fit';
       }
       button.append(title, gain, peak, wait);
-      button.dataset.tip = preview.blockedReason ?? `${spec.name}: ${spec.description}`;
+      button.dataset.tip = preview.blockedReason ?? `${spec.name}${preview.banks ? ` · ${bankSummary(preview)}` : ''}: ${spec.description}`;
       if (isCurrent) button.disabled = true;
       else if (preview.blockedReason) button.disabled = true;
       else button.addEventListener('click', () => confirmHubStyle(state, plan.hub, preview.style, () => changed()));

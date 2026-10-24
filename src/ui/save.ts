@@ -4,6 +4,7 @@ import { repairDuplicateLegIds } from '../sim/schedule';
 import { migrateExecutives } from '../sim/executives';
 import { removeOrphanFlights } from '../sim/fleetTiming';
 import { COST_LEVEL, repriceToCostLevel } from '../sim/costLevel';
+import { migrateHubStyles } from '../sim/hubStyle';
 import { GAME_VERSION } from './version';
 
 /**
@@ -32,7 +33,7 @@ const SAVE_KEY = 'slotsandspokes-save';
 const LEGACY_KEY = 'airgame-save-v46';
 
 /** The shape of SimState this build writes. Bump it with a migration below. */
-export const SAVE_FORMAT = 4;
+export const SAVE_FORMAT = 5;
 
 type SaveFile = { format: number; gameVersion: string; savedAt?: string; state: SimState };
 
@@ -47,6 +48,8 @@ const MIGRATIONS: Record<number, (state: SimState) => void> = {
   3: (state) => migrateExecutives(state),
   // Costs went to COST_LEVEL times the written prices, which an older save's leases and slots were taken at.
   4: (state) => repriceToCostLevel(state, COST_LEVEL),
+  // Banked and Tight banks became one Banked style with waves sized to the network; each keeps its old waves.
+  5: (state) => migrateHubStyles(state),
 };
 
 /**

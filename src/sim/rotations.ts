@@ -3,7 +3,7 @@ import aircraftTypesData from '../../data/aircraft-types.json';
 import { classRank } from './aircraftClasses';
 import { dailyMovementsAt } from './airports';
 import { airportHours, hourlyRoomProblem, hourOf, hoursWithRoom, type AirportHours } from './hours';
-import { nextBankMinute } from './hubStyle';
+import { bankedArrivalMinute, nextBankMinute } from './hubStyle';
 import { nightStopLegs } from './nightStops';
 import { dayIndex, minuteOfDayToTimeString } from './clock';
 import { greatCircleDistanceNm } from './geo';
@@ -83,14 +83,20 @@ const MAX_COLLISION_NUDGES = 24;
  * player click the base itself as the final stop to say "close the loop
  * here" without producing a base→base leg.
  */
-function packRotation(airports: RotationStop[], cruiseKts: number | undefined, startMinute: number, state: SimState): PackedLeg[] {
+function packRotation(airports: RotationStop[], cruiseKts: number | undefined, startMinute: number, state: SimState, onWaves = true): PackedLeg[] {
   const legs: PackedLeg[] = [];
+  const base = airports[0]?.iata;
   let cursor = startMinute;
   for (let i = 0; i < airports.length; i++) {
     const from = airports[i];
     const to = airports[(i + 1) % airports.length];
     if (from.iata === to.iata) continue;
     const blockMinutes = computeBlockMinutes(from.iata, to.iata, cruiseKts);
+    // Home to a banked base, a flight waits at its last stop to land just before a wave (sim/hubStyle.ts), unless that would land it after the day.
+    if (onWaves && to.iata === base && from.iata !== base) {
+      const banked = bankedArrivalMinute(state, base, cursor + blockMinutes) - blockMinutes;
+      if (banked + blockMinutes <= USABLE_DAY_END_MINUTE) cursor = banked;
+    }
     legs.push({ origin: from.iata, dest: to.iata, departMinute: cursor, blockMinutes });
     // The turn includes this route's buffer (sim/turnBuffer.ts), so a
     // flight added to a buffered route is spaced like the ones already on it.
@@ -140,12 +146,13 @@ function packRotationAvoidingCollisions(
   startMinute: number,
   state: SimState,
   dayParity?: 0 | 1,
+  onWaves = true,
 ): PackedLeg[] {
   const schedule = state.schedule;
-  let legs = packRotation(airports, cruiseKts, startMinute, state);
+  let legs = packRotation(airports, cruiseKts, startMinute, state, onWaves);
   for (let attempt = 0; attempt < MAX_COLLISION_NUDGES; attempt++) {
     if (!legs.some((leg) => sameRouteClash({ ...leg, dayParity }, schedule))) return legs;
-    legs = packRotation(airports, cruiseKts, startMinute + (attempt + 1) * COLLISION_NUDGE_MINUTES, state);
+    legs = packRotation(airports, cruiseKts, startMinute + (attempt + 1) * COLLISION_NUDGE_MINUTES, state, onWaves);
   }
   return legs;
 }
@@ -273,11 +280,23 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
   const aircraft = state.aircraft.find((a) => a.tail === tail);
   const type = aircraft ? aircraftTypesByCode.get(aircraft.typeCode) : undefined;
 
-  // At a banked hub a rotation waits for the next wave (sim/hubStyle.ts).
-  const firstFree = nextBankMinute(state, base.iata, rotationStartMinute(tail, state));
+  // At a banked hub a rotation waits for the next wave (sim/hubStyle.ts)...
+  const readyMinute = rotationStartMinute(tail, state);
+  const firstFree = nextBankMinute(state, base.iata, readyMinute);
   // Only a plane's first rotation is staggered: later ones pack on behind it, so the plane loses the stagger once, not every time.
-  const earliestStart = tailIsEmptyNow(state, tail) ? staggeredStart(state, rotationAirports, type?.cruiseKts, firstFree, base.iata) : firstFree;
-  let legs = packRotationAvoidingCollisions(rotationAirports, type?.cruiseKts, earliestStart, state);
+  let earliestStart = tailIsEmptyNow(state, tail) ? staggeredStart(state, rotationAirports, type?.cruiseKts, firstFree, base.iata) : firstFree;
+  let onWaves = true;
+  let legs = packRotationAvoidingCollisions(rotationAirports, type?.cruiseKts, earliestStart, state, undefined, onWaves);
+  // ...unless waiting would land it after the day: then it flies rolling, as soon as the plane is ready.
+  const landsLate = (packed: PackedLeg[]) => packed.length > 0 && packed[packed.length - 1].departMinute + packed[packed.length - 1].blockMinutes > USABLE_DAY_END_MINUTE;
+  if (firstFree !== readyMinute && landsLate(legs)) {
+    const rolling = packRotationAvoidingCollisions(rotationAirports, type?.cruiseKts, readyMinute, state, undefined, false);
+    if (!landsLate(rolling)) {
+      earliestStart = readyMinute;
+      onWaves = false;
+      legs = rolling;
+    }
+  }
   const clockMinutes = legs.reduce(
     (total, leg) => total + legUtilisationMinutes(leg.blockMinutes, extraTurnMinutes(state, leg.origin, leg.dest)),
     0,
@@ -319,7 +338,7 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
     while (problem) {
       start += Math.max(HOUR_SEARCH_STEP, Math.ceil(((hourOf(problem.minute) + 1) * 60 - (problem.minute % 1440)) / HOUR_SEARCH_STEP) * HOUR_SEARCH_STEP);
       if (start > USABLE_DAY_END_MINUTE && !longHaul) break;
-      const attempt = packRotationAvoidingCollisions(rotationAirports, type?.cruiseKts, start, state);
+      const attempt = packRotationAvoidingCollisions(rotationAirports, type?.cruiseKts, start, state, undefined, onWaves);
       const end = attempt[attempt.length - 1];
       if (end && (longHaul ? end.departMinute >= 24 * 60 : end.departMinute + end.blockMinutes > USABLE_DAY_END_MINUTE)) break;
       problem = hourlyRoomProblem(state, attempt, roomCache);

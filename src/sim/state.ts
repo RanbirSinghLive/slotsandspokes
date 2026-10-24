@@ -17,7 +17,7 @@ import { loadCompetitorRoutes, type CompetitorOffering } from './competitors';
 import type { WeatherEvent } from './weather';
 import type { DelayBreakdown } from './delays';
 import type { HandlingTier, StationLedger } from './stations';
-import type { HubStyle } from './hubStyle';
+import type { HubBanks, HubStyle } from './hubStyle';
 import type { AogEvent } from './aog';
 import { createMarket, ensureRivalFleets, type MarketState } from './market';
 import { FUEL_PRICE_BASELINE } from './fuel';
@@ -789,6 +789,12 @@ export type SimState = {
    * the player has changed appear; everything else is Rolling.
    */
   hubStyles: Record<string, HubStyle>;
+  /**
+   * Each banked hub's waves (sim/hubStyle.ts), keyed by IATA, sized when it
+   * switched to Banked. Optional: a banked hub without an entry uses the
+   * default 3-hour cycle.
+   */
+  hubBanks?: Record<string, HubBanks>;
   /**
    * Planes out of service with an AOG (sim/aog.ts) — multi-day
    * unscheduled maintenance. Kept separate from crew groundings above so

@@ -1,7 +1,6 @@
 import { MIN_TURN_MINUTES, flownEveryOtherDay, marketKey, type ScheduleLeg } from './schedule';
 
 export { flownEveryOtherDay };
-import { hubWaitMinutes } from './hubStyle';
 import type { SimState } from './state';
 import { AIRCRAFT_CLASSES } from './aircraftClasses';
 
@@ -45,15 +44,15 @@ export function turnBufferMinutes(state: SimState, origin: string, dest: string)
 
 /**
  * Scheduled ground time after a flight beyond the physical minimum: its
- * route's turn buffer, plus the destination's hub wait when that airport
- * runs banked (sim/hubStyle.ts). Both are slack the planner pays for in
- * aircraft time.
+ * route's turn buffer, slack the planner pays for in aircraft time. (A
+ * banked hub's wait for its wave isn't a turn: the planner times it,
+ * sim/hubStyle.ts.)
  */
 export function extraTurnMinutes(state: SimState, origin: string, dest: string): number {
-  return turnBufferMinutes(state, origin, dest) + hubWaitMinutes(state, dest);
+  return turnBufferMinutes(state, origin, dest);
 }
 
-/** The whole scheduled turn after a flight: the physical minimum plus any buffer and hub wait. */
+/** The whole scheduled turn after a flight: the physical minimum plus any buffer. */
 export function scheduledTurnMinutes(state: SimState, origin: string, dest: string): number {
   return MIN_TURN_MINUTES + extraTurnMinutes(state, origin, dest);
 }

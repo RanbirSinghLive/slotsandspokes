@@ -1558,9 +1558,9 @@ curfews and crew duty in one constant.
 
 **What a leg costs** (`legUtilisationMinutes()`): its block time, plus
 the turn it forces at the far end — the 30-minute minimum
-(`MIN_TURN_MINUTES`), plus the route's turn buffer, plus the
-destination's hub wait if that airport runs banked (see Connecting
-passengers). Charging the turn to the leg that causes it means a
+(`MIN_TURN_MINUTES`), plus the route's turn buffer. (Waiting for a banked
+hub's wave isn't a turn: it shows as a later day, see Connecting
+passengers.) Charging the turn to the leg that causes it means a
 rotation's cost is just the sum of its legs.
 
 **Long haul.** A plane flying exactly one round trip that outruns 16
@@ -1678,7 +1678,8 @@ behind them. Only the first rotation is staggered, and by at most one
 round, because a rotation is only added after a plane's last one: the
 plane gives up that time once. Staggering every rotation cost Montréal
 half its year on 18 seeds ($7.4M against $15.5M); the first alone,
-$13.0M. At a banked hub the waves set the start. The player can still
+$13.0M. At a banked hub the waves set the start, and the flight home waits at
+its last stop to land just before a wave. The player can still
 drag the times on the Gantt. `packRotationAvoidingCollisions()` then shifts
 the whole rotation later in five-minute steps until no leg leaves within
 15 minutes of another of your flights on the same route the same way
@@ -3411,28 +3412,43 @@ answer for that hub while the string matches. The answer is exact, and a
 "what if" copy of the state (the hub planner's, the ring's) gets its own
 right answer. The cache is a module variable, never saved.
 
-**Hub styles** are how the planner times a hub's rotations, and so how
-well they meet:
+**Hub styles** are how the planner times the rotations based at a hub,
+and so how well they meet: **Rolling** (the default: planes leave when
+ready) or **Banked** (`sim/hubStyle.ts`).
 
-| Style | Waves | Extra ground time per arrival |
-|---|---|---|
-| Rolling (default) | none: planes leave when ready | none |
-| Banked | every 3 h from 07:00 | 20 min |
-| Tight banks | every 2 h from 07:00 | 35 min |
+A banked hub runs in **waves**, each a pair: flights home land 50
+minutes before the wave (`BANK_INBOUND_LEAD_MINUTES`: the 40-minute
+connection plus ten), so their passengers make a good connection, and
+flights out leave on it. The waves repeat every **bank cycle**, from
+06:00. The cycle is sized when the hub switches to Banked
+(`bankCycleFor()`): the median round trip of its rotations, packed
+tight, plus the 50 minutes, rounded up to a quarter hour and kept
+between 90 minutes and 5 hours. So the typical plane leaves on one wave
+and is back for the next, waiting at the hub only its turn. It's kept in
+`state.hubBanks` and stays put as the network grows.
 
-Under a banked style every rotation from the hub starts on a wave
-(`nextBankMinute()`): new ones from the planner, and existing ones when
-the style changes. Departures bunch, so the planes coming back meet the
-next wave; but the wave hours fill (`sim/hours.ts`) and congest, and
-the extra ground time is paid in aircraft utilisation, like a turn
-buffer (and like one it absorbs delays). Changing style re-times every
-plane flying into the hub or based there (`applyHubStyleChange()`).
-Where a plane's day overflows, rotations move to other planes in the
-same pool; the change is refused only when no plane has room. Re-timing
-keeps a plane's first rotation where it is and starts each later one as
-soon after the one before as it has room in every hour its legs use
-(`roomyStart()`, `sim/turnBuffer.ts`), so the day closes up behind a
-removed flight but nothing is packed into a full hour.
+The planner (`nextBankMinute()`, `bankedArrivalMinute()`) starts a new
+rotation from a banked hub on the next wave, and has its flight home
+wait at the last outstation to land just before a wave. A rotation that
+would land after 22:00 that way flies rolling, as soon as the plane is
+ready. Switching style re-times every plane based at the hub
+(`applyHubStyleChange()`, `repackTail()` in `sim/turnBuffer.ts`): its
+first rotation moves to the wave at or before its start (the plane spent
+the night there), and each later rotation banks only where that costs
+the plane at most half a cycle more than flying it rolling; a rotation
+longer than the cycle would skip a wave, so it rolls instead. Where a
+plane's day still overflows, its later rotations roll, one at a time;
+only a day that doesn't fit even rolling moves rotations to other planes.
+A plane whose day was already over-full keeps its times. So switching
+doesn't fail because one plane is busy. The Hubs view and the confirm
+say how many rotations leave on a wave ("every 3h30 · 7/9 on bank").
+
+What banking costs: departures bunch into the wave hours, which fill
+(`sim/hours.ts`), congest and price slots higher, and the waiting makes
+planes' days end later. Plan hub prices that waiting at the planes'
+lease (how much later each day ends) against the connections gained.
+Older saves' Banked and Tight banks hubs became Banked, keeping their
+3-hour and 2-hour waves from 07:00 (save format 5).
 The ring's Hub style choices and the Plan hub window value each style on
 the schedule it would re-time (`connectingUnderStyle()`).
 

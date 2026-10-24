@@ -4,7 +4,7 @@ import { airports } from '../render/airports';
 import { armRouteBuilderAt } from './routeBuilder';
 import * as ops from './routeActions';
 import type { SimState } from '../sim/state';
-import { confirmHubStyle } from './hubStyleConfirm';
+import { bankSummary, confirmHubStyle } from './hubStyleConfirm';
 
 /**
  * The Plan hub window: everything about one hub's connections on one
@@ -79,7 +79,7 @@ function renderStyles(plan: HubPlan, state: SimState): void {
       figures.className = 'hub-style-figures';
       figures.textContent =
         `${Math.round(preview.connecting)} connecting/day · peak load ${Math.round(preview.load * 100)}%` +
-        (spec.hubWaitMinutes > 0 ? ` · +${spec.hubWaitMinutes} min per arrival` : '');
+        (preview.banks ? ` · ${bankSummary(preview)}` : '');
       const description = document.createElement('div');
       description.className = 'hub-style-description';
       description.textContent = spec.description;
