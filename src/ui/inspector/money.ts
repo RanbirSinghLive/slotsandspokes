@@ -106,7 +106,7 @@ function groupTable(state: SimState, by: RouteGroupBy): HTMLElement {
   const table = document.createElement('table');
   table.className = 'money-group-table';
   const head = document.createElement('tr');
-  for (const text of [by === 'hub' ? 'Hub' : by === 'region' ? 'Region' : 'Sector', 'Routes', '$/day', 'Margin', '']) {
+  for (const text of [by === 'hub' ? 'Hub' : by === 'region' ? 'Region' : 'Sector', 'Routes', '$/day', 'Net', '']) {
     const th = document.createElement('th');
     th.textContent = text;
     head.append(th);
@@ -212,7 +212,7 @@ export function buildMoneyView(state: SimState): HTMLElement {
   root.append(
     lineWithInfo(
       `Cash ${money(state.cash)}${runwayText}`,
-      `Runway: how long cash lasts at the last ${RUNWAY_WINDOW_DAYS} days' rate, shown once a full day has been flown. At $0 the airline is finished.`,
+      `Runway: how long cash lasts at the last ${RUNWAY_WINDOW_DAYS} days' rate, after what is already owed at checks${runway && runway.owed > 0.5 ? ` (${money(runway.owed)})` : ''}, shown once a full day has been flown. At $0 the airline is finished.`,
       runway?.daysLeft ? 'inspector-line is-over' : 'inspector-line',
     ),
   );

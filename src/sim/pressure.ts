@@ -118,6 +118,34 @@ export function respiteDaysLeft(state: SimState, a: string, b: string): number {
   return Math.max(0, Math.ceil((latest + RIVAL_SQUEEZED_RESPITE_DAYS * 1440 - state.simMinute) / 1440));
 }
 
+/**
+ * Rivals enter a market one at a time: once one has opened on it, no other
+ * opens there for this long. Every rival reads the same signal (money on
+ * the table, sim/attractiveness.ts), so without a gap a fat new route drew
+ * four or five airlines in the same week, each on one flight, all losing
+ * money through their grace period while splitting the player's riders.
+ * A real carrier waits to see how the first entrant does. The edge still
+ * goes, one rival a month, rather than all at once.
+ */
+export const RIVAL_ENTRY_SPACING_DAYS = 30;
+
+/** Whether any rival opened on the a–b market within RIVAL_ENTRY_SPACING_DAYS, so no other opens on it yet. */
+export function recentlyEnteredByRival(state: SimState, a: string, b: string): boolean {
+  return entrySpacingDaysLeft(state, a, b) > 0;
+}
+
+/** Days until another rival may open on the a–b market, or 0 when one may now. */
+export function entrySpacingDaysLeft(state: SimState, a: string, b: string): number {
+  const latest = Math.max(
+    -Infinity,
+    ...state.competitorRoutes
+      .filter((route) => (route.origin === a && route.dest === b) || (route.origin === b && route.dest === a))
+      .map((route) => route.openedAtMinute),
+  );
+  if (!Number.isFinite(latest)) return 0;
+  return Math.max(0, Math.ceil((latest + RIVAL_ENTRY_SPACING_DAYS * 1440 - state.simMinute) / 1440));
+}
+
 /** Whether airline `code` closed the a–b market within RIVAL_REOPEN_COOLDOWN_DAYS. */
 export function recentlyClosedByRival(state: SimState, code: string, a: string, b: string): boolean {
   const market = [a, b].sort().join('-');

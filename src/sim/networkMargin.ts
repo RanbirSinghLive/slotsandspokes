@@ -3,6 +3,7 @@ import { contractOn } from './contracts';
 import { regionOf } from './regions';
 import { flightsByGauge } from './routeYield';
 import { countryOf, homeCountry } from './rights';
+import { routeFixedCosts } from './routeCosts';
 import { marketKey } from './schedule';
 import type { SimState } from './state';
 
@@ -75,10 +76,14 @@ export function networkMargin(state: SimState): NetworkMargin | null {
 }
 
 export type RouteWeek = {
-  /** Margin a day over the last week, null with less than three finished days. */
+  /** Net margin a day over the last week (flying margin less fixedPerDay), null with less than three finished days. */
   perDay: number | null;
-  /** The week before, per day, or null with under a full week of it. */
+  /** The week before, per day and net the same way, or null with under a full week of it. */
   previousPerDay: number | null;
+  /** The flights' own margin a day over the last week, before lease, slots and overhead. */
+  flyingPerDay: number | null;
+  /** The route's share of leases, slot fees and overhead a day (sim/routeCosts.ts), at today's schedule. */
+  fixedPerDay: number;
   /** Revenue a day over the last week. */
   revenuePerDay: number;
   /** Contract and event money a day inside that revenue. */
@@ -88,20 +93,35 @@ export type RouteWeek = {
   /** Cost a day over the last week. */
   costPerDay: number;
   previousCostPerDay: number | null;
-  /** Daily margins, oldest first, for a sparkline. */
+  /** Daily net margins, oldest first, for a sparkline. */
   series: number[];
 };
 
+/**
+ * A route's week, net of what it costs beyond its own flights: its share of
+ * plane leases, slot fees and overhead (sim/routeCosts.ts). Those are paid
+ * airline-wide at midnight, so a route's history never holds them, and on
+ * flying margin alone a thin route on a leased plane at a dear airport reads
+ * as earning while it loses money. The share is priced at today's schedule
+ * and taken off every day of the window, so the week-on-week trend is the
+ * flights' own.
+ */
 export function routeWeek(state: SimState, key: string): RouteWeek {
   const revenue = state.revenueHistoryByMarket[key] ?? [];
   const cost = state.costHistoryByMarket[key] ?? [];
-  const margins = revenue.map((r, i) => r - (cost[i] ?? 0));
+  const [a, b] = key.split('-');
+  const fixed = routeFixedCosts(state, a, b);
+  const fixedPerDay = fixed.leasePerDay + fixed.slotsPerDay + fixed.overheadPerDay;
+  const margins = revenue.map((r, i) => r - (cost[i] ?? 0) - fixedPerDay);
   const last = window(margins, MARGIN_WINDOW_DAYS);
   const earlier = window(margins, MARGIN_WINDOW_DAYS, MARGIN_WINDOW_DAYS);
   const lastRevenue = window(revenue, MARGIN_WINDOW_DAYS);
   const paid = window(state.bonusHistoryByMarket?.[key], MARGIN_WINDOW_DAYS);
+  const perDay = last.length >= MIN_DAYS ? sum(last) / last.length : null;
   return {
-    perDay: last.length >= MIN_DAYS ? sum(last) / last.length : null,
+    perDay,
+    flyingPerDay: perDay === null ? null : perDay + fixedPerDay,
+    fixedPerDay,
     previousPerDay: earlier.length === MARGIN_WINDOW_DAYS ? sum(earlier) / earlier.length : null,
     revenuePerDay: lastRevenue.length > 0 ? sum(lastRevenue) / lastRevenue.length : 0,
     paidPerDay: last.length > 0 ? sum(paid) / last.length : 0,

@@ -1238,6 +1238,14 @@ in month two to $7–12k a day, while one that keeps growing keeps
 earning. Rivals grow outward from their own networks, all in North
 America, so none reaches London's markets.
 
+**Rivals enter one at a time.** Once any rival opens on a market, no
+other rival, newcomer or existing, opens there for 30 days
+(`RIVAL_ENTRY_SPACING_DAYS`, `recentlyEnteredByRival()` in
+`sim/pressure.ts`). Every rival reads the same money on the table, so
+without the gap a fat new route drew four or five airlines inside a week,
+each on one flight and all sitting out their grace period at a loss. The
+route view's rivals line shows "next entry Nd+" while the gap runs.
+
 **Rivals take your yield** (`rivalYieldFactor()`). Markets here are
 seat-limited, so a rival splitting demand would still leave the player's
 planes full. Instead, rival frequency cuts what each passenger pays: up
@@ -1372,7 +1380,7 @@ One day's profit is noisy: a flight landing after midnight books to the next day
 - **Flying margin** = the routes' revenue less what their flights cost, over their revenue, last 7 finished days. **All-in** takes the whole airline's profit (leases, overhead, checks) over its revenue. The gap shows as "Upkeep" on the Money page. Below 0% is red, 0 to 10% amber, above green. The arrow compares with the 7 days before.
 - **Paid by buyers** is the share of route revenue that is contract pay and event premiums (`todayBonusByMarket`, booked in `contracts.ts` and `mandates.ts`), so a network held up by subsidy can be told apart from one that earns it.
 - The sim keeps network totals per finished day (`routeRevenueHistory`, `routeMarginHistory`, `bonusRevenueHistory`) beside the per-market arrays, because a route dropped from the schedule leaves the per-market arrays and would shrink a sum. Saves from before have none of them and read "—" until 3 days have closed.
-- **Routes page:** the Margin column is the 7-day average a day with a 14-day sparkline (dashed = $0) and an arrow against the week before; yesterday's figure is in the tooltip. Tags: contract, event, and a sprout for a route with under 14 days of history. "All / Hub / Sector" groups the table: a route's hub is its end with more routes (home airport on a tie), sector is domestic when both ends are in the home country, and region (`src/sim/regions.ts`) is where the far end is: Quebec, Ontario, Atlantic or Western Canada, US Northeast, Southeast, Central or West, or the country code elsewhere. Airports carry no province or state, so regions are cut by map position and a border town can land in its neighbour; nothing in the sim decides anything from them. Group headers sum their routes and collapse by hand; they start closed once there are more than 12 routes. The choice is remembered in the browser only.
+- **Routes page:** the Net column is the 7-day average a day after the route's share of leases, slot fees and overhead (`routeFixedCosts()`, priced at today's schedule and taken off each day), with a 14-day sparkline (dashed = $0) and an arrow against the week before; the flying margin before those costs and yesterday's figure are in the tooltip. Groups, margin bands and the Money page's group tables and best/worst routes read the same net. Tags: contract, event, and a sprout for a route with under 14 days of history. "All / Hub / Sector" groups the table: a route's hub is its end with more routes (home airport on a tie), sector is domestic when both ends are in the home country, and region (`src/sim/regions.ts`) is where the far end is: Quebec, Ontario, Atlantic or Western Canada, US Northeast, Southeast, Central or West, or the country code elsewhere. Airports carry no province or state, so regions are cut by map position and a border town can land in its neighbour; nothing in the sim decides anything from them. Group headers sum their routes and collapse by hand; they start closed once there are more than 12 routes. The choice is remembered in the browser only.
 - **Overview and HUD:** a Margin card and a chip on the P&L strip show the flying margin. **Money** adds the margin line, the 7-day margin chart, tables by hub and by sector, and the three best and three worst routes of the week.
 - **Costs by kind:** `costHistoryByCategory` keeps each finished day's cost by kind, so Money shows the week's average a day by kind beside today's, and a "Checks and repairs" line (the `maintenance` kind: contracted checks, engine shop visits, expedited repairs) with its spike days, those over three times the week's average. Checks are inside all-in margin and the daily bars but outside each route's margin.
 - **Daily bars spread the checks:** the P&L strip's bars and the Overview's Margin chart show each day's profit with checks and repairs replaced by the average of the last 7 days' (`smoothedMarginHistory()`), so a check day reads as part of a steady cost. The tooltip gives the day as paid. Today's running number, cash and every book stay as they were.
@@ -2390,15 +2398,24 @@ no borrowing (loans were removed in WEEK-TEN.md's thread 1). `main.ts`
 stops the clock and `ui/gameOver.ts` shows the game-over screen.
 
 **The runway** is the warning. `cashRunway()` draws a straight line
-through the last 7 closing balances: if cash is falling, days left =
-cash ÷ average daily fall. It shows three ways, escalating:
-- a **Runway** row under Cash, always visible — amber inside 30 days,
-  red inside 14;
-- a line in the alert strip inside 30 days;
+through the last 7 closing balances, with maintenance counted the day it
+is flown rather than paid (the week's `maintenanceAccrualHistory` comes
+off the slope). It starts from cash less what is already owed at checks
+(`checksOwed()`): every plane's maintenance reserve, paid in one go at its
+next check, plus the contract-hangar fee for each C or D check due within
+30 days at a base with no hangar for the type. If cash is falling, days
+left = (cash − owed) ÷ average daily fall; at 0 once what is owed
+exceeds cash. It shows three ways, escalating:
+- a **Runway** row under Cash, always visible: amber inside 60 days,
+  red inside 30;
+- a line in the alert strip inside 60 days;
 - a pop-up that **pauses the game** the first time the runway drops
-  inside 14 days. It re-arms only after the runway recovers past 30, so
-  hovering around two weeks doesn't nag. (That re-arm flag lives in the
-  UI module, not in `SimState`, so a reload can show it again.)
+  inside 30 days, naming the three routes losing most after their share
+  of leases, slots and overhead. It re-arms only after the runway
+  recovers past 60, so hovering around a month doesn't nag. (That re-arm
+  flag lives in the UI module, not in `SimState`, so a reload can show
+  it again.) The bands are wide because turning a network round takes
+  weeks.
 
 At 100× a fortnight passes in under half a minute, which is why the
 pause exists.

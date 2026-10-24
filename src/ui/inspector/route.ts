@@ -18,7 +18,7 @@ import { heading, info, line, lineWithInfo } from './dom';
 import { ON_TIME_GRACE_MINUTES } from '../../sim/delays';
 import { money } from '../format';
 import { showConfirm } from '../confirmModal';
-import { RIVAL_SQUEEZED_RESPITE_DAYS } from '../../sim/pressure';
+import { entrySpacingDaysLeft, RIVAL_ENTRY_SPACING_DAYS, RIVAL_SQUEEZED_RESPITE_DAYS } from '../../sim/pressure';
 import { brandInWords, formatNps, marketNps, networkNps } from '../../sim/nps';
 import { rivalYieldFactor } from '../../sim/pressure';
 import { policyFare, putSeatsOnPolicy, setFareClasses, setFareStance, setHandFare } from '../../sim/pricing';
@@ -352,11 +352,13 @@ function describeRivalsView(state: SimState, a: string, b: string): HTMLElement 
     table.rivalSlotFees === null
       ? 'and an airport here is full, so no rival can get in'
       : `and a rival would pay ${money(table.rivalSlotFees)} a day in slots`;
-  const text = table.perDay >= 1 ? `Rivals see ~${money(table.perDay)}/day here` : 'Rivals see nothing worth taking';
+  const spacing = entrySpacingDaysLeft(state, a, b);
+  const text = (table.perDay >= 1 ? `Rivals see ~${money(table.perDay)}/day here` : 'Rivals see nothing worth taking') + (spacing > 0 ? ` · next entry ${spacing}d+` : '');
   const why =
-    table.perDay >= 1
+    (table.perDay >= 1
       ? `${capitalise(draws.join(' and '))}; ${kept.join(', ')}, ${slots}. Turned-away passengers and a fat margin draw rivals; more flights, a hub feeding the route, and dear or full slots keep them out.`
-      : `${capitalise(draws.join(' and '))}, but ${kept.join(', ')}, ${slots}.`;
+      : `${capitalise(draws.join(' and '))}, but ${kept.join(', ')}, ${slots}.`) +
+    ` Rivals enter one at a time: after one opens here, no other opens for ${RIVAL_ENTRY_SPACING_DAYS} days.`;
   return lineWithInfo(text, why, table.perDay >= RIVALS_VIEW_WARN_PER_DAY ? 'inspector-line is-warn' : 'inspector-line');
 }
 
