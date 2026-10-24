@@ -4,7 +4,7 @@ import { hourlyRoomProblem, hourOf, airportHours, hourPriceMultiplier } from './
 import { summarizeMarket } from './marketSummary';
 import { chainProblem, nightStopLegs, planUnwrap, planWrap } from './nightStops';
 import aircraftTypesData from '../../data/aircraft-types.json';
-import { computeBlockMinutes, isAircraftTypeAllowedAt, legDistanceNm, marketKey, type ScheduleLeg } from './schedule';
+import { computeBlockMinutes, isAircraftTypeAllowedAt, legDistanceNm, marketKey, SAME_ROUTE_SPACING_MINUTES, sameRouteClash, type ScheduleLeg } from './schedule';
 import { nextSlotFees } from './slots';
 import type { SimState } from './state';
 import { isLongHaulRoundTrip, scheduledTurnMinutes, USABLE_DAY_END_MINUTE, USABLE_DAY_START_MINUTE, flownEveryOtherDay, wrappedLongHaul } from './utilisation';
@@ -26,7 +26,8 @@ import { rangeNmFor } from './range';
  * - **What it must fit**: the usable day (06:00–22:00), its new plane's
  *   other rotations with a turn either side, room in every hour its legs
  *   now use at every airport (sim/hours.ts, not counting its own old
- *   movements), and no same-market departure at the same minute.
+ *   movements), and no departure within SAME_ROUTE_SPACING_MINUTES of
+ *   another of yours on the same route and direction.
  * - **What it costs**: each departure's slot re-priced at its new hour
  *   (a peak slot costs more, sim/slots.ts), so a slot taken cheap
  *   off-peak can't be dragged into the peak for free.
@@ -257,10 +258,15 @@ export function planRetime(state: SimState, legIds: string[], toTail: string, st
   const without = { ...world, schedule: world.schedule.filter((leg) => !movedIds.has(leg.legId)) };
   const room = hourlyRoomProblem(world, moved, new Map(), world.schedule.filter((leg) => movedIds.has(leg.legId)));
   if (room) return fail(`${room.iata} ${String(room.hour).padStart(2, '0')}:00 full`);
-  const collision = moved.find((leg) =>
-    without.schedule.some((other) => other.origin === leg.origin && other.dest === leg.dest && other.departMinute === leg.departMinute),
-  );
-  if (collision) return fail(`${collision.origin}→${collision.dest} already leaves at ${hhmm(collision.departMinute)}`);
+  // Same route, same direction: at least SAME_ROUTE_SPACING_MINUTES apart
+  // (sim/schedule.ts). Only a flight whose time changes answers for it, so
+  // a swap or sort that keeps an older save's stacked times still goes.
+  const oldMinute = new Map(world.schedule.map((leg) => [leg.legId, leg.departMinute]));
+  for (const leg of moved) {
+    if (oldMinute.get(leg.legId) === leg.departMinute) continue;
+    const clash = sameRouteClash(leg, without.schedule);
+    if (clash) return fail(`${leg.origin}→${leg.dest} ${hhmm(leg.departMinute)} · ${clash.tail} leaves ${hhmm(clash.departMinute)} · ${SAME_ROUTE_SPACING_MINUTES}m apart`);
+  }
 
   const after = { ...world, schedule: [...without.schedule, ...moved] };
 

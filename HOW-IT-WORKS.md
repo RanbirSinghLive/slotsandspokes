@@ -1672,8 +1672,25 @@ plane gives up that time once. Staggering every rotation cost Montréal
 half its year on 18 seeds ($7.4M against $15.5M); the first alone,
 $13.0M. At a banked hub the waves set the start. The player can still
 drag the times on the Gantt. `packRotationAvoidingCollisions()` then shifts
-the whole rotation later in five-minute steps until no leg departs at the
-exact minute another plane already flies that market.
+the whole rotation later in five-minute steps until no leg leaves within
+15 minutes of another of your flights on the same route the same way
+(see *Same-route spacing* below).
+
+### Same-route spacing
+
+Two of your flights on the same route in the same direction leave at
+least `SAME_ROUTE_SPACING_MINUTES` (15) apart: `sameRouteClash()` in
+`sim/schedule.ts`, the one check every placement uses. A new rotation is
+nudged later until clear; a Gantt drag, swap, sort or draft ✓ that would
+put a flight closer is refused, the tip naming the flight it would stack
+on ("YYZ→YUL 15:05 · C-P002 leaves 15:00 · 15m apart"); AOG and check
+cover and turn-buffer respacing only shift a flight to a clear time. The
+opposite way at the same minute is an ordinary bank and allowed, and
+alternate-day flights on opposite days never meet. Only a flight whose
+time changes answers for it, so an older save's stacked flights still
+swap planes; the Gantt hatches them amber with a ⇉ tip until dragged
+apart. Demand already split close departures (crowding, below); this is
+about a timetable no airline would publish.
 
 ### One place decides everything
 
@@ -1682,7 +1699,7 @@ add-a-stop buttons. It checks, across every leg including the closing one: the b
 is in the network, slots are available (and quotes their fees), range,
 airport size limits, landing back before 22:00
 (`USABLE_DAY_END_MINUTE` — except a single long-haul round trip, which
-counts as one full aircraft), and exact-time collisions. Only an
+counts as one full aircraft), and same-route spacing. Only an
 out-of-range *closing* leg leaves add-a-stop enabled, because a nearer
 stop can fix it.
 
@@ -1730,7 +1747,8 @@ it back. The rules:
   its new plane's other rotations with a
   turn either side, and room in every hour its legs now use at every
   airport (its own old movements count as room, rivals stay where they
-  are), with no same-market departure at the same minute.
+  are), with no departure within 15 minutes of another of yours on the
+  same route the same way (*Same-route spacing*).
 - Always allowed, in the air or part flown too. A rotation with a leg
   in the air, or some flown and some not, is **held for tomorrow**:
   today's flying stays as it is, the move is kept in

@@ -17,6 +17,8 @@ import {
   marketKey,
   networkAirports,
   nextLegId,
+  SAME_ROUTE_SPACING_MINUTES,
+  sameRouteClash,
   type ScheduleLeg,
 } from './schedule';
 import { acquireNeededSlots, quoteSlots, takeQuotedSlots, type SlotQuote } from './slots';
@@ -64,7 +66,7 @@ function hourText(hour: number): string {
   return `${String(hour).padStart(2, '0')}:00`;
 }
 
-/** Five-minute steps, the granularity nudgeing uses to dodge an exact-time collision. */
+/** Five-minute steps, the granularity nudging uses to dodge a same-route clash. */
 const COLLISION_NUDGE_MINUTES = 5;
 /** Enough nudging to clear a couple of hours of congestion, then give up. */
 const MAX_COLLISION_NUDGES = 24;
@@ -122,8 +124,8 @@ function rotationStartMinute(tail: string, state: SimState): number {
 
 /**
  * The packed rotation, nudged later in five-minute steps until no leg
- * departs at the exact minute another tail already flies that same market
- * (findExactTimeCollision()). Auto-packing makes that collision likely
+ * leaves within SAME_ROUTE_SPACING_MINUTES of another of your flights on
+ * the same route and direction (sameRouteClash()). Auto-packing makes that collision likely
  * rather than rare — two aircraft based at the same airport, both opening
  * their day at 06:00 on the same market, would hit it every time — and
  * the player doesn't author departure times, so there is no "pick a
@@ -137,11 +139,12 @@ function packRotationAvoidingCollisions(
   cruiseKts: number | undefined,
   startMinute: number,
   state: SimState,
+  dayParity?: 0 | 1,
 ): PackedLeg[] {
   const schedule = state.schedule;
   let legs = packRotation(airports, cruiseKts, startMinute, state);
   for (let attempt = 0; attempt < MAX_COLLISION_NUDGES; attempt++) {
-    if (!legs.some((leg) => findExactTimeCollision(leg.origin, leg.dest, leg.departMinute, schedule))) return legs;
+    if (!legs.some((leg) => sameRouteClash({ ...leg, dayParity }, schedule))) return legs;
     legs = packRotation(airports, cruiseKts, startMinute + (attempt + 1) * COLLISION_NUDGE_MINUTES, state);
   }
   return legs;
@@ -288,7 +291,9 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
   if (alternateDays && legs[1] && legs[1].departMinute >= 24 * 60) {
     // Its flight back must leave before midnight (step.ts dispatches on each day's own clock), so the pair starts as early as it takes.
     const start = Math.floor((24 * 60 - 5 - (legs[1].departMinute - legs[0].departMinute)) / 5) * 5;
-    if (start >= 0) legs = packRotationAvoidingCollisions(rotationAirports, type?.cruiseKts, start, state);
+    // The plane on the other days flies at the same times without clashing (sim/schedule.ts's sameRouteClash()).
+    const parity = alternateDayParity(state, rotationAirports[0].iata, rotationAirports[1].iata);
+    if (start >= 0) legs = packRotationAvoidingCollisions(rotationAirports, type?.cruiseKts, start, state, parity);
   }
   const longHaul = tailIsEmpty && rotationAirports.length === 2 && isLongHaulRoundTrip(legs.length, clockMinutes, alternateDays);
   const rotationMinutes = longHaul ? USABLE_DAY_MINUTES : clockMinutes;
@@ -479,11 +484,11 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
   // up. Rare, and not something the player can retime any more, so it says
   // what it is rather than asking for a different time.
   const collision = legs
-    .map((leg) => findExactTimeCollision(leg.origin, leg.dest, leg.departMinute, state.schedule))
+    .map((leg) => sameRouteClash({ ...leg, dayParity: plan.dayParity }, state.schedule))
     .find((leg) => leg !== undefined);
   if (collision) {
     return fail(
-      `${collision.tail} already departs ${collision.origin} for ${collision.dest} at every minute this rotation could use (${collision.legId}). Thin out that market first.`,
+      `${collision.origin} → ${collision.dest} · ${collision.tail} leaves ${minuteOfDayToTimeString(((collision.departMinute % 1440) + 1440) % 1440)} · every start this rotation could use is within ${SAME_ROUTE_SPACING_MINUTES} min of one of your flights. Thin out that market first.`,
     );
   }
 
@@ -497,26 +502,6 @@ export function planRotation(chain: RotationStop[], dest: RotationStop, tail: st
  */
 function airportByIata(iata: string, chain: RotationStop[]): RotationStop {
   return chain.find((airport) => airport.iata === iata)!;
-}
-
-/**
- * A leg already departing this exact origin, for this exact destination,
- * at this exact minute — checked same-direction only, unlike
- * isExistingMarket() in ui/routeBuilder.ts. Same-direction matters here: two flights leaving
- * in *opposite* directions at the same clock time is an ordinary
- * synchronized schedule bank, not a conflict. Two leaving the same
- * direction at the identical minute has no legitimate interpretation in
- * this model.
- */
-function findExactTimeCollision(
-  originIata: string,
-  destIata: string,
-  departMinute: number,
-  schedule: ScheduleLeg[],
-): ScheduleLeg | undefined {
-  return schedule.find(
-    (leg) => leg.origin === originIata && leg.dest === destIata && leg.departMinute === departMinute,
-  );
 }
 
 /**

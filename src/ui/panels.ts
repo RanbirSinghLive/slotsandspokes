@@ -12,7 +12,7 @@ import { cancelPendingRetime, type RetimePlan } from '../sim/retime';
 import { airportHours, FIRST_OPEN_HOUR, freeInHour, OPEN_HOURS } from '../sim/hours';
 import { money, shortMoney } from './format';
 import { formatNps, networkNps } from '../sim/nps';
-import { validateSchedule, type ScheduleLeg } from '../sim/schedule';
+import { SAME_ROUTE_SPACING_MINUTES, stackedDepartures, validateSchedule, type ScheduleLeg } from '../sim/schedule';
 import { allRotations, rotationsForTail, USABLE_DAY_END_MINUTE, USABLE_DAY_MINUTES, USABLE_DAY_START_MINUTE, utilisationProblems, wrappedLongHaul, type Rotation } from '../sim/utilisation';
 import { select, selectRoute, type Selection } from './selection';
 import { networkTrends, type Measure } from '../sim/trends';
@@ -607,6 +607,9 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
   const eventLegs = new Set(mandatesOf(state).filter((m) => m.status === 'accepted').flatMap((m) => mandatedLeg(state, m)?.legId ?? []));
   const drafted = new Set(draft?.drops.flat().flatMap((move) => move.legIds));
   const conflicted = draft ? overlappingLegs(state) : null;
+  // Flights leaving too close behind another of yours on the same route and way (an older save can still have them).
+  const stacked = stackedDepartures(state.schedule);
+  const clockMinute = (minute: number) => ((minute % 1440) + 1440) % 1440;
   const at = (minute: number) => `${((minute - start) / (end - start)) * 100}%`;
   const width = (minutes: number) => `${(minutes / (end - start)) * 100}%`;
 
@@ -776,12 +779,18 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
         const within = (minute: number) => `${((minute - rotation.departMinute) / (rotation.arriveMinute - rotation.departMinute)) * 100}%`;
         // A long-haul pair over midnight stores its flight back a day early (sim/utilisation.ts wrappedLongHaul): drawn after the flight out.
         const departOf = (leg: ScheduleLeg) => (leg.departMinute < rotation.departMinute ? leg.departMinute + 24 * 60 : leg.departMinute);
+        const stackedNotes: string[] = [];
         rotation.legs.forEach((leg, i) => {
           const block = document.createElement('div');
           block.className = 'timeline-leg';
           block.dataset.leg = leg.legId;
           block.style.left = within(departOf(leg));
           block.style.width = `${(leg.blockMinutes / (rotation.arriveMinute - rotation.departMinute)) * 100}%`;
+          const stackedOn = stacked.get(leg.legId);
+          if (stackedOn) {
+            block.classList.add('is-stacked');
+            stackedNotes.push(`${leg.origin}→${leg.dest} ${minuteOfDayToTimeString(clockMinute(leg.departMinute))} · ${stackedOn.tail} ${minuteOfDayToTimeString(clockMinute(stackedOn.departMinute))}`);
+          }
           span.append(block);
           // Where the plane waits between this flight and the one before: the chain reads ALB ▬ LGA ▬ ALB.
           if (i > 0) {
@@ -789,6 +798,7 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
             span.append(groundLabel(before.dest, within((departOf(before) + before.blockMinutes + departOf(leg)) / 2)));
           }
         });
+        if (stackedNotes.length > 0) span.title += ` · ⇉ ${stackedNotes.join(' · ')} · ${SAME_ROUTE_SPACING_MINUTES}m apart min · drag to space them`;
         if (rotation.legs.some((leg) => eventLegs.has(leg.legId))) {
           const star = document.createElement('span');
           star.className = 'timeline-event-star';
