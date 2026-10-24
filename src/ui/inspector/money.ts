@@ -269,7 +269,7 @@ export function buildMoneyView(state: SimState): HTMLElement {
       heading('RASM / CASM'),
       lineWithInfo(
         `RASM ${latest.rasm.toFixed(2)}¢ · CASM ${latest.casm.toFixed(2)}¢ · ${units.length}d`,
-        'Revenue and cost per available seat nautical mile, for each finished day. Capacity counts every seat flown, sold or not, so RASM falls when planes fly empty. The gap between the lines is the margin per seat nm.',
+        'Revenue and cost per available seat nautical mile, for each finished day. Capacity counts every seat flown, sold or not, so RASM falls when planes fly empty. CASM counts maintenance on the day it was flown, not the day a check pays it. The gap between the lines is the margin per seat nm.',
         latest.rasm < latest.casm ? 'inspector-line is-over' : 'inspector-line is-good',
       ),
       unitChart(units),

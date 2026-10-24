@@ -1,3 +1,4 @@
+import { recordMaintenanceAccrual } from './unitEconomics';
 import { contractCost, heavyBays, heavyRated, lineCapacity, lineRated } from './bases';
 import { dayStartMinute } from './clock';
 import { executiveToleranceExtraDays, executiveToleranceMultiplier } from './executives';
@@ -71,7 +72,7 @@ const HEAVY_WORK_MINUTES: Record<string, number> = { PROP: 2880, REGIONAL: 2880,
 
 /**
  * The share of a flight's non-fuel block-hour cost that is maintenance.
- * It is held back from the flight and paid when the plane's heavy check is
+ * It is held back from the flight and paid when the plane's next A or heavy check is
  * done, so maintenance comes as a lump you can see coming rather than a
  * trickle. Route margins and rivals still count the whole cost, so only
  * when the money leaves changes.
@@ -177,7 +178,10 @@ export function accrueMaintenance(aircraft: Aircraft, blockNonFuel: number): num
 /** Pay what the plane has built up: at a heavy check, and when it goes back to the lessor. */
 export function settleMaintenance(state: SimState, aircraft: Aircraft): void {
   const owed = maintenanceReserve(aircraft);
-  if (owed > 0) chargeMaintenance(state, owed);
+  if (owed > 0) {
+    chargeMaintenance(state, owed);
+    recordMaintenanceAccrual(state, -owed);
+  }
   delete aircraft.maintenanceReserve;
 }
 
