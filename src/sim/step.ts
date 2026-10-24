@@ -57,7 +57,7 @@ import {
 import { CANCELLATION_NPS_SCORE, WAIVED_NPS_SCORE, flightSatisfactionScore, recordFlightNps, rollTrailingNps } from './nps';
 import { recordDailyCashHistory } from './forecast';
 import { recordDailyPnlHistory } from './pnlHistory';
-import { recordFlightSeatNm, recordDailySeatNmHistory } from './unitEconomics';
+import { recordFlightSeatNm, recordDailySeatNmHistory, recordMaintenanceAccrual } from './unitEconomics';
 import { recordDailyOnTimeHistory } from './routeOtp';
 import { recordDailyLoadHistory, recordFlightLoad } from './loadFactor';
 import { checkMilestones } from './ladder';
@@ -692,6 +692,7 @@ export function step(state: SimState): void {
           state.todayCost -= heldBack;
           state.todayCostByCategory.blockNonFuel -= heldBack;
           state.todayMargin += heldBack;
+          recordMaintenanceAccrual(state, heldBack);
           // Same numbers, split by market — sim/pnlHistory.ts rolls these
           // into revenueHistoryByMarket/costHistoryByMarket at rollover.
           state.todayRevenueByMarket[key] = (state.todayRevenueByMarket[key] ?? 0) + result.revenue;

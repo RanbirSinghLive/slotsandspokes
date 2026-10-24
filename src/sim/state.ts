@@ -555,6 +555,13 @@ export type SimState = {
   todaySeatNm?: number;
   seatNmHistory?: number[];
   /**
+   * Maintenance held back into planes' reserves less reserves paid, today
+   * and for each finished day: turns the paid cost into an accrued one for
+   * CASM (sim/unitEconomics.ts). Optional, like the seat-nm history.
+   */
+  todayMaintenanceAccrual?: number;
+  maintenanceAccrualHistory?: number[];
+  /**
    * Same-day accumulation as `todayRevenue`/`todayCost` above, split by
    * market (`marketKey(origin, dest)`, sim/schedule.ts) instead of summed
    * across the whole airline — filled in step.ts's arrival loop, right

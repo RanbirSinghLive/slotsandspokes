@@ -1459,7 +1459,7 @@ the same colour. On-time and Completion show the last 7 days once there
 are 7 (the lifetime share before), so the figure and its colour agree.
 Each card opens the view that explains it: Cash and Runway open
 **Money** (`ui/inspector/money.ts`: closing cash over the last month,
-the runway, RASM and CASM per finished day, a week's average day, today's costs by kind). RASM and CASM are a day's revenue and cost over seats flown times nautical miles (`sim/unitEconomics.ts`), in cents; empty seats count as capacity; On-time,
+the runway, RASM and CASM per finished day, a week's average day, today's costs by kind). RASM and CASM are a day's revenue and cost over seats flown times nautical miles (`sim/unitEconomics.ts`), in cents; empty seats count as capacity; CASM counts maintenance as flown (the slice held in each plane's reserve goes on the day it was earned, and the reserve paid at a check comes off that day), so a check doesn't spike it; On-time,
 Completion, Load factor and NPS open **Routes** (`ui/inspector/routes.ts`:
 every route in one table with flights a day, load, on-time, flown, NPS
 and yesterday's margin, sorted by that card's measure, worst first, each
