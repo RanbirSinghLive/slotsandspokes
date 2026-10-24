@@ -96,20 +96,28 @@ export function updateRunway(state: SimState): boolean {
     modalDaysEl.textContent = `${daysLeft} day${daysLeft === 1 ? '' : 's'}`;
     modalRateEl.textContent = money(Math.max(0, -runway.dailyDelta));
     modalOwedEl.textContent = runway.owed > 0.5 ? ` That counts ${money(runway.owed)} already owed at upcoming checks.` : '';
-    modalRoutesEl.textContent = worstRoutesText(state);
+    modalRoutesEl.replaceChildren(...worstRoutes(state));
     modalEl.hidden = false;
     return true;
   }
   return false;
 }
 
-/** The routes losing most a day after their share of leases, slots and overhead, for the pop-up. */
-function worstRoutesText(state: SimState): string {
+/** The routes losing most a day after their share of leases, slots and overhead, for the pop-up; each kept on one line. */
+function worstRoutes(state: SimState): (string | HTMLElement)[] {
   const losing = flownMarkets(state)
     .map((market) => ({ market, perDay: routeWeek(state, market.key).perDay }))
     .filter((row): row is { market: (typeof row)['market']; perDay: number } => row.perDay !== null && row.perDay < 0)
     .sort((x, y) => x.perDay - y.perDay)
     .slice(0, POPUP_ROUTES);
-  if (losing.length === 0) return 'No route loses money after its lease and slots: the loss is in the upkeep (bases, executives, overhead, checks).';
-  return `Losing most after lease and slots: ${losing.map(({ market, perDay }) => `${market.a}–${market.b} ${shortMoney(perDay)}/day`).join(' · ')}.`;
+  if (losing.length === 0) return ['No route loses money after its lease and slots: the loss is in the upkeep (bases, executives, overhead, checks).'];
+  const parts: (string | HTMLElement)[] = ['Losing most after lease and slots: '];
+  losing.forEach(({ market, perDay }, i) => {
+    const route = document.createElement('span');
+    route.style.whiteSpace = 'nowrap';
+    route.textContent = `${market.a}–${market.b} ${shortMoney(perDay)}/day`;
+    parts.push(...(i > 0 ? [' · '] : []), route);
+  });
+  parts.push('.');
+  return parts;
 }

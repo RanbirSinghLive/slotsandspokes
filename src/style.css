@@ -2796,6 +2796,18 @@ button.ticker-item:hover {
   color: #cdd3e0;
 }
 
+/* On a phone the rail sits over the right edge, above the overlay, so the box centres in what is left of the screen. */
+@media (max-width: 700px) {
+  .modal-overlay {
+    padding: 12px calc(var(--rail-width) + 12px) 12px 12px;
+  }
+
+  .modal-box {
+    box-sizing: border-box;
+    max-width: 100%;
+  }
+}
+
 .modal-box h2 {
   margin: 0 0 10px;
   font-size: 15px;

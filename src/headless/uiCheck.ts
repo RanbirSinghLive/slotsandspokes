@@ -80,6 +80,8 @@ async function visit(browser: Browser, label: string, url: string, save: string,
   await page.waitForSelector('#rail', { timeout: 20000 });
   await page.waitForTimeout(800);
   await page.screenshot({ path: `${outDir}${label}-map.png` });
+  // A save near $0 opens the runway pop-up, which would cover the rail.
+  if (await page.locator('#runway-modal').isVisible()) await page.locator('#runway-modal-close').click();
 
   const screens = await page.$$eval('#rail [data-go]', (buttons) => buttons.map((button) => (button as HTMLElement).dataset.go!));
   const only = option('only');
