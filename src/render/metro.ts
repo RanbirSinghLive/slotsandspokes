@@ -19,7 +19,9 @@ import type { SimState } from '../sim/state';
  * - The core inside it is as wide as the route's load factor over the
  *   last 7 days: a hollow tube is flying air, a solid one is full.
  * - The core's colour is the route's on-time share over the same week,
- *   on the Ops lens's red-amber-green scale.
+ *   on a red-amber-green scale. The Profit lens draws the same tubes
+ *   coloured by margin instead (render/mapmodes.ts), so every lens that
+ *   shows your routes reads fullness the same way.
  * - ▲ or ▼ along the line is this week's load against last week's, when
  *   it moved by TREND_STEP or more.
  *
@@ -40,6 +42,12 @@ const TREND_STEP = 0.05;
 const TREND_AT = 0.65;
 const TREND_FONT = 'bold 10px ui-monospace, Consolas, monospace';
 
+/** The Network and Ops lenses' core colour: on-time over the last week, blue-grey until there are enough flights to judge. */
+export function onTimeCoreColor(state: SimState, origin: string, dest: string): string {
+  const otp = trailingMarketOtp(state, origin, dest).otp;
+  return otp === null ? METRO_COLORS.noOtp : onTimeColor(otp);
+}
+
 /** The tube's outer width for a route's seats a day. */
 export function tubeWidth(seatsADay: number): number {
   return Math.max(MIN_TUBE_PX, TUBE_BASE_PX + TUBE_SCALE * widthForSeats(seatsADay));
@@ -49,6 +57,7 @@ export function drawMetroRoutes(
   ctx: CanvasRenderingContext2D,
   state: SimState,
   routes: ReadonlyMap<string, { origin: string; dest: string }>,
+  coreColor: (state: SimState, origin: string, dest: string) => string = onTimeCoreColor,
 ): void {
   const path = geoPath(projection, ctx);
   const seats = seatsADayByMarket(state);
@@ -82,8 +91,7 @@ export function drawMetroRoutes(
   for (const { origin, dest, line, width } of lines) {
     const load = marketLoadFactor(state, origin, dest).factor;
     if (load === null || load <= 0) continue;
-    const otp = trailingMarketOtp(state, origin, dest).otp;
-    ctx.strokeStyle = otp === null ? METRO_COLORS.noOtp : onTimeColor(otp);
+    ctx.strokeStyle = coreColor(state, origin, dest);
     ctx.lineWidth = Math.max(MIN_CORE_PX, width * Math.min(1, load));
     ctx.beginPath();
     path(line);

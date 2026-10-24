@@ -1,36 +1,31 @@
-import { geoPath } from 'd3-geo';
-import type { LineString } from 'geojson';
-import { projection } from './projection';
-import { airports } from './airports';
+import { isAirportKnown } from './airports';
+import { drawMetroRoutes, onTimeCoreColor } from './metro';
 import { marketKey } from '../sim/schedule';
 import { summarizeMarket } from '../sim/marketSummary';
 import { OTP_BASELINE } from '../sim/routeOtp';
 import type { SimState } from '../sim/state';
-import { routeWidthsByMarket } from './routeWidth';
 
 /**
  * Recolouring the existing route network by a per-market metric instead
  * of drawing new geometry — the Paradox "mapmode" idea (EU4/Vic3/HoI4 all
- * do this: one map, several lenses). `'none'` is the base game, same flat
- * grey render/routes.ts already draws; every other mode replaces that
- * with a colour that answers one question at a glance instead of
- * requiring a trip to the Commercial or On-Time tab.
+ * do this: one map, several lenses). `'none'` is the Network lens, drawn
+ * by render/routes.ts; every other mode recolours the same tubes' cores
+ * so they answer one question at a glance instead of requiring a trip to
+ * the Commercial or On-Time tab.
  *
- * Two modes to start, both reusing numbers the sim already produces
- * rather than inventing new ones: `summarizeMarket()` (sim/marketSummary.ts,
- * the same formula the Commercial panel's own numbers come from) for
- * profitability, and `state.onTimeByMarket` for on-time. Each is one of
- * the map's lenses (main.ts's setLens()); another mode is a colour
- * function plus a lens button.
+ * Both modes reuse numbers the sim already produces rather than
+ * inventing new ones: `summarizeMarket()` (sim/marketSummary.ts, the same
+ * formula the Commercial panel's own numbers come from) for
+ * profitability, and the last 7 days' on-time (sim/routeOtp.ts) for
+ * on-time. Each is one of the map's lenses (main.ts's setLens()); another
+ * mode is a colour function plus a lens button.
  */
 export type MapMode = 'none' | 'profitability' | 'ontime';
 
 
-const airportsByIata = new Map(airports.map((airport) => [airport.iata, airport]));
 
 const NO_DATA_STROKE = '#3a4258'; // same grey render/routes.ts's plain mode uses — "nothing to report" reads as the base state, not an error
 const LOSS_STROKE = '#ff8080';
-const LINE_WIDTH = 2; // thicker than the plain 1px route line — a mapmode is meant to be read at a glance, not squinted at
 
 // Exported so main.ts's legend swatches are literally these colours,
 // never a second set of hex values that could drift from what the map
@@ -86,47 +81,28 @@ function distinctMarkets(state: SimState): Map<string, { origin: string; dest: s
   return markets;
 }
 
+/** The Profit lens's core colour: margin over revenue, the Commercial panel's own numbers. */
+function profitCoreColor(state: SimState, origin: string, dest: string): string {
+  const routeSettings = state.routeSettings[marketKey(origin, dest)];
+  if (!routeSettings) return NO_DATA_STROKE;
+  const summary = summarizeMarket(origin, dest, state, routeSettings);
+  return profitabilityColor(summary.margin, summary.revenue);
+}
+
 /**
- * Draw the route network recoloured by `mode`. Called from main.ts's
- * render() in place of drawRoutes() whenever a mapmode is active — same
- * "replaces, doesn't add to" relationship render/competition.ts's overlay
- * already has with the plain route layer, and for the same reason:
- * drawing both would double every line.
+ * Draw the route network recoloured by `mode`, as the Network lens's
+ * tubes (render/metro.ts): width is seats a day and the core fills with
+ * load, so only the core's colour changes between lenses. Called from
+ * main.ts's render() in place of drawRoutes() whenever a mapmode is
+ * active, and like the competition overlay it replaces the plain layer
+ * rather than adding to it, since drawing both would double every line.
+ * Routes to airports the airport filter hides are left out, as drawRoutes() does.
  */
 export function drawRouteMapMode(ctx: CanvasRenderingContext2D, state: SimState, mode: MapMode): void {
   if (mode === 'none') return;
-  const path = geoPath(projection, ctx);
-
-  ctx.lineWidth = LINE_WIDTH;
-  const widths = routeWidthsByMarket(state);
-  for (const { origin, dest } of distinctMarkets(state).values()) {
-    const originAirport = airportsByIata.get(origin);
-    const destAirport = airportsByIata.get(dest);
-    if (!originAirport || !destAirport) continue;
-
-    let color: string = NO_DATA_STROKE;
-    if (mode === 'profitability') {
-      const routeSettings = state.routeSettings[marketKey(origin, dest)];
-      if (routeSettings) {
-        const summary = summarizeMarket(origin, dest, state, routeSettings);
-        color = profitabilityColor(summary.margin, summary.revenue);
-      }
-    } else {
-      const stats = state.onTimeByMarket[marketKey(origin, dest)];
-      if (stats && stats.arrived > 0) color = onTimeColor(stats.onTime / stats.arrived);
-    }
-
-    const line: LineString = {
-      type: 'LineString',
-      coordinates: [
-        [originAirport.lon, originAirport.lat],
-        [destAirport.lon, destAirport.lat],
-      ],
-    };
-    ctx.strokeStyle = color;
-    if (widths) ctx.lineWidth = widths.get(marketKey(origin, dest)) ?? LINE_WIDTH;
-    ctx.beginPath();
-    path(line);
-    ctx.stroke();
+  const routes = new Map<string, { origin: string; dest: string }>();
+  for (const [key, market] of distinctMarkets(state)) {
+    if (isAirportKnown(market.origin) && isAirportKnown(market.dest)) routes.set(key, market);
   }
+  drawMetroRoutes(ctx, state, routes, mode === 'profitability' ? profitCoreColor : onTimeCoreColor);
 }
