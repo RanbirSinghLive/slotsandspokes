@@ -1238,6 +1238,14 @@ in month two to $7–12k a day, while one that keeps growing keeps
 earning. Rivals grow outward from their own networks, all in North
 America, so none reaches London's markets.
 
+**Rivals enter one at a time.** Once any rival opens on a market, no
+other rival, newcomer or existing, opens there for 30 days
+(`RIVAL_ENTRY_SPACING_DAYS`, `recentlyEnteredByRival()` in
+`sim/pressure.ts`). Every rival reads the same money on the table, so
+without the gap a fat new route drew four or five airlines inside a week,
+each on one flight and all sitting out their grace period at a loss. The
+route view's rivals line shows "next entry Nd+" while the gap runs.
+
 **Rivals take your yield** (`rivalYieldFactor()`). Markets here are
 seat-limited, so a rival splitting demand would still leave the player's
 planes full. Instead, rival frequency cuts what each passenger pays: up
