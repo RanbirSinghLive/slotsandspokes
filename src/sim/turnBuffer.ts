@@ -1,5 +1,5 @@
 import { classByCode } from './aircraftClasses';
-import { marketKey, nextLegId, type ScheduleLeg } from './schedule';
+import { marketKey, nextLegId, sameRouteClash, type ScheduleLeg } from './schedule';
 import { nextBankMinute } from './hubStyle';
 import { hourlyRoomProblem, hourOf } from './hours';
 import {
@@ -45,7 +45,7 @@ import type { Aircraft, SimState } from './state';
 /** The choices the route's ring offers, in minutes. */
 export const TURN_BUFFER_CHOICES = [0, 15, 30, 45, 60];
 
-/** Same nudge the route builder uses to dodge two tails departing the same market at the same minute. */
+/** Same nudge the route builder uses to dodge a same-route clash with another plane. */
 const COLLISION_NUDGE_MINUTES = 5;
 const MAX_COLLISION_NUDGES = 24;
 
@@ -61,10 +61,9 @@ export type TurnBufferPlan =
     }
   | { ok: false; reason: string };
 
+/** Whether another plane's flight on this leg's route and direction leaves too close to `departMinute` (sim/schedule.ts's sameRouteClash()). */
 function collides(schedule: ScheduleLeg[], leg: ScheduleLeg, departMinute: number): boolean {
-  return schedule.some(
-    (other) => other !== leg && other.origin === leg.origin && other.dest === leg.dest && other.departMinute === departMinute,
-  );
+  return sameRouteClash({ ...leg, departMinute }, schedule.filter((other) => other.tail !== leg.tail)) !== undefined;
 }
 
 /**
@@ -380,10 +379,10 @@ function coverShift(state: SimState, legs: ScheduleLeg[], hostTail: string): num
       }
     }
     if (shift === 0) return true;
-    // Moved off its own times: room in the hours it now uses (its own old movements count as room), and no same-market departure at the same minute.
+    // Moved off its own times: room in the hours it now uses (its own old movements count as room), and clear of your other flights on its routes.
     const moved = legs.map((leg) => ({ ...leg, departMinute: leg.departMinute + shift }));
     if (hourlyRoomProblem(state, moved, cache, legs)) return false;
-    return !moved.some((leg) => others.some((other) => other.origin === leg.origin && other.dest === leg.dest && other.departMinute === leg.departMinute));
+    return !moved.some((leg) => sameRouteClash(leg, others));
   };
 
   if (fits(0)) return 0;

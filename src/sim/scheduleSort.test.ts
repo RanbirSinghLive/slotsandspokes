@@ -84,6 +84,8 @@ assert.ok(anyTidied, 'no sort tidied a scrambled fleet');
 const longHaul = structuredClone(state);
 const rotation = allRotations(longHaul).find((r) => r.legs.length === 2 && r.closed && r.airports[0] === longHaul.aircraft.find((a) => a.tail === r.tail)!.baseAirport)!;
 longHaul.schedule = longHaul.schedule.filter((leg) => leg.tail !== rotation.tail || rotation.legs.includes(leg));
+// Alone on its route, so no other plane's flight there is within the same-route spacing of where it's moved.
+longHaul.schedule = longHaul.schedule.filter((leg) => leg.tail === rotation.tail || !rotation.legs.some((own) => own.origin === leg.origin && own.dest === leg.dest));
 const [out, home] = longHaul.schedule.filter((leg) => rotation.legs.some((l) => l.legId === leg.legId)).sort((a, b) => a.departMinute - b.departMinute);
 out.blockMinutes = 520;
 home.blockMinutes = 520;

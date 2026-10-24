@@ -44,6 +44,57 @@ export function legDailyWeight(leg: ScheduleLeg): number {
   return leg.dayParity === undefined ? 1 : 0.5;
 }
 
+/**
+ * How far apart, at the least, two of the airline's flights on the same
+ * route in the same direction must leave. Two YYZ→YUL departures at 15:00
+ * aren't a schedule anyone would publish, and they let two planes split one
+ * hour's passengers. Opposite directions at the same minute are an ordinary
+ * bank and stay allowed.
+ */
+export const SAME_ROUTE_SPACING_MINUTES = 15;
+
+/** Minutes between two clock times of day, the short way round midnight (a long-haul flight back is stored a day early). */
+function minutesApartOnClock(a: number, b: number): number {
+  const apart = (((a - b) % 1440) + 1440) % 1440;
+  return Math.min(apart, 1440 - apart);
+}
+
+/**
+ * The first of `others` leaving the same origin for the same destination
+ * less than SAME_ROUTE_SPACING_MINUTES from `leg`, or undefined. Alternate-day
+ * legs on opposite days never meet, so they never clash. Callers leave the
+ * leg itself (and whatever is moving with it) out of `others`.
+ */
+export function sameRouteClash(
+  leg: Pick<ScheduleLeg, 'origin' | 'dest' | 'departMinute' | 'dayParity'>,
+  others: ScheduleLeg[],
+): ScheduleLeg | undefined {
+  return others.find(
+    (other) =>
+      other.origin === leg.origin &&
+      other.dest === leg.dest &&
+      minutesApartOnClock(other.departMinute, leg.departMinute) < SAME_ROUTE_SPACING_MINUTES &&
+      !(other.dayParity !== undefined && leg.dayParity !== undefined && other.dayParity !== leg.dayParity),
+  );
+}
+
+/** Every leg in the schedule leaving too soon after another of the airline's on its route and direction, with the one it is stacked on. */
+export function stackedDepartures(schedule: ScheduleLeg[]): Map<string, ScheduleLeg> {
+  const byDirection = new Map<string, ScheduleLeg[]>();
+  for (const leg of schedule) {
+    const key = `${leg.origin}>${leg.dest}`;
+    byDirection.set(key, [...(byDirection.get(key) ?? []), leg]);
+  }
+  const found = new Map<string, ScheduleLeg>();
+  for (const legs of byDirection.values()) {
+    for (const leg of legs) {
+      const clash = sameRouteClash(leg, legs.filter((other) => other.legId !== leg.legId));
+      if (clash) found.set(leg.legId, clash);
+    }
+  }
+  return found;
+}
+
 const TAXI_ALLOWANCE_MINUTES = 20;
 
 /**
