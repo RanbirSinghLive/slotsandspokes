@@ -113,35 +113,8 @@ export function stationSection(state: SimState, iata: string, changed: () => voi
 
   const actions = document.createElement('div');
   actions.className = 'station-actions';
-  const next: 'own' | 'hub' | null = tier === 'contract' ? 'own' : tier === 'own' ? 'hub' : null;
-  if (next) {
-    const up = document.createElement('button');
-    up.type = 'button';
-    up.className = 'base-close';
-    up.textContent = `▲ ${TIER_GLYPH[next]} ${money(STATION_FEE[next])}`;
-    const blocked = stationUpgradeBlocked(state, iata);
-    up.disabled = blocked !== null;
-    up.title = blocked ?? `${TIER_NAME[next]} · ${money(STATION_FEE[next])} + ${money(STATION_PER_DAY[next])}/day · ${STATION_BUILD_DAYS[next]} days to build`;
-    up.addEventListener('click', () =>
-      showConfirm({
-        title: `${TIER_NAME[next]} · ${iata}`,
-        rows: [
-          { label: 'Fee now', value: money(STATION_FEE[next]) },
-          { label: 'Running cost', value: `${money(STATION_PER_DAY[next])}/day` },
-          { label: 'Ready in', value: `${STATION_BUILD_DAYS[next]} days` },
-          { label: 'Ground delays', value: `${Math.round(HANDLING[next].chance * 100)}% · up to ${HANDLING[next].maxMinutes} min` },
-          { label: 'Cash after', value: money(state.cash - STATION_FEE[next]) },
-        ],
-        facts: ['Stepping down later is instant and refunds nothing.'],
-        confirmLabel: `Build · ${money(STATION_FEE[next])}`,
-        run: () => {
-          upgradeStation(state, iata);
-          changed();
-        },
-      }),
-    );
-    actions.append(up);
-  }
+  const up = stationUpgradeButton(state, iata, changed);
+  if (up) actions.append(up);
   if (tier !== 'contract') {
     const down = document.createElement('button');
     down.type = 'button';
@@ -158,4 +131,41 @@ export function stationSection(state: SimState, iata: string, changed: () => voi
   }
   if (actions.childElementCount > 0) nodes.push(actions);
   return nodes;
+}
+
+/**
+ * The step-up button for this station, with its confirm: the Airports
+ * screen's watch list puts the same button beside a field whose ground
+ * delays lead. Null at hub-grade, where there is no step up.
+ */
+export function stationUpgradeButton(state: SimState, iata: string, changed: () => void): HTMLButtonElement | null {
+  const tier = stationTier(state, iata);
+  const next: 'own' | 'hub' | null = tier === 'contract' ? 'own' : tier === 'own' ? 'hub' : null;
+  if (!next) return null;
+  const up = document.createElement('button');
+  up.type = 'button';
+  up.className = 'base-close';
+  up.textContent = `▲ ${TIER_GLYPH[next]} ${money(STATION_FEE[next])}`;
+  const blocked = stationUpgradeBlocked(state, iata);
+  up.disabled = blocked !== null;
+  up.title = blocked ?? `${TIER_NAME[next]} · ${money(STATION_FEE[next])} + ${money(STATION_PER_DAY[next])}/day · ${STATION_BUILD_DAYS[next]} days to build`;
+  up.addEventListener('click', () =>
+    showConfirm({
+      title: `${TIER_NAME[next]} · ${iata}`,
+      rows: [
+        { label: 'Fee now', value: money(STATION_FEE[next]) },
+        { label: 'Running cost', value: `${money(STATION_PER_DAY[next])}/day` },
+        { label: 'Ready in', value: `${STATION_BUILD_DAYS[next]} days` },
+        { label: 'Ground delays', value: `${Math.round(HANDLING[next].chance * 100)}% · up to ${HANDLING[next].maxMinutes} min` },
+        { label: 'Cash after', value: money(state.cash - STATION_FEE[next]) },
+      ],
+      facts: ['Stepping down later is instant and refunds nothing.'],
+      confirmLabel: `Build · ${money(STATION_FEE[next])}`,
+      run: () => {
+        upgradeStation(state, iata);
+        changed();
+      },
+    }),
+  );
+  return up;
 }

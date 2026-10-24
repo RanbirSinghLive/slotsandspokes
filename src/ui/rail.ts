@@ -10,6 +10,7 @@ import { contractsOf, faceOf, takeoverOpen } from '../sim/contracts';
 import { mandatesOf } from '../sim/mandates';
 import { anyEntryShort } from '../sim/crewPlan';
 import { activeShock } from '../sim/shocks';
+import { watchItems } from './inspector/airports';
 
 /**
  * The rail down the side panel's left edge: every screen one click away,
@@ -23,7 +24,8 @@ import { activeShock } from '../sim/shocks';
  *     plane on its way that would enter service short, amber),
  *     a route that lost money yesterday (Routes, amber), cash running out
  *     within a month (Money, red), a fuel spike running (Fuel, amber), a running contract whose buyer is sad
- *     (Contracts, amber; red once a rival circles it);
+ *     (Contracts, amber; red once a rival circles it), a field on the Airports watch list with a problem to fix
+ *     (amber; red for a full peak hour or a hub missing a lot; a feed idea or a rival's news don't light it);
  *   - something new since the screen was last open, like unread mail: a
  *     milestone met (Goals, green), a rival on one of your markets
  *     (Rivals, amber), an executive seat newly wanting a look or an
@@ -120,7 +122,9 @@ export function conditions(state: SimState): Partial<Record<Screen, Dot>> {
     return margins.length > 0 && margins[margins.length - 1] < 0;
   });
   const runway = cashRunway(state)?.daysLeft ?? null;
+  const watch = watchItems(state).filter((item) => item.kind !== 'feed' && item.kind !== 'rival');
   return {
+    airports: watch.some((item) => item.severity === 'bad') ? 'bad' : watch.length > 0 ? 'warn' : null,
     fleet: fleetBad ? 'bad' : null,
     crews,
     maintenance: state.aogs.length > 0 ? 'bad' : null,

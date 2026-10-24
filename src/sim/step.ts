@@ -33,6 +33,7 @@ import { chargersPerDay, powertrainFuelFactor } from './powertrain';
 import { rollDailyFleet } from './fleetTiming';
 import { rollDailyRebases } from './rebase';
 import { rollDailyRights } from './rightsLicences';
+import { rollAirportShares } from './airportWatch';
 import { handlingParameters, recordStationDeparture, rollDailyMoats, rollDailyStations, rollStationLedgers, stationCostPerDay, stationLoadAt } from './stations';
 import { addTally, emptyTally } from './fareClasses';
 import { networkOverheadPerDay } from './overhead';
@@ -286,6 +287,7 @@ export function step(state: SimState): void {
     rollDailyStations(state);
     rollDailyMoats(state);
     rollStationLedgers(state);
+    rollAirportShares(state);
 
     // Network overhead (sim/overhead.ts): grows with the square of the fleet.
     const overhead = networkOverheadPerDay(state) + stationCostPerDay(state);

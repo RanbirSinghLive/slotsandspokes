@@ -40,7 +40,7 @@ import type { SimState } from './state';
 export const HUB_MISSED_WARN_PER_DAY = 500;
 export const HUB_MISSED_ACT_PER_DAY = 2500;
 /** A style isn't recommended if it would push the airport's peak load past this — the congestion would eat the gain. */
-const MAX_RECOMMENDED_LOAD = 0.75;
+export const MAX_RECOMMENDED_LOAD = 0.75;
 /**
  * ...nor if it would push any plane's scheduled day to within this many
  * minutes of the 22:00 curfew (sim/curfew.ts): the planner can't price

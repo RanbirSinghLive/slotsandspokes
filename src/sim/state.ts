@@ -840,6 +840,8 @@ export type SimState = {
   stationLedger?: Record<string, StationLedger>;
   /** Days each station has earned toward its hub-moat lift (sim/stations.ts). */
   stationMoatDays?: Record<string, number>;
+  /** Your share of each served field's movements, one entry a day for the last week, oldest first (sim/airportWatch.ts). */
+  airportShares?: Record<string, number[]>;
   /**
    * Lifetime cancellations by cause — the same shape (and the same
    * purpose) as `delayMinutesByCause`. Each cause has a different answer

@@ -275,7 +275,7 @@ function loadAndSlots(state: SimState, iata: string): HTMLElement[] {
  * numbers in the line under the chart; otherwise that line reads the
  * busiest hour.
  */
-function hourStrip(hours: AirportHours): HTMLElement {
+export function hourStrip(hours: AirportHours): HTMLElement {
   const openHours = Array.from({ length: OPEN_HOURS }, (_, i) => FIRST_OPEN_HOUR + i);
   const capacity = hours.capacity[FIRST_OPEN_HOUR];
   const top = Math.max(1, capacity, ...openHours.map((hour) => hours.mine[hour] + hours.rivals[hour]));
@@ -373,7 +373,7 @@ function groundedPlanes(state: SimState, iata: string): HTMLElement[] {
  * plain when the hub is fine, yellow when it's worth a look, red when it's
  * worth acting on. Null where you don't fly.
  */
-function planHubButton(state: SimState, iata: string, changed: () => void): HTMLButtonElement | null {
+export function planHubButton(state: SimState, iata: string, changed: () => void): HTMLButtonElement | null {
   if (!hasHubView(state, iata)) return null;
   const plan = planHub(state, iata);
   const button = document.createElement('button');

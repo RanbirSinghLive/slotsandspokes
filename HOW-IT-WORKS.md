@@ -1476,14 +1476,14 @@ pure read of `state`, like the canvas layers.
 **The inspector** (`src/ui/inspector/`, `src/ui/selection.ts`). The panel
 shows whatever is selected. At **Network** it is the Overview above.
 The rail's screens are selections too, in two groups split by a rule:
-the screens you act on first (Routes, Fleet, Crews, Mtc, Product,
-Contracts, Office), then the read-outs (Overview, Money, Airports,
+the screens you act on first (Routes, Airports, Fleet, Crews, Mtc, Product,
+Contracts, Office), then the read-outs (Overview, Money,
 Rivals, Goals), with Game at the foot. The detail views sit under
 **Airports**, **Fleet** or **Rivals**:
 
 | Selection | How you get there | What it shows |
 |---|---|---|
-| Airports list | the rail | every known airport (served, or all known), sortable by departures, load, slots, waiting riders or delay |
+| Airports | the rail | three views, the last one used remembered. **Watch** (`src/sim/airportWatch.ts`): only fields that want a call, worst first, each with its one problem and the button that acts on it: peak hour 90%+ full (red at 100%; Gantt), the hub planner finding $500+/day (red at $2,500; Plan), ground handling 3+ min a departure with a station step up allowed (the station's ▲ with its confirm), an own or hub-grade station under its departures floor with moat days draining, rival routes opened at the field in the last 7 days (from day 7 on; opens the rival), and the two best feed ideas worth 20+ connecting passengers a day (+ Route). Its count is the switch's badge; the rail dot lights for everything but feed ideas and rival news. **Hubs**: a card per field with two routes or more, most connecting first: style and connections, the moat as pips, the hour strip, the three styles side by side (connections gained or lost against the current one, peak load, red over 75%, and the ground time each arrival waits; a style the schedule can't absorb says ✕ no fit), a click switches with the usual confirm, and Plan hub. **Share**: every known airport (served, or all known), sortable by departures, your share of the field's movements (▲/▼ for 2+ points of change over the 7 days kept in `airportShares`, rolled at midnight), load, slots (★N heritage pairs), base, delay or waiting riders |
 | An airport | click its dot, or its row | presence, waiting riders, load, slots, a line per grounded plane (opening Maintenance), Plan hub, planes based there, and every market flown from it. Its crews are on the Crews screen only |
 | Maintenance | the rail (Mtc), an AOG line in the ticker or an airport | three views, the last one used remembered: Stations (every AOG with its fault, days back, what it cancels and Expedite 1d; a card per station with its line slots, hangar bays and ratings; outstations), Fleet (release to service and every plane's check clocks, by type) and Engines (each class's engine plan and book) |
 | A route | click its line, or a market row | the route view: flights, demand, rivals, fare stances, pools, margin and on-time |
