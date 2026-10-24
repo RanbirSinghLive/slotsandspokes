@@ -383,15 +383,17 @@ function techTree(state: SimState, changed: () => void): HTMLElement[] {
     tierEl.append(label, row);
     tree.append(tierEl);
   });
-  const nodes: HTMLElement[] = [rdBar(state, changed), tree];
-  const selected = options.find((option) => option.id === selectedInnovation);
-  if (selected) {
-    const card = innovationCard(state, selected, changed);
+  // The project's progress sits right under the budget it is spent from: the one picked in the tree, or else the one in research.
+  const nodes: HTMLElement[] = [rdBar(state, changed)];
+  const shown = options.find((option) => option.id === selectedInnovation) ?? options.find((option) => option.active);
+  if (shown) {
+    const card = innovationCard(state, shown, changed);
     nodes.push(card);
-    // The card sits under the whole tree, so on a phone a tap high in the tree would show nothing without this.
+    // On a phone a tap low in the tree would leave the card off screen without this.
     if (showCardAfterRender) requestAnimationFrame(() => card.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
-    showCardAfterRender = false;
   }
+  showCardAfterRender = false;
+  nodes.push(tree);
   return nodes;
 }
 
