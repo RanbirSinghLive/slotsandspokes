@@ -763,7 +763,7 @@ export function previewDCheckBooking(state: SimState, tail: string): { days: num
   };
 }
 
-function dCheckContractCost(typeCode: string): number {
+export function dCheckContractCost(typeCode: string): number {
   return contractCost((D_WORK_HOURS[typeCode] ?? D_WORK_HOURS.PROP) * 60);
 }
 

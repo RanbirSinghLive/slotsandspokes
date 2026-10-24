@@ -2390,15 +2390,24 @@ no borrowing (loans were removed in WEEK-TEN.md's thread 1). `main.ts`
 stops the clock and `ui/gameOver.ts` shows the game-over screen.
 
 **The runway** is the warning. `cashRunway()` draws a straight line
-through the last 7 closing balances: if cash is falling, days left =
-cash ÷ average daily fall. It shows three ways, escalating:
-- a **Runway** row under Cash, always visible — amber inside 30 days,
-  red inside 14;
-- a line in the alert strip inside 30 days;
+through the last 7 closing balances, with maintenance counted the day it
+is flown rather than paid (the week's `maintenanceAccrualHistory` comes
+off the slope). It starts from cash less what is already owed at checks
+(`checksOwed()`): every plane's maintenance reserve, paid in one go at its
+next check, plus the contract-hangar fee for each C or D check due within
+30 days at a base with no hangar for the type. If cash is falling, days
+left = (cash − owed) ÷ average daily fall; at 0 once what is owed
+exceeds cash. It shows three ways, escalating:
+- a **Runway** row under Cash, always visible: amber inside 60 days,
+  red inside 30;
+- a line in the alert strip inside 60 days;
 - a pop-up that **pauses the game** the first time the runway drops
-  inside 14 days. It re-arms only after the runway recovers past 30, so
-  hovering around two weeks doesn't nag. (That re-arm flag lives in the
-  UI module, not in `SimState`, so a reload can show it again.)
+  inside 30 days, naming the three routes losing most after their share
+  of leases, slots and overhead. It re-arms only after the runway
+  recovers past 60, so hovering around a month doesn't nag. (That re-arm
+  flag lives in the UI module, not in `SimState`, so a reload can show
+  it again.) The bands are wide because turning a network round takes
+  weeks.
 
 At 100× a fortnight passes in under half a minute, which is why the
 pause exists.

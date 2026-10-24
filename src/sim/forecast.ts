@@ -1,6 +1,7 @@
-import { basesCostPerDay } from './bases';
+import { basesCostPerDay, contractCost, heavyRated } from './bases';
 import { executiveSalariesPerDay } from './executives';
 import { runningCostForDay } from './innovations';
+import { dCheckContractCost, dCheckDueIn, heavyCheckDueIn, heavyCheckWorkMinutes, maintenanceReserve } from './mxChecks';
 import { networkOverheadPerDay } from './overhead';
 import { slotFeesPerDayAt } from './slots';
 import type { SimState } from './state';
@@ -37,23 +38,55 @@ export function recordDailyCashHistory(state: SimState): void {
 export const RUNWAY_WINDOW_DAYS = 7;
 
 export type CashRunway = {
-  /** Average day-over-day change in closing cash across the window. */
+  /** Average change a day in closing cash across the window, with maintenance counted the day it is flown. */
   dailyDelta: number;
-  /** Days until Cash hits zero if that average holds — null when cash isn't falling. */
+  /** Cash already owed at checks coming up (checksOwed), set against Cash. */
+  owed: number;
+  /** Days until Cash less what is owed hits zero if that average holds; null when cash isn't falling and covers what is owed. */
   daysLeft: number | null;
 };
 
+/** How far ahead the runway looks for checks that will charge a contract hangar. */
+export const CHECKS_AHEAD_DAYS = 30;
+
+/**
+ * Cash the airline holds but already owes to maintenance: every plane's
+ * reserve (each flight's maintenance slice is held back in cash and paid in
+ * one go at the plane's next check, sim/mxChecks.ts), plus the contract
+ * hangar fee for each C or D check due inside CHECKS_AHEAD_DAYS at a base
+ * with no hangar of its own for the type. Without it the runway reads a
+ * check as a surprise: cash looks fine until the day a large one lands.
+ */
+export function checksOwed(state: SimState): number {
+  let owed = 0;
+  for (const aircraft of state.aircraft) {
+    owed += maintenanceReserve(aircraft);
+    if (heavyRated(state, aircraft.baseAirport ?? state.homeAirport, aircraft.typeCode)) continue;
+    if (heavyCheckDueIn(aircraft) <= CHECKS_AHEAD_DAYS) owed += contractCost(heavyCheckWorkMinutes(aircraft.typeCode));
+    if (dCheckDueIn(aircraft) <= CHECKS_AHEAD_DAYS) owed += dCheckContractCost(aircraft.typeCode);
+  }
+  return owed;
+}
+
 /**
  * "If the last week repeats, when does Cash run out?" A straight line
- * through the closing balances over RUNWAY_WINDOW_DAYS.
+ * through the closing balances over RUNWAY_WINDOW_DAYS, starting from Cash
+ * less what is owed at checks (checksOwed). The week's slope counts
+ * maintenance as it is flown, not as it is paid (sim/unitEconomics.ts), so
+ * a reserve paid this week isn't counted twice, once in the slope and once
+ * in what is owed.
  * Null until there are two closing balances to draw a line through.
  */
 export function cashRunway(state: SimState): CashRunway | null {
   const recent = state.cashHistory.slice(-(RUNWAY_WINDOW_DAYS + 1));
   if (recent.length < 2) return null;
-  const dailyDelta = (recent[recent.length - 1] - recent[0]) / (recent.length - 1);
-  const daysLeft = dailyDelta < 0 && state.cash > 0 ? Math.ceil(state.cash / -dailyDelta) : null;
-  return { dailyDelta, daysLeft };
+  const days = recent.length - 1;
+  const heldBack = (state.maintenanceAccrualHistory ?? []).slice(-days).reduce((sum, amount) => sum + amount, 0);
+  const dailyDelta = (recent[recent.length - 1] - recent[0] - heldBack) / days;
+  const owed = checksOwed(state);
+  const cover = state.cash - owed;
+  const daysLeft = state.cash <= 0 ? null : cover <= 0 ? 0 : dailyDelta < 0 ? Math.ceil(cover / -dailyDelta) : null;
+  return { dailyDelta, owed, daysLeft };
 }
 
 /**
