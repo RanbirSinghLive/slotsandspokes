@@ -85,7 +85,7 @@ const COLUMNS: { sort: RouteSort; name: string; value: (row: RouteRow) => number
   },
   {
     sort: 'margin',
-    name: 'Margin',
+    name: 'Net',
     value: (row) => row.week.perDay,
     show: (row) => (row.week.perDay === null ? '—' : shortMoney(row.week.perDay)),
     rate: (row) => {
@@ -196,8 +196,9 @@ function marginCell(row: RouteRow): HTMLTableCellElement {
   const { week } = row;
   const share = routeMarginShare(week);
   const tip = [
-    week.perDay === null ? 'Under 3 flown days' : `${perDayText(week.perDay)}/day over the last 7 days`,
+    week.perDay === null ? 'Under 3 flown days' : `Net ${perDayText(week.perDay)}/day over the last 7 days`,
     share === null ? null : `${percentText(share)} of revenue`,
+    week.flyingPerDay === null ? null : `flying ${perDayText(week.flyingPerDay)} less lease, slots, overhead ${shortMoney(week.fixedPerDay)}`,
     week.previousPerDay === null ? null : `week before ${perDayText(week.previousPerDay)}/day`,
     week.previousRevenuePerDay === null || week.previousCostPerDay === null
       ? null
@@ -266,7 +267,7 @@ function subtotalCells(rows: RouteRow[], columns: (typeof COLUMNS)[number][]): H
       td.textContent = known.length === 0 ? '—' : `${perDayText(margin)}${revenue > 0 ? ` · ${percentText(margin / revenue)}` : ''}`;
       td.classList.add('routes-margin');
       if (known.length > 0 && revenue > 0) td.classList.add(`is-${marginBand(margin / revenue)}`);
-      td.dataset.tip = `Margin a day over the last 7 days, summed over ${known.length} routes with 3+ flown days · revenue ${shortMoney(revenue)}/day`;
+      td.dataset.tip = `Net margin a day (after lease, slots, overhead) over the last 7 days, summed over ${known.length} routes with 3+ flown days · revenue ${shortMoney(revenue)}/day`;
     } else {
       const values = rows.map((r) => c.value(r)).filter((v): v is number => v !== null);
       const mean = values.length === 0 ? null : values.reduce((a, b) => a + b, 0) / values.length;
@@ -457,7 +458,7 @@ export function buildRoutesView(state: SimState, sort: RouteSort): HTMLElement {
   const intro = document.createElement('div');
   intro.className = 'inspector-line';
   intro.textContent = `${bestFirst ? 'Best' : 'Worst'} ${column.name.toLowerCase()} first`;
-  intro.append(' ', info('The money lens is first; the stopwatch lens reads reliability. Margin is the average a day over the last 7 days, with the last 14 as a line (dashed = $0), the share of revenue in the tip, and an arrow against the week before. Tags: contract and event pay are inside it; a sprout is a route under 2 weeks old. On-time, flown, load and PRASM (profit per available seat-mile, in cents) are the last 7 days; flights are per direction (a dotted /day is flown by more than one size of plane: its tip splits it by size; on a phone tap it); NPS about the last month. Group by hub (the end with more routes), sector (domestic = both ends in your home country), region (where the far end is, by map position, so approximate), plane size (mixed = more than one size) or margin band; each group heading carries its subtotals and folds on a tap, and ▸ folds them all. Click a heading to sort by it, again to flip the order, or a route to open it. The bottom row and group headings total their routes: flights and margin add up, the rest are plain averages of the routes. The fare strip under the table opens the fare policy and seat split.'));
+  intro.append(' ', info('The money lens is first; the stopwatch lens reads reliability. Net is the margin a day over the last 7 days after the route's share of plane leases, slot fees and overhead (the flying margin before them is in the tip), with the last 14 as a line (dashed = $0), the share of revenue in the tip, and an arrow against the week before. Tags: contract and event pay are inside it; a sprout is a route under 2 weeks old. On-time, flown, load and PRASM (profit per available seat-mile, in cents) are the last 7 days; flights are per direction (a dotted /day is flown by more than one size of plane: its tip splits it by size; on a phone tap it); NPS about the last month. Group by hub (the end with more routes), sector (domestic = both ends in your home country), region (where the far end is, by map position, so approximate), plane size (mixed = more than one size) or margin band; each group heading carries its subtotals and folds on a tap, and ▸ folds them all. Click a heading to sort by it, again to flip the order, or a route to open it. The bottom row and group headings total their routes: flights and net add up, the rest are plain averages of the routes. The fare strip under the table opens the fare policy and seat split.'));
   root.append(intro);
 
   const chips = document.createElement('div');

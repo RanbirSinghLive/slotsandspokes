@@ -106,7 +106,7 @@ function groupTable(state: SimState, by: RouteGroupBy): HTMLElement {
   const table = document.createElement('table');
   table.className = 'money-group-table';
   const head = document.createElement('tr');
-  for (const text of [by === 'hub' ? 'Hub' : by === 'region' ? 'Region' : 'Sector', 'Routes', '$/day', 'Margin', '']) {
+  for (const text of [by === 'hub' ? 'Hub' : by === 'region' ? 'Region' : 'Sector', 'Routes', '$/day', 'Net', '']) {
     const th = document.createElement('th');
     th.textContent = text;
     head.append(th);
