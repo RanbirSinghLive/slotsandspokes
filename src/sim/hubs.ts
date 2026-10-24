@@ -4,8 +4,9 @@ import { connectingFeedMultiplier } from './innovations';
 import { actualDailyDemand, currentPotentialDemand } from './marketDemand';
 import { flowRights, grantedCountries, homeCountry } from './rights';
 import { marketKey, type ScheduleLeg } from './schedule';
-import { hubStyleAt, type HubStyle } from './hubStyle';
-import { planRespace, applyRespace, workingCopy, type TurnBufferPlan } from './turnBuffer';
+import { bankCycleFor, banksWithPeriod, hubBanksAt, hubStyleAt, isOnBank, type HubBanks, type HubStyle } from './hubStyle';
+import { rotationsForTail, scheduledTurnMinutes } from './utilisation';
+import { planRespace, applyRespace, tailFits, workingCopy, type TurnBufferPlan } from './turnBuffer';
 import { recessionFactor } from './shocks';
 import type { SimState } from './state';
 
@@ -415,15 +416,45 @@ export function connectingDemandOnMarket(state: SimState, origin: string, dest: 
 }
 
 /**
+ * The waves `hub` would get as Banked: its current ones if already banked,
+ * else a cycle sized to the round trips of the rotations based there
+ * (sim/hubStyle.ts's bankCycleFor()), each measured packed tight, block
+ * times plus the turns between its legs.
+ */
+export function proposedBanks(state: SimState, hub: string): HubBanks {
+  const current = hubBanksAt(state, hub);
+  if (current) return current;
+  const roundTrips: number[] = [];
+  for (const aircraft of state.aircraft) {
+    if (aircraft.baseAirport !== hub) continue;
+    for (const rotation of rotationsForTail(state, aircraft.tail)) {
+      if (rotation.legs[0]?.origin !== hub) continue;
+      const minutes = rotation.legs.reduce((total, leg, i) => total + leg.blockMinutes + (i < rotation.legs.length - 1 ? scheduledTurnMinutes(state, leg.origin, leg.dest) : 0), 0);
+      roundTrips.push(minutes);
+    }
+  }
+  return banksWithPeriod(bankCycleFor(roundTrips));
+}
+
+/** `state` with `hub` run as `style`, for planning on: the style and, for Banked, its waves. */
+export function withStyle(state: SimState, hub: string, style: HubStyle): Pick<SimState, 'hubStyles' | 'hubBanks'> {
+  return {
+    hubStyles: { ...state.hubStyles, [hub]: style },
+    hubBanks: style === 'banked' ? { ...state.hubBanks, [hub]: proposedBanks(state, hub) } : state.hubBanks,
+  };
+}
+
+/**
  * What switching `hub` to `style` would do to the schedule: every plane
- * flying into it gets the style's hub wait after each arrival there, and
- * every plane based there starts its rotations on the style's waves,
- * re-timed and re-pooled exactly like a turn-buffer change.
+ * based there starts its rotations on the style's waves and lands home
+ * just before one, as many of its rotations as its day can take, re-timed
+ * and re-pooled exactly like a turn-buffer change.
  */
 export function planHubStyleChange(state: SimState, hub: string, style: HubStyle): TurnBufferPlan {
-  const work = workingCopy(state, { hubStyles: { ...state.hubStyles, [hub]: style } });
+  const work = workingCopy(state, withStyle(state, hub, style));
   const basedHere = new Set(state.aircraft.filter((aircraft) => aircraft.baseAirport === hub).map((aircraft) => aircraft.tail));
-  const affectedTails = [...new Set(state.schedule.filter((leg) => leg.dest === hub || basedHere.has(leg.tail)).map((leg) => leg.tail))];
+  // A plane whose day is already over-full (AOG cover can leave one so) keeps its times rather than blocking the switch.
+  const affectedTails = [...new Set(state.schedule.filter((leg) => basedHere.has(leg.tail)).map((leg) => leg.tail))].filter((tail) => tailFits(state, tail));
   return planRespace(state, work, affectedTails);
 }
 
@@ -432,7 +463,22 @@ export function connectingUnderStyle(state: SimState, hub: string, style: HubSty
   if (style === hubStyleAt(state, hub)) return connectingPassengersThrough(state, hub);
   const plan = planHubStyleChange(state, hub, style);
   if (!plan.ok) return connectingPassengersThrough(state, hub);
-  return connectingPassengersThrough({ ...state, hubStyles: { ...state.hubStyles, [hub]: style }, schedule: plan.schedule }, hub);
+  return connectingPassengersThrough({ ...state, ...withStyle(state, hub, style), schedule: plan.schedule }, hub);
+}
+
+/** A banked hub's rotations that leave on a wave, of all the rotations based there. */
+export function rotationsOnBank(state: SimState, hub: string): { onBank: number; total: number } {
+  let onBank = 0;
+  let total = 0;
+  for (const aircraft of state.aircraft) {
+    if (aircraft.baseAirport !== hub) continue;
+    for (const rotation of rotationsForTail(state, aircraft.tail)) {
+      if (rotation.legs[0]?.origin !== hub) continue;
+      total++;
+      if (isOnBank(state, hub, rotation.legs[0].departMinute)) onBank++;
+    }
+  }
+  return { onBank, total };
 }
 
 export function applyHubStyleChange(
@@ -442,8 +488,14 @@ export function applyHubStyleChange(
 ): { ok: true; moved: number } | { ok: false; reason: string } {
   const plan = planHubStyleChange(state, hub, style);
   if (!plan.ok) return plan;
+  const { hubBanks } = withStyle(state, hub, style);
   applyRespace(state, plan);
-  if (style === 'rolling') delete state.hubStyles[hub];
-  else state.hubStyles[hub] = style;
+  if (style === 'rolling') {
+    delete state.hubStyles[hub];
+    if (state.hubBanks) delete state.hubBanks[hub];
+  } else {
+    state.hubStyles[hub] = style;
+    state.hubBanks = hubBanks;
+  }
   return { ok: true, moved: plan.moved };
 }

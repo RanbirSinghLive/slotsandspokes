@@ -3,8 +3,8 @@ import { brandEdge } from './nps';
 import { airlineFuelPrice } from './fuelPrice';
 import { loadFactorCap } from './innovations';
 import { connectingPriceResponse, legCost, type EconomyAircraftType } from './economy';
-import { connectingDemandOnMarket, connectingPassengersThrough, connectingFlowsAt, spokesOf, planHubStyleChange } from './hubs';
-import { HUB_STYLES, HUB_STYLE_ORDER, hubStyleAt, type HubStyle } from './hubStyle';
+import { connectingDemandOnMarket, connectingPassengersThrough, connectingFlowsAt, spokesOf, planHubStyleChange, rotationsOnBank, withStyle } from './hubs';
+import { HUB_STYLE_ORDER, hubBanksAt, hubStyleAt, type HubBanks, type HubStyle } from './hubStyle';
 import { airportLoad } from './airports';
 import { summarizeMarket } from './marketSummary';
 import { legsServingMarket, marketKey, recommendedFare, type ScheduleLeg } from './schedule';
@@ -25,9 +25,10 @@ import type { SimState } from './state';
  *
  *   - Frequency (one more daily round trip to a spoke): minus the extra
  *     flights' direct cost.
- *   - Hub style: minus the aircraft time its hub wait uses, priced at what
- *     that time costs in lease. That's also what makes "go back to
- *     Rolling" a real recommendation when the waves are filling nothing.
+ *   - Hub style: minus the aircraft time waiting for waves uses (how much
+ *     later each plane's day ends), priced at what that time costs in
+ *     lease. That's also what makes "go back to Rolling" a real
+ *     recommendation when the waves are filling nothing.
  *   - New spokes: shown, valued once grown, but never counted as "missed"
  *     — they're growth ideas, not something the current network is
  *     getting wrong.
@@ -64,6 +65,11 @@ export type StylePreview = {
   style: HubStyle;
   connecting: number;
   load: number;
+  /** A Banked style's waves, null for Rolling. */
+  banks: HubBanks | null;
+  /** Rotations based at the hub that would leave on a wave, of `rotations`. */
+  onBank: number;
+  rotations: number;
   /** Null when the schedule can absorb it; otherwise why not. */
   blockedReason: string | null;
 };
@@ -142,15 +148,17 @@ function frequencyMove(state: SimState, hub: string, spoke: string): HubMove | n
   return { kind: 'frequency', spoke, gainPerDay: revenue - cost, extraConnecting: passengers };
 }
 
-/** What the hub wait at `hub` costs a day under `style`, priced at the lease cost of the planes arriving there. */
-function hubWaitCostPerDay(state: SimState, hub: string, style: HubStyle): number {
-  const wait = HUB_STYLES[style].hubWaitMinutes;
-  if (wait === 0) return 0;
+/**
+ * What re-timing from `before` to `after` costs a day in aircraft time:
+ * how much later each plane based at `hub` ends its day, priced at its
+ * lease. Negative when the days get shorter.
+ */
+function dayStretchCostPerDay(before: SimState, after: SimState, hub: string): number {
   let cost = 0;
-  for (const leg of state.schedule) {
-    if (leg.dest !== hub) continue;
-    const aircraft = state.aircraft.find((a) => a.tail === leg.tail);
-    if (aircraft) cost += (wait * aircraft.leaseCostPerDay) / USABLE_DAY_MINUTES;
+  for (const aircraft of before.aircraft) {
+    if (aircraft.baseAirport !== hub) continue;
+    const ends = (state: SimState) => latestArrival(state.schedule.filter((leg) => leg.tail === aircraft.tail));
+    cost += ((ends(after) - ends(before)) * aircraft.leaseCostPerDay) / USABLE_DAY_MINUTES;
   }
   return cost;
 }
@@ -168,13 +176,17 @@ export function styleAdvice(state: SimState, hub: string): { styles: StylePrevie
   const afters = new Map<HubStyle, SimState>();
   const styles: StylePreview[] = HUB_STYLE_ORDER.map((candidate) => {
     const plan = candidate === style ? null : planHubStyleChange(state, hub, candidate);
-    const after = { ...state, hubStyles: { ...state.hubStyles, [hub]: candidate }, schedule: plan?.ok ? plan.schedule : state.schedule };
+    const after = { ...state, ...withStyle(state, hub, candidate), schedule: plan?.ok ? plan.schedule : state.schedule };
     afters.set(candidate, after);
     if (plan?.ok && latestArrival(plan.schedule) > USABLE_DAY_END_MINUTE - CURFEW_MARGIN_MINUTES) lateDays.add(candidate);
+    const { onBank, total } = rotationsOnBank(after, hub);
     return {
       style: candidate,
       connecting: connectingPassengersThrough(after, hub),
       load: airportLoad(after, hub),
+      banks: hubBanksAt(after, hub),
+      onBank,
+      rotations: total,
       blockedReason: plan && !plan.ok ? plan.reason : null,
     };
   });
@@ -188,8 +200,7 @@ export function styleAdvice(state: SimState, hub: string): { styles: StylePrevie
     const { revenue, passengers } = connectionRevenueGain(state, after, hub);
     // Going to a less-banked style loses connections too; value that loss the same capped way.
     const { revenue: lost } = connectionRevenueGain(after, state, hub);
-    const waitSaving = hubWaitCostPerDay(state, hub, style) - hubWaitCostPerDay(state, hub, preview.style);
-    const gainPerDay = revenue - lost + waitSaving;
+    const gainPerDay = revenue - lost - dayStretchCostPerDay(state, after, hub);
     if (gainPerDay > 0 && (!best || gainPerDay > best.gainPerDay)) {
       best = { kind: 'style', style: preview.style, gainPerDay, extraConnecting: passengers };
     }

@@ -58,7 +58,7 @@ import { CHARGER_FEE, CHARGER_PER_DAY } from '../sim/powertrain';
  */
 
 // Short enough to fit a button: the full names are in each button's label.
-const HUB_STYLE_ICON_TEXT = { rolling: 'Roll', banked: 'Bank', tight: 'Tight' } as const;
+const HUB_STYLE_ICON_TEXT = { rolling: 'Roll', banked: 'Bank' } as const;
 
 const ringHintEl = document.querySelector<HTMLElement>('#radial-hint')!;
 /** How far below the click point the ring's hint label sits: clear of the ring and an open fan (radial.ts FAN_RADIUS_PX). */

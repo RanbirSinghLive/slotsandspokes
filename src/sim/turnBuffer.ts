@@ -1,6 +1,6 @@
 import { classByCode } from './aircraftClasses';
 import { marketKey, nextLegId, sameRouteClash, type ScheduleLeg } from './schedule';
-import { nextBankMinute } from './hubStyle';
+import { bankAtOrBefore, bankedArrivalMinute, hubBanksAt, nextBankMinute } from './hubStyle';
 import { hourlyRoomProblem, hourOf } from './hours';
 import {
   aircraftUtilisation,
@@ -70,52 +70,96 @@ function collides(schedule: ScheduleLeg[], leg: ScheduleLeg, departMinute: numbe
  * Re-space one aircraft's whole day: within a rotation each leg leaves one
  * block time plus one scheduled turn after the previous one. The day's
  * first rotation keeps its start. Each later one starts as soon after the
- * one before as it has room in every hour its legs use (sim/hours.ts) and,
- * at a banked hub, on a wave (sim/hubStyle.ts's nextBankMinute()): so the
- * day closes up behind a removed flight, and a longer turn pushes the rest
- * later, but nothing is packed into a full hour. Mutates the legs in
- * `work.schedule`.
+ * one before as it has room in every hour its legs use (sim/hours.ts), so
+ * the day closes up behind a removed flight, and a longer turn pushes the
+ * rest later, but nothing is packed into a full hour.
+ *
+ * At a banked base a rotation is timed to the waves (sim/hubStyle.ts): it
+ * leaves on a wave, and its flight home waits at the last outstation so it
+ * lands just before the next wave it can feed. Only where that costs the
+ * plane at most half a cycle: a rotation that would skip a wave flies
+ * rolling instead. Only the first `bankedRotations` rotations may bank,
+ * so planRespace() can lower the count until the day fits. Mutates the
+ * legs in `work.schedule`.
  */
-function repackTail(work: SimState, tail: string): void {
+function repackTail(work: SimState, tail: string, bankedRotations = Infinity): void {
   const legs = work.schedule.filter((leg) => leg.tail === tail).sort((a, b) => a.departMinute - b.departMinute);
   if (legs.length === 0) return;
   const base = work.aircraft.find((aircraft) => aircraft.tail === tail)?.baseAirport;
+  const banks = hubBanksAt(work, base);
 
-  // The first rotation keeps its start, on a wave at a banked base.
-  let cursor = legs[0].origin === base ? nextBankMinute(work, base, legs[0].departMinute) : legs[0].departMinute;
-  for (let i = 0; i < legs.length; i++) {
-    const leg = legs[i];
-    const startsRotation = i > 0 && leg.origin === base && legs[i - 1].dest === base;
-    let departMinute = startsRotation ? roomyStart(work, legs, i, base, cursor) : cursor;
-    for (let nudge = 0; nudge < MAX_COLLISION_NUDGES && collides(work.schedule, leg, departMinute); nudge++) {
-      departMinute += COLLISION_NUDGE_MINUTES;
+  let cursor = legs[0].departMinute;
+  let rotation = 0;
+  for (let from = 0; from < legs.length; rotation++) {
+    let to = from;
+    while (to < legs.length - 1 && !(legs[to + 1].origin === base && legs[to].dest === base)) to++;
+    const rotationLegs = legs.slice(from, to + 1);
+    const fromBase = rotationLegs[0].origin === base;
+    // The first rotation keeps its start; at a banked base, the wave at or before it, since the plane spent the night there.
+    const start = (onWaves: boolean) =>
+      from === 0 ? (onWaves ? bankAtOrBefore(work, base, cursor) : cursor) : fromBase ? roomyStart(work, legs, from, base, cursor, onWaves) : cursor;
+    let times = placeRotation(work, rotationLegs, base, start(false), false);
+    if (banks && fromBase && rotation < bankedRotations) {
+      const banked = placeRotation(work, rotationLegs, base, start(true), true);
+      if (rotationEnd(rotationLegs, banked) - rotationEnd(rotationLegs, times) <= banks.periodMinutes / 2) times = banked;
     }
-    leg.departMinute = departMinute;
-    cursor = departMinute + leg.blockMinutes + scheduledTurnMinutes(work, leg.origin, leg.dest);
+    rotationLegs.forEach((leg, i) => (leg.departMinute = times[i]));
+    const last = rotationLegs[rotationLegs.length - 1];
+    cursor = last.departMinute + last.blockMinutes + scheduledTurnMinutes(work, last.origin, last.dest);
+    from = to + 1;
   }
 }
 
 /**
- * The earliest start from `cursor` (on a wave at a banked base) for the
+ * Departure times for one rotation's legs from `start`, each a block and a
+ * turn after the one before, nudged off another plane's flight on the
+ * same route. With `onWaves`, the flight home to a banked base waits to
+ * land just before a wave.
+ */
+function placeRotation(work: SimState, rotationLegs: ScheduleLeg[], base: string | null | undefined, start: number, onWaves: boolean): number[] {
+  const times: number[] = [];
+  let at = start;
+  for (const leg of rotationLegs) {
+    let departMinute = at;
+    if (onWaves && leg.dest === base && leg.origin !== base) {
+      departMinute = bankedArrivalMinute(work, base, departMinute + leg.blockMinutes) - leg.blockMinutes;
+    }
+    for (let nudge = 0; nudge < MAX_COLLISION_NUDGES && collides(work.schedule, leg, departMinute); nudge++) {
+      departMinute += COLLISION_NUDGE_MINUTES;
+    }
+    times.push(departMinute);
+    at = departMinute + leg.blockMinutes + scheduledTurnMinutes(work, leg.origin, leg.dest);
+  }
+  return times;
+}
+
+function rotationEnd(rotationLegs: ScheduleLeg[], times: number[]): number {
+  return times[times.length - 1] + rotationLegs[rotationLegs.length - 1].blockMinutes;
+}
+
+/**
+ * The earliest start from `cursor` (on a wave when `onWaves`) for the
  * rotation beginning at `legs[from]` that has room in every hour its legs
  * would use, searched like the route planner's (sim/rotations.ts): each
  * try clears the full hour it hit. The earliest start at all when no hour
  * fits before the day ends: an over-full hour congests, it doesn't stop
  * the re-spacing.
  */
-function roomyStart(work: SimState, legs: ScheduleLeg[], from: number, base: string | null | undefined, cursor: number): number {
+function roomyStart(work: SimState, legs: ScheduleLeg[], from: number, base: string | null | undefined, cursor: number, onWaves: boolean): number {
   let to = from;
   while (to < legs.length - 1 && legs[to].dest !== base) to++;
   const rotation = legs.slice(from, to + 1);
+  const wave = (minute: number) => (onWaves ? nextBankMinute(work, base, minute) : minute);
   const packedFrom = (start: number) => {
     let at = start;
     return rotation.map((leg) => {
+      if (onWaves && leg.dest === base) at = bankedArrivalMinute(work, base, at + leg.blockMinutes) - leg.blockMinutes;
       const packed = { origin: leg.origin, dest: leg.dest, departMinute: at, blockMinutes: leg.blockMinutes };
       at += leg.blockMinutes + scheduledTurnMinutes(work, leg.origin, leg.dest);
       return packed;
     });
   };
-  const earliest = nextBankMinute(work, base, cursor);
+  const earliest = wave(cursor);
   const cache = new Map();
   let start = earliest;
   for (let tries = 0; tries < 24; tries++) {
@@ -124,13 +168,34 @@ function roomyStart(work: SimState, legs: ScheduleLeg[], from: number, base: str
     if (last.departMinute + last.blockMinutes > USABLE_DAY_END_MINUTE) break;
     const problem = hourlyRoomProblem(work, packed, cache, rotation);
     if (!problem) return start;
-    start = nextBankMinute(work, base, start + Math.max(COLLISION_NUDGE_MINUTES, (hourOf(problem.minute) + 1) * 60 - (problem.minute % 1440)));
+    start = wave(start + Math.max(COLLISION_NUDGE_MINUTES, (hourOf(problem.minute) + 1) * 60 - (problem.minute % 1440)));
   }
   return earliest;
 }
 
+/**
+ * Re-space a tail, timing as many of its rotations to its banked base's
+ * waves as its day can take: all of them if they fit, else one fewer at a
+ * time, down to none (rolling). Only a day that doesn't fit even rolling
+ * is left for planRespace() to move rotations off.
+ */
+function repackFitting(work: SimState, tail: string): void {
+  const legs = work.schedule.filter((leg) => leg.tail === tail);
+  const original = legs.map((leg) => leg.departMinute);
+  repackTail(work, tail);
+  if (tailFits(work, tail)) return;
+  const base = work.aircraft.find((aircraft) => aircraft.tail === tail)?.baseAirport;
+  if (!hubBanksAt(work, base)) return;
+  for (let banked = rotationsForTail(work, tail).length - 1; banked >= 0; banked--) {
+    // Each try starts from the times the day had, not the last try's.
+    legs.forEach((leg, i) => (leg.departMinute = original[i]));
+    repackTail(work, tail, banked);
+    if (tailFits(work, tail)) return;
+  }
+}
+
 /** Whether this tail's day, as currently scheduled, ends inside the usable day. */
-function tailFits(work: SimState, tail: string): boolean {
+export function tailFits(work: SimState, tail: string): boolean {
   const legs = work.schedule.filter((leg) => leg.tail === tail);
   if (legs.length === 0) return true;
   // A long-haul round trip is allowed to run round the clock (see
@@ -258,7 +323,7 @@ export function planRespace(state: SimState, work: SimState, affectedTails: stri
   let moved = 0;
 
   for (const tail of affectedTails) {
-    repackTail(work, tail);
+    repackFitting(work, tail);
 
     while (!tailFits(work, tail)) {
       const aircraft = state.aircraft.find((x) => x.tail === tail);
@@ -280,7 +345,7 @@ export function planRespace(state: SimState, work: SimState, affectedTails: stri
       work.schedule = work.schedule.filter((leg) => !toMove.legs.includes(leg));
       if (!rehome(work, state, toMove, tail)) return { ok: false, reason: noRoom };
       moved += 1;
-      repackTail(work, tail);
+      repackFitting(work, tail);
     }
   }
 

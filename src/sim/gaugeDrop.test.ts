@@ -6,6 +6,8 @@ import { computeBlockMinutes, legDistanceNm } from './schedule';
 import { step } from './step';
 import { allRotations } from './utilisation';
 import { rangeNmFor } from './range';
+import airportsData from '../../data/airports.json';
+import { applyRotation, planRotation, type RotationStop } from './rotations';
 
 // Run with `npm run gaugetest`: a rotation dropped on a plane of another type
 // at the same base is re-timed for that type, and refused when any leg is
@@ -55,7 +57,17 @@ assert.ok(upgauged > 0, 'no prop round trip could be upgauged onto a regional');
 
 // Range: a rotation with a leg beyond the prop's range is refused on every prop, in both a plain move and as the far side of a swap.
 // Clear of the prop's range by a mile: the planner rounds distances, so a leg a fraction over still fits.
-const tooFar = rotations.filter((r) => typeOf(r.tail) !== 'PROP' && longest(r.legs) > rangeNmFor(state, 'PROP') + 1);
+const isTooFar = (r: (typeof rotations)[number]) => typeOf(r.tail) !== 'PROP' && longest(r.legs) > rangeNmFor(state, 'PROP') + 1;
+if (!rotations.some(isTooFar)) {
+  // The game didn't fly one by day 75: give the regional one through the route planner, on a day cleared for it.
+  const regional = regionals[0];
+  state.schedule = state.schedule.filter((leg) => leg.tail !== regional.tail);
+  const stop = (iata: string) => (airportsData as RotationStop[]).find((airport) => airport.iata === iata)!;
+  const plan = planRotation([stop(regional.baseAirport!)], stop('MSP'), regional.tail, state);
+  assert.equal(plan.error, null, `the regional couldn't plan a long rotation: ${plan.error}`);
+  applyRotation(state, regional.tail, plan);
+}
+const tooFar = allRotations(state).filter((r) => r.closed && r.airports.length === 3).filter(isTooFar);
 assert.ok(tooFar.length > 0, 'the game needs a regional rotation beyond a prop');
 for (const rotation of tooFar) {
   const ids = rotation.legs.map((leg) => leg.legId);
