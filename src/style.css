@@ -2780,6 +2780,11 @@ button.ticker-item:hover {
   display: none;
 }
 
+/* The Plan hub window opens from the side panel (an airport's view, the Airports screen), so it sits above the panel, which on a phone covers the screen; confirms still go over it. */
+#hub-planner-modal {
+  z-index: 42;
+}
+
 .modal-box {
   max-width: 360px;
   padding: 20px 24px;
@@ -8387,3 +8392,135 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
   width: 120px;
   accent-color: #c3a6ff;
 }
+
+/* Airports screen (ui/inspector/airports.ts): the watch list, hub cards and the share column. */
+
+.watch-list {
+  gap: 2px;
+}
+
+.watch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 2px 6px;
+  border-left: 3px solid #ffd166;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+}
+
+.watch-row:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.watch-row.is-bad {
+  border-left-color: #ff5c5c;
+}
+
+.watch-row .glyph {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: #ffd166;
+}
+
+.watch-row.is-bad .glyph {
+  color: #ff8080;
+}
+
+.watch-code {
+  flex: none;
+  min-width: 34px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.watch-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #cdd3e0;
+}
+
+.watch-row .watch-action {
+  flex: none;
+  margin: 0;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+
+.hub-card {
+  margin: 6px 0 10px;
+  padding: 6px 8px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+}
+
+.hub-card-head {
+  width: 100%;
+}
+
+.hub-moat .pips {
+  margin-left: 2px;
+}
+
+.pips-moat i.is-on { background: #5ed6c8; border-color: #5ed6c8; }
+
+.hub-style-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 6px 0 2px;
+}
+
+.hub-style-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 5px 7px;
+  font: inherit;
+  font-size: 11px;
+  color: #cdd3e0;
+  text-align: left;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.hub-style-chip b {
+  font-size: 12px;
+  color: #fff;
+}
+
+.hub-style-chip:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.hub-style-chip:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.hub-style-chip.is-active,
+.hub-style-chip.is-active:disabled {
+  opacity: 1;
+  border-color: rgba(94, 214, 200, 0.8);
+  background: rgba(94, 214, 200, 0.08);
+}
+
+.hub-style-chip .is-gain { color: #7fd88f; }
+.hub-style-chip .is-cost { color: #ff9b8a; }
+
+.share-bar i {
+  background: #5ed6c8;
+}
+
+.share-trend.is-up { color: #7fd88f; }
+.share-trend.is-down { color: #ff9b8a; }
+.slot-heritage { color: #ffd166; }
