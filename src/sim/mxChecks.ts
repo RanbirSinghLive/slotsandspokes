@@ -33,10 +33,10 @@ import type { Aircraft, SimState } from './state';
  *
  * **The heavy check** is HEAVY_WORK_MINUTES of hangar work every
  * HEAVY_INTERVAL_DAYS days the plane flies, done as one stretch with the
- * plane out of service, in a hangar bay or contracted out: booked by the
- * player once HEAVY_WINDOW_DAYS before it's due, or forced when the plane
- * is OVERDUE_GRACE_DAYS past due, as an AOG (sim/aog.ts), at its base,
- * until the work is done. Done, it clears every deferred item. So the lever
+ * plane out of service, in a hangar bay or contracted out: booked early by
+ * the player from HEAVY_WINDOW_DAYS before it's due, or started by itself
+ * the morning it falls due, as an AOG (sim/aog.ts), at its base, until the
+ * work is done. Done, it clears every deferred item. So the lever
  * is picking the quiet week, not the shape of the plane's night.
  */
 
@@ -62,7 +62,6 @@ export const C_INTERVAL_HOURS = 900;
 export const C_INTERVAL_CYCLES = 750;
 /** The heavy check's work starts being done this many days before it's due. */
 export const HEAVY_WINDOW_DAYS = 15;
-export const OVERDUE_GRACE_DAYS = 7;
 /**
  * Hangar minutes a heavy check takes, by class: whole days, so the plane is
  * out of service 2, 2, 3 or 4 days. Rare and heavy rather than frequent and
@@ -96,9 +95,10 @@ const A_WORK_MINUTES: Record<string, number> = { PROP: 240, REGIONAL: 300, NARRO
 
 /**
  * The D check: an overhaul due after D_INTERVAL_DAYS flying days or
- * D_INTERVAL_HOURS airborne, whichever comes first. It takes the plane out of
- * service for days, so it is only ever booked by the player, never forced; a
- * plane past due wears like D_WEAR_YEARS more years of age until it goes in.
+ * D_INTERVAL_HOURS airborne, whichever comes first. Like the C check it can
+ * be booked early from its window and otherwise starts by itself the morning
+ * it falls due at base; a plane past due (away from base) wears like
+ * D_WEAR_YEARS more years of age until it goes in.
  */
 export const D_INTERVAL_DAYS = 720;
 export const D_INTERVAL_HOURS = 7200;
@@ -574,13 +574,17 @@ export function morningHolds(state: SimState): { tail: string; legIds: string[] 
 }
 
 /**
- * Heavy checks overdue past the grace, from sim/aog.ts's morning pass:
- * each plane at base is grounded for the work it has left, in whole days.
- * Done in house at a hangar rated for the class; elsewhere the work is
- * contracted, paid here.
+ * Heavy checks falling due, from sim/aog.ts's morning pass: each plane at
+ * base goes in that morning for the work it has left, in whole days, so a
+ * check never waits on the player. Done in house at a hangar rated for the
+ * class; elsewhere the work is contracted, paid here. A plane whose D check
+ * is due or booked goes in for that instead, which does the C check too.
  */
-export function forcedHeavyChecks(state: SimState, claimed: BayClaims = new Map()): { aircraft: Aircraft; days: number }[] {
-  return groundForHeavyCheck(state, state.aircraft.filter((aircraft) => heavyCheckDueIn(aircraft) <= -OVERDUE_GRACE_DAYS), claimed);
+export function dueHeavyChecks(state: SimState, claimed: BayClaims = new Map()): { aircraft: Aircraft; days: number }[] {
+  const due = state.aircraft.filter((aircraft) => heavyCheckDueIn(aircraft) <= 0 && !aircraft.dCheckBooked && dCheckDueIn(aircraft) > 0);
+  const started = groundForHeavyCheck(state, due, claimed);
+  for (const { aircraft } of started) delete aircraft.heavyCheckBooked;
+  return started;
 }
 
 /** Bays taken so far this morning by checks starting, by station. */
@@ -616,7 +620,7 @@ function takesBay(state: SimState, station: string, typeCode: string, claimed: B
  * forced this morning) are left alone.
  */
 export function bookedHeavyChecks(state: SimState, skip: Aircraft[], claimed: BayClaims = new Map()): { aircraft: Aircraft; days: number }[] {
-  const booked = groundForHeavyCheck(state, state.aircraft.filter((aircraft) => aircraft.heavyCheckBooked && !skip.includes(aircraft)), claimed);
+  const booked = groundForHeavyCheck(state, state.aircraft.filter((aircraft) => aircraft.heavyCheckBooked && !aircraft.dCheckBooked && !skip.includes(aircraft)), claimed);
   for (const { aircraft } of booked) delete aircraft.heavyCheckBooked;
   return booked;
 }
@@ -768,20 +772,22 @@ export function dCheckContractCost(typeCode: string): number {
 }
 
 /**
- * D checks the player booked: grounded the next morning for the whole
- * overhaul, the same way a C check is. A booked plane that isn't at its base
- * that morning stays booked until it is. Planes in `skip` (already starting a
- * C check) wait.
+ * D checks the player booked, or falling due: grounded that morning for the
+ * whole overhaul, the same way a C check is. A plane that isn't at its base
+ * that morning waits until it is. Planes in `skip` (already starting a C
+ * check) wait.
  */
-export function bookedDChecks(state: SimState, skip: Aircraft[], claimed: BayClaims = new Map()): { aircraft: Aircraft; days: number }[] {
+export function startingDChecks(state: SimState, skip: Aircraft[], claimed: BayClaims = new Map()): { aircraft: Aircraft; days: number; booked: boolean }[] {
   const going = state.aircraft
-    .filter((aircraft) => aircraft.dCheckBooked && !skip.includes(aircraft))
+    .filter((aircraft) => (aircraft.dCheckBooked || dCheckDueIn(aircraft) <= 0) && !skip.includes(aircraft))
     .filter((aircraft) => aircraft.status === 'ground' && (aircraft.atAirport === aircraft.baseAirport || aircraft.atAirport === nightStopStation(state, aircraft.tail)) && !aircraft.rebase)
     .filter((aircraft) => !state.aogs.some((event) => event.tail === aircraft.tail));
   return going.map((aircraft) => {
+    const booked = aircraft.dCheckBooked === true;
     delete aircraft.dCheckBooked;
+    delete aircraft.heavyCheckBooked;
     if (!takesBay(state, aircraft.atAirport ?? '', aircraft.typeCode, claimed)) chargeMaintenance(state, dCheckContractCost(aircraft.typeCode));
-    return { aircraft, days: dCheckDays(aircraft.typeCode) };
+    return { aircraft, days: dCheckDays(aircraft.typeCode), booked };
   });
 }
 

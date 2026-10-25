@@ -12,6 +12,7 @@ import { drawPainGauges } from './render/pain';
 import { drawCallPulse, callPulseActive } from './render/callPulse';
 import { drawMilestonePops, milestonePopsActive, onMilestonePops } from './render/milestones';
 import { playMilestoneChime } from './ui/popSound';
+import { noteCheckStarts } from './ui/checkSound';
 import { METRO_COLORS } from './render/metro';
 import { drawAirports, drawSelectedAirport, airports, setKnownAirports, nearestAirportCandidate, setAirportHold } from './render/airports';
 import { drawHubView, hasHubView } from './render/hubs';
@@ -320,6 +321,7 @@ function render(nowMs: number = performance.now()): void {
   updateMarket(state);
   updatePoolBars(state);
   updatePipeline(state, choosingHome);
+  if (!choosingHome) noteCheckStarts(state);
   // Always visible, whatever screen is open: see ui/alerts.ts's own
   // comment for why that's the point. An alert with no view of its own
   // (a schedule problem) opens Fleet, where the rotations are.

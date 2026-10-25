@@ -8,7 +8,7 @@ import { marketKey } from './schedule';
 import { aircraftUtilisation, rotationsForTail, type Rotation } from './utilisation';
 import { coverRotations, handBackCover } from './turnBuffer';
 import { applyRefit, refitDays, refitWorkMinutes, type RefitTarget } from './cabins';
-import { type BayClaims, bookedDChecks, chargeMaintenance, freeHeavyBays, bookedHeavyChecks, finishDCheck, finishHeavyCheck, forcedHeavyChecks, wornAge } from './mxChecks';
+import { type BayClaims, chargeMaintenance, freeHeavyBays, bookedHeavyChecks, dueHeavyChecks, finishDCheck, finishHeavyCheck, startingDChecks, wornAge } from './mxChecks';
 import { nightStopStation } from './nightStops';
 import { rollFleetCabins } from './fleetCabins';
 import { engineFault, rollEngineDay } from './enginePool';
@@ -188,14 +188,14 @@ export function rollDailyAogs(state: SimState, dayStartMinute: number): void {
     }
     handBackCover(state, event);
   }
-  // Heavy checks overdue past the grace (sim/mxChecks.ts): grounded, the same way, for the work left.
+  // Checks falling due today, and the ones booked early (sim/mxChecks.ts): grounded, the same way, for the work left.
   const bayClaims: BayClaims = new Map();
-  const forced = forcedHeavyChecks(state, bayClaims);
+  const due = dueHeavyChecks(state, bayClaims);
   const checksToStart = [
-    ...forced.map((check) => ({ ...check, fault: 'C check overdue' })),
-    ...bookedHeavyChecks(state, forced.map((check) => check.aircraft), bayClaims).map((check) => ({ ...check, fault: 'C check booked' })),
+    ...due.map((check) => ({ ...check, fault: 'C check due' })),
+    ...bookedHeavyChecks(state, due.map((check) => check.aircraft), bayClaims).map((check) => ({ ...check, fault: 'C check booked' })),
   ];
-  const dChecks = bookedDChecks(state, checksToStart.map((check) => check.aircraft), bayClaims).map((check) => ({ ...check, fault: 'D check booked', checkKind: 'D' as const }));
+  const dChecks = startingDChecks(state, checksToStart.map((check) => check.aircraft), bayClaims).map((check) => ({ ...check, fault: check.booked ? 'D check booked' : 'D check due', checkKind: 'D' as const }));
   for (const { aircraft, days, fault, checkKind } of [...checksToStart.map((check) => ({ ...check, checkKind: undefined })), ...dChecks]) {
     state.lastAogDay = dayIndex(state);
     state.aogs.push({

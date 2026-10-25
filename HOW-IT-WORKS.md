@@ -3792,12 +3792,12 @@ stay on the Crews screen, where the whole roster is in view.
 The bottom left of the map holds the next 30 days (`PIPELINE_DAYS`) of
 everything dated coming at the airline, on one axis from today, with a lane
 per department. `pipelineItems()` gathers it from the mechanics that own
-each thing; it has no rules of its own. Something overdue sits on today; a
+each thing; it has no rules of its own. Something overdue sits on today (a check only when its plane is away from base, since checks go in by themselves on their due day); a
 span (a plane out of service, a closure, an event) runs as a bar to its end.
 
 | Lane | Marks | Quick edits in the tip |
 | --- | --- | --- |
-| Mtc | C check (teal, amber in its booking window, red overdue, dashed when booked), D check (violet), a plane in its heavy check or AOG or refit, as a bar to the day it's back | induct or push a C check +1/+5/+15d, book or cancel a D check, expedite an AOG |
+| Mtc | C check (teal, amber in its booking window, red overdue, dashed when booked; the plane goes in on that day by itself), D check (violet), a plane in its heavy check or AOG or refit, as a bar to the day it's back | induct or push a C check +1/+5/+15d, book or cancel a D check, expedite an AOG |
 | Fleet | a delivery (EIS; red with "−N" when it would arrive short of crews), a ferry to another base, a plane going back to the lessor or a seasonal lease ending | hire the crews a delivery is short |
 | Crews | a batch of crews joining (hired or converting), a batch of attendants joining (☺+N) | |
 | Sales | a contract term ending, an offer or award lapsing, a tender being decided, a rival's takeover window closing, a request offer lapsing or a request running; the lane goes when tenders and requests are both switched off | decline a tender or offer not yet awarded |
@@ -4089,15 +4089,20 @@ day, free, handed back at the next rollover like a swap
 **The heavy check is the C check** (the screens call it C; the code says heavy).
 It is due after 90 flying days, 900 flight hours or 750 cycles, whichever comes
 first (`heavyCheckProgressDays()`), so a plane flown hard comes due sooner than
-one flown lightly. The 15-day window and 7-day grace below are counted in days
+one flown lightly. The 15-day window below is counted in days
 on whichever clock is furthest along. It is rare and heavy rather than frequent
 and light: 2 days out of service for a Propeller or a Regional, 3 for a
 Narrowbody, 4 for a Widebody, so a fast-forwarded game isn't a constant queue
 for the hangar. It is one stretch with the plane out of service, never done in
 slices on nights: the plane is grounded as an AOG with its flying moved to
 spare planes, for the work in whole days, in a hangar bay or contracted out.
-It goes in when the player books it (from 15 days before it's due) or, 7
-days past due, whenever it is at base or its night stop. When the work is
+It goes in by itself the morning it falls due, when the plane is at base or
+its night stop (`dueHeavyChecks()`, fault "C check due"), or earlier when the
+player books it (from 15 days before it's due). So the pipeline's C mark is
+the day the plane leaves the line, and a check never sits waiting at the
+front of it; one only runs overdue while the plane is away from base. The
+map plays a wrench rattle the morning any C or D check goes in
+(`ui/checkSound.ts`, on the Game screen's Pops switch). When the work is
 done, the interval starts again and every deferred item is cleared. A plane
 just leased starts part-way through its interval, staggered by tail and never
 within 30 days of due, with its hour and cycle clocks started as far along as
@@ -4109,19 +4114,18 @@ due together. A plane from an older save keeps its clocks, and any hours it had 
 shows "Book C check" on its Mtc card (`bookHeavyCheck()`). The confirm shows
 the days grounded, the contract cost (nothing in house) and the rotations that
 move to other planes. The plane goes in the next morning, grounded the same way
-as a forced check (`bookedHeavyChecks()`, fault "C check booked"), so the
-player picks a quiet week instead of taking the 7-day grace. The booking is
+as a due check (`bookedHeavyChecks()`, fault "C check booked"), so the
+player picks a quiet week instead of taking whatever day it falls due. The booking is
 cancelled with ✕ any time before then; a booked plane away from base waits at
 the booking until it is back. The same booking is a wrench on the plane's
 hangar bay (the dashed box on its base's station card on Mtc); a plane that can't book yet
 (in the air, or away from base) shows a plane icon there whose tip says what
 it waits for (`heavyBookBlocker()`). The headless player books each plane once
 its window is open and it is parked at base, when a hangar bay is free there
-(counting planes it has already booked), and takes the forced, contracted
-check when it is overdue (`keepHeavyChecks()`).
+(counting planes it has already booked), and otherwise lets it go in on its due day (`keepHeavyChecks()`).
 
-**Bays are shared by every check that grounds a plane.** A forced or booked C
-check, and a booked D check, go in house only if the base's hangar is rated for
+**Bays are shared by every check that grounds a plane.** A C or D check going
+in, due or booked, go in house only if the base's hangar is rated for
 the class and has a bay free (bays minus planes already in a C or D check there,
 and any started the same morning). With none free the work is contracted out and
 paid by the hour, the same as at a base with no hangar, and the booking confirm
@@ -4144,19 +4148,20 @@ narrowbody or widebody, +2 on a regional, none on a propeller) and 2 for each ha
 fallen due without the push, the plane wears like 0.1 years of extra age
 (`toleranceWearYears()`, in `wornAge()`), so it breaks and delays more until
 it goes in; the marker is hatched while it wears. The Director also cuts the
-fee (Aaltonen −20%, Bakare −50%). The grace still runs from the pushed date,
+fee (Aaltonen −20%, Bakare −50%). The check goes in by itself on the pushed date,
 and the push and its wear clear when the check is done. The headless player
 never pushes.
 
 **The D check** is the overhaul above the C check, due after 720 flying days
-or 7,200 flight hours, whichever comes first (`dCheckDueIn()`). It is
-**booked, never forced**: from 60 days before due, a plane parked at its base
-shows "Book D check" on its Mtc card (`bookDCheck()`). It goes in the next
-morning, grounded as an AOG with its flying moved to spare planes, for 10 days
+or 7,200 flight hours, whichever comes first (`dCheckDueIn()`). It goes
+in by itself the morning it falls due at base (`startingDChecks()`, fault
+"D check due"), or earlier when booked: from 60 days before due, a plane
+parked at its base shows "Book D check" on its Mtc card (`bookDCheck()`),
+and goes in the next morning, grounded as an AOG with its flying moved to spare planes, for 10 days
 (Propeller), 14 (Regional), 18 (Narrowbody) or 24 (Widebody), the same way a
 C check is. Away from a heavy-rated hangar the work is contracted and paid
 when it goes in. It also does the C and A checks, so those clocks restart with
-it. A plane past due wears like 2 more years of age (`D_WEAR_YEARS`, in
+it. A plane past due (kept away from base) wears like 2 more years of age (`D_WEAR_YEARS`, in
 `wornAge()`) until it goes in. A plane from an older save, or just leased,
 starts staggered by tail, at least 120 days from due, its hours clock with it.
 The headless player never books, so its planes wear past due.
@@ -4221,7 +4226,7 @@ only when the money leaves moves. The Mtc card shows what is due.
   serviceable, on watch, due for action (held, or a heavy check overdue),
   in the hangar or on the ground, then a card per plane, worst first. Each
   card has the heavy-check clock (days since the last check, the booking
-  window, the due mark, the overdue grace) with a thinner
+  window, the due mark, the overdue stretch) with a thinner
   A-check lane under it (percent of its interval, same marks), its deferred
   items as slots filling toward the hold, last night's
   check, and its age, life, tech and AOG figures. Display only: the

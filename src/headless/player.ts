@@ -1453,7 +1453,7 @@ function keepMaintenance(state: SimState): string[] {
  * Book each plane's C check once its window is open and the plane is parked
  * at base, when a hangar bay is free for it (counting the planes already
  * booked there), so checks go in house one stretch at a time instead of
- * waiting out the overdue grace and being contracted out.
+ * taking whatever day they fall due and being contracted out when bays are full.
  */
 function keepHeavyChecks(state: SimState): string[] {
   const log: string[] = [];

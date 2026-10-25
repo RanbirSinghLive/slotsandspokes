@@ -13,7 +13,7 @@
 export interface SoundSettings {
   /** Background lounge music. Off by default: a game that starts making noise unasked is rude. */
   music: boolean;
-  /** A short chime when a route or airport crosses a milestone on the map (ui/popSound.ts). Off by default, like music. */
+  /** Short effects: a chime when a route or airport crosses a milestone on the map (ui/popSound.ts), a wrench when a check goes in (ui/checkSound.ts). Off by default, like music. */
   pops: boolean;
   /** Master volume, 0 to 1. */
   volume: number;
