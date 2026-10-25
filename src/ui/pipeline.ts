@@ -263,7 +263,7 @@ function tipBody(state: SimState, item: PipelineItem): { title: string; lines: s
       if (!readout) break;
       const due = readout.dueIn > 0 ? `due in ${readout.dueIn}d` : readout.dueIn === 0 ? 'due today' : `${-readout.dueIn}d overdue`;
       const lines = [`${due} · days, hours or cycles, whichever first`];
-      lines.push(readout.booked ? 'Booked · in tomorrow' : readout.open ? `In its ${HEAVY_WINDOW_DAYS}d booking window` : `Booking opens ${HEAVY_WINDOW_DAYS}d before due`);
+      lines.push(readout.booked ? 'Booked · in tomorrow' : readout.dueIn <= 0 ? `Goes in once parked at ${readout.base}` : `Goes in by itself ${readout.dueIn === 1 ? 'tomorrow' : `in ${readout.dueIn}d`}${readout.open ? ' · induct early to pick the day' : ''}`);
       if (readout.shiftDays > 0) lines.push(`Pushed +${readout.shiftDays}/${readout.toleranceCap}d${readout.toleranceWear > 0 ? ` · wearing +${readout.toleranceWear.toFixed(1)}y` : ''}`);
       if (!readout.dInCheck && readout.dDueIn <= readout.dueIn) lines.push(`D check due first (${readout.dDueIn > 0 ? `in ${readout.dDueIn}d` : 'now'}) · it also does the C`);
       const actions: HTMLElement[] = [];
@@ -299,7 +299,7 @@ function tipBody(state: SimState, item: PipelineItem): { title: string; lines: s
         book.append(' book D');
         actions.push(book);
       }
-      return { title: `D check · ${readout.tail} · ${readout.base}`, lines: [`${due} · the overhaul, also clears C and A`, readout.dBooked ? 'Booked · in tomorrow' : readout.dOpen ? 'Booking open' : 'Booking not open yet'], actions };
+      return { title: `D check · ${readout.tail} · ${readout.base}`, lines: [`${due} · the overhaul, also clears C and A`, readout.dBooked ? 'Booked · in tomorrow' : readout.dDueIn <= 0 ? `Goes in once parked at ${readout.base}` : `Goes in by itself ${readout.dDueIn === 1 ? 'tomorrow' : `in ${readout.dDueIn}d`}${readout.dOpen ? ' · book early to pick the day' : ''}`], actions };
     }
     case 'hangar':
     case 'aog': {

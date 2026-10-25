@@ -3,7 +3,7 @@ import { execNudge } from '../execNudge';
 import { aogChance, aogFor, daysUntilReturn, expediteCost, expediteRepair } from '../../sim/aog';
 import { ageDelayParameters } from '../../sim/delays';
 import { USEFUL_LIFE_YEARS } from '../../sim/leasing';
-import { LINE_INTERVAL_NIGHTS, A_OVERDUE, A_WINDOW, C_INTERVAL_CYCLES, C_INTERVAL_HOURS, D_INTERVAL_DAYS, D_INTERVAL_HOURS, D_WEAR_YEARS, D_WINDOW_DAYS, DEFERRED_AGE_YEARS, HEAVY_INTERVAL_DAYS, HEAVY_WINDOW_DAYS, MX_HOLD_AT, OVERDUE_GRACE_DAYS, wornAge } from '../../sim/mxChecks';
+import { LINE_INTERVAL_NIGHTS, A_OVERDUE, A_WINDOW, C_INTERVAL_CYCLES, C_INTERVAL_HOURS, D_INTERVAL_DAYS, D_INTERVAL_HOURS, D_WEAR_YEARS, D_WINDOW_DAYS, DEFERRED_AGE_YEARS, HEAVY_INTERVAL_DAYS, HEAVY_WINDOW_DAYS, MX_HOLD_AT, wornAge } from '../../sim/mxChecks';
 import * as ops from '../routeActions';
 import type { EngineReadout, HeavyCheckReadout, LevelledBaseReadout, MxStationCard, OutstationReadout, StationClassReadout } from '../../sim/playerActions';
 import type { SimState } from '../../sim/state';
@@ -130,8 +130,10 @@ type Standing = 'aog' | 'check' | 'due' | 'watch' | 'ok';
 const STANDING_ORDER: Standing[] = ['aog', 'check', 'due', 'watch', 'ok'];
 const STANDING_WORDS: Record<Standing, string> = { aog: 'AOG', check: 'IN HANGAR', due: 'ACTION', watch: 'WATCH', ok: 'SERVICEABLE' };
 
-/** The heavy-check clock runs from the last check to the end of its grace, so the overdue stretch shows. */
-const CLOCK_DAYS = HEAVY_INTERVAL_DAYS + OVERDUE_GRACE_DAYS;
+/** Days past due the heavy-check clock shows, for a plane kept away from base on its due morning. */
+const OVERDUE_SHOWN_DAYS = 7;
+/** The heavy-check clock runs from the last check a week past due, so an overdue stretch shows. */
+const CLOCK_DAYS = HEAVY_INTERVAL_DAYS + OVERDUE_SHOWN_DAYS;
 
 function standingOf(state: SimState, plane: HeavyCheckReadout, life: number): Standing {
   if (plane.inCheck) return 'check';
@@ -207,14 +209,14 @@ function hangarBays(state: SimState, iata: string, level: number, readouts: Heav
  * then a tech-log card for each plane, worst first. Each card carries the
  * heavy-check clock (the days since its last check, the window where
  * nights at a maintenance base count toward it, the due mark and the
- * overdue grace beyond it), its deferred items as slots that fill toward
+ * overdue stretch beyond it), its deferred items as slots that fill toward
  * the hold, and how worn it is.
  */
 function buildFleetBoard(state: SimState, changed: () => void): HTMLElement[] {
   const nodes: HTMLElement[] = [
     heading(
       'Fleet',
-      `Release to service, plane by plane. Serviceable: nothing open. Watch: a deferred item, a C check in its window or under 2 years of life. Action: held at ${MX_HOLD_AT} deferred items or a C check overdue. C-check clock: every ${HEAVY_INTERVAL_DAYS} flying days, ${C_INTERVAL_HOURS} flight hours or ${C_INTERVAL_CYCLES} cycles, 2–4 days in the hangar with the plane grounded. Book it from ${HEAVY_WINDOW_DAYS} days before it's due; ${OVERDUE_GRACE_DAYS} days overdue it is grounded whenever it is at base. Items: each deferred item (no line check, or a night too short) wears the plane like ${DEFERRED_AGE_YEARS} more years; at ${MX_HOLD_AT} it is held for a morning and its first rotation cancelled. Tech: the share of flights that leave without a mechanical delay. AOG: today's chance of a fault grounding it. Life: years left before the airframe reaches its useful life.`,
+      `Release to service, plane by plane. Serviceable: nothing open. Watch: a deferred item, a C check in its window or under 2 years of life. Action: held at ${MX_HOLD_AT} deferred items or a C check overdue. C-check clock: every ${HEAVY_INTERVAL_DAYS} flying days, ${C_INTERVAL_HOURS} flight hours or ${C_INTERVAL_CYCLES} cycles, 2–4 days in the hangar with the plane grounded. It goes in by itself the morning it falls due at base; book it earlier from ${HEAVY_WINDOW_DAYS} days before to pick a quiet week. Items: each deferred item (no line check, or a night too short) wears the plane like ${DEFERRED_AGE_YEARS} more years; at ${MX_HOLD_AT} it is held for a morning and its first rotation cancelled. Tech: the share of flights that leave without a mechanical delay. AOG: today's chance of a fault grounding it. Life: years left before the airframe reaches its useful life.`,
     ),
   ];
   const readouts = ops.heavyCheckReadouts(state);
@@ -270,7 +272,7 @@ function buildFleetBoard(state: SimState, changed: () => void): HTMLElement[] {
     windowZone.style.width = `${(HEAVY_WINDOW_DAYS / CLOCK_DAYS) * 100}%`;
     const graceZone = box('mx-clock-grace');
     graceZone.style.left = `${(HEAVY_INTERVAL_DAYS / CLOCK_DAYS) * 100}%`;
-    graceZone.style.width = `${(OVERDUE_GRACE_DAYS / CLOCK_DAYS) * 100}%`;
+    graceZone.style.width = `${(OVERDUE_SHOWN_DAYS / CLOCK_DAYS) * 100}%`;
     const fill = box('mx-clock-fill');
     fill.style.width = `${Math.min(1, Math.max(0, daysSince / CLOCK_DAYS)) * 100}%`;
     const dueMark = box('mx-clock-due');
@@ -315,7 +317,7 @@ function buildFleetBoard(state: SimState, changed: () => void): HTMLElement[] {
       `mx-clock-text${plane.dDueIn < 0 ? ' mx-text-due' : ''}`,
       plane.dInCheck ? 'D check · in the hangar' : `D ${plane.dDueIn >= 0 ? `due ${plane.dDueIn}d` : `${-plane.dDueIn}d overdue · +${D_WEAR_YEARS} yrs wear`} · ${plane.dFlightHours}h`,
     );
-    dLine.title = `D check: overhaul every ${D_INTERVAL_DAYS} flying days or ${D_INTERVAL_HOURS.toLocaleString('en-US')} flight hours. Booked, never forced; past due the plane wears like ${D_WEAR_YEARS} more years until it goes in.`;
+    dLine.title = `D check: overhaul every ${D_INTERVAL_DAYS} flying days or ${D_INTERVAL_HOURS.toLocaleString('en-US')} flight hours. It goes in by itself the morning it falls due at base, or earlier when booked; past due (away from base) the plane wears like ${D_WEAR_YEARS} more years until it goes in.`;
 
     // Deferred items as slots filling toward the hold.
     const slots = box('mx-slots');
@@ -336,7 +338,7 @@ function buildFleetBoard(state: SimState, changed: () => void): HTMLElement[] {
     row.append(items, clockLine);
     card.append(head, clock, aLane, aLine, dLane, dLine, row, wear, dials);
     wrap.append(card);
-    // Book the C check once its window is open, instead of waiting out the overdue grace.
+    // Book the C check early once its window is open, to pick the week instead of taking its due day.
     if (plane.booked) {
       const unbook = document.createElement('button');
       unbook.type = 'button';
@@ -427,7 +429,7 @@ function buildMxBases(state: SimState, changed: () => void): HTMLElement[] {
   const heavyReadout = ops.mxBaseReadout(state, 'heavy');
   const stationHead = heading(
     'Stations',
-    `Each maintenance station: its line base slots (wrench: planes it checks a night, most deferred items first) and its hangar bays as tiles: filled is a plane in its C or D check or a refit, grounded until out; free is an empty bay; dashed is a plane based here whose C check is within ${HEAVY_WINDOW_DAYS} days or overdue. Book it from its wrench when it is parked at base; ${OVERDUE_GRACE_DAYS} days overdue it goes in whenever it is. Planes past the bays are contracted out. Chips are the mechanics' ratings by class, with that class's planes asleep here tonight: solid is rated; dashed amber is a class sleeping here unrated. Each plane needs a line check once every ${LINE_INTERVAL_NIGHTS} nights, and a base checks planes early when it has room, so a level covers several planes. One due and missed (past the slots, an unrated class) gets a deferred item each night; nothing is contracted. A station's first rating is free; each further class costs ${money(MX_RATING_FEE)} and ${money(MX_RATING_PER_DAY)} a day. A new line base costs ${money(lineReadout.fee)}, a hangar ${money(heavyReadout.fee)}, then ${money(lineReadout.perLevelPerDay)} and ${money(heavyReadout.perLevelPerDay)} a day a level; home's first 3 of each are free. Open a new station from its airport's panel or map ring (Bases).`,
+    `Each maintenance station: its line base slots (wrench: planes it checks a night, most deferred items first) and its hangar bays as tiles: filled is a plane in its C or D check or a refit, grounded until out; free is an empty bay; dashed is a plane based here whose C check is within ${HEAVY_WINDOW_DAYS} days or overdue. It goes in by itself the morning it falls due at base; its wrench books it earlier when parked there. Planes past the bays are contracted out. Chips are the mechanics' ratings by class, with that class's planes asleep here tonight: solid is rated; dashed amber is a class sleeping here unrated. Each plane needs a line check once every ${LINE_INTERVAL_NIGHTS} nights, and a base checks planes early when it has room, so a level covers several planes. One due and missed (past the slots, an unrated class) gets a deferred item each night; nothing is contracted. A station's first rating is free; each further class costs ${money(MX_RATING_FEE)} and ${money(MX_RATING_PER_DAY)} a day. A new line base costs ${money(lineReadout.fee)}, a hangar ${money(heavyReadout.fee)}, then ${money(lineReadout.perLevelPerDay)} and ${money(heavyReadout.perLevelPerDay)} a day a level; home's first 3 of each are free. Open a new station from its airport's panel or map ring (Bases).`,
   );
   stationHead.prepend(glyph('wrench', undefined, 'base-head-glyph'), ' ');
   const nodes: HTMLElement[] = [stationHead];
