@@ -20,9 +20,13 @@ import { COST_LEVEL } from './costLevel';
  *     service, to the power SLOT_PRICE_EXPONENT. A field twice as busy as
  *     average costs nearly three times as much; four times as busy, eight.
  *
- * The player's own flights count toward that traffic. Building a hub makes
- * the next slot there more expensive — the price side of the same trade
- * congestion delays are the on-time side of.
+ * The player's own flights count toward that traffic at OWN_TRAFFIC_WEIGHT
+ * when the player is the one buying: an airport sells its slots dearer as
+ * it fills, but a hub isn't priced out by its own growth, and a hub held
+ * is the moat (CLAUDE.md). The room it uses still costs it: hours fill
+ * (sim/hours.ts), congestion delays its flights, and a full airport has
+ * nothing left to sell. A rival buying there counts the player's flights
+ * in full, so a big hub is dear to move into.
  *
  * The fee is locked at the price when the slot is taken, like a lease, so
  * moving into an airport early is worth something. Slots are taken
@@ -57,6 +61,14 @@ import { COST_LEVEL } from './costLevel';
  */
 const SLOT_BASE_FEE_PER_DAY = 50 * COST_LEVEL;
 const SLOT_PRICE_EXPONENT = 1.5;
+/**
+ * How much of the player's own traffic at an airport prices the player's
+ * next pair there. Counted in full, a growing hub priced itself out: a
+ * steady PHL game paid more for its home slots than for every lease
+ * ($43k against $36k a day by day 120), and each new pair cost more than
+ * the last.
+ */
+const OWN_TRAFFIC_WEIGHT = 0.25;
 /** A slot pair adds a takeoff and a landing. */
 const MOVEMENTS_PER_PAIR = 2;
 /** Days a pair must be held, unbroken, to count as heritage. */
@@ -127,12 +139,13 @@ function heritageShare(state: SimState, iata: string): number {
 }
 
 /**
- * Daily fees for the next `count` slot pairs here, in the order they'd be
- * taken — each one adds traffic, so each costs a little more than the
- * last. `extraMovements` is traffic not on the schedule yet (a rotation
- * being previewed), counted as if it were. Null for any pair beyond the
- * airport's capacity. `average` is averageServedMovements(), passed in by a
- * caller pricing several airports against the same traffic.
+ * Daily fees for the next `count` slot pairs here for the player, in the
+ * order they'd be taken: each one adds traffic, so each costs a little
+ * more than the last. `extraMovements` is the player's traffic not on the
+ * schedule yet (a rotation being previewed), counted as if it were. Null
+ * for any pair beyond the airport's capacity. `average` is
+ * averageServedMovements(), passed in by a caller pricing several airports
+ * against the same traffic.
  */
 export function nextSlotFees(
   state: SimState,
@@ -142,17 +155,33 @@ export function nextSlotFees(
   average: number = averageServedMovements(state),
   hourMultiplier = 1,
 ): (number | null)[] {
+  return slotFees(state, iata, count, extraMovements, average, hourMultiplier, OWN_TRAFFIC_WEIGHT);
+}
+
+/** Slot fees for a buyer that counts the player's traffic, and any new pairs the player would take, at `ownWeight`: OWN_TRAFFIC_WEIGHT for the player, 1 for a rival. */
+function slotFees(
+  state: SimState,
+  iata: string,
+  count: number,
+  extraMovements: number,
+  average: number,
+  hourMultiplier: number,
+  ownWeight: number,
+): (number | null)[] {
   const free = freeInDay(airportHours(state, iata)) - Math.max(0, extraMovements);
+  const own = state.schedule.reduce((total, leg) => total + (leg.origin === iata ? 1 : 0) + (leg.dest === iata ? 1 : 0), 0);
+  const others = dailyMovementsAt(state, iata) - own;
   const fees: (number | null)[] = [];
   for (let i = 0; i < count; i++) {
-    const movements = dailyMovementsAt(state, iata) + extraMovements + i * MOVEMENTS_PER_PAIR;
+    const ownMovements = own + extraMovements + i * MOVEMENTS_PER_PAIR;
+    const movements = others + ownMovements;
     if (free - i * MOVEMENTS_PER_PAIR < MOVEMENTS_PER_PAIR) {
       fees.push(null);
     } else if (movements <= 0) {
       // None left once this pair is set aside: the first pair is free.
       fees.push(0);
     } else {
-      const relative = movements / Math.max(average, 1);
+      const relative = (others + ownMovements * ownWeight) / Math.max(average, 1);
       fees.push(Math.round((SLOT_BASE_FEE_PER_DAY * Math.pow(relative, SLOT_PRICE_EXPONENT) * hourMultiplier) / 5) * 5);
     }
   }
@@ -172,8 +201,8 @@ export function nextSlotFees(
 export function rivalSlotQuote(state: SimState, a: string, b: string): number | null {
   // Both ends priced against the same average, counted once.
   const average = averageServedMovements(state);
-  const [atA] = nextSlotFees(state, a, 1, 0, average);
-  const [atB] = nextSlotFees(state, b, 1, 0, average);
+  const [atA] = slotFees(state, a, 1, 0, average, 1, 1);
+  const [atB] = slotFees(state, b, 1, 0, average, 1, 1);
   if (atA === null || atB === null) return null;
   return Math.round(atA * rivalHeritageSurcharge(state, a) + atB * rivalHeritageSurcharge(state, b));
 }

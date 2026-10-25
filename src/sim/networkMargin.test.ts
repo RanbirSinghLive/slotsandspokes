@@ -45,8 +45,8 @@ for (const m of markets) {
   assert.equal(gauges.reduce((sum, g) => sum + g.back, 0), back, `${m.key} gauges add up inbound`);
 }
 
-// A route's week matches its own history.
-const first = markets[0];
+// A route's week matches its own history: the longest-flown route, so it has two weeks of it.
+const first = [...markets].sort((x, y) => (state.revenueHistoryByMarket[y.key]?.length ?? 0) - (state.revenueHistoryByMarket[x.key]?.length ?? 0))[0];
 const week = routeWeek(state, first.key);
 const revenueHistory = state.revenueHistoryByMarket[first.key];
 const costHistory = state.costHistoryByMarket[first.key];
