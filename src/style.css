@@ -2694,7 +2694,8 @@ button.ticker-item:hover {
 }
 
 .ticker-tag--aog,
-.ticker-tag--cnx {
+.ticker-tag--cnx,
+.ticker-tag--miscnx {
   background: #ff8080;
 }
 

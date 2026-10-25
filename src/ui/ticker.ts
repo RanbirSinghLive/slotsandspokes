@@ -36,7 +36,7 @@ const PIXELS_PER_SECOND = 60;
  * ("AOG YUL · C-P002 · hydraulics · back 3d"). Kept apart from the text so
  * the ticker can style it on its own.
  */
-type TickerTag = 'AOG' | 'CNX' | 'CREW' | 'FLEET' | 'LESSOR' | 'RIVAL' | 'FARE' | 'FUEL' | 'SHOCK' | 'AIRSPACE' | 'EVENT' | 'REQUEST' | 'WX' | 'GOAL' | 'REACH' | 'CONTRACT';
+type TickerTag = 'AOG' | 'CNX' | 'MISCNX' | 'CREW' | 'FLEET' | 'LESSOR' | 'RIVAL' | 'FARE' | 'FUEL' | 'SHOCK' | 'AIRSPACE' | 'EVENT' | 'REQUEST' | 'WX' | 'GOAL' | 'REACH' | 'CONTRACT';
 
 /**
  * A line, and the inspector view that explains it, when one does: clicking
@@ -613,6 +613,27 @@ function pollFerryEvents(state: SimState): void {
 }
 
 /**
+ * Missed connections (sim/misconnects.ts): one line each from the sim's
+ * log, only the bigger ones, since a busy hub misses a few most days and
+ * the Hubs card keeps the week's count.
+ */
+const MISCONNECT_LINE_PASSENGERS = 10;
+let lastMisconnectMinute: number | null = null;
+
+function pollMisconnectEvents(state: SimState): void {
+  const log = state.misconnectLog ?? [];
+  if (lastMisconnectMinute === null) {
+    lastMisconnectMinute = log.length > 0 ? log[log.length - 1].simMinute : -1;
+    return;
+  }
+  for (const miss of log) {
+    if (miss.simMinute <= lastMisconnectMinute || miss.passengers < MISCONNECT_LINE_PASSENGERS) continue;
+    pushEvent(state.simMinute, 'MISCNX', `${miss.hub} · ${miss.passengers} pax · ${miss.from} late ${miss.lateMinutes}m · ${shortMoney(miss.cost)}`, { kind: 'airport', iata: miss.hub });
+  }
+  if (log.length > 0) lastMisconnectMinute = Math.max(lastMisconnectMinute, log[log.length - 1].simMinute);
+}
+
+/**
  * The fleet market (sim/market.ts): airframes arriving at the lessor, and
  * rivals leasing from it — the "Trillium Air took the last Regional"
  * moments. Class debuts get a pop-up of their own (ui/market.ts).
@@ -793,6 +814,7 @@ export function updateTicker(state: SimState): void {
   pollPositionEvents(state);
   pollAogEvents(state);
   pollFerryEvents(state);
+  pollMisconnectEvents(state);
   pollFareWarEvents(state);
   pollNemesis(state);
   pollMxHoldEvents(state);

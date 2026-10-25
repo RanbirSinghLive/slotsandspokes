@@ -3462,6 +3462,24 @@ Older saves' Banked and Tight banks hubs became Banked, keeping their
 The ring's Hub style choices and the Plan hub window value each style on
 the schedule it would re-time (`connectingUnderStyle()`).
 
+**Missed connections** (`src/sim/misconnects.ts`). Connecting passengers
+are booked on the departure that best meets their scheduled arrival. When
+a flight lands at a hub late enough that it has less than 40 minutes to
+that departure, or after it left, its share of the flow misses it: the
+flow's day, halved for one direction, spread over the flights in from
+that spoke, never more than the flight carried. Onward on the same plane
+is a through flight and waits. Each passenger costs $120 to rebook and
+care for (the same rule as a stranded passenger, booked as overhead), and
+the late flight's NPS drops as if that share of it had been cancelled
+(100 points per passenger's share, `recordMisconnectNps()`). The hub
+keeps 7 days of counts (`misconnectDaysByHub`), shown on its Hubs card as
+"MISCNX 7d 160 pax · 2.3% · $19k", and misses of 10 passengers or
+more get a ticker line ("MISCNX YYZ · 19 pax · DTW late 26m · $2.3k").
+Banking is where this bites: a wave packs the connections to just over
+the minimum, so a late inbound misses more of them (mid-game YYZ: about
+1.8% of connecting passengers a week rolling, 2.5% banked). Turn buffer
+and an on-time fleet are the fix.
+
 The headless player runs its home hub the way Plan hub says pays best,
 reviewed weekly, when the gain is at least $500 a day
 (`styleAdvice()`, the style half of Plan hub, so it doesn't value a

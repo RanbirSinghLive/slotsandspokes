@@ -55,6 +55,7 @@ import {
   executiveNpsBonus,
   executiveMaintenanceMultiplier,
 } from './executives';
+import { rollMisconnects, settleMisconnects } from './misconnects';
 import { CANCELLATION_NPS_SCORE, WAIVED_NPS_SCORE, flightSatisfactionScore, recordFlightNps, rollTrailingNps } from './nps';
 import { recordDailyCashHistory } from './forecast';
 import { recordDailyPnlHistory } from './pnlHistory';
@@ -194,6 +195,7 @@ export function step(state: SimState): void {
     // The trailing NPS (sim/nps.ts) takes in the day just flown, before
     // today's counts reset below.
     rollTrailingNps(state);
+    rollMisconnects(state);
     rollAncillaries(state);
     // Executives hired on an NPS line leave if the airline stays under it (sim/executives.ts).
     rollExecutiveStanding(state);
@@ -756,6 +758,8 @@ export function step(state: SimState): void {
     // A flight that left yesterday and lands after midnight must not mark today's own departure of the same leg as flown: that skipped every second day of a long-haul round trip.
     if (flight.scheduledDepartMinute >= dayStart) state.completedToday.push(flight.legId);
     settleMandateArrival(state, flight);
+    // Late into a hub: connecting passengers who missed their onward flight (sim/misconnects.ts).
+    settleMisconnects(state, flight, flightPassengers);
     state.activeFlights.splice(i, 1);
   }
 

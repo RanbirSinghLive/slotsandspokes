@@ -13,7 +13,8 @@ import { glyph, pips, type GlyphName } from '../glyphs';
 import { airportWatch, movementShareAt, shareTrend, type WatchItem } from '../../sim/airportWatch';
 import { airportHours } from '../../sim/hours';
 import { planHub, MAX_RECOMMENDED_LOAD } from '../../sim/hubPlanner';
-import { spokesOf, wavesAt } from '../../sim/hubs';
+import { MIN_CONNECT_MINUTES, spokesOf, wavesAt } from '../../sim/hubs';
+import { MISCONNECT_COST_PER_PASSENGER, MISCONNECT_DAYS, misconnectsAt } from '../../sim/misconnects';
 import { HUB_STYLES } from '../../sim/hubStyle';
 import { MOAT_RAMP_DAYS, moatDays } from '../../sim/stations';
 import { dayIndex } from '../../sim/clock';
@@ -23,7 +24,7 @@ import { armRouteBuilderAt } from '../routeBuilder';
 import { bankSummary, confirmHubStyle } from '../hubStyleConfirm';
 import { USABLE_DAY_END_MINUTE, USABLE_DAY_START_MINUTE } from '../../sim/utilisation';
 import { hourStrip, planHubButton } from './airport';
-import { line, titleWithSwitch, viewSwitch } from './dom';
+import { line, lineWithInfo, titleWithSwitch, viewSwitch } from './dom';
 
 /**
  * The Airports screen (ui/inspector/inspector.ts), in three views on one
@@ -430,6 +431,16 @@ function hubsView(state: SimState, changed: () => void): HTMLElement[] {
       moat.className = 'inspector-line hub-moat';
       moat.append(`${TIER_GLYPH[tier]} moat `, pips(Math.round((days / MOAT_RAMP_DAYS) * 6), 6, `Hub moat ${days}/${MOAT_RAMP_DAYS} days: extra room before congestion, earned by holding the station's departures floor`, 'moat'));
       card.append(moat);
+    }
+    const missed = misconnectsAt(state, plan.hub);
+    if (missed > 0) {
+      const share = plan.connecting > 0 ? Math.round((missed / (plan.connecting * (state.misconnectDaysByHub?.[plan.hub]?.length ?? MISCONNECT_DAYS))) * 1000) / 10 : 0;
+      const misconnects = lineWithInfo(
+        `MISCNX 7d ${missed} pax · ${share}% · ${shortMoney(missed * MISCONNECT_COST_PER_PASSENGER)}`,
+        `Missed connections, 7 days: passengers, share of connecting passengers, rebooking paid. A passenger misses when their flight in lands under ${MIN_CONNECT_MINUTES} min before their booked flight out, or after it left. Each is rebooked for ${shortMoney(MISCONNECT_COST_PER_PASSENGER)} and rates the late flight like a cancellation. Tight waves miss more; turn buffer and on-time planes miss fewer.`,
+        'inspector-line hub-misconnects',
+      );
+      card.append(misconnects);
     }
     const hours = hourStrip(airportHours(state, plan.hub));
     // The waves go straight under the hours they share an axis with, above the readout.
