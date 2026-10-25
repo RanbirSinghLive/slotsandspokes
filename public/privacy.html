@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Privacy · Slots & Spokes</title>
+    <meta name="description" content="What Slots & Spokes collects, why, and how to turn it off." />
+    <style>
+      :root { color-scheme: dark; }
+      body { margin: 0; background: #05070c; color: #c9d1e4; font: 15px/1.6 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+      main { max-width: 680px; margin: 0 auto; padding: 32px 16px 64px; }
+      h1 { color: #fff; font-size: 26px; margin: 0 0 4px; }
+      h2 { color: #fff; font-size: 17px; margin: 28px 0 6px; }
+      a { color: #5ed6c8; }
+      .updated { color: #6b7694; font-size: 13px; }
+      table { border-collapse: collapse; width: 100%; font-size: 14px; }
+      th, td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+      th { color: #fff; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Privacy</h1>
+      <p class="updated">Slots &amp; Spokes · updated 25 October 2026</p>
+
+      <p>Slots &amp; Spokes is a browser game. You can play it without an account, a name or an email address. This page lists everything the game collects, why, and how to say no.</p>
+
+      <h2>Anonymous play stats</h2>
+      <p>To learn whether people enjoy the game and how they found it, the game sends a few anonymous events to our own server:</p>
+      <table>
+        <tr><th>Event</th><th>When</th></tr>
+        <tr><td>Visit</td><td>The game opens, and whether a game was already saved</td></tr>
+        <tr><td>Game started</td><td>You pick a home airport and difficulty</td></tr>
+        <tr><td>Day reached</td><td>Your airline reaches game day 1, 7, 30, 100 or 365</td></tr>
+        <tr><td>Out of cash</td><td>Your airline goes bust</td></tr>
+        <tr><td>Cloud saves on</td><td>You turn on cloud saves</td></tr>
+        <tr><td>Stats off</td><td>You turn play stats off (the last event sent)</td></tr>
+      </table>
+      <p>Each event carries: a random id made in your browser (not linked to you, your save or your sync code), the home airport, difficulty and game day, how many days since your first visit, the link tag or website that first brought you (for example <code>?utm_source=reddit</code>), your country as worked out by our host, and whether you are on a phone or a computer. We do not keep your IP address, browser details, name or email. There are no cookies and no advertising or third-party tracking scripts.</p>
+      <p>If your browser sends <a href="https://globalprivacycontrol.org/" target="_blank" rel="noopener">Global Privacy Control</a>, play stats start off.</p>
+
+      <h2>How to turn play stats off</h2>
+      <p>Use <strong>Turn off</strong> under the Start button, or the <strong>📊 Play stats</strong> switch on the Game screen (in the About card). The choice is remembered in this browser. Clearing the site's data resets it and makes a new random id.</p>
+
+      <h2>Visit counts</h2>
+      <p>Our host, Cloudflare, counts page visits with <a href="https://www.cloudflare.com/web-analytics/" target="_blank" rel="noopener">Cloudflare Web Analytics</a>, which uses no cookies and does not follow you across sites.</p>
+
+      <h2>Your saved game</h2>
+      <p>Your game saves in your browser's storage on your device. If you turn on cloud saves, a copy is stored on Cloudflare's servers under your sync code, so you can play on another device. We store only a scrambled form (a hash) of the code. Anyone with your code can open that save, so keep it to yourself.</p>
+
+      <h2>Feedback</h2>
+      <p>The Feedback button opens a Google Form. It is filled in with the game version, home airport and day, and anything else is what you choose to type. Google's own privacy policy applies to the form.</p>
+
+      <h2>Why, and how long</h2>
+      <p>Play stats are used only to improve the game and to see which links and ads bring players. They are never sold or used to build a profile of you. Events are kept for up to 90 days (our host's limit), and cloud saves until you replace them.</p>
+
+      <h2>Who is responsible</h2>
+      <p>The game's developer, in Montréal, Québec, is responsible for personal information under Québec's Act respecting the protection of personal information in the private sector (Law 25) and Canada's PIPEDA. To ask a question, see what we hold, or ask for something to be corrected or deleted, use the <a href="https://docs.google.com/forms/d/e/1FAIpQLSfGpwUSuGqSTGb0MR-utRc5-JtVjs2rMytbf4LxvwDE1rhThg/viewform" target="_blank" rel="noopener">feedback form</a> and say it is a privacy request. Because play stats are anonymous, we can only find your events if you tell us your id, which is the <code>id</code> field under <code>airgame.playStats</code> in the site's local storage.</p>
+
+      <p><a href="/">← Back to the game</a></p>
+    </main>
+  </body>
+</html>

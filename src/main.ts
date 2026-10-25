@@ -63,6 +63,8 @@ import { isHubPlannerOpen } from './ui/hubPlanner';
 import { setupFarePolicy, updateFarePolicy } from './ui/farePolicy';
 import { setupInfoTooltips } from './ui/infoTooltip';
 import { setupSoundControls } from './ui/soundControls';
+import { setupPlayStatsControls } from './ui/playStatsControls';
+import { trackBust, trackDayReached, trackGameStarted, trackLanded, type StatsGameContext } from './ui/playStats';
 import { setupMapToolTips } from './ui/mapTools';
 import { setupNetworkCardButton } from './ui/networkCardDialog';
 import { updateTicker } from './ui/ticker';
@@ -135,7 +137,15 @@ setupGameControls(state);
 setupBriefs(state);
 setupCloudSaveControls();
 setupSoundControls();
+setupPlayStatsControls();
 void startCloudSave(state);
+
+// Anonymous play stats (ui/playStats.ts) carry the game they came from.
+function statsContext(): StatsGameContext {
+  return { home: state.homeAirport, difficulty: state.difficulty ?? 'medium', day: dayIndex(state) };
+}
+trackLanded(savedState === null ? {} : statsContext(), savedState !== null);
+let bustTracked = isInsolvent(state);
 
 const canvas = document.querySelector<HTMLCanvasElement>('#map')!;
 setMapElement(canvas);
@@ -650,6 +660,7 @@ function tick(nowMs: number): void {
         syncSpeedUi();
       });
     }
+    trackDayReached(statsContext(), lastSavedDay, currentDay);
     lastSavedDay = currentDay;
     saveState(state);
     // The day's numbers have moved (demand, the last-7-days bars, rival
@@ -660,6 +671,10 @@ function tick(nowMs: number): void {
   // The failure state: the instant Cash is gone, force a stop — there's
   // nothing left to decide, so nothing should keep flying behind the
   // game-over screen ui/gameOver.ts is about to show.
+  if (isInsolvent(state) && !bustTracked) {
+    bustTracked = true;
+    trackBust(statsContext());
+  }
   if (isInsolvent(state) && speedMultiplier !== 0) {
     speedMultiplier = 0;
     syncSpeedUi();
@@ -1244,6 +1259,7 @@ if (choosingHome) {
   showHomePicker(homeOptions(), (iata, season, difficulty, eventsOff) => {
     chooseHome(state, iata, season, difficulty, eventsOff);
     saveState(state);
+    trackGameStarted(statsContext());
     choosingHome = false;
     resize();
     // Paused, so the first route is drawn before any cash is spent on

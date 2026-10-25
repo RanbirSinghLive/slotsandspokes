@@ -20,6 +20,9 @@
   // the saves. Without this binding /api/cloud answers "not configured" and
   // the game hides cloud saves.
   "kv_namespaces": [{ "binding": "SAVES", "id": "7e6f7f4db8554bc682604fd8e2f70112" }],
+  // Play stats (HOW-IT-WORKS.md, "Play stats"): anonymous funnel events
+  // from /api/event. The dataset is created on the first write.
+  "analytics_engine_datasets": [{ "binding": "EVENTS", "dataset": "slotsandspokes_events" }],
   // Pull-request builds run `npx wrangler preview`, which refuses to run
   // without this block; empty means the top-level settings apply.
   "previews": {}
