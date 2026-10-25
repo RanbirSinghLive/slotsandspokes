@@ -3,6 +3,7 @@ import { dayIndex } from '../sim/clock';
 import { formatSyncCode, newSyncCode, readSyncCode } from '../worker/syncCode';
 import type { SaveMeta } from '../worker/saveRoutes';
 import { hasSavedState, importSaveText, onSaveWritten, saveFileText } from './save';
+import { trackCloudOn } from './playStats';
 
 /**
  * Cloud saves: one game across phone and computer. The localStorage save
@@ -257,6 +258,7 @@ async function checkRemote(atStartup: boolean): Promise<void> {
 export function enableCloudSave(): void {
   if (!available) return;
   writeLink({ code: newSyncCode(), rev: 0, device: newDevice(), dirty: true });
+  trackCloudOn({});
   setStatus('Turning on…');
   void push().then(() => listeners.forEach((listener) => listener()));
   showCodeOnce();

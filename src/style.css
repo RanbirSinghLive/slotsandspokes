@@ -8581,3 +8581,57 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
 .share-trend.is-up { color: #7fd88f; }
 .share-trend.is-down { color: #ff9b8a; }
 .slot-heritage { color: #ffd166; }
+
+/* Play stats (ui/playStatsControls.ts): the About card switch and the line under Start. */
+#stats-settings {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+#stats-settings .game-switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: #9aa3b8;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+#stats-settings .game-switch:has(input:checked) {
+  color: #fff;
+  border-color: rgba(94, 214, 200, 0.55);
+  background: rgba(94, 214, 200, 0.08);
+}
+
+.stats-privacy-link,
+.home-world-stats a,
+.home-world-stats button {
+  color: #5ed6c8;
+  font: inherit;
+  font-size: 11px;
+}
+
+.home-world-stats {
+  padding: 2px 0;
+  font-size: 11px;
+  color: #6b7694;
+}
+
+.home-world-stats button {
+  background: none;
+  border: none;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.home-world-stats[data-on='true'] .home-world-stats-off,
+.home-world-stats[data-on='false'] .home-world-stats-on {
+  display: none;
+}

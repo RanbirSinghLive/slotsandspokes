@@ -2160,6 +2160,47 @@ fallback; the cloud is a copy of it.
 - Storage is the KV namespace bound as `SAVES` in `wrangler.jsonc`.
   `npm run cloudtest` checks the API in Node.
 
+**Play stats** (`ui/playStats.ts`, `worker/eventRoutes.ts`): anonymous
+events that show where players come from and how far they get, for
+judging links and paid ads. `public/privacy.html` tells players the same.
+
+- Events: `landed` (each page load; detail `new` or `resumed`),
+  `game_started` (home picked), `day_reached` (game day 1, 7, 30, 100,
+  365, sent as the day is crossed), `bust` (cash gone), `cloud_on`, and
+  `stats_off` (the last one sent when a player says no).
+- Each carries a random id made in the browser (`airgame.playStats` in
+  localStorage, never tied to the save or sync code), home, difficulty,
+  game day, days since the first visit, visit number, and the **first
+  touch**: `utm_source` / `utm_medium` / `utm_campaign` (or `ref`) from
+  the first link opened, and the referring site. Tag every ad and post
+  link, e.g. `?utm_source=reddit&utm_medium=cpc&utm_campaign=tycoon1`.
+- The Worker adds country (from Cloudflare) and phone or desktop, keeps
+  no IP or user agent, and writes one row to Workers Analytics Engine
+  (binding `EVENTS`, dataset `slotsandspokes_events`, kept 90 days).
+  Without the binding the route accepts and drops events.
+- Off switch: Turn off under Start on the home picker, and Play stats in
+  the Game screen's About card. Global Privacy Control starts it off.
+  Automated browsers (`navigator.webdriver`) never send, so `uicheck`
+  and crawlers aren't counted. No cookies and no third-party scripts, to
+  stay inside Law 25 / PIPEDA without a consent banner; adding an ad
+  pixel would need opt-in consent first.
+- Reading it: the Analytics Engine SQL API (Cloudflare dashboard >
+  Workers > Analytics Engine, or `POST /accounts/ID/analytics_engine/sql`
+  with an API token). Columns: `blob1` event, `blob2` id, `blob3`
+  country, `blob4` device, `blob5` source, `blob6` medium, `blob7`
+  campaign, `blob8` referrer, `blob9` home, `blob10` difficulty, `blob11`
+  detail, `double1` game day, `double2` days since first visit, `double3`
+  visit. Rows are sampled under heavy load, so count with
+  `SUM(_sample_interval)`. Players per source who reached day 7:
+
+  ```sql
+  SELECT blob5 AS source, SUM(_sample_interval) AS players
+  FROM slotsandspokes_events
+  WHERE blob1 = 'day_reached' AND double1 = 7 AND timestamp > NOW() - INTERVAL '14' DAY
+  GROUP BY source ORDER BY players DESC
+  ```
+- `npm run eventtest` checks the route in Node.
+
 **The crash catcher** (`ui/problemCard.ts`): an uncaught error or
 rejected promise pauses the game and shows a card with the error, the
 version, a download of the save as it stands, and Reload.

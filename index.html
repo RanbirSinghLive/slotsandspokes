@@ -5,6 +5,21 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Slots & Spokes</title>
+    <meta name="description" content="Build an airline from one leased propeller. Draw routes on a live world map, fight rival carriers for slots and passengers, and watch one delay cascade through your day. Free in the browser, on desktop or phone." />
+    <meta name="theme-color" content="#0b1220" />
+    <link rel="canonical" href="https://slotsandspokes.com/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Slots & Spokes" />
+    <meta property="og:title" content="Slots & Spokes · airline network game" />
+    <meta property="og:description" content="Start with one leased propeller and grow an airline against rival carriers on a live world map. Free in the browser." />
+    <meta property="og:url" content="https://slotsandspokes.com/" />
+    <meta property="og:image" content="https://slotsandspokes.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Slots & Spokes · airline network game" />
+    <meta name="twitter:description" content="Start with one leased propeller and grow an airline against rival carriers on a live world map. Free in the browser." />
+    <meta name="twitter:image" content="https://slotsandspokes.com/og-image.png" />
   </head>
   <body>
     <canvas id="map"></canvas>
@@ -265,6 +280,10 @@
               <button type="button" id="about-report-button" class="game-tile" data-tip="Report so far · how the airline is doing"><svg class="gi" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>Report</button>
               <button type="button" id="about-feedback-button" class="game-tile" data-tip="Send feedback · what broke, confused or bored you"><svg class="gi" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>Feedback</button>
             </div>
+            <div id="stats-settings">
+              <label class="game-switch" data-tip="Anonymous play stats · no name, email or save sent"><input type="checkbox" id="stats-setting-on" /> 📊 Play stats</label>
+              <a href="/privacy.html" target="_blank" rel="noopener" class="stats-privacy-link" data-tip="What is collected and why">Privacy</a>
+            </div>
             <details class="credits-fold">
               <summary data-tip="Credits">Credits</summary>
               <ul class="credits">
@@ -348,6 +367,7 @@
           </div>
           <div id="home-world-difficulty-note" class="home-world-season-note"></div>
           <button type="button" id="home-world-start" class="home-world-start" disabled>Start</button>
+          <div id="home-world-stats" class="home-world-stats"><span class="home-world-stats-on">Anonymous play stats</span><span class="home-world-stats-off">Play stats off</span> · <a href="/privacy.html" target="_blank" rel="noopener">Privacy</a> · <button type="button" id="home-world-stats-toggle">Turn off</button></div>
           <button type="button" id="home-world-cloud" class="home-world-cloud" hidden>Playing on another device? Use your sync code</button>
           <button type="button" id="home-world-other" class="home-world-other">Select a different airport<span class="home-world-other-short">All airports</span></button>
         </div>
