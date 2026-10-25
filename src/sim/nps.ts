@@ -170,6 +170,21 @@ export function recordFlightNps(state: SimState, origin: string, dest: string, s
 }
 
 /**
+ * Mark down a flight already scored for passengers who then missed their
+ * connection (sim/misconnects.ts): `points` moves today's average as if
+ * that share of the flight had rated it like a cancellation, without
+ * counting another flight. Only into a day that has scored flights, so
+ * the average always has a denominator.
+ */
+export function recordMisconnectNps(state: SimState, origin: string, dest: string, points: number): void {
+  if (state.todayNpsScoredFlights <= 0) return;
+  state.npsPointsTotal += points;
+  state.todayNpsPoints += points;
+  const day = state.todayNpsByMarket?.[marketKey(origin, dest)];
+  if (day && day.flights > 0) day.points += points;
+}
+
+/**
  * Fold the day just flown into the trailing scores: the network's, and
  * each market flown today. A market flown for the first time starts from
  * the network's score, since passengers already know the airline's name;

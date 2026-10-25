@@ -2,6 +2,7 @@ import type { Nemesis } from './nemesis';
 import type { FareClassSettings, FareClassTally } from './fareClasses';
 import type { CallPolicy, RoutePriority } from './priority';
 import type { Crisis } from './crisis';
+import type { Misconnect } from './misconnects';
 import type { GameDifficulty } from './difficulty';
 import type { FareWar, FareWarEvent } from './fareWars';
 import type { DemandEvent } from './demandEvents';
@@ -829,6 +830,10 @@ export type SimState = {
   nemesesBeaten?: string[];
   /** The network's fare level against the going rate, remembered over about 60 days (sim/brand.ts); absent means 100%. */
   brandLevel?: number;
+  /** Connecting passengers who missed their onward flight at each hub (sim/misconnects.ts), one count per day, the last MISCONNECT_DAYS days, today last. */
+  misconnectDaysByHub?: Record<string, number[]>;
+  /** The latest few missed connections, for the ticker (sim/misconnects.ts). */
+  misconnectLog?: Misconnect[];
   /** Stranded planes ferried home empty before the day starts (sim/ferry.ts), the latest few, for the ticker. */
   ferryLog?: { tail: string; from: string; to: string; cost: number; simMinute: number }[];
   /** The shared lessor's shelf (sim/market.ts): what's listed and when the next of each class arrives. */
