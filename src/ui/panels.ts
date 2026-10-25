@@ -29,6 +29,7 @@ import { glyphSvg, type GlyphName } from './glyphs';
 import { marginMovers, type MarginMovers } from '../sim/marginMovers';
 import { marginTip, percentText, trendMark } from './marginChip';
 import { networkMargin, type NetworkMargin } from '../sim/networkMargin';
+import { hubBanksAt } from '../sim/hubStyle';
 
 // Must match the --panel-width custom property's default value in
 // style.css — see the comment there. Wide enough for the tab bar, the
@@ -345,6 +346,8 @@ const SORTS: { mode: SortMode; glyph: GlyphName; tip: string }[] = [
  * connecting passengers a day before and after. Remembered in this browser.
  */
 const CNX_KEY = 'slotsandspokes-gantt-cnx';
+/** How much of the day before each wave its band covers: the good-connection window, a flight home landing 75 to 40 minutes ahead. */
+const WAVE_BAND_MINUTES = 75;
 let cnxOn = false;
 try {
   cnxOn = localStorage.getItem(CNX_KEY) === '1';
@@ -638,6 +641,9 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
     '☾ ✓ · 2 · −40m · ✗ · ● · ☾A ',
     info(`Tonight's line check, beside each plane (one every 5 nights at a line base). ✓ checked tonight. 2 not due for 2 nights. −40m short by that long. ✗ due and missed. ● a deferred item (${MX_HOLD_AT} holds the plane a morning). A hatched cell with A: the night's spare hours go to that plane's A check.`),
   );
+  if (Object.keys(state.hubStyles).length > 0) {
+    key.append(' · ▮ wave ', info('Planes based at a banked hub show its waves: land home inside the teal band (75 to 40 minutes before) and leave on its right edge, so passengers connect.'));
+  }
   rows.push(key);
 
   for (const cls of AIRCRAFT_CLASSES) {
@@ -729,6 +735,18 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
         line.className = 'timeline-gridline';
         line.style.left = at(hour * 60);
         track.append(line);
+      }
+      // At a banked base, each wave (sim/hubStyle.ts): a band where flights home should land, ending in a line where flights out leave.
+      const banks = hubBanksAt(state, aircraft.baseAirport);
+      if (banks) {
+        for (let wave = banks.firstMinute; wave < end; wave += banks.periodMinutes) {
+          if (wave < start) continue;
+          const band = document.createElement('span');
+          band.className = 'timeline-wave';
+          band.style.left = at(Math.max(start, wave - WAVE_BAND_MINUTES));
+          band.style.width = width(Math.min(WAVE_BAND_MINUTES, wave - start));
+          track.append(band);
+        }
       }
       // A night stop's two halves (sim/nightStops.ts): the morning flight home and the evening flight out.
       const nightStop = nightStopLegs(state, aircraft.tail);

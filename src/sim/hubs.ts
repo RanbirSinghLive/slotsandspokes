@@ -5,7 +5,7 @@ import { actualDailyDemand, currentPotentialDemand } from './marketDemand';
 import { flowRights, grantedCountries, homeCountry } from './rights';
 import { marketKey, type ScheduleLeg } from './schedule';
 import { bankCycleFor, banksWithPeriod, hubBanksAt, hubStyleAt, isOnBank, type HubBanks, type HubStyle } from './hubStyle';
-import { rotationsForTail, scheduledTurnMinutes } from './utilisation';
+import { rotationsForTail, scheduledTurnMinutes, USABLE_DAY_END_MINUTE } from './utilisation';
 import { planRespace, applyRespace, tailFits, workingCopy, type TurnBufferPlan } from './turnBuffer';
 import { recessionFactor } from './shocks';
 import type { SimState } from './state';
@@ -36,27 +36,23 @@ import type { SimState } from './state';
  * pay fares like anyone else (sim/economy.ts).
  */
 
-/** Share of an A–B city pair's latent demand that would connect through a hub rather than go another way. */
-const CONNECT_SHARE = 0.08;
+/**
+ * Share of an A–B city pair's latent demand that would connect through a
+ * hub rather than go another way, when every flight meets a good one out.
+ * Set with TIMING_FLOOR so a Rolling hub, about 14% timed by chance,
+ * connects about as many people as it did when one good connection a day
+ * counted as nearly fully timed (mid-game YYZ, YUL and PHL saves).
+ */
+const CONNECT_SHARE = 0.14;
 /** How fast more flights make a connection possible (connectingChance()). */
 const FREQUENCY_SCALE = 2;
 /**
- * How well timed a spoke pair's flights are, one way: 1 - e^(-connections
- * / CONNECTION_SCALE), where each arrival from A counts as much as its
- * best onward departure to B is good (1 for a wait up to
- * GOOD_CONNECT_MINUTES, falling to POOR_CONNECT_QUALITY at the longest).
- * One good connection a day is about 86% timed.
+ * The share of possible connections made even when no times meet: they
+ * take a long wait or an overnight. Low, so timing carries most of a
+ * hub's connections and a well-run bank, which meets most arrivals with
+ * a good departure, connects clearly more than a Rolling hub.
  */
-const CONNECTION_SCALE = 0.5;
-/**
- * The share of possible connections made even when no times meet. Set so
- * a Rolling hub, whose flights meet only by chance (about 40% timed),
- * connects about as the flat Rolling style (0.5) did, and perfect timing
- * as Tight banks (1.0) did: with 18 seeds a home, the steady player's
- * year matched before timed connections at Montréal ($13.8M, 2 busts),
- * Toronto ($38M) and Halifax (12 busts); at 0.5 Toronto made $70M.
- */
-const TIMING_FLOOR = 0.3;
+const TIMING_FLOOR = 0.15;
 /** The shortest wait at the hub a passenger and their bag can make. */
 export const MIN_CONNECT_MINUTES = 40;
 /** A wait up to this long is a good connection... */
@@ -145,16 +141,23 @@ function connectionsOneWay(arrivals: HubTime[], departures: HubTime[]): number {
  * thinner spoke: about 40% at one daily flight, 63% at two, 86% at four),
  * and timing how many of those do: TIMING_FLOOR of them with times that
  * never meet (they take a long wait, or an overnight), all of them when
- * every flight in meets a good one out (the timed share, both directions
- * averaged). A frequency base keeps a small, early network connecting
+ * every flight in meets a good one out (the timed share: each arrival
+ * counted at its best onward departure, divided by the arrivals, both
+ * directions averaged). A spoke flown once a day meets only the
+ * departures in its own wave, so a hub connects best when its spokes are
+ * flown in several waves. A frequency base keeps a small, early network connecting
  * about as it always did, where a purely timed chance left it next to
  * nothing (measured: the steady player went bust at Montréal 3 games in
  * 6 against 0 in 6); timing is what a hub's style and the Schedule earn.
  */
 function connectingChance(times: SpokeTimes, a: string, b: string): number {
-  const timed = (share: number) => 1 - Math.exp(-share / CONNECTION_SCALE);
-  const ab = timed(connectionsOneWay(times.arrivalsFrom.get(a) ?? [], times.departuresTo.get(b) ?? []));
-  const ba = timed(connectionsOneWay(times.arrivalsFrom.get(b) ?? [], times.departuresTo.get(a) ?? []));
+  // Timed one way: the share of arrivals from one spoke that meet a good departure to the other, each counted at its best onward connection.
+  const timed = (from: string, to: string) => {
+    const arrivals = times.arrivalsFrom.get(from) ?? [];
+    return arrivals.length > 0 ? connectionsOneWay(arrivals, times.departuresTo.get(to) ?? []) / arrivals.length : 0;
+  };
+  const ab = timed(a, b);
+  const ba = timed(b, a);
   const flights = (spoke: string) => ((times.arrivalsFrom.get(spoke)?.length ?? 0) + (times.departuresTo.get(spoke)?.length ?? 0)) / 2;
   const frequency = 1 - Math.exp(-Math.min(flights(a), flights(b)) / FREQUENCY_SCALE);
   return frequency * (TIMING_FLOOR + (1 - TIMING_FLOOR) * (ab + ba) / 2);
@@ -479,6 +482,30 @@ export function rotationsOnBank(state: SimState, hub: string): { onBank: number;
     }
   }
   return { onBank, total };
+}
+
+/** One of a banked hub's waves: flights landing in time to feed it, and flights leaving on it. */
+export type HubWave = { minute: number; feeding: number; leaving: number };
+
+/**
+ * A banked hub's waves across the usable day, each with your flights
+ * landing in its good-connection window (MIN_CONNECT_MINUTES to
+ * GOOD_CONNECT_MINUTES before it) and leaving on it. Empty at a Rolling hub.
+ */
+export function wavesAt(state: SimState, hub: string): HubWave[] {
+  const banks = hubBanksAt(state, hub);
+  if (!banks) return [];
+  const waves: HubWave[] = [];
+  for (let minute = banks.firstMinute; minute < USABLE_DAY_END_MINUTE; minute += banks.periodMinutes) {
+    let feeding = 0;
+    let leaving = 0;
+    for (const leg of state.schedule) {
+      if (leg.dest === hub && connectionQuality(minute - (leg.departMinute + leg.blockMinutes)) >= 1) feeding++;
+      if (leg.origin === hub && isOnBank(state, hub, leg.departMinute) && leg.departMinute - minute >= 0 && leg.departMinute - minute < banks.periodMinutes) leaving++;
+    }
+    waves.push({ minute, feeding, leaving });
+  }
+  return waves;
 }
 
 export function applyHubStyleChange(

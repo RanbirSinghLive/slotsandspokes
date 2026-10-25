@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createPlayer } from '../headless/player';
 import { startHeadlessGame } from '../headless/newGame';
-import { MIN_CONNECT_MINUTES, planHubStyleChange, rotationsOnBank } from './hubs';
+import { MIN_CONNECT_MINUTES, planHubStyleChange, rotationsOnBank, wavesAt } from './hubs';
 import {
   BANK_INBOUND_LEAD_MINUTES,
   bankAtOrBefore,
@@ -36,7 +36,8 @@ assert.equal(nextBankMinute(banked, 'AAA', 361), 600);
 assert.equal(nextBankMinute(banked, 'AAA', 600), 600);
 assert.equal(bankAtOrBefore(banked, 'AAA', 599), 360);
 assert.equal(bankedArrivalMinute(banked, 'AAA', 500), 600 - BANK_INBOUND_LEAD_MINUTES);
-assert.equal(bankedArrivalMinute(banked, 'AAA', 560), 840 - BANK_INBOUND_LEAD_MINUTES, 'a flight too late for one wave feeds the next');
+assert.equal(bankedArrivalMinute(banked, 'AAA', 556), 556, 'a flight running a little long still feeds the wave 44 minutes later');
+assert.equal(bankedArrivalMinute(banked, 'AAA', 570), 840 - BANK_INBOUND_LEAD_MINUTES, 'a flight too late for one wave feeds the next');
 assert.equal(nextBankMinute(banked, 'BBB', 361), 361, 'a Rolling airport has no waves');
 assert.ok(BANK_INBOUND_LEAD_MINUTES >= MIN_CONNECT_MINUTES, 'the lead leaves a connection time');
 
@@ -64,6 +65,12 @@ assert.ok(banks.periodMinutes >= 90 && banks.periodMinutes <= 300 && banks.perio
 const { onBank, total } = rotationsOnBank(state, hub);
 assert.ok(total > 0 && onBank > 0, `no rotation left on a wave (${onBank}/${total})`);
 
+// Landing 50 to 40 minutes before a wave: in time for it, with the connection to spare.
+const feedsWave = (lands: number) => {
+  const ahead = nextBankMinute(state, hub, lands) - lands;
+  return ahead >= MIN_CONNECT_MINUTES && ahead <= BANK_INBOUND_LEAD_MINUTES;
+};
+
 // Each banked rotation's flight home lands the inbound lead before a wave, and every day still ends by 22:00.
 let feeding = 0;
 for (const aircraft of state.aircraft.filter((a) => a.baseAirport === hub)) {
@@ -72,7 +79,7 @@ for (const aircraft of state.aircraft.filter((a) => a.baseAirport === hub)) {
     const home = rotation.legs[rotation.legs.length - 1];
     const lands = home.departMinute + home.blockMinutes;
     assert.ok(lands <= USABLE_DAY_END_MINUTE || rotations.length === 1, `${aircraft.tail} lands ${lands} after the day`);
-    if ((lands + BANK_INBOUND_LEAD_MINUTES - banks.firstMinute) % banks.periodMinutes === 0) feeding++;
+    if (feedsWave(lands)) feeding++;
   }
 }
 assert.ok(feeding > 0, 'no flight home lands just before a wave');
@@ -94,7 +101,7 @@ for (const aircraft of state.aircraft.filter((a) => a.baseAirport === hub)) {
   const [out, back] = next.legs;
   const lands = back.departMinute + back.blockMinutes;
   if (out.departMinute === nextBankMinute(copy, hub, out.departMinute)) {
-    const beforeWave = (lands + BANK_INBOUND_LEAD_MINUTES - banks.firstMinute) % banks.periodMinutes === 0;
+    const beforeWave = feedsWave(lands);
     const waveAfterDay = bankedArrivalMinute(copy, hub, lands) > USABLE_DAY_END_MINUTE;
     assert.ok(beforeWave || waveAfterDay, `${aircraft.tail}'s new rotation lands ${lands}, not before a wave`);
   }
@@ -104,6 +111,10 @@ assert.ok(planned > 0, 'no plane at the hub could plan a rotation');
 
 const json = JSON.parse(JSON.stringify(state));
 assert.deepEqual(json.hubBanks, state.hubBanks, 'banks survive a save');
+
+// The Hubs card's strip: some wave is both fed and flown out of.
+const waves = wavesAt(state, hub);
+assert.ok(waves.length >= 3 && waves.some((wave) => wave.feeding > 0 && wave.leaving > 0), `no working wave: ${JSON.stringify(waves)}`);
 
 // Back to Rolling drops the waves.
 assert.ok(setHubStyle(state, hub, 'rolling').ok);

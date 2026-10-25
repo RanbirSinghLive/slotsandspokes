@@ -6,6 +6,7 @@ import { computeBlockMinutes, legDistanceNm } from './schedule';
 import { step } from './step';
 import { allRotations } from './utilisation';
 import { rangeNmFor } from './range';
+import { leasePlane } from './playerActions';
 import airportsData from '../../data/airports.json';
 import { applyRotation, planRotation, type RotationStop } from './rotations';
 
@@ -23,6 +24,16 @@ const typeOf = (tail: string) => state.aircraft.find((a) => a.tail === tail)!.ty
 const longest = (legs: { origin: string; dest: string }[]) => Math.max(...legs.map((leg) => legDistanceNm(leg.origin, leg.dest)));
 const rotations = allRotations(state).filter((r) => r.closed && r.airports.length === 3);
 const props = rotations.filter((r) => typeOf(r.tail) === 'PROP');
+if (!state.aircraft.some((a) => a.typeCode === 'REGIONAL')) {
+  // The game didn't lease one by day 75: lease one at home the way the page does, with the cash to pay for it.
+  state.cash = Math.max(state.cash, 5_000_000);
+  const leased = leasePlane(state, state.homeAirport, 'REGIONAL');
+  assert.ok(leased.ok, `couldn't lease a regional: ${!leased.ok && leased.reason}`);
+  // It arrives after its delivery days.
+  for (let day = 0; day < 60 && !state.aircraft.some((a) => a.typeCode === 'REGIONAL'); day++) {
+    for (let minute = 0; minute < 1440; minute++) step(state);
+  }
+}
 const regionals = state.aircraft.filter((a) => a.typeCode === 'REGIONAL');
 assert.ok(props.length > 0 && regionals.length > 0, 'the game needs props and a regional');
 // A regional with its day cleared, so a prop round trip has free time to land on whatever the game booked.

@@ -1400,6 +1400,16 @@ button,
   pointer-events: none;
 }
 
+/* A banked base's waves on its planes' rows (ui/panels.ts): the window to land home in, ending where flights out leave. */
+.timeline-wave {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(94, 214, 200, 0.1);
+  border-right: 1px solid rgba(94, 214, 200, 0.55);
+  pointer-events: none;
+}
+
 /* Planes are grouped by type under a header that folds the group away;
    every rotation block takes its type's colour (--puck, TYPE_COLOURS in
    ui/planeIcons.ts). */
@@ -8480,11 +8490,45 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
   margin-left: 2px;
 }
 
+/* A banked hub's waves under its hour strip (ui/inspector/airports.ts), on the strip's own axis. */
+.bank-strip {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 4px;
+  margin: -2px 0 6px;
+  font-size: 9px;
+  line-height: 14px;
+}
+
+.bank-strip-label {
+  color: #8a93a6;
+  text-align: right;
+}
+
+.bank-strip-lane {
+  position: relative;
+  height: 14px;
+}
+
+.bank-wave {
+  position: absolute;
+  transform: translateX(-2px);
+  padding: 0 3px;
+  white-space: nowrap;
+  color: #5ed6c8;
+  border-left: 2px solid #5ed6c8;
+  font-variant-numeric: tabular-nums;
+}
+
+.bank-wave.is-thin {
+  opacity: 0.5;
+}
+
 .pips-moat i.is-on { background: #5ed6c8; border-color: #5ed6c8; }
 
 .hub-style-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   margin: 6px 0 2px;
 }
