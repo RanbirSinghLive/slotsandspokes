@@ -13,7 +13,7 @@ import { glyph, pips, type GlyphName } from '../glyphs';
 import { airportWatch, movementShareAt, shareTrend, type WatchItem } from '../../sim/airportWatch';
 import { airportHours } from '../../sim/hours';
 import { planHub, MAX_RECOMMENDED_LOAD } from '../../sim/hubPlanner';
-import { spokesOf } from '../../sim/hubs';
+import { spokesOf, wavesAt } from '../../sim/hubs';
 import { HUB_STYLES } from '../../sim/hubStyle';
 import { MOAT_RAMP_DAYS, moatDays } from '../../sim/stations';
 import { dayIndex } from '../../sim/clock';
@@ -21,6 +21,7 @@ import { shortMoney } from '../format';
 import { openHubPlanner } from '../hubPlanner';
 import { armRouteBuilderAt } from '../routeBuilder';
 import { bankSummary, confirmHubStyle } from '../hubStyleConfirm';
+import { USABLE_DAY_END_MINUTE, USABLE_DAY_START_MINUTE } from '../../sim/utilisation';
 import { hourStrip, planHubButton } from './airport';
 import { line, titleWithSwitch, viewSwitch } from './dom';
 
@@ -430,7 +431,10 @@ function hubsView(state: SimState, changed: () => void): HTMLElement[] {
       moat.append(`${TIER_GLYPH[tier]} moat `, pips(Math.round((days / MOAT_RAMP_DAYS) * 6), 6, `Hub moat ${days}/${MOAT_RAMP_DAYS} days: extra room before congestion, earned by holding the station's departures floor`, 'moat'));
       card.append(moat);
     }
-    card.append(hourStrip(airportHours(state, plan.hub)));
+    const hours = hourStrip(airportHours(state, plan.hub));
+    // The waves go straight under the hours they share an axis with, above the readout.
+    if (plan.style === 'banked') hours.firstElementChild?.after(bankStrip(state, plan.hub));
+    card.append(hours);
 
     // The styles side by side: what each would connect, how full it would make the peak, and how many rotations would leave on a wave.
     const styles = document.createElement('div');
@@ -470,6 +474,35 @@ function hubsView(state: SimState, changed: () => void): HTMLElement[] {
     if (planner) card.append(planner);
     return card;
   });
+}
+
+/**
+ * A banked hub's waves under its hour strip, on the same 06:00–22:00
+ * axis: each wave's flights landing in time to feed it (▼) and leaving
+ * on it (▲). A wave with nothing in or nothing out is dimmed.
+ */
+function bankStrip(state: SimState, hub: string): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'bank-strip';
+  const label = document.createElement('span');
+  label.className = 'bank-strip-label';
+  label.textContent = 'wv';
+  const lane = document.createElement('div');
+  lane.className = 'bank-strip-lane';
+  const dayStart = USABLE_DAY_START_MINUTE;
+  const dayLength = USABLE_DAY_END_MINUTE - USABLE_DAY_START_MINUTE;
+  const clock = (minute: number) => `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
+  for (const wave of wavesAt(state, hub)) {
+    const mark = document.createElement('span');
+    mark.className = 'bank-wave';
+    mark.classList.toggle('is-thin', wave.feeding === 0 || wave.leaving === 0);
+    mark.style.left = `${((wave.minute - dayStart) / dayLength) * 100}%`;
+    mark.textContent = `▼${wave.feeding}▲${wave.leaving}`;
+    mark.dataset.tip = `Wave ${clock(wave.minute)} · ${wave.feeding} in ${clock(wave.minute - 75)}–${clock(wave.minute - 40)} · ${wave.leaving} out`;
+    lane.append(mark);
+  }
+  wrap.append(label, lane);
+  return wrap;
 }
 
 function shareView(state: SimState, changed: () => void): HTMLElement[] {

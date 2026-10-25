@@ -42,6 +42,8 @@ export type HubBanks = { periodMinutes: number; firstMinute: number };
  * minutes) plus ten to spare, and more than the plane's own 30-minute turn.
  */
 export const BANK_INBOUND_LEAD_MINUTES = 50;
+/** A flight home running a little long still feeds the wave if it lands this long before it: the connection itself, and still more than the plane's turn. */
+const LATEST_INBOUND_LEAD_MINUTES = 40;
 /** The first wave a newly banked hub gets: the opening of the usable day (sim/utilisation.ts's 06:00, written out here to keep this module import-free). */
 const FIRST_BANK_MINUTE = 6 * 60;
 /** Bank cycles are whole quarter hours, and at least this long... */
@@ -109,7 +111,8 @@ export function bankAtOrBefore(state: SimState, iata: string | null | undefined,
  */
 export function bankedArrivalMinute(state: SimState, iata: string | null | undefined, arrivalMinute: number): number {
   if (!hubBanksAt(state, iata)) return arrivalMinute;
-  return nextBankMinute(state, iata, arrivalMinute + BANK_INBOUND_LEAD_MINUTES) - BANK_INBOUND_LEAD_MINUTES;
+  const wave = nextBankMinute(state, iata, arrivalMinute + LATEST_INBOUND_LEAD_MINUTES);
+  return Math.max(arrivalMinute, wave - BANK_INBOUND_LEAD_MINUTES);
 }
 
 /** Whether a departure at `minute` from this banked hub leaves on one of its waves. */

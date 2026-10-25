@@ -3355,10 +3355,10 @@ For each pair of spokes at a hub, passengers a day (both directions) =
 | Factor | What it is |
 |---|---|
 | A–B potential demand | the gravity model (`sim/demand.ts`) |
-| × 8% | the share willing to change planes (`CONNECT_SHARE`) |
+| × 14% | the share willing to change planes when every flight meets a good one out (`CONNECT_SHARE`) |
 | × establishment | the less built-up spoke route's local traffic ÷ 40 a day, capped at 1, so a new route feeds about a quarter |
 | × frequency chance | `1 − e^(−flights/2)` on the thinner spoke: about 40% at one daily flight, 63% at two, 86% at four |
-| × timing | `0.3 + 0.7 × timed`, where timed is `1 − e^(−connections/0.5)` each way, averaged over the two: every arrival from A counts as much as its best onward departure to B is good |
+| × timing | `0.15 + 0.85 × timed`, where timed is the share of arrivals from A that meet a good departure to B (each counted at its best onward one), averaged over both ways |
 | × circuity | full up to 1.3× the direct distance, falling to nothing at 2× |
 | × nonstop discount | 0.2 if anyone, player or rival, flies A–B direct |
 | × air rights | 0 when A and B are in one country that isn't the airline's home (Air rights, below) |
@@ -3368,16 +3368,19 @@ passenger and their bag can make) to 75 minutes, worth 1; longer waits
 are worth less, down to 0.25 at 3 hours, and nothing after. Onward on
 **the same plane** is a through flight: passengers stay aboard, so it's
 a good connection at any wait. Frequency says how many passengers
-could connect, timing how many do: 30% of them even when no times
+could connect, timing how many do: 15% of them even when no times
 meet (they take a long wait or an overnight), all of them when every
-flight in meets a good one out. A Rolling hub, about 40% timed by
-chance, connects about half, as the flat Rolling style did, and a
-well-banked one all, as Tight banks did: the range the styles' flat
-efficiencies used to cover, now earned by the schedule. Set with 18
-seeds a home to match the steady player's year before timed
-connections at Montréal, Toronto and Halifax. A purely timed chance left a small, early network
-connecting next to nothing: the steady player went bust at Montréal
-in 3 games of 6, against none with the frequency base.
+flight in meets a good one out. Timing is a share of arrivals, not a
+count, so a spoke flown once a day meets only the departures within
+three hours of it: a Rolling hub's flights meet about 14% of the time
+by chance, and a banked one's meet whoever leaves on their wave. A hub
+connects best when its spokes are flown in several waves. The 14% and
+15% were set together so mid-game Rolling hubs (YYZ, YUL, PHL saves)
+connect about as many people as when one good connection a day counted
+as nearly fully timed, while banking them connects 9–22% more. A floor
+keeps a small, early network connecting: a purely timed chance left it
+next to nothing (the steady player went bust at Montréal in 3 games of
+6, against none with a floor).
 
 **They ride both legs.** Each flow is added to the demand of both routes
 it uses (`connectingDemandOnMarket()`), where it books seats before
@@ -3429,7 +3432,9 @@ and is back for the next, waiting at the hub only its turn. It's kept in
 
 The planner (`nextBankMinute()`, `bankedArrivalMinute()`) starts a new
 rotation from a banked hub on the next wave, and has its flight home
-wait at the last outstation to land just before a wave. A rotation that
+wait at the last outstation to land just before a wave (a flight
+running up to ten minutes long still feeds it, landing 40 minutes
+ahead). A rotation that
 would land after 22:00 that way flies rolling, as soon as the plane is
 ready. Switching style re-times every plane based at the hub
 (`applyHubStyleChange()`, `repackTail()` in `sim/turnBuffer.ts`): its
@@ -3442,6 +3447,11 @@ only a day that doesn't fit even rolling moves rotations to other planes.
 A plane whose day was already over-full keeps its times. So switching
 doesn't fail because one plane is busy. The Hubs view and the confirm
 say how many rotations leave on a wave ("every 3h30 · 7/9 on bank").
+Under a banked hub's hour strip, a wave strip (`wavesAt()`) marks each
+wave with the flights landing in its good-connection window (▼) and
+leaving on it (▲); a wave missing either is dimmed. On the Fleet
+Schedule, planes based there show each wave as a teal band: land home
+inside it, leave on its right edge.
 
 What banking costs: departures bunch into the wave hours, which fill
 (`sim/hours.ts`), congest and price slots higher, and the waiting makes
