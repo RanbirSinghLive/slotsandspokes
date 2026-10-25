@@ -3299,7 +3299,12 @@ along the top when the hour is full.
 **Slots at every airport.** Each daily departure needs a slot pair. The
 first pair at an airport nobody serves is free. Otherwise the daily fee
 scales with how busy the airport is against the average served one, so a
-field twice as busy costs nearly three times as much. The fee is locked
+field twice as busy costs nearly three times as much. The player's own
+flights count a quarter toward that busyness when the player buys
+(`OWN_TRAFFIC_WEIGHT`), so a growing hub isn't priced out by itself;
+rivals buying there count them in full, so a big hub is dear to move
+into. (Counted in full, a steady PHL game paid more for its home slots
+than for all its leases by day 120.) The fee is locked
 when taken, like a lease. Slots are taken automatically when a rotation
 needs them (the route builder quotes the price first) and released at
 rollover once unused, most expensive first. A slot in a busier hour
