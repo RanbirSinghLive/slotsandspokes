@@ -1389,7 +1389,8 @@ function removeButtonFor(rotation: Rotation, state: SimState, partner?: Rotation
     if (!armed && !button.classList.contains('is-armed')) {
       armed = true;
       button.classList.add('is-armed');
-      button.title = partner ? 'Click again to remove the night stop, both flights' : 'Click again to remove this rotation';
+      const again = window.matchMedia('(pointer: coarse)').matches ? 'Tap' : 'Click';
+      button.title = partner ? `${again} again to remove the night stop, both flights` : `${again} again to remove this rotation`;
       return;
     }
     removeRotation(rotation, state);

@@ -97,7 +97,11 @@ export function setupMapInput(canvas: HTMLCanvasElement, toMapPoint: (clientX: n
   // A tap is handled here rather than left to the mouse events a browser makes up
   // after it: iOS skips those when pointer-move handlers change the page, and then
   // nothing could be tapped. The made-up events are cancelled.
-  canvas.addEventListener('touchend', (event) => event.preventDefault(), { passive: false });
+  // After a pan the browser marks the touchend uncancelable (and logs an error
+  // if asked); no mouse events follow a pan anyway.
+  canvas.addEventListener('touchend', (event) => {
+    if (event.cancelable) event.preventDefault();
+  }, { passive: false });
   // A long press must not open the browser's own menu or select text under the finger.
   canvas.addEventListener('contextmenu', (event) => event.preventDefault());
 
