@@ -132,11 +132,29 @@ function send(name: EventName, game: StatsGameContext, detail = ''): void {
   }
 }
 
-/** Once per page load: counts the visit, and says whether a game was already saved here. */
+/** How long a page must stay open, untouched, before it counts as a visit. */
+const LANDED_AFTER_MS = 5_000;
+
+/**
+ * Once per page load: counts the visit, and says whether a game was already
+ * saved here. Held until the first tap, click or key press, or until the
+ * page has been open 5 seconds, because ad networks' review bots load the
+ * page for a second or two and would otherwise swamp the visit count.
+ */
 export function trackLanded(game: StatsGameContext, hasSave: boolean): void {
-  record = { ...record, visits: record.visits + 1 };
-  save(record);
-  send('landed', game, hasSave ? 'resumed' : 'new');
+  let sent = false;
+  const interactions = ['pointerdown', 'keydown', 'touchstart', 'wheel'] as const;
+  const sendOnce = (): void => {
+    if (sent) return;
+    sent = true;
+    window.clearTimeout(timer);
+    for (const name of interactions) window.removeEventListener(name, sendOnce, true);
+    record = { ...record, visits: record.visits + 1 };
+    save(record);
+    send('landed', game, hasSave ? 'resumed' : 'new');
+  };
+  const timer = window.setTimeout(sendOnce, LANDED_AFTER_MS);
+  for (const name of interactions) window.addEventListener(name, sendOnce, { capture: true, passive: true });
 }
 
 export function trackGameStarted(game: StatsGameContext): void {

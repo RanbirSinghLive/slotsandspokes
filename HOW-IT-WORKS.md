@@ -2164,7 +2164,9 @@ fallback; the cloud is a copy of it.
 events that show where players come from and how far they get, for
 judging links and paid ads. `public/privacy.html` tells players the same.
 
-- Events: `landed` (each page load; detail `new` or `resumed`),
+- Events: `landed` (each page load, sent at the first tap, click or
+  key press, or after 5 seconds open, so ad-review bots that load the
+  page for a moment aren't counted; detail `new` or `resumed`),
   `game_started` (home picked), `day_reached` (game day 1, 7, 30, 100,
   365, sent as the day is crossed), `bust` (cash gone), `cloud_on`, and
   `stats_off` (the last one sent when a player says no).
