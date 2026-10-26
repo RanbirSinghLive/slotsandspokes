@@ -90,15 +90,14 @@ function dailyContent(brief: DailyBrief): HTMLElement {
   if (brief.chips.length === 0) {
     const ok = document.createElement('span');
     ok.className = 'brief-chip is-ok';
-    ok.textContent = '✓';
-    ok.title = 'Nothing needs you this morning';
+    ok.textContent = '✓ Nothing needs you';
     wrap.append(ok);
   }
   for (const chip of brief.chips) {
     const el = document.createElement(chip.target ? 'button' : 'span');
     el.className = `brief-chip is-${chip.kind}`;
-    el.title = chip.tip;
-    el.textContent = `${CHIP_ICONS[chip.kind]} ${chip.count}`;
+    // The chip says what it is about, not only how many: no hover on a phone.
+    el.textContent = `${CHIP_ICONS[chip.kind]} ${chip.count} · ${chip.tip}`;
     if (chip.target) {
       const target = chip.target;
       (el as HTMLButtonElement).type = 'button';
@@ -110,8 +109,7 @@ function dailyContent(brief: DailyBrief): HTMLElement {
     const y = brief.yesterday;
     const line = document.createElement('span');
     line.className = 'brief-yesterday';
-    line.title = 'Yesterday: flights landed · on time · cancelled';
-    line.textContent = `DEP ${y.flown} · OTP ${y.flown > 0 ? Math.round((y.onTime / y.flown) * 100) : 0}% · CNX ${y.cancelled}`;
+    line.textContent = `Yesterday · DEP ${y.flown} · OTP ${y.flown > 0 ? Math.round((y.onTime / y.flown) * 100) : 0}% · CNX ${y.cancelled}`;
     wrap.append(line);
   }
   for (const item of brief.settled) {

@@ -2096,6 +2096,20 @@ the night to 15 minutes before the first departure, then 1× to watch it
 fly. Picking any speed meanwhile ends the run. A clock the player already
 started is left alone.
 
+**An idle plane in the first 30 days gets a row.** A plane flying under
+half its usable day still pays its whole lease, which is why a one-route
+start loses money. Until day 30 the alert strip names the idlest such
+plane ("IDLE · C-P001 flies 14% of its day · tap for another route from
+YUL"), and the row arms the route builder at its base with its type. The
+× dismisses it.
+
+**(i) marks open a note.** Hovering an (i) with a mouse shows its words in
+a floating tip; tapping or clicking it opens them as a note under the line
+it explains, kept until tapped again, and put back after the panel
+rebuilds (`ui/infoTooltip.ts`). Where a tip held a number the player needs
+(air-rights progress and setup, which tier opens a locked lessor class,
+the Gantt key's marks, demand over seats), the line itself now says it.
+
 ## Persistence (`src/ui/save.ts`)
 
 A save is `JSON.stringify(state)` in `localStorage` under one fixed key,
@@ -4774,7 +4788,7 @@ failure costs.
 
 Two read-only briefs. They change no economy; `sim/briefs.ts` decides when each is due and what it says, `ui/briefWindow.ts` draws it.
 
-- **Daily brief** at 05:30 home time, once a day. Icon chips, each with a tooltip and a tap that opens the screen that fixes it: weather (and closed airports), closed or announced airspace, AOGs, maintenance holds, crews short within 3 days, events flying today, and yesterday's cancellations. A line gives yesterday's DEP, OTP and CNX. A quiet morning shows a green tick and folds itself into its tab after a few seconds. At 100x it arrives already folded.
+- **Daily brief** at 05:30 home time, once a day. Chips, each saying its count and what it is about ("🔧 1 · AOG: C-P001 (hydraulics)") with a tap that opens the screen that fixes it: weather (and closed airports), closed or announced airspace, AOGs, maintenance holds, crews short within 3 days, events flying today, and yesterday's cancellations. A line gives yesterday's DEP, OTP and CNX. A quiet morning shows "✓ Nothing needs you" and folds itself into its tab after a few seconds. At 100x it arrives already folded.
 - **Season review** every 182 days, counted from the game's first frame (a save from before briefs starts its count when loaded). Routes ranked by profit over that half year (revenue less route costs, from `marketTotals` against the snapshot taken at the last review), top three outlined green and bottom three red; a ▲/▼/▬ for how the seasonal demand curve (`sim/seasons.ts`) changes in the next half year against the last; a dot where demand exceeds seats, a ring for a route no longer flown; and the three airports with the most unserved passengers. Tapping a row opens that route. The first appearance pauses the clock (Space resumes).
 - **The window** floats over the map and is dragged by its header (mouse or pen); on touch it docks at the bottom of the map instead. Minimizing folds it into an icon tab at the right end of the clock bar (below it on a phone). Position and tabs are screen state, not saved.
 - **Settings** (Game screen, Messages): daily on/off, season on/off, pause on season on/off, pause for a late plane's call (✋, see Cancellations), and a reopen button for each. Off means no pop-up; reopening still works. Stored in `state.briefs` (optional; an old save has both on).

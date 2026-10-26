@@ -335,7 +335,7 @@ function renderStrip(state: SimState): void {
       const opener = tierThatOpens(cls.code);
       const lock = document.createElement('span');
       lock.className = 'market-card-lock';
-      lock.append('🔒 ', info(`Opens as ${opener ? airlineCalled(opener) : 'a bigger airline'}. See Goals. Until then its listings are for rivals.`));
+      lock.append(`🔒 ${opener ? airlineCalled(opener) : 'later'} `, info(`Opens as ${opener ? airlineCalled(opener) : 'a bigger airline'}. See Goals. Until then its listings are for rivals.`));
       head.append(lock);
     } else {
       // The bell places or removes a standing order for this class.

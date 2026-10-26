@@ -236,7 +236,7 @@ export function buildRouteView(state: SimState, a: string, b: string, changed: (
   root.append(
     lineWithInfo(
       `${marketSize(state, a, b)} market · ${marketCharacterWord(a, b)}${fillWords}` +
-        (short ? ' · demand exceeds seats' : '') +
+        (short ? ' · demand exceeds seats · add a flight or a bigger plane' : '') +
         (fill.thin ? ' · still growing' : '') +
         fareGrowth +
         ` · season ${seasonNow(state, a, b)}`,

@@ -638,7 +638,8 @@ function buildTimeline(state: SimState, rotations: Rotation[]): HTMLElement[] {
   const key = document.createElement('div');
   key.className = 'timeline-key';
   key.append(
-    '☾ ✓ · 2 · −40m · ✗ · ● · ☾A ',
+    // Each mark with its word, so the key reads without its (i).
+    '☾ line check: ✓ done · 2 nights to go · −40m short · ✗ missed · ● deferred · A A check ',
     info(`Tonight's line check, beside each plane (one every 5 nights at a line base). ✓ checked tonight. 2 not due for 2 nights. −40m short by that long. ✗ due and missed. ● a deferred item (${MX_HOLD_AT} holds the plane a morning). A hatched cell with A: the night's spare hours go to that plane's A check.`),
   );
   if (Object.keys(state.hubStyles).length > 0) {
