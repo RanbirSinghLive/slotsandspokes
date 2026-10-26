@@ -479,6 +479,10 @@ function rightsSection(state: SimState, changed: () => void): HTMLElement[] {
     const icon = { locked: '🔒', earning: '◔', offered: '🔑', held: '🛡', home: '🛡' }[offer.status];
     name.append(`${icon} ${country} `, info(`${country} domestic rights · ${offer.progressDays}/${EARN_DAYS} days earned · setup ${money(offer.setup)} · ${money(offer.levyPerYear)}/yr`));
     card.append(name);
+    // Where the rights stand, on the card rather than only in its (i).
+    if (offer.status !== 'held' && offer.status !== 'home') {
+      card.append(line(offer.status === 'offered' ? `setup ${money(offer.setup)} · ${money(offer.levyPerYear)}/yr` : `${offer.progressDays}/${EARN_DAYS}d earned`));
+    }
     if (offer.status === 'held') {
       card.append(
         line(`${offer.weeklyUsed}/${offer.weeklyCap} per week · ${money(offer.levyPerYear)}/yr`),

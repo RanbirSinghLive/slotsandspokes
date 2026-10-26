@@ -3134,6 +3134,17 @@ button.ticker-item:hover {
   .modal-box--home {
     max-height: 90dvh;
   }
+
+  /* The way back takes its own line, so the date buttons keep theirs. */
+  .modal-box--home .home-season {
+    flex-wrap: wrap;
+  }
+
+  .modal-box--home .home-picker-back {
+    order: 1;
+    min-height: 44px;
+    margin-left: 0;
+  }
 }
 
 /* The start season (ui/homePicker.ts): two buttons, the chosen one lit. */
@@ -3151,6 +3162,7 @@ button.ticker-item:hover {
 }
 
 .home-season button {
+  white-space: nowrap;
   padding: 5px 10px;
   font-family: inherit;
   font-size: 13px;
@@ -3858,6 +3870,32 @@ button.market-slot:not(:disabled):hover {
 
 .info-mark.rights-mark.is-domestic {
   color: rgb(110, 220, 160);
+}
+
+.info-mark.is-open {
+  color: #0a0c12;
+  background: #8fb4ff;
+  border-color: #8fb4ff;
+}
+
+/* An (i) opened by a tap or click: its words under the line they explain,
+   until tapped again (ui/infoTooltip.ts). */
+.info-note {
+  flex-basis: 100%;
+  margin: 4px 0 8px;
+  padding: 6px 8px;
+  border-left: 2px solid #8fb4ff;
+  background: rgba(143, 180, 255, 0.07);
+  color: #cdd3e0;
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: normal;
+  font-style: normal;
+  letter-spacing: normal;
+  text-transform: none;
+  line-height: 1.5;
+  white-space: pre-line;
+  cursor: pointer;
 }
 
 /* Same floating-card treatment as the map's own tooltips, so an
@@ -6719,6 +6757,8 @@ button.ops-item:hover {
 /* The daily brief and season review window (ui/briefWindow.ts), and the tabs it folds into. */
 #brief-window {
   position: fixed;
+  font-family: ui-monospace, Consolas, monospace;
+  color: #cdd3e0;
   top: 130px;
   left: 16px;
   width: 300px;
@@ -6792,7 +6832,10 @@ button.ops-item:hover {
   align-items: center;
 }
 .brief-chip {
-  font-size: 13px;
+  font-family: inherit;
+  color: inherit;
+  text-align: left;
+  font-size: 12px;
   padding: 4px 8px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.2);

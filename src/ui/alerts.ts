@@ -9,6 +9,7 @@ import { biggestBottleneck, type Bottleneck } from '../sim/bottleneck';
 import { isOpsView } from '../render/opsView';
 import { airports } from '../render/airports';
 import { armRouteBuilderAt } from './routeBuilder';
+import { aircraftUtilisation } from '../sim/utilisation';
 import type { SimState } from '../sim/state';
 
 /**
@@ -43,6 +44,10 @@ export type Alert = {
 /** How many rows show before collapsing into "+N more" — a handful of aircraft shouldn't need scrolling to read. */
 const MAX_VISIBLE_ALERTS = 4;
 
+/** The idle-plane row helps a new airline fill its first planes, then stops nagging. */
+const EARLY_IDLE_DAYS = 30;
+const IDLE_SHARE = 0.5;
+
 // The answer only moves as the world does; the strip is asked every frame.
 let bottleneckState: SimState | null = null;
 let bottleneckMinute = -1;
@@ -74,6 +79,29 @@ function collectAlerts(state: SimState, choosingHome: boolean): Alert[] {
         if (home) armRouteBuilderAt(home, state.aircraft.find((plane) => plane.baseAirport === home.iata)?.typeCode);
       },
     });
+  }
+
+  // The first weeks: a plane flying under half its day still costs its whole
+  // lease, which is why a one-route start loses money. The row says so and,
+  // tapped, starts another route from that plane's base.
+  if (!choosingHome && state.schedule.length > 0 && dayIndex(state) < EARLY_IDLE_DAYS) {
+    const idlest = state.aircraft
+      .map((plane) => ({ plane, share: aircraftUtilisation(state, plane.tail).share }))
+      .filter((each) => each.share < IDLE_SHARE)
+      .sort((x, y) => x.share - y.share)[0];
+    if (idlest) {
+      const verb = window.matchMedia('(pointer: coarse)').matches ? 'tap' : 'click';
+      const { plane } = idlest;
+      alerts.push({
+        key: `idle:${plane.tail}`,
+        message: `IDLE · ${plane.tail} flies ${Math.round(idlest.share * 100)}% of its day · ${verb} for another route from ${plane.baseAirport}`,
+        tab: 'fleet',
+        run: () => {
+          const base = airports.find((airport) => airport.iata === plane.baseAirport);
+          if (base) armRouteBuilderAt(base, plane.typeCode);
+        },
+      });
+    }
   }
 
   // Planes grounded for want of pilots or of their cabin's legal floor of
