@@ -7,6 +7,8 @@ import { scheduleProblems } from './panels';
 import { runwayAlertMessage } from './runway';
 import { biggestBottleneck, type Bottleneck } from '../sim/bottleneck';
 import { isOpsView } from '../render/opsView';
+import { airports } from '../render/airports';
+import { armRouteBuilderAt } from './routeBuilder';
 import type { SimState } from '../sim/state';
 
 /**
@@ -34,6 +36,8 @@ export type Alert = {
   tab: string;
   /** The inspector view that explains it, when one does: opened instead of the tab. */
   view?: Selection;
+  /** What the row does instead of opening a view or tab, when the fix is one step away. */
+  run?: () => void;
 };
 
 /** How many rows show before collapsing into "+N more" — a handful of aircraft shouldn't need scrolling to read. */
@@ -56,13 +60,19 @@ function collectAlerts(state: SimState, choosingHome: boolean): Alert[] {
   const alerts: Alert[] = scheduleProblems(state).map((message) => ({ key: `schedule:${message}`, message, tab: 'fleet' }));
 
   // A new game waits paused with an empty schedule: say what to do first.
-  // It clears itself the moment a route is flown.
+  // It clears itself the moment a route is drawn, which starts the clock.
   if (!choosingHome && state.schedule.length === 0) {
+    // The row itself starts drawing from home, so the first route is two
+    // taps and a ✓ without finding Draw route in the airport's ring.
+    const verb = window.matchMedia('(pointer: coarse)').matches ? 'tap' : 'click';
     alerts.push({
       key: 'first-route',
-      message: `NO ROUTES · click ${state.homeAirport} · Draw route · click a city · ✓ · then press 1×`,
+      message: `FIRST ROUTE · ${verb} here, then a city near ${state.homeAirport} · ✓`,
       tab: 'fleet',
-      view: { kind: 'airport', iata: state.homeAirport },
+      run: () => {
+        const home = airports.find((airport) => airport.iata === state.homeAirport);
+        if (home) armRouteBuilderAt(home, state.aircraft.find((plane) => plane.baseAirport === home.iata)?.typeCode);
+      },
     });
   }
 
@@ -157,7 +167,7 @@ export function updateAlerts(state: SimState, onNavigate: (tab: string) => void,
     row.type = 'button';
     row.className = 'alert-row';
     row.textContent = alert.message;
-    row.addEventListener('click', () => (alert.view ? select(alert.view) : onNavigate(alert.tab)));
+    row.addEventListener('click', () => (alert.run ? alert.run() : alert.view ? select(alert.view) : onNavigate(alert.tab)));
 
     const close = document.createElement('button');
     close.type = 'button';

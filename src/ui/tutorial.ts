@@ -6,7 +6,7 @@ import type { SimState } from '../sim/state';
  * player who has never seen the game. A spotlight dims everything but the
  * thing being explained, and a card beside it says what it is and what to
  * do with it. Most steps move on with Next; the ones where the player does
- * something (choosing a home, drawing a first route) move on by themselves
+ * something (drawing a first route) move on by themselves
  * once it's done, with a way to skip.
  *
  * A first visit asks whether to play it; the answer is remembered in
@@ -25,8 +25,6 @@ type Step = {
   target?: string;
   /** Moves on by itself once this is true; the card shows "Skip this step" instead of Next. */
   until?: (state: SimState, choosingHome: boolean) => boolean;
-  /** The steps after it mean nothing until it is done, so it can't be skipped alone. */
-  required?: boolean;
   /** Runs as the step starts: pause for reading, or run the clock to watch. */
   speed?: 0 | 1;
   /** Opens what the step points at (a screen in the side panel) before it's shown. */
@@ -42,14 +40,17 @@ function openGanttAt(scrollTo: string): () => void {
   };
 }
 
+/** "tap" on a touch screen, "click" with a mouse, for steps that say what to press. */
+function press(): string {
+  return window.matchMedia('(pointer: coarse)').matches ? 'tap' : 'click';
+}
+
+/**
+ * Choosing a home has no step: the picker explains itself, and a card over
+ * it would hide most of the cities on a phone. A tutorial started from the
+ * welcome card waits for the choice and begins once the map is up.
+ */
 const STEPS: Step[] = [
-  {
-    title: 'Pick your home',
-    text: 'Your airline starts with one leased Propeller at the city you choose. Big-city homes are the gentlest start; small ones have thin markets, and more contract help. Easy, Medium and Hard set your cash and how soon rivals arrive.',
-    target: '#home-picker-modal .modal-box',
-    until: (_state, choosingHome) => !choosingHome,
-    required: true,
-  },
   {
     title: 'Your airline',
     text: "This is the map: your home, and the airports a Propeller can reach from it. Everything you'll build, you build here.",
@@ -58,18 +59,21 @@ const STEPS: Step[] = [
   },
   {
     title: 'Fly your first route',
-    text: 'Click your home airport to open its ring, choose Draw route (with more than one type there, pick which), then click another airport and press ✓. The game times the flights for you.',
+    get text() {
+      const verb = press();
+      return `${verb[0].toUpperCase()}${verb.slice(1)} the FIRST ROUTE bar (or your home airport, then Draw route), ${verb} a city in reach, and press ✓. The game times the flights and starts the clock.`;
+    },
     target: '#map-surface',
     until: (state) => state.schedule.length > 0,
   },
   {
     title: 'The clock',
-    text: 'Your airline runs on its home clock. Speed up with 20× or 100× when things are quiet; Space pauses.',
+    text: 'The clock started with your first route: the night runs fast to the first departure, then 1× to watch it fly. Dots set the speed; the pause button or Space stops it.',
     target: '#hud',
   },
   {
     title: "Today's operation",
-    text: 'The bar under the clock is the day\'s flights: green flown, blue in the air, grey to go. LATE and CNX show up when there are any. The tall bars are each day: green made money, red lost it. Hover them for the whole chart. Dots set the speed. An amber ★ is a request: a priority flight that pays a premium. The game pauses when one arrives.',
+    text: 'The bar under the clock is the day\'s flights: green flown, blue in the air, grey to go. LATE and CNX show up when there are any. The tall bars are each day: green made money, red lost it. Hover them for the whole chart. An amber ★ is a request: a priority flight that pays a premium. The game pauses when one arrives.',
     target: '#hud',
   },
   {
@@ -159,7 +163,7 @@ function button(label: string, className: string, onClick: () => void): HTMLButt
 /** Whether a step's own action is done, in which case it's skipped over. */
 let lastState: { state: SimState; choosingHome: boolean } | null = null;
 
-/** Show step `next`, passing over any hands-on step already done (a home already chosen) in the direction of travel. */
+/** Show step `next`, passing over any hands-on step already done (a route already drawn) in the direction of travel. */
 function show(next: number, direction: 1 | -1 = 1): void {
   while (next < steps.length && next >= 0 && lastState && steps[next].until?.(lastState.state, lastState.choosingHome)) next += direction;
   index = next;
@@ -187,9 +191,7 @@ function show(next: number, direction: 1 | -1 = 1): void {
   actions.className = 'tutorial-actions';
   actions.append(button('Skip tutorial', 'tutorial-skip', end));
   if (index > 0) actions.append(button('Back', 'tutorial-back', () => show(index - 1, -1)));
-  if (step.required) {
-    // No way on from here but doing it: the picker is the only thing on screen.
-  } else if (step.until) {
+  if (step.until) {
     actions.append(button('Skip this step', 'tutorial-next', () => show(index + 1)));
   } else {
     actions.append(button(index === steps.length - 1 ? 'Start playing' : 'Next', 'tutorial-next', () => show(index + 1)));
@@ -217,12 +219,14 @@ function place(): void {
     spotlight.hidden = true;
   }
   // The card goes below the target if there's room, else above, else inside it; in the middle with no target.
+  // A wide target gets the card centred: below a short one (the clock on a phone), inside a tall one (the map).
   const box = card.getBoundingClientRect();
   let left: number;
   let top: number;
   if (!rect || rect.width > window.innerWidth * 0.6) {
     left = (window.innerWidth - box.width) / 2;
-    top = rect ? Math.max(margin, rect.bottom - box.height - 80) : (window.innerHeight - box.height) / 2;
+    const roomBelow = rect !== null && rect.height < window.innerHeight * 0.4 && rect.bottom + 18 + box.height < window.innerHeight;
+    top = !rect ? (window.innerHeight - box.height) / 2 : roomBelow ? rect.bottom + 18 : Math.max(margin, rect.bottom - box.height - 80);
   } else if (rect.left > window.innerWidth * 0.6) {
     left = rect.left - box.width - 20;
     top = rect.top + 20;
@@ -246,14 +250,23 @@ function end(): void {
   if (wasRunning && lastState && !lastState.choosingHome) controls?.setSpeed(1);
 }
 
-/** Start the tutorial from the first step that isn't already done. */
+/** Waiting for a home to be chosen before the first step shows. */
+let waitingForHome = false;
+
+/** Start the tutorial from the first step that isn't already done, once a home is chosen. */
 export function startTutorial(): void {
   steps = STEPS;
+  if (lastState?.choosingHome) {
+    waitingForHome = true;
+    card.hidden = true;
+    card.classList.remove('is-centred');
+    return;
+  }
   show(0);
 }
 
 export function isTutorialRunning(): boolean {
-  return index >= 0;
+  return index >= 0 || waitingForHome;
 }
 
 /**
@@ -299,6 +312,11 @@ export function setupTutorial(setSpeed: (speed: 0 | 1) => void): void {
  */
 export function updateTutorial(state: SimState, choosingHome: boolean): void {
   lastState = { state, choosingHome };
+  if (waitingForHome && !choosingHome) {
+    waitingForHome = false;
+    show(0);
+    return;
+  }
   if (index < 0) return;
   const step = steps[index];
   if (step?.until?.(state, choosingHome)) {

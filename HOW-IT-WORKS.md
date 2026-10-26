@@ -2069,26 +2069,32 @@ the Game screen's "Play the tutorial" starts it again.
 
 Thirteen steps over the real screen, each a spotlight on its target (a
 gold frame, the rest dimmed by a huge shadow, clicks passing through)
-and a card beside it with Back, Next and Skip tutorial: pick a home (the
-home picker), your airline (the map), fly your first route (with the
-type choice), the clock, today's operation (ops board and P&L strip, and the amber ★ event chip),
+and a card beside it with Back, Next and Skip tutorial. Choosing a home
+has no step: the picker explains itself, and a card over it hid most of
+the cities on a phone, so a tutorial started on the welcome card waits
+for the choice. Then: your airline (the map), fly your first route,
+the clock, today's operation (ops board and P&L strip, and the amber ★ event chip),
 the lenses, the rail, the Schedule (the step opens Fleet on it), hours
 filling (peaks, the planner's next free hour, peak against off-peak),
 crews and maintenance (Mtc), Fuel (the standing policy), Head office (contracts, air rights, the three chairs and board seat,
 the tree), Goals, and a last word on edges fading, size drawing rivals,
 cash, and the year one report. A step pointing inside a screen opens it
-first (`open`). The two hands-on steps, choosing a
-home and drawing a first route, move on by themselves once done (a
-"Skip this step" meanwhile, except choosing a home, which only "Skip
-tutorial" leaves), and are passed over when already done. The clock
-pauses for reading after the home is chosen, and runs at 1× again at the
-end.
+first (`open`). The hands-on step, drawing a first route, moves on by
+itself once done (with "Skip this step" meanwhile), and is passed over
+when already done. A wide target gets the card below it when it is short
+(the clock on a phone) and inside it when tall (the map). Steps say
+"tap" on a touch screen and "click" with a mouse.
 
-**A new game starts paused.** Choosing a home leaves the clock stopped,
-and while the schedule is empty the alert strip says what to do first
-("NO ROUTES · click BOS · Draw route · click a city · ✓ · then press
-1×"), opening the home airport when clicked. It goes when a route is
-flown.
+**A new game starts paused, and the first route starts it.** Choosing a
+home leaves the clock stopped. While the schedule is empty the alert
+strip says what to do ("FIRST ROUTE · tap here, then a city near BOS ·
+✓"), and the row itself arms the route builder from home, so the first
+route is two taps and a ✓. The home airport's ring pulses its Draw route
+button and its hint says so. When the first route goes in (`main.ts`,
+`startClockOnFirstRoute`) a paused clock starts by itself: 20× through
+the night to 15 minutes before the first departure, then 1× to watch it
+fly. Picking any speed meanwhile ends the run. A clock the player already
+started is left alone.
 
 ## Persistence (`src/ui/save.ts`)
 
