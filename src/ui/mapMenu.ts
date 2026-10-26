@@ -504,6 +504,7 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
       label: 'Draw route',
       icon: ICON.route,
       angleDeg: -115,
+      beckon: state.schedule.length === 0,
       disabledReason: hasPlane ? undefined : `No plane based at ${airport.iata} · lease one first`,
       ...(typesHere.length > 1
         ? { label: 'Draw route · choose the type', children: drawChoices }
@@ -552,7 +553,8 @@ function openAirportMenu(airport: Airport, state: SimState): void {
 
   open = { kind: 'airport', airport };
   openState = state;
-  notice = null;
+  // A new player's first ring says which button to start with.
+  notice = state.schedule.length === 0 && candidateTailsAt(state, airport.iata).length > 0 ? 'FIRST ROUTE · Draw route (lit) · then a city · ✓' : null;
   hover = null;
 
   select({ kind: 'airport', iata: airport.iata });

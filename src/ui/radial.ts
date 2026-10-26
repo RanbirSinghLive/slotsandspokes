@@ -33,6 +33,8 @@ export type RadialAction = {
   confirm?: boolean;
   /** Lit as the current choice, for a fan of mutually exclusive settings (a route's turn buffer). */
   selected?: boolean;
+  /** Pulses, for the one action a new player should find first (Draw route before any route exists). */
+  beckon?: boolean;
   /**
    * Holding the button fires it again and again (after a short delay, then
    * on an interval) instead of once. For things like "add a flight" where
@@ -177,6 +179,7 @@ function buildButton(action: RadialAction, spec: RadialSpec): HTMLButtonElement 
   if (action.large) button.classList.add('large');
   if (action.id === openParentId || action.selected) button.classList.add('active');
   if (action.id === armedId) button.classList.add('confirming');
+  if (action.beckon && !action.disabledReason) button.classList.add('beckon');
 
   // A button waiting for its second click keeps saying so, since the ring
   // is rebuilt under the pointer when it arms and re-fires the hover.

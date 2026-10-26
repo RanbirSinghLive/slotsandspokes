@@ -144,7 +144,7 @@ function showStory(): void {
   const home = lifted ?? pinned;
   if (!home) {
     const how = window.matchMedia('(pointer: coarse)').matches ? 'tap one to choose it · pinch to zoom' : 'point at one to read it, click to choose it';
-    storyEl.replaceChildren(textEl('p', 'home-world-hint', `${featured.length} featured homes · ${how}`));
+    storyEl.replaceChildren(textEl('p', 'home-world-hint', `${featured.length} featured homes · big cities start gentlest · ${how}`));
   } else {
     const { option, story } = home;
     storyEl.replaceChildren(

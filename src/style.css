@@ -1975,6 +1975,18 @@ button,
   border-color: rgba(255, 209, 102, 0.9);
 }
 
+/* The one button a new player should press first: Draw route before any route exists. */
+.radial-button.beckon {
+  border-color: #5ed6c8;
+  color: #5ed6c8;
+  animation: radial-beckon 1.2s ease-in-out infinite;
+}
+
+@keyframes radial-beckon {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(94, 214, 200, 0.6); }
+  50% { box-shadow: 0 0 0 8px rgba(94, 214, 200, 0); }
+}
+
 .radial-button.confirming {
   border-color: #ff8080;
   color: #ff8080;

@@ -680,6 +680,8 @@ function tick(nowMs: number): void {
     syncSpeedUi();
   }
 
+  startClockOnFirstRoute();
+
   // The runway pop-up pauses once so the warning can't scroll past at
   // 100x. speedBeforePause is left alone, so Space resumes at the old speed.
   briefSpeed = speedMultiplier;
@@ -773,7 +775,42 @@ function syncSpeedUi(): void {
   speedUpEl.disabled = level === SPEED_LEVELS.length - 1;
 }
 
+// A new game waits paused for its first route. The moment one is drawn the
+// clock starts by itself: a player who doesn't know the speed dots would
+// otherwise sit looking at a still map. The night before the first
+// departure runs at 20× so the first plane is moving within seconds, then
+// the clock drops to 1× to watch it. Any speed the player picks wins.
+let awaitingFirstRoute = state.schedule.length === 0;
+const FIRST_DEPARTURE_RUN_SPEED = 20;
+/** How long before the first departure the run to it slows to 1×, so the boarding plane is seen. */
+const FIRST_DEPARTURE_LEAD_MINUTES = 15;
+/** The home-local minute of day the run to the first departure stops at, while it runs. */
+let runToMinuteOfDay: number | null = null;
+
+function startClockOnFirstRoute(): void {
+  if (awaitingFirstRoute && !choosingHome && state.schedule.length > 0) {
+    awaitingFirstRoute = false;
+    if (speedMultiplier !== 0) return;
+    const firstDeparture = Math.min(...state.schedule.map((leg) => leg.departMinute));
+    const stopAt = firstDeparture - FIRST_DEPARTURE_LEAD_MINUTES;
+    runToMinuteOfDay = homeMinuteOfDay(state) < stopAt ? stopAt : null;
+    speedMultiplier = runToMinuteOfDay === null ? 1 : FIRST_DEPARTURE_RUN_SPEED;
+    speedBeforePause = speedMultiplier;
+    syncSpeedUi();
+    return;
+  }
+  if (runToMinuteOfDay !== null && (homeMinuteOfDay(state) >= runToMinuteOfDay || state.activeFlights.length > 0)) {
+    runToMinuteOfDay = null;
+    if (speedMultiplier === FIRST_DEPARTURE_RUN_SPEED) {
+      speedMultiplier = 1;
+      speedBeforePause = 1;
+      syncSpeedUi();
+    }
+  }
+}
+
 function setSpeedLevel(level: number): void {
+  runToMinuteOfDay = null;
   const clamped = Math.max(0, Math.min(SPEED_LEVELS.length - 1, level));
   speedMultiplier = SPEED_LEVELS[clamped];
   speedBeforePause = speedMultiplier;
@@ -790,6 +827,7 @@ speedPauseEl.addEventListener('click', () => togglePause());
 syncSpeedUi();
 
 function togglePause(): void {
+  runToMinuteOfDay = null;
   speedMultiplier = speedMultiplier === 0 ? speedBeforePause : 0;
   syncSpeedUi();
 }
@@ -1263,7 +1301,8 @@ if (choosingHome) {
     choosingHome = false;
     resize();
     // Paused, so the first route is drawn before any cash is spent on
-    // nothing; 1× or Space starts the clock at 1×.
+    // nothing; drawing it starts the clock (startClockOnFirstRoute).
+    awaitingFirstRoute = true;
     speedMultiplier = 0;
     speedBeforePause = 1;
     syncSpeedUi();
