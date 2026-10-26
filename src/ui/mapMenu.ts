@@ -60,6 +60,9 @@ import { CHARGER_FEE, CHARGER_PER_DAY } from '../sim/powertrain';
 // Short enough to fit a button: the full names are in each button's label.
 const HUB_STYLE_ICON_TEXT = { rolling: 'Roll', banked: 'Bank' } as const;
 
+/** "tap" on a touch screen, "click" with a mouse. */
+const pressWord = (): string => (window.matchMedia('(pointer: coarse)').matches ? 'tap' : 'click');
+
 const ringHintEl = document.querySelector<HTMLElement>('#radial-hint')!;
 /** How far below the click point the ring's hint label sits: clear of the ring and an open fan (radial.ts FAN_RADIUS_PX). */
 const RING_HINT_OFFSET_PX = 128;
@@ -280,8 +283,8 @@ function airportActions(airport: Airport, state: SimState): RadialAction[] {
   planeChoices.push({
     id: 'plane:term',
     label: seasonalTerm
-      ? `Term: ${SEASON_DAYS} days for the season, ${Math.round((SEASONAL_PREMIUM - 1) * 100)}% dearer a day, back by itself · click for a standing lease`
-      : `Term: standing lease · click to lease for a ${SEASON_DAYS}-day season instead (${Math.round((SEASONAL_PREMIUM - 1) * 100)}% dearer a day, back by itself)`,
+      ? `Term: ${SEASON_DAYS} days for the season, ${Math.round((SEASONAL_PREMIUM - 1) * 100)}% dearer a day, back by itself · ${pressWord()} for a standing lease`
+      : `Term: standing lease · ${pressWord()} to lease for a ${SEASON_DAYS}-day season instead (${Math.round((SEASONAL_PREMIUM - 1) * 100)}% dearer a day, back by itself)`,
     // The term as a word on the button: 90d for a season, a dash for standing.
     icon: textIcon(seasonalTerm ? `${SEASON_DAYS}d` : '—', 9),
     angleDeg: 0,

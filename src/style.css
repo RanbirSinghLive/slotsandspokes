@@ -1817,6 +1817,35 @@ button,
   display: block;
 }
 
+/* A phone's day is too narrow to grab a short flight, so its hours get a
+   thumb-sized width and the Gantt scrolls sideways; the tails stay pinned at
+   the left. A flight itself still drags (touch-action: none), the gaps scroll. */
+@media (pointer: coarse) {
+  :root[data-narrow] #rotations-timeline {
+    grid-template-columns: auto minmax(560px, 1fr);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding-bottom: 12px;
+  }
+
+  /* A type's header and the key span the grid: held to the visible width at the left. */
+  :root[data-narrow] #rotations-timeline .timeline-group,
+  :root[data-narrow] #rotations-timeline .timeline-key {
+    position: sticky;
+    left: 0;
+    box-sizing: border-box;
+    max-width: calc(100vw - 80px);
+  }
+
+  :root[data-narrow] #rotations-timeline .timeline-plane {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    padding-right: 4px;
+    background: #0a0c12;
+  }
+}
+
 /* On touch: taller rows to hit, and × always showing, since there is no hover to reveal it. */
 @media (pointer: coarse) {
   .timeline-pending-cancel {
@@ -3016,8 +3045,30 @@ button.ticker-item:hover {
     left: 16px;
   }
 
+  /* Name, facts and the paragraph about how the city plays come first; the
+     history scrolls under them. */
   #home-world-story {
-    height: 64px;
+    display: flex;
+    flex-direction: column;
+    height: 92px;
+  }
+
+  /* The fade says there is more to scroll. */
+  #home-world-story {
+    -webkit-mask-image: linear-gradient(#000 70%, transparent);
+    mask-image: linear-gradient(#000 70%, transparent);
+    padding-bottom: 24px;
+    box-sizing: border-box;
+  }
+
+  #home-world-story .home-world-text--game {
+    order: -1;
+    margin-top: 6px;
+  }
+
+  #home-world-story .home-world-name,
+  #home-world-story .home-world-facts {
+    order: -2;
   }
 
   /* The way to the full list rides the top corner, a real button a thumb can hit. */
@@ -3057,8 +3108,14 @@ button.ticker-item:hover {
     grid-column: 1;
   }
 
+  /* The note under its row, one line, rather than squeezed beside the buttons. */
   .home-world-season-note {
-    grid-column: 2;
+    grid-column: 1 / -1;
+    margin-top: -6px;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .home-world-start {
@@ -6518,15 +6575,39 @@ button.ops-item:hover {
     position: relative;
   }
 
-  /* The speed buttons sit tight: a tall invisible hit area, not much wider. */
+  /* A thumb sets the speed by its dot, so − and + give their room to the
+     dots and the pause button, each wide enough to hit; a tall invisible hit
+     area makes up the 44px. */
   #speed-controls button {
     position: relative;
+    width: 32px;
+  }
+
+  #speed-controls button.speed-dot {
+    width: 24px;
+  }
+
+  #speed-controls #speed-down,
+  #speed-controls #speed-up {
+    display: none;
   }
 
   #speed-controls button::after {
     content: '';
     position: absolute;
     inset: -11px -2px;
+  }
+
+  #market-chip,
+  .alert-dismiss {
+    position: relative;
+  }
+
+  #market-chip::after,
+  .alert-dismiss::after {
+    content: '';
+    position: absolute;
+    inset: -10px -4px;
   }
 
   .info-mark::after,

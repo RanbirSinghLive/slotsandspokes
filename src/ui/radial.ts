@@ -185,7 +185,7 @@ function buildButton(action: RadialAction, spec: RadialSpec): HTMLButtonElement 
   // is rebuilt under the pointer when it arms and re-fires the hover.
   button.addEventListener('mouseenter', () => {
     spec.onPreview?.(action.disabledReason ? null : (action.preview ?? null));
-    if (action.id === armedId) spec.onHint(`Click again to confirm: ${action.label}`, true);
+    if (action.id === armedId) spec.onHint(`${againWord()} again to confirm: ${action.label}`, true);
     else spec.onHint(action.disabledReason ?? action.label, !!action.disabledReason);
   });
   button.addEventListener('mouseleave', () => {
@@ -210,6 +210,11 @@ function buildButton(action: RadialAction, spec: RadialSpec): HTMLButtonElement 
   return button;
 }
 
+/** "Tap" on a touch screen, "Click" with a mouse. */
+function againWord(): string {
+  return window.matchMedia('(pointer: coarse)').matches ? 'Tap' : 'Click';
+}
+
 function choose(action: RadialAction, spec: RadialSpec): void {
   if (action.disabledReason) {
     spec.onHint(action.disabledReason, true);
@@ -225,7 +230,7 @@ function choose(action: RadialAction, spec: RadialSpec): void {
 
   if (action.confirm && armedId !== action.id) {
     armedId = action.id;
-    spec.onHint(`Click again to confirm: ${action.label}`, true);
+    spec.onHint(`${againWord()} again to confirm: ${action.label}`, true);
     render();
     return;
   }

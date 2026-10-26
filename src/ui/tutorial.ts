@@ -68,12 +68,18 @@ const STEPS: Step[] = [
   },
   {
     title: 'The clock',
-    text: 'The clock started with your first route: the night runs fast to the first departure, then 1× to watch it fly. Dots set the speed; the pause button or Space stops it.',
+    get text() {
+      const stop = press() === 'tap' ? 'the pause button stops it' : 'the pause button or Space stops it';
+      return `The clock started with your first route: the night runs fast to the first departure, then 1× to watch it fly. Dots set the speed; ${stop}.`;
+    },
     target: '#hud',
   },
   {
     title: "Today's operation",
-    text: 'The bar under the clock is the day\'s flights: green flown, blue in the air, grey to go. LATE and CNX show up when there are any. The tall bars are each day: green made money, red lost it. Hover them for the whole chart. An amber ★ is a request: a priority flight that pays a premium. The game pauses when one arrives.',
+    get text() {
+      const reach = press() === 'tap' ? 'Tap them' : 'Hover them';
+      return `The bar under the clock is the day's flights: green flown, blue in the air, grey to go. LATE and CNX show up when there are any. The tall bars are each day: green made money, red lost it. ${reach} for the whole chart. An amber ★ is a request: a priority flight that pays a premium. The game pauses when one arrives.`;
+    },
     target: '#hud',
   },
   {
@@ -82,7 +88,9 @@ const STEPS: Step[] = [
     target: '#map-tools',
   },
   {
-    title: 'Every screen, one click',
+    get title() {
+      return `Every screen, one ${press()}`;
+    },
     text: 'The rail has everything. The top group is where you act: Routes and fares, Fleet to lease planes, Crews, Mtc, Product for fees and cabins, Contracts to bid on, and Office for fuel and executives. Below the line are the read-outs: Overview, Money, Airports, Rivals, Goals. A dot means something wants a look.',
     target: '#rail',
   },
@@ -94,7 +102,10 @@ const STEPS: Step[] = [
   },
   {
     title: 'Hours fill up',
-    text: "A busy airport fills at its peaks first (07:00, 17:00). A full hour takes no new flights, so the planner starts yours at the next hour with room. Peak flights carry more business travellers and cost more in slots; off-peak ones are cheap and mostly leisure. Click an airport to see its hours.",
+    get text() {
+      const verb = press();
+      return `A busy airport fills at its peaks first (07:00, 17:00). A full hour takes no new flights, so the planner starts yours at the next hour with room. Peak flights carry more business travellers and cost more in slots; off-peak ones are cheap and mostly leisure. ${verb[0].toUpperCase()}${verb.slice(1)} an airport to see its hours.`;
+    },
     target: '#rotations-section',
   },
   {
@@ -109,7 +120,9 @@ const STEPS: Step[] = [
   },
   {
     title: 'Head office',
-    text: 'Domestic air rights abroad, three executive chairs and a board seat (click one to meet its candidates; who fits changes as your planes get bigger), and the innovations each rung opens, as a tree.',
+    get text() {
+      return `Domestic air rights abroad, three executive chairs and a board seat (${press()} one to meet its candidates; who fits changes as your planes get bigger), and the innovations each rung opens, as a tree.`;
+    },
     target: '#rail .rail-item[data-go="headOffice"]',
   },
   {
