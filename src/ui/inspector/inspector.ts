@@ -21,6 +21,7 @@ import { buildProductView } from './product';
 import { adopt } from './dom';
 import { updateOnTimePanel } from '../onTime';
 import { updateGameControls } from '../gameControls';
+import { noteShown, overviewSwitch } from '../screenGroups';
 
 /**
  * The side panel as an inspector: the detail for whatever is selected
@@ -40,6 +41,13 @@ const breadcrumbEl = document.querySelector<HTMLElement>('#inspector-breadcrumb'
 const bodyEl = document.querySelector<HTMLElement>('#inspector-body')!;
 // The Network summary (the cards and Last 7 days) shows only at Network.
 const networkEls = [document.querySelector<HTMLElement>('#econ-summary')!];
+const overviewTitleEl = document.querySelector<HTMLElement>('#overview-title')!;
+
+/** The Overview's title and its switch to Goals; built at load (the game opens on Overview) and on each return to it, so the Goals dot is fresh. */
+function renderOverviewTitle(): void {
+  overviewTitleEl.replaceChildren('Overview', overviewSwitch('network'));
+}
+renderOverviewTitle();
 
 let redrawPools: (() => void) | null = null;
 /** What the view was last built for, so a rebuild of the same thing keeps its scroll position. */
@@ -199,11 +207,13 @@ export function renderInspector(state: SimState): void {
     selection = getSelection();
   }
 
+  noteShown(selection.kind);
   const atNetwork = selection.kind === 'network';
   inspectorEl.hidden = atNetwork;
   for (const el of networkEls) el.hidden = !atNetwork;
   redrawPools = null;
   if (atNetwork) {
+    renderOverviewTitle();
     bodyEl.replaceChildren();
     renderedKey = '';
     return;

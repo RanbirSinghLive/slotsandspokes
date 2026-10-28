@@ -1,5 +1,7 @@
 import { info, line, heading, titleWithSwitch, viewSwitch } from './dom';
 import { glyph } from '../glyphs';
+import { screenDot } from '../screenGroups';
+import { select } from '../selection';
 import { money } from '../format';
 import { cashAfterRows, showConfirm } from '../confirmModal';
 import type { SimState } from '../../sim/state';
@@ -397,24 +399,38 @@ function techTree(state: SimState, changed: () => void): HTMLElement[] {
   return nodes;
 }
 
-export function buildHeadOfficeView(state: SimState, changed: () => void): HTMLElement {
-  const root = document.createElement('div');
-  root.className = 'inspector-view';
+/**
+ * Office's switch: its own three views, then Contracts, a screen of its
+ * own folded under the Office rail icon (ui/screenGroups.ts). Picking
+ * Contracts selects it; picking an Office view from Contracts comes back.
+ */
+export function officeSwitch(state: SimState, current: OfficeView | 'contracts', changed: () => void): HTMLElement {
   const seatsToLook = ops.executiveOptions(state).filter((seat) => seatWantsLook(seat) || seat.advice.empty).length;
   const rightsOffered = rightsCountries(state).filter((country) => rightsOffer(state, country).status === 'offered').length;
-  const views = viewSwitch<OfficeView>(
+  return viewSwitch<OfficeView | 'contracts'>(
     [
       { id: 'executives', icon: glyph('people'), tip: 'Executives: the chairs, their holders and candidates', badge: seatsToLook },
       { id: 'rd', icon: glyph('flask'), tip: 'R&D: the budget and the projects the ladder opens' },
       { id: 'rights', icon: glyph('shield'), tip: 'Rights: domestic rights abroad, earned then bought', badge: rightsOffered },
+      { id: 'contracts', icon: glyph('contract'), tip: 'Contracts: tenders to bid on and the contracts you hold', dot: current === 'contracts' ? null : screenDot('contracts') },
     ],
-    view,
+    current,
     (next) => {
+      if (next === 'contracts') {
+        select({ kind: 'contracts' });
+        return;
+      }
       setView(next);
-      changed();
+      if (current === 'contracts') select({ kind: 'headOffice' });
+      else changed();
     },
   );
-  root.append(titleWithSwitch('Head office', views));
+}
+
+export function buildHeadOfficeView(state: SimState, changed: () => void): HTMLElement {
+  const root = document.createElement('div');
+  root.className = 'inspector-view';
+  root.append(titleWithSwitch('Head office', officeSwitch(state, view, changed)));
 
   if (view === 'rd') {
     root.append(

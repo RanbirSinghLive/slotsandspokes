@@ -24,7 +24,8 @@ import { buyerKey, buyerTypeOf, eligibleRivals, frequencyOf, minAskPerDay, place
 import { requestRows } from '../mandates';
 import { money, shortMoney } from '../format';
 import { select } from '../selection';
-import { heading, line } from './dom';
+import { heading, line, titleWithSwitch } from './dom';
+import { officeSwitch } from './headOffice';
 
 /**
  * The Contracts screen (Network › Contracts): tenders to bid on, the
@@ -328,6 +329,8 @@ function requestsSection(state: SimState, changed: () => void): HTMLElement[] {
 
 export function buildContractsView(state: SimState, changed: () => void): HTMLElement {
   const root = document.createElement('div');
+  root.className = 'inspector-view';
+  root.append(titleWithSwitch('Contracts', officeSwitch(state, 'contracts', changed)));
   const all = contractsOf(state);
   const tenders = all.filter((c) => c.status === 'offered').sort((x, y) => x.id - y.id);
   const running = all.filter((c) => c.status === 'active').sort((x, y) => x.id - y.id);

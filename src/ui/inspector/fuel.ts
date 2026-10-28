@@ -20,7 +20,8 @@ import {
 import type { SimState } from '../../sim/state';
 import { money } from '../format';
 import * as ops from '../routeActions';
-import { heading, info, line } from './dom';
+import { heading, info, line, titleWithSwitch } from './dom';
+import { moneySwitch } from '../screenGroups';
 
 /**
  * The Fuel view: the market price, what the airline pays under its
@@ -259,10 +260,7 @@ function dials(state: SimState, changed: () => void): HTMLElement[] {
 export function buildFuelView(state: SimState, changed: () => void): HTMLElement {
   const root = document.createElement('div');
   root.className = 'inspector-view';
-  const title = document.createElement('h3');
-  title.className = 'inspector-title';
-  title.textContent = 'Fuel';
-  root.append(title);
+  root.append(titleWithSwitch('Fuel', moneySwitch('fuel')));
 
   const policy = fuelPolicyOf(state);
   const history = state.fuelPriceHistory ?? [];

@@ -83,6 +83,11 @@ async function visit(browser: Browser, label: string, url: string, save: string,
   // A save near $0 opens the runway pop-up, which would cover the rail.
   if (await page.locator('#runway-modal').isVisible()) await page.locator('#runway-modal-close').click();
 
+  const checkOverflow = async (where: string): Promise<void> => {
+    if (!phone) return;
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    if (overflow > 0) note(`${where} overflows the page sideways by ${overflow}px`);
+  };
   const screens = await page.$$eval('#rail [data-go]', (buttons) => buttons.map((button) => (button as HTMLElement).dataset.go!));
   const only = option('only');
   for (const screen of screens.filter((name) => !only || name === only)) {
@@ -91,9 +96,19 @@ async function visit(browser: Browser, label: string, url: string, save: string,
     else await button.click();
     await page.waitForTimeout(400);
     await page.screenshot({ path: `${outDir}${label}-${screen}.png` });
-    if (phone) {
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-      if (overflow > 0) note(`${screen} overflows the page sideways by ${overflow}px`);
+    await checkOverflow(screen);
+    // Each other view on the screen's switch, folded screens (Goals, Fuel, Contracts) among them.
+    const switchButtons = page.locator('#panel .view-switch:visible button');
+    const views = await switchButtons.count();
+    for (let i = 0; i < views; i++) {
+      const choice = page.locator('#panel .view-switch:visible button').nth(i);
+      if ((await choice.getAttribute('aria-selected')) === 'true') continue;
+      const name = ((await choice.getAttribute('aria-label')) ?? `view${i}`).split(':')[0].toLowerCase().replace(/[^a-z]+/g, '-');
+      if (phone) await choice.tap();
+      else await choice.click();
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: `${outDir}${label}-${screen}-${name}.png` });
+      await checkOverflow(`${screen} ${name}`);
     }
   }
   console.log(`${label}: ${screens.length} screens visited`);

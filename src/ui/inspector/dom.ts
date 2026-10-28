@@ -59,8 +59,8 @@ export function adopt(id: string): HTMLElement {
 
 const adopted = new Map<string, HTMLElement>();
 
-/** One choice on a view switch: its glyph, its name (said in the tip and to screen readers), and an optional count badge. */
-export type ViewChoice<T extends string> = { id: T; icon: HTMLElement; tip: string; badge?: number };
+/** One choice on a view switch: its glyph, its name (said in the tip and to screen readers), and an optional count badge or rail-style dot. */
+export type ViewChoice<T extends string> = { id: T; icon: HTMLElement; tip: string; badge?: number; dot?: 'bad' | 'warn' | 'good' | null };
 
 /**
  * The switch between a screen's views: icon buttons, the chosen one lit,
@@ -84,6 +84,10 @@ export function viewSwitch<T extends string>(choices: ViewChoice<T>[], current: 
       badge.className = 'view-switch-badge';
       badge.textContent = String(choice.badge);
       button.append(badge);
+    } else if (choice.dot) {
+      const dot = document.createElement('span');
+      dot.className = `view-switch-dot is-${choice.dot}`;
+      button.append(dot);
     }
     button.dataset.tip = choice.tip;
     button.setAttribute('aria-label', choice.tip);
