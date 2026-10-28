@@ -91,7 +91,7 @@ const STEPS: Step[] = [
     get title() {
       return `Every screen, one ${press()}`;
     },
-    text: 'The rail has everything. The top group is where you act: Routes and fares, Fleet to lease planes, Crews, Mtc, Product for fees and cabins, Contracts to bid on, and Office for fuel and executives. Below the line are the read-outs: Overview, Money, Airports, Rivals, Goals. A dot means something wants a look.',
+    text: 'The rail has everything. Overview sits at the top with your cards. Then Routes and fares, Airports, Fleet to lease planes, Crews, Mtc, Product for fees and cabins, Contracts to bid on, Fuel, and Office for executives, then Money, Rivals and Goals. A dot means something wants a look.',
     target: '#rail',
   },
   {
