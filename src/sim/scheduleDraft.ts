@@ -1,4 +1,4 @@
-import { commitBringHome, commitRetime, planRetime, tomorrowView, type RetimePlan } from './retime';
+import { commitBringHome, commitRetime, moveRoomProblem, planRetime, roomProblemText, spacingProblem, tomorrowView, type RetimePlan } from './retime';
 import { connectingPassengersThrough, connectionsWith, spokesOf, type LegConnection } from './hubs';
 import type { ScheduleLeg } from './schedule';
 import type { SimState } from './state';
@@ -141,14 +141,25 @@ export function commitDraft(state: SimState, moves: DraftMove[], options: Commit
     restore(state, saved);
     return { ok: false as const, reason };
   };
+  // Room by the hour and same-route spacing are judged once, on where every
+  // moved flight ends up, so two rotations trading times or planes trade
+  // their slots too.
+  const before = tomorrowView(state);
+  const beforeView = { ...before, schedule: before.schedule.map((leg) => ({ ...leg })) };
   const messages: string[] = [];
   for (const move of moves) {
     const result = move.bringHome
       ? commitBringHome(state, move.tail)
-      : commitRetime(state, move.legIds, move.tail, move.start, { allowOverlap: true, allowTypeChange: true, noWrap: move.noWrap });
+      : commitRetime(state, move.legIds, move.tail, move.start, { allowOverlap: true, allowTypeChange: true, noWrap: move.noWrap, draftChecks: true });
     if (!result.ok) return fail(result.reason);
     messages.push(result.message);
   }
+  const after = tomorrowView(state).schedule;
+  const movedLegs = after.filter((leg) => movedIds.has(leg.legId));
+  const room = moveRoomProblem(beforeView, movedLegs);
+  if (room) return fail(roomProblemText(room));
+  const spacing = spacingProblem(beforeView.schedule, movedLegs, after);
+  if (spacing) return fail(spacing);
   if (final) {
     // A leg that left a plane can leave a problem behind on it too.
     const problem = scheduleConflicts(state, touchedTails(movedIds)).find((c) => (movedIds.has(c.a.legId) || movedIds.has(c.b.legId)) && !existing.has(pairOf(c)));
@@ -171,7 +182,8 @@ function planDropOn(state: SimState, legIds: string[], toTail: string, start: nu
   const plain = planRetime(state, legIds, toTail, start, { allowTypeChange: true });
   if (plain.ok) return { ok: true, kind: 'move', plan: plain, moves: [move], swapWith: [], reason: null };
   // Refused for a reason other than sitting on other flights: nothing to hold.
-  const loose = planRetime(state, legIds, toTail, start, { allowOverlap: true, allowTypeChange: true });
+  // Room and spacing are left to the swap below, where the flights it trades with give theirs up.
+  const loose = planRetime(state, legIds, toTail, start, { allowOverlap: true, allowTypeChange: true, draftChecks: true });
   if (!loose.ok) return { ok: false, kind: 'move', plan: loose, moves: [move], swapWith: [], reason: loose.reason };
 
   const view = tomorrowView(state);
@@ -195,7 +207,10 @@ function planDropOn(state: SimState, legIds: string[], toTail: string, start: nu
       }
     }
   }
-  return { ok: true, kind: 'hold', plan: loose, moves: [move], swapWith: [], reason: plain.reason };
+  // Held on its own, it needs room of its own.
+  const held = planRetime(state, legIds, toTail, start, { allowOverlap: true, allowTypeChange: true });
+  if (!held.ok) return { ok: false, kind: 'move', plan: held, moves: [move], swapWith: [], reason: held.reason };
+  return { ok: true, kind: 'hold', plan: held, moves: [move], swapWith: [], reason: plain.reason };
 }
 
 /** How close, in minutes, a dragged rotation must be to a neighbour's edge for `snapStart()` to pull it in. */

@@ -89,6 +89,8 @@ export type RetimeOptions = {
   unwrapStart?: number;
   /** Let the move sit on top of the new plane's other flights; a draft (sim/scheduleDraft.ts) checks the whole day once it's done. */
   allowOverlap?: boolean;
+  /** Leave the hourly room and same-route spacing to a draft (sim/scheduleDraft.ts), which checks them once for all its moves together, so a swap's rotations can trade slots and times. */
+  draftChecks?: boolean;
   /** Never make or undo a night stop: off either end of the day is refused. A turn stretched at the Gantt (sim/scheduleDraft.ts planGroundTime) pushes flights, it doesn't reshape the plane's night. */
   noWrap?: boolean;
 };
@@ -114,18 +116,17 @@ function hhmm(minute: number): string {
 const typeSpecs = new Map((aircraftTypesData as { code: string; name: string; rangeNm: number; cruiseKts: number }[]).map((type) => [type.code, type]));
 
 /**
- * The legs as another type would fly them: each block time from that type's
- * cruise speed, every leg keeping the wait it had after the one before. A
- * leg beyond the type's range, or into an airport too small for it, is why
- * not.
+ * The legs as another type would fly them: each block time from that
+ * type's cruise speed, and each leg leaving when it does now, so it keeps
+ * its slot. Only a slower type that can't make a turn pushes the legs
+ * after it later, by as little as it needs. A leg beyond the type's range,
+ * or into an airport too small for it, is why not.
  */
 function legsForType(world: SimState, legs: ScheduleLeg[], typeCode: string): ScheduleLeg[] | string {
   const type = typeSpecs.get(typeCode);
   if (!type) return 'No such type.';
   const restyled: ScheduleLeg[] = [];
-  let shift = 0;
-  for (let i = 0; i < legs.length; i++) {
-    const leg = legs[i];
+  for (const leg of legs) {
     const distanceNm = Math.round(legDistanceNm(leg.origin, leg.dest));
     const rangeNm = rangeNmFor(world, typeCode);
     if (distanceNm > rangeNm) return `${leg.origin}→${leg.dest} ${distanceNm} nm · beyond the ${type.name}'s ${rangeNm} nm range`;
@@ -133,15 +134,48 @@ function legsForType(world: SimState, legs: ScheduleLeg[], typeCode: string): Sc
       if (!isAircraftTypeAllowedAt(iata, typeCode)) return `${iata} is too small for the ${type.name}`;
     }
     const blockMinutes = computeBlockMinutes(leg.origin, leg.dest, type.cruiseKts);
-    restyled.push({ ...leg, departMinute: leg.departMinute + shift, blockMinutes });
-    const next = legs[i + 1];
-    if (next) {
-      const turn = scheduledTurnMinutes(world, leg.origin, leg.dest);
-      const wait = next.departMinute - (leg.departMinute + leg.blockMinutes + turn);
-      shift = restyled[i].departMinute + blockMinutes + turn + wait - next.departMinute;
-    }
+    const before = restyled[restyled.length - 1];
+    const ready = before ? before.departMinute + before.blockMinutes + scheduledTurnMinutes(world, before.origin, before.dest) : leg.departMinute;
+    restyled.push({ ...leg, departMinute: Math.max(leg.departMinute, ready), blockMinutes });
   }
   return restyled;
+}
+
+/**
+ * The first airport and hour these moved legs would overfill, as `world`
+ * stood before the move. Their old movements count as room, and a leg
+ * that keeps its departure time keeps its landing slot too: a plane of
+ * another type at the same time of day lands a few minutes off, in the
+ * slot it already holds, so a gauge change never needs room it didn't have.
+ */
+export function moveRoomProblem(world: SimState, moved: ScheduleLeg[]): { iata: string; hour: number; minute: number } | null {
+  const before = new Map(world.schedule.map((leg) => [leg.legId, leg]));
+  const held = moved.flatMap((leg) => before.get(leg.legId) ?? []);
+  const asHeld = moved.map((leg) => {
+    const old = before.get(leg.legId);
+    return old && old.departMinute === leg.departMinute ? { ...leg, blockMinutes: old.blockMinutes } : leg;
+  });
+  return hourlyRoomProblem(world, asHeld, new Map(), held);
+}
+
+/**
+ * Same route, same direction: at least SAME_ROUTE_SPACING_MINUTES apart
+ * (sim/schedule.ts), against `others`, the rest of the schedule. Only a
+ * flight whose time changes from `before` answers for it, so a swap or
+ * sort that keeps an older save's stacked times still goes.
+ */
+export function spacingProblem(before: ScheduleLeg[], moved: ScheduleLeg[], others: ScheduleLeg[]): string | null {
+  const oldMinute = new Map(before.map((leg) => [leg.legId, leg.departMinute]));
+  for (const leg of moved) {
+    if (oldMinute.get(leg.legId) === leg.departMinute) continue;
+    const clash = sameRouteClash(leg, others.filter((other) => other.legId !== leg.legId));
+    if (clash) return `${leg.origin}→${leg.dest} ${hhmm(leg.departMinute)} · ${clash.tail} leaves ${hhmm(clash.departMinute)} · ${SAME_ROUTE_SPACING_MINUTES}m apart`;
+  }
+  return null;
+}
+
+export function roomProblemText(room: { iata: string; hour: number }): string {
+  return `${room.iata} ${String(room.hour).padStart(2, '0')}:00 full`;
 }
 
 /** Plan moving the rotation made of these legs to start at `startMinute` on `toTail`. */
@@ -256,16 +290,11 @@ export function planRetime(state: SimState, legIds: string[], toTail: string, st
   // Room by the hour: its own old movements count as room, rivals stay put.
   const movedIds = new Set(moved.map((leg) => leg.legId));
   const without = { ...world, schedule: world.schedule.filter((leg) => !movedIds.has(leg.legId)) };
-  const room = hourlyRoomProblem(world, moved, new Map(), world.schedule.filter((leg) => movedIds.has(leg.legId)));
-  if (room) return fail(`${room.iata} ${String(room.hour).padStart(2, '0')}:00 full`);
-  // Same route, same direction: at least SAME_ROUTE_SPACING_MINUTES apart
-  // (sim/schedule.ts). Only a flight whose time changes answers for it, so
-  // a swap or sort that keeps an older save's stacked times still goes.
-  const oldMinute = new Map(world.schedule.map((leg) => [leg.legId, leg.departMinute]));
-  for (const leg of moved) {
-    if (oldMinute.get(leg.legId) === leg.departMinute) continue;
-    const clash = sameRouteClash(leg, without.schedule);
-    if (clash) return fail(`${leg.origin}→${leg.dest} ${hhmm(leg.departMinute)} · ${clash.tail} leaves ${hhmm(clash.departMinute)} · ${SAME_ROUTE_SPACING_MINUTES}m apart`);
+  if (!options.draftChecks) {
+    const room = moveRoomProblem(world, moved);
+    if (room) return fail(roomProblemText(room));
+    const spacing = spacingProblem(world.schedule, moved, without.schedule);
+    if (spacing) return fail(spacing);
   }
 
   const after = { ...world, schedule: [...without.schedule, ...moved] };
