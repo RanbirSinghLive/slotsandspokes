@@ -8612,6 +8612,65 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
   white-space: nowrap;
 }
 
+.watch-row .watch-dismiss {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #8a93a6;
+  cursor: pointer;
+}
+
+.watch-row .watch-dismiss:hover {
+  color: #e6e9f0;
+}
+
+.watch-row .watch-dismiss .glyph {
+  width: 14px;
+  height: 14px;
+  color: inherit;
+}
+
+.watch-row.is-dismissed {
+  opacity: 0.55;
+  border-left-color: #59607a;
+}
+
+.watch-row.is-dismissed > .glyph {
+  color: #8a93a6;
+}
+
+.watch-show-dismissed {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 6px 0 2px;
+  padding: 3px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: none;
+  color: #8a93a6;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.watch-show-dismissed.is-on {
+  color: #e6e9f0;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.watch-show-dismissed .glyph {
+  width: 14px;
+  height: 14px;
+}
+
 .hub-card {
   margin: 6px 0 10px;
   padding: 6px 8px 8px;
