@@ -140,3 +140,97 @@ export function airportWatch(state: SimState): WatchItem[] {
     (a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity] || KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.iata.localeCompare(b.iata),
   );
 }
+
+/**
+ * Dismissing a watch item: the player has seen it and made the call, so
+ * it leaves the list until it gets meaningfully worse (or bigger, for an
+ * opportunity). Without this a problem the player chose to live with, a
+ * full peak they are happy to queue in, sits on the list and in the rail
+ * dot for ever, and the list stops meaning "wants a call now".
+ */
+
+/** One item's identity across days: its kind and field, and the other end for a feed idea. */
+export function watchKey(item: WatchItem): string {
+  return item.kind === 'feed' ? `feed:${item.iata}:${item.other}` : `${item.kind}:${item.iata}`;
+}
+
+/** The one number that says how big an item is, bigger meaning it wants the call more (fewer moat days left is worse). */
+function watchMeasure(item: WatchItem): number {
+  switch (item.kind) {
+    case 'peak':
+      return item.load;
+    case 'hub':
+      return item.missedPerDay;
+    case 'ground':
+      return item.minutes;
+    case 'moat':
+      return item.daysLeft;
+    case 'rival':
+      return item.routes;
+    case 'feed':
+      return item.connecting;
+  }
+}
+
+/** A peak this many points fuller than when dismissed comes back. */
+export const WATCH_RETURN_PEAK_POINTS = 5;
+/** Money missed or connections offered this many times what they were come back. */
+export const WATCH_RETURN_GROWTH = 1.5;
+/** Ground minutes this many more a departure come back. */
+export const WATCH_RETURN_GROUND = 1;
+/** A draining moat comes back once, when this few days are left. */
+export const WATCH_RETURN_MOAT_DAYS = 3;
+
+/** Whether an item that was dismissed has moved far enough to want the call again. */
+function returnsFromDismissal(item: WatchItem, dismissed: { severity: 'warn' | 'bad'; measure: number }): boolean {
+  if (SEVERITY_ORDER[item.severity] < SEVERITY_ORDER[dismissed.severity]) return true;
+  const now = watchMeasure(item);
+  switch (item.kind) {
+    case 'peak':
+      // In whole points, as the row shows it, so 92% to 97% counts however the fractions round.
+      return Math.round(now * 100) >= Math.round(dismissed.measure * 100) + WATCH_RETURN_PEAK_POINTS;
+    case 'hub':
+    case 'feed':
+      return now >= dismissed.measure * WATCH_RETURN_GROWTH;
+    case 'ground':
+      return now >= dismissed.measure + WATCH_RETURN_GROUND;
+    case 'moat':
+      return dismissed.measure > WATCH_RETURN_MOAT_DAYS && now <= WATCH_RETURN_MOAT_DAYS;
+    case 'rival':
+      return now > dismissed.measure;
+  }
+}
+
+/** Whether this item is set aside right now. */
+export function isWatchDismissed(state: SimState, item: WatchItem): boolean {
+  const dismissed = state.watchDismissed?.[watchKey(item)];
+  return dismissed !== undefined && !returnsFromDismissal(item, dismissed);
+}
+
+/** Take an item off the watch list until it gets worse. */
+export function dismissWatchItem(state: SimState, item: WatchItem): void {
+  state.watchDismissed = { ...state.watchDismissed, [watchKey(item)]: { severity: item.severity, measure: watchMeasure(item) } };
+}
+
+/** Put a dismissed item back on the list. */
+export function restoreWatchItem(state: SimState, item: WatchItem): void {
+  if (!state.watchDismissed) return;
+  const { [watchKey(item)]: _restored, ...rest } = state.watchDismissed;
+  state.watchDismissed = rest;
+}
+
+/**
+ * At rollover: forget a dismissal once its item is gone from the list (so
+ * if it comes back later it is news again) or has come back by getting
+ * worse (so it stays back even if it eases a little).
+ */
+export function pruneWatchDismissed(state: SimState): void {
+  const dismissed = state.watchDismissed;
+  if (!dismissed || Object.keys(dismissed).length === 0) return;
+  const kept: NonNullable<SimState['watchDismissed']> = {};
+  for (const item of airportWatch(state)) {
+    const entry = dismissed[watchKey(item)];
+    if (entry && !returnsFromDismissal(item, entry)) kept[watchKey(item)] = entry;
+  }
+  state.watchDismissed = kept;
+}

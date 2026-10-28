@@ -10,7 +10,7 @@ import { CAUSE_STYLE, TIER_GLYPH, minutesText, stationUpgradeButton } from './st
 import { select } from '../selection';
 import { linkToMap } from '../mapLink';
 import { glyph, pips, type GlyphName } from '../glyphs';
-import { airportWatch, movementShareAt, shareTrend, type WatchItem } from '../../sim/airportWatch';
+import { airportWatch, dismissWatchItem, isWatchDismissed, movementShareAt, restoreWatchItem, shareTrend, type WatchItem } from '../../sim/airportWatch';
 import { airportHours } from '../../sim/hours';
 import { planHub, MAX_RECOMMENDED_LOAD } from '../../sim/hubPlanner';
 import { MIN_CONNECT_MINUTES, spokesOf, wavesAt } from '../../sim/hubs';
@@ -276,14 +276,23 @@ export function watchItems(state: SimState): WatchItem[] {
   return watchCache.items;
 }
 
+/** The watch list less what the player dismissed: what the badge and the rail dot count. */
+export function openWatchItems(state: SimState): WatchItem[] {
+  return watchItems(state).filter((item) => !isWatchDismissed(state, item));
+}
+
+/** Whether the dismissed items are listed under the open ones; for this visit only. */
+let showDismissed = false;
+
 /** Build the screen. `changed` rebuilds the inspector, for a new view, sort or filter, or after an action. */
 export function buildAirportsView(state: SimState, changed: () => void): HTMLElement {
   const root = document.createElement('div');
   root.className = 'inspector-view';
   const watch = watchItems(state);
+  const open = watch.filter((item) => !isWatchDismissed(state, item));
   const views = viewSwitch<AirportsView>(
     [
-      { id: 'watch', icon: glyph('alert'), tip: 'Watch: fields that want a call now, with the fix', badge: watch.length || undefined },
+      { id: 'watch', icon: glyph('alert'), tip: 'Watch: fields that want a call now, with the fix', badge: open.length || undefined },
       { id: 'hubs', icon: glyph('hub'), tip: 'Hubs: each hub\'s day by the hour, and what each hub style gains and costs' },
       { id: 'share', icon: glyph('pie'), tip: 'Share: every field, your share and its trend, slots, delays, waiting passengers' },
     ],
@@ -294,7 +303,7 @@ export function buildAirportsView(state: SimState, changed: () => void): HTMLEle
     },
   );
   root.append(titleWithSwitch('Airports', views));
-  if (view === 'watch') root.append(...watchView(state, watch, changed));
+  if (view === 'watch') root.append(...watchView(state, open, watch.filter((item) => isWatchDismissed(state, item)), changed));
   else if (view === 'hubs') root.append(...hubsView(state, changed));
   else root.append(...shareView(state, changed));
   return root;
@@ -368,38 +377,81 @@ function watchAction(state: SimState, item: WatchItem, changed: () => void): HTM
   }
 }
 
-function watchView(state: SimState, items: WatchItem[], changed: () => void): HTMLElement[] {
-  if (state.schedule.length === 0) return [line('None served · tap an airport on the map to start')];
-  if (items.length === 0) return [line('All fields steady', 'inspector-line goal-ahead')];
-  const list = document.createElement('div');
-  list.className = 'inspector-rows watch-list';
-  for (const item of items) {
-    const row = linkToMap(document.createElement('div'), { kind: 'airport', iata: item.iata });
-    row.className = 'watch-row';
-    row.classList.toggle('is-bad', item.severity === 'bad');
-    row.setAttribute('role', 'button');
-    row.tabIndex = 0;
-    row.title = namesByIata.get(item.iata) ?? item.iata;
-    const mark = glyph(WATCH_GLYPH[item.kind], WATCH_TIP[item.kind], `watch-${item.kind}`);
-    const code = document.createElement('span');
-    code.className = 'watch-code';
-    code.textContent = item.iata;
-    const text = document.createElement('span');
-    text.className = 'watch-text';
-    text.textContent = watchText(item);
-    row.append(mark, code, text);
-    const action = watchAction(state, item, changed);
-    if (action) {
-      action.classList.add('watch-action');
-      row.append(action);
-    }
-    row.addEventListener('click', () => select({ kind: 'airport', iata: item.iata }));
-    row.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') select({ kind: 'airport', iata: item.iata });
-    });
-    list.append(row);
+/** A watch row: what is wrong, the button that acts on it, and the ✕ that sets it aside (or ↺ that brings it back). */
+function watchRow(state: SimState, item: WatchItem, dismissed: boolean, changed: () => void): HTMLElement {
+  const row = linkToMap(document.createElement('div'), { kind: 'airport', iata: item.iata });
+  row.className = 'watch-row';
+  row.classList.toggle('is-bad', item.severity === 'bad');
+  row.classList.toggle('is-dismissed', dismissed);
+  row.setAttribute('role', 'button');
+  row.tabIndex = 0;
+  row.title = namesByIata.get(item.iata) ?? item.iata;
+  const mark = glyph(WATCH_GLYPH[item.kind], WATCH_TIP[item.kind], `watch-${item.kind}`);
+  const code = document.createElement('span');
+  code.className = 'watch-code';
+  code.textContent = item.iata;
+  const text = document.createElement('span');
+  text.className = 'watch-text';
+  text.textContent = watchText(item);
+  row.append(mark, code, text);
+  const action = dismissed ? null : watchAction(state, item, changed);
+  if (action) {
+    action.classList.add('watch-action');
+    row.append(action);
   }
-  return [list];
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'watch-dismiss';
+  toggle.append(glyph(dismissed ? 'undo' : 'close'));
+  const tip = dismissed ? 'Back on the list' : 'Dismiss · hidden until it gets worse';
+  toggle.dataset.tip = tip;
+  toggle.setAttribute('aria-label', tip);
+  toggle.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (dismissed) restoreWatchItem(state, item);
+    else dismissWatchItem(state, item);
+    changed();
+  });
+  row.append(toggle);
+  row.addEventListener('click', () => select({ kind: 'airport', iata: item.iata }));
+  row.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') select({ kind: 'airport', iata: item.iata });
+  });
+  return row;
+}
+
+function watchView(state: SimState, items: WatchItem[], dismissed: WatchItem[], changed: () => void): HTMLElement[] {
+  if (state.schedule.length === 0) return [line('None served · tap an airport on the map to start')];
+  const out: HTMLElement[] = [];
+  if (items.length === 0) out.push(line('All fields steady', 'inspector-line goal-ahead'));
+  else {
+    const list = document.createElement('div');
+    list.className = 'inspector-rows watch-list';
+    list.append(...items.map((item) => watchRow(state, item, false, changed)));
+    out.push(list);
+  }
+  if (dismissed.length > 0) {
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'watch-show-dismissed';
+    toggle.classList.toggle('is-on', showDismissed);
+    toggle.append(glyph('eye'), document.createTextNode(` ${dismissed.length}`));
+    const tip = showDismissed ? 'Hide dismissed' : `Show ${dismissed.length} dismissed · each comes back by itself if it gets worse`;
+    toggle.dataset.tip = tip;
+    toggle.setAttribute('aria-label', tip);
+    toggle.addEventListener('click', () => {
+      showDismissed = !showDismissed;
+      changed();
+    });
+    out.push(toggle);
+    if (showDismissed) {
+      const list = document.createElement('div');
+      list.className = 'inspector-rows watch-list';
+      list.append(...dismissed.map((item) => watchRow(state, item, true, changed)));
+      out.push(list);
+    }
+  }
+  return out;
 }
 
 /** Every field with two routes or more, most connecting passengers first. */

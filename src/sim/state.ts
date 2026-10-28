@@ -860,6 +860,8 @@ export type SimState = {
   stationMoatDays?: Record<string, number>;
   /** Your share of each served field's movements, one entry a day for the last week, oldest first (sim/airportWatch.ts). */
   airportShares?: Record<string, number[]>;
+  /** Watch items the player set aside, by watchKey(), with how bad each was then (sim/airportWatch.ts). */
+  watchDismissed?: Record<string, { severity: 'warn' | 'bad'; measure: number }>;
   /**
    * Lifetime cancellations by cause — the same shape (and the same
    * purpose) as `delayMinutesByCause`. Each cause has a different answer

@@ -10,7 +10,7 @@ import { contractsOf, faceOf, takeoverOpen } from '../sim/contracts';
 import { mandatesOf } from '../sim/mandates';
 import { anyEntryShort } from '../sim/crewPlan';
 import { activeShock } from '../sim/shocks';
-import { watchItems } from './inspector/airports';
+import { openWatchItems } from './inspector/airports';
 
 /**
  * The rail down the side panel's left edge: every screen one click away,
@@ -122,7 +122,7 @@ export function conditions(state: SimState): Partial<Record<Screen, Dot>> {
     return margins.length > 0 && margins[margins.length - 1] < 0;
   });
   const runway = cashRunway(state)?.daysLeft ?? null;
-  const watch = watchItems(state).filter((item) => item.kind !== 'feed' && item.kind !== 'rival');
+  const watch = openWatchItems(state).filter((item) => item.kind !== 'feed' && item.kind !== 'rival');
   return {
     airports: watch.some((item) => item.severity === 'bad') ? 'bad' : watch.length > 0 ? 'warn' : null,
     fleet: fleetBad ? 'bad' : null,
