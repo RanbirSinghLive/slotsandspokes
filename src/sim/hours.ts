@@ -206,7 +206,8 @@ export function freeInDay(hours: AirportHours): number {
  * times build each airport's day once. `excluding` are legs on the
  * schedule that these would replace (a rotation being moved): their own
  * movements count as room, with rivals left where they are, so a
- * rotation can always move within room it already holds.
+ * rotation can always move within room it already holds, however busy
+ * that hour has become.
  */
 export function hourlyRoomProblem(
   state: SimState,
@@ -236,7 +237,10 @@ export function hourlyRoomProblem(
   for (const { iata, hour, count, minute } of wanted.values()) {
     let hours = cache.get(iata);
     if (!hours) cache.set(iata, (hours = airportHours(state, iata)));
-    if (freeInHour(hours, hour) + (freed.get(`${iata}@${hour}`) ?? 0) < count && (!first || minute < first.minute)) first = { iata, hour, minute };
+    // Movements in an hour these legs already hold need no new room, even
+    // when rivals have since packed that hour past what the field takes.
+    const needed = count - (freed.get(`${iata}@${hour}`) ?? 0);
+    if (needed > 0 && freeInHour(hours, hour) < needed && (!first || minute < first.minute)) first = { iata, hour, minute };
   }
   return first;
 }

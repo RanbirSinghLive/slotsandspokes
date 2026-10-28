@@ -106,4 +106,43 @@ for (const rotation of props) {
     }
   }
 }
+// Same time of day, other type: the flight keeps the slots it holds, even
+// when rivals have packed every hour at both ends past what the field takes.
+const packed = (copy: typeof state, airports: string[]) => {
+  const template = copy.competitorRoutes[0];
+  for (const iata of airports) copy.competitorRoutes.push({ ...template, origin: iata, dest: iata === 'LHR' ? 'CDG' : 'LHR', dailyFrequency: 400 });
+};
+const keptSlot = props.find((rotation) => {
+  const copy = structuredClone(roomy);
+  packed(copy, rotation.airports);
+  const drop = planDrop(copy, rotation.legs.map((leg) => leg.legId), regionals[0].tail, rotation.departMinute);
+  assert.ok(drop.ok || !/full/.test(drop.reason ?? ''), `${rotation.airports.join('>')} at its own time refused: ${drop.reason}`);
+  return drop.ok && drop.kind === 'move' && commitDraft(copy, drop.moves).ok;
+});
+assert.ok(keptSlot, 'no prop round trip could change type at its own time on packed airports');
+// And a planned slot that isn't held still needs room: the same flight an hour later is refused.
+const later = structuredClone(roomy);
+packed(later, keptSlot.airports);
+const laterDrop = planDrop(later, keptSlot.legs.map((leg) => leg.legId), regionals[0].tail, keptSlot.departMinute + 120);
+assert.ok(!laterDrop.ok && /full/.test(laterDrop.reason ?? ''), `a new hour on a packed airport was allowed: ${laterDrop.reason}`);
+
+// A swap trades slots: a prop round trip dropped on a regional's round trip at the same times swaps planes, on airports packed past full.
+const swapping = structuredClone(state);
+swapping.schedule = swapping.schedule.filter((leg) => leg.tail !== regionals[0].tail);
+const propTrip = allRotations(swapping).find((r) => r.closed && r.airports.length === 3 && typeOf(r.tail) === 'PROP' && r.departMinute >= 9 * 60)!;
+const regionalStop = (iata: string) => (airportsData as RotationStop[]).find((airport) => airport.iata === iata)!;
+const regionalPlan = planRotation([regionalStop(regionals[0].baseAirport!)], regionalStop(propTrip.airports[1]), regionals[0].tail, swapping);
+assert.equal(regionalPlan.error, null, `the regional couldn't fly ${propTrip.airports[1]}: ${regionalPlan.error}`);
+applyRotation(swapping, regionals[0].tail, regionalPlan);
+// At the prop's own times, as an older save's stacked flights can be: each plane keeps its times and trades only its type.
+for (const leg of swapping.schedule.filter((l) => l.tail === regionals[0].tail)) {
+  leg.departMinute = propTrip.legs.find((l) => l.origin === leg.origin)!.departMinute;
+}
+const regionalTrip = allRotations(swapping).find((r) => r.tail === regionals[0].tail)!;
+packed(swapping, propTrip.airports);
+const swapDrop = planDrop(swapping, propTrip.legs.map((leg) => leg.legId), regionals[0].tail, regionalTrip.departMinute);
+assert.ok(swapDrop.ok && swapDrop.kind === 'swap', `trading slots on packed airports was refused: ${swapDrop.reason}`);
+const swapped = commitDraft(swapping, swapDrop.moves);
+assert.ok(swapped.ok, `the swap didn't save: ${!swapped.ok && swapped.reason}`);
+
 console.log(`gauge drops ok · ${upgauged} upgauges tried · ${tooFar.length} long rotations kept off props`);

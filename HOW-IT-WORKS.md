@@ -1756,7 +1756,10 @@ it back. The rules:
   its new plane's other rotations with a
   turn either side, and room in every hour its legs now use at every
   airport (its own old movements count as room, rivals stay where they
-  are), with no departure within 15 minutes of another of yours on the
+  are; a movement in an hour it already holds never needs new room, even
+  if rivals have since packed that hour past full, and a leg that keeps
+  its departure keeps its landing slot though a new type lands a few
+  minutes off), with no departure within 15 minutes of another of yours on the
   same route the same way (*Same-route spacing*).
 - Always allowed, in the air or part flown too. A rotation with a leg
   in the air, or some flown and some not, is **held for tomorrow**:
@@ -1781,7 +1784,9 @@ it back. The rules:
 
 **Gauge by drag** (`sim/retime.ts`, `legsForType()`). A rotation can be
 dropped on a plane of another type at the same base, up or down a class: its
-legs are re-timed at that type's cruise speed (each keeping its wait), and the
+legs are re-timed at that type's cruise speed, each leaving when it does now so
+it keeps its slots (a slower type that can't make a turn pushes the legs after
+it later, by as little as it needs), and the
 drop is refused, red, if any leg is beyond that type's range or touches an
 airport too small for it. A swap checks both directions, so a long regional
 rotation is never sent down to a propeller. Held moves keep the new block times
@@ -1793,6 +1798,9 @@ rotations go to the dragged one's plane at their own times (a lone one
 can also take the place the dragged one left), all or nothing. One long
 flight dropped on two short ones sends both across. The tip reads "⇄
 C-P001 ×2" and the rotations that would trade are outlined green.
+A draft's hourly room and same-route spacing are judged once, on where all
+its moves leave every flight, so rotations trading planes or times trade
+their slots too.
 **Every Gantt change goes into a draft** (a drop, a swap, a night stop made
 or brought home with ⌂, a turn step, a sort), so nothing changes on the
 real schedule until ✓. A drop that fails only because it sits on other
