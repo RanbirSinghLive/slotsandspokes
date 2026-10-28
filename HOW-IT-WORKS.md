@@ -1483,10 +1483,10 @@ pure read of `state`, like the canvas layers.
 
 **The inspector** (`src/ui/inspector/`, `src/ui/selection.ts`). The panel
 shows whatever is selected. At **Network** it is the Overview above.
-The rail's screens are selections too, in two groups split by a rule:
-the screens you act on first (Routes, Airports, Fleet, Crews, Mtc, Product,
-Contracts, Office), then the read-outs (Overview, Money,
-Rivals, Goals), with Game at the foot. The detail views sit under
+The rail's screens are selections too, in one run under Jump: Overview,
+then the screens you act on (Routes, Airports, Fleet, Crews, Mtc, Product,
+Contracts, Fuel, Office), then the read-outs (Money, Rivals, Goals), with
+Game at the foot. The detail views sit under
 **Airports**, **Fleet** or **Rivals**:
 
 | Selection | How you get there | What it shows |
