@@ -120,7 +120,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span class="rail-label">Jump</span>
       </button>
       <div class="rail-rule"></div>
-      <button type="button" class="rail-item" data-go="network" title="Cards and the last 7 days" aria-label="Overview">
+      <button type="button" class="rail-item" data-go="network" title="Cards and the last 7 days; Goals" aria-label="Overview">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg><span class="rail-label">Overview</span><span class="rail-dot" hidden></span>
       </button>
       <button type="button" class="rail-item" data-go="routes" title="Every route, fare policy and reliability" aria-label="Routes">
@@ -141,23 +141,14 @@
       <button type="button" class="rail-item" data-go="product" title="Fees, and cabins by type: standards and templates" aria-label="Product">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v9a2 2 0 0 0 2 2h8"/><path d="M16 14v7M8 21h10M6 3h3"/></svg><span class="rail-label">Product</span><span class="rail-dot" hidden></span>
       </button>
-      <button type="button" class="rail-item" data-go="contracts" title="Tenders to bid on and the contracts you hold" aria-label="Contracts">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m9 15 2 2 4-4"/></svg><span class="rail-label">Contracts</span><span class="rail-dot" hidden></span>
-      </button>
-      <button type="button" class="rail-item" data-go="fuel" title="Fuel: price, hedge ladder, surcharge" aria-label="Fuel">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16"/><path d="M3 21h12"/><path d="M7 7h4"/><path d="M14 9h2a2 2 0 0 1 2 2v6a1.5 1.5 0 0 0 3 0V8l-3-3"/></svg><span class="rail-label">Fuel</span><span class="rail-dot" hidden></span>
-      </button>
-      <button type="button" class="rail-item" data-go="headOffice" title="Head office: executives, rights, R&amp;D" aria-label="Office">
+      <button type="button" class="rail-item" data-go="headOffice" title="Head office: executives, R&amp;D, rights; Contracts" aria-label="Office">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="1"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01"/></svg><span class="rail-label">Office</span><span class="rail-dot" hidden></span>
       </button>
-      <button type="button" class="rail-item" data-go="money" title="Cash, runway and costs" aria-label="Money">
+      <button type="button" class="rail-item" data-go="money" title="Cash, runway and costs; Fuel" aria-label="Money">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span class="rail-label">Money</span><span class="rail-dot" hidden></span>
       </button>
       <button type="button" class="rail-item" data-go="rivals" title="Every rival airline" aria-label="Rivals">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg><span class="rail-label">Rivals</span><span class="rail-dot" hidden></span>
-      </button>
-      <button type="button" class="rail-item" data-go="goals" title="The ladder and its milestones" aria-label="Goals">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M17 5h3v2a3 3 0 0 1-3 3"/><path d="M7 5H4v2a3 3 0 0 0 3 3"/></svg><span class="rail-label">Goals</span><span class="rail-dot" hidden></span>
       </button>
       <div class="rail-spacer"></div>
       <button type="button" class="rail-item" id="rail-feedback" title="Tell us what broke, confused or bored you (opens a short form)" aria-label="Feedback">
@@ -178,6 +169,8 @@
         <div id="inspector-body"></div>
       </section>
       <section id="econ-summary">
+        <!-- The Overview's title and its switch to Goals (ui/screenGroups.ts), filled in by ui/inspector/inspector.ts. -->
+        <h3 id="overview-title" class="inspector-title has-view-switch">Overview</h3>
         <div id="stat-cards">
           <button type="button" class="stat-card" id="card-cash" title="Cash on hand. Open Money."><span class="stat-label">Cash</span><span id="panel-cash" class="stat-value"></span><span class="stat-trend"></span></button>
           <button type="button" class="stat-card" id="card-runway"><span class="stat-label">Runway</span><span id="panel-runway" class="stat-value"></span><span class="stat-trend"></span></button>

@@ -8473,6 +8473,22 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
 }
 
 /* A count on a view's button (AOGs on Mtc's Stations), pinned to its corner so the button stays icon-sized. */
+/* A folded screen's rail dot, carried onto its choice in the parent's switch (ui/screenGroups.ts). */
+.view-switch-dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ffd166;
+}
+.view-switch-dot.is-bad {
+  background: #ff8080;
+}
+.view-switch-dot.is-good {
+  background: #7fd88f;
+}
 .view-switch-badge {
   position: absolute;
   top: 1px;

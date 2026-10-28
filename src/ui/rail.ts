@@ -11,6 +11,7 @@ import { mandatesOf } from '../sim/mandates';
 import { anyEntryShort } from '../sim/crewPlan';
 import { activeShock } from '../sim/shocks';
 import { openWatchItems } from './inspector/airports';
+import { foldedUnder, lastShownUnder, railItemOf, setScreenDots, worstDot, type Dot } from './screenGroups';
 
 /**
  * The rail down the side panel's left edge: every screen one click away,
@@ -31,7 +32,9 @@ import { openWatchItems } from './inspector/airports';
  *     (Rivals, amber), an executive seat newly wanting a look or an
  *     innovation newly on offer (Office, green), a contract newly out to tender (Contracts, green). Opening the screen reads it.
  * The first look only records what's there, so loading a game lights no
- * "new" dots.
+ * "new" dots. Goals, Fuel and Contracts sit under Overview, Money and
+ * Office (ui/screenGroups.ts): their dots light the parent's icon and
+ * their choice on its view switch.
  */
 
 const railEl = document.querySelector<HTMLElement>('#rail')!;
@@ -40,9 +43,14 @@ const hideButton = railEl.querySelector<HTMLButtonElement>('#rail-hide')!;
 
 type Screen = 'network' | 'routes' | 'airports' | 'fleet' | 'product' | 'crews' | 'maintenance' | 'rivals' | 'money' | 'goals' | 'contracts' | 'fuel' | 'headOffice' | 'game';
 
-/** Where each rail item goes. Routes opens worst margin first. */
+/** Where each screen opens. Routes opens worst margin first. */
 function targetOf(screen: Screen): Selection {
   return screen === 'routes' ? { kind: 'routes', sort: 'margin' } : ({ kind: screen } as Selection);
+}
+
+/** Where a rail icon goes: its own screen, or the one of its group shown last (ui/screenGroups.ts). */
+function railTargetOf(item: Screen): Selection {
+  return targetOf(lastShownUnder(item) as Screen);
 }
 
 /** The rail item a selection sits under, the one lit while it shows. */
@@ -66,18 +74,17 @@ export function setupRail(panel: { isHidden: () => boolean; setHidden: (hidden: 
   for (const item of items) {
     item.addEventListener('click', () => {
       const screen = item.dataset.go as Screen;
-      if (!panel.isHidden() && screenOf(getSelection()) === screen) {
+      if (!panel.isHidden() && railItemOf(screenOf(getSelection())) === screen) {
         panel.setHidden(true);
         return;
       }
       if (panel.isHidden()) panel.setHidden(false);
-      select(targetOf(screen));
+      select(railTargetOf(screen));
     });
   }
   hideButton.addEventListener('click', () => panel.setHidden(!panel.isHidden()));
 }
 
-type Dot = 'bad' | 'warn' | 'good' | null;
 
 /** What each "new" dot compares against: the ids seen when its screen was last open. */
 const seen: Partial<Record<Screen, Set<string>>> = {};
@@ -184,8 +191,11 @@ function updateDots(state: SimState, open: Screen | null, now: number): void {
     if (!seen[screen] || screen === open) seen[screen] = new Set(ids);
     if (ids.some((id) => !seen[screen]!.has(id))) dots[screen] = NEWS_DOT[screen] ?? 'warn';
   }
+  setScreenDots(dots);
   for (const item of items) {
-    const dot = dots[item.dataset.go as Screen] ?? null;
+    const screen = item.dataset.go as Screen;
+    // An icon carries the most urgent dot of the screens folded under it too.
+    const dot = foldedUnder(screen).reduce((worst, folded) => worstDot(worst, dots[folded as Screen] ?? null), dots[screen] ?? null);
     const el = item.querySelector<HTMLElement>('.rail-dot')!;
     el.hidden = dot === null;
     el.classList.toggle('is-bad', dot === 'bad');
@@ -197,7 +207,8 @@ function updateDots(state: SimState, open: Screen | null, now: number): void {
 export function updateRail(state: SimState, panelHidden: boolean): void {
   const current = screenOf(getSelection());
   updateDots(state, panelHidden ? null : current, performance.now());
-  for (const item of items) item.classList.toggle('is-active', !panelHidden && item.dataset.go === current);
+  const lit = railItemOf(current);
+  for (const item of items) item.classList.toggle('is-active', !panelHidden && item.dataset.go === lit);
   hideButton.classList.toggle('is-active', panelHidden);
   const label = hideButton.querySelector('.rail-label')!;
   if (label.textContent !== (panelHidden ? 'Show' : 'Hide')) {

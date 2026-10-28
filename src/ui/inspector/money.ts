@@ -1,5 +1,6 @@
 import { cashRunway, RUNWAY_WINDOW_DAYS } from '../../sim/forecast';
-import { line, heading, lineWithInfo } from './dom';
+import { line, heading, lineWithInfo, titleWithSwitch } from './dom';
+import { moneySwitch } from '../screenGroups';
 import { money, shortMoney } from '../format';
 import { chartLegend } from '../chartLegend';
 import { unitEconomicsHistory } from '../../sim/unitEconomics';
@@ -201,10 +202,7 @@ const COST_NAMES: Record<string, string> = {
 export function buildMoneyView(state: SimState): HTMLElement {
   const root = document.createElement('div');
   root.className = 'inspector-view';
-  const title = document.createElement('h3');
-  title.className = 'inspector-title';
-  title.textContent = 'Money';
-  root.append(title);
+  root.append(titleWithSwitch('Money', moneySwitch('money')));
 
   const runway = cashRunway(state);
   const runwayText =

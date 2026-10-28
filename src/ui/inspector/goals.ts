@@ -1,6 +1,7 @@
 import { airlineCalled, currentTier, gateMilestones, isMilestoneMet, LADDER, tierComplete, tierCounts, tierNeeded, tiersClimbed, type Milestone, type Tier } from '../../sim/ladder';
 import { HOLD_DAYS, LEAD_RATIO, LEAD_ROUTES, nemesisStatus } from '../../sim/nemesis';
-import { info, line, heading } from './dom';
+import { info, line, heading, titleWithSwitch } from './dom';
+import { overviewSwitch } from '../screenGroups';
 import type { SimState } from '../../sim/state';
 import { select } from '../selection';
 
@@ -95,10 +96,7 @@ function tierRow(state: SimState, tier: Tier, index: number, climbed: number): H
 export function buildGoalsView(state: SimState): HTMLElement {
   const root = document.createElement('div');
   root.className = 'inspector-view';
-  const title = document.createElement('h3');
-  title.className = 'inspector-title';
-  title.textContent = 'Goals';
-  root.append(title);
+  root.append(titleWithSwitch('Goals', overviewSwitch('goals')));
 
   const climbed = tiersClimbed(state);
   const tier = currentTier(state);

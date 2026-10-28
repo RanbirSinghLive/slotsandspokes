@@ -1485,8 +1485,13 @@ pure read of `state`, like the canvas layers.
 shows whatever is selected. At **Network** it is the Overview above.
 The rail's screens are selections too, in one run under Jump: Overview,
 then the screens you act on (Routes, Airports, Fleet, Crews, Mtc, Product,
-Contracts, Fuel, Office), then the read-outs (Money, Rivals, Goals), with
-Game at the foot. The detail views sit under
+Office), then the read-outs (Money, Rivals), with Game at the foot. Three
+screens sit under another icon as a view on its switch
+(`ui/screenGroups.ts`): Goals under Overview, Fuel under Money, Contracts
+under Office. Each is still its own selection (search, cards and links
+open it by name); the rail lights its parent, the parent's icon reopens
+whichever of its group showed last, and its dot lights the parent's icon
+and its choice on the switch. The detail views sit under
 **Airports**, **Fleet** or **Rivals**:
 
 | Selection | How you get there | What it shows |
@@ -2603,7 +2608,7 @@ balance lever for a weak home.
   airline's bid score (rivals get none) and up to 10 points more to a
   happy buyer's renewal raise. The card shows the type icon and five
   pips of standing.
-- **Where it shows:** the Contracts screen (rail item, key none), with
+- **Where it shows:** the Contracts screen (a view under Office on the rail, key none), with
   three groups. *Tenders*: route, rivals who may bid (◌ none, ⚔ n),
   days until bids close, and an ask stepper (± 5% of the reference), a
   1×/2× toggle, a bid button (✋; ↻ to change a bid) and ✕ to decline; a
@@ -2615,7 +2620,7 @@ balance lever for a weak home.
   with who won a lost tender. Every icon is a button so its tip shows on
   tap. Also CONTRACT lines in the ticker, a line in the route and airport
   views, and a dashed gold line and ring under the Demand lens. The
-  Contracts rail dot is green for a new tender (opening the screen reads
+  Contracts dot (on the Office icon and its switch) is green for a new tender (opening the screen reads
   it) and amber while a running contract's buyer is sad, red once a rival circles
   it (a ⚔ chip with the rival and days left, and three cut buttons on the
   card; a ticker line opens Contracts). A new offer is
@@ -2681,7 +2686,7 @@ leak and locking only on dips about 4× the premium back; the "dips" rule
 keeps that skill in a standing policy. The policy's effect on balance is
 not measured.
 
-**Fuel** (rail, `ui/inspector/fuel.ts`) shows the market, the price
+**Fuel** (a view under Money on the rail, `ui/inspector/fuel.ts`) shows the market, the price
 paid and the share hedged as coloured chips, a 90-day chart (amber
 market, green paid, dashed usual, faint locked rungs), the running rungs
 (green under today's market, red over, filled by the term left), the next

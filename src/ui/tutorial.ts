@@ -91,7 +91,7 @@ const STEPS: Step[] = [
     get title() {
       return `Every screen, one ${press()}`;
     },
-    text: 'The rail has everything. Overview sits at the top with your cards. Then Routes and fares, Airports, Fleet to lease planes, Crews, Mtc, Product for fees and cabins, Contracts to bid on, Fuel, and Office for executives, then Money, Rivals and Goals. A dot means something wants a look.',
+    text: 'The rail has everything. Overview sits at the top with your cards, and Goals is its second view. Then Routes and fares, Airports, Fleet to lease planes, Crews, Mtc, Product for fees and cabins, Office for executives and contracts, Money with fuel beside it, and Rivals. A dot means something wants a look.',
     target: '#rail',
   },
   {
@@ -115,8 +115,8 @@ const STEPS: Step[] = [
   },
   {
     title: 'Fuel',
-    text: 'A standing fuel policy: how much fuel to keep hedged, for how long, whether to lock only on dips, and how much of a price rise to pass into fares. The chart shows the market against what you pay.',
-    target: '#rail .rail-item[data-go="fuel"]',
+    text: 'Under Money, a standing fuel policy: how much fuel to keep hedged, for how long, whether to lock only on dips, and how much of a price rise to pass into fares. The chart shows the market against what you pay.',
+    target: '#rail .rail-item[data-go="money"]',
   },
   {
     title: 'Head office',
@@ -127,8 +127,8 @@ const STEPS: Step[] = [
   },
   {
     title: 'Aim for the next rung',
-    text: 'Goals is a ladder of milestones. Meet them to become a bigger airline, and unlock bigger aircraft.',
-    target: '#rail .rail-item[data-go="goals"]',
+    text: 'Goals, the second view under Overview, is a ladder of milestones. Meet them to become a bigger airline, and unlock bigger aircraft.',
+    target: '#rail .rail-item[data-go="network"]',
   },
   {
     title: 'Build something that lasts',
