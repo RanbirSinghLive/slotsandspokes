@@ -29,8 +29,11 @@ to be played on a preview URL and judged.
   at the same time it does on the map.
 - Arcs rise with distance and cast a shadow on the ground; width is seats a
   day (render/routeWidth.ts), colour is the route's on-time week.
-- Drag turns the globe, pinch or wheel zooms. No taps, rings or panels on
-  the globe in this spike.
+- Drag turns the globe, pinch or wheel zooms. Tapping an airport, then a
+  second one, opens the same route popover and confirm ring as the 2D map
+  (ui/routeBuilder.ts's `routeBuilderTap`); tapping the first again, or open
+  ground, drops it. Airports you know of but don't serve show as small grey
+  dots so they can be picked.
 
 ## What to judge on the preview
 
@@ -40,5 +43,5 @@ is more fun than on the 2D map.
 
 ## Not built
 
-Tapping airports or planes, the route builder, lenses, fog of war, labels
+Tapping planes, the airport menu ring, lenses, fog of war, labels
 beyond airport codes, and any of the rebuild plan's later phases.

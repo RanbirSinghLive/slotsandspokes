@@ -51,6 +51,8 @@ const COLORS = {
   late: '#ffb347',
   plane: '#ffffff',
   airport: '#ffffff',
+  selected: '#ffffff',
+  known: '#9fb6cc',
 };
 // A route this long or longer is long-haul and drawn gold.
 const LONG_HAUL_NM = 2500;
@@ -58,6 +60,12 @@ const LONG_HAUL_NM = 2500;
 const PLANE_PX = 20;
 const DOT_PX = 3.5;
 const HOME_DOT_PX = 5.5;
+const KNOWN_DOT_PX = 2.5;
+// How far from an airport a tap still picks it: a fingertip is wider than a mouse pointer.
+const TAP_REACH_PX = window.matchMedia('(pointer: coarse)').matches ? 26 : 14;
+// A press that moves less than this and lifts within TAP_MS is a tap, not a drag of the globe.
+const TAP_SLOP_PX = 8;
+const TAP_MS = 400;
 // Labels closer than this on screen than one already shown are left out.
 const LABEL_GAP_PX = 34;
 
@@ -93,11 +101,21 @@ function loadTexture(loader: THREE.TextureLoader, url: string): THREE.Texture {
 type RouteDraw = { key: string; origin: string; dest: string; width: number; colour: string };
 
 export type GlobeView = {
-  render(state: SimState, nowFractionalMinute: number): void;
+  /**
+   * Draw a frame. `knownAirports` are the airports the player can see and
+   * pick (the 2D map's same list); `pickedAirports` are the route being
+   * drawn, base first (ui/routeBuilder.ts), drawn white.
+   */
+  render(state: SimState, nowFractionalMinute: number, knownAirports: string[], pickedAirports: string[]): void;
   resize(): void;
+  /** Where an airport is on the page, or null when it's on the far side of the Earth. */
+  screenPoint(iata: string): [number, number] | null;
 };
 
-export function createGlobeView(container: HTMLElement): GlobeView {
+/** Called with the airport a tap landed on, or null for a tap on open ground. */
+export type GlobeTap = (iata: string | null) => void;
+
+export function createGlobeView(container: HTMLElement, onTap: GlobeTap): GlobeView {
   // Colours in this file are the hex values the look book names, shown as they are.
   THREE.ColorManagement.enabled = false;
 
@@ -107,6 +125,12 @@ export function createGlobeView(container: HTMLElement): GlobeView {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setClearColor(COLORS.space);
   container.appendChild(renderer.domElement);
+
+  // While a route is being drawn, a line at the top says what the next tap does.
+  const hint = document.createElement('div');
+  hint.className = 'globe-hint';
+  hint.hidden = true;
+  container.appendChild(hint);
 
   const labels = new CSS2DRenderer();
   labels.domElement.className = 'globe-labels';
@@ -172,9 +196,14 @@ export function createGlobeView(container: HTMLElement): GlobeView {
     return line;
   }
 
-  function routesToDraw(current: SimState): RouteDraw[] {
+  function routesToDraw(current: SimState, picked: string[]): RouteDraw[] {
     const seats = seatsADayByMarket(current);
     const routes = new Map<string, RouteDraw>();
+    // The route being drawn goes first and white, over any route it shares a market with.
+    for (let i = 1; i < picked.length; i++) {
+      const key = marketKey(picked[i - 1]!, picked[i]!);
+      routes.set(key, { key, origin: picked[i - 1]!, dest: picked[i]!, width: 3.5, colour: COLORS.selected });
+    }
     for (const leg of current.schedule) {
       const key = marketKey(leg.origin, leg.dest);
       if (routes.has(key)) continue;
@@ -189,8 +218,8 @@ export function createGlobeView(container: HTMLElement): GlobeView {
     return [...routes.values()];
   }
 
-  function rebuildRoutes(current: SimState): void {
-    const routes = routesToDraw(current);
+  function rebuildRoutes(current: SimState, picked: string[]): void {
+    const routes = routesToDraw(current, picked);
     const signature = routes.map((r) => `${r.key}:${r.width.toFixed(1)}:${r.colour}`).join('|');
     if (signature === routeSignature) return;
     routeSignature = signature;
@@ -312,15 +341,27 @@ export function createGlobeView(container: HTMLElement): GlobeView {
   scene.add(airportGroup);
   const dotGeometry = new THREE.CircleGeometry(1, 20);
   const dotMaterial = new THREE.MeshBasicMaterial({ color: COLORS.airport, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+  const knownDotMaterial = new THREE.MeshBasicMaterial({ color: COLORS.known, transparent: true, depthWrite: false, side: THREE.DoubleSide });
   const rimMaterial = new THREE.MeshBasicMaterial({ color: COLORS.casing, transparent: true, depthWrite: false, side: THREE.DoubleSide });
-  type AirportMark = { iata: string; normal: THREE.Vector3; dot: THREE.Mesh; rim: THREE.Mesh; label: CSS2DObject; home: boolean };
+  type AirportMark = {
+    iata: string;
+    normal: THREE.Vector3;
+    dot: THREE.Mesh;
+    rim: THREE.Mesh;
+    label: CSS2DObject;
+    home: boolean;
+    // On your network; the others are airports you know of and can fly to, drawn smaller and grey.
+    served: boolean;
+  };
   let airportMarks: AirportMark[] = [];
   let airportSignature = '';
+  const marksByIata = new Map<string, AirportMark>();
 
-  function rebuildAirports(current: SimState): void {
-    const codes = [...new Set(current.schedule.flatMap((leg) => [leg.origin, leg.dest]))].sort();
-    if (!codes.includes(current.homeAirport)) codes.push(current.homeAirport);
-    const signature = codes.join(',');
+  function rebuildAirports(current: SimState, known: string[]): void {
+    const served = new Set(current.schedule.flatMap((leg) => [leg.origin, leg.dest]));
+    served.add(current.homeAirport);
+    const codes = [...new Set([...served, ...known])].sort();
+    const signature = `${[...served].sort().join(',')}|${codes.join(',')}`;
     if (signature === airportSignature) return;
     airportSignature = signature;
     for (const mark of airportMarks) {
@@ -328,11 +369,12 @@ export function createGlobeView(container: HTMLElement): GlobeView {
       mark.label.element.remove();
     }
     airportMarks = [];
+    marksByIata.clear();
     for (const iata of codes) {
       const airport = airportsByIata.get(iata);
       if (!airport) continue;
       const normal = toVector(airport.lon, airport.lat).normalize();
-      const dot = new THREE.Mesh(dotGeometry, dotMaterial);
+      const dot = new THREE.Mesh(dotGeometry, served.has(iata) ? dotMaterial : knownDotMaterial);
       const rim = new THREE.Mesh(dotGeometry, rimMaterial);
       for (const mesh of [rim, dot]) {
         mesh.position.copy(normal).multiplyScalar(SHADOW_RADIUS + 0.0005);
@@ -341,21 +383,70 @@ export function createGlobeView(container: HTMLElement): GlobeView {
       rim.renderOrder = 6;
       dot.renderOrder = 7;
       const element = document.createElement('span');
-      element.className = iata === current.homeAirport ? 'globe-label is-home' : 'globe-label';
+      element.className = iata === current.homeAirport ? 'globe-label is-home' : served.has(iata) ? 'globe-label' : 'globe-label is-known';
       element.textContent = iata;
       const label = new CSS2DObject(element);
       label.position.copy(normal).multiplyScalar(1.004);
       label.center.set(0, 0.5);
       airportGroup.add(rim, dot, label);
-      airportMarks.push({ iata, normal, dot, rim, label, home: iata === current.homeAirport });
+      const mark = { iata, normal, dot, rim, label, home: iata === current.homeAirport, served: served.has(iata) };
+      airportMarks.push(mark);
+      marksByIata.set(iata, mark);
     }
-    // Home first, so it always keeps its label when codes crowd.
-    airportMarks.sort((a, b) => Number(b.home) - Number(a.home));
     if (!framed) {
       framed = true;
-      frameNetwork(airportMarks.map((mark) => mark.normal));
+      frameNetwork(airportMarks.filter((mark) => mark.served).map((mark) => mark.normal));
     }
   }
+
+  /** Which labels win when codes crowd: the route being drawn, then home, then your network, then the rest. */
+  function labelRank(mark: AirportMark, picked: string[]): number {
+    if (picked.includes(mark.iata)) return 0;
+    if (mark.home) return 1;
+    return mark.served ? 2 : 3;
+  }
+
+  function screenPoint(iata: string): [number, number] | null {
+    const mark = marksByIata.get(iata);
+    const airport = airportsByIata.get(iata);
+    const normal = mark?.normal ?? (airport ? toVector(airport.lon, airport.lat).normalize() : null);
+    if (!normal || normal.dot(cameraDirection.copy(camera.position).normalize()) <= 0) return null;
+    const onScreen = screen.copy(normal).project(camera);
+    const box = container.getBoundingClientRect();
+    return [box.left + ((onScreen.x + 1) / 2) * box.width, box.top + ((1 - onScreen.y) / 2) * box.height];
+  }
+
+  /** The front-facing airport nearest a point on the page, within a fingertip. */
+  function airportAt(clientX: number, clientY: number): string | null {
+    let best: string | null = null;
+    let bestDistance = TAP_REACH_PX;
+    for (const mark of airportMarks) {
+      const point = screenPoint(mark.iata);
+      if (!point) continue;
+      const distance = Math.hypot(point[0] - clientX, point[1] - clientY);
+      if (distance < bestDistance) {
+        best = mark.iata;
+        bestDistance = distance;
+      }
+    }
+    return best;
+  }
+
+  // A tap is a press that barely moves and lifts quickly, with one finger; anything else turns or zooms the globe.
+  let press: { x: number; y: number; at: number } | null = null;
+  const fingersDown = new Set<number>();
+  renderer.domElement.addEventListener('pointerdown', (event) => {
+    fingersDown.add(event.pointerId);
+    press = fingersDown.size === 1 ? { x: event.clientX, y: event.clientY, at: performance.now() } : null;
+  });
+  const lift = (event: PointerEvent): void => {
+    fingersDown.delete(event.pointerId);
+    const tapped = press && Math.hypot(event.clientX - press.x, event.clientY - press.y) < TAP_SLOP_PX && performance.now() - press.at < TAP_MS;
+    press = null;
+    if (tapped && event.type === 'pointerup') onTap(airportAt(event.clientX, event.clientY));
+  };
+  renderer.domElement.addEventListener('pointerup', lift);
+  renderer.domElement.addEventListener('pointercancel', lift);
 
   const sun = new THREE.Vector3();
   const cameraDirection = new THREE.Vector3();
@@ -375,7 +466,7 @@ export function createGlobeView(container: HTMLElement): GlobeView {
     for (const material of lineMaterials) material.resolution.copy(drawing);
   }
 
-  function render(current: SimState, nowFractionalMinute: number): void {
+  function render(current: SimState, nowFractionalMinute: number, known: string[], picked: string[]): void {
     // Slower turning when zoomed in, so a drag over a hub doesn't spin the planet.
     const distance = camera.position.length();
     controls.rotateSpeed = Math.min(1, 0.35 * (distance - 1));
@@ -386,8 +477,11 @@ export function createGlobeView(container: HTMLElement): GlobeView {
     // Clouds drift with real time, not game time, so 100x doesn't whip them round the planet.
     earthMaterial.uniforms.cloudTime!.value = (performance.now() - startRealMs) / 120000;
 
-    rebuildRoutes(current);
-    rebuildAirports(current);
+    // Only before the destination is picked: after that, the route popover says it all.
+    hint.hidden = picked.length !== 1;
+    hint.textContent = picked.length === 1 ? `${picked[0]} → tap destination` : '';
+    rebuildRoutes(current, picked);
+    rebuildAirports(current, known);
     const drawing = renderer.getDrawingBufferSize(new THREE.Vector2());
     for (const material of lineMaterials) material.resolution.copy(drawing);
 
@@ -399,8 +493,11 @@ export function createGlobeView(container: HTMLElement): GlobeView {
     const shown: THREE.Vector2[] = [];
     const width = container.clientWidth;
     const height = container.clientHeight;
-    for (const mark of airportMarks) {
-      const radius = pixel * (mark.home ? HOME_DOT_PX : DOT_PX);
+    const byRank = [...airportMarks].sort((a, b) => labelRank(a, picked) - labelRank(b, picked));
+    for (const mark of byRank) {
+      const isPicked = picked.includes(mark.iata);
+      mark.label.element.classList.toggle('is-picked', isPicked);
+      const radius = pixel * (mark.home || isPicked ? HOME_DOT_PX : mark.served ? DOT_PX : KNOWN_DOT_PX);
       mark.dot.scale.setScalar(radius);
       mark.rim.scale.setScalar(radius * 1.5);
       // A code on the far side of the Earth, on its edge, or crowding one already shown is hidden.
@@ -416,5 +513,5 @@ export function createGlobeView(container: HTMLElement): GlobeView {
   }
 
   resize();
-  return { render, resize };
+  return { render, resize, screenPoint };
 }

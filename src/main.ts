@@ -55,6 +55,9 @@ import {
   drawRoutePreview,
   hideRouteHoverTooltip,
   isRouteBuilderActive,
+  routeBuilderAirports,
+  routeBuilderTap,
+  setRouteBuilderScreenPoint,
 } from './ui/routeBuilder';
 import { handleMapMenuMouseDown, handleMapMenuKeyDown, hideMapMenu, isMapMenuOpen } from './ui/mapMenu';
 import { back, getSelection, NETWORK, onSelectionChange, select, type Selection } from './ui/selection';
@@ -358,7 +361,7 @@ function render(nowMs: number = performance.now()): void {
   if (globe) globe.container.hidden = choosingHome;
   canvas.style.visibility = globe && !choosingHome ? 'hidden' : '';
   if (globe?.view && !choosingHome) {
-    globe.view.render(state, latestFractionalMinute);
+    globe.view.render(state, latestFractionalMinute, visibleAirports(state), routeBuilderAirports());
     return;
   }
 
@@ -534,7 +537,13 @@ if (globe) {
   globe.container.appendChild(back);
   canvas.after(globe.container);
   void import('./render/globe/globeView').then(({ createGlobeView }) => {
-    globe.view = createGlobeView(globe.container);
+    // A tap on the globe drives the same route builder as the 2D map: airport, then destination, then the confirm ring.
+    globe.view = createGlobeView(globe.container, (iata) => {
+      routeBuilderTap(iata ? (airports.find((airport) => airport.iata === iata) ?? null) : null, state);
+      render();
+    });
+    const view = globe.view;
+    setRouteBuilderScreenPoint((airport) => view.screenPoint(airport.iata));
     render();
   });
   window.addEventListener('resize', () => globe.view?.resize());
