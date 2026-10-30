@@ -1,3 +1,4 @@
+import type { GlobeView } from './render/globe/globeView';
 import './style.css';
 import { dayIndex, homeUtcOffsetMinutes, minuteOfDay as homeMinuteOfDay } from './sim/clock';
 import { fitProjection, mapGesture, setMapElement, mapPoint, mapSize, mapSizeChanged, type ClientPoint } from './render/projection';
@@ -54,6 +55,9 @@ import {
   drawRoutePreview,
   hideRouteHoverTooltip,
   isRouteBuilderActive,
+  routeBuilderAirports,
+  routeBuilderTap,
+  setRouteBuilderScreenPoint,
 } from './ui/routeBuilder';
 import { handleMapMenuMouseDown, handleMapMenuKeyDown, hideMapMenu, isMapMenuOpen } from './ui/mapMenu';
 import { back, getSelection, NETWORK, onSelectionChange, select, type Selection } from './ui/selection';
@@ -353,6 +357,14 @@ function render(nowMs: number = performance.now()): void {
   updateGameOver(state);
   if (updateRunway(state)) runwayPauseRequested = true;
 
+  // The globe spike draws instead of the 2D map once a home is picked (WEEK-TWENTYSEVEN.md).
+  if (globe) globe.container.hidden = choosingHome;
+  canvas.style.visibility = globe && !choosingHome ? 'hidden' : '';
+  if (globe?.view && !choosingHome) {
+    globe.view.render(state, latestFractionalMinute, visibleAirports(state), routeBuilderAirports());
+    return;
+  }
+
   const { width: cssWidth, height: cssHeight } = mapSize();
 
   // The known airports, less any the map's airport filter hides (ui/airportFilter.ts).
@@ -507,6 +519,34 @@ function updateClock(state: SimState): void {
   const minutes = localMinute % 60;
   clockEl.textContent = `${gameDateWithYear(state, dayIndex(state))} · ${pad(hours)}:${pad(minutes)}`;
   clockEl.dataset.tip = `${state.homeAirport} local time (${formatUtcOffset(homeUtcOffsetMinutes(state))}). Every schedule time in the game uses this clock.`;
+}
+
+// The globe spike (WEEK-TWENTYSEVEN.md): `?globe=1` draws the same game on a
+// three.js globe in place of the 2D map. three.js is imported only here, on
+// demand, so the normal game never downloads it.
+const globe: { container: HTMLDivElement; view: GlobeView | null } | null = new URLSearchParams(location.search).has('globe')
+  ? { container: document.createElement('div'), view: null }
+  : null;
+if (globe) {
+  globe.container.id = 'globe';
+  globe.container.hidden = true;
+  const back = document.createElement('a');
+  back.className = 'globe-back';
+  back.href = location.pathname;
+  back.textContent = '2D map';
+  globe.container.appendChild(back);
+  canvas.after(globe.container);
+  void import('./render/globe/globeView').then(({ createGlobeView }) => {
+    // A tap on the globe drives the same route builder as the 2D map: airport, then destination, then the confirm ring.
+    globe.view = createGlobeView(globe.container, (iata) => {
+      routeBuilderTap(iata ? (airports.find((airport) => airport.iata === iata) ?? null) : null, state);
+      render();
+    });
+    const view = globe.view;
+    setRouteBuilderScreenPoint((airport) => view.screenPoint(airport.iata));
+    render();
+  });
+  window.addEventListener('resize', () => globe.view?.resize());
 }
 
 // A resize keeps the player's pan and zoom; only Home (below) and a new home airport refit.

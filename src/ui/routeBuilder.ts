@@ -266,6 +266,50 @@ export function armRouteBuilderAt(airport: Airport, typeCode?: string): void {
 }
 
 /**
+ * Where an airport is on screen, for placing the popover and the confirm
+ * ring: the 2D map's projection, unless another view (the globe spike,
+ * render/globe/globeView.ts) draws the map and says where it put it.
+ */
+let screenPointOf = (airport: Airport): [number, number] | null => projection([airport.lon, airport.lat]);
+
+export function setRouteBuilderScreenPoint(pointOf: (airport: Airport) => [number, number] | null): void {
+  screenPointOf = pointOf;
+}
+
+/** The airports of the route being drawn, base first, then the pending destination: for views that mark them. */
+export function routeBuilderAirports(): string[] {
+  if (builderState.mode === 'idle') return [];
+  const chain = builderState.chain.map((airport) => airport.iata);
+  return builderState.mode === 'confirming' ? [...chain, builderState.dest.iata] : chain;
+}
+
+/**
+ * A tap on a view with no hover and no map menu (the globe spike): a
+ * first tap on an airport arms the builder from it, a second picks the
+ * destination and opens the confirm ring, and a tap on the same airport
+ * or on open ground drops the route.
+ */
+export function routeBuilderTap(tapped: Airport | null, state: SimState): void {
+  if (builderState.mode === 'idle') {
+    if (tapped) armRouteBuilderAt(tapped);
+    return;
+  }
+  if (builderState.mode === 'armed' && tapped && tapped.iata !== chainOrigin(builderState.chain).iata) {
+    pickDestination(tapped, state);
+    return;
+  }
+  reset();
+}
+
+function pickDestination(dest: Airport, state: SimState): void {
+  if (builderState.mode !== 'armed') return;
+  const chain = builderState.chain;
+  builderState = { mode: 'confirming', chain, dest };
+  showForm(chain, dest, state);
+  showConfirmRing(chain, dest, state, confirmRoute);
+}
+
+/**
  * Handle a canvas mousedown *before* main.ts's own pan-drag logic does.
  * Returns true when the route builder consumed the click (armed a new
  * route, confirmed one, or cancelled a pending one) — main.ts should skip
@@ -285,10 +329,7 @@ export function handleRouteBuilderMouseDown(event: ClientPoint, state: SimState)
       return 'consumed';
     }
     if (clicked) {
-      const chain = builderState.chain;
-      builderState = { mode: 'confirming', chain, dest: clicked };
-      showForm(chain, clicked, state);
-      showConfirmRing(chain, clicked, state, confirmRoute);
+      pickDestination(clicked, state);
       return 'consumed';
     }
     // Open water while armed: a drag pans the map and keeps the route, a plain click cancels.
@@ -521,7 +562,7 @@ let ringOpen = false;
  * can't, shows on the card's last line while hovered.
  */
 function showConfirmRing(chain: Airport[], dest: Airport, state: SimState, onConfirmed: (legIds: string[]) => void): void {
-  const point = projection([dest.lon, dest.lat]);
+  const point = screenPointOf(dest);
   if (!point) return;
   const origin = chainOrigin(chain);
   const tail = activeTail(state, dest);
@@ -619,7 +660,7 @@ function showForm(chain: Airport[], dest: Airport, state: SimState): void {
   // showing, so measuring it any earlier (e.g., right after `hidden =
   // false`) would clamp against a shorter box than what's actually about
   // to render, and it could still spill past the bottom of the screen.
-  const destPoint = projection([dest.lon, dest.lat]);
+  const destPoint = screenPointOf(dest);
   if (destPoint) positionPopover(destPoint[0], destPoint[1]);
 
 }
