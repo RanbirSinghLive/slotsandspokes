@@ -16,6 +16,7 @@
     "lakes": "tsx src/headless/buildLakes.ts",
     "rivers": "tsx src/headless/buildRivers.ts",
     "land50": "tsx src/headless/buildLand50.ts",
+    "globetextures": "tsx src/headless/buildGlobeTextures.ts",
     "quick": "tsx src/headless/quickBalance.ts",
     "global": "tsx src/headless/globalBalance.ts",
     "test": "tsx src/headless/runTests.ts",
@@ -58,6 +59,7 @@
   "devDependencies": {
     "@types/d3-geo": "^3.1.0",
     "@types/node": "^26.1.1",
+    "@types/three": "0.186.0",
     "@types/topojson-client": "^3.1.5",
     "playwright-core": "^1.64.1",
     "tsx": "^4.23.1",
@@ -66,6 +68,7 @@
   },
   "dependencies": {
     "d3-geo": "^3.1.1",
+    "three": "0.186.1",
     "topojson-client": "^3.1.0"
   }
 }

@@ -8846,3 +8846,54 @@ button.rival-route:hover { background: rgba(255, 255, 255, 0.04); }
 .home-world-stats[data-on='false'] .home-world-stats-on {
   display: none;
 }
+
+/* The globe spike (?globe=1, render/globe/globeView.ts): the same box as #map. */
+#globe {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: calc(100vw - var(--panel-width));
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  touch-action: none;
+  background: #02060c;
+}
+#globe[hidden] {
+  display: none;
+}
+#globe canvas {
+  display: block;
+}
+.globe-labels {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+.globe-label {
+  margin-left: 10px;
+  font: 600 11px/1 'Roboto Mono', ui-monospace, monospace;
+  color: #ffffff;
+  background: rgba(10, 36, 64, 0.82);
+  padding: 2px 5px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.globe-label.is-home {
+  font-size: 12px;
+  background: #ffffff;
+  color: #0a2440;
+}
+.globe-back {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  z-index: 200;
+  font: 600 12px/1 system-ui, sans-serif;
+  color: #0a2440;
+  background: #ffffff;
+  padding: 7px 12px;
+  border-radius: 14px;
+  text-decoration: none;
+}
